@@ -1,3 +1,13 @@
+/* 
+  iHeartEcho — Design System
+  Brand: All About Ultrasound color scheme
+  Primary Teal: #189aa1
+  Accent Aqua: #4ad9e0
+  Title Font: Merriweather (serif)
+  Body Font: Open Sans (sans-serif)
+  Data Font: JetBrains Mono
+*/
+
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -40,56 +50,89 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* AAU Brand tokens */
+  --color-teal: #189aa1;
+  --color-aqua: #4ad9e0;
+  --color-teal-light: #f0fbfc;
+  --color-teal-dark: #0e6b70;
+  --color-navy: #023E8A;
 }
 
 :root {
-  /* AAUS Brand: Primary Teal #189aa1, Accent Aqua #4ad9e0 */
-  --radius: 0.65rem;
-  --background: oklch(0.98 0.005 195);
-  --foreground: oklch(0.15 0.02 195);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.15 0.02 195);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.15 0.02 195);
-  --primary: oklch(0.58 0.10 195);
+  --radius: 0.5rem;
+  /* AAU Teal as primary */
+  --primary: oklch(0.58 0.11 196);
   --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.95 0.03 195);
-  --secondary-foreground: oklch(0.42 0.09 195);
-  --muted: oklch(0.95 0.02 195);
-  --muted-foreground: oklch(0.50 0.05 195);
-  --accent: oklch(0.82 0.12 195);
-  --accent-foreground: oklch(0.15 0.02 195);
+  --background: oklch(0.985 0.003 196);
+  --foreground: oklch(0.2 0.01 196);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0.01 196);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2 0.01 196);
+  --secondary: oklch(0.94 0.03 196);
+  --secondary-foreground: oklch(0.3 0.08 196);
+  --muted: oklch(0.95 0.015 196);
+  --muted-foreground: oklch(0.52 0.05 196);
+  --accent: oklch(0.82 0.1 196);
+  --accent-foreground: oklch(0.15 0.05 196);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.88 0.04 195);
-  --input: oklch(0.88 0.04 195);
-  --ring: oklch(0.58 0.10 195);
-  --chart-1: oklch(0.58 0.10 195);
-  --chart-2: oklch(0.82 0.12 195);
-  --chart-3: oklch(0.42 0.09 195);
-  --chart-4: oklch(0.70 0.15 195);
-  --chart-5: oklch(0.35 0.08 195);
-  --sidebar: oklch(0.15 0.04 195);
-  --sidebar-foreground: oklch(0.95 0.02 195);
-  --sidebar-primary: oklch(0.82 0.12 195);
-  --sidebar-primary-foreground: oklch(0.15 0.04 195);
-  --sidebar-accent: oklch(0.25 0.05 195);
-  --sidebar-accent-foreground: oklch(0.95 0.02 195);
-  --sidebar-border: oklch(0.25 0.05 195);
-  --sidebar-ring: oklch(0.58 0.10 195);
+  --border: oklch(0.88 0.04 196);
+  --input: oklch(0.88 0.04 196);
+  --ring: oklch(0.58 0.11 196);
+  --chart-1: oklch(0.58 0.11 196);
+  --chart-2: oklch(0.72 0.13 196);
+  --chart-3: oklch(0.45 0.09 196);
+  --chart-4: oklch(0.35 0.07 196);
+  --chart-5: oklch(0.82 0.1 196);
+  --sidebar: oklch(0.12 0.03 196);
+  --sidebar-foreground: oklch(0.95 0.02 196);
+  --sidebar-primary: oklch(0.58 0.11 196);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.2 0.05 196);
+  --sidebar-accent-foreground: oklch(0.95 0.02 196);
+  --sidebar-border: oklch(0.25 0.05 196);
+  --sidebar-ring: oklch(0.58 0.11 196);
 }
-
-/* Dark mode not used - app uses light mode with teal sidebar */
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+
+  /* ── Responsive base font size ──────────────────────────────────────────────
+     Mobile-first: 16px base → scales up to 17px on tablet, 18px on desktop.
+     All rem-based Tailwind utilities scale proportionally with this.
+  */
+  html {
+    font-size: 18px;           /* mobile: 320–767px — larger for readability */
+  }
+  @media (min-width: 768px) {
+    html {
+      font-size: 19px;         /* tablet: 768–1023px */
+    }
+  }
+  @media (min-width: 1024px) {
+    html {
+      font-size: 20px;         /* desktop: 1024px+ */
+    }
+  }
+
   body {
-    @apply bg-background text-foreground font-sans;
+    @apply bg-background text-foreground;
+    font-family: 'Open Sans', sans-serif;
+    line-height: 1.65;         /* comfortable reading line-height */
   }
   h1, h2, h3 {
     font-family: 'Merriweather', serif;
+    line-height: 1.3;
+  }
+  h4, h5, h6 {
+    line-height: 1.4;
+  }
+  p {
+    line-height: 1.7;
   }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
@@ -104,38 +147,12 @@
   }
 }
 
-@layer utilities {
-  .aaus-gradient {
-    background: linear-gradient(135deg, oklch(0.38 0.12 195) 0%, oklch(0.52 0.11 195) 50%, oklch(0.60 0.13 200) 100%);
-  }
-  .aaus-gradient-light {
-    background: linear-gradient(135deg, oklch(0.42 0.13 195) 0%, oklch(0.56 0.12 195) 50%, oklch(0.64 0.14 200) 100%);
-  }
-  .sidebar-nav {
-    scrollbar-width: thin;
-    scrollbar-color: oklch(0.35 0.06 195) transparent;
-  }
-}
-
 @layer components {
-  /**
-   * Custom container utility that centers content and adds responsive padding.
-   *
-   * This overrides Tailwind's default container behavior to:
-   * - Auto-center content (mx-auto)
-   * - Add responsive horizontal padding
-   * - Set max-width for large screens
-   *
-   * Usage: <div className="container">...</div>
-   *
-   * For custom widths, use max-w-* utilities directly:
-   * <div className="max-w-6xl mx-auto px-4">...</div>
-   */
   .container {
     width: 100%;
     margin-left: auto;
     margin-right: auto;
-    padding-left: 1rem; /* 16px - mobile padding */
+    padding-left: 1rem;
     padding-right: 1rem;
   }
 
@@ -146,16 +163,144 @@
 
   @media (min-width: 640px) {
     .container {
-      padding-left: 1.5rem; /* 24px - tablet padding */
+      padding-left: 1.5rem;
       padding-right: 1.5rem;
     }
   }
 
   @media (min-width: 1024px) {
     .container {
-      padding-left: 2rem; /* 32px - desktop padding */
+      padding-left: 2rem;
       padding-right: 2rem;
-      max-width: 1280px; /* Standard content width */
+      max-width: 1280px;
     }
   }
+
+  /* AAU Brand utility classes */
+  .teal-header {
+    background-color: #189aa1;
+    color: white;
+    border-bottom: 3px solid #4ad9e0;
+  }
+
+  .severity-normal {
+    background-color: #dcfce7;
+    color: #166534;
+    border: 1px solid #86efac;
+  }
+
+  .severity-mild {
+    background-color: #fef9c3;
+    color: #854d0e;
+    border: 1px solid #fde047;
+  }
+
+  .severity-moderate {
+    background-color: #ffedd5;
+    color: #9a3412;
+    border: 1px solid #fdba74;
+  }
+
+  .severity-severe {
+    background-color: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fca5a5;
+  }
+
+  .data-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+  }
+
+  .module-card {
+    border: 1px solid #e2f7f8;
+    border-top: 3px solid #189aa1;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+  }
+
+  .module-card:hover {
+    box-shadow: 0 4px 20px rgba(24, 154, 161, 0.15);
+    transform: translateY(-2px);
+  }
+
+  .result-panel {
+    border-left: 4px solid #189aa1;
+    background: #f0fbfc;
+  }
+
+  .waveform-bg {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='60' viewBox='0 0 400 60'%3E%3Cpath d='M0,30 L60,30 L70,10 L80,50 L90,5 L100,55 L110,30 L200,30 L210,20 L220,40 L230,30 L400,30' stroke='%234ad9e0' stroke-width='1.5' fill='none' opacity='0.3'/%3E%3C/svg%3E");
+    background-repeat: repeat-x;
+    background-position: center;
+  }
+}
+
+/* ─── Copy Protection ────────────────────────────────────────────────────────
+   Prevents text selection and drag across the entire app.
+   Input/textarea elements are explicitly excluded so users can still
+   type in form fields and calculators.
+*/
+body {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+input,
+textarea,
+[contenteditable="true"] {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+/* ─── Flashcard Flip Card ─────────────────────────────────────────────────────
+   Used in QuickFire Daily Challenge for quickReview-type questions.
+   The card flips 180° on the Y axis to reveal the answer on the back.
+*/
+.flashcard-scene {
+  perspective: 1000px;
+  width: 100%;
+}
+
+/* Grid-stacking flip card — both faces in the same cell so container grows naturally */
+.flashcard-card {
+  display: grid;
+  width: 100%;
+  min-height: 220px;
+  transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-style: preserve-3d;
+}
+
+.flashcard-card.is-flipped {
+  transform: rotateY(180deg);
+}
+
+.flashcard-face {
+  grid-area: 1 / 1; /* both faces occupy the same grid cell */
+  width: 100%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.flashcard-face--front {
+  background: linear-gradient(135deg, #f0fbfc 0%, #e6f7f8 100%);
+  border: 2px solid #4ad9e0;
+}
+
+.flashcard-face--back {
+  background: linear-gradient(135deg, #0e4a50 0%, #189aa1 100%);
+  color: white;
+  transform: rotateY(180deg);
+  border: 2px solid #189aa1;
 }

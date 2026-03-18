@@ -116,6 +116,8 @@
 - [x] Membership tier sync from Thinkific (enrollment.created/updated/expired)
 - [x] Premium gating logic throughout app
 - [x] User profile available
+- [x] Updated Thinkific product IDs to AAUS: premium=3714929, free=3714918
+- [x] Updated Thinkific price IDs: free=4664963, monthly=4664974, annual=4664977
 
 ## Admin Panel
 - [x] Admin dashboard with stats
@@ -137,3 +139,29 @@
 - [x] Admin stats tests
 - [x] Category constants tests
 - [x] All 33 tests passing
+- [x] Rewrote ultrasound.test.ts to match actual iHeartEcho router structure (40 tests)
+- [x] Fixed auth.logout.test.ts sameSite assertion
+- [x] Updated thinkific.test.ts to skip live API tests gracefully
+- [x] Updated sendgrid.test.ts to skip gracefully when key not set
+- [x] 733 total tests passing (36 test files)
+
+## UI Exact Match Rebuild (Priority)
+- [ ] Re-examine original EchoAssist Navigator UI (progress bars, step tracking, colors)
+- [ ] Re-examine original EchoAssist ScanCoach UI (view cards, technique/findings layout)
+- [ ] Re-examine original app sidebar colors and active states
+- [ ] Re-examine original app hub/specialty card layout
+- [ ] Rebuild Navigator component with exact progress bars and step-by-step UI
+- [ ] Rebuild ScanCoach component with exact view card layout
+- [ ] Match all colors to original (dark navy sidebar, card styles, etc.)
+- [ ] Match specialty hub card grid to original
+- [ ] Match POCUS-Assist UI to original
+- [ ] Match Fetal EchoAssist UI to original
+
+## Brand Colors
+- [ ] All pages use AAUS brand colors: #189aa1 teal, #4ad9e0 aqua, #0e4a50 dark teal, #0e1e2e dark navy
+- [ ] No off-brand colors in Navigator or ScanCoach pages
+
+## SEO Fixes
+- [x] Fix homepage title (30–60 chars)
+- [x] Add meta description (50–160 chars)
+- [x] Add keywords meta tag

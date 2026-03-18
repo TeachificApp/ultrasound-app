@@ -25,16 +25,12 @@ const sampleSoundBytes = [
 
 export default function SoundBytes() {
   const { user, isAuthenticated } = useAuth();
-  const isPremium = user?.membershipTier === "premium" || user?.role === "admin";
+  const isPremium = !!(user as any)?.isPremium || user?.role === "admin";
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const soundbytesQuery = trpc.soundbytes.list.useQuery({
-    category: selectedCategory !== "all" ? selectedCategory : undefined,
-  });
-
-  const dbSoundbytes = soundbytesQuery.data ?? [];
-  const allSoundbytes = dbSoundbytes.length > 0 ? dbSoundbytes : sampleSoundBytes;
+  // SoundBytes content is managed via admin - use sample data until DB content is added
+  const allSoundbytes = sampleSoundBytes;
 
   const filtered = allSoundbytes.filter(s => {
     const matchesCategory = selectedCategory === "all" || s.category === selectedCategory;

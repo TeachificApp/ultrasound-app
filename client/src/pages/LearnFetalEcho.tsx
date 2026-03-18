@@ -57,7 +57,7 @@ const levelColors: Record<string, string> = {
 
 export default function LearnFetalEcho() {
   const { user, isAuthenticated } = useAuth();
-  const isPremium = user?.membershipTier === "premium" || user?.role === "admin";
+  const isPremium = user?.isPremium === true || user?.role === "admin";
 
   return (
     <div className="min-h-screen bg-background">

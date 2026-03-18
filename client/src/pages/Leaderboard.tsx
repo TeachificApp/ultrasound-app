@@ -7,8 +7,8 @@ import { ArrowLeft, Medal, Trophy } from "lucide-react";
 
 export default function Leaderboard() {
   const { user } = useAuth();
-  const leaderboardQuery = trpc.leaderboard.list.useQuery();
-  const entries = leaderboardQuery.data ?? [];
+  const leaderboardQuery = trpc.quickfire.getLeaderboard.useQuery({ period: "allTime" });
+  const entries = leaderboardQuery.data?.entries ?? [];
 
   const medalColors = ["text-yellow-500", "text-gray-400", "text-amber-600"];
 

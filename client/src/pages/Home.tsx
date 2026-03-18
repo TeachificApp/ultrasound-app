@@ -1,227 +1,350 @@
+/*
+  UltrasoundAssist™ — Dashboard Home
+  Brand: Teal #189aa1, Aqua #4ad9e0, Dark Navy #0e1e2e
+  Fonts: Merriweather headings, Open Sans body
+*/
+import { useEffect } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl } from "@/const";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
+import Layout from "@/components/Layout";
 import { trpc } from "@/lib/trpc";
 import {
-  Activity,
-  BookOpen,
-  Brain,
-  Crown,
-  FileText,
-  Heart,
-  Trophy,
-  Volume2,
-  Zap,
-  ArrowRight,
-  Star,
-  Users,
-  TrendingUp,
+  Calculator, ClipboardList, Activity, BookOpen, FileText,
+  ArrowRight, Users, Award, Zap, Stethoscope, ExternalLink, MessageCircle, GraduationCap, BookMarked, Crown, Shield, Heart
 } from "lucide-react";
-import { AAUS_LOGO_URL, THINKIFIC_LINKS } from "@shared/appConstants";
 
-const AAUS_LOGO = AAUS_LOGO_URL;
+const BRAND = "#189aa1";
 
-const quickLinks = [
-  { label: "UltrasoundAssist™", href: "/ultrasound-assist", icon: <Activity size={20} />, color: "bg-teal-500", desc: "15 specialty modules" },
-  { label: "POCUS-Assist™", href: "/pocus-assist", icon: <Zap size={20} />, color: "bg-blue-500", desc: "eFAST, RUSH, Lung, Cardiac" },
-  { label: "Fetal EchoAssist™", href: "/fetal-echo-assist", icon: <Heart size={20} />, color: "bg-pink-500", desc: "Fetal echo calculators" },
-  { label: "Daily Challenge", href: "/daily-challenge", icon: <Brain size={20} />, color: "bg-purple-500", desc: "Test your knowledge" },
-  { label: "Flashcards", href: "/flashcards", icon: <BookOpen size={20} />, color: "bg-amber-500", desc: "Study & review" },
-  { label: "Case Library", href: "/case-library", icon: <FileText size={20} />, color: "bg-emerald-500", desc: "Clinical cases" },
-  { label: "SoundBytes™", href: "/soundbytes", icon: <Volume2 size={20} />, color: "bg-indigo-500", desc: "Video pearls" },
-  { label: "Leaderboard", href: "/leaderboard", icon: <Trophy size={20} />, color: "bg-orange-500", desc: "Top performers" },
+type Module = {
+  path: string;
+  icon: any;
+  title: string;
+  description: string;
+  badge: string;
+  color: string;
+  premium?: boolean;
+  external?: boolean;
+  pinLast?: boolean;
+};
+
+// NOTE: Any module with pinLast: true will always render at the end of the grid.
+const modules: Module[] = [
+  {
+    path: "/ultrasound-assist",
+    icon: Stethoscope,
+    title: "UltrasoundAssist™",
+    description: "Scan navigator and ScanCoach for all 15 ultrasound specialties — Abdominal, Pelvic/Gyn, OB 1st & 2nd/3rd Trimester, Thyroid, Scrotum, Breast, Venous, Arterial, Abdominal Vascular, Carotid, TCD, MSK, and POCUS. View-by-view checklists, reference values, and probe guidance.",
+    badge: "15 Specialties",
+    color: BRAND,
+  },
+  {
+    path: "/pocus-assist-hub",
+    icon: Shield,
+    title: "POCUS-Assist™",
+    description: "Point-of-care ultrasound protocols for eFAST, Cardiac POCUS, RUSH, and Lung POCUS — window-by-window checklists, probe guidance, IVC CI, B-line scorer, and eFAST free-fluid grader.",
+    badge: "4 Modules",
+    color: BRAND,
+  },
+  {
+    path: "/fetal-echo-assist-hub",
+    icon: Heart,
+    title: "Fetal EchoAssist™",
+    description: "ASE-guideline fetal echo navigator and ScanCoach — segmental anatomy, cardiac views, M-mode, Doppler, and biometric calculators for fetal cardiac assessment.",
+    badge: "ASE Guidelines",
+    color: BRAND,
+  },
+  {
+    path: "/echoassist",
+    icon: Calculator,
+    title: "POCUS & Fetal Echo Calculators",
+    description: "Guideline-based calculators for POCUS (IVC CI, B-line score, eFAST grader) and Fetal Echo (biometrics, cardiac measurements, z-scores).",
+    badge: "Guideline-Based",
+    color: BRAND,
+  },
+  {
+    path: "/quickfire",
+    icon: BookOpen,
+    title: "Daily Challenge",
+    description: "One question. One case. One chance today. Answer the challenge, see the explanation. Maintain your streak, earn points and compare with other ultrasound professionals.",
+    badge: "Daily",
+    color: BRAND,
+  },
+  {
+    path: "/flashcards",
+    icon: BookMarked,
+    title: "UltrasoundFlashcards™",
+    description: "Review key ultrasound concepts across 15 categories — Abdominal, Vascular, OB, Fetal Echo, POCUS, Physics, and more. Spaced repetition with daily limits.",
+    badge: "16 Categories",
+    color: BRAND,
+  },
+  {
+    path: "/case-library",
+    icon: FileText,
+    title: "Case Library",
+    description: "Clinical cases with imaging, findings, and teaching points. Browse POCUS and Fetal Echo cases with detailed explanations.",
+    badge: "Cases",
+    color: BRAND,
+  },
+  {
+    path: "/soundbytes",
+    icon: Activity,
+    title: "SoundBytes™",
+    description: "Short-form ultrasound education videos — quick tips, technique pearls, and clinical insights from All About Ultrasound educators.",
+    badge: "Video",
+    color: BRAND,
+  },
+  {
+    path: "/cme",
+    icon: GraduationCap,
+    title: "CME Hub",
+    description: "Browse accredited CME courses from All About Ultrasound — SDMS, AMA PRA, and more. Click to enroll directly on Thinkific.",
+    badge: "CME",
+    color: BRAND,
+  },
+  {
+    path: "/learn-fetal-echo",
+    icon: GraduationCap,
+    title: "Learn Fetal Echo",
+    description: "Comprehensive fetal echocardiography courses from All About Ultrasound — from beginner to advanced fetal cardiac assessment.",
+    badge: "Courses",
+    color: BRAND,
+  },
+  {
+    path: "/accreditation-navigator",
+    icon: Award,
+    title: "Accreditation Navigator™",
+    description: "IAC standards guide — search case mix requirements, CME, staff qualifications, policies, and common deficiencies for ultrasound accreditation.",
+    badge: "Free · IAC",
+    color: BRAND,
+  },
+  {
+    path: "/accreditation",
+    icon: ClipboardList,
+    title: "DIY Accreditation Tool™",
+    description: "Quality reviews, peer review tracking, policy builder, and appropriate use monitoring — everything your lab needs for IAC accreditation.",
+    badge: "Accreditation",
+    color: BRAND,
+    premium: true,
+  },
+  // ⚠️ pinLast: true — Community Hub always renders last.
+  {
+    path: "https://member.allaboutultrasound.com/products/communities/allaboutultrasound-community",
+    icon: MessageCircle,
+    title: "UltrasoundAssist™ Community",
+    description: "Join the All About Ultrasound community on Thinkific — case discussions, peer learning, and specialty hubs for ultrasound professionals.",
+    badge: "Community",
+    color: BRAND,
+    external: true,
+    pinLast: true,
+  },
 ];
 
 export default function Home() {
   const { user, isAuthenticated } = useAuth();
-  const isPremium = user?.membershipTier === "premium" || user?.role === "admin";
-  const challengeQuery = trpc.challenge.today.useQuery();
-  const myResponseQuery = trpc.challenge.myResponse.useQuery(undefined, { enabled: isAuthenticated });
+  const isPremium = user?.isPremium === true || user?.role === "admin";
+
+  const statsQuery = trpc.quickfire.getUserStats.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
+
+  useEffect(() => {
+    document.title = "UltrasoundAssist™ | All About Ultrasound";
+  }, []);
+
+  const pinnedLast = modules.filter(m => m.pinLast);
+  const sortedModules = [...modules.filter(m => !m.pinLast), ...pinnedLast];
 
   return (
-    <div className="min-h-screen bg-background">
+    <Layout>
       {/* Hero Banner */}
-      <div className="aaus-gradient-light px-4 py-8 md:py-12">
-        <div className="max-w-4xl mx-auto text-center">
-          <div className="flex justify-center mb-4">
-            <img src={AAUS_LOGO} alt="All About Ultrasound" className="w-20 h-20 rounded-full object-cover shadow-lg" />
-          </div>
-          <h1 className="text-2xl md:text-4xl font-bold text-white mb-2" style={{ fontFamily: "Merriweather, serif" }}>
-            UltrasoundAssist™
-          </h1>
-          <p className="text-white/90 text-sm md:text-base mb-1">
-            All About Ultrasound™ Clinical Intelligence Platform
-          </p>
-          <p className="text-white/70 text-xs md:text-sm mb-6">
-            General · OB/GYN · Vascular · Breast · POCUS · MSK
-          </p>
-
-          {!isAuthenticated ? (
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <a href={getLoginUrl()}>
-                <Button className="bg-white text-primary hover:bg-white/90 font-semibold px-6">
-                  Sign In
-                </Button>
-              </a>
-              <a href={THINKIFIC_LINKS.freeRegister} target="_blank" rel="noopener noreferrer">
-                <Button variant="outline" className="border-white text-white hover:bg-white/20 px-6">
-                  Register Free
-                </Button>
-              </a>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center gap-3">
-              <div className="text-white/90 text-sm">
-                Welcome back, <span className="font-semibold">{user?.name ?? user?.email}</span>
+      <div
+        className="relative overflow-hidden"
+        style={{ background: "linear-gradient(135deg, #0e1e2e 0%, #0e4a50 60%, #189aa1 100%)" }}
+      >
+        <div className="container py-8 md:py-10">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span
+                  className="text-xs font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wider"
+                  style={{ background: "rgba(74,217,224,0.15)", color: "#4ad9e0" }}
+                >
+                  All About Ultrasound™
+                </span>
               </div>
-              {isPremium ? (
-                <Badge className="bg-yellow-400 text-yellow-900 text-xs">
-                  <Crown size={10} className="mr-1" /> PREMIUM
-                </Badge>
-              ) : (
-                <Link href="/premium">
-                  <Badge className="bg-white/20 text-white text-xs cursor-pointer hover:bg-white/30">
-                    Upgrade to Premium
-                  </Badge>
-                </Link>
-              )}
+              <h1
+                className="text-2xl md:text-3xl font-bold text-white mb-1"
+                style={{ fontFamily: "Merriweather, serif" }}
+              >
+                UltrasoundAssist™
+              </h1>
+              <p className="text-white/70 text-sm md:text-base max-w-xl">
+                Your clinical ultrasound intelligence platform — AIUM-based navigators, scan coaches, POCUS tools, and Fetal Echo resources.
+              </p>
             </div>
-          )}
+            {isAuthenticated && statsQuery.data && (
+              <div className="flex items-center gap-4 bg-white/10 rounded-xl px-5 py-3 backdrop-blur-sm">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-white">{statsQuery.data.streak ?? 0}</div>
+                  <div className="text-[10px] text-white/60 uppercase tracking-wider">Day Streak</div>
+                </div>
+                <div className="w-px h-10 bg-white/20" />
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-white">{statsQuery.data.bonusPoints ?? 0}</div>
+                  <div className="text-[10px] text-white/60 uppercase tracking-wider">Points</div>
+                </div>
+                <div className="w-px h-10 bg-white/20" />
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-white">{statsQuery.data.total ?? 0}</div>
+                  <div className="text-[10px] text-white/60 uppercase tracking-wider">Answered</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        {/* Decorative wave */}
+        <div className="absolute bottom-0 left-0 right-0 h-6 overflow-hidden">
+          <svg viewBox="0 0 1440 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full">
+            <path d="M0 24L1440 24L1440 0C1200 20 960 24 720 12C480 0 240 4 0 0L0 24Z" fill="white" fillOpacity="0.04" />
+          </svg>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-        {/* Daily Challenge Banner */}
-        {challengeQuery.data && !myResponseQuery.data && (
-          <Card className="border-primary/30 bg-primary/5">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
-                    <Brain size={18} className="text-white" />
-                  </div>
-                  <div>
-                    <div className="font-semibold text-sm">Daily Challenge Available!</div>
-                    <div className="text-xs text-muted-foreground">Answer today's question to earn points</div>
-                  </div>
-                </div>
-                <Link href="/daily-challenge">
-                  <Button size="sm" className="gap-1">
-                    Take Challenge <ArrowRight size={14} />
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* User Stats */}
-        {isAuthenticated && user && (
-          <div className="grid grid-cols-3 gap-3">
-            <Card className="text-center">
-              <CardContent className="p-3">
-                <div className="text-2xl font-bold text-primary">{user.totalPoints ?? 0}</div>
-                <div className="text-xs text-muted-foreground">Points</div>
-              </CardContent>
-            </Card>
-            <Card className="text-center">
-              <CardContent className="p-3">
-                <div className="text-2xl font-bold text-orange-500">{user.streakCount ?? 0}</div>
-                <div className="text-xs text-muted-foreground">Day Streak 🔥</div>
-              </CardContent>
-            </Card>
-            <Card className="text-center">
-              <CardContent className="p-3">
-                <div className="text-2xl font-bold text-emerald-500">{isPremium ? "PRO" : "FREE"}</div>
-                <div className="text-xs text-muted-foreground">Membership</div>
-              </CardContent>
-            </Card>
+      {/* Main Content */}
+      <div className="container py-6 md:py-8">
+        <div className="flex items-center justify-between mb-5">
+          <h2
+            className="text-xl md:text-2xl font-bold text-gray-800"
+            style={{ fontFamily: "Merriweather, serif" }}
+          >
+            Clinical Modules
+          </h2>
+          <div className="flex items-center gap-1.5 text-xs md:text-sm text-[#189aa1] font-medium">
+            <Zap className="w-3.5 h-3.5" />
+            {modules.length} Modules Available
           </div>
-        )}
+        </div>
 
-        {/* Quick Access Grid */}
-        <div>
-          <h2 className="text-lg font-bold mb-3 text-foreground">Quick Access</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {quickLinks.map((link) => (
-              <Link key={link.href} href={link.href}>
-                <Card className="hover:shadow-md transition-all cursor-pointer hover:border-primary/40 group">
-                  <CardContent className="p-4 text-center">
-                    <div className={`w-10 h-10 rounded-xl ${link.color} flex items-center justify-center mx-auto mb-2 text-white group-hover:scale-110 transition-transform`}>
-                      {link.icon}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {sortedModules.map(({ path, icon: Icon, title, description, badge, color, premium, external }) => {
+            const cardContent = (
+              <div className="module-card bg-white rounded-xl p-5 cursor-pointer group h-full relative overflow-hidden">
+                {premium && (
+                  <div className="absolute top-0 right-0">
+                    <div
+                      className="text-white text-[10px] font-bold px-3 py-0.5 rounded-bl-lg tracking-wide uppercase shadow-sm"
+                      style={{ background: "linear-gradient(to right, #0e4a50, #189aa1)" }}
+                    >
+                      Accreditation Subscription
                     </div>
-                    <div className="text-xs font-semibold text-foreground leading-tight">{link.label}</div>
-                    <div className="text-[10px] text-muted-foreground mt-0.5">{link.desc}</div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        {/* Premium Upgrade CTA */}
-        {!isPremium && (
-          <Card className="bg-gradient-to-r from-amber-50 to-yellow-50 border-amber-200">
-            <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <Crown size={24} className="text-yellow-500 flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <div className="font-semibold text-sm mb-1">Unlock Premium Access</div>
-                  <div className="text-xs text-muted-foreground mb-3">
-                    Get unlimited flashcards, all 15 specialty modules, advanced calculators, and more.
                   </div>
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <a href={THINKIFIC_LINKS.premiumMonthly} target="_blank" rel="noopener noreferrer">
-                      <Button size="sm" className="bg-yellow-500 hover:bg-yellow-600 text-white text-xs">
-                        $9.97/month
-                      </Button>
-                    </a>
-                    <a href={THINKIFIC_LINKS.premiumAnnual} target="_blank" rel="noopener noreferrer">
-                      <Button size="sm" variant="outline" className="border-yellow-400 text-yellow-700 text-xs">
-                        $99.97/year (Save 17%)
-                      </Button>
-                    </a>
+                )}
+                <div className="flex items-start justify-between mb-3">
+                  <div
+                    className="w-10 h-10 rounded-lg flex items-center justify-center"
+                    style={{ background: color + "18" }}
+                  >
+                    <Icon className="w-5 h-5" style={{ color }} />
                   </div>
+                  {!premium && (
+                    <span
+                      className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                      style={{ background: color + "15", color }}
+                    >
+                      {badge}
+                    </span>
+                  )}
+                </div>
+                <h3
+                  className="font-bold text-gray-800 mb-1.5 text-sm md:text-base leading-snug"
+                  style={{ fontFamily: "Merriweather, serif" }}
+                >
+                  {title}
+                </h3>
+                <p className="text-xs md:text-sm text-gray-500 leading-relaxed mb-3">{description}</p>
+                <div
+                  className="flex items-center gap-1 text-xs md:text-sm font-semibold group-hover:gap-2 transition-all"
+                  style={{ color }}
+                >
+                  {external ? (
+                    <>Visit Community <ExternalLink className="w-3 h-3" /></>
+                  ) : (
+                    <>Open Module <ArrowRight className="w-3 h-3" /></>
+                  )}
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        )}
+            );
 
-        {/* About Section */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Star size={16} className="text-primary" />
-              About UltrasoundAssist™
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground space-y-2">
-            <p>
-              UltrasoundAssist™ is the clinical intelligence platform from <strong>All About Ultrasound™</strong>, 
-              designed for sonographers, physicians, and ultrasound educators.
-            </p>
-            <p>
-              Access ScanCoach protocols and Navigator guides for 15 ultrasound specialties, 
-              including abdominal, OB/GYN, vascular, breast, POCUS, and MSK ultrasound.
-            </p>
-            <div className="flex flex-wrap gap-2 pt-1">
-              {["Abdominal", "OB/GYN", "Vascular", "Breast", "POCUS", "MSK", "Thyroid", "Fetal Echo"].map(tag => (
-                <Badge key={tag} variant="secondary" className="text-[10px]">{tag}</Badge>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Footer */}
-        <div className="text-center text-xs text-muted-foreground pb-6">
-          <p>© All About Ultrasound, Inc. dba iHeartEcho. All rights reserved.</p>
-          <p className="mt-1">UltrasoundAssist™ is for educational purposes only.</p>
+            return external ? (
+              <a key={path} href={path} target="_blank" rel="noopener noreferrer">
+                {cardContent}
+              </a>
+            ) : (
+              <Link key={path} href={path}>
+                {cardContent}
+              </Link>
+            );
+          })}
         </div>
+
+        {/* Premium CTA */}
+        {!isPremium ? (
+          <div
+            className="mt-8 rounded-xl p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4"
+            style={{ background: "linear-gradient(135deg, #0e1e2e, #0e4a50)" }}
+          >
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <Award className="w-4 h-4 text-[#4ad9e0]" />
+                <span className="text-xs md:text-sm font-semibold text-[#4ad9e0] uppercase tracking-wider">
+                  Premium Access
+                </span>
+              </div>
+              <h3
+                className="text-white font-bold text-base md:text-lg mb-1"
+                style={{ fontFamily: "Merriweather, serif" }}
+              >
+                Unlock Full Clinical Suite
+              </h3>
+              <p className="text-white/60 text-xs md:text-sm">
+                All 15 specialty navigators, full ScanCoach library, 500+ cases, and all premium modules — $9.97/month or $99.97/year.
+              </p>
+            </div>
+            <a
+              href="https://member.allaboutultrasound.com/enroll/3714929?price_id=4664974"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm text-white transition-all hover:opacity-90"
+              style={{ background: "#189aa1" }}
+            >
+              <ExternalLink className="w-4 h-4" />
+              Upgrade
+            </a>
+          </div>
+        ) : (
+          <div
+            className="mt-8 rounded-xl p-5 flex items-center gap-4"
+            style={{ background: "linear-gradient(135deg, #0e1e2e, #0e4a50)" }}
+          >
+            <div
+              className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+              style={{ background: "#189aa1" }}
+            >
+              <Crown className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="text-xs md:text-sm font-semibold text-[#4ad9e0] uppercase tracking-wider">
+                  Premium Active
+                </span>
+              </div>
+              <p className="text-white font-semibold text-sm md:text-base">
+                You have full Premium Access — all 15 specialty modules are unlocked.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
+    </Layout>
   );
 }

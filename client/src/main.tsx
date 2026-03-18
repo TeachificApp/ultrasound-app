@@ -10,6 +10,32 @@ import "./index.css";
 
 const queryClient = new QueryClient();
 
+// ─── Copy & Right-Click Protection ───────────────────────────────────────────
+// Disable right-click context menu, copy, cut, and drag site-wide.
+// Input/textarea interactions are not affected (browser handles those natively).
+function isFormElement(target: EventTarget | null): boolean {
+  if (!target || !(target instanceof HTMLElement)) return false;
+  const tag = target.tagName.toLowerCase();
+  return tag === "input" || tag === "textarea" || target.isContentEditable;
+}
+
+document.addEventListener("contextmenu", (e) => {
+  if (!isFormElement(e.target)) e.preventDefault();
+});
+
+document.addEventListener("copy", (e) => {
+  if (!isFormElement(e.target)) e.preventDefault();
+});
+
+document.addEventListener("cut", (e) => {
+  if (!isFormElement(e.target)) e.preventDefault();
+});
+
+document.addEventListener("dragstart", (e) => {
+  if (!isFormElement(e.target)) e.preventDefault();
+});
+// ─────────────────────────────────────────────────────────────────────────────
+
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
   if (typeof window === "undefined") return;
@@ -18,7 +44,7 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
 
   if (!isUnauthorized) return;
 
-  window.location.href = getLoginUrl();
+  window.location.href = "/login";
 };
 
 queryClient.getQueryCache().subscribe(event => {

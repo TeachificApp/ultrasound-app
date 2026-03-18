@@ -1,45 +1,265 @@
+/*
+  UltrasoundAssist™ — All About Ultrasound™
+  App Router — all routes for the UltrasoundAssist platform
+*/
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { Route, Switch, useLocation } from "wouter";
+import { useEffect } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
+import DemoModeBanner from "./components/DemoModeBanner";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import AppLayout from "./components/AppLayout";
+import { RoleGuard } from "@/components/RoleGuard";
+
+// ── Core pages ────────────────────────────────────────────────────────────────
 import Home from "./pages/Home";
+import Profile from "./pages/Profile";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import VerifyEmail from "./pages/VerifyEmail";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import MagicLinkRequest from "./pages/MagicLinkRequest";
+import MagicLinkCallback from "./pages/MagicLinkCallback";
+import Enrolled from "./pages/Enrolled";
+import Unsubscribe from "./pages/Unsubscribe";
+import UpgradeSuccess from "./pages/UpgradeSuccess";
+import Premium from "./pages/Premium";
+
+// ── UltrasoundAssist™ Hub ────────────────────────────────────────────────────
 import UltrasoundAssistHub from "./pages/UltrasoundAssistHub";
-import SpecialtyDetail from "./pages/SpecialtyDetail";
-import POCUSAssist from "./pages/POCUSAssist";
+
+// ── Abdominal Ultrasound ──────────────────────────────────────────────────────
+import AbdominalNavigator from "./pages/AbdominalNavigator";
+import AbdominalScanCoach from "./pages/AbdominalScanCoach";
+
+// ── Pelvic/Gyn Ultrasound ─────────────────────────────────────────────────────
+import PelvicGynNavigator from "./pages/PelvicGynNavigator";
+import PelvicGynScanCoach from "./pages/PelvicGynScanCoach";
+
+// ── Obstetric 1st Trimester ───────────────────────────────────────────────────
+import OB1Navigator from "./pages/OB1Navigator";
+import OB1ScanCoach from "./pages/OB1ScanCoach";
+
+// ── Obstetric 2nd/3rd Trimester ───────────────────────────────────────────────
+import OB23Navigator from "./pages/OB23Navigator";
+import OB23ScanCoach from "./pages/OB23ScanCoach";
+
+// ── Small Parts — Thyroid ─────────────────────────────────────────────────────
+import ThyroidNavigator from "./pages/ThyroidNavigator";
+import ThyroidScanCoach from "./pages/ThyroidScanCoach";
+
+// ── Small Parts — Scrotum ─────────────────────────────────────────────────────
+import ScrotumNavigator from "./pages/ScrotumNavigator";
+import ScrotumScanCoach from "./pages/ScrotumScanCoach";
+
+// ── Breast Ultrasound ─────────────────────────────────────────────────────────
+import BreastNavigator from "./pages/BreastNavigator";
+import BreastScanCoach from "./pages/BreastScanCoach";
+
+// ── Vascular — Venous ─────────────────────────────────────────────────────────
+import VenousNavigator from "./pages/VenousNavigator";
+import VenousScanCoach from "./pages/VenousScanCoach";
+
+// ── Vascular — Arterial ───────────────────────────────────────────────────────
+import ArterialNavigator from "./pages/ArterialNavigator";
+import ArterialScanCoach from "./pages/ArterialScanCoach";
+
+// ── Vascular — Abdominal/Renal/Mesenteric ────────────────────────────────────
+import AbdominalVascularNavigator from "./pages/AbdominalVascularNavigator";
+import AbdominalVascularScanCoach from "./pages/AbdominalVascularScanCoach";
+
+// ── Vascular — Abdominal Aorta/EndoLeak ──────────────────────────────────────
+import AortaNavigator from "./pages/AortaNavigator";
+import AortaScanCoach from "./pages/AortaScanCoach";
+
+// ── Vascular — Extracranial Carotid ──────────────────────────────────────────
+import CarotidNavigator from "./pages/CarotidNavigator";
+import CarotidScanCoach from "./pages/CarotidScanCoach";
+
+// ── Vascular — Intracranial Duplex/TCD ───────────────────────────────────────
+import TCDNavigator from "./pages/TCDNavigator";
+import TCDScanCoach from "./pages/TCDScanCoach";
+
+// ── MSK ───────────────────────────────────────────────────────────────────────
+import MSKNavigator from "./pages/MSKNavigator";
+import MSKScanCoach from "./pages/MSKScanCoach";
+
+// ── POCUS-Assist™ ─────────────────────────────────────────────────────────────
+import POCUSAssistHub from "./pages/POCUSAssistHub";
+import POCUSEfastNavigator from "./pages/POCUSEfastNavigator";
+import POCUSRushNavigator from "./pages/POCUSRushNavigator";
+import POCUSCardiacNavigator from "./pages/POCUSCardiacNavigator";
+import POCUSLungNavigator from "./pages/POCUSLungNavigator";
+import POCUSEfastScanCoach from "./pages/POCUSEfastScanCoach";
+import POCUSRushScanCoach from "./pages/POCUSRushScanCoach";
+import POCUSCardiacScanCoach from "./pages/POCUSCardiacScanCoach";
+import POCUSLungScanCoach from "./pages/POCUSLungScanCoach";
+
+// ── Fetal EchoAssist™ ─────────────────────────────────────────────────────────
 import FetalEchoAssist from "./pages/FetalEchoAssist";
-import Flashcards from "./pages/Flashcards";
+import FetalNavigator from "./pages/FetalNavigator";
+
+// ── LMS Engines ───────────────────────────────────────────────────────────────
+import QuickFire from "./pages/QuickFire";
+import FlashcardDeck from "./pages/FlashcardDeck";
 import CaseLibrary from "./pages/CaseLibrary";
 import CaseDetail from "./pages/CaseDetail";
+import SubmitCase from "./pages/SubmitCase";
 import SoundBytes from "./pages/SoundBytes";
-import DailyChallenge from "./pages/DailyChallenge";
-import Leaderboard from "./pages/Leaderboard";
-import PremiumAccess from "./pages/PremiumAccess";
-import AdminDashboard from "./pages/AdminDashboard";
+
+// ── Admin & Platform ──────────────────────────────────────────────────────────
+import AdminCaseManagement from "./pages/AdminCaseManagement";
+import QuickFireAdmin from "./pages/QuickFireAdmin";
+import ScanCoachEditor from "./pages/ScanCoachEditor";
+import ThinkificWebhookAdmin from "./pages/ThinkificWebhookAdmin";
+import FormBuilderAdmin from "./pages/FormBuilderAdmin";
+import EmailAdmin from "./pages/EmailAdmin";
+import PlatformAdmin from "./pages/PlatformAdmin";
+import ImageQualityReview from "./pages/ImageQualityReview";
+
+// ── DIY Accreditation™ (hidden, backend use) ──────────────────────────────────
+import DIYMemberPortal from "./pages/DIYMemberPortal";
+import DIYAccreditationPlans from "./pages/DIYAccreditationPlans";
+import DIYRegister from "./pages/DIYRegister";
+import AccreditationNavigator from "./pages/AccreditationNavigator";
+
+// ── Learn Fetal Echo ──────────────────────────────────────────────────────────
 import LearnFetalEcho from "./pages/LearnFetalEcho";
+
+// ── Physician Over-Read (public, token-based) ─────────────────────────────────
+import PhysicianOverReadForm from "./pages/PhysicianOverReadForm";
 
 function Router() {
   return (
-    <Switch>
-      <Route path="/" component={Home} />
-      <Route path="/ultrasound-assist" component={UltrasoundAssistHub} />
-      <Route path="/ultrasound-assist/:specialty" component={SpecialtyDetail} />
-      <Route path="/pocus-assist" component={POCUSAssist} />
-      <Route path="/fetal-echo-assist" component={FetalEchoAssist} />
-      <Route path="/flashcards" component={Flashcards} />
-      <Route path="/case-library" component={CaseLibrary} />
-      <Route path="/case-library/:id" component={CaseDetail} />
-      <Route path="/soundbytes" component={SoundBytes} />
-      <Route path="/daily-challenge" component={DailyChallenge} />
-      <Route path="/leaderboard" component={Leaderboard} />
-      <Route path="/premium" component={PremiumAccess} />
-      <Route path="/admin" component={AdminDashboard} />
-      <Route path="/learn-fetal-echo" component={LearnFetalEcho} />
-      <Route path="/404" component={NotFound} />
-      <Route component={NotFound} />
-    </Switch>
+    <>
+      <Switch>
+        {/* ── Public ────────────────────────────────────────────────────── */}
+        <Route path="/" component={Home} />
+        <Route path="/login" component={Login} />
+        <Route path="/register" component={Register} />
+        <Route path="/verify-email" component={VerifyEmail} />
+        <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/reset-password" component={ResetPassword} />
+        <Route path="/magic-link" component={MagicLinkRequest} />
+        <Route path="/magic-link/callback" component={MagicLinkCallback} />
+        <Route path="/enrolled" component={Enrolled} />
+        <Route path="/unsubscribe" component={Unsubscribe} />
+        <Route path="/upgrade-success" component={UpgradeSuccess} />
+        <Route path="/premium" component={Premium} />
+        <Route path="/profile" component={Profile} />
+
+        {/* ── UltrasoundAssist™ Hub ─────────────────────────────────────── */}
+        <Route path="/ultrasound-assist" component={UltrasoundAssistHub} />
+
+        {/* ── Abdominal ─────────────────────────────────────────────────── */}
+        <Route path="/abdominal-navigator" component={AbdominalNavigator} />
+        <Route path="/abdominal-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><AbdominalScanCoach /></RoleGuard>}</Route>
+
+        {/* ── Pelvic/Gyn ────────────────────────────────────────────────── */}
+        <Route path="/pelvic-gyn-navigator" component={PelvicGynNavigator} />
+        <Route path="/pelvic-gyn-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><PelvicGynScanCoach /></RoleGuard>}</Route>
+
+        {/* ── OB 1st Trimester ──────────────────────────────────────────── */}
+        <Route path="/ob1-navigator" component={OB1Navigator} />
+        <Route path="/ob1-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><OB1ScanCoach /></RoleGuard>}</Route>
+
+        {/* ── OB 2nd/3rd Trimester ──────────────────────────────────────── */}
+        <Route path="/ob23-navigator" component={OB23Navigator} />
+        <Route path="/ob23-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><OB23ScanCoach /></RoleGuard>}</Route>
+
+        {/* ── Thyroid ───────────────────────────────────────────────────── */}
+        <Route path="/thyroid-navigator" component={ThyroidNavigator} />
+        <Route path="/thyroid-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><ThyroidScanCoach /></RoleGuard>}</Route>
+
+        {/* ── Scrotum ───────────────────────────────────────────────────── */}
+        <Route path="/scrotum-navigator" component={ScrotumNavigator} />
+        <Route path="/scrotum-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><ScrotumScanCoach /></RoleGuard>}</Route>
+
+        {/* ── Breast ────────────────────────────────────────────────────── */}
+        <Route path="/breast-navigator" component={BreastNavigator} />
+        <Route path="/breast-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><BreastScanCoach /></RoleGuard>}</Route>
+
+        {/* ── Vascular — Venous ─────────────────────────────────────────── */}
+        <Route path="/venous-navigator" component={VenousNavigator} />
+        <Route path="/venous-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><VenousScanCoach /></RoleGuard>}</Route>
+
+        {/* ── Vascular — Arterial ───────────────────────────────────────── */}
+        <Route path="/arterial-navigator" component={ArterialNavigator} />
+        <Route path="/arterial-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><ArterialScanCoach /></RoleGuard>}</Route>
+
+        {/* ── Vascular — Abdominal/Renal/Mesenteric ─────────────────────── */}
+        <Route path="/abdominal-vascular-navigator" component={AbdominalVascularNavigator} />
+        <Route path="/abdominal-vascular-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><AbdominalVascularScanCoach /></RoleGuard>}</Route>
+
+        {/* ── Vascular — Aorta/EndoLeak ─────────────────────────────────── */}
+        <Route path="/aorta-navigator" component={AortaNavigator} />
+        <Route path="/aorta-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><AortaScanCoach /></RoleGuard>}</Route>
+
+        {/* ── Vascular — Carotid ────────────────────────────────────────── */}
+        <Route path="/carotid-navigator" component={CarotidNavigator} />
+        <Route path="/carotid-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><CarotidScanCoach /></RoleGuard>}</Route>
+
+        {/* ── Vascular — TCD ────────────────────────────────────────────── */}
+        <Route path="/tcd-navigator" component={TCDNavigator} />
+        <Route path="/tcd-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><TCDScanCoach /></RoleGuard>}</Route>
+
+        {/* ── MSK ───────────────────────────────────────────────────────── */}
+        <Route path="/msk-navigator" component={MSKNavigator} />
+        <Route path="/msk-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><MSKScanCoach /></RoleGuard>}</Route>
+
+        {/* ── POCUS-Assist™ ─────────────────────────────────────────────── */}
+        <Route path="/pocus-assist" component={POCUSAssistHub} />
+        <Route path="/pocus-efast-navigator" component={POCUSEfastNavigator} />
+        <Route path="/pocus-rush-navigator" component={POCUSRushNavigator} />
+        <Route path="/pocus-cardiac-navigator" component={POCUSCardiacNavigator} />
+        <Route path="/pocus-lung-navigator" component={POCUSLungNavigator} />
+        <Route path="/pocus-efast-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><POCUSEfastScanCoach /></RoleGuard>}</Route>
+        <Route path="/pocus-rush-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><POCUSRushScanCoach /></RoleGuard>}</Route>
+        <Route path="/pocus-cardiac-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><POCUSCardiacScanCoach /></RoleGuard>}</Route>
+        <Route path="/pocus-lung-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><POCUSLungScanCoach /></RoleGuard>}</Route>
+
+        {/* ── Fetal EchoAssist™ ─────────────────────────────────────────── */}
+        <Route path="/fetal-echo-assist" component={FetalEchoAssist} />
+        <Route path="/fetal-navigator" component={FetalNavigator} />
+
+        {/* ── Learn Fetal Echo ──────────────────────────────────────────── */}
+        <Route path="/learn-fetal-echo" component={LearnFetalEcho} />
+
+        {/* ── LMS Engines ───────────────────────────────────────────────── */}
+        <Route path="/quickfire" component={QuickFire} />
+        <Route path="/flashcards" component={FlashcardDeck} />
+        <Route path="/case-library" component={CaseLibrary} />
+        <Route path="/case-library/submit" component={SubmitCase} />
+        <Route path="/case-library/edit/:id" component={SubmitCase} />
+        <Route path="/case-library/:id" component={CaseDetail} />
+        <Route path="/soundbytes" component={SoundBytes} />
+
+        {/* ── Admin ─────────────────────────────────────────────────────── */}
+        <Route path="/admin/cases">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminCaseManagement /></RoleGuard>}</Route>
+        <Route path="/admin/quickfire">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuickFireAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/scancoach">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ScanCoachEditor /></RoleGuard>}</Route>
+        <Route path="/admin/thinkific-webhook">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ThinkificWebhookAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/form-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/form-builder/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/email">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><EmailAdmin /></RoleGuard>}</Route>
+        <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
+        <Route path="/image-quality-review">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ImageQualityReview /></RoleGuard>}</Route>
+
+        {/* ── DIY Accreditation™ (hidden backend) ───────────────────────── */}
+        <Route path="/diy-accreditation-plans" component={DIYAccreditationPlans} />
+        <Route path="/diy-register" component={DIYRegister} />
+        <Route path="/diy-member">{() => <RoleGuard roles={["diy_user", "diy_admin"]} allowAdmin={false}><DIYMemberPortal /></RoleGuard>}</Route>
+        <Route path="/accreditation-navigator" component={AccreditationNavigator} />
+
+        {/* ── Physician Over-Read (public, token-based) ─────────────────── */}
+        <Route path="/physician-review/:token" component={PhysicianOverReadForm} />
+
+        <Route path="/404" component={NotFound} />
+        <Route component={NotFound} />
+      </Switch>
+    </>
   );
 }
 
@@ -49,9 +269,8 @@ function App() {
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster />
-          <AppLayout>
-            <Router />
-          </AppLayout>
+          <DemoModeBanner />
+          <Router />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>
