@@ -4,35 +4,54 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import AppLayout from "./components/AppLayout";
 import Home from "./pages/Home";
+import UltrasoundAssistHub from "./pages/UltrasoundAssistHub";
+import SpecialtyDetail from "./pages/SpecialtyDetail";
+import POCUSAssist from "./pages/POCUSAssist";
+import FetalEchoAssist from "./pages/FetalEchoAssist";
+import Flashcards from "./pages/Flashcards";
+import CaseLibrary from "./pages/CaseLibrary";
+import CaseDetail from "./pages/CaseDetail";
+import SoundBytes from "./pages/SoundBytes";
+import DailyChallenge from "./pages/DailyChallenge";
+import Leaderboard from "./pages/Leaderboard";
+import PremiumAccess from "./pages/PremiumAccess";
+import AdminDashboard from "./pages/AdminDashboard";
+import LearnFetalEcho from "./pages/LearnFetalEcho";
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
+      <Route path="/" component={Home} />
+      <Route path="/ultrasound-assist" component={UltrasoundAssistHub} />
+      <Route path="/ultrasound-assist/:specialty" component={SpecialtyDetail} />
+      <Route path="/pocus-assist" component={POCUSAssist} />
+      <Route path="/fetal-echo-assist" component={FetalEchoAssist} />
+      <Route path="/flashcards" component={Flashcards} />
+      <Route path="/case-library" component={CaseLibrary} />
+      <Route path="/case-library/:id" component={CaseDetail} />
+      <Route path="/soundbytes" component={SoundBytes} />
+      <Route path="/daily-challenge" component={DailyChallenge} />
+      <Route path="/leaderboard" component={Leaderboard} />
+      <Route path="/premium" component={PremiumAccess} />
+      <Route path="/admin" component={AdminDashboard} />
+      <Route path="/learn-fetal-echo" component={LearnFetalEcho} />
+      <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
   );
 }
 
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
-
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="light"
-        // switchable
-      >
+      <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster />
-          <Router />
+          <AppLayout>
+            <Router />
+          </AppLayout>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>
