@@ -1531,7 +1531,7 @@ export function DIYReportsTab({ isProfessionalPlus = true }: { isProfessionalPlu
     doc.setFillColor(24, 154, 161);
     doc.rect(0, 0, pageW, 14, "F");
     doc.setFontSize(11); doc.setFont("helvetica", "bold"); doc.setTextColor(255, 255, 255);
-    doc.text("All About Ultrasound\u2122 EchoAccreditation Navigator\u2122", 10, 9);
+    doc.text("All About Ultrasound™\u2122 EchoAccreditation Navigator\u2122", 10, 9);
     doc.setFontSize(8); doc.setFont("helvetica", "normal");
     doc.text(`Analytics Report — ${startDate} to ${endDate}`, pageW - 10, 9, { align: "right" });
     y = 22;
@@ -1590,9 +1590,9 @@ export function DIYReportsTab({ isProfessionalPlus = true }: { isProfessionalPlu
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
       doc.setFontSize(7); doc.setTextColor(150);
-      doc.text(`All About Ultrasound\u2122 EchoAccreditation Navigator\u2122 — Confidential — Page ${i} of ${pageCount}`, pageW / 2, 290, { align: "center" });
+      doc.text(`All About Ultrasound™\u2122 EchoAccreditation Navigator\u2122 — Confidential — Page ${i} of ${pageCount}`, pageW / 2, 290, { align: "center" });
     }
-    doc.save(`All About Ultrasound-Analytics-${startDate}-${endDate}.pdf`);
+    doc.save(`All About Ultrasound™-Analytics-${startDate}-${endDate}.pdf`);
   };
 
   const selectedStaffName = useMemo(() => {

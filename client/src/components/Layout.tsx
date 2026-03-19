@@ -303,7 +303,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <ExternalLink className="w-3 h-3" />
             www.allaboutultrasound.com
           </a>
-          <div className="text-xs text-white/30">© All About Ultrasound</div>
+          <div className="text-xs text-white/30">© All About Ultrasound™</div>
         </div>
       </aside>
 

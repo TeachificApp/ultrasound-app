@@ -1,7 +1,7 @@
 /*
   All About Ultrasound™ — Post-Enrollment Decision-Tree Landing Page
-  Shown after completing the free All About Ultrasound membership enrollment.
-  Two paths: All About Ultrasound Community | UltrasoundAssist™ Clinical Intelligence App
+  Shown after completing the free All About Ultrasound™ membership enrollment.
+  Two paths: All About Ultrasound™ Community | UltrasoundAssist™ Clinical Intelligence App
   Brand: Teal #189aa1, Aqua #4ad9e0, Dark navy #0e1e2e
 */
 import { useEffect } from "react";
@@ -22,7 +22,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 
 const COMMUNITY_FEATURES = [
-  { icon: BookOpen,      text: "Access all your enrolled All About Ultrasound courses" },
+  { icon: BookOpen,      text: "Access all your enrolled All About Ultrasound™ courses" },
   { icon: MessageCircle, text: "Connect with sonographers, physicians & ultrasound learners worldwide" },
   { icon: Users,         text: "Join live Q&A sessions and community discussions" },
 ];
@@ -69,7 +69,7 @@ export default function Enrolled() {
           className="text-3xl md:text-4xl font-bold text-white mb-3 max-w-xl leading-tight"
           style={{ fontFamily: "Merriweather, serif" }}
         >
-          Welcome to <br />All About Ultrasound!
+          Welcome to <br />All About Ultrasound™!
         </h1>
         <p className="text-white/60 text-base max-w-md leading-relaxed">
           Your free membership is active. <br />Choose where you'd like to go next.
@@ -79,7 +79,7 @@ export default function Enrolled() {
       {/* ── Decision Cards ─────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col lg:flex-row items-stretch justify-center gap-6 px-6 pb-12 max-w-5xl mx-auto w-full">
 
-        {/* ── Path 1: All About Ultrasound Community ── */}
+        {/* ── Path 1: All About Ultrasound™ Community ── */}
         <a
           href="https://member.allaboutultrasound.com/enrollments"
           target="_blank"
@@ -109,11 +109,11 @@ export default function Enrolled() {
                 className="text-xl font-bold text-white leading-snug"
                 style={{ fontFamily: "Merriweather, serif" }}
               >
-                All About Ultrasound Dashboard
+                All About Ultrasound™ Dashboard
               </h2>
             </div>
             <p className="text-white/60 text-sm leading-relaxed">
-              Access your All About Ultrasound member dashboard — view your enrolled courses, continue learning, and connect with the community.
+              Access your All About Ultrasound™ member dashboard — view your enrolled courses, continue learning, and connect with the community.
             </p>
           </div>
 
@@ -231,7 +231,7 @@ export default function Enrolled() {
       {/* ── Footer note ────────────────────────────────────────────────────── */}
       <footer className="text-center pb-8 px-6">
         <p className="text-white/30 text-xs max-w-sm mx-auto leading-relaxed">
-          Your membership is managed through All About Ultrasound. Any changes to your membership are automatically reflected in All About Ultrasound™.
+          Your membership is managed through All About Ultrasound™. Any changes to your membership are automatically reflected in All About Ultrasound™.
         </p>
       </footer>
     </div>

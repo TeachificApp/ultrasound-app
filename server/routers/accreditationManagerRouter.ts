@@ -127,13 +127,13 @@ async function sendTaskAssignmentEmail(opts: {
             </td></tr>
           </table>
           <p style="margin:0 0 24px;font-size:13px;color:#6b7280;line-height:1.6;">
-            Please log in to the All About Ultrasound Accreditation Manager to view the full task details and mark it as complete when done.
+            Please log in to the All About Ultrasound™ Accreditation Manager to view the full task details and mark it as complete when done.
           </p>
           <a href="https://app.allaboutultrasound.com/accreditation-manager" style="display:inline-block;padding:12px 24px;background:#189aa1;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;border-radius:8px;" target="_blank" rel="noopener noreferrer">View Task</a>
         </td></tr>
         <!-- Footer -->
         <tr><td style="padding:20px 32px;background:#f8fafc;border-top:1px solid #e5e7eb;">
-          <p style="margin:0;font-size:11px;color:#9ca3af;">© All About Ultrasound · All About Ultrasound™ Accreditation Platform</p>
+          <p style="margin:0;font-size:11px;color:#9ca3af;">© All About Ultrasound™ · All About Ultrasound™ Accreditation Platform</p>
         </td></tr>
       </table>
     </td></tr>
@@ -143,7 +143,7 @@ async function sendTaskAssignmentEmail(opts: {
 
   return sendEmail({
     to: { name: opts.toName, email: opts.toEmail },
-    subject: `[All About Ultrasound] New Task Assigned: ${opts.taskTitle}`,
+    subject: `[All About Ultrasound™] New Task Assigned: ${opts.taskTitle}`,
     htmlBody: html,
     previewText: `${opts.assignedByName} assigned you a ${typeLabel} task for ${opts.facilityName}`,
   });

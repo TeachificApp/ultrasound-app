@@ -113,7 +113,7 @@ function emailWrapper(content: string): string {
           <tr>
             <td style="background:#f8fffe;border-top:1px solid #e5f7f8;padding:20px 32px;text-align:center;">
               <p style="margin:0;font-size:12px;color:#94a3b8;">
-                © All About Ultrasound · <a href="https://www.allaboutultrasound.com" style="color:${brandColor};text-decoration:none;" target="_blank" rel="noopener noreferrer">www.allaboutultrasound.com</a>
+                © All About Ultrasound™ · <a href="https://www.allaboutultrasound.com" style="color:${brandColor};text-decoration:none;" target="_blank" rel="noopener noreferrer">www.allaboutultrasound.com</a>
               </p>
               <p style="margin:8px 0 0;font-size:11px;color:#cbd5e1;">
                 You received this email because an account was created for you on All About Ultrasound™.
@@ -182,7 +182,7 @@ export function buildVerificationEmail(opts: {
   const previewText = "Click to verify your email and activate your account";
   const htmlBody = emailWrapper(`
     <h2 style="margin:0 0 8px;font-size:20px;color:${brandDark};font-family:Georgia,serif;">
-      Welcome to All About Ultrasound, ${opts.firstName}!
+      Welcome to All About Ultrasound™, ${opts.firstName}!
     </h2>
     <p style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.6;">
       Thank you for registering. Please verify your email address to activate your account and access all clinical tools.
@@ -458,7 +458,7 @@ export function buildWelcomeEmail(opts: {
 
   const htmlBody = emailWrapper(`
     <h2 style="margin:0 0 8px;font-size:20px;color:${brandDark};font-family:Georgia,serif;">
-      Welcome to All About Ultrasound, ${opts.firstName}!
+      Welcome to All About Ultrasound™, ${opts.firstName}!
     </h2>
     <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
       Your account has been set up by an administrator. You now have access to the All About Ultrasound™ clinical platform.

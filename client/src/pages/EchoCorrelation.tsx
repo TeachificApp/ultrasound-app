@@ -419,7 +419,7 @@ export default function EchoCorrelationTab() {
         {step === 1 && (
           <SectionCard title="">
             <FieldRow label="Organization / Facility">
-              <BrandInput value={organization} onChange={setOrganization} placeholder="e.g. All About Ultrasound" />
+              <BrandInput value={organization} onChange={setOrganization} placeholder="e.g. All About Ultrasound™" />
             </FieldRow>
             <FieldRow label="Date Review Completed">
               <BrandInput type="date" value={dateReviewCompleted} onChange={setDateReviewCompleted} />

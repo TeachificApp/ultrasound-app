@@ -128,7 +128,7 @@ export default function Unsubscribe() {
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-6">
-          © All About Ultrasound · All About Ultrasound™ Platform
+          © All About Ultrasound™ · All About Ultrasound™ Platform
         </p>
       </div>
     </div>

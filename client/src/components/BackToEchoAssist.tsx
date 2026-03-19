@@ -1,5 +1,5 @@
 /**
- * BackToEchoAssist — compatibility shim for All About Ultrasound pages copied into UltrasoundAssist.
+ * BackToEchoAssist — compatibility shim for All About Ultrasound™ pages copied into UltrasoundAssist.
  * Renders a "Back to UltrasoundAssist" button pointing at /ultrasound-assist-hub.
  */
 import { Link } from "wouter";

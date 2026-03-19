@@ -1,7 +1,7 @@
 /**
  * UltrasoundAssist™ App — Unit Tests
  *
- * Tests the core server-side logic using the actual All About Ultrasound router structure
+ * Tests the core server-side logic using the actual All About Ultrasound™ router structure
  * that was copied and adapted for UltrasoundAssist™ (All About Ultrasound™).
  *
  * Router structure:

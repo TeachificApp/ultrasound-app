@@ -61,7 +61,7 @@ async function handleCheckoutSessionCompleted(session: Record<string, unknown>) 
     console.warn(`[Stripe] No user found for email: ${customerEmail}`);
     await notifyOwner({
       title: "⚠️ Concierge Purchase — User Not Found",
-      content: `Concierge payment received from ${customerEmail} but no All About Ultrasound account was found. Amount: $${(amountTotal / 100).toFixed(2)}. Please verify manually in Stripe dashboard.`,
+      content: `Concierge payment received from ${customerEmail} but no All About Ultrasound™ account was found. Amount: $${(amountTotal / 100).toFixed(2)}. Please verify manually in Stripe dashboard.`,
     });
     return;
   }

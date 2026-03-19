@@ -69,7 +69,7 @@ ${preview}
       <tr>
         <td style="background:#f4f7f8;padding:20px 32px;border-top:1px solid #e5eaec;">
           <p style="margin:0;font-size:11px;color:#8a9bb0;text-align:center;line-height:1.6;">
-            © ${new Date().getFullYear()} All About Ultrasound™ · All About Ultrasound<br/>
+            © ${new Date().getFullYear()} All About Ultrasound™ · All About Ultrasound™<br/>
             You are receiving this email because you have an account on All About Ultrasound™.<br/>
             <a href="https://app.allaboutultrasound.com/profile" style="color:#189aa1;text-decoration:none;">Manage your preferences</a>
           </p>
@@ -87,7 +87,7 @@ const SEED_TEMPLATES = [
   {
     name: "📣 Platform Announcement",
     subject: "Important Update from All About Ultrasound™",
-    previewText: "A message from the All About Ultrasound team",
+    previewText: "A message from the All About Ultrasound™ team",
     htmlBody: `<h2 style="font-family:Merriweather,Georgia,serif;color:#0e1e2e;margin-top:0;">Platform Update</h2>
 <p>Dear All About Ultrasound™ community,</p>
 <p>We have an exciting update to share with you. [Insert announcement here.]</p>

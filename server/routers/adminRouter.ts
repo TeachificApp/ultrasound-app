@@ -331,7 +331,7 @@ export const platformAdminRouter = router({
   }),
 
   /**
-   * Bulk backfill: fetch all users from Thinkific and create All About Ultrasound accounts
+   * Bulk backfill: fetch all users from Thinkific and create All About Ultrasound™ accounts
    * for anyone not already registered. Runs silently (no emails sent).
    * Returns counts of created, skipped (already existed), and errors.
    */

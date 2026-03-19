@@ -1090,7 +1090,7 @@ export default function PlatformAdmin() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <div className="flex-1">
                 <p className="text-sm text-gray-600 mb-1">
-                  Create All About Ultrasound accounts for all existing Thinkific members who don&apos;t have one yet.
+                  Create All About Ultrasound™ accounts for all existing Thinkific members who don&apos;t have one yet.
                   No emails are sent. Future members are handled automatically via webhook.
                 </p>
                 {lastMemberSyncResult ? (

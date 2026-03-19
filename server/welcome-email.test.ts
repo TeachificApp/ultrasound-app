@@ -88,13 +88,13 @@ describe("buildWelcomeEmail", () => {
     expect(result.htmlBody).toContain("border-radius:50%");
   });
 
-  it("includes the All About Ultrasound copyright in the footer", () => {
+  it("includes the All About Ultrasound™ copyright in the footer", () => {
     const result = buildWelcomeEmail({
       firstName: "Jane",
       loginUrl: "https://app.iheartecho.com/login",
       roles: [],
     });
-    expect(result.htmlBody).toContain("All About Ultrasound");
+    expect(result.htmlBody).toContain("All About Ultrasound™");
   });
 
   it("returns a non-empty previewText", () => {

@@ -9,7 +9,7 @@
  *   • subscription.activated     (re-activation after pause/lapse)
  *   • enrollment.created         (direct enrollment, e.g. gifted access)
  *   • enrollment.updated         (status change on an existing enrollment)
- *   • user.signup               (new Thinkific registration without purchase — creates free All About Ultrasound account silently)
+ *   • user.signup               (new Thinkific registration without purchase — creates free All About Ultrasound™ account silently)
  *
  * Allowed products (matched by name substring — case-insensitive):
  *   • All About Ultrasound™ App — Premium Access  → grants/revokes "premium_user" role
@@ -156,7 +156,7 @@ function isIHeartEchoAppProduct(name: string | null | undefined): boolean {
   );
 }
 
-/** Returns true if the product is relevant to All About Ultrasound (premium, DIY, or free). */
+/** Returns true if the product is relevant to All About Ultrasound™ (premium, DIY, or free). */
 function isRelevantProduct(name: string | null | undefined): boolean {
   return isPremiumProduct(name) || isDIYProduct(name) || isFreeProduct(name) || isIHeartEchoAppProduct(name);
 }
@@ -209,7 +209,7 @@ export function registerThinkificWebhook(app: Router) {
       // ── Gate 1: Event type filter ─────────────────────────────────────────
       // Reject any event type not in the allowlist immediately — no DB work done.
       if (!isAllowedEvent(resource, action)) {
-        const msg = `filtered: ${resource}.${action} is not in the All About Ultrasound event allowlist`;
+        const msg = `filtered: ${resource}.${action} is not in the All About Ultrasound™ event allowlist`;
         console.log(`[Thinkific Webhook] ${msg}`);
         await logWebhookEvent({ resource, action, httpStatus: 200, outcome: "filtered", message: msg, rawPayload: payload });
         return res.status(200).json({ ok: true, message: msg });
@@ -236,9 +236,9 @@ export function registerThinkificWebhook(app: Router) {
         return res;
       }
 
-      // ── 0b. user.signup → silently create All About Ultrasound account ─────────────
+      // ── 0b. user.signup → silently create All About Ultrasound™ account ─────────────
       // Fired when a user registers on Thinkific without purchasing anything.
-      // Creates a free All About Ultrasound account with base "user" role. No email sent.
+      // Creates a free All About Ultrasound™ account with base "user" role. No email sent.
       if (resource === "user" && action === "signup") {
         const up = payload as { email?: string; first_name?: string; last_name?: string } | undefined;
         const newUserEmail = (up?.email ?? "").toLowerCase().trim();
@@ -258,7 +258,7 @@ export function registerThinkificWebhook(app: Router) {
           }
           const newId = await createPendingUser(newUserEmail);
           await ensureUserRole(newId);
-          const msg = `user.signup: pending All About Ultrasound account created for ${newUserEmail} (userId=${newId})`;
+          const msg = `user.signup: pending All About Ultrasound™ account created for ${newUserEmail} (userId=${newId})`;
           console.log(`[Thinkific Webhook] ${msg}`);
           await logWebhookEvent({ resource, action, email: newUserEmail, httpStatus: 200, outcome: "pending_created", message: msg, rawPayload: payload });
           return res.status(200).json({ ok: true, message: msg, userId: newId });
@@ -272,7 +272,7 @@ export function registerThinkificWebhook(app: Router) {
 
       // ── Gate 2: Extract user email and product name ───────────────────────
       // NOTE: Gate 2 no longer filters by product — ALL enrollments/orders from
-      // Thinkific create a free All About Ultrasound account. Premium/DIY role grants are
+      // Thinkific create a free All About Ultrasound™ account. Premium/DIY role grants are
       // applied on top of the base account creation.
       const p = payload as {
         product_name?: string;
@@ -290,7 +290,7 @@ export function registerThinkificWebhook(app: Router) {
       if (resource === "order" && action === "created") {
         const orderStatus = (p?.status ?? "").toLowerCase();
 
-        // All orders (any product) create an All About Ultrasound account.
+        // All orders (any product) create an All About Ultrasound™ account.
         // Product-specific role grants (premium, DIY) are applied inside grantAccess.
         if (orderStatus !== "complete") {
           const msg = `ignored: order status is "${orderStatus}", not "complete"`;

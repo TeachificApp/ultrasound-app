@@ -316,3 +316,7 @@
 - [x] Wire GetAppBanner into App.tsx
 - [x] Dismiss remembered in localStorage for 30 days
 - [x] Upload 192x192 and 512x512 AAUS icons to CDN for manifest
+
+## TM Symbol & Description Fixes (Mar 19)
+- [x] Add ™ to all uses of "All About Ultrasound" that are missing it (all files — 26 files fixed, 0 remaining)
+- [x] Update dashboard hero description subtext to user-specified copy

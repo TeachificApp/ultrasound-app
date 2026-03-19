@@ -76,7 +76,7 @@ const modules: Module[] = [
     path: "/soundbytes",
     icon: Activity,
     title: "SoundBytes™",
-    description: "Short-form ultrasound education videos — quick tips, technique pearls, and clinical insights from All About Ultrasound educators.",
+    description: "Short-form ultrasound education videos — quick tips, technique pearls, and clinical insights from All About Ultrasound™ educators.",
     badge: "Video",
     color: BRAND,
   },
@@ -84,7 +84,7 @@ const modules: Module[] = [
     path: "/cme",
     icon: GraduationCap,
     title: "CME Hub",
-    description: "Browse accredited CME courses from All About Ultrasound — SDMS, AMA PRA, and more. Click to enroll directly on Thinkific.",
+    description: "Browse accredited CME courses from All About Ultrasound™ — SDMS, AMA PRA, and more. Click to enroll directly on Thinkific.",
     badge: "CME",
     color: BRAND,
   },
@@ -96,8 +96,8 @@ const modules: Module[] = [
   {
     path: "https://member.allaboutultrasound.com/products/communities/allaboutultrasound-community",
     icon: MessageCircle,
-    title: "All About Ultrasound Community",
-    description: "Join the All About Ultrasound community on Thinkific — case discussions, peer learning, and specialty hubs for ultrasound professionals.",
+    title: "All About Ultrasound™ Community",
+    description: "Join the All About Ultrasound™ community on Thinkific — case discussions, peer learning, and specialty hubs for ultrasound professionals.",
     badge: "Community",
     color: BRAND,
     external: true,
@@ -110,7 +110,7 @@ export default function Home() {
   const isPremium = user?.isPremium === true || user?.role === "admin";
 
   useEffect(() => {
-    document.title = "UltrasoundAssist™ | All About Ultrasound";
+    document.title = "UltrasoundAssist™ | All About Ultrasound™";
   }, []);
 
   const pinnedLast = modules.filter(m => m.pinLast);
@@ -150,7 +150,7 @@ export default function Home() {
                 UltrasoundAssist™
               </h1>
               <p className="text-white/70 text-sm md:text-base max-w-xl mb-5">
-                Your clinical ultrasound intelligence platform — AIUM-based navigators, scan coaches, POCUS tools, and Fetal Echo resources.
+                Advanced, guideline-driven clinical intelligence app designed for sonographers, physicians, and ultrasound learners across general, vascular, and point-of-care imaging — serving as the ultimate pocket reference for real-time scanning and clinical decision support.
               </p>
 
               {/* CTA Buttons — iHeartEcho style */}
