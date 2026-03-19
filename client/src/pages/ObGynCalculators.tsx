@@ -1,296 +1,484 @@
 /*
-  UltrasoundAssist™ — OB/Gyn Ultrasound Calculators
-  Guideline-based calculators for obstetric and gynecologic ultrasound
-  References: ACOG, SMFM, ISUOG, AIUM, perinatology.com methodology
+  UltrasoundAssist™ — Clinical Calculators Hub
+  Tabs: OB/Gyn | Abdominal | Breast | Vascular
+  References: ACOG, SMFM, ISUOG, AIUM, EASL, WFUMB, ACR, AHA/ACC
 */
 import { useState } from "react";
+import { Link } from "wouter";
 import Layout from "@/components/Layout";
-import BackToEchoAssist from "@/components/BackToEchoAssist";
-import { Calculator, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
+import { Calculator, ChevronDown, ChevronUp, ArrowLeft, Baby, Activity, Scan, Heart } from "lucide-react";
 
-// ─── Utility helpers ─────────────────────────────────────────────────────────
+// ─── Shared types ─────────────────────────────────────────────────────────────
+type CalcResult = { result: string; label: string; note: string } | null;
+type FieldDef = { key: string; label: string; placeholder: string; min?: number; max?: number };
+type CalcDef = {
+  id: string; title: string; subtitle: string; category: string; premium: boolean;
+  fields: FieldDef[];
+  calculate: (vals: Record<string, number>) => CalcResult;
+};
+
+// ─── OB/GYN helpers ──────────────────────────────────────────────────────────
 function gestationalAge(crl_mm: number): string {
-  // Robinson & Fleming (1975) CRL → GA formula
   const days = Math.round(8.052 * Math.sqrt(crl_mm + 23.73) + 23.73);
-  const weeks = Math.floor(days / 7);
-  const d = days % 7;
-  return `${weeks}w ${d}d`;
+  return `${Math.floor(days / 7)}w ${days % 7}d`;
 }
-
-function ntPercentile(nt_mm: number, crl_mm: number): string {
-  // Simplified Snijders/FMF reference: 95th percentile ≈ 0.7 + 0.031 × CRL
-  const p95 = 0.7 + 0.031 * crl_mm;
-  const p99 = 3.5; // fixed threshold
-  if (nt_mm >= p99) return "≥99th percentile — HIGH RISK";
-  if (nt_mm >= p95) return "≥95th percentile — Increased risk";
+function ntPercentile(nt: number, crl: number): string {
+  const p95 = 0.7 + 0.031 * crl;
+  if (nt >= 3.5) return "≥99th percentile — HIGH RISK";
+  if (nt >= p95) return "≥95th percentile — Increased risk";
   return "Below 95th percentile — Low risk";
 }
-
-function mcaPsvMoM(psv_cm_s: number, ga_weeks: number): string {
-  // Ref: Mari et al. NEJM 2000 — MCA PSV 1.5 MoM threshold
-  // Median MCA PSV by GA (simplified linear approximation)
-  const median = 20.0 + (ga_weeks - 18) * 2.5; // cm/s approximation
-  const mom = psv_cm_s / median;
-  if (mom >= 1.5) return `${mom.toFixed(2)} MoM — ELEVATED (≥1.5 MoM, consider fetal transfusion)`;
-  if (mom >= 1.29) return `${mom.toFixed(2)} MoM — Borderline (1.29–1.49 MoM, repeat in 1–2 weeks)`;
+function mcaPsvMoM(psv: number, ga: number): string {
+  const median = 20.0 + (ga - 18) * 2.5;
+  const mom = psv / median;
+  if (mom >= 1.5) return `${mom.toFixed(2)} MoM — ELEVATED (≥1.5 MoM)`;
+  if (mom >= 1.29) return `${mom.toFixed(2)} MoM — Borderline (1.29–1.49 MoM)`;
   return `${mom.toFixed(2)} MoM — Normal (<1.29 MoM)`;
 }
-
 function efw(bpd: number, hc: number, ac: number, fl: number): number {
-  // Hadlock 4-parameter formula (1985): log10(EFW) = 1.3596 - 0.00386*AC*FL + 0.0064*HC + 0.00061*BPD*AC + 0.0424*AC + 0.174*FL
-  const log10EFW = 1.3596 - 0.00386 * ac * fl + 0.0064 * hc + 0.00061 * bpd * ac + 0.0424 * ac + 0.174 * fl;
-  return Math.round(Math.pow(10, log10EFW));
+  const log10 = 1.3596 - 0.00386 * ac * fl + 0.0064 * hc + 0.00061 * bpd * ac + 0.0424 * ac + 0.174 * fl;
+  return Math.round(Math.pow(10, log10));
+}
+function twinDiscordance(a: number, b: number): string {
+  const larger = Math.max(a, b), smaller = Math.min(a, b);
+  const d = ((larger - smaller) / larger) * 100;
+  if (d >= 25) return `${d.toFixed(1)}% — SIGNIFICANT discordance (≥25%)`;
+  if (d >= 15) return `${d.toFixed(1)}% — Moderate discordance (15–24%)`;
+  return `${d.toFixed(1)}% — Within normal limits (<15%)`;
 }
 
-function cvr(length: number, width: number, height: number, lhr: number): string {
-  // CVR = (π/6 × L × W × H) / HC²  — simplified as volume/HC²
-  const volume = (Math.PI / 6) * length * width * height;
-  const cvr_val = volume / (lhr * lhr);
-  if (cvr_val > 1.6) return `CVR = ${cvr_val.toFixed(2)} — Favorable (>1.6)`;
-  if (cvr_val >= 0.9) return `CVR = ${cvr_val.toFixed(2)} — Intermediate (0.9–1.6)`;
-  return `CVR = ${cvr_val.toFixed(2)} — Poor prognosis (<0.9)`;
+// ─── Abdominal helpers ────────────────────────────────────────────────────────
+function liverStiffnessStage(kpa: number, method: string): string {
+  // EASL/WFUMB guidelines — pSWE (point SWE / ARFI) thresholds
+  if (method === "pswe") {
+    if (kpa < 1.21) return "F0–F1 — No/minimal fibrosis (<1.21 m/s equivalent)";
+    if (kpa < 1.35) return "F1–F2 — Mild fibrosis (1.21–1.34 m/s)";
+    if (kpa < 1.55) return "F2–F3 — Moderate fibrosis (1.35–1.54 m/s)";
+    if (kpa < 1.80) return "F3 — Significant fibrosis (1.55–1.79 m/s)";
+    return "F4 — Cirrhosis (≥1.80 m/s) — Confirm clinically";
+  }
+  // 2D-SWE kPa thresholds (EASL 2017)
+  if (kpa < 6.0) return "F0–F1 — No/minimal fibrosis (<6.0 kPa)";
+  if (kpa < 8.0) return "F1–F2 — Mild fibrosis (6.0–7.9 kPa)";
+  if (kpa < 10.0) return "F2–F3 — Moderate fibrosis (8.0–9.9 kPa)";
+  if (kpa < 14.0) return "F3 — Significant fibrosis (10.0–13.9 kPa)";
+  return "F4 — Cirrhosis (≥14.0 kPa) — Confirm clinically";
+}
+function udffGrade(udff: number): string {
+  if (udff < 5) return "S0 — No steatosis (<5%)";
+  if (udff < 17.5) return "S1 — Mild steatosis (5–17.4%)";
+  if (udff < 22.1) return "S2 — Moderate steatosis (17.5–22.0%)";
+  return "S3 — Severe steatosis (≥22.1%)";
+}
+function gallbladderWall(thickness_mm: number): string {
+  if (thickness_mm <= 3) return "Normal (≤3 mm)";
+  if (thickness_mm <= 5) return "Borderline thickening (3–5 mm) — correlate clinically";
+  return "Abnormal (>5 mm) — consider cholecystitis, hepatitis, heart failure, hypoalbuminemia";
+}
+function spleenSize(length_cm: number): string {
+  if (length_cm <= 11) return "Normal (≤11 cm)";
+  if (length_cm <= 13) return "Mild splenomegaly (11–13 cm)";
+  if (length_cm <= 16) return "Moderate splenomegaly (13–16 cm)";
+  return "Massive splenomegaly (>16 cm) — evaluate for portal hypertension, hematologic cause";
 }
 
-function twinDiscordance(ega1: number, ega2: number): string {
-  if (ega1 <= 0 || ega2 <= 0) return "—";
-  const larger = Math.max(ega1, ega2);
-  const smaller = Math.min(ega1, ega2);
-  const disc = ((larger - smaller) / larger) * 100;
-  if (disc >= 25) return `${disc.toFixed(1)}% — SIGNIFICANT discordance (≥25%)`;
-  if (disc >= 15) return `${disc.toFixed(1)}% — Moderate discordance (15–24%)`;
-  return `${disc.toFixed(1)}% — Within normal limits (<15%)`;
+// ─── Breast helpers ───────────────────────────────────────────────────────────
+function sweKpaMalignancy(kpa: number): string {
+  // ACR/WFUMB SWE BI-RADS adjunct criteria
+  if (kpa < 30) return "Soft (<30 kPa) — Benign characteristic. Supports BI-RADS 2–3 downgrade.";
+  if (kpa < 80) return "Intermediate (30–79 kPa) — Indeterminate. Correlate with B-mode features.";
+  if (kpa < 160) return "Stiff (80–159 kPa) — Suspicious. Supports BI-RADS 4–5 upgrade.";
+  return "Very stiff (≥160 kPa) — Highly suspicious for malignancy. Biopsy recommended.";
+}
+function sweMs(ms: number): string {
+  const kpa = ms * ms * 3; // approximate conversion: kPa ≈ 3 × (m/s)²
+  return sweKpaMalignancy(kpa) + ` [≈${kpa.toFixed(0)} kPa]`;
+}
+function lesionFatRatio(lesion_kpa: number, fat_kpa: number): string {
+  if (fat_kpa <= 0) return "—";
+  const ratio = lesion_kpa / fat_kpa;
+  if (ratio < 1.5) return `Ratio = ${ratio.toFixed(2)} — Soft (benign characteristic)`;
+  if (ratio < 3.0) return `Ratio = ${ratio.toFixed(2)} — Intermediate`;
+  return `Ratio = ${ratio.toFixed(2)} — Stiff (malignant characteristic, ratio ≥3.0)`;
+}
+function biradsSweAdjunct(birads: number, kpa: number): string {
+  const soft = kpa < 30, stiff = kpa >= 80;
+  if (birads <= 3 && stiff) return `BI-RADS ${birads} + stiff SWE → Consider upgrade to BI-RADS 4A`;
+  if (birads === 4 && soft) return `BI-RADS 4 + soft SWE → Consider downgrade to BI-RADS 3 (if other features benign)`;
+  if (birads >= 4 && stiff) return `BI-RADS ${birads} + stiff SWE → Supports biopsy recommendation`;
+  return `BI-RADS ${birads} + SWE ${kpa} kPa — No adjunct upgrade/downgrade indicated`;
 }
 
-function umbilicalArtery(sd_ratio: number, pi: number, ri: number): string {
-  if (sd_ratio <= 0) return "—";
-  const results = [];
-  if (sd_ratio > 4.0) results.push("S/D ratio elevated (>4.0)");
-  if (pi > 1.7) results.push("PI elevated (>1.7)");
-  if (ri > 0.8) results.push("RI elevated (>0.8)");
-  if (sd_ratio < 0) results.push("Absent/reversed end-diastolic flow — CRITICAL");
-  return results.length > 0 ? results.join("; ") : "Normal umbilical artery Doppler";
+// ─── Vascular helpers ─────────────────────────────────────────────────────────
+function abiInterpret(abi: number): string {
+  if (abi > 1.40) return "Non-compressible (>1.40) — Likely calcified vessels. Consider toe-brachial index.";
+  if (abi >= 1.00) return "Normal (1.00–1.40) — No significant PAD.";
+  if (abi >= 0.90) return "Borderline (0.90–0.99) — Mild PAD possible. Repeat with exercise.";
+  if (abi >= 0.70) return "Mild PAD (0.70–0.89) — Lifestyle modification, risk factor control.";
+  if (abi >= 0.40) return "Moderate PAD (0.40–0.69) — Vascular surgery referral.";
+  return "Severe PAD (<0.40) — Critical limb ischemia. Urgent vascular referral.";
+}
+function ivcCi(max_cm: number, min_cm: number): string {
+  if (max_cm <= 0) return "—";
+  const ci = ((max_cm - min_cm) / max_cm) * 100;
+  let cvp = "";
+  if (ci >= 50) cvp = "Low CVP (<5 mmHg) — volume responsive";
+  else if (ci >= 20) cvp = "Intermediate CVP (5–10 mmHg) — consider clinical context";
+  else cvp = "High CVP (>10 mmHg) — likely volume overloaded";
+  return `CI = ${ci.toFixed(1)}% — ${cvp}`;
+}
+function carotidStenosis(psv: number, edv: number, ica_cca_ratio: number): string {
+  // NASCET/SRU criteria
+  const results: string[] = [];
+  if (psv < 125) results.push("<50% stenosis (PSV <125 cm/s)");
+  else if (psv < 230) results.push("50–69% stenosis (PSV 125–229 cm/s)");
+  else results.push("≥70% stenosis (PSV ≥230 cm/s)");
+  if (edv >= 100) results.push("EDV ≥100 cm/s supports ≥70%");
+  if (ica_cca_ratio >= 4.0) results.push("ICA/CCA ratio ≥4.0 supports ≥70%");
+  return results.join("; ");
+}
+function rvsp(tr_velocity: number, rap: number): string {
+  // RVSP = 4 × TRV² + RAP (modified Bernoulli)
+  const rvsp_val = 4 * tr_velocity * tr_velocity + rap;
+  let interp = "";
+  if (rvsp_val < 36) interp = "Normal RVSP (<36 mmHg)";
+  else if (rvsp_val < 50) interp = "Mild pulmonary hypertension (36–49 mmHg)";
+  else interp = "Moderate–Severe pulmonary hypertension (≥50 mmHg) — echocardiographic confirmation recommended";
+  return `RVSP = ${rvsp_val.toFixed(0)} mmHg — ${interp}`;
 }
 
 // ─── Calculator definitions ───────────────────────────────────────────────────
-const calculators = [
+const obgynCalcs: CalcDef[] = [
   {
-    id: "crl_ga",
-    title: "CRL → Gestational Age",
-    subtitle: "Crown-Rump Length to GA (Robinson & Fleming 1975)",
-    category: "1st Trimester",
-    premium: false,
+    id: "crl_ga", title: "CRL → Gestational Age", subtitle: "Crown-Rump Length to GA (Robinson & Fleming 1975)",
+    category: "1st Trimester", premium: false,
     fields: [{ key: "crl", label: "CRL (mm)", placeholder: "e.g. 45", min: 1, max: 84 }],
-    calculate: (vals: Record<string, number>) => {
-      if (!vals.crl) return null;
-      return { result: gestationalAge(vals.crl), label: "Estimated Gestational Age", note: "Valid for CRL 1–84 mm (6w0d–13w6d)" };
-    },
+    calculate: (v) => v.crl ? { result: gestationalAge(v.crl), label: "Estimated Gestational Age", note: "Valid for CRL 1–84 mm (6w0d–13w6d)" } : null,
   },
   {
-    id: "nt_assessment",
-    title: "Nuchal Translucency Assessment",
-    subtitle: "NT percentile vs. CRL (FMF/Snijders reference)",
-    category: "1st Trimester",
-    premium: false,
+    id: "nt_assessment", title: "Nuchal Translucency Assessment", subtitle: "NT percentile vs. CRL (FMF/Snijders reference)",
+    category: "1st Trimester", premium: false,
     fields: [
       { key: "nt", label: "NT (mm)", placeholder: "e.g. 2.8", min: 0.5, max: 10 },
       { key: "crl", label: "CRL (mm)", placeholder: "e.g. 55", min: 36, max: 84 },
     ],
-    calculate: (vals: Record<string, number>) => {
-      if (!vals.nt || !vals.crl) return null;
-      return { result: ntPercentile(vals.nt, vals.crl), label: "NT Risk Assessment", note: "NT ≥3.5 mm = high risk regardless of CRL. Refer for genetic counseling." };
-    },
+    calculate: (v) => (v.nt && v.crl) ? { result: ntPercentile(v.nt, v.crl), label: "NT Risk Assessment", note: "NT ≥3.5 mm = high risk regardless of CRL." } : null,
   },
   {
-    id: "mca_psv",
-    title: "MCA PSV (Multiples of Median)",
-    subtitle: "Middle Cerebral Artery PSV — fetal anemia screening (Mari 2000)",
-    category: "2nd/3rd Trimester",
-    premium: false,
+    id: "mca_psv", title: "MCA PSV (Multiples of Median)", subtitle: "Fetal anemia screening (Mari NEJM 2000)",
+    category: "2nd/3rd Trimester", premium: false,
     fields: [
       { key: "psv", label: "MCA PSV (cm/s)", placeholder: "e.g. 52", min: 10, max: 120 },
       { key: "ga", label: "Gestational Age (weeks)", placeholder: "e.g. 28", min: 18, max: 40 },
     ],
-    calculate: (vals: Record<string, number>) => {
-      if (!vals.psv || !vals.ga) return null;
-      return { result: mcaPsvMoM(vals.psv, vals.ga), label: "MCA PSV Assessment", note: "Angle of insonation must be <30°. Measure at proximal 1/3 of MCA near circle of Willis." };
-    },
+    calculate: (v) => (v.psv && v.ga) ? { result: mcaPsvMoM(v.psv, v.ga), label: "MCA PSV Assessment", note: "Angle of insonation <30°. Measure at proximal 1/3 of MCA." } : null,
   },
   {
-    id: "efw_hadlock",
-    title: "Estimated Fetal Weight (Hadlock 4-parameter)",
-    subtitle: "BPD + HC + AC + FL — Hadlock 1985",
-    category: "2nd/3rd Trimester",
-    premium: false,
+    id: "efw_hadlock", title: "Estimated Fetal Weight (Hadlock 4-parameter)", subtitle: "BPD + HC + AC + FL — Hadlock 1985",
+    category: "2nd/3rd Trimester", premium: false,
     fields: [
       { key: "bpd", label: "BPD (cm)", placeholder: "e.g. 7.2", min: 1, max: 12 },
       { key: "hc", label: "HC (cm)", placeholder: "e.g. 26.5", min: 5, max: 40 },
       { key: "ac", label: "AC (cm)", placeholder: "e.g. 25.0", min: 5, max: 40 },
       { key: "fl", label: "FL (cm)", placeholder: "e.g. 5.2", min: 1, max: 9 },
     ],
-    calculate: (vals: Record<string, number>) => {
-      if (!vals.bpd || !vals.hc || !vals.ac || !vals.fl) return null;
-      const efwG = efw(vals.bpd, vals.hc, vals.ac, vals.fl);
-      const efwLb = (efwG / 453.592).toFixed(2);
-      return { result: `${efwG.toLocaleString()} g (${efwLb} lbs)`, label: "Estimated Fetal Weight", note: "±15–20% error range. SGA <10th percentile; LGA >90th percentile." };
-    },
+    calculate: (v) => (v.bpd && v.hc && v.ac && v.fl) ? {
+      result: `${efw(v.bpd, v.hc, v.ac, v.fl).toLocaleString()} g (${(efw(v.bpd, v.hc, v.ac, v.fl) / 453.592).toFixed(2)} lbs)`,
+      label: "Estimated Fetal Weight", note: "±15–20% error range. SGA <10th percentile; LGA >90th percentile."
+    } : null,
   },
   {
-    id: "twin_discordance",
-    title: "Twin Growth Discordance",
-    subtitle: "EFW discordance between twins (ACOG/SMFM criteria)",
-    category: "2nd/3rd Trimester",
-    premium: false,
+    id: "twin_discordance", title: "Twin Growth Discordance", subtitle: "EFW discordance (ACOG/SMFM criteria)",
+    category: "2nd/3rd Trimester", premium: false,
     fields: [
       { key: "efw1", label: "Twin A EFW (g)", placeholder: "e.g. 1800", min: 100, max: 5000 },
       { key: "efw2", label: "Twin B EFW (g)", placeholder: "e.g. 1350", min: 100, max: 5000 },
     ],
-    calculate: (vals: Record<string, number>) => {
-      if (!vals.efw1 || !vals.efw2) return null;
-      return { result: twinDiscordance(vals.efw1, vals.efw2), label: "Twin Discordance", note: "≥25% discordance = significant. Measure from larger twin. SMFM recommends surveillance every 2 weeks." };
+    calculate: (v) => (v.efw1 && v.efw2) ? { result: twinDiscordance(v.efw1, v.efw2), label: "Twin Discordance", note: "≥25% = significant. SMFM recommends surveillance every 2 weeks." } : null,
+  },
+  {
+    id: "cervical_length", title: "Cervical Length Risk Stratification", subtitle: "Preterm birth risk (ACOG/SMFM)",
+    category: "Cervix", premium: false,
+    fields: [
+      { key: "cl", label: "Cervical Length (mm)", placeholder: "e.g. 28", min: 1, max: 60 },
+      { key: "ga", label: "Gestational Age (weeks)", placeholder: "e.g. 22", min: 16, max: 34 },
+    ],
+    calculate: (v) => {
+      if (!v.cl || !v.ga) return null;
+      let risk = v.cl <= 10 ? "Extremely short — very high risk. Immediate referral."
+        : v.cl <= 20 ? "Short cervix (≤20 mm) — high risk. Progesterone and/or cerclage evaluation."
+        : v.cl <= 25 ? "Borderline short (21–25 mm) — increased risk. Consider progesterone."
+        : "Normal cervical length (>25 mm) — low risk.";
+      return { result: risk, label: "Cervical Length Assessment", note: "Measure transvaginally with empty bladder. Report shortest of 3 measurements." };
     },
   },
   {
-    id: "umbilical_doppler",
-    title: "Umbilical Artery Doppler Indices",
-    subtitle: "S/D ratio, PI, RI interpretation",
-    category: "Doppler",
-    premium: true,
+    id: "afv", title: "Amniotic Fluid Index (AFI) / DVP", subtitle: "Oligohydramnios and polyhydramnios assessment",
+    category: "Amniotic Fluid", premium: false,
+    fields: [
+      { key: "afi", label: "AFI (cm) — sum of 4 quadrants", placeholder: "e.g. 14", min: 0, max: 40 },
+      { key: "dvp", label: "Deepest Vertical Pocket (cm)", placeholder: "e.g. 5.2", min: 0, max: 20 },
+    ],
+    calculate: (v) => {
+      const res: string[] = [];
+      if (v.afi > 0) res.push(v.afi < 5 ? `AFI ${v.afi} cm — Oligohydramnios` : v.afi <= 8 ? `AFI ${v.afi} cm — Low normal` : v.afi <= 24 ? `AFI ${v.afi} cm — Normal` : `AFI ${v.afi} cm — Polyhydramnios`);
+      if (v.dvp > 0) res.push(v.dvp < 2 ? `DVP ${v.dvp} cm — Oligohydramnios` : v.dvp <= 8 ? `DVP ${v.dvp} cm — Normal` : `DVP ${v.dvp} cm — Polyhydramnios`);
+      return res.length ? { result: res.join(" | "), label: "Amniotic Fluid Assessment", note: "DVP preferred in multiple gestations. AFI <5 cm or DVP <2 cm = oligohydramnios." } : null;
+    },
+  },
+  {
+    id: "umbilical_doppler", title: "Umbilical Artery Doppler Indices", subtitle: "S/D ratio, PI, RI interpretation",
+    category: "Doppler", premium: true,
     fields: [
       { key: "sd", label: "S/D Ratio", placeholder: "e.g. 3.2", min: 0.5, max: 20 },
       { key: "pi", label: "Pulsatility Index (PI)", placeholder: "e.g. 1.2", min: 0.1, max: 5 },
       { key: "ri", label: "Resistive Index (RI)", placeholder: "e.g. 0.65", min: 0.1, max: 1.5 },
     ],
-    calculate: (vals: Record<string, number>) => {
-      if (!vals.sd) return null;
-      return { result: umbilicalArtery(vals.sd, vals.pi || 0, vals.ri || 0), label: "Umbilical Artery Assessment", note: "Absent/reversed end-diastolic flow = immediate obstetric consultation." };
-    },
-  },
-  {
-    id: "lhr",
-    title: "Lung-to-Head Ratio (LHR)",
-    subtitle: "Congenital Diaphragmatic Hernia prognosis (Metkus 1996)",
-    category: "Fetal Anomaly",
-    premium: true,
-    fields: [
-      { key: "lung_area", label: "Contralateral Lung Area (mm²)", placeholder: "e.g. 450", min: 50, max: 3000 },
-      { key: "hc", label: "Head Circumference (mm)", placeholder: "e.g. 260", min: 100, max: 400 },
-    ],
-    calculate: (vals: Record<string, number>) => {
-      if (!vals.lung_area || !vals.hc) return null;
-      const lhr = vals.lung_area / vals.hc;
-      let interp = "";
-      if (lhr < 0.6) interp = "Extremely poor prognosis (<0.6)";
-      else if (lhr < 1.0) interp = "Poor prognosis (0.6–0.99)";
-      else if (lhr < 1.4) interp = "Intermediate prognosis (1.0–1.39)";
-      else interp = "Favorable prognosis (≥1.4)";
-      return { result: `LHR = ${lhr.toFixed(2)} — ${interp}`, label: "Lung-to-Head Ratio", note: "Measure contralateral lung (4-chamber view). O/E LHR preferred at specialized centers." };
-    },
-  },
-  {
-    id: "cvr_calc",
-    title: "Congenital Pulmonary Airway Malformation Volume Ratio (CVR)",
-    subtitle: "CPAM/CCAM prognosis (Crombleholme 2002)",
-    category: "Fetal Anomaly",
-    premium: true,
-    fields: [
-      { key: "length", label: "CPAM Length (cm)", placeholder: "e.g. 4.5", min: 0.5, max: 15 },
-      { key: "width", label: "CPAM Width (cm)", placeholder: "e.g. 3.2", min: 0.5, max: 15 },
-      { key: "height", label: "CPAM Height (cm)", placeholder: "e.g. 2.8", min: 0.5, max: 15 },
-      { key: "hc", label: "Head Circumference (cm)", placeholder: "e.g. 26.5", min: 5, max: 40 },
-    ],
-    calculate: (vals: Record<string, number>) => {
-      if (!vals.length || !vals.width || !vals.height || !vals.hc) return null;
-      const vol = (Math.PI / 6) * vals.length * vals.width * vals.height;
-      const cvr_val = vol / (vals.hc * vals.hc);
-      let interp = "";
-      if (cvr_val > 1.6) interp = "High risk for hydrops (>1.6) — consider fetal intervention";
-      else if (cvr_val >= 0.9) interp = "Intermediate risk (0.9–1.6) — close surveillance";
-      else interp = "Low risk (<0.9) — expectant management";
-      return { result: `CVR = ${cvr_val.toFixed(2)} — ${interp}`, label: "CPAM Volume Ratio", note: "CVR >1.6 = 75% risk of hydrops. Refer to fetal medicine center." };
-    },
-  },
-  {
-    id: "cervical_length",
-    title: "Cervical Length Risk Stratification",
-    subtitle: "Preterm birth risk by cervical length (ACOG/SMFM)",
-    category: "Cervix",
-    premium: false,
-    fields: [
-      { key: "cl", label: "Cervical Length (mm)", placeholder: "e.g. 28", min: 1, max: 60 },
-      { key: "ga", label: "Gestational Age (weeks)", placeholder: "e.g. 22", min: 16, max: 34 },
-    ],
-    calculate: (vals: Record<string, number>) => {
-      if (!vals.cl || !vals.ga) return null;
-      let risk = "";
-      if (vals.cl <= 10) risk = "Extremely short — very high risk for preterm birth. Immediate referral.";
-      else if (vals.cl <= 20) risk = "Short cervix (≤20 mm) — high risk. Progesterone and/or cerclage evaluation.";
-      else if (vals.cl <= 25) risk = "Borderline short (21–25 mm) — increased risk. Consider progesterone.";
-      else risk = "Normal cervical length (>25 mm) — low risk at this gestational age.";
-      return { result: risk, label: "Cervical Length Assessment", note: "Measure with empty bladder, transvaginal approach. Three measurements — report shortest." };
-    },
-  },
-  {
-    id: "afv",
-    title: "Amniotic Fluid Index (AFI) / DVP",
-    subtitle: "Oligohydramnios and polyhydramnios assessment",
-    category: "Amniotic Fluid",
-    premium: false,
-    fields: [
-      { key: "afi", label: "AFI (cm) — sum of 4 quadrants", placeholder: "e.g. 14", min: 0, max: 40 },
-      { key: "dvp", label: "Deepest Vertical Pocket (cm)", placeholder: "e.g. 5.2", min: 0, max: 20 },
-    ],
-    calculate: (vals: Record<string, number>) => {
-      if (vals.afi === undefined && vals.dvp === undefined) return null;
-      const results = [];
-      if (vals.afi !== undefined && vals.afi > 0) {
-        if (vals.afi < 5) results.push(`AFI ${vals.afi} cm — Oligohydramnios (<5 cm)`);
-        else if (vals.afi <= 8) results.push(`AFI ${vals.afi} cm — Low normal (5–8 cm)`);
-        else if (vals.afi <= 24) results.push(`AFI ${vals.afi} cm — Normal (8–24 cm)`);
-        else results.push(`AFI ${vals.afi} cm — Polyhydramnios (>24 cm)`);
-      }
-      if (vals.dvp !== undefined && vals.dvp > 0) {
-        if (vals.dvp < 2) results.push(`DVP ${vals.dvp} cm — Oligohydramnios (<2 cm)`);
-        else if (vals.dvp <= 8) results.push(`DVP ${vals.dvp} cm — Normal (2–8 cm)`);
-        else results.push(`DVP ${vals.dvp} cm — Polyhydramnios (>8 cm)`);
-      }
-      return { result: results.join(" | "), label: "Amniotic Fluid Assessment", note: "DVP preferred over AFI in multiple gestations and post-dates. AFI <5 cm or DVP <2 cm = oligohydramnios." };
+    calculate: (v) => {
+      if (!v.sd) return null;
+      const res: string[] = [];
+      if (v.sd > 4.0) res.push("S/D ratio elevated (>4.0)");
+      if (v.pi > 1.7) res.push("PI elevated (>1.7)");
+      if (v.ri > 0.8) res.push("RI elevated (>0.8)");
+      return { result: res.length ? res.join("; ") : "Normal umbilical artery Doppler", label: "Umbilical Artery Assessment", note: "Absent/reversed end-diastolic flow = immediate obstetric consultation." };
     },
   },
 ];
 
-// ─── Component ────────────────────────────────────────────────────────────────
-export default function ObGynCalculators() {
-  const [expanded, setExpanded] = useState<string | null>("crl_ga");
-  const [values, setValues] = useState<Record<string, Record<string, number>>>({});
-  const [results, setResults] = useState<Record<string, { result: string; label: string; note: string } | null>>({});
+const abdominalCalcs: CalcDef[] = [
+  {
+    id: "liver_stiffness_2dswe", title: "Liver Stiffness — 2D-SWE (kPa)", subtitle: "Hepatic fibrosis staging (EASL 2017 guidelines)",
+    category: "Liver SWE", premium: false,
+    fields: [{ key: "kpa", label: "2D-SWE Result (kPa)", placeholder: "e.g. 8.5", min: 1, max: 75 }],
+    calculate: (v) => v.kpa ? { result: liverStiffnessStage(v.kpa, "2dswe"), label: "Fibrosis Stage (2D-SWE)", note: "Fasting ≥2 h required. Avoid after exercise. IQR/median <30% for reliable result. Reference: EASL Clinical Practice Guidelines 2017." } : null,
+  },
+  {
+    id: "liver_stiffness_pswe", title: "Liver Stiffness — pSWE / ARFI (m/s)", subtitle: "Hepatic fibrosis staging (WFUMB/EFSUMB guidelines)",
+    category: "Liver SWE", premium: false,
+    fields: [{ key: "kpa", label: "pSWE / ARFI Result (m/s)", placeholder: "e.g. 1.45", min: 0.5, max: 4.5 }],
+    calculate: (v) => v.kpa ? { result: liverStiffnessStage(v.kpa, "pswe"), label: "Fibrosis Stage (pSWE/ARFI)", note: "Measure in right lobe, 10th intercostal space, 1–2 cm below liver capsule. 10 valid measurements. Reference: WFUMB 2015." } : null,
+  },
+  {
+    id: "udff", title: "UDFF — Ultrasound-Derived Fat Fraction", subtitle: "Hepatic steatosis grading S0–S3 (GE LOGIQ / Siemens Acuson)",
+    category: "Steatosis (UDFF)", premium: false,
+    fields: [{ key: "udff", label: "UDFF (%)", placeholder: "e.g. 12.5", min: 0, max: 100 }],
+    calculate: (v) => v.udff !== undefined ? { result: udffGrade(v.udff), label: "Steatosis Grade (UDFF)", note: "UDFF <5% = no steatosis. Validated against MRI-PDFF. Vendor-specific: GE uses ATI, Siemens uses STE. Reference: Ferraioli et al. Ultrasonography 2021." } : null,
+  },
+  {
+    id: "gallbladder_wall", title: "Gallbladder Wall Thickness", subtitle: "Normal vs. abnormal wall thickness interpretation",
+    category: "Gallbladder", premium: false,
+    fields: [{ key: "thickness_mm", label: "Wall Thickness (mm)", placeholder: "e.g. 4", min: 1, max: 20 }],
+    calculate: (v) => v.thickness_mm ? { result: gallbladderWall(v.thickness_mm), label: "Gallbladder Wall Assessment", note: "Measure anterior wall in fasting patient. Diffuse thickening >3 mm has many causes beyond cholecystitis." } : null,
+  },
+  {
+    id: "spleen_size", title: "Spleen Size Assessment", subtitle: "Splenomegaly grading by maximum length",
+    category: "Spleen", premium: false,
+    fields: [{ key: "length_cm", label: "Spleen Length (cm)", placeholder: "e.g. 12.5", min: 4, max: 30 }],
+    calculate: (v) => v.length_cm ? { result: spleenSize(v.length_cm), label: "Spleen Size Assessment", note: "Measure maximum craniocaudal length in coronal plane. Normal ≤11 cm in adults." } : null,
+  },
+];
 
-  const handleInput = (calcId: string, fieldKey: string, raw: string) => {
+const breastCalcs: CalcDef[] = [
+  {
+    id: "swe_kpa", title: "SWE Lesion Stiffness (kPa) → Malignancy Risk", subtitle: "ACR/WFUMB SWE BI-RADS adjunct criteria",
+    category: "SWE Stiffness", premium: false,
+    fields: [{ key: "kpa", label: "Mean Lesion Stiffness (kPa)", placeholder: "e.g. 95", min: 1, max: 300 }],
+    calculate: (v) => v.kpa ? { result: sweKpaMalignancy(v.kpa), label: "SWE Malignancy Risk (kPa)", note: "Use mean stiffness in ROI placed over stiffest part of lesion. Avoid ROI in necrotic areas. Reference: ACR SWE Lexicon 2019." } : null,
+  },
+  {
+    id: "swe_ms", title: "SWE Lesion Stiffness (m/s) → Malignancy Risk", subtitle: "Convert m/s to kPa and interpret (kPa ≈ 3 × v²)",
+    category: "SWE Stiffness", premium: false,
+    fields: [{ key: "ms", label: "Mean Lesion Stiffness (m/s)", placeholder: "e.g. 5.5", min: 0.5, max: 15 }],
+    calculate: (v) => v.ms ? { result: sweMs(v.ms), label: "SWE Malignancy Risk (m/s)", note: "Conversion: kPa ≈ 3 × (m/s)². Vendor-specific: Supersonic Imagine reports m/s; Siemens/GE report kPa." } : null,
+  },
+  {
+    id: "lesion_fat_ratio", title: "Lesion-to-Fat SWE Ratio", subtitle: "Lesion stiffness relative to adjacent fat (ratio ≥3.0 = suspicious)",
+    category: "SWE Stiffness", premium: false,
+    fields: [
+      { key: "lesion_kpa", label: "Lesion Stiffness (kPa)", placeholder: "e.g. 90", min: 1, max: 300 },
+      { key: "fat_kpa", label: "Adjacent Fat Stiffness (kPa)", placeholder: "e.g. 18", min: 1, max: 50 },
+    ],
+    calculate: (v) => (v.lesion_kpa && v.fat_kpa) ? { result: lesionFatRatio(v.lesion_kpa, v.fat_kpa), label: "Lesion-to-Fat Ratio", note: "Measure fat stiffness in same plane, same depth. Ratio ≥3.0 supports malignant classification. Reference: Berg et al. Radiology 2012." } : null,
+  },
+  {
+    id: "birads_swe_adjunct", title: "BI-RADS + SWE Adjunct Assessment", subtitle: "SWE upgrade/downgrade guidance for BI-RADS 3–5",
+    category: "BI-RADS Adjunct", premium: false,
+    fields: [
+      { key: "birads", label: "B-mode BI-RADS Category (2–5)", placeholder: "e.g. 4", min: 2, max: 5 },
+      { key: "kpa", label: "Mean Lesion Stiffness (kPa)", placeholder: "e.g. 95", min: 1, max: 300 },
+    ],
+    calculate: (v) => (v.birads && v.kpa) ? { result: biradsSweAdjunct(v.birads, v.kpa), label: "BI-RADS + SWE Adjunct", note: "SWE is an adjunct — never use alone to upgrade or downgrade without full B-mode assessment. Reference: ACR BI-RADS Atlas 5th Ed." } : null,
+  },
+];
+
+const vascularCalcs: CalcDef[] = [
+  {
+    id: "abi", title: "Ankle-Brachial Index (ABI)", subtitle: "Peripheral arterial disease assessment (AHA/ACC guidelines)",
+    category: "Peripheral Arterial", premium: false,
+    fields: [
+      { key: "ankle", label: "Ankle Systolic Pressure (mmHg)", placeholder: "e.g. 110", min: 40, max: 250 },
+      { key: "brachial", label: "Brachial Systolic Pressure (mmHg)", placeholder: "e.g. 130", min: 60, max: 250 },
+    ],
+    calculate: (v) => (v.ankle && v.brachial) ? { result: abiInterpret(v.ankle / v.brachial), label: `ABI = ${(v.ankle / v.brachial).toFixed(2)}`, note: "Use higher of 2 brachial pressures. Use higher of dorsalis pedis and posterior tibial pressures per side. Reference: AHA/ACC PAD Guidelines 2016." } : null,
+  },
+  {
+    id: "ivc_ci", title: "IVC Collapsibility Index (IVC-CI)", subtitle: "Volume status / CVP estimation (POCUS)",
+    category: "Venous / POCUS", premium: false,
+    fields: [
+      { key: "max_cm", label: "IVC Max Diameter (cm, expiration)", placeholder: "e.g. 2.1", min: 0.5, max: 4 },
+      { key: "min_cm", label: "IVC Min Diameter (cm, inspiration)", placeholder: "e.g. 0.9", min: 0, max: 4 },
+    ],
+    calculate: (v) => (v.max_cm) ? { result: ivcCi(v.max_cm, v.min_cm || 0), label: "IVC Collapsibility Index", note: "Measure 2 cm from RA junction, subcostal view. Spontaneously breathing patients. Mechanically ventilated: use distensibility index instead. Reference: ACEP POCUS Guidelines 2016." } : null,
+  },
+  {
+    id: "carotid_stenosis", title: "Carotid Stenosis Grading (ICA)", subtitle: "NASCET/SRU velocity criteria for ICA stenosis",
+    category: "Carotid / Cerebrovascular", premium: false,
+    fields: [
+      { key: "psv", label: "ICA PSV (cm/s)", placeholder: "e.g. 240", min: 20, max: 600 },
+      { key: "edv", label: "ICA EDV (cm/s)", placeholder: "e.g. 110", min: 0, max: 300 },
+      { key: "ica_cca_ratio", label: "ICA/CCA PSV Ratio", placeholder: "e.g. 4.2", min: 0, max: 20 },
+    ],
+    calculate: (v) => v.psv ? { result: carotidStenosis(v.psv, v.edv || 0, v.ica_cca_ratio || 0), label: "Carotid Stenosis Grade", note: "PSV ≥230 cm/s, EDV ≥100 cm/s, or ICA/CCA ratio ≥4.0 each independently suggest ≥70% stenosis. Reference: SRU Consensus 2003." } : null,
+  },
+  {
+    id: "rvsp", title: "RVSP Estimation (Tricuspid Regurgitation)", subtitle: "Right ventricular systolic pressure via modified Bernoulli",
+    category: "Cardiac / Pulmonary", premium: false,
+    fields: [
+      { key: "tr_velocity", label: "TR Peak Velocity (m/s)", placeholder: "e.g. 3.2", min: 1, max: 6 },
+      { key: "rap", label: "Estimated RAP (mmHg)", placeholder: "e.g. 5", min: 0, max: 20 },
+    ],
+    calculate: (v) => (v.tr_velocity && v.rap !== undefined) ? { result: rvsp(v.tr_velocity, v.rap), label: "RVSP Estimate", note: "RVSP = 4 × TRV² + RAP. RAP: 5 mmHg if IVC <2.1 cm + >50% collapse; 10 mmHg if intermediate; 15–20 mmHg if IVC >2.1 cm + <50% collapse. Reference: ASE Guidelines 2015." } : null,
+  },
+  {
+    id: "dvt_wells", title: "DVT Pre-test Probability (Wells Score)", subtitle: "Lower extremity DVT clinical probability",
+    category: "Venous / POCUS", premium: true,
+    fields: [
+      { key: "active_cancer", label: "Active cancer (0 or 1)", placeholder: "0 = No, 1 = Yes", min: 0, max: 1 },
+      { key: "paralysis", label: "Paralysis/paresis/plaster (0 or 1)", placeholder: "0 = No, 1 = Yes", min: 0, max: 1 },
+      { key: "bedridden", label: "Bedridden >3 days or surgery <12 wk (0 or 1)", placeholder: "0 = No, 1 = Yes", min: 0, max: 1 },
+      { key: "tenderness", label: "Localized tenderness along deep veins (0 or 1)", placeholder: "0 = No, 1 = Yes", min: 0, max: 1 },
+      { key: "entire_leg", label: "Entire leg swollen (0 or 1)", placeholder: "0 = No, 1 = Yes", min: 0, max: 1 },
+      { key: "calf_diff", label: "Calf swelling >3 cm vs. asymptomatic (0 or 1)", placeholder: "0 = No, 1 = Yes", min: 0, max: 1 },
+      { key: "pitting", label: "Pitting edema (symptomatic leg only) (0 or 1)", placeholder: "0 = No, 1 = Yes", min: 0, max: 1 },
+      { key: "collateral", label: "Collateral superficial veins (0 or 1)", placeholder: "0 = No, 1 = Yes", min: 0, max: 1 },
+      { key: "alt_dx", label: "Alternative diagnosis as likely or more likely (0 or -2)", placeholder: "0 = No, -2 = Yes", min: -2, max: 0 },
+    ],
+    calculate: (v) => {
+      const score = (v.active_cancer || 0) + (v.paralysis || 0) + (v.bedridden || 0) + (v.tenderness || 0) + (v.entire_leg || 0) + (v.calf_diff || 0) + (v.pitting || 0) + (v.collateral || 0) + (v.alt_dx || 0);
+      let prob = score <= 0 ? "Low probability (≤0) — DVT unlikely. Consider D-dimer." : score <= 2 ? `Moderate probability (score ${score}) — Ultrasound recommended.` : `High probability (score ${score}) — Ultrasound and anticoagulation consideration.`;
+      return { result: prob, label: `Wells DVT Score = ${score}`, note: "Score ≤0 = low; 1–2 = moderate; ≥3 = high. Reference: Wells PS et al. Lancet 1997." };
+    },
+  },
+];
+
+// ─── Tab config ───────────────────────────────────────────────────────────────
+const TABS = [
+  { id: "obgyn", label: "OB/Gyn", icon: Baby, calcs: obgynCalcs, badge: "OB · Gyn · Fetal", refs: "ACOG, SMFM, ISUOG, Hadlock 1985, Mari 2000, Snijders 1998" },
+  { id: "abdominal", label: "Abdominal", icon: Scan, calcs: abdominalCalcs, badge: "Liver · GB · Spleen", refs: "EASL 2017, WFUMB 2015, Ferraioli 2021" },
+  { id: "breast", label: "Breast", icon: Activity, calcs: breastCalcs, badge: "SWE · BI-RADS", refs: "ACR BI-RADS 5th Ed, WFUMB SWE 2017, Berg 2012" },
+  { id: "vascular", label: "Vascular", icon: Heart, calcs: vascularCalcs, badge: "ABI · IVC · Carotid · DVT", refs: "AHA/ACC 2016, SRU 2003, ASE 2015, Wells 1997" },
+] as const;
+
+type TabId = typeof TABS[number]["id"];
+
+// ─── Calculator card component ────────────────────────────────────────────────
+function CalcCard({ calc, expanded, onToggle }: { calc: CalcDef; expanded: boolean; onToggle: () => void }) {
+  const [values, setValues] = useState<Record<string, number>>({});
+  const [result, setResult] = useState<CalcResult>(null);
+
+  const handleInput = (key: string, raw: string) => {
     const num = parseFloat(raw);
-    setValues(prev => ({
-      ...prev,
-      [calcId]: { ...(prev[calcId] || {}), [fieldKey]: isNaN(num) ? 0 : num },
-    }));
+    setValues(prev => ({ ...prev, [key]: isNaN(num) ? 0 : num }));
   };
 
-  const handleCalculate = (calc: typeof calculators[0]) => {
-    const fieldVals = values[calc.id] || {};
-    const result = calc.calculate(fieldVals);
-    setResults(prev => ({ ...prev, [calc.id]: result }));
+  const handleCalculate = () => {
+    setResult(calc.calculate(values));
   };
 
-  const categories = Array.from(new Set(calculators.map(c => c.category)));
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-2">
+      <button
+        className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-[#f0fbfc] transition-all"
+        onClick={onToggle}
+      >
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg, #0e1e2e, #189aa1)" }}>
+          <Calculator className="w-4 h-4 text-[#4ad9e0]" />
+        </div>
+        <div className="flex-1 text-left">
+          <div className="font-bold text-sm text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>{calc.title}</div>
+          <div className="text-xs text-gray-400 mt-0.5">{calc.subtitle}</div>
+        </div>
+        {calc.premium && (
+          <span className="text-xs font-bold text-[#189aa1] bg-[#f0fbfc] border border-[#189aa140] px-2 py-0.5 rounded-full mr-2">Premium</span>
+        )}
+        {expanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+      </button>
+
+      {expanded && (
+        <div className="border-t border-gray-100 p-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+            {calc.fields.map(field => (
+              <div key={field.key}>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">{field.label}</label>
+                <input
+                  type="number"
+                  placeholder={field.placeholder}
+                  min={field.min}
+                  max={field.max}
+                  step="any"
+                  onChange={e => handleInput(field.key, e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:border-[#189aa1]"
+                  style={{ "--tw-ring-color": "#189aa1" } as React.CSSProperties}
+                />
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={handleCalculate}
+            className="w-full py-2.5 rounded-lg font-bold text-sm text-white transition-all hover:opacity-90"
+            style={{ background: "linear-gradient(135deg, #0e1e2e, #189aa1)" }}
+          >
+            Calculate
+          </button>
+          {result && (
+            <div className="mt-4 rounded-xl p-4 border" style={{ borderColor: "#189aa140", background: "#f0fbfc" }}>
+              <div className="text-xs font-bold text-[#189aa1] uppercase tracking-wider mb-1">{result.label}</div>
+              <div className="text-base font-bold text-gray-900 mb-2">{result.result}</div>
+              {result.note && <div className="text-xs text-gray-500 leading-relaxed">{result.note}</div>}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+export default function ObGynCalculators() {
+  const [activeTab, setActiveTab] = useState<TabId>("obgyn");
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  const tab = TABS.find(t => t.id === activeTab)!;
+  const categories = Array.from(new Set(tab.calcs.map(c => c.category)));
 
   return (
     <Layout>
-      {/* Header */}
+      {/* Hero header */}
       <div
         className="relative overflow-hidden"
         style={{ background: "linear-gradient(135deg, #0e1e2e 0%, #0e4a50 60%, #189aa1 100%)" }}
       >
         <div className="container py-8 md:py-10">
-          <div className="mb-3">
-            <BackToEchoAssist />
+          {/* Breadcrumb */}
+          <div className="mb-4">
+            <Link href="/ultrasound-assist">
+              <a className="inline-flex items-center gap-1.5 text-[#4ad9e0] hover:text-white text-sm font-medium transition-colors">
+                <ArrowLeft className="w-4 h-4" />
+                UltrasoundAssist™
+              </a>
+            </Link>
           </div>
+
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(255,255,255,0.1)" }}>
               <Calculator className="w-6 h-6 text-[#4ad9e0]" />
@@ -298,16 +486,37 @@ export default function ObGynCalculators() {
             <div className="flex-1">
               <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-3 py-1 mb-2">
                 <div className="w-2 h-2 rounded-full bg-[#4ad9e0] animate-pulse" />
-                <span className="text-sm text-white/80 font-medium">OB/Gyn · Calculators</span>
+                <span className="text-sm text-white/80 font-medium">UltrasoundAssist™ · {tab.badge}</span>
               </div>
               <h1 className="text-2xl md:text-3xl font-black text-white leading-tight" style={{ fontFamily: "Merriweather, serif" }}>
-                OB/Gyn Ultrasound Calculators
+                UltrasoundAssist™ Calculators
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">Guideline-Based Clinical Calculators</p>
               <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
-                CRL, NT, MCA PSV, EFW, twin discordance, umbilical Doppler, LHR, CVR, cervical length, and amniotic fluid — based on ACOG, SMFM, and ISUOG guidelines.
+                OB/Gyn biometrics, liver SWE/UDFF, breast SWE stiffness, and vascular indices — based on ACOG, EASL, ACR, and AHA/ACC guidelines.
               </p>
             </div>
+          </div>
+
+          {/* Tab bar */}
+          <div className="flex gap-1 mt-6 bg-white/10 rounded-xl p-1 w-fit">
+            {TABS.map(t => {
+              const Icon = t.icon;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => { setActiveTab(t.id); setExpanded(null); }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    activeTab === t.id
+                      ? "bg-[#189aa1] text-white shadow"
+                      : "text-white/70 hover:text-white hover:bg-white/10"
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {t.label}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -320,74 +529,23 @@ export default function ObGynCalculators() {
           </p>
         </div>
 
+        {/* Calculators by category */}
         {categories.map(cat => (
           <div key={cat}>
             <div className="text-xs font-bold text-[#189aa1] uppercase tracking-wider px-1 mb-2">{cat}</div>
-            {calculators.filter(c => c.category === cat).map(calc => (
-              <div key={calc.id} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-2">
-                <button
-                  className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-[#f0fbfc] transition-all"
-                  onClick={() => setExpanded(expanded === calc.id ? null : calc.id)}
-                >
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg, #0e1e2e, #189aa1)" }}>
-                    <Calculator className="w-4 h-4 text-[#4ad9e0]" />
-                  </div>
-                  <div className="flex-1 text-left">
-                    <div className="font-bold text-sm text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>{calc.title}</div>
-                    <div className="text-xs text-gray-400 mt-0.5">{calc.subtitle}</div>
-                  </div>
-                  {calc.premium && (
-                    <span className="text-xs font-bold text-[#189aa1] bg-[#f0fbfc] border border-[#189aa140] px-2 py-0.5 rounded-full mr-2">Premium</span>
-                  )}
-                  {expanded === calc.id ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
-                </button>
-
-                {expanded === calc.id && (
-                  <div className="border-t border-gray-100 p-5">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-                      {calc.fields.map(field => (
-                        <div key={field.key}>
-                          <label className="block text-xs font-semibold text-gray-600 mb-1">{field.label}</label>
-                          <input
-                            type="number"
-                            placeholder={field.placeholder}
-                            min={field.min}
-                            max={field.max}
-                            step="any"
-                            onChange={e => handleInput(calc.id, field.key, e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:border-[#189aa1]"
-                            style={{ "--tw-ring-color": "#189aa1" } as React.CSSProperties}
-                          />
-                        </div>
-                      ))}
-                    </div>
-
-                    <button
-                      onClick={() => handleCalculate(calc)}
-                      className="w-full py-2.5 rounded-lg font-bold text-sm text-white transition-all hover:opacity-90"
-                      style={{ background: "linear-gradient(135deg, #0e1e2e, #189aa1)" }}
-                    >
-                      Calculate
-                    </button>
-
-                    {results[calc.id] && (
-                      <div className="mt-4 rounded-xl p-4 border" style={{ borderColor: "#189aa140", background: "#f0fbfc" }}>
-                        <div className="text-xs font-bold text-[#189aa1] uppercase tracking-wider mb-1">{results[calc.id]!.label}</div>
-                        <div className="text-base font-bold text-gray-900 mb-2">{results[calc.id]!.result}</div>
-                        {results[calc.id]!.note && (
-                          <div className="text-xs text-gray-500 leading-relaxed">{results[calc.id]!.note}</div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+            {tab.calcs.filter(c => c.category === cat).map(calc => (
+              <CalcCard
+                key={calc.id}
+                calc={calc}
+                expanded={expanded === calc.id}
+                onToggle={() => setExpanded(expanded === calc.id ? null : calc.id)}
+              />
             ))}
           </div>
         ))}
 
         <div className="text-xs text-gray-400 px-1 mt-4">
-          References: ACOG Practice Bulletins; SMFM Consult Series; ISUOG Practice Guidelines; Hadlock FP et al. Radiology 1985; Mari G et al. NEJM 2000; Snijders RJM et al. Lancet 1998; Metkus AP et al. J Pediatr Surg 1996; Crombleholme TM et al. Am J Obstet Gynecol 2002.
+          References: {tab.refs}
         </div>
       </div>
     </Layout>

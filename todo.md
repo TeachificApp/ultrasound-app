@@ -342,3 +342,10 @@
 
 ## Sidebar Calculators Link (Mar 19)
 - [x] Add UltrasoundAssist™ Calculators link to sidebar under Clinical Tools
+
+## Calculators Page Expansion (Mar 19)
+- [x] Add Abdominal tab: liver stiffness 2D-SWE (kPa) + pSWE/ARFI (m/s), UDFF steatosis S0-S3, gallbladder wall, spleen size
+- [x] Add Breast tab: SWE kPa + m/s malignancy risk, lesion-to-fat ratio, BI-RADS SWE adjunct
+- [x] Add Vascular tab: ABI, IVC-CI, carotid stenosis (NASCET/SRU), RVSP, DVT Wells score
+- [x] Add breadcrumb back-link to UltrasoundAssist™ hub on Calculators page
+- [x] Refactored to per-card state (CalcCard component) so each calculator has independent inputs and results
