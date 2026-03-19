@@ -320,3 +320,8 @@
 ## TM Symbol & Description Fixes (Mar 19)
 - [x] Add ™ to all uses of "All About Ultrasound" that are missing it (all files — 26 files fixed, 0 remaining)
 - [x] Update dashboard hero description subtext to user-specified copy
+
+## Live Member Counter (Mar 19)
+- [x] Add tRPC publicProcedure to return live registered user count from DB
+- [x] Wire Members stat on dashboard hero to live count with count-up animation
+- [x] Match iHeartEcho behavior: animate on mount, show real number

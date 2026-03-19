@@ -3,11 +3,32 @@
   Brand: Teal #189aa1, Aqua #4ad9e0, Dark Navy #0e1e2e
   Fonts: Merriweather headings, Open Sans body
 */
-import { useEffect } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import { trpc } from "@/lib/trpc";
+
+/** Animates a number from 0 to `target` over `duration` ms */
+function useCountUp(target: number, duration = 1800) {
+  const [count, setCount] = useState(0);
+  const rafRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!target) return;
+    const start = performance.now();
+    const step = (now: number) => {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / duration, 1);
+      // ease-out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setCount(Math.round(eased * target));
+      if (progress < 1) rafRef.current = requestAnimationFrame(step);
+    };
+    rafRef.current = requestAnimationFrame(step);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, [target, duration]);
+  return count;
+}
 import {
   Calculator, ClipboardList, Activity, BookOpen, FileText,
   ArrowRight, Users, Award, Zap, Stethoscope, ExternalLink, MessageCircle, GraduationCap, BookMarked, Crown, Shield, Heart
@@ -108,13 +129,18 @@ const modules: Module[] = [
 export default function Home() {
   const { user, isAuthenticated } = useAuth();
   const isPremium = user?.isPremium === true || user?.role === "admin";
-
   useEffect(() => {
     document.title = "UltrasoundAssist™ | All About Ultrasound™";
   }, []);
-
   const pinnedLast = modules.filter(m => m.pinLast);
   const sortedModules = [...modules.filter(m => !m.pinLast), ...pinnedLast];
+
+  // Live member count from DB
+  const { data: statsData } = trpc.stats.userCount.useQuery(undefined, {
+    staleTime: 5 * 60 * 1000, // cache for 5 min
+  });
+  const liveCount = statsData?.total ?? 0;
+  const animatedCount = useCountUp(liveCount);
 
   return (
     <Layout>
@@ -206,7 +232,9 @@ export default function Home() {
               </div>
               <div className="flex items-center gap-2 text-white/80">
                 <Users className="w-4 h-4 text-[#4ad9e0]" />
-                <span className="text-lg font-bold text-white">10,000+</span>
+                <span className="text-lg font-bold text-white">
+                  {liveCount > 0 ? animatedCount.toLocaleString() : "—"}
+                </span>
                 <span className="text-xs text-white/60">Members</span>
               </div>
             </div>
