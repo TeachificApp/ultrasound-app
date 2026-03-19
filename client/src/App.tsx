@@ -9,6 +9,7 @@ import { Route, Switch, useLocation } from "wouter";
 import { useEffect } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import DemoModeBanner from "./components/DemoModeBanner";
+import GetAppBanner from "./components/GetAppBanner";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { RoleGuard } from "@/components/RoleGuard";
 
@@ -272,6 +273,7 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <DemoModeBanner />
+          <GetAppBanner />
           <Router />
         </TooltipProvider>
       </ThemeProvider>

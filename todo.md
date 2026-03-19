@@ -299,3 +299,20 @@
 - [x] Rename "Echo Flashcards" to "Ultrasound Flashcards" everywhere (page heading, sidebar, banner)
 - [x] Remove cards-available count from FlashcardsBanner
 - [x] Match iHeartEcho random card rotation on page load (shuffle on mount, not just on category change)
+
+## PWA "Get App" Install Banner (Mar 19)
+- [ ] Add web app manifest (manifest.json) with app.allaboutultrasound.com start_url, AAUS icons, theme colors
+- [ ] Add service worker registration for PWA installability
+- [ ] Create GetAppBanner component — iHeartEcho-style bottom banner with "Add to Home Screen" CTA
+- [ ] Show banner on first visit (after 3s delay), dismiss with X, remember dismissal in localStorage
+- [ ] iOS Safari: show custom instructions overlay (iOS doesn't support beforeinstallprompt)
+- [ ] Android/Chrome: use native beforeinstallprompt event for one-tap install
+- [ ] Wire GetAppBanner into DashboardLayout so it appears on all pages
+
+## PWA "Get App" Install Banner (Mar 19)
+- [x] Create manifest.json with AAUS branding, start_url: https://app.allaboutultrasound.com/
+- [x] Create sw.js service worker for PWA installability
+- [x] Create GetAppBanner component — fixed bottom bar, 3s delay, Android native prompt + iOS instructions
+- [x] Wire GetAppBanner into App.tsx
+- [x] Dismiss remembered in localStorage for 30 days
+- [x] Upload 192x192 and 512x512 AAUS icons to CDN for manifest
