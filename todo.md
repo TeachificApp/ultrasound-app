@@ -325,3 +325,17 @@
 - [x] Add tRPC publicProcedure to return live registered user count from DB
 - [x] Wire Members stat on dashboard hero to live count with count-up animation
 - [x] Match iHeartEcho behavior: animate on mount, show real number
+
+## Calculators Route Fix (Mar 19)
+- [ ] Fix Calculators page 404 — register route in App.tsx
+- [ ] Add Calculators link to sidebar navigation under Clinical Tools
+
+## Get App Banner & Calculators Route (Mar 19)
+- [ ] Get App banner: show on every dashboard page load on mobile unless PWA already installed
+- [ ] Remove 30-day dismiss localStorage — show every time on dashboard load
+- [ ] Fix Calculators 404 — import ObGynCalculators and register /ob-gyn-calculators route in App.tsx
+- [ ] Add Calculators sidebar nav link under Clinical Tools
+
+## Flashcard Daily Limit Fix (Mar 19)
+- [x] Fix daily limit: 10 total cards per day across ALL categories (not 10 per category)
+- [x] Server now queries global daily count (no cardIds filter) so switching categories does not reset the count

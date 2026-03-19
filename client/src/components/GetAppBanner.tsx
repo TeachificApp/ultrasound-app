@@ -1,18 +1,16 @@
 /**
  * GetAppBanner — PWA "Get App" install banner.
  *
- * Behaviour matches iHeartEcho:
- * - Appears as a fixed bottom bar after 3 seconds on first visit
+ * Behaviour:
+ * - Shows on every dashboard page load on mobile (< 768px) unless already running in standalone/PWA mode
  * - Android/Chrome: uses native beforeinstallprompt for one-tap install
  * - iOS Safari: shows "Add to Home Screen" instruction overlay
- * - Dismissed with ✕; dismissal remembered in localStorage for 30 days
- * - Never shown if app is already running in standalone mode
+ * - Dismissed with ✕ for that session only (no persistent storage — reappears on next load)
+ * - Never shown if app is already running in standalone mode (already installed)
  */
 import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
 import { X, Download, Share } from "lucide-react";
-
-const DISMISS_KEY = "aaus_get_app_dismissed";
-const DISMISS_DAYS = 30;
 
 function isStandalone() {
   return (
@@ -21,22 +19,8 @@ function isStandalone() {
   );
 }
 
-function isDismissed() {
-  try {
-    const raw = localStorage.getItem(DISMISS_KEY);
-    if (!raw) return false;
-    const ts = parseInt(raw, 10);
-    if (isNaN(ts)) return false;
-    return Date.now() - ts < DISMISS_DAYS * 24 * 60 * 60 * 1000;
-  } catch {
-    return false;
-  }
-}
-
-function dismiss() {
-  try {
-    localStorage.setItem(DISMISS_KEY, String(Date.now()));
-  } catch {}
+function isMobile() {
+  return window.innerWidth < 768;
 }
 
 function isIOS() {
@@ -47,10 +31,15 @@ export default function GetAppBanner() {
   const [visible, setVisible] = useState(false);
   const [showIosInstructions, setShowIosInstructions] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [location] = useLocation();
 
   useEffect(() => {
-    // Don't show if already installed or dismissed
-    if (isStandalone() || isDismissed()) return;
+    // Only show on dashboard route
+    if (location !== "/") return;
+    // Never show if already installed as PWA
+    if (isStandalone()) return;
+    // Only show on mobile
+    if (!isMobile()) return;
 
     // Capture the native install prompt (Android/Chrome)
     const handler = (e: Event) => {
@@ -64,21 +53,28 @@ export default function GetAppBanner() {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
 
-    // Show banner after 3 seconds (matches iHeartEcho timing)
+    // Show banner after 2 seconds on dashboard load
     const timer = setTimeout(() => {
       setVisible(true);
-    }, 3000);
+    }, 2000);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handler);
       clearTimeout(timer);
     };
-  }, []);
+  }, [location]); // re-run whenever the route changes (so it shows again on each dashboard visit)
+
+  // Hide when navigating away from dashboard
+  useEffect(() => {
+    if (location !== "/") {
+      setVisible(false);
+      setShowIosInstructions(false);
+    }
+  }, [location]);
 
   if (!visible) return null;
 
   function handleDismiss() {
-    dismiss();
     setVisible(false);
     setShowIosInstructions(false);
   }
@@ -92,7 +88,6 @@ export default function GetAppBanner() {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
       if (outcome === "accepted") {
-        dismiss();
         setVisible(false);
       }
       setDeferredPrompt(null);

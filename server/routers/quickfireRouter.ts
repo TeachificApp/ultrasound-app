@@ -1964,13 +1964,16 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
               ))
           : [];
 
-        // Count how many distinct flashcards the user has reviewed TODAY
-        const todayAttemptedIds = new Set(
-          attempts
-            .filter((a) => a.setDate === deckSetDate)
-            .map((a) => a.questionId)
-        );
-        const dailySeenCount = todayAttemptedIds.size;
+        // Count how many distinct flashcards the user has reviewed TODAY — GLOBAL across ALL categories.
+        // We query without the cardIds filter so switching categories does not reset the visible count.
+        const globalTodayRows = await db
+          .select({ questionId: quickfireAttempts.questionId })
+          .from(quickfireAttempts)
+          .where(and(
+            eq(quickfireAttempts.userId, ctx.user.id),
+            eq(quickfireAttempts.setDate, deckSetDate),
+          ));
+        const dailySeenCount = new Set(globalTodayRows.map((r) => r.questionId)).size;
 
         // Build per-card stats
         const statsMap: Record<number, { gotIt: number; missed: number; lastSeen: Date | null; lastResult: boolean | null }> = {};
