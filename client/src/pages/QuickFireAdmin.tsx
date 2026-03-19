@@ -114,7 +114,7 @@ interface ConnectPair { left: string; right: string; }
 interface IdentifierMarker { x: number; y: number; label: string; }
 interface OrderItem { text: string; }
 
-type QuestionCategory = "Abdominal" | "Pelvic/Gyn" | "OB 1st Trimester" | "OB 2nd/3rd Trimester" | "Fetal Echo" | "Venous" | "Arterial" | "Abdominal Vascular" | "Extracranial Carotid" | "Intracranial Duplex/TCD" | "POCUS" | "Physics" | "Thyroid" | "Scrotum" | "Breast" | "MSK";
+type QuestionCategory = "Abdominal" | "Pelvic/Gyn" | "OB 1st Trimester" | "OB 2nd/3rd Trimester" | "Fetal Echo" | "Venous" | "Arterial" | "Vascular" | "Abdominal Vascular" | "Extracranial Carotid" | "Intracranial Duplex/TCD" | "POCUS" | "Physics" | "Thyroid" | "Scrotum" | "Breast" | "MSK";
 
 interface QuestionForm {
   type: QuestionType;
@@ -251,7 +251,7 @@ export default function QuickFireAdmin() {
   // List state
   const [page, setPage] = useState(1);
   const [typeFilter, setTypeFilter] = useState<QuestionType | "all">("all");
-  const [categoryFilter, setCategoryFilter] = useState<"all" | "Abdominal" | "Pelvic/Gyn" | "OB 1st Trimester" | "OB 2nd/3rd Trimester" | "Fetal Echo" | "Venous" | "Arterial" | "Abdominal Vascular" | "Extracranial Carotid" | "Intracranial Duplex/TCD" | "POCUS" | "Physics" | "Thyroid" | "Scrotum" | "Breast" | "MSK">("all");
+  const [categoryFilter, setCategoryFilter] = useState<"all" | "Abdominal" | "Pelvic/Gyn" | "OB 1st Trimester" | "OB 2nd/3rd Trimester" | "Fetal Echo" | "Venous" | "Arterial" | "Vascular" | "Abdominal Vascular" | "Extracranial Carotid" | "Intracranial Duplex/TCD" | "POCUS" | "Physics" | "Thyroid" | "Scrotum" | "Breast" | "MSK">("all");
   const [includeInactive, setIncludeInactive] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [challengeSearch, setChallengeSearch] = useState("");
@@ -1196,6 +1196,7 @@ export default function QuickFireAdmin() {
               <SelectItem value="Fetal Echo">Fetal Echo</SelectItem>
               <SelectItem value="Venous">Venous</SelectItem>
               <SelectItem value="Arterial">Arterial</SelectItem>
+              <SelectItem value="Vascular">Vascular</SelectItem>
               <SelectItem value="Abdominal Vascular">Abdominal Vascular</SelectItem>
               <SelectItem value="Extracranial Carotid">Extracranial Carotid</SelectItem>
               <SelectItem value="Intracranial Duplex/TCD">Intracranial Duplex/TCD</SelectItem>
@@ -1333,6 +1334,7 @@ export default function QuickFireAdmin() {
                           <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
                             q.category === "Venous" ? "bg-blue-50 text-blue-700" :
                             q.category === "Arterial" ? "bg-red-50 text-red-600" :
+                            q.category === "Vascular" ? "bg-sky-50 text-sky-700" :
                             q.category === "Fetal Echo" ? "bg-purple-50 text-purple-700" :
                             q.category === "POCUS" ? "bg-amber-50 text-amber-700" :
                             q.category === "Physics" ? "bg-gray-50 text-gray-600" :
@@ -2009,6 +2011,7 @@ export default function QuickFireAdmin() {
                     <SelectItem value="Fetal Echo">Fetal Echo</SelectItem>
                     <SelectItem value="Venous">Venous</SelectItem>
                     <SelectItem value="Arterial">Arterial</SelectItem>
+                    <SelectItem value="Vascular">Vascular</SelectItem>
                     <SelectItem value="Abdominal Vascular">Abdominal Vascular</SelectItem>
                     <SelectItem value="Extracranial Carotid">Extracranial Carotid</SelectItem>
                     <SelectItem value="Intracranial Duplex/TCD">Intracranial Duplex/TCD</SelectItem>
@@ -2862,6 +2865,7 @@ export default function QuickFireAdmin() {
                         <SelectItem value="Fetal Echo">Fetal Echo</SelectItem>
                         <SelectItem value="Venous">Venous</SelectItem>
                         <SelectItem value="Arterial">Arterial</SelectItem>
+                        <SelectItem value="Vascular">Vascular</SelectItem>
                         <SelectItem value="Abdominal Vascular">Abdominal Vascular</SelectItem>
                         <SelectItem value="Extracranial Carotid">Extracranial Carotid</SelectItem>
                         <SelectItem value="Intracranial Duplex/TCD">Intracranial Duplex/TCD</SelectItem>
@@ -2942,6 +2946,7 @@ export default function QuickFireAdmin() {
                         <SelectItem value="Fetal Echo">Fetal Echo</SelectItem>
                         <SelectItem value="Venous">Venous</SelectItem>
                         <SelectItem value="Arterial">Arterial</SelectItem>
+                        <SelectItem value="Vascular">Vascular</SelectItem>
                         <SelectItem value="Abdominal Vascular">Abdominal Vascular</SelectItem>
                         <SelectItem value="Extracranial Carotid">Extracranial Carotid</SelectItem>
                         <SelectItem value="Intracranial Duplex/TCD">Intracranial Duplex/TCD</SelectItem>

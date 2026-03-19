@@ -1,0 +1,82 @@
+{
+  "query": "SELECT COUNT(*) as venous_questions FROM quickfireQuestions WHERE category = 'Venous';\nSELECT COUNT(*) as venous_challenges FROM quickfireChallenges WHERE category = 'Venous';\nSELECT id, title, category, status FROM quickfireChallenges WHERE category = 'Venous' LIMIT 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT COUNT(*) as venous_questions FROM quickfireQuestions WHERE category = 'Venous';\nSELECT COUNT(*) as venous_challenges FROM quickfireChallenges WHERE category = 'Venous';\nSELECT id, title, category, status FROM quickfireChallenges WHERE category = 'Venous' LIMIT 20;",
+  "rows": [
+    {
+      "venous_questions": "39"
+    },
+    {
+      "venous_questions": "venous_challenges"
+    },
+    {
+      "venous_questions": "20"
+    },
+    {
+      "venous_questions": "id\ttitle\tcategory\tstatus"
+    },
+    {
+      "venous_questions": "21\tA 45-year-old male presents with chronic leg swelling and...\tVenous\tscheduled"
+    },
+    {
+      "venous_questions": "22\tDuring a venous duplex examination for suspected DVT, dis...\tVenous\tscheduled"
+    },
+    {
+      "venous_questions": "23\tA patient presents with a painful, palpable cord along th...\tVenous\tscheduled"
+    },
+    {
+      "venous_questions": "24\tDuring a venous duplex ultrasound, a tortuous, dilated su...\tVenous\tscheduled"
+    },
+    {
+      "venous_questions": "25\tDuring a venous duplex examination, a dilated, tortuous s...\tVenous\tscheduled"
+    },
+    {
+      "venous_questions": "26\tA 45-year-old male presents with recurrent episodes of lo...\tVenous\tscheduled"
+    },
+    {
+      "venous_questions": "27\tDuring a venous duplex ultrasound for suspected DVT, augm...\tVenous\tscheduled"
+    },
+    {
+      "venous_questions": "28\tA 65-year-old female presents with acute onset left lower...\tVenous\tscheduled"
+    },
+    {
+      "venous_questions": "29\tA patient presents with a painful, palpable cord in the m...\tVenous\tscheduled"
+    },
+    {
+      "venous_questions": "30\tDuring a venous duplex study for suspected DVT, augmentat...\tVenous\tscheduled"
+    },
+    {
+      "venous_questions": "31\tA 62-year-old female presents with acute onset right calf...\tVenous\tscheduled"
+    },
+    {
+      "venous_questions": "32\tA 45-year-old male presents with bilateral lower extremit...\tVenous\tscheduled"
+    },
+    {
+      "venous_questions": "33\tA patient presents with a palpable, tender cord along the...\tVenous\tscheduled"
+    },
+    {
+      "venous_questions": "34\tA 65-year-old female presents with acute onset left lower...\tVenous\tscheduled"
+    },
+    {
+      "venous_questions": "35\tDuring a venous duplex examination of the lower extremity...\tVenous\tscheduled"
+    },
+    {
+      "venous_questions": "36\tDuring a venous duplex examination, a segment of the popl...\tVenous\tscheduled"
+    },
+    {
+      "venous_questions": "37\tA 50-year-old male presents with visible varicose veins i...\tVenous\tscheduled"
+    },
+    {
+      "venous_questions": "38\tA 40-year-old female presents with a painful, palpable co...\tVenous\tscheduled"
+    },
+    {
+      "venous_questions": "39\tWhich of the following is the most reliable sonographic c...\tVenous\tscheduled"
+    },
+    {
+      "venous_questions": "40\tA 62-year-old female presents with acute onset right leg ...\tVenous\tscheduled"
+    }
+  ],
+  "messages": [],
+  "stdout": "venous_questions\n39\nvenous_challenges\n20\nid\ttitle\tcategory\tstatus\n21\tA 45-year-old male presents with chronic leg swelling and...\tVenous\tscheduled\n22\tDuring a venous duplex examination for suspected DVT, dis...\tVenous\tscheduled\n23\tA patient presents with a painful, palpable cord along th...\tVenous\tscheduled\n24\tDuring a venous duplex ultrasound, a tortuous, dilated su...\tVenous\tscheduled\n25\tDuring a venous duplex examination, a dilated, tortuous s...\tVenous\tscheduled\n26\tA 45-year-old male presents with recurrent episodes of lo...\tVenous\tscheduled\n27\tDuring a venous duplex ultrasound for suspected DVT, augm...\tVenous\tscheduled\n28\tA 65-year-old female presents with acute onset left lower...\tVenous\tscheduled\n29\tA patient presents with a painful, palpable cord in the m...\tVenous\tscheduled\n30\tDuring a venous duplex study for suspected DVT, augmentat...\tVenous\tscheduled\n31\tA 62-year-old female presents with acute onset right calf...\tVenous\tscheduled\n32\tA 45-year-old male presents with bilateral lower extremit...\tVenous\tscheduled\n33\tA patient presents with a palpable, tender cord along the...\tVenous\tscheduled\n34\tA 65-year-old female presents with acute onset left lower...\tVenous\tscheduled\n35\tDuring a venous duplex examination of the lower extremity...\tVenous\tscheduled\n36\tDuring a venous duplex examination, a segment of the popl...\tVenous\tscheduled\n37\tA 50-year-old male presents with visible varicose veins i...\tVenous\tscheduled\n38\tA 40-year-old female presents with a painful, palpable co...\tVenous\tscheduled\n39\tWhich of the following is the most reliable sonographic c...\tVenous\tscheduled\n40\tA 62-year-old female presents with acute onset right leg ...\tVenous\tscheduled\n",
+  "stderr": "",
+  "execution_time_ms": 72
+}

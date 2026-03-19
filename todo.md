@@ -366,3 +366,42 @@
 - [x] Fix UltrasoundAssist Hub: show proper lock overlay on locked navigator cards — amber corner badge + Lock icon + click-anywhere-to-upgrade
 - [x] Verify BlurredOverlay premium CTA links to correct AAUS premium/upgrade page (/premium)
 - [x] Add login-gate BlurredOverlay to Flashcards category selector page for unauthenticated users (already implemented)
+
+## Registry Review Hub (Mar 19)
+- [x] Build RegistryReviewHub.tsx page matching iHeartEcho structure
+- [x] Add /registry-review route in App.tsx
+- [x] Add Registry Review Hub link to sidebar nav in Layout.tsx
+
+## Daily Challenge Category Fix (Mar 19)
+- [ ] Rename "Thyroid" category → "Small Parts" in QuickFire frontend CATS array
+- [ ] Update server-side category map to map "Small Parts" to both thyroid and scrotum question tags
+- [ ] Ensure existing Thyroid questions are re-tagged to "Small Parts" in the DB
+- [ ] Ensure existing Scrotum questions are tagged to "Small Parts" in the DB
+
+## Daily Challenge Category Restructure (Mar 19)
+- [ ] Rename OB 2nd/3rd Trimester → OB/Gyn in CHALLENGE_CATEGORIES and CAT_KEY
+- [ ] Add Small Parts (Thyroid+Scrotum), Vascular (Venous+Arterial), MSK categories
+- [ ] Update parseDailySetIds defaults and ensureTodaySet to use new 6-cat system
+- [ ] Update getCategoryPrefs / updateCategoryPrefs prefs schema
+- [x] Update QuickFire.tsx CATS array and prefs UI to use Vasculartry Review Hub to sidebar nav and App.tsx route
+
+## Daily Challenge Full Category Restructure (Mar 19 - updated)
+- [ ] Server: CHALLENGE_CATEGORIES = Abdominal, OB/Gyn, Small Parts, Vascular, MSK, POCUS
+- [ ] Server: CAT_KEY maps obgyn, smallparts, vascular, msk
+- [ ] Server: OB/Gyn fallback pool = pelvic_gyn + obstetric_1st + obstetric_2nd_3rd questions
+- [ ] Server: Small Parts fallback pool = thyroid + scrotum questions
+- [ ] Server: Vascular fallback pool = venous + arterial questions
+- [ ] Server: Update parseDailySetIds defaults to new 6-key system
+- [ ] Server: Update getCategoryPrefs / updateCategoryPrefs prefs schema
+- [ ] Frontend: QuickFire.tsx CATS array updated to 6 new categories
+- [ ] Frontend: Prefs UI updated (toggle labels)
+- [ ] Frontend: Category filter labels updated
+- [x] Registry Review Hub page created and route wired in App.tsx
+- [x] Registry Review Hub sidebar link added (user explicitly requested)
+
+## Admin QuickFire Category Update (Mar 19)
+- [x] Update QuickFireAdmin.tsx category dropdown to include Vascular (alongside existing categories)
+- [x] Update quickfireRouter.ts CHALLENGE_CATEGORIES and CAT_KEY to include Vascular
+- [x] Migrate existing Venous quickfireQuestions → category "Vascular" in DB (0 questions, all were Arterial)
+- [x] Migrate existing Venous quickfireChallenges → category "Vascular" in DB (20 challenges migrated)
+- [x] Update server-side fallback pool for Vascular to pull from venous + arterial echoCategory questions

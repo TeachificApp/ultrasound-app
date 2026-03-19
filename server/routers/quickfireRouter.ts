@@ -107,16 +107,15 @@ function seededShuffle<T>(arr: T[], seed: string): T[] {
 }
 
 // Category keys used throughout the daily challenge system (AAUS categories)
-export const CHALLENGE_CATEGORIES = ["Abdominal", "Venous", "Arterial", "OB 2nd/3rd Trimester", "POCUS"] as const;
+export const CHALLENGE_CATEGORIES = ["Abdominal", "Vascular", "OB 2nd/3rd Trimester", "POCUS"] as const;
 export type ChallengeCategory = typeof CHALLENGE_CATEGORIES[number];
 // Map category label -> JSON key used in questionIds object
 const CAT_KEY: Record<ChallengeCategory, string> = {
   "Abdominal": "abdominal",
-  "Venous": "venous",
-  "Arterial": "arterial",
+  "Vascular": "vascular",
   "OB 2nd/3rd Trimester": "ob2nd3rd",
   "POCUS": "pocus",
-};;
+};
 
 /**
  * Parse questionIds from a daily set row.
@@ -128,18 +127,18 @@ function parseDailySetIds(raw: string): Record<string, number | null> {
     const parsed = JSON.parse(raw || "{}");
     if (Array.isArray(parsed)) {
       // Legacy: single-question array — treat as Abdominal
-      return { abdominal: parsed[0] ?? null, venous: null, arterial: null, ob2nd3rd: null, pocus: null };
+      return { abdominal: parsed[0] ?? null, vascular: null, ob2nd3rd: null, pocus: null };
     }
-    return { abdominal: null, venous: null, arterial: null, ob2nd3rd: null, pocus: null, ...parsed };
+    return { abdominal: null, vascular: null, ob2nd3rd: null, pocus: null, ...parsed };
   } catch {
-    return { abdominal: null, venous: null, arterial: null, ob2nd3rd: null, pocus: null };
+    return { abdominal: null, vascular: null, ob2nd3rd: null, pocus: null };
   }
 }
 
 /**
  * Ensure a daily set exists for the given date.
  * Stores one question per category:
-   *   questionIds = JSON object: { abdominal: id|null, venous: id|null, arterial: id|null, ob2nd3rd: id|null, pocus: id|null }
+   *   questionIds = JSON object: { abdominal: id|null, vascular: id|null, ob2nd3rd: id|null, pocus: id|null }
  *
  * Priority order per category:
  *   1. Next queued challenge with matching category (draft/scheduled)
@@ -154,7 +153,7 @@ async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>
   if (existing.length > 0) return existing[0];
 
   const questionMap: Record<string, number | null> = {
-    abdominal: null, venous: null, arterial: null, ob2nd3rd: null, pocus: null,
+    abdominal: null, vascular: null, ob2nd3rd: null, pocus: null,
   };
 
   // 1. Check for queued challenges per category
@@ -203,6 +202,8 @@ async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>
   }
 
   // 2. Fallback: for any category still null, pick a random active question
+  // Vascular pulls from Venous + Arterial + Abdominal Vascular question pool
+  const VASCULAR_CATS = ["Venous", "Arterial", "Vascular", "Abdominal Vascular", "Vascular"];
   for (const cat of CHALLENGE_CATEGORIES) {
     const key = CAT_KEY[cat];
     if (questionMap[key] !== null) continue;
@@ -213,7 +214,9 @@ async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>
         and(
           eq(quickfireQuestions.isActive, true),
           sql`${quickfireQuestions.type} != 'quickReview'` as any,
-          sql`${quickfireQuestions.category} = ${cat}` as any
+          cat === "Vascular"
+            ? sql`${quickfireQuestions.category} IN (${sql.join(VASCULAR_CATS.map(c => sql`${c}`), sql`, `)})` as any
+            : sql`${quickfireQuestions.category} = ${cat}` as any
         )
       );
     if (pool.length > 0) {
@@ -246,7 +249,7 @@ export const quickfireRouter = router({
     const questionMap = parseDailySetIds(set.questionIds);
 
     // Determine which categories the user has opted into (default: all)
-    let enabledCats: Set<string> = new Set(["abdominal", "venous", "arterial", "ob2nd3rd", "pocus"]);
+    let enabledCats: Set<string> = new Set(["abdominal", "vascular", "ob2nd3rd", "pocus"]);
     if (ctx.user) {
       const [userRow] = await db
         .select({ challengeCategoryPrefs: users.challengeCategoryPrefs })
@@ -256,7 +259,7 @@ export const quickfireRouter = router({
       if (userRow?.challengeCategoryPrefs) {
         try {
           const prefs = JSON.parse(userRow.challengeCategoryPrefs);
-          // prefs: { abdominal: bool, venous: bool, arterial: bool, ob2nd3rd: bool, pocus: bool }
+          // prefs: { abdominal: bool, vascular: bool, ob2nd3rd: bool, pocus: bool }
           // false = opted out
           enabledCats = new Set(
             Object.entries(prefs)
@@ -264,7 +267,7 @@ export const quickfireRouter = router({
               .map(([k]) => k)
           );
           // If user opted out of everything, show all anyway
-          if (enabledCats.size === 0) enabledCats = new Set(["abdominal", "venous", "arterial", "ob2nd3rd", "pocus"]);
+          if (enabledCats.size === 0) enabledCats = new Set(["abdominal", "vascular", "ob2nd3rd", "pocus"]);
         } catch { /* ignore parse errors */ }
       }
     }
@@ -283,8 +286,8 @@ export const quickfireRouter = router({
       .from(quickfireQuestions)
       .where(and(eq(quickfireQuestions.isActive, true), inArray(quickfireQuestions.id, allIds)));
 
-    // Order: Abdominal, Venous, Arterial, OB 2nd/3rd Trimester, POCUS
-    const catOrder = ["abdominal", "venous", "arterial", "ob2nd3rd", "pocus"];
+    // Order: Abdominal, Vascular, OB 2nd/3rd Trimester, POCUS
+    const catOrder = ["abdominal", "vascular", "ob2nd3rd", "pocus"];
     const orderedQuestions = catOrder
       .filter((key) => enabledCats.has(key) && questionMap[key] !== null)
       .map((key) => questions.find((q) => q.id === questionMap[key]))
@@ -611,7 +614,7 @@ getUserStats: protectedProcedure.query(async ({ ctx }) => {
         difficulty: z.enum(["beginner", "intermediate", "advanced"]).default("intermediate"),
         tags: z.array(z.string()).default([]),
         echoCategory: z.enum(["abdominal", "pelvic_gyn", "obstetric_1st", "obstetric_2nd_3rd", "fetal_echo", "venous", "arterial", "abdominal_vascular", "extracranial_carotid", "intracranial_tcd", "pocus", "physics", "thyroid", "scrotum", "breast", "msk"]).default("abdominal"),
-        category: z.enum(["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"]).default("Abdominal"),
+        category: z.enum(["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Vascular", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"]).default("Abdominal"),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -662,7 +665,7 @@ getUserStats: protectedProcedure.query(async ({ ctx }) => {
         tags: z.array(z.string()).optional(),
         isActive: z.boolean().optional(),
         echoCategory: z.enum(["abdominal", "pelvic_gyn", "obstetric_1st", "obstetric_2nd_3rd", "fetal_echo", "venous", "arterial", "abdominal_vascular", "extracranial_carotid", "intracranial_tcd", "pocus", "physics", "thyroid", "scrotum", "breast", "msk"]).optional(),
-        category: z.enum(["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"]).optional(),
+        category: z.enum(["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Vascular", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"]).optional(),
       })
     )
     .mutation(async ({ input }) => {
@@ -823,7 +826,7 @@ getUserStats: protectedProcedure.query(async ({ ctx }) => {
         includeInactive: z.boolean().default(false),
         search: z.string().max(200).optional(),
         echoCategory: z.enum(["abdominal", "pelvic_gyn", "obstetric_1st", "obstetric_2nd_3rd", "fetal_echo", "venous", "arterial", "abdominal_vascular", "extracranial_carotid", "intracranial_tcd", "pocus", "physics", "thyroid", "scrotum", "breast", "msk"]).optional(),
-        category: z.enum(["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"]).optional(),
+        category: z.enum(["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Vascular", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"]).optional(),
         ids: z.array(z.number().int().positive()).max(50).optional(),
       })
     )
@@ -1464,7 +1467,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
       .from(users)
       .where(eq(users.id, ctx.user.id))
       .limit(1);
-    const defaults = { abdominal: true, venous: true, arterial: true, ob2nd3rd: true, pocus: true };
+    const defaults = { abdominal: true, vascular: true, ob2nd3rd: true, pocus: true };
     if (!userRow?.challengeCategoryPrefs) return defaults;
     try {
       return { ...defaults, ...JSON.parse(userRow.challengeCategoryPrefs) };
@@ -1478,8 +1481,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
     .input(
       z.object({
         abdominal: z.boolean().default(true),
-        venous: z.boolean().default(true),
-        arterial: z.boolean().default(true),
+        vascular: z.boolean().default(true),
         ob2nd3rd: z.boolean().default(true),
         pocus: z.boolean().default(true),
       })
@@ -1667,7 +1669,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
       description: z.string().max(2000).optional(),
       questionIds: z.array(z.number().int().positive()).min(1).max(1),  // exactly 1 question per challenge
       priority: z.number().int().min(1).default(100),
-      category: z.enum(["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"]).optional(),
+      category: z.enum(["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Vascular", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"]).optional(),
       queuePosition: z.number().int().min(1).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -1708,7 +1710,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
       description: z.string().max(2000).optional().nullable(),
       questionIds: z.array(z.number().int().positive()).min(1).max(1).optional(),  // exactly 1 question per challenge
       priority: z.number().int().min(1).optional(),
-      category: z.enum(["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"]).optional(),
+      category: z.enum(["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Vascular", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"]).optional(),
       queuePosition: z.number().int().min(1).optional().nullable(),
     }))
     .mutation(async ({ input }) => {
@@ -1835,7 +1837,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
       id: z.number().int().positive(),
       title: z.string().min(3).max(300).optional(),
       description: z.string().max(5000).optional().nullable(),
-      category: z.enum(["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"]).optional(),
+      category: z.enum(["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Vascular", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"]).optional(),
       difficulty: z.enum(["beginner", "intermediate", "advanced"]).optional().nullable(),
       questionIds: z.array(z.number().int().positive()).min(1).max(1).optional(),
     }))
@@ -2323,7 +2325,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
         orderedItems: z.array(z.string().min(1)).min(2).max(10).optional(),
         difficulty: z.enum(["beginner", "intermediate", "advanced"]).default("intermediate"),
         tags: z.array(z.string()).default([]),
-      category: z.enum(["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"]).default("Abdominal"),
+      category: z.enum(["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Vascular", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"]).default("Abdominal"),
       submitterName: z.string().max(200).optional(),
         submitterLinkedIn: z.string().max(500).optional(),
       })

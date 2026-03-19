@@ -10,7 +10,7 @@ import {
   Scan, BookOpen, FileText, Menu, X, ChevronRight,
   Stethoscope, Zap, ExternalLink, ShoppingBag, FlaskConical, MessageCircle, Award, Shield, GraduationCap,
   BookMarked, Library, Plus, Crown, Droplets, Building2, Users, UserPlus,
-  LogIn, LogOut, Settings, ChevronDown, Webhook, Layers, CreditCard, Lock
+  LogIn, LogOut, Settings, ChevronDown, Webhook, Layers, CreditCard, Lock, ClipboardCheck
 } from "lucide-react";
 
 import { trpc } from "@/lib/trpc";
@@ -70,6 +70,7 @@ const navGroups = [
     items: [
       { path: "/quickfire", label: "Daily Challenge", icon: Zap },
       { path: "/flashcards", label: "Ultrasound Flashcards", icon: Layers },
+      { path: "/registry-review", label: "Registry Review Hub", icon: ClipboardCheck },
       { path: "/case-library", label: "Case Library", icon: Library },
       { path: "/soundbytes", label: "SoundBytes™", icon: BookMarked },
       { path: "/cme", label: "CME Hub", icon: GraduationCap },

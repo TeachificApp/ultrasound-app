@@ -931,7 +931,7 @@ export const quickfireQuestions = mysqlTable("quickfireQuestions", {
   // AAUS specialty category for flashcard filtering
   echoCategory: mysqlEnum("echoCategory", ["abdominal", "pelvic_gyn", "obstetric_1st", "obstetric_2nd_3rd", "fetal_echo", "venous", "arterial", "abdominal_vascular", "extracranial_carotid", "intracranial_tcd", "pocus", "physics", "thyroid", "scrotum", "breast", "msk"]).default("abdominal"),
   // Broad clinical category for admin filtering (AAUS categories)
-  category: mysqlEnum("category", ["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"]).default("Abdominal"),
+  category: mysqlEnum("category", ["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Vascular", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"]).default("Abdominal"),
   // Whether this question is active and eligible for daily sets
   isActive: boolean("isActive").default(true).notNull(),
   // Soft-delete: set when question is deleted from the bank. Permanently purged after 30 days.
@@ -1085,9 +1085,8 @@ export const quickfireChallenges = mysqlTable("quickfireChallenges", {
   questionIds: text("questionIds").notNull(),
   // Admin-assigned priority — lower number = published first (1 = highest)
   priority: int("priority").default(100).notNull(),
-  // Category tag for filtering (ACS | Adult Echo | Pediatric Echo | Fetal Echo | POCUS | General)
-  category: mysqlEnum("category", ["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"]).default("Abdominal").notNull(),
-  // Difficulty level for filtering
+  // Category tag for filtering — determines which daily slot this challenge fills
+  category: mysqlEnum("category", ["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Vascular", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"]).default("Abdominal").notNull(),
   difficulty: mysqlEnum("difficulty", ["beginner", "intermediate", "advanced"]).default("intermediate"),
   // Lifecycle status — queued = in the auto-publish queue, waiting for its turn
   status: mysqlEnum("status", ["draft", "queued", "scheduled", "live", "archived"]).default("draft").notNull(),
@@ -2128,7 +2127,7 @@ export const educatorCourses = mysqlTable("educatorCourses", {
   // Cover image
   coverImageUrl: text("coverImageUrl"),
   // Category alignment (mirrors quickfire categories)
-  category: mysqlEnum("category", ["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"]).default("Abdominal"),
+  category: mysqlEnum("category", ["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Vascular", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"]).default("Abdominal"),
   // Status
   status: mysqlEnum("status", ["draft", "published", "archived"]).notNull().default("draft"),
   // Ordering within the org
@@ -2234,8 +2233,8 @@ export const educatorCompetencies = mysqlTable("educatorCompetencies", {
   title: varchar("title", { length: 300 }).notNull(),
   description: text("description"),
   // Category alignment
-  category: mysqlEnum("category", ["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"]).default("Abdominal"),
-  // Competency level: 1=Novice, 2=Advanced Beginner, 3=Competent, 4=Proficient, 5=Expert
+  category: mysqlEnum("category", ["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Vascular", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"]).default("Abdominal"),
+  // Difficulty level: 1=Novice, 2=Advanced Beginner, 3=Competent, 4=Proficient, 5=Expert
   maxLevel: int("maxLevel").default(5).notNull(),
   // Whether this competency is required for certification/completion
   isRequired: boolean("isRequired").default(false).notNull(),
@@ -2344,8 +2343,8 @@ export const educatorPresentations = mysqlTable("educatorPresentations", {
   slidesData: longtext("slidesData"),
   // Cover image
   coverImageUrl: text("coverImageUrl"),
-  // Category
-  category: mysqlEnum("category", ["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"]).default("Abdominal"),
+  // Category alignment
+  category: mysqlEnum("category", ["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Vascular", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"]).default("Abdominal").notNull(),
   status: mysqlEnum("status", ["draft", "published", "archived"]).notNull().default("draft"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

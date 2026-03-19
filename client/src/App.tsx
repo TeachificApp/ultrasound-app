@@ -107,6 +107,7 @@ import FetalNavigator from "./pages/FetalNavigator";
 import QuickFire from "./pages/QuickFire";
 import FlashcardDeck from "./pages/FlashcardDeck";
 import CaseLibrary from "./pages/CaseLibrary";
+import RegistryReviewHub from "./pages/RegistryReviewHub";
 import CaseDetail from "./pages/CaseDetail";
 import SubmitCase from "./pages/SubmitCase";
 import SoundBytes from "./pages/SoundBytes";
@@ -237,6 +238,7 @@ function Router() {
         <Route path="/quickfire" component={QuickFire} />
         <Route path="/flashcards" component={FlashcardDeck} />
         <Route path="/case-library" component={CaseLibrary} />
+        <Route path="/registry-review" component={RegistryReviewHub} />
         <Route path="/case-library/submit" component={SubmitCase} />
         <Route path="/case-library/edit/:id" component={SubmitCase} />
         <Route path="/case-library/:id" component={CaseDetail} />

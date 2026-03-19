@@ -1,0 +1,18 @@
+{
+  "query": "\n-- Add 'Vascular' to quickfireQuestions.category enum\nALTER TABLE `quickfireQuestions` MODIFY COLUMN `category` ENUM(\n  'Abdominal','Pelvic/Gyn','OB 1st Trimester','OB 2nd/3rd Trimester','Fetal Echo',\n  'Venous','Arterial','Vascular','Abdominal Vascular','Extracranial Carotid',\n  'Intracranial Duplex/TCD','POCUS','Physics','Thyroid','Scrotum','Breast','MSK'\n) NOT NULL DEFAULT 'Abdominal';\n\n-- Add 'Vascular' to quickfireChallenges.category enum\nALTER TABLE `quickfireChallenges` MODIFY COLUMN `category` ENUM(\n  'Abdominal','Pelvic/Gyn','OB 1st Trimester','OB 2nd/3rd Trimester','Fetal Echo',\n  'Venous','Arterial','Vascular','Abdominal Vascular','Extracranial Carotid',\n  'Intracranial Duplex/TCD','POCUS','Physics','Thyroid','Scrotum','Breast','MSK'\n) NOT NULL DEFAULT 'Abdominal';\n\n-- Migrate all Venous challenges to Vascular\nUPDATE `quickfireChallenges` SET `category` = 'Vascular' WHERE `category` = 'Venous';\n\n-- Verify\nSELECT category, COUNT(*) as cnt FROM quickfireChallenges GROUP BY category ORDER BY cnt DESC;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \n-- Add 'Vascular' to quickfireQuestions.category enum\nALTER TABLE `quickfireQuestions` MODIFY COLUMN `category` ENUM(\n  'Abdominal','Pelvic/Gyn','OB 1st Trimester','OB 2nd/3rd Trimester','Fetal Echo',\n  'Venous','Arterial','Vascular','Abdominal Vascular','Extracranial Carotid',\n  'Intracranial Duplex/TCD','POCUS','Physics','Thyroid','Scrotum','Breast','MSK'\n) NOT NULL DEFAULT 'Abdominal';\n\n-- Add 'Vascular' to quickfireChallenges.category enum\nALTER TABLE `quickfireChallenges` MODIFY COLUMN `category` ENUM(\n  'Abdominal','Pelvic/Gyn','OB 1st Trimester','OB 2nd/3rd Trimester','Fetal Echo',\n  'Venous','Arterial','Vascular','Abdominal Vascular','Extracranial Carotid',\n  'Intracranial Duplex/TCD','POCUS','Physics','Thyroid','Scrotum','Breast','MSK'\n) NOT NULL DEFAULT 'Abdominal';\n\n-- Migrate all Venous challenges to Vascular\nUPDATE `quickfireChallenges` SET `category` = 'Vascular' WHERE `category` = 'Venous';\n\n-- Verify\nSELECT category, COUNT(*) as cnt FROM quickfireChallenges GROUP BY category ORDER BY cnt DESC;\n",
+  "rows": [
+    {
+      "category": "Abdominal",
+      "cnt": "20"
+    },
+    {
+      "category": "Vascular",
+      "cnt": "20"
+    }
+  ],
+  "messages": [],
+  "stdout": "category\tcnt\nAbdominal\t20\nVascular\t20\n",
+  "stderr": "",
+  "execution_time_ms": 2051
+}

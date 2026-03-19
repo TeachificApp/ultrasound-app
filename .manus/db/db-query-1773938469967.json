@@ -1,0 +1,80 @@
+{
+  "query": "SELECT id, name, email, role, openId FROM users LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT id, name, email, role, openId FROM users LIMIT 10;",
+  "rows": [
+    {
+      "id": "1",
+      "name": "larawilliams0501",
+      "email": "larawilliams0501@gmail.com",
+      "role": "admin",
+      "openId": "8Rf5JXPawpyd9eN4E94j4K"
+    },
+    {
+      "id": "175",
+      "name": "lmiller1002",
+      "email": "lmiller1002@gmail.com",
+      "role": "user",
+      "openId": "NULL"
+    },
+    {
+      "id": "176",
+      "name": "carlton.hartwell@leehealth.org",
+      "email": "carlton.hartwell@leehealth.org",
+      "role": "user",
+      "openId": "NULL"
+    },
+    {
+      "id": "177",
+      "name": "lacarnprobst@gmail.com",
+      "email": "lacarnprobst@gmail.com",
+      "role": "user",
+      "openId": "NULL"
+    },
+    {
+      "id": "178",
+      "name": "test-premium@example.com",
+      "email": "test-premium@example.com",
+      "role": "user",
+      "openId": "NULL"
+    },
+    {
+      "id": "179",
+      "name": "test-webhook-log@example.com",
+      "email": "test-webhook-log@example.com",
+      "role": "user",
+      "openId": "NULL"
+    },
+    {
+      "id": "180",
+      "name": "Admin Sona",
+      "email": "admin@sonamedicalsolutions.com",
+      "role": "user",
+      "openId": "NULL"
+    },
+    {
+      "id": "181",
+      "name": "admi.@sonamedicalcareers.com",
+      "email": "admi.@sonamedicalcareers.com",
+      "role": "user",
+      "openId": "NULL"
+    },
+    {
+      "id": "182",
+      "name": "ainhoa.aguinaga@gmail.com",
+      "email": "ainhoa.aguinaga@gmail.com",
+      "role": "user",
+      "openId": "NULL"
+    },
+    {
+      "id": "183",
+      "name": "susie34susanne@yahoo.com",
+      "email": "susie34susanne@yahoo.com",
+      "role": "user",
+      "openId": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\temail\trole\topenId\n1\tlarawilliams0501\tlarawilliams0501@gmail.com\tadmin\t8Rf5JXPawpyd9eN4E94j4K\n175\tlmiller1002\tlmiller1002@gmail.com\tuser\tNULL\n176\tcarlton.hartwell@leehealth.org\tcarlton.hartwell@leehealth.org\tuser\tNULL\n177\tlacarnprobst@gmail.com\tlacarnprobst@gmail.com\tuser\tNULL\n178\ttest-premium@example.com\ttest-premium@example.com\tuser\tNULL\n179\ttest-webhook-log@example.com\ttest-webhook-log@example.com\tuser\tNULL\n180\tAdmin Sona\tadmin@sonamedicalsolutions.com\tuser\tNULL\n181\tadmi.@sonamedicalcareers.com\tadmi.@sonamedicalcareers.com\tuser\tNULL\n182\tainhoa.aguinaga@gmail.com\tainhoa.aguinaga@gmail.com\tuser\tNULL\n183\tsusie34susanne@yahoo.com\tsusie34susanne@yahoo.com\tuser\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 131
+}

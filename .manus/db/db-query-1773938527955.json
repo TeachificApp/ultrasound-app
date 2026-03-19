@@ -1,0 +1,31 @@
+{
+  "query": "SELECT id, userId, role, assignedByUserId, createdAt FROM userRoles WHERE userId = 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT id, userId, role, assignedByUserId, createdAt FROM userRoles WHERE userId = 1;",
+  "rows": [
+    {
+      "id": "1",
+      "userId": "1",
+      "role": "platform_admin",
+      "assignedByUserId": "1",
+      "createdAt": "2026-03-19 16:42:04"
+    },
+    {
+      "id": "2",
+      "userId": "1",
+      "role": "premium_user",
+      "assignedByUserId": "1",
+      "createdAt": "2026-03-19 16:42:04"
+    },
+    {
+      "id": "3",
+      "userId": "1",
+      "role": "user",
+      "assignedByUserId": "1",
+      "createdAt": "2026-03-19 16:42:04"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tuserId\trole\tassignedByUserId\tcreatedAt\n1\t1\tplatform_admin\t1\t2026-03-19 16:42:04\n2\t1\tpremium_user\t1\t2026-03-19 16:42:04\n3\t1\tuser\t1\t2026-03-19 16:42:04\n",
+  "stderr": "",
+  "execution_time_ms": 74
+}

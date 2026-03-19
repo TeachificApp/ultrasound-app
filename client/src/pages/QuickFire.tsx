@@ -85,7 +85,7 @@ type AnswerResult = {
 
 type LeaderboardPeriod = "7d" | "30d" | "allTime";
 
-const CATEGORY_TAGS = ["Abdominal", "Venous", "Arterial", "OB 2nd/3rd Trimester", "POCUS"] as const;
+const CATEGORY_TAGS = ["Abdominal", "Vascular", "OB 2nd/3rd Trimester", "POCUS"] as const;
 const DIFFICULTY_OPTIONS = ["beginner", "intermediate", "advanced"] as const;
 
 const TYPE_LABELS: Record<string, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
@@ -107,6 +107,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   "Abdominal": "bg-[#189aa1]/10 text-[#189aa1]",
   "Venous": "bg-blue-100 text-blue-700",
   "Arterial": "bg-red-100 text-red-700",
+  "Vascular": "bg-sky-100 text-sky-700",
   "OB 2nd/3rd Trimester": "bg-pink-100 text-pink-700",
   "Fetal Echo": "bg-purple-100 text-purple-700",
   "POCUS": "bg-amber-100 text-amber-700",
@@ -488,8 +489,7 @@ export default function QuickFire() {
   // Map display names to server camelCase keys
   const CAT_DISPLAY_TO_KEY: Record<string, string> = {
     "Abdominal": "abdominal",
-    "Venous": "venous",
-    "Arterial": "arterial",
+    "Vascular": "vascular",
     "OB 2nd/3rd Trimester": "ob2nd3rd",
     "POCUS": "pocus",
   };
@@ -1182,18 +1182,17 @@ export default function QuickFire() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {([
                     { cat: "Abdominal" as const, prefKey: "abdominal" as const, Icon: Activity, label: "Abdominal" },
-                    { cat: "Venous" as const, prefKey: "venous" as const, Icon: Activity, label: "Venous" },
-                    { cat: "Arterial" as const, prefKey: "arterial" as const, Icon: Activity, label: "Arterial" },
+                    { cat: "Vascular" as const, prefKey: "vascular" as const, Icon: Activity, label: "Vascular" },
                     { cat: "OB 2nd/3rd Trimester" as const, prefKey: "ob2nd3rd" as const, Icon: Baby, label: "OB 2nd/3rd" },
                     { cat: "POCUS" as const, prefKey: "pocus" as const, Icon: ({ className }: { className?: string }) => <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/pocus-icon_0b2e6eff.png" alt="POCUS" className={className} style={{ objectFit: 'contain' }} /> },
-                  ] as { cat: string; prefKey: "abdominal" | "venous" | "arterial" | "ob2nd3rd" | "pocus"; Icon: (props: { className?: string }) => import('react').ReactElement; label?: string }[]).map(({ cat, prefKey, Icon, label }) => {
-                    const prefs = categoryPrefsQuery.data ?? { abdominal: true, venous: true, arterial: true, ob2nd3rd: true, pocus: true };
+                  ] as { cat: string; prefKey: "abdominal" | "vascular" | "ob2nd3rd" | "pocus"; Icon: (props: { className?: string }) => import('react').ReactElement; label?: string }[]).map(({ cat, prefKey, Icon, label }) => {
+                    const prefs = categoryPrefsQuery.data ?? { abdominal: true, vascular: true, ob2nd3rd: true, pocus: true };
                     const isEnabled = (prefs as any)[prefKey] !== false;
                     return (
                       <button
                         key={cat}
                         onClick={() => {
-                          const current = categoryPrefsQuery.data ?? { abdominal: true, venous: true, arterial: true, ob2nd3rd: true, pocus: true };
+                          const current = categoryPrefsQuery.data ?? { abdominal: true, vascular: true, ob2nd3rd: true, pocus: true };
                           updateCategoryPrefsMutation.mutate({ ...current, [prefKey]: !isEnabled });
                         }}                        className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${
                           isEnabled
