@@ -274,3 +274,16 @@
 - [x] Add SWE protocol section to Breast Navigator (lesion stiffness, BI-RADS SWE criteria)
 - [x] Add SWE to Breast ScanCoach (technique tips, vendor notes, pitfalls)
 - [ ] Add SWE to Breast Calculator hub (lesion stiffness kPa/m/s → malignancy risk)
+
+## iHeartEcho-Style Gating Rules (Mar 19)
+- [ ] Daily Challenge: not-logged-in → see banner + blurred preview, must sign in to play; free → today's challenge only (all categories); premium → today + full archive + leaderboard
+- [ ] Daily Challenge: archive tab locked for free members with upgrade prompt overlay
+- [ ] Daily Challenge: leaderboard tab locked for free members with upgrade prompt overlay
+- [ ] Flashcards: not-logged-in → see banner + blurred card deck, must sign in; free → 10 cards/day randomized, after limit show upgrade overlay; premium → unlimited randomized
+- [ ] Flashcards: daily limit counter visible in header for free members; resets at midnight
+- [ ] Flashcards: category filter available to all logged-in members; premium badge on premium-only categories
+- [ ] Case Library: not-logged-in → see banner + blurred case list, must sign in; free → can view all published cases; premium → can submit cases + access premium case types
+- [ ] Case Library: case submission locked for free members with upgrade prompt
+- [ ] SoundBytes: not-logged-in → see banner + blurred list, must sign in; free → first 3 clips per category free; premium → all clips unlocked
+- [ ] SoundBytes: rebuild card layout to match iHeartEcho (thumbnail, title, category badge, duration, lock icon for premium)
+- [ ] All four pages: consistent lock overlay style — blurred content + teal upgrade CTA card centered

@@ -2,9 +2,11 @@
  * FlashcardDeck.tsx
  *
  * Standalone Ultrasound Flashcards study mode.
- * - Category filter: Adult Echo, Pediatric/Congenital Echo, Fetal Echo
+ * - Category filter: Abdominal, Vascular, OB/Gyn, Breast, Thyroid, POCUS, Physics
  * - Spaced repetition: missed cards appear first
  * - Scoring/tracking displayed below the card
+ * - Free: 10 cards/day randomized; Premium: unlimited + spaced repetition
+ * - Login required to access
  */
 
 import { useState, useMemo, useRef, useEffect } from "react";
@@ -27,6 +29,7 @@ import {
   ListOrdered,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { getLoginUrl } from "@/const";
 import { Link } from "wouter";
 import { Lock, Zap } from "lucide-react";
 import FlashcardsBanner from "@/components/FlashcardsBanner";
@@ -202,7 +205,53 @@ export default function Flashcards() {
     refetch();
   }
 
-  // ── Render: Loading ───────────────────────────────────────────────────────
+  // ── Render: Login Gate ────────────────────────────────────────────────
+  if (!isAuthenticated && !isLoading) {
+    return (
+      <Layout>
+        <FlashcardsBanner streak={0} totalCards={0} isPremium={false} />
+        <div className="container py-8 max-w-lg mx-auto">
+          {/* Blurred card preview */}
+          <div className="relative mb-6">
+            <div className="pointer-events-none select-none" style={{ filter: "blur(6px)", opacity: 0.35, maxHeight: "320px", overflow: "hidden" }}>
+              <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 text-center">
+                <div className="text-xs font-bold text-[#189aa1] uppercase tracking-wider mb-3">Abdominal</div>
+                <p className="text-lg font-bold text-gray-800 mb-4">What is the normal diameter of the common bile duct in adults?</p>
+                <div className="h-0.5 bg-gray-100 my-4" />
+                <p className="text-sm text-gray-500">Tap to reveal answer</p>
+              </div>
+            </div>
+            {/* Login overlay */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-full max-w-sm rounded-2xl border shadow-2xl px-6 py-7 text-center" style={{ background: "rgba(14, 30, 46, 0.97)", borderColor: "#4ad9e040", backdropFilter: "blur(12px)" }}>
+                <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: "linear-gradient(135deg, #0e4a50, #189aa1)" }}>
+                  <Lock className="w-7 h-7 text-white" />
+                </div>
+                <div className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 mb-3 text-xs font-semibold" style={{ background: "#189aa122", color: "#189aa1", border: "1px solid #189aa133" }}>
+                  Free Account Required
+                </div>
+                <h2 className="font-bold text-white text-lg mb-2" style={{ fontFamily: "Merriweather, serif" }}>Sign In to Study</h2>
+                <p className="text-white/60 text-sm mb-5 leading-relaxed">Create a free All About Ultrasound™ account to access Ultrasound Flashcards. Free members get 10 cards per day. Upgrade to Premium for unlimited access and spaced repetition.</p>
+                <div className="flex flex-col gap-2">
+                  <a href={getLoginUrl()} className="block">
+                    <button className="w-full font-semibold text-white py-2.5 px-4 rounded-lg flex items-center justify-center gap-2" style={{ background: "linear-gradient(135deg, #0e4a50, #189aa1)" }}>
+                      <Lock className="w-4 h-4" />
+                      Sign In or Create Free Account
+                    </button>
+                  </a>
+                  <Link href="/">
+                    <button className="w-full text-white/50 text-sm py-2 hover:text-white/70 transition-colors">Back to Dashboard</button>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // ── Render: Loading ────────────────────────────────────────────────────
   if (isLoading) {
     return (
       <Layout>

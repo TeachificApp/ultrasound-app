@@ -1139,14 +1139,14 @@ export default function QuickFire() {
         )}
 
         {/* Tab bar */}
-        <div className="flex gap-2 mb-6 flex-wrap">
+          <div className="flex gap-2 mb-6 flex-wrap">
           {([
-            { id: "challenge" as const, label: "Daily Challenge", icon: Zap },
-            { id: "archive" as const, label: "Archive", icon: Archive },
-            { id: "performance" as const, label: "My Performance", icon: BarChart3 },
-            { id: "leaderboard" as const, label: "Leaderboard", icon: Trophy },
-            { id: "submit" as const, label: "Submit a Question", icon: Stethoscope },
-          ] as const).map(({ id, label, icon: Icon }) => (
+            { id: "challenge" as const, label: "Daily Challenge", icon: Zap, premiumOnly: false },
+            { id: "archive" as const, label: "Archive", icon: Archive, premiumOnly: true },
+            { id: "performance" as const, label: "My Performance", icon: BarChart3, premiumOnly: false },
+            { id: "leaderboard" as const, label: "Leaderboard", icon: Trophy, premiumOnly: true },
+            { id: "submit" as const, label: "Submit a Question", icon: Stethoscope, premiumOnly: false },
+          ] as const).map(({ id, label, icon: Icon, premiumOnly }) => (
             <button
               key={id}
               onClick={() => setActiveTab(id)}
@@ -1159,9 +1159,10 @@ export default function QuickFire() {
             >
               <Icon className="w-3.5 h-3.5" />
               {label}
+              {premiumOnly && !isPremium && <Lock className="w-3 h-3 ml-0.5 text-amber-400" />}
             </button>
           ))}
-        </div>
+          </div>
 
         {/* ── TAB: Daily Challenge ─────────────────────────────────────────────────── */}
         {activeTab === "challenge" && (
@@ -2622,9 +2623,35 @@ export default function QuickFire() {
         {/* ── TAB: Leaderboard ─────────────────────────────────────────────── */}
         {activeTab === "leaderboard" && (
           <>
+            {/* Free users: premium gate */}
+            {!isPremium && (
+              <BlurredOverlay type="premium" featureName="Leaderboard">
+                <div className="space-y-3 pointer-events-none">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h2 className="text-base font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>Ultrasound Leaderboard</h2>
+                      <p className="text-xs text-gray-500 mt-0.5">Top performers by correct answers</p>
+                    </div>
+                  </div>
+                  {["SonoExpert_RVT", "AbdoMaster_RDMS", "VascularPro_RVS", "FetalSono_RDCS", "POCUSNinja_MD", "BreastSono_RDMS"].map((name, i) => (
+                    <div key={i} className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-4">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold" style={{ background: i < 3 ? "#189aa1" : "#f0fbfc", color: i < 3 ? "white" : "#189aa1" }}>{i + 1}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-800">{name}</p>
+                        <p className="text-xs text-gray-400">{Math.floor(Math.random() * 400 + 100)} pts · {Math.floor(Math.random() * 20 + 5)} day streak</p>
+                      </div>
+                      {i === 0 && <span className="text-lg">🏆</span>}
+                      {i === 1 && <span className="text-lg">🥈</span>}
+                      {i === 2 && <span className="text-lg">🥉</span>}
+                    </div>
+                  ))}
+                </div>
+              </BlurredOverlay>
+            )}
+            {isPremium && <>
             <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
               <div>
-                <h2 className="text-base font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>Echo Ninja Leaderboard</h2>
+                <h2 className="text-base font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>Ultrasound Leaderboard</h2>
                 <p className="text-xs text-gray-500">Top performers by correct answers</p>
               </div>
               {/* Period filter */}
@@ -2734,10 +2761,11 @@ export default function QuickFire() {
                 </div>
               </div>
             )}
+            </>
+            }
           </>
         )}
-
-        {/* ── TAB: Submit a Question ─────────────────────────────────────── */}
+        {/* ── TAB: Submit a Questionn ─────────────────────────────────────── */}
         {activeTab === "submit" && <SubmitQuestionTab isAuthenticated={isAuthenticated} />}
 
       </div>

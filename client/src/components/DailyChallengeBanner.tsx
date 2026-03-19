@@ -11,7 +11,7 @@
 import { Trophy, Archive, CheckCircle2, Flame } from "lucide-react";
 
 const BANNER_IMG =
-  "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/daily-challenge-banner-v3_178feef6.png";
+  "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/daily-challenge-banner_48dee28a.png";
 
 interface DailyChallengeBannerProps {
   streak?: number;
