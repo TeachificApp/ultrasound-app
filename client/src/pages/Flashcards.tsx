@@ -209,7 +209,7 @@ export default function Flashcards() {
   if (!isAuthenticated && !isLoading) {
     return (
       <Layout>
-        <FlashcardsBanner streak={0} totalCards={0} isPremium={false} />
+        <FlashcardsBanner streak={0} isPremium={false} />
         <div className="container py-8 max-w-lg mx-auto">
           {/* Blurred card preview */}
           <div className="relative mb-6">
@@ -380,7 +380,6 @@ export default function Flashcards() {
       {/* Full-width hero banner */}
       <FlashcardsBanner
         streak={data?.userStats ? (data.userStats as any).streak ?? 0 : 0}
-        totalCards={data?.totalCards ?? 0}
         isPremium={dailyLimit === null}
       />
       <div className="container py-4 max-w-2xl mx-auto">

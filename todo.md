@@ -294,3 +294,8 @@
 ## Dashboard Hero CTAs (Mar 19)
 - [x] Add iHeartEcho-style CTA buttons to dashboard hero: "Open UltrasoundAssist™", "Daily Challenge", "allaboutultrasound.com"
 - [x] Add stats row below hero (Calculators count, Cases count, Protocols covered, Members)
+
+## Flashcards Fixes (Mar 19)
+- [x] Rename "Echo Flashcards" to "Ultrasound Flashcards" everywhere (page heading, sidebar, banner)
+- [x] Remove cards-available count from FlashcardsBanner
+- [x] Match iHeartEcho random card rotation on page load (shuffle on mount, not just on category change)

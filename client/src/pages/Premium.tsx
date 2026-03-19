@@ -72,7 +72,7 @@ const PREMIUM_FEATURES = [
   },
   {
     icon: Layers,
-    title: "Unlimited Echo Flashcards",
+    title: "Unlimited Ultrasound Flashcards",
     description: "Unlimited daily flashcard access with random rotation. Free members get 10 per day, resetting at midnight.",
   },
   {
@@ -90,7 +90,7 @@ const PREMIUM_FEATURES = [
 const FREE_FEATURES = [
   "Echo Case Library — 50 cases (mix of image/video and text-based)",
   "Daily Challenge — today's challenge only (no archive access)",
-  "Echo Flashcards — 10 per day, random rotation, resets at midnight",
+  "Ultrasound Flashcards — 10 per day, random rotation, resets at midnight",
   "Adult TTE Navigator & ScanCoach",
   "Pediatric, Fetal & Adult Congenital Navigators",
   "Strain Navigator & ScanCoach",
@@ -109,7 +109,7 @@ const PREMIUM_ONLY_LABELS = [
   "HOCM LVOT Gradient Calculator",
   "Report Builder",
   "Unlimited Case Library (500+ cases)",
-  "Unlimited Echo Flashcards (no daily limit)",
+  "Unlimited Ultrasound Flashcards (no daily limit)",
   "Daily Challenge Archive (full history)",
   "EchoAccreditation Navigator",
 ];

@@ -19,7 +19,7 @@ const PREMIUM_FEATURES = [
   "HOCM LVOT Gradient Calculator",
   "Report Builder — 2025 ASE-compliant clinical narratives",
   "Unlimited Case Library (500+ cases) & Daily Challenge Archive",
-  "Unlimited Echo Flashcards (no daily limit)",
+  "Unlimited Ultrasound Flashcards (no daily limit)",
   "EchoAccreditation Navigator — IAC standards guide",
 ];
 

@@ -1,7 +1,7 @@
 /**
  * FlashcardDeck.tsx
  *
- * Standalone Echo Flashcards study mode.
+ * Standalone Ultrasound Flashcards study mode.
  * - Category filter: Adult Echo, Pediatric/Congenital Echo, Fetal Echo
  * - Spaced repetition: missed cards appear first
  * - Scoring/tracking displayed below the card
@@ -306,7 +306,7 @@ export default function FlashcardDeck() {
                 <Zap className="w-4 h-4 text-[#4ad9e0]" />
                 <span className="text-xs font-bold text-[#4ad9e0] uppercase tracking-wider">Premium Membership</span>
               </div>
-              <p className="text-white font-bold text-sm mb-1">Unlimited Echo Flashcards</p>
+              <p className="text-white font-bold text-sm mb-1">Unlimited Ultrasound Flashcards</p>
               <p className="text-white/60 text-xs">Study as many flashcards as you want, every day — plus spaced repetition, all categories, and the full All About Ultrasound clinical suite.</p>
             </div>
             <Link href="/premium">
@@ -331,7 +331,6 @@ export default function FlashcardDeck() {
       {/* Full-width hero banner */}
       <FlashcardsBanner
         streak={data?.userStats ? (data.userStats as any).streak ?? 0 : 0}
-        totalCards={data?.totalCards ?? 0}
         isPremium={dailyLimit === null}
       />
       <div className="container py-4 max-w-2xl mx-auto">
@@ -340,7 +339,7 @@ export default function FlashcardDeck() {
           <div className="flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-[#189aa1]" />
             <h1 className="text-lg font-black text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>
-              Echo Flashcards
+              Ultrasound Flashcards
             </h1>
           </div>
           {/* Daily usage indicator for free users */}

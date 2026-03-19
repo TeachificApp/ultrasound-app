@@ -1,20 +1,19 @@
 /**
- * FlashcardsBanner — Hero banner for the Echo Flashcards page.
+ * FlashcardsBanner — Hero banner for the Ultrasound Flashcards page.
  * Matches the dashboard hero style: navy-to-teal gradient, same typography.
  */
 import { Link } from "wouter";
-import { Zap, BookOpen } from "lucide-react";
+import { Zap } from "lucide-react";
 
 const BANNER_IMG =
   "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/flashcards-banner-final_AAUS_94ef5d55.webp";
 
 interface FlashcardsBannerProps {
   streak?: number;
-  totalCards?: number;
   isPremium?: boolean;
 }
 
-export default function FlashcardsBanner({ streak = 0, totalCards = 0, isPremium = false }: FlashcardsBannerProps) {
+export default function FlashcardsBanner({ streak = 0, isPremium = false }: FlashcardsBannerProps) {
   return (
     <div
       className="relative overflow-hidden"
@@ -52,14 +51,8 @@ export default function FlashcardsBanner({ streak = 0, totalCards = 0, isPremium
             Vascular, Breast, Thyroid, POCUS, and Physics. Spaced repetition surfaces the cards you need most.
           </p>
 
-          {/* Stats row */}
+          {/* Access row — iHeartEcho style: streak + free/premium info only, no card count */}
           <div className="flex flex-wrap gap-4 mb-6">
-            {totalCards > 0 && (
-              <div className="flex items-center gap-1.5 text-sm text-white/70">
-                <BookOpen className="w-4 h-4 text-[#4ad9e0]" />
-                <span><strong className="text-white">{totalCards}</strong> cards available</span>
-              </div>
-            )}
             {streak > 0 && (
               <div className="flex items-center gap-1.5 text-sm text-white/70">
                 <span className="text-lg">🔥</span>
