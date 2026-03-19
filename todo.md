@@ -287,3 +287,6 @@
 - [ ] SoundBytes: not-logged-in → see banner + blurred list, must sign in; free → first 3 clips per category free; premium → all clips unlocked
 - [ ] SoundBytes: rebuild card layout to match iHeartEcho (thumbnail, title, category badge, duration, lock icon for premium)
 - [ ] All four pages: consistent lock overlay style — blurred content + teal upgrade CTA card centered
+
+## Dashboard Banner Stats (Mar 19)
+- [x] Remove Day Streak, Points, and Questions Answered stats from dashboard hero banner (keep on Daily Challenge page only)

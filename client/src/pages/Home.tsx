@@ -109,10 +109,6 @@ export default function Home() {
   const { user, isAuthenticated } = useAuth();
   const isPremium = user?.isPremium === true || user?.role === "admin";
 
-  const statsQuery = trpc.quickfire.getUserStats.useQuery(undefined, {
-    enabled: isAuthenticated,
-  });
-
   useEffect(() => {
     document.title = "UltrasoundAssist™ | All About Ultrasound";
   }, []);
@@ -148,24 +144,7 @@ export default function Home() {
                 Your clinical ultrasound intelligence platform — AIUM-based navigators, scan coaches, POCUS tools, and Fetal Echo resources.
               </p>
             </div>
-            {isAuthenticated && statsQuery.data && (
-              <div className="flex items-center gap-4 bg-white/10 rounded-xl px-5 py-3 backdrop-blur-sm">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-white">{statsQuery.data.streak ?? 0}</div>
-                  <div className="text-[10px] text-white/60 uppercase tracking-wider">Day Streak</div>
-                </div>
-                <div className="w-px h-10 bg-white/20" />
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-white">{statsQuery.data.bonusPoints ?? 0}</div>
-                  <div className="text-[10px] text-white/60 uppercase tracking-wider">Points</div>
-                </div>
-                <div className="w-px h-10 bg-white/20" />
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-white">{statsQuery.data.total ?? 0}</div>
-                  <div className="text-[10px] text-white/60 uppercase tracking-wider">Answered</div>
-                </div>
-              </div>
-            )}
+
           </div>
         </div>
         {/* Decorative wave */}
