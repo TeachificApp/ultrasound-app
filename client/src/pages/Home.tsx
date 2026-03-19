@@ -113,7 +113,7 @@ const modules: Module[] = [
     path: "/registry-review",
     icon: ClipboardCheck,
     title: "Registry Review Hub",
-    description: "Prepare for ARDMS, ARRT, CCI, and SVU registry exams with structured review courses, practice questions, and study resources.",
+    description: "Prepare for ARDMS, ARRT, CCI, and SVU registry exams with comprehensive review courses and test & learn quizzes from All About Ultrasound™.",
     badge: "Registry",
     color: BRAND,
   },

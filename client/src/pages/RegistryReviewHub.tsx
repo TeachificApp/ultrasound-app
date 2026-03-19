@@ -1,8 +1,7 @@
 /*
   UltrasoundAssist™ — Registry Review Hub
-  Displays All About Ultrasound Registry Review courses pulled from the live
-  Thinkific catalog cache. Checkout links are pre-filled with the logged-in
-  user's email for fast checkout.
+  Displays All About Ultrasound™ Registry Review courses pulled from the live
+  Thinkific catalog cache.
   Brand: Teal #189aa1, Aqua #4ad9e0
 */
 import { useState } from "react";
@@ -123,22 +122,12 @@ export default function RegistryReviewHub() {
               Registry Review
             </h1>
             <p className="text-[#4ad9e0] font-semibold text-base mb-3">
-              All About Ultrasound — Registry Review Courses
+              All About Ultrasound™ — Registry Review Courses
             </p>
             <p className="text-white/70 text-sm leading-relaxed max-w-lg">
-              Prepare for your registry exams with comprehensive review courses from All About
-              Ultrasound. Click "Learn More" to view course details or "Enroll" to go directly to
-              checkout — your email is pre-filled.
+              Prepare for your registry exams with comprehensive review courses and test & learn quizzes from All About Ultrasound™. Click "Learn More" to view course details or "Enroll" to register directly on Thinkific.
             </p>
-            {user && (
-              <div className="mt-3 inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-lg px-3 py-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
-                <span className="text-xs text-white/80">
-                  Signed in as <span className="text-white font-medium">{user.email}</span> —
-                  checkout links are pre-filled
-                </span>
-              </div>
-            )}
+
           </div>
         </div>
       </div>
@@ -345,12 +334,7 @@ export default function RegistryReviewHub() {
         >
           <Clock className="w-4 h-4 text-[#189aa1] flex-shrink-0 mt-0.5 sm:mt-0" />
           <p className="text-xs text-gray-600 leading-relaxed">
-            All courses are from <strong>All About Ultrasound</strong>. "Learn More" opens the
-            course details page; "Enroll" opens the checkout page
-            {user?.email
-              ? ` with your email (${user.email}) pre-filled`
-              : " — log in to UltrasoundAssist™ to have your email pre-filled automatically"}
-            .
+            All courses are from <strong>All About Ultrasound™</strong>. "Learn More" opens the course details page; "Enroll" takes you directly to the Thinkific checkout page.
           </p>
           <a
             href="https://member.allaboutultrasound.com/collections/registry-review"

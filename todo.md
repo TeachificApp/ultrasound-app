@@ -413,3 +413,13 @@
 - [x] Move Registry Review Hub sidebar link to after CME Hub
 - [x] Add/move Registry Review Hub dashboard card to after CME Hub card
 - [x] Remove category filter/list from Registry Review Hub page (also removed category badge on course cards)
+
+## Registry Review Hub Text Updates (Mar 19)
+- [ ] Change description language to "comprehensive review courses and test & learn quizzes"
+- [ ] Add ™ to all "All About Ultrasound" references on the Registry Review Hub page
+
+## Registry Review Hub Text Updates (Mar 19)
+- [x] Change description language to "comprehensive review courses and test & learn quizzes"
+- [x] Add ™ to all "All About Ultrasound" references on the Registry Review Hub page
+- [x] Remove all "email is pre-filled" / "checkout links are pre-filled" references
+- [x] Updated Home.tsx dashboard card description to match
