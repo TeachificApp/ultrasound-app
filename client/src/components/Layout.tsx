@@ -59,8 +59,9 @@ const navGroups = [
     label: "Clinical Tools",
     items: [
       { path: "/ultrasound-assist", label: "UltrasoundAssist™", icon: Stethoscope },
-      { path: "/pocus-assist-hub", label: "POCUS-Assist™", icon: Shield },
-      { path: "/fetal-echo-assist", label: "Fetal EchoAssist™", icon: Heart },
+      // POCUS-Assist™ and Fetal EchoAssist™ accessible via UltrasoundAssist™ pathway
+      // { path: "/pocus-assist-hub", label: "POCUS-Assist™", icon: Shield },
+      // { path: "/fetal-echo-assist", label: "Fetal EchoAssist™", icon: Heart },
     ],
   },
   {
@@ -74,13 +75,11 @@ const navGroups = [
       { path: "https://www.allaboutultrasound.net/fetal-echo-preview-access-pass", label: "Learn Fetal Echo", icon: BookOpen, external: true },
     ],
   },
-  {
-    label: "Accreditation",
-    items: [
-      { path: "/accreditation-navigator", label: "Accreditation Navigator™", icon: Award },
-      { path: "/diy-accreditation-smart", label: "DIY Accreditation™", icon: ClipboardList },
-    ],
-  },
+  // Accreditation section hidden until requested
+  // { label: "Accreditation", items: [
+  //   { path: "/accreditation-navigator", label: "Accreditation Navigator™", icon: Award },
+  //   { path: "/diy-accreditation-smart", label: "DIY Accreditation™", icon: ClipboardList },
+  // ] },
   {
     label: "Community",
     items: [

@@ -37,22 +37,9 @@ const modules: Module[] = [
     badge: "15 Specialties",
     color: BRAND,
   },
-  {
-    path: "/pocus-assist-hub",
-    icon: Shield,
-    title: "POCUS-Assist™",
-    description: "Point-of-care ultrasound protocols for eFAST, Cardiac POCUS, RUSH, and Lung POCUS — window-by-window checklists, probe guidance, IVC CI, B-line scorer, and eFAST free-fluid grader.",
-    badge: "4 Modules",
-    color: BRAND,
-  },
-  {
-    path: "/fetal-echo-assist-hub",
-    icon: Heart,
-    title: "Fetal EchoAssist™",
-    description: "ASE-guideline fetal echo navigator and ScanCoach — segmental anatomy, cardiac views, M-mode, Doppler, and biometric calculators for fetal cardiac assessment.",
-    badge: "ASE Guidelines",
-    color: BRAND,
-  },
+  // POCUS-Assist™ and Fetal EchoAssist™ accessible via UltrasoundAssist™ pathway
+  // { path: "/pocus-assist-hub", icon: Shield, title: "POCUS-Assist™", ... },
+  // { path: "/fetal-echo-assist-hub", icon: Heart, title: "Fetal EchoAssist™", ... },
   {
     path: "/echoassist",
     icon: Calculator,
@@ -109,23 +96,9 @@ const modules: Module[] = [
     badge: "Courses",
     color: BRAND,
   },
-  {
-    path: "/accreditation-navigator",
-    icon: Award,
-    title: "Accreditation Navigator™",
-    description: "IAC standards guide — search case mix requirements, CME, staff qualifications, policies, and common deficiencies for ultrasound accreditation.",
-    badge: "Free · IAC",
-    color: BRAND,
-  },
-  {
-    path: "/accreditation",
-    icon: ClipboardList,
-    title: "DIY Accreditation Tool™",
-    description: "Quality reviews, peer review tracking, policy builder, and appropriate use monitoring — everything your lab needs for IAC accreditation.",
-    badge: "Accreditation",
-    color: BRAND,
-    premium: true,
-  },
+  // Accreditation Navigator and DIY Accreditation Tool hidden until requested
+  // { path: "/accreditation-navigator", icon: Award, title: "Accreditation Navigator™", ... },
+  // { path: "/accreditation", icon: ClipboardList, title: "DIY Accreditation Tool™", ... },
   // ⚠️ pinLast: true — Community Hub always renders last.
   {
     path: "https://member.allaboutultrasound.com/products/communities/allaboutultrasound-community",

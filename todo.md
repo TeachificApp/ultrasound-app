@@ -170,7 +170,10 @@
 - [x] Add keywords meta tag
 
 ## UI Changes
-- [ ] Remove Accreditation Navigator and DIY Accreditation cards from dashboard (hide until requested)
+- [x] Remove Accreditation Navigator and DIY Accreditation cards from dashboard (hidden until requested)
+- [x] Remove Accreditation Navigator and DIY Accreditation links from sidebar nav (hidden until requested)
+- [x] Remove POCUS-Assist™ and Fetal EchoAssist™ direct dashboard cards (accessible via UltrasoundAssist™ pathway)
+- [x] Remove POCUS-Assist™ and Fetal EchoAssist™ direct sidebar nav links (accessible via UltrasoundAssist™ pathway)
 
 ## Bugs
 - [x] Magic link login fails on app.allaboutultrasound.com — "failed query" DB error (missing users columns — fixed via ALTER TABLE)
