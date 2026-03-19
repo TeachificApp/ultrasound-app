@@ -65,7 +65,7 @@
 - [x] Fetal Echo ScanCoach
 - [x] FetalEchoAssist™ Calculators (6 calculators: CT ratio, cardiac axis, DV PI, MCA PSV, FHR, Ao/PA ratio)
 
-## SoundBytes™
+## SoundBytes™ (Updated Mar 19)
 - [x] SoundBytes page with category filters
 - [x] All 16 categories available
 - [x] Premium gating (sign-in required)
@@ -233,3 +233,44 @@
 - [x] Audit and align all notification rules (challenge reminders, email scheduler)
 - [x] Fix Thinkific webhook product matchers for AAUS product names, suppress welcome email
 - [x] Replace all iHeartEcho™ brand text with All About Ultrasound™ across entire codebase (UI, emails, logs, comments)
+
+## Branding Copy Fixes (Mar 19 — continued)
+- [x] SoundBytes: rebuilt with iHeartEcho-style hero banner + AAUS branding
+- [x] Case Library: renamed Echo Case Library → Ultrasound Case Library throughout
+- [x] CaseLibraryBanner: updated title, subtitle, and description copy
+- [x] FlashcardsBanner: updated title (Echo Flashcards → Ultrasound Flashcards) and description
+- [x] DailyChallengeBanner: updated subtitle and description (echo → ultrasound terminology)
+- [x] Flashcards daily limit gate: updated premium copy to All About Ultrasound™
+
+## Branding Copy Fixes (Mar 19)
+- [x] Login page: normalize "All About Ultrasound" → "All About Ultrasound™" (no double TM or plain variant)
+- [x] Login page: change sign-in CTA to "Sign in to All About Ultrasound™ — UltrasoundAssist™"
+- [x] Login page: remove PMC-cited references from ad copy; use "guideline-based" only
+- [x] Login page: remove "General & Vascular Ultrasound Clinical Intelligence" → "Ultrasound Clinical Intelligence"
+- [x] Emails: change "General & Vascular Ultrasound Clinical Intelligence" → "Ultrasound Clinical Intelligence"
+- [x] Emails: sign-in links say "Sign in to All About Ultrasound™ — UltrasoundAssist™"
+- [x] Ad copy everywhere: replace specific guideline citations with "guideline-based"
+
+## Navigator Progress Bar
+- [x] Add ProtocolProgressBar shared component (sticky, animated fill, color transitions, Reset button)
+- [x] Applied to all 20 navigators (16 specialty + 4 POCUS)
+
+## Perinatology.com Ultrasound Calculators
+- [ ] Audit perinatology.com/calculators2.htm and identify ultrasound-relevant calculators
+- [ ] Implement identified calculators in the UltrasoundAssist Calculators section
+
+## Calculator Hubs (Mar 19)
+- [ ] OB/Gyn Calculator hub (perinatology.com ultrasound calcs + guideline-based)
+- [ ] Abdominal/Small Parts Calculator hub (liver, GB, bile duct, spleen, kidney, thyroid, testis, aorta)
+- [ ] Vascular Calculator hub (ABI, stenosis grading, IVC CI, DVT Wells, CIMT, RI)
+- [ ] Breast Calculator hub (BI-RADS risk, lesion volume, malignancy probability)
+- [ ] Wire all calculator hubs into the existing Calculators navigation entry
+
+## SWE + UDFF Integration (Mar 19)
+- [x] Add SWE protocol section to Abdominal Navigator (liver SWE, ARFI, 2D-SWE, pSWE — fibrosis staging)
+- [x] Add UDFF section to Abdominal Navigator (steatosis grading S0-S3)
+- [x] Add SWE to Abdominal ScanCoach (technique tips, vendor notes, pitfalls)
+- [ ] Add SWE + UDFF to Abdominal Calculator hub (liver stiffness staging, UDFF % → steatosis grade)
+- [x] Add SWE protocol section to Breast Navigator (lesion stiffness, BI-RADS SWE criteria)
+- [x] Add SWE to Breast ScanCoach (technique tips, vendor notes, pitfalls)
+- [ ] Add SWE to Breast Calculator hub (lesion stiffness kPa/m/s → malignancy risk)

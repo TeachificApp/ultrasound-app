@@ -10,6 +10,7 @@ import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { CheckCircle2, Circle, ChevronDown, ChevronUp, Info, Scan, ExternalLink } from "lucide-react";
 import { PremiumGate } from "@/components/PremiumGate";
+import ProtocolProgressBar from "../components/ProtocolProgressBar";
 
 const views = [
   {
@@ -126,24 +127,14 @@ export default function ScrotumNavigator() {
         </div>
       </div>
 
+      <ProtocolProgressBar
+        checked={checked.size}
+        total={totalItems}
+        onReset={resetChecklist}
+        checkedCritical={checkedCritical}
+        totalCritical={criticalItems}
+      />
       <div className="container py-6">
-        {/* Progress bar */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-5">
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-sm font-semibold text-gray-700">Protocol Progress</div>
-            <div className="text-sm font-bold text-[#189aa1]">{checked.size}/{totalItems} items</div>
-          </div>
-          <div className="w-full bg-gray-100 rounded-full h-2 mb-2">
-            <div className="h-2 rounded-full transition-all duration-300" style={{ width: `${progress}%`, background: "#189aa1" }} />
-          </div>
-          <div className="flex items-center justify-between text-xs text-gray-500">
-            <span>{progress}% complete</span>
-            <span className="text-amber-600 font-medium">{checkedCritical}/{criticalItems} critical items</span>
-          </div>
-          {checked.size > 0 && (
-            <button onClick={resetChecklist} className="mt-2 text-xs text-gray-400 hover:text-gray-600 underline">Reset checklist</button>
-          )}
-        </div>
 
         {/* Tabs */}
         <div className="flex gap-2 mb-5">

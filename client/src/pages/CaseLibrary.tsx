@@ -157,11 +157,11 @@ export default function CaseLibrary() {
                 <BookOpen className="w-5 h-5 text-white" />
               </div>
               <h1 className="text-2xl font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>
-                Echo Case Library
+                Ultrasound Case Library
               </h1>
             </div>
             <p className="text-sm text-gray-500 ml-11">
-              Our Echo Case Library has image, video and non-image cases. Cases are intended to encourage critical thinking, not just in image review, but also in clinical history, clinical scenarios and outcomes.
+              Our Ultrasound Case Library has image, video, and non-image cases. Cases are intended to encourage critical thinking — not just in image review, but also in clinical history, clinical scenarios, and outcomes.
             </p>
           </div>
           {isAuthenticated ? (
@@ -208,7 +208,7 @@ export default function CaseLibrary() {
 
         {/* ── Browse Tab ─────────────────────────────────────────────────────── */}
         {activeTab === "browse" && (
-          <BlurredOverlay type="login" featureName="Echo Case Library" disabled={authLoading || isAuthenticated}>
+          <BlurredOverlay type="login" featureName="Ultrasound Case Library" disabled={authLoading || isAuthenticated}>
             {/* Filters */}
             <div className="flex flex-col sm:flex-row gap-3 mb-6">
               <div className="relative flex-1">
@@ -525,7 +525,7 @@ export default function CaseLibrary() {
               Sign In to View Cases
             </h2>
             <p className="text-white/60 text-sm mb-5 leading-relaxed">
-              Create a free account to access the Echo Case Library. Free members can view cases and submit their own. Upgrade to Premium for the full clinical suite.
+              Create a free All About Ultrasound™ account to access the Ultrasound Case Library. Free members can view cases and submit their own. Upgrade to Premium for the full clinical suite.
             </p>
             <div className="flex flex-col gap-2">
               <a href={getLoginUrl()} className="block">

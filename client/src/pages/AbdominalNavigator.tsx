@@ -10,6 +10,7 @@ import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { CheckCircle2, Circle, ChevronDown, ChevronUp, Info, Scan, ExternalLink } from "lucide-react";
 import { PremiumGate } from "@/components/PremiumGate";
+import ProtocolProgressBar from "../components/ProtocolProgressBar";
 
 const views = [
   {
@@ -79,15 +80,74 @@ const views = [
 
 const normalValues = [
   {
-    category: "Key Parameters",
+    category: "Liver",
     values: [
-      { param: "Refer to AIUM guidelines", normal: "See AIUM Practice Parameter for the Performa", borderline: "—", abnormal: "—" },
+      { param: "Liver span (MCL)", normal: "≤15 cm", borderline: "15–17 cm", abnormal: ">17 cm" },
+      { param: "Portal vein diameter", normal: "≤13 mm", borderline: "13–15 mm", abnormal: ">15 mm" },
+      { param: "CBD diameter (adults)", normal: "≤6 mm", borderline: "6–8 mm", abnormal: ">8 mm" },
+      { param: "CBD (post-cholecystectomy)", normal: "≤10 mm", borderline: "—", abnormal: ">10 mm" },
     ],
-  }
+  },
+  {
+    category: "Gallbladder",
+    values: [
+      { param: "GB wall thickness (fasted)", normal: "≤3 mm", borderline: "3–5 mm", abnormal: ">5 mm" },
+      { param: "GB length", normal: "≤10 cm", borderline: "—", abnormal: ">10 cm" },
+    ],
+  },
+  {
+    category: "Spleen",
+    values: [
+      { param: "Spleen length (craniocaudal)", normal: "≤12 cm", borderline: "12–13 cm", abnormal: ">13 cm" },
+    ],
+  },
+  {
+    category: "Kidneys",
+    values: [
+      { param: "Renal length (adult)", normal: "9–12 cm", borderline: "8–9 cm", abnormal: "<8 cm or >12 cm" },
+      { param: "Cortical thickness", normal: "≥7 mm", borderline: "5–7 mm", abnormal: "<5 mm" },
+    ],
+  },
+  {
+    category: "Aorta",
+    values: [
+      { param: "Aortic diameter (infrarenal)", normal: "<3 cm", borderline: "3–5 cm", abnormal: "≥5 cm (AAA)" },
+    ],
+  },
 ];
 
+const sweUdffData = {
+  sweProtocol: [
+    { id: "swe_1", label: "Patient fasted ≥2 hours; supine with right arm extended above head", detail: "Fasting reduces portal venous flow and liver stiffness variability.", critical: false },
+    { id: "swe_2", label: "Select ROI in right lobe of liver (segment 5 or 6), ≥1 cm below capsule, ≥2 cm from vessels", detail: "Avoid subcapsular parenchyma and large vessels — both falsely elevate stiffness.", critical: true },
+    { id: "swe_3", label: "Minimal probe pressure; patient in quiet respiration or brief breath-hold", detail: "Probe pressure and deep inspiration both increase liver stiffness artifactually.", critical: true },
+    { id: "swe_4", label: "Acquire ≥10 valid measurements; discard IQR/median >30% (unreliable)", detail: "EASL guidelines require IQR/M ≤30% for reliable pSWE/2D-SWE results.", critical: false },
+    { id: "swe_5", label: "Record median kPa (or m/s) with IQR/M ratio", detail: "Report median, not mean. IQR/M >30% = unreliable — repeat or defer.", critical: false },
+    { id: "swe_6", label: "Document vendor and SWE modality (pSWE/ARFI vs 2D-SWE)", detail: "Thresholds differ by vendor and modality — always document for comparison.", critical: false },
+  ],
+  sweStaging: [
+    { stage: "F0–F1 (No/Mild fibrosis)", pSWE: "<7.1 kPa", swe2d: "<7.0 kPa", note: "No significant fibrosis" },
+    { stage: "F2 (Significant fibrosis)", pSWE: "7.1–9.5 kPa", swe2d: "7.0–8.7 kPa", note: "Moderate fibrosis" },
+    { stage: "F3 (Advanced fibrosis)", pSWE: "9.5–12.4 kPa", swe2d: "8.7–10.3 kPa", note: "Bridging fibrosis" },
+    { stage: "F4 (Cirrhosis)", pSWE: ">12.4 kPa", swe2d: ">10.3 kPa", note: "Cirrhosis" },
+  ],
+  udffProtocol: [
+    { id: "udff_1", label: "Patient fasted ≥2 hours; supine position", detail: "Fasting reduces postprandial hepatic blood flow variation.", critical: false },
+    { id: "udff_2", label: "Place ROI in right lobe (segments 5–8), ≥1 cm below capsule, away from vessels", detail: "Same positioning rules as SWE — subcapsular and perivascular areas are unreliable.", critical: true },
+    { id: "udff_3", label: "Acquire UDFF measurement using vendor-specific attenuation-based algorithm", detail: "UDFF uses ultrasound attenuation coefficient (dB/cm/MHz) to estimate fat fraction.", critical: false },
+    { id: "udff_4", label: "Record UDFF % value and steatosis grade (S0–S3)", detail: "UDFF correlates with MRI-PDFF. S1 threshold ~5–6% UDFF.", critical: false },
+    { id: "udff_5", label: "Combine with liver stiffness (SWE) for comprehensive MASLD assessment", detail: "UDFF + SWE together assess both steatosis and fibrosis — key for MASLD staging.", critical: false },
+  ],
+  udffStaging: [
+    { grade: "S0 (No steatosis)", udff: "<5%", mriPdff: "<5%", note: "Normal" },
+    { grade: "S1 (Mild steatosis)", udff: "5–17%", mriPdff: "5–17%", note: "≥5% hepatic fat" },
+    { grade: "S2 (Moderate steatosis)", udff: "17–22%", mriPdff: "17–22%", note: "Moderate hepatic fat" },
+    { grade: "S3 (Severe steatosis)", udff: ">22%", mriPdff: ">22%", note: "Severe hepatic fat" },
+  ],
+};
+
 export default function AbdominalNavigator() {
-  const [tab, setTab] = useState<"protocol" | "reference">("protocol");
+  const [tab, setTab] = useState<"protocol" | "reference" | "swe">("protocol");
   const [expandedView, setExpandedView] = useState<number | null>(0);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [expandedRef, setExpandedRef] = useState<number | null>(0);
@@ -153,31 +213,21 @@ export default function AbdominalNavigator() {
         </div>
       </div>
 
+      <ProtocolProgressBar
+        checked={checked.size}
+        total={totalItems}
+        onReset={resetChecklist}
+        checkedCritical={checkedCritical}
+        totalCritical={criticalItems}
+      />
       <div className="container py-6">
-        {/* Progress bar */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-5">
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-sm font-semibold text-gray-700">Protocol Progress</div>
-            <div className="text-sm font-bold text-[#189aa1]">{checked.size}/{totalItems} items</div>
-          </div>
-          <div className="w-full bg-gray-100 rounded-full h-2 mb-2">
-            <div className="h-2 rounded-full transition-all duration-300" style={{ width: `${progress}%`, background: "#189aa1" }} />
-          </div>
-          <div className="flex items-center justify-between text-xs text-gray-500">
-            <span>{progress}% complete</span>
-            <span className="text-amber-600 font-medium">{checkedCritical}/{criticalItems} critical items</span>
-          </div>
-          {checked.size > 0 && (
-            <button onClick={resetChecklist} className="mt-2 text-xs text-gray-400 hover:text-gray-600 underline">Reset checklist</button>
-          )}
-        </div>
 
         {/* Tabs */}
         <div className="flex gap-2 mb-5">
-          {["protocol", "reference"].map(t => (
+          {(["protocol", "reference", "swe"] as const).map(t => (
             <button
               key={t}
-              onClick={() => setTab(t as "protocol" | "reference")}
+              onClick={() => setTab(t)}
               className="px-4 py-2 rounded-lg text-sm font-semibold transition-all"
               style={{
                 background: tab === t ? "#189aa1" : "white",
@@ -185,7 +235,7 @@ export default function AbdominalNavigator() {
                 border: `1px solid ${tab === t ? "#189aa1" : "#189aa1" + "40"}`,
               }}
             >
-              {t === "protocol" ? "Protocol Checklist" : "Reference Values"}
+              {t === "protocol" ? "Protocol Checklist" : t === "reference" ? "Reference Values" : "SWE / UDFF"}
             </button>
           ))}
         </div>
@@ -287,6 +337,127 @@ export default function AbdominalNavigator() {
             ))}
             <div className="text-xs text-gray-400 px-1">
               Reference: <a href="https://onlinelibrary.wiley.com/doi/10.1002/jum.15874" target="_blank" rel="noopener noreferrer" className="underline hover:text-[#189aa1]">AIUM Practice Parameter for the Performance of an Ultrasound Examination of the Abdomen and/or Retroperitoneum (2021)</a>
+            </div>
+          </div>
+        )}
+
+        {tab === "swe" && (
+          <div className="space-y-5">
+            {/* SWE Section */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100" style={{ background: "linear-gradient(135deg, #0e1e2e 0%, #189aa1 100%)" }}>
+                <div className="font-bold text-white text-sm" style={{ fontFamily: "Merriweather, serif" }}>Shear Wave Elastography (SWE) — Liver Fibrosis Staging</div>
+                <p className="text-xs text-[#4ad9e0] mt-0.5">pSWE/ARFI and 2D-SWE protocol — EASL/AASLD guideline-based</p>
+              </div>
+              <div className="p-5 space-y-2">
+                {sweUdffData.sweProtocol.map((item) => (
+                  <div key={item.id} className="flex gap-3 p-3 rounded-lg border" style={{ borderColor: item.critical ? "#189aa140" : "#e5e7eb", background: item.critical ? "#f0fbfc" : "white" }}>
+                    <div className="flex-shrink-0 mt-0.5">
+                      {item.critical ? <span className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-bold text-white" style={{ background: "#189aa1" }}>!</span> : <span className="w-4 h-4 rounded-full border-2 border-gray-300 inline-block" />}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">{item.label}</p>
+                      {item.detail && <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{item.detail}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* SWE Fibrosis Staging Table */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
+                <span className="font-bold text-sm text-gray-700" style={{ fontFamily: "Merriweather, serif" }}>Liver Stiffness Thresholds (METAVIR)</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="text-left py-2 px-4 font-semibold text-gray-600">Stage</th>
+                      <th className="text-left py-2 px-3 font-semibold text-[#189aa1]">pSWE/ARFI</th>
+                      <th className="text-left py-2 px-3 font-semibold text-[#0e4a50]">2D-SWE</th>
+                      <th className="text-left py-2 px-3 font-semibold text-gray-500">Interpretation</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {sweUdffData.sweStaging.map((row, i) => (
+                      <tr key={i} className="hover:bg-gray-50">
+                        <td className="py-2 px-4 font-medium text-gray-700">{row.stage}</td>
+                        <td className="py-2 px-3 font-mono text-[#189aa1]">{row.pSWE}</td>
+                        <td className="py-2 px-3 font-mono text-[#0e4a50]">{row.swe2d}</td>
+                        <td className="py-2 px-3 text-gray-500">{row.note}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* UDFF Section */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100" style={{ background: "linear-gradient(135deg, #0e1e2e 0%, #0e4a50 100%)" }}>
+                <div className="font-bold text-white text-sm" style={{ fontFamily: "Merriweather, serif" }}>Ultrasound-Derived Fat Fraction (UDFF) — Steatosis Grading</div>
+                <p className="text-xs text-[#4ad9e0] mt-0.5">Attenuation-based hepatic steatosis assessment — MASLD/NAFLD staging</p>
+              </div>
+              <div className="p-5 space-y-2">
+                {sweUdffData.udffProtocol.map((item) => (
+                  <div key={item.id} className="flex gap-3 p-3 rounded-lg border" style={{ borderColor: item.critical ? "#189aa140" : "#e5e7eb", background: item.critical ? "#f0fbfc" : "white" }}>
+                    <div className="flex-shrink-0 mt-0.5">
+                      {item.critical ? <span className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-bold text-white" style={{ background: "#189aa1" }}>!</span> : <span className="w-4 h-4 rounded-full border-2 border-gray-300 inline-block" />}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">{item.label}</p>
+                      {item.detail && <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{item.detail}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* UDFF Steatosis Staging Table */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
+                <span className="font-bold text-sm text-gray-700" style={{ fontFamily: "Merriweather, serif" }}>UDFF Steatosis Grading</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="text-left py-2 px-4 font-semibold text-gray-600">Grade</th>
+                      <th className="text-left py-2 px-3 font-semibold text-[#189aa1]">UDFF %</th>
+                      <th className="text-left py-2 px-3 font-semibold text-[#0e4a50]">MRI-PDFF</th>
+                      <th className="text-left py-2 px-3 font-semibold text-gray-500">Interpretation</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {sweUdffData.udffStaging.map((row, i) => (
+                      <tr key={i} className="hover:bg-gray-50">
+                        <td className="py-2 px-4 font-medium text-gray-700">{row.grade}</td>
+                        <td className="py-2 px-3 font-mono text-[#189aa1]">{row.udff}</td>
+                        <td className="py-2 px-3 font-mono text-[#0e4a50]">{row.mriPdff}</td>
+                        <td className="py-2 px-3 text-gray-500">{row.note}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Vendor Notes */}
+            <div className="rounded-xl p-4 border" style={{ borderColor: "#189aa140", background: "#f0fbfc" }}>
+              <p className="text-xs font-bold text-[#189aa1] mb-2 uppercase tracking-wider">Vendor Notes</p>
+              <ul className="text-xs text-gray-600 space-y-1">
+                <li><span className="font-semibold">Siemens (ARFI/pSWE):</span> Virtual Touch Tissue Quantification (VTTQ) — reports m/s; multiply ×1.05 to approximate kPa.</li>
+                <li><span className="font-semibold">GE (2D-SWE):</span> ElastPQ — reports kPa directly. Color map available for spatial visualization.</li>
+                <li><span className="font-semibold">Philips (2D-SWE):</span> ElastQ Imaging — reports kPa with color overlay.</li>
+                <li><span className="font-semibold">Canon/Toshiba (2D-SWE):</span> Real-time Tissue Elastography (RTE) — qualitative; use shear wave mode for quantitative kPa.</li>
+                <li><span className="font-semibold">Samsung (UDFF):</span> S-Detect with attenuation imaging — reports dB/cm/MHz and UDFF %.</li>
+                <li><span className="font-semibold">Fujifilm:</span> SWE available on Arietta series — reports kPa.</li>
+              </ul>
+            </div>
+
+            <div className="text-xs text-gray-400 px-1">
+              References: EASL Clinical Practice Guidelines on non-invasive tests for evaluation of liver disease severity (2021); AASLD Practice Guidance on NAFLD/MASLD (2023); AIUM Practice Parameter for Abdominal Ultrasound (2021).
             </div>
           </div>
         )}

@@ -18,6 +18,7 @@ import {
   Info, CheckCircle2, Building2, Zap as ZapIcon, ClipboardList, ShieldCheck, Lock
 } from "lucide-react";
 import { Microscope } from "lucide-react";
+import ProtocolProgressBar from "../components/ProtocolProgressBar";
 
 const BRAND = "#189aa1";
 

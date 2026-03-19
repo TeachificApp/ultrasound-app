@@ -40,13 +40,13 @@ export default function CaseLibraryBanner({ isAuthenticated }: CaseLibraryBanner
             className="text-3xl md:text-4xl font-black text-white leading-tight mb-2"
             style={{ fontFamily: "Merriweather, serif" }}
           >
-            Echo Case Library
+            Ultrasound Case Library
           </h1>
           <p className="text-[#4ad9e0] font-semibold text-base mb-3">
-            Clinical Reasoning Through Real Echo Cases
+            Clinical Reasoning Through Real Ultrasound Cases
           </p>
           <p className="text-white/70 text-sm leading-relaxed mb-6 max-w-lg">
-            Browse image, video, and scenario-based echo cases designed to sharpen your clinical
+            Browse image, video, and scenario-based ultrasound cases designed to sharpen your clinical
             thinking — not just image interpretation, but history, decision-making, and outcomes.
           </p>
 

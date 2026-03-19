@@ -7,6 +7,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
+import ProtocolProgressBar from "../components/ProtocolProgressBar";
 import {
   CheckCircle2, Circle, ChevronDown, ChevronUp, Info,
   Heart, AlertTriangle, ArrowRight, Shield,
@@ -148,6 +149,7 @@ export default function POCUSCardiacNavigator() {
 
   const totalItems = cardiacViews.flatMap((v) => v.items).length;
   const checkedCount = Object.values(checked).filter(Boolean).length;
+  const resetAll = () => setChecked({});
   const progress = Math.round((checkedCount / totalItems) * 100);
 
   const criticalUnchecked = cardiacViews
@@ -193,24 +195,12 @@ export default function POCUSCardiacNavigator() {
           </div>
         </div>
       </div>
-
+      <ProtocolProgressBar
+        checked={checkedCount}
+        total={totalItems}
+        onReset={resetAll}
+      />
       <div className="container py-6 space-y-6">
-        {/* Progress */}
-        <div className="bg-white rounded-xl border border-gray-100 p-4" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-semibold text-gray-700">Exam Progress</span>
-            <span className="text-sm font-bold" style={{ color: BRAND }}>{checkedCount} / {totalItems} items</span>
-          </div>
-          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`, background: progress === 100 ? "#16a34a" : BRAND }} />
-          </div>
-          {criticalUnchecked.length > 0 && (
-            <div className="mt-2 flex items-start gap-2 text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
-              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-              <span>{criticalUnchecked.length} critical item{criticalUnchecked.length > 1 ? "s" : ""} not yet assessed</span>
-            </div>
-          )}
-        </div>
 
         {/* Interpretation table */}
         <div className="bg-white rounded-xl border border-gray-100 p-4" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>

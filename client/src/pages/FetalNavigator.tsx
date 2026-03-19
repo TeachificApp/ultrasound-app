@@ -8,6 +8,7 @@ import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { Baby, AlertCircle, CheckCircle2, HelpCircle, Scan, ClipboardList, ChevronDown, ChevronUp, Calculator, Crown } from "lucide-react";
 import { PremiumGate } from "@/components/PremiumGate";
+import ProtocolProgressBar from "../components/ProtocolProgressBar";
 
 const findings3VV = [
   {

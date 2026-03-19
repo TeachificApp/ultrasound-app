@@ -42,14 +42,14 @@ export default function FlashcardsBanner({ streak = 0, totalCards = 0, isPremium
             className="text-3xl md:text-4xl font-black text-white leading-tight mb-2"
             style={{ fontFamily: "Merriweather, serif" }}
           >
-            Echo Flashcards
+            Ultrasound Flashcards
           </h1>
           <p className="text-[#4ad9e0] font-semibold text-base mb-3">
-            Rapid-Fire Clinical Knowledge Review
+            Rapid-Fire Clinical Knowledge Review from All About Ultrasound™
           </p>
           <p className="text-white/70 text-sm leading-relaxed mb-6 max-w-lg">
-            Reinforce echo knowledge with quick-review cards covering ACS, Adult Echo, Pediatric,
-            Fetal, and POCUS. Spaced repetition surfaces the cards you need most.
+            Reinforce your ultrasound knowledge with quick-review cards covering Abdominal, OB/Gyn,
+            Vascular, Breast, Thyroid, POCUS, and Physics. Spaced repetition surfaces the cards you need most.
           </p>
 
           {/* Stats row */}

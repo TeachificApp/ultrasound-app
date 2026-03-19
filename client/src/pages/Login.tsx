@@ -20,7 +20,7 @@ const FEATURES = [
   { icon: Stethoscope, title: "Clinical Navigators", desc: "Abdomen, Pelvic/Gyn, OB, Vascular, POCUS & more" },
   { icon: Activity, title: "Ultrasound-Assist™ Calculators", desc: "Guideline-based interpretation across all modalities" },
   { icon: BookOpen, title: "CME & Registry Review", desc: "Accredited courses, registry prep, 500+ ultrasound cases" },
-  { icon: Shield, title: "ScanCoach™ & Reference Values", desc: "Protocol guidance, normal values, PMC-cited references" },
+  { icon: Shield, title: "ScanCoach™ & Reference Values", desc: "Protocol guidance, guideline-based normal values and reference ranges" },
 ];
 
 export default function Login() {
@@ -95,7 +95,7 @@ export default function Login() {
             The Complete Ultrasound<br /><span style={{ color: "#4ad9e0" }}>Clinical Intelligence Guide</span>
           </h1>
           <p className="text-white/70 text-sm leading-relaxed max-w-sm">
-            Advanced, guideline-driven clinical intelligence app designed for sonographers, physicians, and ultrasound learners across general, vascular, and point-of-care imaging—serving as the ultimate pocket reference for real-time scanning and clinical decision support.
+            Advanced, guideline-based clinical intelligence for sonographers, physicians, and ultrasound learners — the ultimate pocket reference for real-time scanning and clinical decision support.
           </p>
         </div>
         {/* Features */}
@@ -112,7 +112,7 @@ export default function Login() {
             </div>
           ))}
         </div>
-        <div className="relative mt-8 lg:mt-0 text-white/30 text-xs">© {new Date().getFullYear()} All About Ultrasound™ · All About Ultrasound</div>
+        <div className="relative mt-8 lg:mt-0 text-white/30 text-xs">© {new Date().getFullYear()} All About Ultrasound™</div>
       </div>
 
       {/* ── Right panel: magic link form ── */}
@@ -138,7 +138,7 @@ export default function Login() {
                   <Mail className="w-7 h-7" style={{ color: "#189aa1" }} />
                 </div>
                 <h2 className="text-2xl font-black mb-2" style={{ fontFamily: "Merriweather, serif", color: "#0e1e2e" }}>
-                  Sign in to All About Ultrasound™
+                  Sign in to All About Ultrasound™ — UltrasoundAssist™
                 </h2>
                 <p className="text-sm text-gray-500 leading-relaxed">
                   Enter your email address and we'll send you a one-click sign-in link. No password required.
@@ -187,7 +187,7 @@ export default function Login() {
                 <Zap className="w-4 h-4 text-[#189aa1] flex-shrink-0 mt-0.5" />
                 <div className="text-xs text-gray-600 leading-relaxed space-y-1">
                   <p>The link expires in <strong>15 minutes</strong> and can only be used once.</p>
-                  <p>📬 <strong>Don't see it?</strong> Check your <strong>spam</strong> or <strong>junk</strong> folder — the email comes from <span className="font-medium">All About Ultrasound™ / All About Ultrasound</span>.
+                  <p>📬 <strong>Don't see it?</strong> Check your <strong>spam</strong> or <strong>junk</strong> folder — the email comes from <span className="font-medium">All About Ultrasound™</span>.
                   </p>
                 </div>
               </div>
@@ -236,7 +236,7 @@ export default function Login() {
                 <Zap className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                 <div className="text-xs text-amber-700 leading-relaxed space-y-1">
                   <p>The link expires in <strong>15 minutes</strong> and can only be used once.</p>
-                  <p>📬 <strong>Don't see it?</strong> Check your <strong>spam</strong> or <strong>junk</strong> folder — the email comes from <span className="font-medium">All About Ultrasound™ / All About Ultrasound</span>.</p>
+                  <p>📬 <strong>Don't see it?</strong> Check your <strong>spam</strong> or <strong>junk</strong> folder — the email comes from <span className="font-medium">All About Ultrasound™</span>.</p>
                 </div>
               </div>
 

@@ -61,6 +61,7 @@ export default function BreastScanCoach() {
   const [selectedView, setSelectedView] = useState(0);
   const [expandedTip, setExpandedTip] = useState<number | null>(null);
   const [showGeneral, setShowGeneral] = useState(false);
+  const [showSWE, setShowSWE] = useState(false);
 
   const currentView = views[selectedView];
 
@@ -200,9 +201,47 @@ export default function BreastScanCoach() {
           )}
         </div>
 
+        {/* SWE Technique Section */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-5">
+          <button
+            className="w-full flex items-center gap-3 px-5 py-3 hover:bg-[#f0fbfc] transition-all"
+            onClick={() => setShowSWE(!showSWE)}
+          >
+            <div className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0" style={{ background: "#189aa1" }}>
+              <span className="text-white text-[9px] font-black">SWE</span>
+            </div>
+            <span className="font-bold text-sm text-gray-700 flex-1 text-left" style={{ fontFamily: "Merriweather, serif" }}>
+              Breast SWE Technique Guide
+            </span>
+            {showSWE ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+          </button>
+          {showSWE && (
+            <div className="border-t border-gray-100 p-5 space-y-3">
+              {[
+                { cat: "Patient Preparation", text: "Patient supine, ipsilateral arm elevated above head. No special fasting required. Ensure adequate coupling gel to minimize probe pressure.", color: "#0e4a50" },
+                { cat: "Probe & Settings", text: "High-frequency linear ≥12 MHz. Activate SWE mode. Reduce probe pressure to near-zero — even slight compression falsely elevates stiffness values significantly.", color: "#189aa1" },
+                { cat: "ROI Placement", text: "Place ROI box to include the entire lesion plus ≥5 mm of surrounding tissue. For larger lesions, ensure the ROI captures the stiffest region (often the periphery in malignant lesions).", color: "#0e1e2e" },
+                { cat: "Acquisition", text: "Acquire ≥3 SWE maps in quiet respiration. Record mean kPa, max kPa, and lesion-to-fat (L/F) ratio. L/F ratio >4.0 is highly suspicious for malignancy (Supersonic Imagine data).", color: "#4a6fa5" },
+                { cat: "Color Map Interpretation", text: "Blue = soft (benign). Green/yellow = intermediate. Orange/red = stiff (suspicious). Signal void (black) in center = very stiff malignant core — treat as high stiffness.", color: "#0e4a50" },
+                { cat: "Pitfall", text: "SWE signal may be absent in very hard lesions (void artifact) — do NOT interpret void as soft. Deep lesions (>3 cm) may have poor SWE signal quality. Cysts show falsely high stiffness at margins.", color: "#d97706" },
+                { cat: "Pearl", text: "SWE is an adjunct to BI-RADS — it does NOT replace B-mode assessment. SWE can support downgrading BI-RADS 4A lesions with mean kPa <30 and L/F ratio <3.0, but biopsy remains indicated for BI-RADS 4B+.", color: "#059669" },
+                { cat: "Vendor Notes", text: "Supersonic Imagine Aixplorer®: ShearWave™ Elastography (kPa). GE LOGIQ: Q-Box™ measurement. Siemens Acuson: Virtual Touch IQ. Philips EPIQ: ElastQ Imaging. Canon: Real-time SWE (quantitative kPa mode).", color: "#189aa1" },
+              ].map((tip, i) => (
+                <div key={i} className="rounded-xl p-4 border" style={{ borderColor: (tip.color) + "30", background: (tip.color) + "08" }}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Lightbulb className="w-3.5 h-3.5 flex-shrink-0" style={{ color: tip.color }} />
+                    <span className="text-xs font-bold uppercase tracking-wider" style={{ color: tip.color }}>{tip.cat}</span>
+                  </div>
+                  <p className="text-sm text-gray-700 leading-relaxed">{tip.text}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Reference */}
         <div className="text-xs text-gray-400 px-1 mt-4">
-          Based on: <a href="https://www.aium.org/resources/practice-parameters" target="_blank" rel="noopener noreferrer" className="underline hover:text-[#189aa1]">AIUM Practice Parameter for the Performance of a Breast Ultrasound Examination (2016)</a>
+          Based on: <a href="https://www.aium.org/resources/practice-parameters" target="_blank" rel="noopener noreferrer" className="underline hover:text-[#189aa1]">AIUM Practice Parameter for the Performance of a Breast Ultrasound Examination (2016)</a>; ACR BI-RADS® Atlas 5th Edition (2013); EUSOBI Recommendations for Breast SWE (2017).
         </div>
       </div>
     </Layout>

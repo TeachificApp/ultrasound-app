@@ -56,10 +56,10 @@ export default function DailyChallengeBanner({
             Daily Challenge
           </h1>
           <p className="text-[#4ad9e0] font-semibold text-base mb-3">
-            Sharpen Your Echo Knowledge Every Day
+            Sharpen Your Ultrasound Knowledge Every Day
           </p>
           <p className="text-white/70 text-sm leading-relaxed mb-4 max-w-lg">
-            One question per category — ACS, Adult Echo, Pediatric, Fetal, and POCUS. Complete all
+            One question per category — Abdominal, Vascular, OB/Gyn, Breast, and POCUS. Complete all
             five to finish today's challenge. Maintain your streak and climb the leaderboard.
           </p>
 
