@@ -6,7 +6,7 @@ import { useState } from "react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import {
-  Activity, Baby, Scan, TrendingUp, BookOpen, Crown,
+  Activity, Baby, Scan, TrendingUp, BookOpen, Crown, Lock,
   Stethoscope, Brain, Bone, Circle, Zap, Microscope
 } from "lucide-react";
 import { usePremium } from "@/hooks/usePremium";
@@ -303,14 +303,35 @@ export default function UltrasoundAssistHub() {
               const Icon = spec.icon;
               const locked = !isPremium;
               return (
-                <div key={i} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-all">
+                <div
+                  key={i}
+                  className={`relative bg-white rounded-xl border shadow-sm overflow-hidden transition-all cursor-pointer ${
+                    locked
+                      ? "border-amber-100 hover:shadow-md hover:border-amber-300/50"
+                      : "border-gray-100 hover:shadow-md hover:border-[#189aa1]/30"
+                  }`}
+                  style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}
+                  onClick={locked ? () => setUpgradeModal({ title: spec.title }) : undefined}
+                >
+                  {/* Amber corner badge for locked cards — iHeartEcho style */}
+                  {locked && (
+                    <div className="absolute top-0 right-0 overflow-hidden rounded-tr-xl rounded-bl-xl">
+                      <div
+                        className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-white"
+                        style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}
+                      >
+                        <Crown className="w-2.5 h-2.5" />
+                        PREMIUM
+                      </div>
+                    </div>
+                  )}
                   <div className="p-5">
                     <div className="flex items-start gap-3 mb-3">
                       <div
                         className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                        style={{ background: locked ? "#f3f4f6" : "linear-gradient(135deg, #0e1e2e, #189aa1)" }}
+                        style={{ background: locked ? "#f59e0b15" : "linear-gradient(135deg, #0e1e2e, #189aa1)" }}
                       >
-                        <Icon className={`w-5 h-5 ${locked ? "text-gray-400" : "text-[#4ad9e0]"}`} />
+                        <Icon className={`w-5 h-5 ${locked ? "text-amber-500" : "text-[#4ad9e0]"}`} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -320,30 +341,22 @@ export default function UltrasoundAssistHub() {
                           >
                             {spec.badge}
                           </span>
-                          <span className="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full flex items-center gap-1">
-                            <Crown className="w-2.5 h-2.5" /> Premium
-                          </span>
                         </div>
                         <h3
-                          className={`font-bold text-sm mt-1 leading-tight ${locked ? "text-gray-400" : "text-gray-900"}`}
+                          className="font-bold text-sm mt-1 leading-tight text-gray-800"
                           style={{ fontFamily: "Merriweather, serif" }}
                         >
                           {spec.title}
                         </h3>
                       </div>
                     </div>
-                    <p className={`text-xs leading-relaxed mb-4 ${locked ? "text-gray-400" : "text-gray-500"}`}>
+                    <p className="text-xs leading-relaxed mb-4 text-gray-500">
                       {spec.description}
                     </p>
                     {locked ? (
-                      <button
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs text-white transition-all hover:opacity-90"
-                        style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}
-                        onClick={() => setUpgradeModal({ title: spec.title })}
-                      >
-                        <Crown className="w-3 h-3" />
-                        Unlock with Premium
-                      </button>
+                      <div className="flex items-center gap-1 text-xs font-semibold text-amber-600">
+                        <Lock className="w-3 h-3" /> Upgrade to Access
+                      </div>
                     ) : (
                       <div className="flex gap-2">
                         <Link href={spec.path}>

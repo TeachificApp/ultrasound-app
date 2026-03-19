@@ -360,3 +360,9 @@
 - [x] Match iHeartEcho profile menu roles exactly: same role checks (diy_user, diy_admin, platform_admin, accreditation_manager)
 - [x] Add EducatorAssist™ menu item — visible only for platform_admin / admin role users
 - [x] Rename "Submit an Echo Case" → "Submit Ultrasound Case" in profile menu and anywhere else it appears
+
+## iHeartEcho-Style Gating Rules (Mar 19)
+- [x] Fix Flashcards.tsx: pass dynamic isPremium to FlashcardsBanner (not hardcoded false)
+- [x] Fix UltrasoundAssist Hub: show proper lock overlay on locked navigator cards — amber corner badge + Lock icon + click-anywhere-to-upgrade
+- [x] Verify BlurredOverlay premium CTA links to correct AAUS premium/upgrade page (/premium)
+- [x] Add login-gate BlurredOverlay to Flashcards category selector page for unauthenticated users (already implemented)
