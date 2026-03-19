@@ -405,3 +405,11 @@
 - [x] Migrate existing Venous quickfireQuestions → category "Vascular" in DB (0 questions, all were Arterial)
 - [x] Migrate existing Venous quickfireChallenges → category "Vascular" in DB (20 challenges migrated)
 - [x] Update server-side fallback pool for Vascular to pull from venous + arterial echoCategory questions
+
+## Registry Review Hub Fix (Mar 19)
+- [x] Remove category filter/list from Registry Review Hub — show all courses without category grouping
+
+## Registry Review Hub Placement (Mar 19)
+- [x] Move Registry Review Hub sidebar link to after CME Hub
+- [x] Add/move Registry Review Hub dashboard card to after CME Hub card
+- [x] Remove category filter/list from Registry Review Hub page (also removed category badge on course cards)

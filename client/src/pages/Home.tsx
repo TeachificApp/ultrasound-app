@@ -31,7 +31,7 @@ function useCountUp(target: number, duration = 1800) {
 }
 import {
   Calculator, ClipboardList, Activity, BookOpen, FileText,
-  ArrowRight, Users, Award, Zap, Stethoscope, ExternalLink, MessageCircle, GraduationCap, BookMarked, Crown, Shield, Heart
+  ArrowRight, Users, Award, Zap, Stethoscope, ExternalLink, MessageCircle, GraduationCap, BookMarked, Crown, Shield, Heart, ClipboardCheck
 } from "lucide-react";
 
 const BRAND = "#189aa1";
@@ -107,6 +107,14 @@ const modules: Module[] = [
     title: "CME Hub",
     description: "Browse accredited CME courses from All About Ultrasound™ — SDMS, AMA PRA, and more. Click to enroll directly on Thinkific.",
     badge: "CME",
+    color: BRAND,
+  },
+  {
+    path: "/registry-review",
+    icon: ClipboardCheck,
+    title: "Registry Review Hub",
+    description: "Prepare for ARDMS, ARRT, CCI, and SVU registry exams with structured review courses, practice questions, and study resources.",
+    badge: "Registry",
     color: BRAND,
   },
   // Learn Fetal Echo card removed from dashboard (accessible via sidebar nav)

@@ -70,10 +70,10 @@ const navGroups = [
     items: [
       { path: "/quickfire", label: "Daily Challenge", icon: Zap },
       { path: "/flashcards", label: "Ultrasound Flashcards", icon: Layers },
-      { path: "/registry-review", label: "Registry Review Hub", icon: ClipboardCheck },
       { path: "/case-library", label: "Case Library", icon: Library },
       { path: "/soundbytes", label: "SoundBytes™", icon: BookMarked },
       { path: "/cme", label: "CME Hub", icon: GraduationCap },
+      { path: "/registry-review", label: "Registry Review Hub", icon: ClipboardCheck },
       { path: "https://www.allaboutultrasound.net/fetal-echo-preview-access-pass", label: "Learn Fetal Echo", icon: BookOpen, external: true },
     ],
   },
