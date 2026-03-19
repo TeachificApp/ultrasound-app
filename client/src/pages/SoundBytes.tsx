@@ -18,7 +18,7 @@ import { CATEGORY_LABELS, CATEGORY_COLORS, THINKIFIC_LINKS } from "@shared/appCo
 import Layout from "@/components/Layout";
 
 const BANNER_IMG =
-  "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/soundbytes-banner_b5a7c3d2.png";
+  "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/soundbytes-banner-AAUS_8880afff.png";
 
 // Sample soundbytes — replaced by DB content once available
 const sampleSoundBytes = [

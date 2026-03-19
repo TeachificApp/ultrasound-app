@@ -123,7 +123,16 @@ export default function Home() {
         className="relative overflow-hidden"
         style={{ background: "linear-gradient(135deg, #0e1e2e 0%, #0e4a50 60%, #189aa1 100%)" }}
       >
-        <div className="container py-8 md:py-10">
+        {/* Background probe image */}
+        <div
+          className="absolute inset-0 opacity-20"
+          style={{
+            backgroundImage: `url("https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/ultrasound-hero-probe-3bWMAQMJw9YFHoPXwbt8bZ.webp")`,
+            backgroundSize: "cover",
+            backgroundPosition: "center right",
+          }}
+        />
+        <div className="relative container py-8 md:py-10">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-2">
