@@ -139,6 +139,9 @@
 - [x] Admin stats tests
 - [x] Category constants tests
 - [x] All 33 tests passing
+- [x] Thinkific API key verified (products fetch OK)
+- [x] SendGrid API key verified (authenticated as Lara Williams / All About Ultrasound)
+- [x] 733 tests passing across 36 test files (all credentials live)
 - [x] Rewrote ultrasound.test.ts to match actual iHeartEcho router structure (40 tests)
 - [x] Fixed auth.logout.test.ts sameSite assertion
 - [x] Updated thinkific.test.ts to skip live API tests gracefully
@@ -165,6 +168,9 @@
 - [x] Fix homepage title (30–60 chars)
 - [x] Add meta description (50–160 chars)
 - [x] Add keywords meta tag
+
+## UI Changes
+- [ ] Remove Accreditation Navigator and DIY Accreditation cards from dashboard (hide until requested)
 
 ## Bugs
 - [x] Magic link login fails on app.allaboutultrasound.com — "failed query" DB error (missing users columns — fixed via ALTER TABLE)
