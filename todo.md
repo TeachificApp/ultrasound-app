@@ -290,3 +290,7 @@
 
 ## Dashboard Banner Stats (Mar 19)
 - [x] Remove Day Streak, Points, and Questions Answered stats from dashboard hero banner (keep on Daily Challenge page only)
+
+## Dashboard Hero CTAs (Mar 19)
+- [x] Add iHeartEcho-style CTA buttons to dashboard hero: "Open UltrasoundAssist™", "Daily Challenge", "allaboutultrasound.com"
+- [x] Add stats row below hero (Calculators count, Cases count, Protocols covered, Members)

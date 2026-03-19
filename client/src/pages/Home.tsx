@@ -149,11 +149,67 @@ export default function Home() {
               >
                 UltrasoundAssist™
               </h1>
-              <p className="text-white/70 text-sm md:text-base max-w-xl">
+              <p className="text-white/70 text-sm md:text-base max-w-xl mb-5">
                 Your clinical ultrasound intelligence platform — AIUM-based navigators, scan coaches, POCUS tools, and Fetal Echo resources.
               </p>
+
+              {/* CTA Buttons — iHeartEcho style */}
+              <div className="flex flex-wrap gap-3">
+                <Link href="/ultrasound-assist">
+                  <button
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm text-white transition-all hover:opacity-90 hover:scale-105"
+                    style={{ background: "#189aa1" }}
+                  >
+                    <Stethoscope className="w-4 h-4" />
+                    Open UltrasoundAssist™
+                  </button>
+                </Link>
+                <Link href="/quickfire">
+                  <button className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all">
+                    <Zap className="w-4 h-4" />
+                    Daily Challenge
+                  </button>
+                </Link>
+                <a
+                  href="https://www.allaboutultrasound.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  allaboutultrasound.com
+                </a>
+              </div>
             </div>
 
+          </div>
+        </div>
+
+        {/* Stats row */}
+        <div className="relative border-t border-white/10">
+          <div className="container py-4">
+            <div className="flex flex-wrap gap-6 md:gap-10">
+              <div className="flex items-center gap-2 text-white/80">
+                <Calculator className="w-4 h-4 text-[#4ad9e0]" />
+                <span className="text-lg font-bold text-white">20+</span>
+                <span className="text-xs text-white/60">Clinical Calculators</span>
+              </div>
+              <div className="flex items-center gap-2 text-white/80">
+                <BookOpen className="w-4 h-4 text-[#4ad9e0]" />
+                <span className="text-lg font-bold text-white">500+</span>
+                <span className="text-xs text-white/60">Ultrasound Cases</span>
+              </div>
+              <div className="flex items-center gap-2 text-white/80">
+                <ClipboardList className="w-4 h-4 text-[#4ad9e0]" />
+                <span className="text-lg font-bold text-white">15</span>
+                <span className="text-xs text-white/60">Protocols Covered</span>
+              </div>
+              <div className="flex items-center gap-2 text-white/80">
+                <Users className="w-4 h-4 text-[#4ad9e0]" />
+                <span className="text-lg font-bold text-white">10,000+</span>
+                <span className="text-xs text-white/60">Members</span>
+              </div>
+            </div>
           </div>
         </div>
         {/* Decorative wave */}
