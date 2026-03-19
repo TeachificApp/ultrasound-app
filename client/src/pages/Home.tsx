@@ -80,7 +80,7 @@ const modules: Module[] = [
   {
     path: "/flashcards",
     icon: BookMarked,
-    title: "UltrasoundFlashcards™",
+    title: "Ultrasound Flashcards™",
     description: "Review key ultrasound concepts across 15 categories — Abdominal, Vascular, OB, Fetal Echo, POCUS, Physics, and more. Spaced repetition with daily limits.",
     badge: "16 Categories",
     color: BRAND,
