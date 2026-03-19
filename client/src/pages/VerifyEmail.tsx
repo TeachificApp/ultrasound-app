@@ -198,8 +198,8 @@ export default function VerifyEmail() {
           <div className="px-8 py-4 bg-gray-50 border-t border-gray-100 text-center">
             <p className="text-xs text-gray-400">
               © All About Ultrasound ·{" "}
-              <a href="https://www.iheartecho.com" className="text-[#189aa1] hover:underline">
-                www.iheartecho.com
+              <a href="https://www.allaboutultrasound.com" className="text-[#189aa1] hover:underline">
+                www.allaboutultrasound.com
               </a>
             </p>
           </div>

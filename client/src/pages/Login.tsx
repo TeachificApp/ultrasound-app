@@ -17,10 +17,10 @@ import { Mail, Loader2, Stethoscope, Activity, BookOpen, Shield, CheckCircle2, Z
 const LOGO = import.meta.env.VITE_APP_LOGO as string;
 
 const FEATURES = [
-  { icon: Stethoscope, title: "Clinical Navigators", desc: "TTE, TEE, Stress, Fetal, Pediatric, ACHD protocols" },
-  { icon: Activity, title: "EchoAssist™ & Calculators", desc: "Guideline-based severity grading across 9 domains" },
-  { icon: BookOpen, title: "CME & Registry Review", desc: "Accredited courses, registry prep, 500+ echo cases" },
-  { icon: Shield, title: "Accreditation Tools", desc: "Peer review, IQR, echo correlation, lab analytics" },
+  { icon: Stethoscope, title: "Clinical Navigators", desc: "Abdomen, Pelvic/Gyn, OB, Vascular, POCUS & more" },
+  { icon: Activity, title: "Ultrasound-Assist™ Calculators", desc: "Guideline-based interpretation across all modalities" },
+  { icon: BookOpen, title: "CME & Registry Review", desc: "Accredited courses, registry prep, 500+ ultrasound cases" },
+  { icon: Shield, title: "ScanCoach™ & Reference Values", desc: "Protocol guidance, normal values, PMC-cited references" },
 ];
 
 export default function Login() {
@@ -82,7 +82,7 @@ export default function Login() {
           )}
           <div>
             <div className="text-2xl font-black text-white" style={{ fontFamily: "Merriweather, serif" }}>All About Ultrasound™</div>
-            <div className="text-xs font-medium" style={{ color: "#4ad9e0" }}>EchoAssist™ Echocardiography Clinical Companion</div>
+            <div className="text-xs font-medium" style={{ color: "#4ad9e0" }}>UltrasoundAssist™ Clinical Intelligence</div>
           </div>
         </div>
         {/* Hero */}
@@ -92,10 +92,10 @@ export default function Login() {
             <span className="text-xs text-white/80 font-medium">Real-time Clinical Decision Support</span>
           </div>
           <h1 className="text-3xl lg:text-4xl font-black text-white leading-tight mb-4" style={{ fontFamily: "Merriweather, serif" }}>
-            The complete echo<br /><span style={{ color: "#4ad9e0" }}>clinical companion</span>
+            The complete ultrasound<br /><span style={{ color: "#4ad9e0" }}>clinical intelligence</span>
           </h1>
           <p className="text-white/70 text-sm leading-relaxed max-w-sm">
-            Guideline-based interpretation, structured protocols, accreditation tools, and CME — built for cardiac ultrasound students, sonographers, echocardiographers, cardiologists, physicians, residents, ACS professionals, and echo educators.
+            Advanced, guideline-driven clinical intelligence app designed for sonographers, physicians, and ultrasound learners across general, vascular, and point-of-care imaging—serving as the ultimate pocket reference for real-time scanning and clinical decision support.
           </p>
         </div>
         {/* Features */}
@@ -212,9 +212,9 @@ export default function Login() {
 
               <p className="mt-6 text-xs text-gray-400 text-center leading-relaxed">
                 By signing in you agree to the{" "}
-                <a href="https://www.iheartecho.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600">Terms of Service</a>
+                <a href="https://www.allaboutultrasound.com/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600">Terms of Service</a>
                 {" "}and{" "}
-                <a href="https://www.iheartecho.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600">Privacy Policy</a>.
+                <a href="https://www.allaboutultrasound.com/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600">Privacy Policy</a>.
               </p>
             </>
           ) : (

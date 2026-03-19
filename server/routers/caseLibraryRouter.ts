@@ -360,7 +360,7 @@ export const caseLibraryRouter = router({
       // Notify admin when a regular user submits a case for review
       if (!isAdmin) {
         const submitterName = ctx.user.displayName || ctx.user.name || "A user";
-        const appUrl = process.env.VITE_APP_URL ?? "https://app.iheartecho.com";
+        const appUrl = process.env.VITE_APP_URL ?? "https://app.allaboutultrasound.com";
         const adminUrl = `${appUrl}/admin/cases`;
 
         // In-app notification to the platform owner
@@ -622,7 +622,7 @@ export const caseLibraryRouter = router({
       }
       // Notify admin of resubmission
       const submitterName = ctx.user.displayName || ctx.user.name || "A user";
-      const appUrl = process.env.VITE_APP_URL ?? "https://app.iheartecho.com";
+      const appUrl = process.env.VITE_APP_URL ?? "https://app.allaboutultrasound.com";
       notifyOwner({
         title: "Case Resubmitted for Review",
         content: `${submitterName} resubmitted a case: "${input.title}" (${input.modality}). Visit Case Management to review it.`,
@@ -724,7 +724,7 @@ export const caseLibraryRouter = router({
           .where(eq(users.id, caseRow.submittedByUserId))
           .limit(1);
         if (submitter?.email) {
-          const appUrl = process.env.VITE_APP_URL ?? "https://app.iheartecho.com";
+          const appUrl = process.env.VITE_APP_URL ?? "https://app.allaboutultrasound.com";
           const firstName = (submitter.displayName || submitter.name || "there").split(" ")[0];
           const { subject, htmlBody, previewText } = buildCaseApprovedEmail({
             firstName,
@@ -782,7 +782,7 @@ export const caseLibraryRouter = router({
           .where(eq(users.id, caseRow.submittedByUserId))
           .limit(1);
         if (submitter?.email) {
-          const appUrl = process.env.VITE_APP_URL ?? "https://app.iheartecho.com";
+          const appUrl = process.env.VITE_APP_URL ?? "https://app.allaboutultrasound.com";
           const firstName = (submitter.displayName || submitter.name || "there").split(" ")[0];
           const { subject, htmlBody, previewText } = buildCaseRejectedEmail({
             firstName,

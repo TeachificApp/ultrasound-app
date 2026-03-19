@@ -1400,7 +1400,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
   triggerStreakReminders: adminProcedure
     .input(z.object({ appUrl: z.string().url().optional() }))
     .mutation(async ({ input }) => {
-      const appUrl = input.appUrl ?? process.env.VITE_APP_URL ?? "https://app.iheartecho.com";
+      const appUrl = input.appUrl ?? process.env.VITE_APP_URL ?? "https://app.allaboutultrasound.com";
       const summary = await sendStreakReminders(appUrl);
       return summary;
     }),

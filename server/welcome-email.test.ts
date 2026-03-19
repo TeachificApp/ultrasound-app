@@ -76,7 +76,7 @@ describe("buildWelcomeEmail", () => {
       roles: [],
     });
     // The circular logo CDN URL should be present
-    expect(result.htmlBody).toContain("tMerpTNEMefRhZwO.png");
+    expect(result.htmlBody).toContain("aaus_logo_ring_01cc7ccd.webp");
   });
 
   it("includes the circular logo with border-radius:50%", () => {
@@ -142,13 +142,13 @@ describe("buildWelcomeEmail", () => {
     expect(result.htmlBody).toContain("#189aa1");
   });
 
-  it("includes the iheartecho.com link in the footer", () => {
+  it("includes the allaboutultrasound.com link in the footer", () => {
     const result = buildWelcomeEmail({
       firstName: "Jane",
-      loginUrl: "https://app.iheartecho.com/login",
+      loginUrl: "https://app.allaboutultrasound.com/login",
       roles: [],
     });
-    expect(result.htmlBody).toContain("www.iheartecho.com");
+    expect(result.htmlBody).toContain("www.allaboutultrasound.com");
   });
 });
 

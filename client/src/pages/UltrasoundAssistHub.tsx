@@ -12,7 +12,7 @@ import {
 import { usePremium } from "@/hooks/usePremium";
 
 const specialties = [
-  // ── FREE ──────────────────────────────────────────────────────────────────
+  // ── FREE NAVIGATORS (registered users) ───────────────────────────────────
   {
     path: "/abdominal-navigator",
     scanCoachPath: "/abdominal-scan-coach",
@@ -21,6 +21,7 @@ const specialties = [
     description: "Liver, gallbladder, bile ducts, pancreas, spleen, kidneys, aorta, and IVC — complete abdominal protocol with view-by-view checklist and AIUM-based reference values.",
     badge: "Abdominal",
     free: true,
+    freeScanCoach: true,
   },
   {
     path: "/pelvic-gyn-navigator",
@@ -30,16 +31,41 @@ const specialties = [
     description: "Uterus, endometrium, ovaries, adnexa, and cul-de-sac — transabdominal and transvaginal pelvic ultrasound protocol per AIUM guidelines.",
     badge: "Pelvic/Gyn",
     free: true,
+    freeScanCoach: true,
   },
   {
     path: "/ob1-navigator",
     scanCoachPath: "/ob1-scan-coach",
     icon: Baby,
-    title: "Obstetric 1st Trimester",
+    title: "OB 1st Trimester",
     description: "Gestational sac, yolk sac, embryo/fetus, CRL, NT measurement, and early anatomy — first trimester obstetric ultrasound per AIUM guidelines.",
     badge: "OB 1st Tri",
     free: true,
+    freeScanCoach: true,
   },
+  // ── PREMIUM NAVIGATOR + SCANCOACH ─────────────────────────────────────────
+  {
+    path: "/ob23-navigator",
+    scanCoachPath: "/ob23-scan-coach",
+    icon: Baby,
+    title: "OB 2nd/3rd Trimester",
+    description: "Fetal biometry, anatomy survey, placenta, amniotic fluid, umbilical cord, and cervical length — second and third trimester obstetric ultrasound per AIUM guidelines.",
+    badge: "OB 2nd/3rd Tri",
+    free: false,
+    freeScanCoach: false,
+  },
+  // ── FREE NAVIGATOR, PREMIUM SCANCOACH ─────────────────────────────────────
+  {
+    path: "/fetal-navigator",
+    scanCoachPath: "/fetal-echo-assist",
+    icon: Baby,
+    title: "Fetal Echo",
+    description: "Fetal cardiac anatomy, segmental analysis, 4-chamber view, outflow tracts, 3VV, 3VT, and fetal arrhythmia — fetal echocardiography per ASE guidelines.",
+    badge: "Fetal Echo",
+    free: true,
+    freeScanCoach: false,
+  },
+  // ── PREMIUM NAVIGATOR + SCANCOACH ─────────────────────────────────────────
   {
     path: "/venous-navigator",
     scanCoachPath: "/venous-scan-coach",
@@ -47,53 +73,8 @@ const specialties = [
     title: "Vascular — Venous (Upper & Lower)",
     description: "DVT evaluation of upper and lower extremity veins — compression technique, color Doppler, and spectral waveform analysis per AIUM/SVU guidelines.",
     badge: "Venous",
-    free: true,
-  },
-  {
-    path: "/thyroid-navigator",
-    scanCoachPath: "/thyroid-scan-coach",
-    icon: Microscope,
-    title: "Small Parts — Thyroid",
-    description: "Thyroid lobes, isthmus, nodule characterization (ACR TIRADS), and cervical lymph nodes — thyroid ultrasound protocol per AIUM guidelines.",
-    badge: "Thyroid",
-    free: true,
-  },
-  {
-    path: "/pocus-assist-hub",
-    scanCoachPath: "/pocus-assist-hub",
-    icon: Zap,
-    title: "POCUS — Lung, eFAST, RUSH",
-    description: "Point-of-care ultrasound protocols — Lung B-lines, eFAST trauma survey, and RUSH hemodynamic assessment with view-by-view checklists and ScanCoach.",
-    badge: "POCUS",
-    free: true,
-  },
-  // ── PREMIUM ───────────────────────────────────────────────────────────────
-  {
-    path: "/ob23-navigator",
-    scanCoachPath: "/ob23-scan-coach",
-    icon: Baby,
-    title: "Obstetric 2nd/3rd Trimester",
-    description: "Fetal biometry, anatomy survey, placenta, amniotic fluid, umbilical cord, and cervical length — second and third trimester obstetric ultrasound per AIUM guidelines.",
-    badge: "OB 2nd/3rd Tri",
     free: false,
-  },
-  {
-    path: "/scrotum-navigator",
-    scanCoachPath: "/scrotum-scan-coach",
-    icon: Scan,
-    title: "Small Parts — Scrotum",
-    description: "Testes, epididymis, vas deferens, and scrotal wall — scrotal ultrasound protocol with Doppler assessment per AIUM guidelines.",
-    badge: "Scrotum",
-    free: false,
-  },
-  {
-    path: "/breast-navigator",
-    scanCoachPath: "/breast-scan-coach",
-    icon: Scan,
-    title: "Breast Ultrasound",
-    description: "Breast lesion characterization (ACR BI-RADS), whole-breast screening, and axillary lymph node assessment — breast ultrasound protocol per AIUM guidelines.",
-    badge: "Breast",
-    free: false,
+    freeScanCoach: false,
   },
   {
     path: "/arterial-navigator",
@@ -103,6 +84,7 @@ const specialties = [
     description: "Peripheral arterial disease evaluation — ABI, segmental pressures, and duplex imaging of upper and lower extremity arteries per AIUM guidelines.",
     badge: "Arterial",
     free: false,
+    freeScanCoach: false,
   },
   {
     path: "/abdominal-vascular-navigator",
@@ -112,7 +94,42 @@ const specialties = [
     description: "Renal arteries, mesenteric arteries, celiac axis, and portal venous system — abdominal vascular duplex ultrasound per AIUM guidelines.",
     badge: "Abdominal Vascular",
     free: false,
+    freeScanCoach: false,
   },
+  // ── FREE NAVIGATOR, PREMIUM SCANCOACH ─────────────────────────────────────
+  {
+    path: "/carotid-navigator",
+    scanCoachPath: "/carotid-scan-coach",
+    icon: Activity,
+    title: "Vascular — Extracranial Carotid Artery",
+    description: "CCA, ICA, ECA, and vertebral artery — extracranial carotid duplex ultrasound with SRU consensus stenosis grading per AIUM guidelines.",
+    badge: "Carotid",
+    free: true,
+    freeScanCoach: false,
+  },
+  // ── PREMIUM NAVIGATOR + SCANCOACH ─────────────────────────────────────────
+  {
+    path: "/tcd-navigator",
+    scanCoachPath: "/tcd-scan-coach",
+    icon: Brain,
+    title: "Vascular — Intracranial Duplex/TCD",
+    description: "Transcranial Doppler and duplex — MCA, ACA, PCA, basilar, and vertebral arteries via temporal, orbital, and suboccipital windows per AIUM guidelines.",
+    badge: "TCD",
+    free: false,
+    freeScanCoach: false,
+  },
+  // ── FREE NAVIGATOR, PREMIUM SCANCOACH ─────────────────────────────────────
+  {
+    path: "/pocus-assist",
+    scanCoachPath: "/pocus-assist",
+    icon: Zap,
+    title: "POCUS — Lung, eFAST, RUSH",
+    description: "Point-of-care ultrasound protocols — Lung B-lines, eFAST trauma survey, and RUSH hemodynamic assessment with view-by-view checklists and ScanCoach.",
+    badge: "POCUS",
+    free: true,
+    freeScanCoach: false,
+  },
+  // ── ADDITIONAL PREMIUM ────────────────────────────────────────────────────
   {
     path: "/aorta-navigator",
     scanCoachPath: "/aorta-scan-coach",
@@ -203,7 +220,7 @@ export default function UltrasoundAssistHub() {
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-base mt-0.5">Ultrasound Protocol Navigator &amp; ScanCoach</p>
               <p className="text-white/70 text-sm md:text-base mt-2 max-w-xl leading-relaxed">
-                Structured ultrasound protocols with view-by-view checklists, normal reference values, scanning tips, probe guidance, and guideline-based interpretation — for every modality and patient population.
+                Advanced, guideline-driven clinical intelligence app designed for sonographers, physicians, and ultrasound learners across general, vascular, and point-of-care imaging—serving as the ultimate pocket reference for real-time scanning and clinical decision support.
               </p>
             </div>
           </div>

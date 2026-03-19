@@ -73,13 +73,13 @@ export default function CaseLibraryBanner({ isAuthenticated }: CaseLibraryBanner
               </a>
             )}
             <a
-              href="https://www.iheartecho.com"
+              href="https://member.allaboutultrasound.com"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all"
             >
               <BookOpen className="w-4 h-4" />
-              iheartecho.com
+              All About Ultrasound
             </a>
           </div>
         </div>

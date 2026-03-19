@@ -1,7 +1,7 @@
 /*
   All About Ultrasound™ — Post-Enrollment Decision-Tree Landing Page
   Shown after completing the free All About Ultrasound membership enrollment.
-  Two paths: All About Ultrasound Community | All About Ultrasound™ EchoAssist™ App
+  Two paths: All About Ultrasound Community | UltrasoundAssist™ Clinical Intelligence App
   Brand: Teal #189aa1, Aqua #4ad9e0, Dark navy #0e1e2e
 */
 import { useEffect } from "react";
@@ -23,15 +23,15 @@ import { getLoginUrl } from "@/const";
 
 const COMMUNITY_FEATURES = [
   { icon: BookOpen,      text: "Access all your enrolled All About Ultrasound courses" },
-  { icon: MessageCircle, text: "Connect with sonographers & cardiologists worldwide" },
+  { icon: MessageCircle, text: "Connect with sonographers, physicians & ultrasound learners worldwide" },
   { icon: Users,         text: "Join live Q&A sessions and community discussions" },
 ];
 
 const APP_FEATURES = [
-  { icon: Stethoscope, text: "EchoAssist™ — guideline-based severity interpretation" },
-  { icon: Calculator,  text: "Echo calculators for AS, MR, TR, AR, diastology & more" },
-  { icon: Zap,         text: "Daily Echo Challenge to sharpen your clinical skills" },
-  { icon: BookOpen,    text: "Echo Case Library with annotated teaching points" },
+  { icon: Stethoscope, text: "Clinical Navigators for Abdomen, Pelvic/Gyn, OB, Vascular & POCUS" },
+  { icon: Calculator,  text: "Ultrasound-Assist™ Calculators with guideline-based interpretation" },
+  { icon: Zap,         text: "Daily Challenge to sharpen your scanning & clinical skills" },
+  { icon: BookOpen,    text: "Ultrasound Case Library with annotated teaching points" },
 ];
 
 export default function Enrolled() {
@@ -47,7 +47,7 @@ export default function Enrolled() {
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <header className="flex items-center justify-center gap-3 px-6 py-6">
         <img
-          src="https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/TTSqgyHlTBmxeODV.png?Expires=1804183007&Signature=tWUrD-cUfgsk0u97qoBm0zB3mj75cGUW2F-hh-3aepkHA9QlDWUbfY2eqgxrIpyY2Zp3wTFpuBC7DXxtNjAMv5Ju2HBWLLcCgaGJrEB5X2wKLtoJQKscrbUUOXFV7xdwiJWP5zeVe7QNQaBw5zHqqyN6EYc6a0WovYLeHtUnM~vCz5pDvUh0L43UEpwlSVUZnU9ULfYO~ML9cpjCX-M~Uwb1QHUU2IxD7Qa9wMXw3nUhLxhbrUVdc-byWsUfQg5~PCwxH3jjLLq-4hlrBvFgkyB5QJJiqv6f~GM6bMh8jFE1GfWCAPzQVdcY97tgqT4GBExpYMkQ-K7AK83Fvd5zEg__&Key-Pair-Id=K2HSFNDJXOU9YS"
+          src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp"
           alt="All About Ultrasound™"
           className="w-10 h-10 object-contain"
         />
@@ -191,11 +191,11 @@ export default function Enrolled() {
                 className="text-xl font-bold text-white leading-snug"
                 style={{ fontFamily: "Merriweather, serif" }}
               >
-                All About Ultrasound™ EchoAssist™ Echocardiography Clinical Companion
+                All About Ultrasound™ UltrasoundAssist™ Clinical Intelligence
               </h2>
             </div>
             <p className="text-white/60 text-sm leading-relaxed">
-              Real-time echo interpretation tools, clinical calculators, and daily learning — built for the clinical environment.
+              Advanced, guideline-driven clinical intelligence app designed for sonographers, physicians, and ultrasound learners across general, vascular, and point-of-care imaging—serving as the ultimate pocket reference for real-time scanning and clinical decision support.
             </p>
           </div>
 

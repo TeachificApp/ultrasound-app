@@ -40,7 +40,7 @@ export default function MagicLinkRequest() {
             style={{ background: "linear-gradient(135deg, #0e1e2e 0%, #0e4a50 60%, #189aa1 100%)" }}
           >
             <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-3">
-              <img src={LOGO || "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/tMerpTNEMefRhZwO.png?Expires=1804389585&Signature=WUUmbeKd6gRL-5YievLbV1CH3uu0nlv-Re4ouPNZeR8Uaa5fZGvIpyzCfN4GeYzdNVN-L2Dfhpb6wP3tKMLML8tU2MU77LZNA0Db1Qt~FgBKmBrDM8f98IhyhaIIh3mcPdLcoP5aezbNBOluLkAKxGF1onaa3LNS33jvn6RdWOARg3rQF-iGyCG8t~MaJrqXCHCHnEQWkv8ww0KFZrIE6cKq-EgnS6NZ6Ugc~9fSwQmMSgxfKiJuZdqcca1LwferRwRh3oNdounneCfHfE~QI00U4T7~b0DybwkrOKG0VWDKwXiSGd2AgO7up05Jcgsq7v8V58dmlV9XRRUqXN~soA__&Key-Pair-Id=K2HSFNDJXOU9YS"} alt="All About Ultrasound™" className="w-8 h-8 object-contain" />
+              <img src={LOGO || "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp"} alt="All About Ultrasound™" className="w-8 h-8 object-contain" />
             </div>
             <h1 className="text-xl font-bold text-white" style={{ fontFamily: "Merriweather, serif" }}>
               All About Ultrasound™
@@ -155,6 +155,9 @@ export default function MagicLinkRequest() {
                       The link expires in <strong>15 minutes</strong> and can only be used once.
                     </p>
                   </div>
+                  <p className="text-xs text-gray-400 mt-2">
+                    Can't find it? Check your spam or junk folder for an email from All About Ultrasound.
+                  </p>
                 </div>
 
                 <div className="pt-2 space-y-2">
@@ -179,8 +182,8 @@ export default function MagicLinkRequest() {
           <div className="px-8 py-4 bg-gray-50 border-t border-gray-100 text-center">
             <p className="text-xs text-gray-400">
               © All About Ultrasound ·{" "}
-              <a href="https://www.iheartecho.com" className="text-[#189aa1] hover:underline">
-                www.iheartecho.com
+              <a href="https://www.allaboutultrasound.com" className="text-[#189aa1] hover:underline">
+                www.allaboutultrasound.com
               </a>
             </p>
           </div>

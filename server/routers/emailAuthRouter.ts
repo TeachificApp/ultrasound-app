@@ -67,7 +67,7 @@ export type EmailPayload = {
 };
 
 async function sendVerificationEmail(to: string, token: string, name: string) {
-  const appUrl = process.env.VITE_APP_URL ?? "https://app.iheartecho.com";
+  const appUrl = process.env.VITE_APP_URL ?? "https://app.allaboutultrasound.com";
   const verificationUrl = `${appUrl}/verify-email?token=${token}`;
   const firstName = name || "there";
   const { subject, htmlBody, previewText } = buildVerificationEmail({ firstName, verificationUrl });
@@ -78,7 +78,7 @@ async function sendVerificationEmail(to: string, token: string, name: string) {
 }
 
 async function sendPasswordResetEmail(to: string, token: string, name: string) {
-  const appUrl = process.env.VITE_APP_URL ?? "https://app.iheartecho.com";
+  const appUrl = process.env.VITE_APP_URL ?? "https://app.allaboutultrasound.com";
   const resetUrl = `${appUrl}/reset-password?token=${token}`;
   const firstName = name || "there";
   const { subject, htmlBody, previewText } = buildPasswordResetEmail({ firstName, resetUrl });
@@ -143,7 +143,7 @@ export const emailAuthRouter = router({
             .where(eq(users.id, existingUser.id));
           await sendVerificationEmail(email, verificationToken, input.firstName);
           // Send welcome email asynchronously (don't block activation)
-          const appUrlActivate = process.env.VITE_APP_URL ?? "https://app.iheartecho.com";
+          const appUrlActivate = process.env.VITE_APP_URL ?? "https://app.allaboutultrasound.com";
           const welcomeActivate = buildWelcomeEmail({
             firstName: input.firstName,
             loginUrl: `${appUrlActivate}/login`,
@@ -206,7 +206,7 @@ export const emailAuthRouter = router({
       await sendVerificationEmail(email, verificationToken, input.firstName);
 
       // Send welcome email asynchronously (don't block registration)
-      const appUrl = process.env.VITE_APP_URL ?? "https://app.iheartecho.com";
+      const appUrl = process.env.VITE_APP_URL ?? "https://app.allaboutultrasound.com";
       const welcomePayload = buildWelcomeEmail({
         firstName: input.firstName,
         loginUrl: `${appUrl}/login`,

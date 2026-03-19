@@ -20,7 +20,7 @@ interface SendEmailOptions {
 
 export async function sendEmail(opts: SendEmailOptions): Promise<boolean> {
   const apiKey = process.env.SENDGRID_API_KEY;
-  const senderEmail = process.env.SENDGRID_FROM_EMAIL || "noreply@iheartecho.com";
+  const senderEmail = process.env.SENDGRID_FROM_EMAIL || "noreply@allaboutultrasound.com";
   const senderName = process.env.SENDGRID_FROM_NAME || "All About Ultrasound™";
 
   if (!apiKey) {
@@ -96,11 +96,11 @@ function emailWrapper(content: string): string {
           <!-- Header -->
           <tr>
             <td style="background:linear-gradient(135deg,${brandDark} 0%,#0e4a50 60%,${brandColor} 100%);padding:28px 32px;text-align:center;">
-              <img src="https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/tMerpTNEMefRhZwO.png?Expires=1804389585&Signature=WUUmbeKd6gRL-5YievLbV1CH3uu0nlv-Re4ouPNZeR8Uaa5fZGvIpyzCfN4GeYzdNVN-L2Dfhpb6wP3tKMLML8tU2MU77LZNA0Db1Qt~FgBKmBrDM8f98IhyhaIIh3mcPdLcoP5aezbNBOluLkAKxGF1onaa3LNS33jvn6RdWOARg3rQF-iGyCG8t~MaJrqXCHCHnEQWkv8ww0KFZrIE6cKq-EgnS6NZ6Ugc~9fSwQmMSgxfKiJuZdqcca1LwferRwRh3oNdounneCfHfE~QI00U4T7~b0DybwkrOKG0VWDKwXiSGd2AgO7up05Jcgsq7v8V58dmlV9XRRUqXN~soA__&Key-Pair-Id=K2HSFNDJXOU9YS"
+              <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp"
                 alt="All About Ultrasound™" width="80" height="80"
                 style="border-radius:50%;display:block;margin:0 auto 12px;" />
               <div style="font-size:22px;font-weight:700;color:#ffffff;font-family:Georgia,serif;">All About Ultrasound™</div>
-              <div style="font-size:12px;color:#4ad9e0;margin-top:4px;">Echocardiography Clinical Companion</div>
+              <div style="font-size:12px;color:#4ad9e0;margin-top:4px;">General & Vascular Ultrasound Clinical Intelligence</div>
             </td>
           </tr>
           <!-- Body -->
@@ -113,7 +113,7 @@ function emailWrapper(content: string): string {
           <tr>
             <td style="background:#f8fffe;border-top:1px solid #e5f7f8;padding:20px 32px;text-align:center;">
               <p style="margin:0;font-size:12px;color:#94a3b8;">
-                © All About Ultrasound · <a href="https://www.iheartecho.com" style="color:${brandColor};text-decoration:none;" target="_blank" rel="noopener noreferrer">www.iheartecho.com</a>
+                © All About Ultrasound · <a href="https://www.allaboutultrasound.com" style="color:${brandColor};text-decoration:none;" target="_blank" rel="noopener noreferrer">www.allaboutultrasound.com</a>
               </p>
               <p style="margin:8px 0 0;font-size:11px;color:#cbd5e1;">
                 You received this email because an account was created for you on All About Ultrasound™.
@@ -313,7 +313,7 @@ export function buildNewCaseSubmissionAdminEmail(opts: {
   adminUrl: string;
 }): { subject: string; htmlBody: string; previewText: string } {
   const subject = `New case submission pending review — "${opts.caseTitle}"`;
-  const previewText = `${opts.submitterName} submitted a new echo case for your review: "${opts.caseTitle}"`;
+  const previewText = `${opts.submitterName} submitted a new ultrasound case for your review: "${opts.caseTitle}"`;
   const difficultyLabel: Record<string, string> = {
     beginner: "Beginner",
     intermediate: "Intermediate",
@@ -324,7 +324,7 @@ export function buildNewCaseSubmissionAdminEmail(opts: {
       New Case Submission Awaiting Review
     </h2>
     <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
-      A user has submitted a new echo case to the All About Ultrasound™ Echo Case Library.
+      A user has submitted a new ultrasound case to the All About Ultrasound™ Ultrasound Case Library.
       Please review it and approve or reject it from the Case Management panel.
     </p>
     <div style="background:#f0fbfc;border-left:3px solid ${brandColor};padding:16px;border-radius:0 8px 8px 0;margin:0 0 24px;">
@@ -365,22 +365,22 @@ export function buildCaseApprovedEmail(opts: {
   caseTitle: string;
   caseUrl: string;
 }): { subject: string; htmlBody: string; previewText: string } {
-  const subject = `Your echo case has been approved — "${opts.caseTitle}"`;
-  const previewText = "Great news! Your submitted echo case has been approved and is now live in the Echo Case Library.";
+  const subject = `Your ultrasound case has been approved — "${opts.caseTitle}"`;
+  const previewText = "Great news! Your submitted ultrasound case has been approved and is now live in the Ultrasound Case Library.";
   const htmlBody = emailWrapper(`
     <h2 style="margin:0 0 8px;font-size:20px;color:${brandDark};font-family:Georgia,serif;">
       Your Case Has Been Approved! 🎉
     </h2>
     <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
-      Hi ${opts.firstName}, great news — your submitted echo case has been reviewed and <strong style="color:#16a34a;">approved</strong>.
-      It is now live in the All About Ultrasound™ Echo Case Library and available to the community.
+      Hi ${opts.firstName}, great news — your submitted ultrasound case has been reviewed and <strong style="color:#16a34a;">approved</strong>.
+      It is now live in the All About Ultrasound™ Ultrasound Case Library and available to the community.
     </p>
     <div style="background:#f0fbfc;border-left:3px solid ${brandColor};padding:12px 16px;border-radius:0 8px 8px 0;margin:0 0 20px;">
       <p style="margin:0;font-size:14px;font-weight:700;color:${brandDark};">${opts.caseTitle}</p>
-      <p style="margin:4px 0 0;font-size:13px;color:#64748b;">Now live in the Echo Case Library</p>
+      <p style="margin:4px 0 0;font-size:13px;color:#64748b;">Now live in the Ultrasound Case Library</p>
     </div>
     <p style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.6;">
-      Thank you for contributing to the All About Ultrasound™ learning community. Your case will help sonographers and cardiologists sharpen their echo interpretation skills.
+      Thank you for contributing to the All About Ultrasound™ learning community. Your case will help sonographers, physicians, and ultrasound learners sharpen their clinical scanning skills.
     </p>
     <div style="text-align:center;margin:28px 0;">
       <a href="${opts.caseUrl}"
@@ -401,14 +401,14 @@ export function buildCaseRejectedEmail(opts: {
   reason: string;
   submitUrl: string;
 }): { subject: string; htmlBody: string; previewText: string } {
-  const subject = `Update on your submitted echo case — "${opts.caseTitle}"`;
-  const previewText = "Your submitted echo case requires some changes before it can be published.";
+  const subject = `Update on your submitted ultrasound case — "${opts.caseTitle}"`;
+  const previewText = "Your submitted ultrasound case requires some changes before it can be published.";
   const htmlBody = emailWrapper(`
     <h2 style="margin:0 0 8px;font-size:20px;color:${brandDark};font-family:Georgia,serif;">
       Case Submission Update
     </h2>
     <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
-      Hi ${opts.firstName}, thank you for submitting a case to the All About Ultrasound™ Echo Case Library.
+      Hi ${opts.firstName}, thank you for submitting a case to the All About Ultrasound™ Ultrasound Case Library.
       After review, our team was unable to approve the following submission at this time:
     </p>
     <div style="background:#fef2f2;border-left:3px solid #ef4444;padding:12px 16px;border-radius:0 8px 8px 0;margin:0 0 20px;">
@@ -432,7 +432,7 @@ export function buildCaseRejectedEmail(opts: {
     </div>
     <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.5;">
       If you have questions about this decision, please contact us at
-      <a href="mailto:support@iheartecho.com" style="color:${brandColor};" target="_blank" rel="noopener noreferrer">support@iheartecho.com</a>.
+      <a href="mailto:support@allaboutultrasound.com" style="color:${brandColor};" target="_blank" rel="noopener noreferrer">support@allaboutultrasound.com</a>.
     </p>
   `);
   return { subject, htmlBody, previewText };
@@ -478,7 +478,7 @@ export function buildWelcomeEmail(opts: {
     </div>
     <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.5;">
       If you have any questions, please contact us at
-      <a href="mailto:support@iheartecho.com" style="color:${brandColor};" target="_blank" rel="noopener noreferrer">support@iheartecho.com</a>.
+      <a href="mailto:support@allaboutultrasound.com" style="color:${brandColor};" target="_blank" rel="noopener noreferrer">support@allaboutultrasound.com</a>.
     </p>
   `);
   return { subject, htmlBody, previewText };

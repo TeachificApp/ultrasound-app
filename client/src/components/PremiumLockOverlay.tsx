@@ -18,14 +18,14 @@ interface PremiumLockOverlayProps {
 }
 
 const PREMIUM_FEATURES = [
-  "TEE Navigator — ME, TG & UE views with full guidance",
-  "Stress Echo Navigator — Exercise & DSE protocols",
-  "Strain Navigator — LV/RV/LA strain reference values",
-  "ICE Navigator — Procedural checklists & measurements",
-  "Device Navigator — TAVR, MitraClip, WATCHMAN guidance",
-  "EchoAssist™ Valve Engines — AS, MS, AR, MR severity grading",
-  "DIY Accreditation Tool™ — Full lab accreditation suite",
-  "500+ Echo Case Lab cases with gamified learning",
+  "OB 2nd/3rd Trimester Navigator — biometry, AFI, growth",
+  "Venous Navigator — DVT protocols & waveform criteria",
+  "Arterial Navigator — ABI, PSV, stenosis grading",
+  "Abdominal Vascular Navigator — renal, celiac, SMA, portal",
+  "Intracranial Duplex/TCD Navigator — MCA, ACA, basilar PSV",
+  "Ultrasound-Assist™ Calculators — guideline-based interpretation",
+  "ScanCoach™ for all vascular & advanced OB specialties",
+  "500+ Ultrasound Case Library cases with teaching points",
 ];
 
 export default function PremiumLockOverlay({
@@ -102,14 +102,14 @@ export default function PremiumLockOverlay({
 
             {/* CTA */}
             <a
-              href="https://www.iheartecho.com"
+              href="https://member.allaboutultrasound.com"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90"
               style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}
             >
               <Zap className="w-4 h-4" />
-              Upgrade to Premium — iheartecho.com
+              Upgrade to Premium — All About Ultrasound
               <ExternalLink className="w-3.5 h-3.5" />
             </a>
           </div>

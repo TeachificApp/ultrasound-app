@@ -285,8 +285,8 @@ export default function UpgradeSuccess() {
               Go back to the Premium page
             </a>{" "}
             or contact us at{" "}
-            <a href="mailto:support@iheartecho.com" className="text-[#189aa1] hover:underline">
-              support@iheartecho.com
+            <a href="mailto:support@allaboutultrasound.com" className="text-[#189aa1] hover:underline">
+              support@allaboutultrasound.com
             </a>
             .
           </p>

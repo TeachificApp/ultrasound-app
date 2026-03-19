@@ -21,7 +21,7 @@ import { sendEmail, buildWelcomeEmail } from "../_core/email";
 
 /** Send a branded welcome email to a pre-registered user via SendGrid */
 async function sendPreRegistrationWelcome(email: string, roles: string[]): Promise<void> {
-  const appUrl = process.env.VITE_APP_URL ?? "https://app.iheartecho.com";
+  const appUrl = process.env.VITE_APP_URL ?? "https://app.allaboutultrasound.com";
   const payload = buildWelcomeEmail({
     firstName: email.split("@")[0], // best-effort first name from email
     loginUrl: `${appUrl}/login`,

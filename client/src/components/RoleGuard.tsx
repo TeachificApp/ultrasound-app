@@ -62,11 +62,11 @@ export function RoleGuard({ roles, allowAdmin = true, children }: RoleGuardProps
       if (data.success) {
         toast.success("Request sent — the platform administrator has been notified.");
       } else {
-        toast.success("Request submitted — please contact support@iheartecho.com if you need immediate assistance.");
+        toast.success("Request submitted — please contact support@allaboutultrasound.com if you need immediate assistance.");
       }
     },
     onError: () => {
-      toast.error("Could not send request. Please email support@iheartecho.com directly.");
+      toast.error("Could not send request. Please email support@allaboutultrasound.com directly.");
     },
   });
 
@@ -302,11 +302,11 @@ export function RoleGuard({ roles, allowAdmin = true, children }: RoleGuardProps
         <p className="text-xs text-muted-foreground">
           If you believe this is an error, contact your Lab Admin or{" "}
           <a
-            href="mailto:support@iheartecho.com"
+            href="mailto:support@allaboutultrasound.com"
             className="underline"
             style={{ color: "#189aa1" }}
           >
-            support@iheartecho.com
+            support@allaboutultrasound.com
           </a>
         </p>
       </div>

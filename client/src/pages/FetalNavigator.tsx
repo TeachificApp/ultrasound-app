@@ -435,13 +435,13 @@ export default function FetalNavigator() {
         </div>
 
         {view === "fetalassist" ? (
-          <PremiumGate featureName="FetalEchoAssist™ Calculator Engine">
+          <PremiumGate featureName="Ultrasound-Assist Calculators">
             <div className="bg-white rounded-xl border border-[#0369a1]/20 shadow-sm overflow-hidden">
               <div className="px-5 py-4 flex items-center gap-3" style={{ background: "linear-gradient(135deg, #0e1e2e, #0369a1)" }}>
                 <Calculator className="w-5 h-5 text-[#4ad9e0]" />
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-white text-base" style={{ fontFamily: "Merriweather, serif" }}>FetalEchoAssist™ Calculator Engine</h3>
+                    <h3 className="font-bold text-white text-base" style={{ fontFamily: "Merriweather, serif" }}>Ultrasound-Assist Calculators</h3>
                     <span className="inline-flex items-center gap-1 bg-amber-400/20 border border-amber-400/40 text-amber-300 text-[10px] font-bold px-2 py-0.5 rounded-full">
                       <Crown className="w-3 h-3" /> Premium
                     </span>

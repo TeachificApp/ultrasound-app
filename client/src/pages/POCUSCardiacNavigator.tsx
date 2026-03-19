@@ -298,7 +298,7 @@ export default function POCUSCardiacNavigator() {
           );
         })}
 
-        {/* ── POCUS-Assist™ Engine Calculators ─────────────────────────────── */}
+        {/* ── Ultrasound-Assist Calculators ─────────────────────────────── */}
         <div className="rounded-xl p-4 mt-2" style={{ background: "linear-gradient(135deg, #0e1e2e 0%, #0e4a50 60%, #189aa1 100%)" }}>
           <div className="flex items-center gap-2 mb-3">
             <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "rgba(255,255,255,0.15)" }}>

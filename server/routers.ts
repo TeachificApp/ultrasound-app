@@ -262,7 +262,7 @@ export const appRouter = router({
         await setPendingEmail(ctx.user.id, newEmail, token, expiry);
 
         // Build verification URL
-        const appUrl = process.env.VITE_APP_URL || 'https://app.iheartecho.com';
+        const appUrl = process.env.VITE_APP_URL || 'https://app.allaboutultrasound.com';
         const verificationUrl = `${appUrl}/verify-email?token=${token}&type=change`;
 
         const firstName = (currentUser.displayName || currentUser.name || 'there').split(' ')[0];
@@ -336,7 +336,7 @@ export const appRouter = router({
 
         await setPasswordResetToken(user.id, token, expiry);
 
-        const appUrl = process.env.VITE_APP_URL || 'https://app.iheartecho.com';
+        const appUrl = process.env.VITE_APP_URL || 'https://app.allaboutultrasound.com';
         const resetUrl = `${appUrl}/reset-password?token=${token}`;
 
         const firstName = (user.displayName || user.name || 'there').split(' ')[0];
@@ -400,7 +400,7 @@ export const appRouter = router({
 
         await setMagicLinkToken(user.id, token, expiry);
 
-        const appUrl = process.env.VITE_APP_URL || 'https://app.iheartecho.com';
+        const appUrl = process.env.VITE_APP_URL || 'https://app.allaboutultrasound.com';
         const magicUrl = `${appUrl}/auth/magic?token=${token}`;
 
         const firstName = (user.displayName || user.name || 'there').split(' ')[0];
@@ -1118,7 +1118,7 @@ export const appRouter = router({
           if (input.notifySonographer === "Yes" && input.notifySonographerEmail) {
             try {
               const { sendEmail, buildPeerReviewFeedbackEmail } = await import('./_core/email');
-              const appUrl = process.env.VITE_APP_URL ?? "https://iheartecho.com";
+              const appUrl = process.env.VITE_APP_URL ?? "https://www.allaboutultrasound.com";
               const reviewerName = ctx.user.name ?? ctx.user.email ?? "Your reviewer";
               const examType = input.examType ?? "Echo Study";
               const examDate = input.examDos ?? input.dateReviewCompleted ?? new Date().toLocaleDateString();
@@ -1158,7 +1158,7 @@ export const appRouter = router({
           if (input.notifyAdmin === "Yes" && input.notifyAdminEmail) {
             try {
               const { sendEmail, buildPeerReviewFeedbackEmail } = await import('./_core/email');
-              const appUrl = process.env.VITE_APP_URL ?? "https://iheartecho.com";
+              const appUrl = process.env.VITE_APP_URL ?? "https://www.allaboutultrasound.com";
               const reviewerName = ctx.user.name ?? ctx.user.email ?? "A reviewer";
               const examType = input.examType ?? "Echo Study";
               const examDate = input.examDos ?? input.dateReviewCompleted ?? new Date().toLocaleDateString();
@@ -1807,7 +1807,7 @@ export const appRouter = router({
         // Send email to physician
         try {
           const { sendEmail } = await import("./_core/email");
-          const appUrl = process.env.VITE_APP_URL || "https://app.iheartecho.com";
+          const appUrl = process.env.VITE_APP_URL || "https://app.allaboutultrasound.com";
           const formUrl = `${appUrl}/physician-review/${accessToken}`;
           const physicianName = input.reviewerName || "Physician";
           const labName = (lab as any).organization || "the lab";
@@ -1977,7 +1977,7 @@ export const appRouter = router({
           const { getUserById: getUser } = await import("./db");
           const creator = await getUser(invitation.createdByUserId);
           if (creator?.email) {
-            const appUrl = process.env.VITE_APP_URL || "https://app.iheartecho.com";
+            const appUrl = process.env.VITE_APP_URL || "https://app.allaboutultrasound.com";
             const step2Url = `${appUrl}/accreditation?tab=physician-review&step2=${submissionId}`;
             await sendEmail({
               to: { name: creator.displayName || creator.name || "Lab Admin", email: creator.email },

@@ -117,7 +117,7 @@ export default function POCUSAssistHub() {
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-base mt-0.5">Point-of-Care Ultrasound Navigator &amp; ScanCoach</p>
               <p className="text-white/70 text-sm md:text-base mt-2 max-w-xl leading-relaxed">
-                Structured POCUS protocols with window-by-window checklists, normal reference values, scanning tips, probe guidance, and clinical decision support — for eFAST, Cardiac, RUSH, and Lung ultrasound.
+Advanced, guideline-driven clinical intelligence app designed for sonographers, physicians, and ultrasound learners across general, vascular, and point-of-care imaging—serving as the ultimate pocket reference for real-time scanning and clinical decision support.
               </p>
               {/* CTA buttons */}
               <div className="flex flex-wrap gap-3 mt-5">
@@ -127,7 +127,7 @@ export default function POCUSAssistHub() {
                     style={{ background: "#189aa1" }}
                   >
                     <Stethoscope className="w-4 h-4" />
-                    Open POCUS-Assist™ Calculator
+                    Open Ultrasound-Assist Calculators
                   </button>
                 </Link>
                 <Link href="/echoassist#engine-frank-starling">

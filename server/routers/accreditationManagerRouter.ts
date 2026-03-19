@@ -129,7 +129,7 @@ async function sendTaskAssignmentEmail(opts: {
           <p style="margin:0 0 24px;font-size:13px;color:#6b7280;line-height:1.6;">
             Please log in to the All About Ultrasound Accreditation Manager to view the full task details and mark it as complete when done.
           </p>
-          <a href="https://app.iheartecho.com/accreditation-manager" style="display:inline-block;padding:12px 24px;background:#189aa1;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;border-radius:8px;" target="_blank" rel="noopener noreferrer">View Task</a>
+          <a href="https://app.allaboutultrasound.com/accreditation-manager" style="display:inline-block;padding:12px 24px;background:#189aa1;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;border-radius:8px;" target="_blank" rel="noopener noreferrer">View Task</a>
         </td></tr>
         <!-- Footer -->
         <tr><td style="padding:20px 32px;background:#f8fafc;border-top:1px solid #e5e7eb;">

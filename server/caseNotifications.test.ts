@@ -109,7 +109,7 @@ describe("buildCaseRejectedEmail", () => {
 
   it("should include a support contact email", () => {
     const { htmlBody } = buildCaseRejectedEmail(opts);
-    expect(htmlBody).toContain("support@iheartecho.com");
+    expect(htmlBody).toContain("support@allaboutultrasound.com");
   });
 });
 

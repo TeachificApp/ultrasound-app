@@ -71,7 +71,7 @@ ${preview}
           <p style="margin:0;font-size:11px;color:#8a9bb0;text-align:center;line-height:1.6;">
             © ${new Date().getFullYear()} All About Ultrasound™ · All About Ultrasound<br/>
             You are receiving this email because you have an account on All About Ultrasound™.<br/>
-            <a href="https://app.iheartecho.com/profile" style="color:#189aa1;text-decoration:none;">Manage your preferences</a>
+            <a href="https://app.allaboutultrasound.com/profile" style="color:#189aa1;text-decoration:none;">Manage your preferences</a>
           </p>
         </td>
       </tr>
@@ -95,7 +95,7 @@ const SEED_TEMPLATES = [
 <p>If you have any questions, please don't hesitate to reach out.</p>
 <p style="margin-top:28px;">With gratitude,<br/><strong style="color:#189aa1;">The All About Ultrasound™ Team</strong></p>
 <hr style="border:none;border-top:1px solid #e5eaec;margin:28px 0;" />
-<p style="font-size:13px;color:#8a9bb0;">Visit us at <a href="https://app.iheartecho.com" style="color:#189aa1;">app.iheartecho.com</a></p>`,
+<p style="font-size:13px;color:#8a9bb0;">Visit us at <a href="https://app.allaboutultrasound.com" style="color:#189aa1;">app.allaboutultrasound.com</a></p>`,
   },
   {
     name: "🎓 New Course / Resource",
@@ -114,7 +114,7 @@ const SEED_TEMPLATES = [
 </table>
 <p>This resource is designed to help you [describe the benefit — e.g., "master advanced TTE techniques", "prepare for your echo boards", etc.].</p>
 <p style="margin-top:20px;">
-  <a href="https://app.iheartecho.com" style="display:inline-block;background:#189aa1;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:700;font-size:14px;">Access Now →</a>
+  <a href="https://app.allaboutultrasound.com" style="display:inline-block;background:#189aa1;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:700;font-size:14px;">Access Now →</a>
 </p>
 <p style="margin-top:28px;">Happy learning,<br/><strong style="color:#189aa1;">The All About Ultrasound™ Team</strong></p>`,
   },

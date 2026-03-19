@@ -532,7 +532,7 @@ export const meetingRouter = router({
             : eq(meetingAttendees.meetingId, input.meetingId)
         );
 
-      const appUrl = process.env.VITE_APP_URL ?? "https://app.iheartecho.com";
+      const appUrl = process.env.VITE_APP_URL ?? "https://app.allaboutultrasound.com";
       let sent = 0;
       const errors: string[] = [];
 

@@ -1070,8 +1070,8 @@ async function generatePDFReport(
   doc.text("FetalEchoAssist\u2122 Clinical Report", margin, 14);
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
-  doc.text("Fetal Echo Calculator Engine \u2014 Guideline-Based Interpretation", margin, 21);
-  doc.text("All About Ultrasound\u2122 | All About Ultrasound | www.iheartecho.com", margin, 27);
+  doc.text("Ultrasound-Assist Calculators - Fetal Echo Engine", margin, 21);
+  doc.text("All About Ultrasound™ | www.allaboutultrasound.com", margin, 27);
   y = 38;
 
   // ── Patient Info ──
@@ -1217,7 +1217,7 @@ async function generatePDFReport(
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(7);
     doc.setFont("helvetica", "normal");
-    doc.text("FetalEchoAssist\u2122 \u2014 All About Ultrasound\u2122 | All About Ultrasound | www.iheartecho.com", margin, 293);
+    doc.text("FetalEchoAssist\u2122 \u2014 All About Ultrasound\u2122 | All About Ultrasound | www.allaboutultrasound.com", margin, 293);
     doc.text(`Page ${i} of ${pageCount}`, pageW - margin - 15, 293);
     doc.text("Reference: Donofrio MT et al. J Am Soc Echocardiogr. 2024;37(1):1-75", margin, 297);
   }
@@ -1311,7 +1311,7 @@ export default function FetalEchoAssist() {
                 </span>
               </div>
               <p className="text-sm" style={{ color: AQUA }}>
-                Fetal Echo Calculator Engine — Guideline-Based Interpretation
+                Ultrasound-Assist Calculators — Fetal Echo Engine
               </p>
             </div>
           </div>
@@ -1430,7 +1430,7 @@ export default function FetalEchoAssist() {
             <p>• Huhta JC. Fetal Cardiovascular Profile Score. <em>Ultrasound Obstet Gynecol.</em> 2005;25:550-555</p>
             <p>• Celermajer DS et al. Cardiothoracic ratio in fetal life. <em>Br Heart J.</em> 1992;68:534-538</p>
             <p>• Tsutsumi T et al. Evaluation of ductus venosus blood flow velocity waveforms. <em>Ultrasound Obstet Gynecol.</em> 1999;13:26-29</p>
-            <p className="pt-1">© All About Ultrasound — All About Ultrasound™ | www.iheartecho.com</p>
+            <p className="pt-1">© All About Ultrasound — All About Ultrasound™ | www.allaboutultrasound.com</p>
           </div>
         </div>
       </PremiumGate>

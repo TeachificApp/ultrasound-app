@@ -75,7 +75,7 @@ async function ensureUnsubscribeToken(userId: number): Promise<string> {
 
 /** Build the unsubscribe URL for a given token */
 function buildUnsubscribeUrl(token: string): string {
-  const appUrl = process.env.VITE_APP_URL || "https://app.iheartecho.com";
+  const appUrl = process.env.VITE_APP_URL || "https://app.allaboutultrasound.com";
   return `${appUrl}/unsubscribe?token=${token}`;
 }
 

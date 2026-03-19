@@ -170,10 +170,50 @@
 - [x] Add keywords meta tag
 
 ## UI Changes
+- [ ] Reorder all specialty lists to: Abdomen, Pelvic/Gyn, OB 1st Trimester, OB 2nd/3rd Trimester, Fetal Echo, Venous, Arterial, Abdominal Vascular, Extracranial Carotid, Intr- [x] Reorder specialties: Abdomen, Pelvic/Gyn, OB 1st, OB 2nd/3rd, Fetal Echo, Venous, Arterial, Abdominal Vascular, Extracranial Carotid, Intracranial/TCD, POCUS, Physics
+- [x] Update navigator gating: Free=Abdomen,Pelvic/Gyn,OB1st,Fetal Echo,Extracranial Carotid,POCUS; Premium=others
+- [x] Update ScanCoach gating: Free=Abdomen,Pelvic/Gyn,OB1st; Premium=all others
+- [x] All navigators/ScanCoaches require minimum free registered user
+- [x] Rename “UltrasoundAssist Community” → “All About Ultrasound Community” everywhere
+- [x] Rename sidebar nav link “AAUS Community” → “Community Hub”
+- [x] Remove “Learn Fetal Echo” dashboard card (keep sidebar nav link)
+- [x] Rename POCUS Assist and Fetal Echo Calculators → “Ultrasound-Assist Calculators” across all pages
+- [x] Rename sidebar nav link “AAUS Store” → “SonoShop”
+- [x] Rename “Clinical Companion” → “Clinical Intelligence” everywhere
+- [x] Update header: “All About Ultrasound” in white on top, “UltrasoundAssist™” below in smaller/secondary style
+- [x] Upload new logo (SONORing4.webp) to CDN and update Layout.tsx + Enrolled.tsx (Login uses VITE_APP_LOGO — update via Settings → General)
+- [x] Update app subtitle/description to: "Advanced, guideline-driven clinical intelligence app designed for sonographers, physicians, and ultrasound learners across general, vascular, and point-of-care imaging—serving as the ultimate pocket reference for real-time scanning and clinical decision support."t."
 - [x] Remove Accreditation Navigator and DIY Accreditation cards from dashboard (hidden until requested)
 - [x] Remove Accreditation Navigator and DIY Accreditation links from sidebar nav (hidden until requested)
 - [x] Remove POCUS-Assist™ and Fetal EchoAssist™ direct dashboard cards (accessible via UltrasoundAssist™ pathway)
 - [x] Remove POCUS-Assist™ and Fetal EchoAssist™ direct sidebar nav links (accessible via UltrasoundAssist™ pathway)
+
+## Branding Fixes (Priority)
+- [x] Fix login page: remove EchoAssist/echocardiography copy, updated to AAUS ultrasound branding
+- [x] Fix sales/enrolled page: remove echo-specific copy, updated to AAUS ultrasound branding
+- [x] Fix email templates: removed iHeartEcho/echo references, updated to AAUS, spam folder prompt mentions All About Ultrasound once
+- [x] Fix all email links and page links to point to app.allaboutultrasound.com (not iheartecho)
+- [x] Update PremiumLockOverlay, PremiumModal, CaseLibraryBanner upgrade URLs to member.allaboutultrasound.com
+- [x] Fix test assertions: welcome-email logo CDN URL, footer URL, case rejection support email (733 tests passing)
+- [ ] Update fetal echo navigator/references to cite ASE guidelines
+- [ ] Update vascular navigators/references to cite SVU guidelines
+
+## Reference Values (PubMed/PMC)
+- Source: https://www.aliem.com/pv-card-ultrasound-measurements/ (ALIEM PV Card) + PMC cross-references
+- [ ] Research PubMed/PMC normal reference values for all 12 anatomy categories
+- [ ] Build reference value tables into each navigator page with PMC citations
+  - [ ] Abdomen Navigator (liver, GB, bile ducts, pancreas, spleen, kidneys, aorta, IVC)
+  - [ ] Pelvic/Gyn Navigator (uterus, endometrium, ovaries, follicles)
+  - [ ] OB 1st Trimester Navigator (CRL, NT, GA, HR, GS, YS)
+  - [ ] OB 2nd/3rd Trimester Navigator (BPD, HC, AC, FL, EFW, AFI, cervix)
+  - [ ] Fetal Echo Navigator (cardiac dimensions, z-scores, CTR)
+  - [ ] Venous Navigator (DVT criteria, vein diameters, waveforms)
+  - [ ] Arterial Navigator (ABI, PSV, EDV, waveform criteria)
+  - [ ] Abdominal Vascular Navigator (renal artery, celiac, SMA, portal vein)
+  - [ ] Extracranial Carotid Navigator (IMT, PSV, EDV, stenosis grading)
+  - [ ] Intracranial Duplex/TCD Navigator (MCA, ACA, PCA, basilar PSV)
+  - [ ] POCUS Navigator (IVC, LVEF, lung B-lines, FAST criteria)
+  - [ ] Physics (not applicable — conceptual content only)
 
 ## Bugs
 - [x] Magic link login fails on app.allaboutultrasound.com — "failed query" DB error (missing users columns — fixed via ALTER TABLE)

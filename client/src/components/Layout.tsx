@@ -83,7 +83,7 @@ const navGroups = [
   {
     label: "Community",
     items: [
-      { path: "https://member.allaboutultrasound.com/products/communities/allaboutultrasound-community", label: "AAUS Community", icon: MessageCircle, external: true },
+      { path: "https://member.allaboutultrasound.com/products/communities/allaboutultrasound-community", label: "Community Hub", icon: MessageCircle, external: true },
     ],
   },
   {
@@ -208,15 +208,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {/* Logo */}
         <div className="flex items-center gap-2 px-4 py-4 border-b border-white/10">
           <img
-            src="https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/aaus_logo.png"
+            src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp"
             alt="All About Ultrasound™"
             className="w-12 h-12 object-contain flex-shrink-0"
           />
           <div className="flex-1 min-w-0">
-            <div className="font-bold text-white text-base leading-tight" style={{ fontFamily: "Merriweather, serif" }}>
-              UltrasoundAssist™
+            <div className="font-bold text-white text-sm leading-tight" style={{ fontFamily: "Merriweather, serif" }}>
+              All About Ultrasound™
             </div>
-            <div className="text-xs md:text-sm text-[#4ad9e0] leading-tight">All About Ultrasound™ Clinical Companion</div>
+            <div className="text-xs text-[#4ad9e0] leading-tight font-medium">UltrasoundAssist™ Clinical Intelligence</div>
           </div>
           <button
             className="ml-auto lg:hidden text-white/60 hover:text-white flex-shrink-0"
@@ -292,7 +292,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             style={{ background: "linear-gradient(135deg, #189aa1 0%, #4ad9e0 100%)" }}
           >
             <ShoppingBag className="w-4 h-4 text-white flex-shrink-0" />
-            <span className="text-sm font-semibold text-white">AAUS Store</span>
+            <span className="text-sm font-semibold text-white">SonoShop</span>
             <ExternalLink className="w-3 h-3 text-white/70 ml-auto" />
           </a>
         </div>
@@ -324,7 +324,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </span>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <span className="text-xs text-gray-400 hidden sm:block">All About Ultrasound™ Clinical Companion</span>
+            <span className="text-xs text-gray-400 hidden sm:block">All About Ultrasound™ Clinical Intelligence</span>
             {isAuthenticated && <NotificationBell />}
             {/* Account / Login in header */}
             {authLoading ? null : isAuthenticated ? (

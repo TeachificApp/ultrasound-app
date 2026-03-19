@@ -43,7 +43,7 @@ const modules: Module[] = [
   {
     path: "/echoassist",
     icon: Calculator,
-    title: "POCUS & Fetal Echo Calculators",
+    title: "Ultrasound-Assist Calculators",
     description: "Guideline-based calculators for POCUS (IVC CI, B-line score, eFAST grader) and Fetal Echo (biometrics, cardiac measurements, z-scores).",
     badge: "Guideline-Based",
     color: BRAND,
@@ -88,14 +88,7 @@ const modules: Module[] = [
     badge: "CME",
     color: BRAND,
   },
-  {
-    path: "/learn-fetal-echo",
-    icon: GraduationCap,
-    title: "Learn Fetal Echo",
-    description: "Comprehensive fetal echocardiography courses from All About Ultrasound — from beginner to advanced fetal cardiac assessment.",
-    badge: "Courses",
-    color: BRAND,
-  },
+  // Learn Fetal Echo card removed from dashboard (accessible via sidebar nav)
   // Accreditation Navigator and DIY Accreditation Tool hidden until requested
   // { path: "/accreditation-navigator", icon: Award, title: "Accreditation Navigator™", ... },
   // { path: "/accreditation", icon: ClipboardList, title: "DIY Accreditation Tool™", ... },
@@ -103,7 +96,7 @@ const modules: Module[] = [
   {
     path: "https://member.allaboutultrasound.com/products/communities/allaboutultrasound-community",
     icon: MessageCircle,
-    title: "UltrasoundAssist™ Community",
+    title: "All About Ultrasound Community",
     description: "Join the All About Ultrasound community on Thinkific — case discussions, peer learning, and specialty hubs for ultrasound professionals.",
     badge: "Community",
     color: BRAND,

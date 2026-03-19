@@ -14,20 +14,20 @@ export const THINKIFIC_LINKS = {
 export const CATEGORY_LABELS: Record<string, string> = {
   abdominal: "Abdominal",
   pelvic_gyn: "Pelvic/Gyn",
-  obstetric_1st: "Obstetric 1st Trimester",
-  obstetric_2nd_3rd: "Obstetric 2nd/3rd Trimester",
-  thyroid: "Thyroid",
-  scrotum: "Scrotum",
-  breast: "Breast",
+  obstetric_1st: "OB 1st Trimester",
+  obstetric_2nd_3rd: "OB 2nd/3rd Trimester",
+  fetal_echo: "Fetal Echo",
   venous: "Venous",
   arterial: "Arterial",
   abdominal_vascular: "Abdominal Vascular",
-  extracranial_carotid: "Extracranial Carotid Artery",
+  extracranial_carotid: "Extracranial Carotid",
   intracranial_tcd: "Intracranial Duplex/TCD",
-  msk: "MSK",
   pocus: "POCUS",
   physics: "Physics",
-  fetal_echo: "Fetal Echo",
+  thyroid: "Thyroid",
+  scrotum: "Scrotum",
+  breast: "Breast",
+  msk: "MSK",
 };
 
 export const CATEGORY_COLORS: Record<string, string> = {
