@@ -119,6 +119,7 @@ import ThinkificWebhookAdmin from "./pages/ThinkificWebhookAdmin";
 import FormBuilderAdmin from "./pages/FormBuilderAdmin";
 import EmailAdmin from "./pages/EmailAdmin";
 import PlatformAdmin from "./pages/PlatformAdmin";
+import EducatorAssist from "./pages/EducatorAssist";
 import ImageQualityReview from "./pages/ImageQualityReview";
 
 // ── DIY Accreditation™ (hidden, backend use) ──────────────────────────────────
@@ -250,6 +251,7 @@ function Router() {
         <Route path="/admin/form-builder/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
         <Route path="/admin/email">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><EmailAdmin /></RoleGuard>}</Route>
         <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
+        <Route path="/educator-assist">{() => <EducatorAssist />}</Route>
         <Route path="/image-quality-review">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ImageQualityReview /></RoleGuard>}</Route>
 
         {/* ── DIY Accreditation™ (hidden backend) ───────────────────────── */}

@@ -349,3 +349,14 @@
 - [x] Add Vascular tab: ABI, IVC-CI, carotid stenosis (NASCET/SRU), RVSP, DVT Wells score
 - [x] Add breadcrumb back-link to UltrasoundAssist™ hub on Calculators page
 - [x] Refactored to per-card state (CalcCard component) so each calculator has independent inputs and results
+
+## Daily Challenge Categories Update (Mar 19)
+- [ ] Replace all Daily Challenge / QuickFire categories with: Abdominal, OB/Gyn, Small Parts, Breast, Vascular, MSK, POCUS
+- [ ] Update Flashcards categories to match
+- [ ] Update DB seed / router category enums
+- [ ] Update QuickFire UI category filter buttons
+
+## Profile Menu Updates (Mar 19)
+- [x] Match iHeartEcho profile menu roles exactly: same role checks (diy_user, diy_admin, platform_admin, accreditation_manager)
+- [x] Add EducatorAssist™ menu item — visible only for platform_admin / admin role users
+- [x] Rename "Submit an Echo Case" → "Submit Ultrasound Case" in profile menu and anywhere else it appears

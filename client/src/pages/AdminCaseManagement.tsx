@@ -874,7 +874,7 @@ export default function AdminCaseManagement() {
               <h1 className="text-xl font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>
                 Case Management
               </h1>
-              <p className="text-xs text-gray-400">Review and approve member-submitted echo cases</p>
+              <p className="text-xs text-gray-400">Review and approve member-submitted ultrasound cases</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -1109,12 +1109,12 @@ export default function AdminCaseManagement() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-purple-500" /> AI Echo Case Generator
+              <Sparkles className="w-5 h-5 text-purple-500" /> AI Ultrasound Case Generator
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <p className="text-sm text-gray-500">
-              Describe a clinical scenario and the AI will generate a complete echo case with clinical history, diagnosis, teaching points, and MCQs. Review the output before saving to the library.
+              Describe a clinical scenario and the AI will generate a complete ultrasound case with clinical history, diagnosis, teaching points, and MCQs. Review the output before saving to the library.
             </p>
             <div className="space-y-3">
               <div>

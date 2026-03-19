@@ -1,7 +1,7 @@
 /**
- * CaseLibrary.tsx — Echo Case Library
+ * CaseLibrary.tsx — Ultrasound Case Library
  *
- * Browse, search, and filter approved echo cases.
+ * Browse, search, and filter approved ultrasound cases.
  * Authenticated users see a "My Submissions" tab with status tracking.
  * Users can submit their own cases (with HIPAA warning).
  */

@@ -897,7 +897,7 @@ export default function PlatformAdmin() {
                 href: "/admin/cases",
                 icon: Library,
                 label: "Case Management",
-                description: "Review, approve, and manage submitted echo cases",
+                description: "Review, approve, and manage submitted ultrasound cases",
                 color: "#189aa1",
               },
               {

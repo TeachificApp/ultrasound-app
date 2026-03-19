@@ -159,6 +159,7 @@ const hiddenNavItems = [
   { path: "/pocus-navigator", label: "POCUS Navigator" },
   { path: "/pocus-scan-coach", label: "POCUS ScanCoach™" },
   { path: "/soundbytes", label: "SoundBytes™" },
+  { path: "/educator-assist", label: "EducatorAssist™" },
 ];
 const navItems = [...navGroups.flatMap(g => g.items), ...hiddenNavItems];
 
@@ -463,7 +464,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                           <button onClick={() => setAccountOpen(false)}
                             className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs md:text-sm text-gray-700 hover:bg-[#f0fbfc] hover:text-[#189aa1] transition-all text-left">
                             <Plus className="w-3.5 h-3.5 text-[#189aa1]" />
-                            Submit an Echo Case
+                            Submit Ultrasound Case
                           </button>
                         </WouterLink>
                       </div>
@@ -486,6 +487,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                               className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-all text-left">
                               <Users className="w-3.5 h-3.5 text-orange-500" />
                               Member Portal
+                            </button>
+                          </WouterLink>
+                        </div>
+                      )}
+
+                      {/* EducatorAssist™ — admin-only */}
+                      {hasPlatformAdmin && (
+                        <div className="px-2 py-1.5 border-t border-gray-100">
+                          <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider px-2 mb-1">Educator Platform</div>
+                          <WouterLink href="/educator-assist">
+                            <button onClick={() => setAccountOpen(false)}
+                              className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs text-gray-700 hover:bg-teal-50 hover:text-[#189aa1] transition-all text-left">
+                              <GraduationCap className="w-3.5 h-3.5 text-[#189aa1]" />
+                              <span className="flex-1">EducatorAssist™</span>
+                              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">Admin</span>
                             </button>
                           </WouterLink>
                         </div>

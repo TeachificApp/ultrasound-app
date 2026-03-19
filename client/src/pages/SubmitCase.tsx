@@ -1,5 +1,5 @@
 /*
- * SubmitCase.tsx — Submit or Edit/Resubmit an Echo Case
+ * SubmitCase.tsx — Submit or Edit/Resubmit an Ultrasound Case
  *
  * Modes:
  *  - New submission: /case-library/submit
@@ -581,7 +581,7 @@ export default function SubmitCase() {
               <ChevronLeft className="w-5 h-5" />
             </button>
             <h1 className="text-xl font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>
-              {isEditMode ? "Edit & Resubmit Case" : "Submit an Echo Case"}
+              {isEditMode ? "Edit & Resubmit Case" : "Submit Ultrasound Case"}
             </h1>
           </div>
           {/* Draft controls (new submission only) */}
