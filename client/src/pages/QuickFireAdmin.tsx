@@ -114,7 +114,7 @@ interface ConnectPair { left: string; right: string; }
 interface IdentifierMarker { x: number; y: number; label: string; }
 interface OrderItem { text: string; }
 
-type QuestionCategory = "ACS" | "Adult Echo" | "Pediatric Echo" | "Fetal Echo" | "POCUS" | "General";
+type QuestionCategory = "Abdominal" | "Pelvic/Gyn" | "OB 1st Trimester" | "OB 2nd/3rd Trimester" | "Fetal Echo" | "Venous" | "Arterial" | "Abdominal Vascular" | "Extracranial Carotid" | "Intracranial Duplex/TCD" | "POCUS" | "Physics" | "Thyroid" | "Scrotum" | "Breast" | "MSK";
 
 interface QuestionForm {
   type: QuestionType;
@@ -145,7 +145,7 @@ const EMPTY_FORM: QuestionForm = {
   imageUrl: "",
   difficulty: "intermediate",
   tags: "",
-  category: "Adult Echo",
+  category: "Abdominal",
   pairs: [{ left: "", right: "" }, { left: "", right: "" }, { left: "", right: "" }, { left: "", right: "" }],
   markers: [],
   orderedItems: [{ text: "" }, { text: "" }, { text: "" }, { text: "" }],
@@ -251,12 +251,12 @@ export default function QuickFireAdmin() {
   // List state
   const [page, setPage] = useState(1);
   const [typeFilter, setTypeFilter] = useState<QuestionType | "all">("all");
-  const [categoryFilter, setCategoryFilter] = useState<"all" | "ACS" | "Adult Echo" | "Pediatric Echo" | "Fetal Echo" | "POCUS" | "General">("all");
+  const [categoryFilter, setCategoryFilter] = useState<"all" | "Abdominal" | "Pelvic/Gyn" | "OB 1st Trimester" | "OB 2nd/3rd Trimester" | "Fetal Echo" | "Venous" | "Arterial" | "Abdominal Vascular" | "Extracranial Carotid" | "Intracranial Duplex/TCD" | "POCUS" | "Physics" | "Thyroid" | "Scrotum" | "Breast" | "MSK">("all");
   const [includeInactive, setIncludeInactive] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [challengeSearch, setChallengeSearch] = useState("");
   const [flashcardSearch, setFlashcardSearch] = useState("");
-  const [flashcardEchoCategory, setFlashcardEchoCategory] = useState<"all" | "adult" | "pediatric_congenital" | "fetal">("all");
+  const [flashcardEchoCategory, setFlashcardEchoCategory] = useState<"all" | "abdominal" | "pelvic_gyn" | "obstetric_1st" | "obstetric_2nd_3rd" | "fetal_echo" | "venous" | "arterial" | "abdominal_vascular" | "extracranial_carotid" | "intracranial_tcd" | "pocus" | "physics" | "thyroid" | "scrotum" | "breast" | "msk">("all");
   const [flashcardAiOpen, setFlashcardAiOpen] = useState(false);
   const [flashcardAiTopic, setFlashcardAiTopic] = useState("");
   const [flashcardAiDifficulty, setFlashcardAiDifficulty] = useState<Difficulty>("intermediate");
@@ -470,7 +470,7 @@ export default function QuickFireAdmin() {
   const [challengeForm, setChallengeForm] = useState({
     title: "",
     description: "",
-    category: "Adult Echo",
+    category: "Abdominal",
     queuePosition: undefined as number | undefined,
     priority: 100,
     selectedQuestionIds: [] as number[],
@@ -484,7 +484,7 @@ export default function QuickFireAdmin() {
       toast.success("Challenge created and added to queue.");
       challengeListQuery.refetch();
       setChallengeFormOpen(false);
-      setChallengeForm({ title: "", description: "", category: "Adult Echo", queuePosition: undefined, priority: 100, selectedQuestionIds: [] });
+      setChallengeForm({ title: "", description: "", category: "Abdominal", queuePosition: undefined, priority: 100, selectedQuestionIds: [] });
     },
     onError: (err) => toast.error(err.message || "Failed to create challenge."),
   });
@@ -547,7 +547,7 @@ export default function QuickFireAdmin() {
     setChallengeForm({
       title: c.title,
       description: c.description ?? "",
-      category: c.category ?? "Adult Echo",
+      category: c.category ?? "Abdominal",
       queuePosition: c.queuePosition ?? undefined,
       priority: c.priority ?? 100,
       selectedQuestionIds: Array.isArray(c.questionIds) ? c.questionIds : [],
@@ -607,7 +607,7 @@ export default function QuickFireAdmin() {
   const [aiMixedPreview, setAiMixedPreview] = useState<Array<{ type: string; question: any }>>([]);
   const [aiMixedSelected, setAiMixedSelected] = useState<Set<number>>(new Set());
   const [aiMixedImporting, setAiMixedImporting] = useState(false);
-  const [aiCategory, setAiCategory] = useState<QuestionCategory>("Adult Echo");
+  const [aiCategory, setAiCategory] = useState<QuestionCategory>("Abdominal");
 
   // Challenge form question picker search
   const [challengeQSearch, setChallengeQSearch] = useState("");
@@ -816,7 +816,7 @@ export default function QuickFireAdmin() {
       imageUrl: q.imageUrl ?? "",
       difficulty: q.difficulty,
       tags: (q.tags ?? []).join(", "),
-      category: (q.category as QuestionCategory) ?? "Adult Echo",
+      category: (q.category as QuestionCategory) ?? "Abdominal",
       pairs: q.pairs ?? [{ left: "", right: "" }, { left: "", right: "" }, { left: "", right: "" }, { left: "", right: "" }],
       markers: q.markers ?? [],
       orderedItems: q.orderedItems ?? [{ text: "" }, { text: "" }, { text: "" }, { text: "" }],
@@ -1189,12 +1189,22 @@ export default function QuickFireAdmin() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Categories</SelectItem>
-              <SelectItem value="ACS">ACS</SelectItem>
-              <SelectItem value="Adult Echo">Adult Echo</SelectItem>
-              <SelectItem value="Pediatric Echo">Pediatric Echo</SelectItem>
+              <SelectItem value="Abdominal">Abdominal</SelectItem>
+              <SelectItem value="Pelvic/Gyn">Pelvic/Gyn</SelectItem>
+              <SelectItem value="OB 1st Trimester">OB 1st Trimester</SelectItem>
+              <SelectItem value="OB 2nd/3rd Trimester">OB 2nd/3rd Trimester</SelectItem>
               <SelectItem value="Fetal Echo">Fetal Echo</SelectItem>
+              <SelectItem value="Venous">Venous</SelectItem>
+              <SelectItem value="Arterial">Arterial</SelectItem>
+              <SelectItem value="Abdominal Vascular">Abdominal Vascular</SelectItem>
+              <SelectItem value="Extracranial Carotid">Extracranial Carotid</SelectItem>
+              <SelectItem value="Intracranial Duplex/TCD">Intracranial Duplex/TCD</SelectItem>
               <SelectItem value="POCUS">POCUS</SelectItem>
-              <SelectItem value="General">General</SelectItem>
+              <SelectItem value="Physics">Physics</SelectItem>
+              <SelectItem value="Thyroid">Thyroid</SelectItem>
+              <SelectItem value="Scrotum">Scrotum</SelectItem>
+              <SelectItem value="Breast">Breast</SelectItem>
+              <SelectItem value="MSK">MSK</SelectItem>
             </SelectContent>
           </Select>
           <Button
@@ -1321,12 +1331,12 @@ export default function QuickFireAdmin() {
                         }`}>{q.difficulty}</span>
                         {q.category && (
                           <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                            q.category === "ACS" ? "bg-red-50 text-red-600" :
-                            q.category === "Adult Echo" ? "bg-teal-50 text-teal-700" :
-                            q.category === "Pediatric Echo" ? "bg-purple-50 text-purple-700" :
-                            q.category === "Fetal Echo" ? "bg-pink-50 text-pink-700" :
-                            q.category === "POCUS" ? "bg-blue-50 text-blue-700" :
-                            "bg-gray-50 text-gray-600"
+                            q.category === "Venous" ? "bg-blue-50 text-blue-700" :
+                            q.category === "Arterial" ? "bg-red-50 text-red-600" :
+                            q.category === "Fetal Echo" ? "bg-purple-50 text-purple-700" :
+                            q.category === "POCUS" ? "bg-amber-50 text-amber-700" :
+                            q.category === "Physics" ? "bg-gray-50 text-gray-600" :
+                            "bg-teal-50 text-teal-700"
                           }`}>{q.category}</span>
                         )}
                         {q.imageUrl && <ImageIcon className="w-3 h-3 text-purple-400" />}
@@ -1572,8 +1582,8 @@ export default function QuickFireAdmin() {
           <div className="space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div>
-                <h2 className="text-base font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>Echo Flashcard Manager</h2>
-                <p className="text-xs text-gray-400 mt-0.5">Create and manage Echo Flashcards by category. Supports AI generation.</p>
+                <h2 className="text-base font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>Ultrasound Flashcard Manager</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Create and manage Ultrasound Flashcards by category. Supports AI generation.</p>
               </div>
               <div className="flex items-center gap-2">
                 <Button
@@ -1607,7 +1617,7 @@ export default function QuickFireAdmin() {
                 className="w-56"
               />
               <div className="flex gap-1 flex-wrap">
-                {(["all", "adult", "pediatric_congenital", "fetal"] as const).map((cat) => (
+                {(["all", "abdominal", "pelvic_gyn", "obstetric_1st", "obstetric_2nd_3rd", "fetal_echo", "venous", "arterial", "abdominal_vascular", "extracranial_carotid", "intracranial_tcd", "pocus", "physics", "thyroid", "scrotum", "breast", "msk"] as const).map((cat) => (
                   <button
                     key={cat}
                     onClick={() => setFlashcardEchoCategory(cat)}
@@ -1617,7 +1627,7 @@ export default function QuickFireAdmin() {
                         : "border-gray-200 bg-gray-50 text-gray-600 hover:border-[#189aa1] hover:text-[#189aa1]"
                     }`}
                   >
-                    {cat === "all" ? "All" : cat === "adult" ? "Adult Echo" : cat === "pediatric_congenital" ? "Pediatric/Congenital" : "Fetal Echo"}
+                    {cat === "all" ? "All" : cat === "abdominal" ? "Abdominal" : cat === "pelvic_gyn" ? "Pelvic/Gyn" : cat === "obstetric_1st" ? "OB 1st" : cat === "obstetric_2nd_3rd" ? "OB 2nd/3rd" : cat === "fetal_echo" ? "Fetal Echo" : cat === "venous" ? "Venous" : cat === "arterial" ? "Arterial" : cat === "abdominal_vascular" ? "Abd. Vascular" : cat === "extracranial_carotid" ? "Carotid" : cat === "intracranial_tcd" ? "TCD" : cat === "pocus" ? "POCUS" : cat === "physics" ? "Physics" : cat === "thyroid" ? "Thyroid" : cat === "scrotum" ? "Scrotum" : cat === "breast" ? "Breast" : "MSK"}
                   </button>
                 ))}
               </div>
@@ -1662,7 +1672,7 @@ export default function QuickFireAdmin() {
                               imageUrl: q.imageUrl ?? "",
                               difficulty: (q.difficulty as Difficulty) ?? "intermediate",
                               tags: tags.join(", "),
-                              category: (q.category as QuestionCategory) ?? "Adult Echo",
+                              category: (q.category as QuestionCategory) ?? "Abdominal",
                               pairs: [{ left: "", right: "" }, { left: "", right: "" }],
                               markers: [],
                               orderedItems: [{ text: "" }, { text: "" }],
@@ -1823,10 +1833,11 @@ export default function QuickFireAdmin() {
                         <div className="flex items-center gap-2 flex-wrap">
                           {q.qid && <span className="text-[10px] font-mono font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{q.qid}</span>}
                           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                            q.category === "ACS" ? "bg-red-100 text-red-700" :
-                            q.category === "POCUS" ? "bg-blue-100 text-blue-700" :
-                            q.category === "Pediatric Echo" ? "bg-purple-100 text-purple-700" :
-                            q.category === "Fetal Echo" ? "bg-pink-100 text-pink-700" :
+                            q.category === "Venous" ? "bg-blue-100 text-blue-700" :
+                            q.category === "Arterial" ? "bg-red-100 text-red-700" :
+                            q.category === "Fetal Echo" ? "bg-purple-100 text-purple-700" :
+                            q.category === "POCUS" ? "bg-amber-100 text-amber-700" :
+                            q.category === "Physics" ? "bg-gray-100 text-gray-700" :
                             "bg-teal-100 text-teal-700"
                           }`}>{q.category}</span>
                           <span className={`text-xs px-1.5 py-0.5 rounded ${
@@ -1980,7 +1991,7 @@ export default function QuickFireAdmin() {
               <div>
                 <p className="text-xs font-semibold text-amber-700">Category assignment is required</p>
                 <p className="text-xs text-amber-600 mt-0.5">
-                  The Daily Challenge shows <strong>one question per category</strong> (ACS, Adult Echo, Pediatric Echo, Fetal Echo).
+                  The Daily Challenge shows <strong>one question per category</strong> (Abdominal, Venous, Arterial, POCUS, etc.).
                   Set the correct category so this challenge appears in the right slot for users.
                 </p>
               </div>
@@ -1991,11 +2002,22 @@ export default function QuickFireAdmin() {
                 <Select value={challengeForm.category} onValueChange={(v) => setChallengeForm((f) => ({ ...f, category: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ACS">ACS</SelectItem>
-                    <SelectItem value="Adult Echo">Adult Echo</SelectItem>
-                    <SelectItem value="Pediatric Echo">Pediatric Echo</SelectItem>
+                    <SelectItem value="Abdominal">Abdominal</SelectItem>
+                    <SelectItem value="Pelvic/Gyn">Pelvic/Gyn</SelectItem>
+                    <SelectItem value="OB 1st Trimester">OB 1st Trimester</SelectItem>
+                    <SelectItem value="OB 2nd/3rd Trimester">OB 2nd/3rd Trimester</SelectItem>
                     <SelectItem value="Fetal Echo">Fetal Echo</SelectItem>
+                    <SelectItem value="Venous">Venous</SelectItem>
+                    <SelectItem value="Arterial">Arterial</SelectItem>
+                    <SelectItem value="Abdominal Vascular">Abdominal Vascular</SelectItem>
+                    <SelectItem value="Extracranial Carotid">Extracranial Carotid</SelectItem>
+                    <SelectItem value="Intracranial Duplex/TCD">Intracranial Duplex/TCD</SelectItem>
                     <SelectItem value="POCUS">POCUS</SelectItem>
+                    <SelectItem value="Physics">Physics</SelectItem>
+                    <SelectItem value="Thyroid">Thyroid</SelectItem>
+                    <SelectItem value="Scrotum">Scrotum</SelectItem>
+                    <SelectItem value="Breast">Breast</SelectItem>
+                    <SelectItem value="MSK">MSK</SelectItem>
                     <SelectItem value="Mixed">Mixed</SelectItem>
                   </SelectContent>
                 </Select>
@@ -2654,7 +2676,7 @@ export default function QuickFireAdmin() {
                   Tags <span className="text-gray-400 font-normal">(comma-separated)</span>
                 </label>
                 <div className="flex flex-wrap gap-1.5 mb-2">
-                  {["ACS", "Adult Echo", "Pediatric Echo", "Fetal Echo", "POCUS"].map((cat) => {
+                  {["Abdominal", "Venous", "Arterial", "OB 2nd/3rd Trimester", "POCUS", "Fetal Echo", "Physics"].map((cat) => {
                     const currentTags = form.tags.split(",").map((t) => t.trim()).filter(Boolean);
                     const isActive = currentTags.includes(cat);
                     return (
@@ -2682,7 +2704,7 @@ export default function QuickFireAdmin() {
                 <Input
                   value={form.tags}
                   onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))}
-                  placeholder="e.g. LV function, diastology, AS"
+                  placeholder="e.g. DVT, hepatic Doppler, renal artery stenosis"
                 />
               </div>
             </div>
@@ -2752,20 +2774,20 @@ export default function QuickFireAdmin() {
                 <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Clinical Topic <span className="text-red-500">*</span></label>
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {[
-                    { label: "ACS", topic: "Advanced Cardiac Sonographer (ACS) echocardiography — advanced imaging, RWMA, LV function, complications, complex hemodynamics", category: "ACS" as QuestionCategory },
-                    { label: "Adult Echo", topic: "Adult transthoracic echocardiography — valvular disease, LV/RV function, Doppler assessment", category: "Adult Echo" as QuestionCategory },
-                    { label: "HOCM", topic: "Hypertrophic obstructive cardiomyopathy (HOCM) — LVOT obstruction, SAM, Doppler gradients, septal morphology, provocable obstruction", category: "Adult Echo" as QuestionCategory },
-                    { label: "Strain / GLS", topic: "Myocardial strain imaging and global longitudinal strain (GLS) — LV GLS, RV strain, layer-specific strain, clinical applications", category: "Adult Echo" as QuestionCategory },
-                    { label: "Diastolic Function", topic: "Diastolic function assessment — grading diastolic dysfunction, E/A ratio, E/e\u2019, LAVI, TR velocity, ASE 2025 guidelines", category: "Adult Echo" as QuestionCategory },
-                    { label: "Dilated CM", topic: "Dilated cardiomyopathy — LV dilation, reduced EF, functional MR, LV dyssynchrony, CRT criteria", category: "Adult Echo" as QuestionCategory },
-                    { label: "Restrictive CM", topic: "Restrictive cardiomyopathy — amyloid, sarcoid, Fabry disease, restrictive filling pattern, biatrial enlargement", category: "Adult Echo" as QuestionCategory },
-                    { label: "Constrictive Pericarditis", topic: "Constrictive pericarditis — respiratory variation, septal bounce, annulus reversus, hepatic vein flow, differentiation from restriction", category: "Adult Echo" as QuestionCategory },
-                    { label: "Tamponade", topic: "Cardiac tamponade — pericardial effusion, chamber collapse, respiratory variation, IVC plethora, equalization of pressures", category: "Adult Echo" as QuestionCategory },
-                    { label: "Pulmonary HTN", topic: "Pulmonary hypertension — RVSP estimation, TR velocity, RV remodeling, PA pressures, ASE 2025 PH guidelines", category: "Adult Echo" as QuestionCategory },
-                    { label: "Pulmonary Embolism", topic: "Pulmonary embolism — RV strain pattern, McConnell sign, D-sign, TR, IVC, risk stratification by echo", category: "POCUS" as QuestionCategory },
-                    { label: "Pediatric Echo", topic: "Pediatric echocardiography — congenital heart disease, Z-scores, shunt assessment, CHD lesions", category: "Pediatric Echo" as QuestionCategory },
-                    { label: "Fetal Echo", topic: "Fetal echocardiography — fetal cardiac anatomy, CHD screening, biometry, situs, arch patterns", category: "Fetal Echo" as QuestionCategory },
-                    { label: "POCUS", topic: "Point-of-care ultrasound (POCUS) — eFAST, RUSH protocol, lung POCUS, bedside cardiac assessment, IVC assessment, pleural effusion", category: "POCUS" as QuestionCategory },
+                    { label: "Abdominal", topic: "Abdominal ultrasound — liver, gallbladder, pancreas, spleen, kidneys, aorta, Doppler assessment, pathology identification", category: "Abdominal" as QuestionCategory },
+                    { label: "Venous", topic: "Venous duplex ultrasound — DVT diagnosis, compressibility criteria, augmentation, venous reflux, varicose veins, SVT", category: "Venous" as QuestionCategory },
+                    { label: "Arterial", topic: "Arterial duplex ultrasound — ABI interpretation, PAD grading, waveform analysis, stenosis criteria, bypass graft surveillance", category: "Arterial" as QuestionCategory },
+                    { label: "Carotid", topic: "Extracranial carotid duplex — ICA/CCA/ECA stenosis criteria, plaque morphology, velocity ratios, NASCET criteria, stent surveillance", category: "Extracranial Carotid" as QuestionCategory },
+                    { label: "Abd. Vascular", topic: "Abdominal vascular ultrasound — renal artery stenosis, mesenteric artery disease, aortic aneurysm, hepatic/portal Doppler", category: "Abdominal Vascular" as QuestionCategory },
+                    { label: "OB 2nd/3rd", topic: "Obstetric ultrasound 2nd/3rd trimester — fetal biometry, growth assessment, placenta previa, AFI, Doppler surveillance, anomaly screening", category: "OB 2nd/3rd Trimester" as QuestionCategory },
+                    { label: "OB 1st Tri", topic: "Obstetric ultrasound 1st trimester — CRL measurement, NT screening, ectopic pregnancy, early fetal anatomy, dating", category: "OB 1st Trimester" as QuestionCategory },
+                    { label: "Fetal Echo", topic: "Fetal echocardiography — cardiac anatomy, 4-chamber view, outflow tracts, CHD screening, arrhythmia, biometry", category: "Fetal Echo" as QuestionCategory },
+                    { label: "Pelvic/Gyn", topic: "Pelvic/gynecologic ultrasound — uterine pathology, ovarian cysts, fibroids, endometrial assessment, adnexal masses, PCOS", category: "Pelvic/Gyn" as QuestionCategory },
+                    { label: "TCD", topic: "Intracranial duplex/TCD — MCA/ACA/PCA velocities, vasospasm monitoring, emboli detection, sickle cell screening, brain death criteria", category: "Intracranial Duplex/TCD" as QuestionCategory },
+                    { label: "POCUS", topic: "Point-of-care ultrasound (POCUS) — eFAST, RUSH protocol, lung POCUS, IVC assessment, pleural effusion, bedside assessment", category: "POCUS" as QuestionCategory },
+                    { label: "Physics", topic: "Ultrasound physics — transducer types, artifacts, Doppler principles, image optimization, ARDMS physics exam topics", category: "Physics" as QuestionCategory },
+                    { label: "Thyroid", topic: "Thyroid ultrasound — nodule characterization, TIRADS scoring, parathyroid, lymph node assessment, biopsy guidance", category: "Thyroid" as QuestionCategory },
+                    { label: "MSK", topic: "MSK ultrasound — tendon pathology, rotator cuff tears, joint effusions, nerve entrapment, dynamic assessment, guided injections", category: "MSK" as QuestionCategory },
                   ].map(({ label, topic, category }) => (
                     <button
                       key={label}
@@ -2784,7 +2806,7 @@ export default function QuickFireAdmin() {
                 <RichTextEditor
                   value={aiTopic}
                   onChange={setAiTopic}
-                  placeholder="e.g. Aortic stenosis severity grading by Doppler, diastolic dysfunction assessment, TAPSE and RV function..."
+                  placeholder="e.g. DVT diagnosis criteria, abdominal aorta aneurysm, hepatic Doppler assessment..."
                   minHeight={70}
                 />
               </div>
@@ -2833,12 +2855,22 @@ export default function QuickFireAdmin() {
                     <Select value={aiCategory} onValueChange={(v) => setAiCategory(v as QuestionCategory)}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="ACS">ACS</SelectItem>
-                        <SelectItem value="Adult Echo">Adult Echo</SelectItem>
-                        <SelectItem value="Pediatric Echo">Pediatric Echo</SelectItem>
+                        <SelectItem value="Abdominal">Abdominal</SelectItem>
+                        <SelectItem value="Pelvic/Gyn">Pelvic/Gyn</SelectItem>
+                        <SelectItem value="OB 1st Trimester">OB 1st Trimester</SelectItem>
+                        <SelectItem value="OB 2nd/3rd Trimester">OB 2nd/3rd Trimester</SelectItem>
                         <SelectItem value="Fetal Echo">Fetal Echo</SelectItem>
+                        <SelectItem value="Venous">Venous</SelectItem>
+                        <SelectItem value="Arterial">Arterial</SelectItem>
+                        <SelectItem value="Abdominal Vascular">Abdominal Vascular</SelectItem>
+                        <SelectItem value="Extracranial Carotid">Extracranial Carotid</SelectItem>
+                        <SelectItem value="Intracranial Duplex/TCD">Intracranial Duplex/TCD</SelectItem>
                         <SelectItem value="POCUS">POCUS</SelectItem>
-                        <SelectItem value="General">General</SelectItem>
+                        <SelectItem value="Physics">Physics</SelectItem>
+                        <SelectItem value="Thyroid">Thyroid</SelectItem>
+                        <SelectItem value="Scrotum">Scrotum</SelectItem>
+                        <SelectItem value="Breast">Breast</SelectItem>
+                        <SelectItem value="MSK">MSK</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -2903,17 +2935,27 @@ export default function QuickFireAdmin() {
                       <Select value={aiCategory} onValueChange={(v) => setAiCategory(v as QuestionCategory)}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="ACS">ACS</SelectItem>
-                          <SelectItem value="Adult Echo">Adult Echo</SelectItem>
-                          <SelectItem value="Pediatric Echo">Pediatric Echo</SelectItem>
-                          <SelectItem value="Fetal Echo">Fetal Echo</SelectItem>
-                          <SelectItem value="POCUS">POCUS</SelectItem>
-                          <SelectItem value="General">General</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                          <SelectItem value="Abdominal">Abdominal</SelectItem>
+                        <SelectItem value="Pelvic/Gyn">Pelvic/Gyn</SelectItem>
+                        <SelectItem value="OB 1st Trimester">OB 1st Trimester</SelectItem>
+                        <SelectItem value="OB 2nd/3rd Trimester">OB 2nd/3rd Trimester</SelectItem>
+                        <SelectItem value="Fetal Echo">Fetal Echo</SelectItem>
+                        <SelectItem value="Venous">Venous</SelectItem>
+                        <SelectItem value="Arterial">Arterial</SelectItem>
+                        <SelectItem value="Abdominal Vascular">Abdominal Vascular</SelectItem>
+                        <SelectItem value="Extracranial Carotid">Extracranial Carotid</SelectItem>
+                        <SelectItem value="Intracranial Duplex/TCD">Intracranial Duplex/TCD</SelectItem>
+                        <SelectItem value="POCUS">POCUS</SelectItem>
+                        <SelectItem value="Physics">Physics</SelectItem>
+                        <SelectItem value="Thyroid">Thyroid</SelectItem>
+                        <SelectItem value="Scrotum">Scrotum</SelectItem>
+                        <SelectItem value="Breast">Breast</SelectItem>
+                        <SelectItem value="MSK">MSK</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
+              </div>
               )}
             </div>
             {/* Generate button */}
@@ -3231,23 +3273,23 @@ export default function QuickFireAdmin() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <p className="text-sm text-gray-500">
-              Describe a clinical topic and the AI will generate ready-to-use Echo Flashcards with concise answers and explanations.
+              Describe a clinical topic and the AI will generate ready-to-use Ultrasound Flashcards with concise answers and explanations.
             </p>
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Clinical Topic <span className="text-red-500">*</span></label>
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {[
-                    { label: "Adult Echo", topic: "Adult transthoracic echocardiography — valvular disease, LV/RV function, Doppler assessment" },
-                    { label: "Diastolic Function", topic: "Diastolic function assessment — grading diastolic dysfunction, E/A ratio, E/e\u2019, LAVI, TR velocity, ASE 2025 guidelines" },
-                    { label: "Aortic Stenosis", topic: "Aortic stenosis severity grading — AVA, mean gradient, peak velocity, low-flow low-gradient AS, dobutamine stress echo" },
-                    { label: "Mitral Valve", topic: "Mitral valve disease — MR severity, MS area, MVA by PHT and planimetry, mitral valve anatomy" },
-                    { label: "HOCM", topic: "Hypertrophic obstructive cardiomyopathy (HOCM) — LVOT obstruction, SAM, Doppler gradients, septal morphology" },
-                    { label: "Strain / GLS", topic: "Myocardial strain imaging and global longitudinal strain (GLS) — LV GLS, RV strain, clinical applications" },
-                    { label: "Pediatric Echo", topic: "Pediatric echocardiography — congenital heart disease, Z-scores, shunt assessment, CHD lesions" },
-                    { label: "Fetal Echo", topic: "Fetal echocardiography — fetal cardiac anatomy, CHD screening, biometry, situs, arch patterns" },
-                    { label: "Pulmonary HTN", topic: "Pulmonary hypertension — RVSP estimation, TR velocity, RV remodeling, PA pressures" },
-                    { label: "Pericardial Disease", topic: "Pericardial disease — tamponade, constrictive pericarditis, pericardial effusion, respiratory variation" },
+                    { label: "Abdominal", topic: "Abdominal ultrasound flashcards — liver echogenicity, gallbladder pathology, renal cysts, spleen size, pancreas assessment, Doppler" },
+                    { label: "Venous", topic: "Venous duplex flashcards — DVT criteria, compressibility, augmentation, reflux testing, venous anatomy" },
+                    { label: "Arterial", topic: "Arterial duplex flashcards — ABI values, waveform morphology, stenosis grading, PAD classification" },
+                    { label: "Carotid", topic: "Extracranial carotid flashcards — ICA stenosis criteria, velocity thresholds, plaque types, NASCET vs ECST" },
+                    { label: "OB 2nd/3rd", topic: "Obstetric ultrasound flashcards 2nd/3rd trimester — biometry formulas, BPP scoring, AFI, placenta grading" },
+                    { label: "Fetal Echo", topic: "Fetal echocardiography flashcards — cardiac anatomy, 4-chamber view, outflow tracts, CHD patterns" },
+                    { label: "Pelvic/Gyn", topic: "Pelvic/gynecologic ultrasound flashcards — endometrial thickness, ovarian cyst types, fibroid classification, PCOS criteria" },
+                    { label: "POCUS", topic: "POCUS flashcards — eFAST findings, lung sliding, B-lines, IVC collapsibility, RUSH protocol steps" },
+                    { label: "Physics", topic: "Ultrasound physics flashcards — acoustic impedance, attenuation, artifacts (shadowing, enhancement, reverberation), Doppler principles" },
+                    { label: "Thyroid", topic: "Thyroid ultrasound flashcards — TIRADS categories, nodule features, echogenicity, vascularity, biopsy criteria" },
                   ].map(({ label, topic }) => (
                     <button
                       key={label}
@@ -3266,7 +3308,7 @@ export default function QuickFireAdmin() {
                 <Input
                   value={flashcardAiTopic}
                   onChange={(e) => setFlashcardAiTopic(e.target.value)}
-                  placeholder="e.g. Aortic stenosis severity grading, diastolic dysfunction, TAPSE and RV function..."
+                  placeholder="e.g. DVT compressibility criteria, renal artery stenosis velocities, TIRADS nodule scoring..."
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -3720,7 +3762,7 @@ export default function QuickFireAdmin() {
                   videoUrl: (flashcardForm as any).videoUrl || undefined,
                   difficulty: flashcardForm.difficulty,
                   tags: flashcardForm.tags ? flashcardForm.tags.split(",").map((t: string) => t.trim()).filter(Boolean) : [],
-                  category: "General" as const,
+                  category: "Abdominal" as const,
                 };
                 if (editingFlashcardId !== null) {
                   updateMutation.mutate({ id: editingFlashcardId, ...payload }, {

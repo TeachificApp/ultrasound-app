@@ -32,15 +32,26 @@ import { Lock, Zap } from "lucide-react";
 import FlashcardsBanner from "@/components/FlashcardsBanner";
 
 type StudyMode = "sequential" | "spaced";
-type EchoCategory = "all" | "acs" | "adult" | "pediatric_congenital" | "fetal" | "pocus";
+type EchoCategory = "all" | "abdominal" | "pelvic_gyn" | "obstetric_1st" | "obstetric_2nd_3rd" | "fetal_echo" | "venous" | "arterial" | "abdominal_vascular" | "extracranial_carotid" | "intracranial_tcd" | "pocus" | "physics" | "thyroid" | "scrotum" | "breast" | "msk";
 
 const CATEGORIES: { value: EchoCategory; label: string }[] = [
   { value: "all", label: "All" },
-  { value: "acs", label: "ACS" },
-  { value: "adult", label: "Adult Echo" },
-  { value: "pediatric_congenital", label: "Pediatric Echo" },
-  { value: "fetal", label: "Fetal Echo" },
+  { value: "abdominal", label: "Abdominal" },
+  { value: "pelvic_gyn", label: "Pelvic/Gyn" },
+  { value: "obstetric_1st", label: "OB 1st Tri" },
+  { value: "obstetric_2nd_3rd", label: "OB 2nd/3rd" },
+  { value: "fetal_echo", label: "Fetal Echo" },
+  { value: "venous", label: "Venous" },
+  { value: "arterial", label: "Arterial" },
+  { value: "abdominal_vascular", label: "Abd. Vascular" },
+  { value: "extracranial_carotid", label: "Carotid" },
+  { value: "intracranial_tcd", label: "TCD" },
   { value: "pocus", label: "POCUS" },
+  { value: "physics", label: "Physics" },
+  { value: "thyroid", label: "Thyroid" },
+  { value: "scrotum", label: "Scrotum" },
+  { value: "breast", label: "Breast" },
+  { value: "msk", label: "MSK" },
 ];
 
 export default function Flashcards() {

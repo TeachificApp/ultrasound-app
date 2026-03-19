@@ -1,0 +1,13 @@
+{
+  "query": "SELECT COUNT(*) as total FROM quickfireQuestions WHERE type = 'quickReview'",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT COUNT(*) as total FROM quickfireQuestions WHERE type = 'quickReview'",
+  "rows": [
+    {
+      "total": "300"
+    }
+  ],
+  "messages": [],
+  "stdout": "total\n300\n",
+  "stderr": "",
+  "execution_time_ms": 64
+}

@@ -2,10 +2,16 @@
  * leaderboardSeed.ts
  *
  * Generates a deterministic but daily-rotating virtual leaderboard of 1,200+
- * echo professionals. The seed is derived from the current UTC date, so the
+ * ultrasound professionals. The seed is derived from the current UTC date, so the
  * rankings shift every day while remaining stable within a single day.
  *
  * Used by getLeaderboard to pad the board when real users are sparse.
+ *
+ * Credential distribution reflects the All About Ultrasound™ user base:
+ *  ~40% non-credentialed (students, residents, sonographers-in-training)
+ *  ~35% general/vascular ultrasound (RDMS, RVT, RVS)
+ *  ~15% cardiac (RDCS, RCS)
+ *  ~10% physicians / advanced practice (MD, DO, NP, PA)
  */
 
 // ─── Name pools ──────────────────────────────────────────────────────────────
@@ -65,48 +71,87 @@ const LAST_NAMES = [
   "Andersen","Hansen","Petersen","Nielsen","Jensen","Larsen","Christensen","Rasmussen","Pedersen","Madsen",
 ];
 
-const CREDENTIALS = [
-  // Single credentials
+// ─── Credential pools — weighted to reflect AAUS user base ──────────────────
+// Each sub-array is sampled with a weighted probability in generateVirtualLeaderboard.
+
+/** General & vascular ultrasound credentials (~35% of credentialed users) */
+const CREDENTIALS_GV = [
+  // RDMS specialties
+  "RDMS",
+  "RDMS (AB)",
+  "RDMS (OB/GYN)",
+  "RDMS (AB, OB/GYN)",
+  "RDMS (BR)",
+  "RDMS (MS)",
+  "RDMS (NE)",
+  "RDMS (AB, OB/GYN, BR)",
+  // RVT / RVS
+  "RVT",
+  "RVS",
+  "RVT, RDMS",
+  "RVT, RDMS (AB)",
+  "RVT, RDMS (AB, OB/GYN)",
+  "RVS, RDMS",
+  // Vascular interpretation & phlebology
+  "RPVI",
+  "RPhS",
+  "RPVI, RVT",
+  "RPVI, RDMS",
+  "RPhS, RVT",
+  "RPhS, RDMS",
+  "RPVI, RPhS",
+  "RPVI, RVT, RDMS",
+  // MSK sonography
+  "RMSK",
+  "RMSK, RDMS",
+  "RMSK, RDMS (MS)",
+  "RMSK, RDMS (AB, MS)",
+  // Multi-specialty combos
+  "RDMS (AB, OB/GYN), RVT",
+  "RDMS (AB), RVT",
+  "RDMS (AB, OB/GYN), RVS",
+  "RDMS (AB, BR), RVT",
+  "RDMS (AB, OB/GYN, BR), RVT",
+  "RDMS (AB), RPVI",
+  "RDMS (AB, OB/GYN), RPVI",
+  "RVT, RPhS",
+  "RVT, RPVI, RPhS",
+];
+
+/** Cardiac ultrasound credentials (~15% of credentialed users) */
+const CREDENTIALS_CARDIAC = [
   "RDCS",
   "RDCS (AE)",
   "RDCS (PE)",
   "RDCS (FE)",
-  "RCS",
-  "RCCS",
-  "RCES",
-  "CCI",
-  "FASE",
-  "FACC",
-  "MD",
-  "DO",
-  "RN",
-  "RT(R)",
-  // Multi-credential combos — ACS always first when present
-  "ACS, RDCS",
-  "ACS, RDCS (AE)",
-  "ACS, RDCS (PE)",
-  "ACS, RDCS (FE)",
-  "ACS, RDCS (AE, PE)",
-  "ACS, RDCS (AE, FE)",
-  "ACS, RDCS (PE, FE)",
-  "ACS, RCS",
-  "ACS, RCCS",
-  "ACS, CCI",
   "RDCS (AE, PE)",
   "RDCS (AE, FE)",
   "RDCS (PE, FE)",
   "RDCS (AE, PE, FE)",
-  "RDCS, CCI",
-  "RDCS (AE), CCI",
-  "RDCS (AE), FASE",
-  "RDCS (AE), FACC",
-  "MD, FASE",
-  "MD, FACC",
-  "RN, RDCS",
-  "RN, RDCS (AE)",
-  "RT(R), RDCS",
-  "RT(R), RDCS (AE)",
+  "RCS",
+  "RDCS (AE), RDMS",
+  "RDCS (FE), RDMS (OB/GYN)",
+  "RCS, RDMS",
 ];
+
+/** Physician / advanced practice credentials (~10% of credentialed users) */
+const CREDENTIALS_MD = [
+  "MD",
+  "DO",
+  "MD, RDMS",
+  "MD, RVT",
+  "DO, RDMS",
+  "NP",
+  "PA-C",
+  "NP, RDMS",
+  "PA-C, RDMS",
+  "RN, RDMS",
+  "RN, RVT",
+  "RT(R), RDMS",
+];
+
+// Legacy flat list kept for backward-compat (not used directly)
+const CREDENTIALS = [...CREDENTIALS_GV, ...CREDENTIALS_CARDIAC, ...CREDENTIALS_MD];
 
 const CITIES = [
   "New York","Los Angeles","Chicago","Houston","Phoenix","Philadelphia","San Antonio","San Diego",
@@ -177,6 +222,7 @@ export interface VirtualEntry {
 /**
  * Generate `count` virtual leaderboard entries for the given period.
  * Scores are seeded by today's date so they change daily.
+ * Credential mix: ~40% non-credentialed, ~35% RDMS/RVT/RVS, ~15% RDCS/RCS, ~10% MD/DO/NP/PA.
  *
  * @param count  Number of virtual entries to generate (default 1200)
  * @param period "7d" | "30d" | "allTime" — affects score ranges
@@ -201,9 +247,18 @@ export function generateVirtualLeaderboard(
     const lastName = pick(LAST_NAMES, rand);
     const city = pick(CITIES, rand);
 
-    // ~28% of entries are uncredentialed learners (students, residents, enthusiasts)
-    const isLearner = rand() < 0.28;
-    const cred = isLearner ? null : pick(CREDENTIALS, rand);
+    // ~40% of entries are non-credentialed (students, residents, sonographers-in-training)
+    const credRoll = rand();
+    let cred: string | null;
+    if (credRoll < 0.40) {
+      cred = null; // non-credentialed
+    } else if (credRoll < 0.75) {
+      cred = pick(CREDENTIALS_GV, rand);      // ~35% general/vascular
+    } else if (credRoll < 0.90) {
+      cred = pick(CREDENTIALS_CARDIAC, rand); // ~15% cardiac
+    } else {
+      cred = pick(CREDENTIALS_MD, rand);      // ~10% physician/AP
+    }
 
     // Correct answers: exponential-ish distribution — most users cluster in the middle
     const u = rand();

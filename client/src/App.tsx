@@ -144,6 +144,8 @@ function Router() {
         <Route path="/reset-password" component={ResetPassword} />
         <Route path="/magic-link" component={MagicLinkRequest} />
         <Route path="/magic-link/callback" component={MagicLinkCallback} />
+        {/* /auth/magic is the URL sent in magic link emails */}
+        <Route path="/auth/magic" component={MagicLinkCallback} />
         <Route path="/enrolled" component={Enrolled} />
         <Route path="/unsubscribe" component={Unsubscribe} />
         <Route path="/upgrade-success" component={UpgradeSuccess} />

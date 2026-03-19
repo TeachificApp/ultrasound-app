@@ -122,7 +122,7 @@ export async function runChallengeCron() {
     }
 
     // ── Step 4: Pick the next queued challenge per category ───────────────────
-    const categories = ["ACS", "Adult Echo", "Pediatric Echo", "Fetal Echo", "POCUS"] as const;
+    const categories = ["Abdominal", "Pelvic/Gyn", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Extracranial Carotid", "POCUS", "Physics"] as const;
     const toPublish: typeof quickfireChallenges.$inferSelect[] = [];
 
     for (const category of categories) {

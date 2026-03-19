@@ -81,7 +81,7 @@ describe("quickfire.adminUpdateArchivedChallenge", () => {
         id: 1,
         title: "Updated Title",
         description: "New description",
-        category: "Adult Echo",
+        category: "Abdominal",
         difficulty: "intermediate",
       })
     ).rejects.toThrow("DB unavailable");

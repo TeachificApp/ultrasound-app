@@ -1,0 +1,90 @@
+{
+  "query": "SELECT echoCategory, category, COUNT(*) as count FROM quickfireQuestions WHERE type = 'quickReview' GROUP BY echoCategory, category ORDER BY count DESC",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT echoCategory, category, COUNT(*) as count FROM quickfireQuestions WHERE type = 'quickReview' GROUP BY echoCategory, category ORDER BY count DESC",
+  "rows": [
+    {
+      "echoCategory": "obstetric_1st",
+      "category": "OB 1st Trimester",
+      "count": "20"
+    },
+    {
+      "echoCategory": "obstetric_2nd_3rd",
+      "category": "OB 2nd/3rd Trimester",
+      "count": "20"
+    },
+    {
+      "echoCategory": "pelvic_gyn",
+      "category": "Pelvic/Gyn",
+      "count": "19"
+    },
+    {
+      "echoCategory": "fetal_echo",
+      "category": "Fetal Echo",
+      "count": "19"
+    },
+    {
+      "echoCategory": "venous",
+      "category": "Venous",
+      "count": "19"
+    },
+    {
+      "echoCategory": "abdominal",
+      "category": "Abdominal",
+      "count": "19"
+    },
+    {
+      "echoCategory": "arterial",
+      "category": "Arterial",
+      "count": "19"
+    },
+    {
+      "echoCategory": "abdominal_vascular",
+      "category": "Abdominal Vascular",
+      "count": "18"
+    },
+    {
+      "echoCategory": "physics",
+      "category": "Physics",
+      "count": "18"
+    },
+    {
+      "echoCategory": "extracranial_carotid",
+      "category": "Extracranial Carotid",
+      "count": "18"
+    },
+    {
+      "echoCategory": "pocus",
+      "category": "POCUS",
+      "count": "18"
+    },
+    {
+      "echoCategory": "thyroid",
+      "category": "Thyroid",
+      "count": "18"
+    },
+    {
+      "echoCategory": "intracranial_tcd",
+      "category": "Intracranial Duplex/TCD",
+      "count": "16"
+    },
+    {
+      "echoCategory": "msk",
+      "category": "MSK",
+      "count": "15"
+    },
+    {
+      "echoCategory": "scrotum",
+      "category": "Scrotum",
+      "count": "14"
+    },
+    {
+      "echoCategory": "breast",
+      "category": "Breast",
+      "count": "14"
+    }
+  ],
+  "messages": [],
+  "stdout": "echoCategory\tcategory\tcount\nobstetric_1st\tOB 1st Trimester\t20\nobstetric_2nd_3rd\tOB 2nd/3rd Trimester\t20\npelvic_gyn\tPelvic/Gyn\t19\nfetal_echo\tFetal Echo\t19\nvenous\tVenous\t19\nabdominal\tAbdominal\t19\narterial\tArterial\t19\nabdominal_vascular\tAbdominal Vascular\t18\nphysics\tPhysics\t18\nextracranial_carotid\tExtracranial Carotid\t18\npocus\tPOCUS\t18\nthyroid\tThyroid\t18\nintracranial_tcd\tIntracranial Duplex/TCD\t16\nmsk\tMSK\t15\nscrotum\tScrotum\t14\nbreast\tBreast\t14\n",
+  "stderr": "",
+  "execution_time_ms": 66
+}

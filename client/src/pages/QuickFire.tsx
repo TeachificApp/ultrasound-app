@@ -85,7 +85,7 @@ type AnswerResult = {
 
 type LeaderboardPeriod = "7d" | "30d" | "allTime";
 
-const CATEGORY_TAGS = ["ACS", "Adult Echo", "Pediatric Echo", "Fetal Echo", "POCUS"] as const;
+const CATEGORY_TAGS = ["Abdominal", "Venous", "Arterial", "OB 2nd/3rd Trimester", "POCUS"] as const;
 const DIFFICULTY_OPTIONS = ["beginner", "intermediate", "advanced"] as const;
 
 const TYPE_LABELS: Record<string, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
@@ -104,11 +104,22 @@ const DIFFICULTY_COLORS: Record<string, string> = {
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
-  ACS: "bg-red-100 text-red-700",
-  "Adult Echo": "bg-[#189aa1]/10 text-[#189aa1]",
-  "Pediatric Echo": "bg-purple-100 text-purple-700",
-  "Fetal Echo": "bg-pink-100 text-pink-700",
-  "POCUS": "bg-blue-100 text-blue-700",
+  "Abdominal": "bg-[#189aa1]/10 text-[#189aa1]",
+  "Venous": "bg-blue-100 text-blue-700",
+  "Arterial": "bg-red-100 text-red-700",
+  "OB 2nd/3rd Trimester": "bg-pink-100 text-pink-700",
+  "Fetal Echo": "bg-purple-100 text-purple-700",
+  "POCUS": "bg-amber-100 text-amber-700",
+  "Pelvic/Gyn": "bg-rose-100 text-rose-700",
+  "OB 1st Trimester": "bg-pink-100 text-pink-700",
+  "Abdominal Vascular": "bg-orange-100 text-orange-700",
+  "Extracranial Carotid": "bg-indigo-100 text-indigo-700",
+  "Intracranial Duplex/TCD": "bg-violet-100 text-violet-700",
+  "Physics": "bg-gray-100 text-gray-700",
+  "Thyroid": "bg-teal-100 text-teal-700",
+  "Scrotum": "bg-cyan-100 text-cyan-700",
+  "Breast": "bg-rose-100 text-rose-700",
+  "MSK": "bg-lime-100 text-lime-700",
 };
 
 // ─── Mini bar chart ───────────────────────────────────────────────────────────
@@ -142,7 +153,7 @@ function SubmitQuestionTab({ isAuthenticated }: { isAuthenticated: boolean }) {
   // Form state
   const [submitterName, setSubmitterName] = useState("");
   const [submitterLinkedIn, setSubmitterLinkedIn] = useState("");
-  const [category, setCategory] = useState<"ACS" | "Adult Echo" | "Pediatric Echo" | "Fetal Echo" | "POCUS" | "General">("Adult Echo");
+  const [category, setCategory] = useState<"Abdominal" | "Pelvic/Gyn" | "OB 1st Trimester" | "OB 2nd/3rd Trimester" | "Fetal Echo" | "Venous" | "Arterial" | "Abdominal Vascular" | "Extracranial Carotid" | "Intracranial Duplex/TCD" | "POCUS" | "Physics" | "Thyroid" | "Scrotum" | "Breast" | "MSK">("Abdominal");
   const [difficulty, setDifficulty] = useState<"beginner" | "intermediate" | "advanced">("intermediate");
   const [question, setQuestion] = useState("");
   const [options, setOptions] = useState(["", "", "", ""]);
@@ -232,7 +243,7 @@ function SubmitQuestionTab({ isAuthenticated }: { isAuthenticated: boolean }) {
             <Select value={category} onValueChange={(v) => setCategory(v as any)}>
               <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {(["ACS", "Adult Echo", "Pediatric Echo", "Fetal Echo", "POCUS"] as const).map((c) => (
+                {(["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"] as const).map((c) => (
                   <SelectItem key={c} value={c}>{c}</SelectItem>
                 ))}
               </SelectContent>
@@ -476,10 +487,10 @@ export default function QuickFire() {
   const todayUserAttempts: Record<number, any> = (todaySetQuery.data as any)?.userAttempts ?? {};
   // Map display names to server camelCase keys
   const CAT_DISPLAY_TO_KEY: Record<string, string> = {
-    "ACS": "acs",
-    "Adult Echo": "adultEcho",
-    "Pediatric Echo": "pediatricEcho",
-    "Fetal Echo": "fetalEcho",
+    "Abdominal": "abdominal",
+    "Venous": "venous",
+    "Arterial": "arterial",
+    "OB 2nd/3rd Trimester": "ob2nd3rd",
     "POCUS": "pocus",
   };
   const activeCatMapKey = activeCategory ? (CAT_DISPLAY_TO_KEY[activeCategory] ?? activeCategory) : null;
@@ -955,8 +966,8 @@ export default function QuickFire() {
   const todaySetForBanner = todaySetQuery.data;
   const catMapForBanner: Record<string, number> = (todaySetForBanner as any)?.categoryMap ?? {};
   const attemptsForBanner: Record<number, any> = (todaySetForBanner as any)?.userAttempts ?? {};
-  const catPrefsForBanner = categoryPrefsQuery.data ?? { acs: true, adultEcho: true, pediatricEcho: true, fetalEcho: true, pocus: true };
-  const enabledCatKeysForBanner = ["acs", "adultEcho", "pediatricEcho", "fetalEcho", "pocus"].filter(
+  const catPrefsForBanner = categoryPrefsQuery.data ?? { abdominal: true, venous: true, arterial: true, ob2nd3rd: true, pocus: true };
+  const enabledCatKeysForBanner = ["abdominal", "venous", "arterial", "ob2nd3rd", "pocus"].filter(
     (k) => (catPrefsForBanner as any)[k] !== false
   );
   const completedTodayForBanner =
@@ -1169,28 +1180,27 @@ export default function QuickFire() {
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {([
-                    { cat: "ACS" as const, prefKey: "acs" as const, Icon: Heart, label: "Advanced Cardiac Sonographer" },
-                    { cat: "Adult Echo" as const, prefKey: "adultEcho" as const, Icon: Stethoscope },
-                    { cat: "Pediatric Echo" as const, prefKey: "pediatricEcho" as const, Icon: Baby },
-                    { cat: "Fetal Echo" as const, prefKey: "fetalEcho" as const, Icon: ({ className }: { className?: string }) => <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/fetal-icon_4e4429c0.png" alt="Fetal Echo" className={className} style={{ objectFit: 'contain' }} /> },
+                    { cat: "Abdominal" as const, prefKey: "abdominal" as const, Icon: Activity, label: "Abdominal" },
+                    { cat: "Venous" as const, prefKey: "venous" as const, Icon: Activity, label: "Venous" },
+                    { cat: "Arterial" as const, prefKey: "arterial" as const, Icon: Activity, label: "Arterial" },
+                    { cat: "OB 2nd/3rd Trimester" as const, prefKey: "ob2nd3rd" as const, Icon: Baby, label: "OB 2nd/3rd" },
                     { cat: "POCUS" as const, prefKey: "pocus" as const, Icon: ({ className }: { className?: string }) => <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/pocus-icon_0b2e6eff.png" alt="POCUS" className={className} style={{ objectFit: 'contain' }} /> },
-                  ] as { cat: string; prefKey: "acs" | "adultEcho" | "pediatricEcho" | "fetalEcho" | "pocus"; Icon: (props: { className?: string }) => import('react').ReactElement; label?: string }[]).map(({ cat, prefKey, Icon, label }) => {
-                    const prefs = categoryPrefsQuery.data ?? { acs: true, adultEcho: true, pediatricEcho: true, fetalEcho: true, pocus: true };
+                  ] as { cat: string; prefKey: "abdominal" | "venous" | "arterial" | "ob2nd3rd" | "pocus"; Icon: (props: { className?: string }) => import('react').ReactElement; label?: string }[]).map(({ cat, prefKey, Icon, label }) => {
+                    const prefs = categoryPrefsQuery.data ?? { abdominal: true, venous: true, arterial: true, ob2nd3rd: true, pocus: true };
                     const isEnabled = (prefs as any)[prefKey] !== false;
                     return (
                       <button
                         key={cat}
                         onClick={() => {
-                          const current = categoryPrefsQuery.data ?? { acs: true, adultEcho: true, pediatricEcho: true, fetalEcho: true, pocus: true };
+                          const current = categoryPrefsQuery.data ?? { abdominal: true, venous: true, arterial: true, ob2nd3rd: true, pocus: true };
                           updateCategoryPrefsMutation.mutate({ ...current, [prefKey]: !isEnabled });
-                        }}
-                        className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${
+                        }}                        className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${
                           isEnabled
                             ? "border-[#189aa1] bg-[#f0fbfc]"
                             : "border-gray-200 bg-gray-50 opacity-60"
                         }`}
                       >
-                        {(prefKey === 'fetalEcho' || prefKey === 'pocus') ? (
+                        {(prefKey === 'pocus') ? (
                           <div className={`w-10 h-10 rounded-full flex items-center justify-center overflow-hidden ${!isEnabled ? "opacity-50 grayscale" : ""}`}>
                             <Icon className="w-10 h-10" />
                           </div>
@@ -1243,13 +1253,13 @@ export default function QuickFire() {
                   const categoryMap: Record<string, number> = (todaySet as any)?.categoryMap ?? {};
                   const todayQuestions: any[] = (todaySet as any)?.questions ?? [];
                   const todayAttempts: Record<number, any> = (todaySet as any)?.userAttempts ?? {};
-                  const catPrefs = categoryPrefsQuery.data ?? { acs: true, adultEcho: true, pediatricEcho: true, fetalEcho: true, pocus: true };
+                  const catPrefs = categoryPrefsQuery.data ?? { abdominal: true, venous: true, arterial: true, ob2nd3rd: true, pocus: true };
 
                   const CATS = [
-                    { key: "ACS", label: "Advanced Cardiac Sonographer", Icon: Heart, desc: "ACS", prefKey: "acs" as const, mapKey: "acs" },
-                    { key: "Adult Echo", label: "Adult Echo", Icon: Stethoscope, desc: "Adult Echocardiography", prefKey: "adultEcho" as const, mapKey: "adultEcho" },
-                    { key: "Pediatric Echo", label: "Pediatric Echo", Icon: Baby, desc: "Pediatric & Congenital", prefKey: "pediatricEcho" as const, mapKey: "pediatricEcho" },
-                    { key: "Fetal Echo", label: "Fetal Echo", Icon: ({ className }: { className?: string }) => <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/fetal-icon_4e4429c0.png" alt="Fetal Echo" className={className} style={{ objectFit: 'contain' }} />, desc: "Fetal Echocardiography", prefKey: "fetalEcho" as const, mapKey: "fetalEcho" },
+                    { key: "Abdominal", label: "Abdominal", Icon: Activity, desc: "Abdominal Ultrasound", prefKey: "abdominal" as const, mapKey: "abdominal" },
+                    { key: "Venous", label: "Venous", Icon: Activity, desc: "Venous Duplex", prefKey: "venous" as const, mapKey: "venous" },
+                    { key: "Arterial", label: "Arterial", Icon: Activity, desc: "Arterial Duplex", prefKey: "arterial" as const, mapKey: "arterial" },
+                    { key: "OB 2nd/3rd Trimester", label: "OB 2nd/3rd", Icon: Baby, desc: "Obstetric Ultrasound", prefKey: "ob2nd3rd" as const, mapKey: "ob2nd3rd" },
                     { key: "POCUS", label: "POCUS", Icon: ({ className }: { className?: string }) => <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/pocus-icon_0b2e6eff.png" alt="POCUS" className={className} style={{ objectFit: 'contain' }} />, desc: "Point-of-Care Ultrasound", prefKey: "pocus" as const, mapKey: "pocus" },
                   ];
 
@@ -1354,7 +1364,7 @@ export default function QuickFire() {
                           >
                             <div className="flex items-start justify-between mb-3">
                               <div className="flex items-center gap-2">
-                                {(cat.mapKey === 'fetalEcho' || cat.mapKey === 'pocus') ? (
+                                {(cat.mapKey === 'pocus') ? (
                                   <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden ${isDone ? (isCorrect ? 'opacity-80' : 'opacity-60 grayscale') : ''}`}>
                                     <cat.Icon className="w-9 h-9" />
                                   </div>
@@ -2002,14 +2012,14 @@ export default function QuickFire() {
                       <p className="text-xs text-gray-500 mt-0.5">Unlimited access — all past challenges</p>
                     </div>
                   </div>
-                  {["Aortic Stenosis — Severe vs. Moderate", "Diastolic Dysfunction Grading", "RV Pressure Overload Pattern", "Mitral Regurgitation: EROA Calculation", "Fetal Echo: 4-Chamber View Abnormalities", "LV Systolic Function — Wall Motion Score"].map((title, i) => (
+                  {["Hepatic Artery Doppler: Normal vs. Abnormal", "DVT Diagnosis — Compressibility Criteria", "Gallbladder Wall Thickness: When to Worry", "Fetal Biometry: BPD & HC Measurements", "ABI Interpretation: Mild vs. Moderate PAD", "Renal Artery Stenosis: Peak Systolic Velocity"].map((title, i) => (
                     <div key={i} className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-4">
                       <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "#f0fbfc" }}>
                         <BookOpen className="w-4 h-4" style={{ color: "#189aa1" }} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-gray-800 truncate">{title}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">Daily Challenge · Adult Echo</p>
+                        <p className="text-xs text-gray-400 mt-0.5">Daily Challenge · Abdominal</p>
                       </div>
                       <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-50 text-green-700">Completed</span>
                     </div>

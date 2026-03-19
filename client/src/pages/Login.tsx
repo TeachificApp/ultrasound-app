@@ -92,7 +92,7 @@ export default function Login() {
             <span className="text-xs text-white/80 font-medium">Real-time Clinical Decision Support</span>
           </div>
           <h1 className="text-3xl lg:text-4xl font-black text-white leading-tight mb-4" style={{ fontFamily: "Merriweather, serif" }}>
-            The complete ultrasound<br /><span style={{ color: "#4ad9e0" }}>clinical intelligence</span>
+            The Complete Ultrasound<br /><span style={{ color: "#4ad9e0" }}>Clinical Intelligence Guide</span>
           </h1>
           <p className="text-white/70 text-sm leading-relaxed max-w-sm">
             Advanced, guideline-driven clinical intelligence app designed for sonographers, physicians, and ultrasound learners across general, vascular, and point-of-care imaging—serving as the ultimate pocket reference for real-time scanning and clinical decision support.

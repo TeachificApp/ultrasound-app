@@ -147,6 +147,7 @@
 - [x] Updated thinkific.test.ts to skip live API tests gracefully
 - [x] Updated sendgrid.test.ts to skip gracefully when key not set
 - [x] 733 total tests passing (36 test files)
+- [x] Fixed quickfire.archiveEdit.test.ts category value (Adult Echo → Abdominal) after AAUS migration
 
 ## UI Exact Match Rebuild (Priority)
 - [ ] Re-examine original EchoAssist Navigator UI (progress bars, step tracking, colors)
@@ -215,7 +216,15 @@
   - [ ] POCUS Navigator (IVC, LVEF, lung B-lines, FAST criteria)
   - [ ] Physics (not applicable — conceptual content only)
 
+## Admin & Feature Alignment
+- [x] Audit admin features vs iHeartEcho and identify gaps
+- [x] Fix premium gate transparency (same blur/overlay style as iHeartEcho)
+- [x] Seed leaderboard with realistic pre-populated user profiles (RDMS/RVT/RVS/RMSK/RPVI/RPhS/RDCS/RCS/MD — 40% non-credentialed)
+- [x] Generate and insert 300 flashcards spread across all 16 AAUS categories
+- [x] Verify and fix AI case generator for AAUS category types (updated prompts, AIUM/SVU/ACR/ARDMS guidelines)
+
 ## Bugs
+- [x] Fix magic link 404 — /auth/magic route returns 404 on published app (added /auth/magic route in App.tsx)
 - [x] Magic link login fails on app.allaboutultrasound.com — "failed query" DB error (missing users columns — fixed via ALTER TABLE)
 - [x] Thinkific webhook: new enrollments create free members only, welcome email suppressed
 - [x] Migrate all users from iHeartEcho database to UltrasoundAssist database (11,753 users migrated, 0 errors)
