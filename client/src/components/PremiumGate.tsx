@@ -164,7 +164,7 @@ function UpgradePrompt({
 
       {/* Body */}
       <p className="text-gray-500 text-sm mb-5 leading-relaxed">
-        Upgrade to iHeartEcho™ Premium for <strong className="text-gray-700">$9.97/month</strong> — advanced
+        Upgrade to All About Ultrasound™ Premium for <strong className="text-gray-700">$9.97/month</strong> — advanced
         protocols, 500+ echo cases, all calculator engines, and every premium tool.
       </p>
 

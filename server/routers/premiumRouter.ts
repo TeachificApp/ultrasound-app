@@ -1,7 +1,7 @@
 /**
  * Premium Access Router
  *
- * Handles premium membership status for the iHeartEcho™ App Premium Access
+ * Handles premium membership status for the All About Ultrasound™ App Premium Access
  * membership ($9.99/month) sold via Thinkific at:
  * https://member.allaboutultrasound.com/enroll/3703267?price_id=4651832
  *
@@ -26,9 +26,9 @@ import {
 export const PREMIUM_MEMBERSHIP_SLUG = "ultrasoundassist-app-premium-membership";
 
 /**
- * Check if a user has a completed order for the iHeartEcho™ Premium Access product on Thinkific.
+ * Check if a user has a completed order for the All About Ultrasound™ Premium Access product on Thinkific.
  *
- * The premium product is sold as a subscription (product_id=3703267, "iHeartEcho™ App - Premium Access").
+ * The premium product is sold as a subscription (product_id=3703267, "All About Ultrasound™ App - Premium Access").
  * It does NOT appear in the enrollments endpoint — we query the orders endpoint directly by email.
  *
  * We query by email directly (not by user lookup) because the /users?query= endpoint

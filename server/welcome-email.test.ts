@@ -17,7 +17,7 @@ describe("buildWelcomeEmail", () => {
       loginUrl: "https://app.iheartecho.com/login",
       roles: [],
     });
-    expect(result.subject).toBe("Your iHeartEcho™ account is ready");
+    expect(result.subject).toBe("Your All About Ultrasound™ account is ready");
   });
 
   it("includes the user's first name in the HTML body", () => {
@@ -69,7 +69,7 @@ describe("buildWelcomeEmail", () => {
     expect(result.htmlBody).not.toContain("unknown_role");
   });
 
-  it("includes the iHeartEcho™ brand logo in the email header", () => {
+  it("includes the All About Ultrasound™ brand logo in the email header", () => {
     const result = buildWelcomeEmail({
       firstName: "Jane",
       loginUrl: "https://app.iheartecho.com/login",
@@ -112,7 +112,7 @@ describe("buildWelcomeEmail", () => {
       loginUrl: "https://app.iheartecho.com/login",
       roles: [],
     });
-    expect(result.htmlBody).toContain("Sign In to iHeartEcho™");
+    expect(result.htmlBody).toContain("Sign In to All About Ultrasound™");
   });
 
   it("handles diy_admin role label correctly", () => {
@@ -165,7 +165,7 @@ describe("sendPreRegistrationWelcome (via buildWelcomeEmail)", () => {
     });
     expect(result.htmlBody).toContain("newuser");
     expect(result.htmlBody).toContain("Premium Access");
-    expect(result.subject).toBe("Your iHeartEcho™ account is ready");
+    expect(result.subject).toBe("Your All About Ultrasound™ account is ready");
   });
 
   it("produces a valid HTML document structure", () => {

@@ -265,7 +265,7 @@ export default function PhysicianOverReadForm() {
             <Stethoscope className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-black text-white">iHeartEcho™ — Physician Over-Read</h1>
+            <h1 className="text-xl font-black text-white">All About Ultrasound™ — Physician Over-Read</h1>
             <p className="text-sm text-[#4ad9e0]">Step 1: Blind Over-Read Form</p>
           </div>
         </div>

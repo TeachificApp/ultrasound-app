@@ -1,5 +1,5 @@
 /*
-  iHeartEcho™ Layout — Sidebar Navigation
+  All About Ultrasound™ Layout — Sidebar Navigation
   Brand: Teal #189aa1, Aqua #4ad9e0, Dark sidebar
   Fonts: Merriweather headings, Open Sans body
 */
@@ -321,7 +321,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-[#4ad9e0] animate-pulse" />
             <span className="text-sm font-semibold text-[#189aa1]" style={{ fontFamily: "Merriweather, serif" }}>
-              {navItems.find(n => n.path === location)?.label ?? "iHeartEcho™"}
+              {navItems.find(n => n.path === location)?.label ?? "All About Ultrasound™"}
             </span>
           </div>
           <div className="ml-auto flex items-center gap-2">

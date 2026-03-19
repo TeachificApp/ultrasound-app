@@ -1,5 +1,5 @@
 /*
-  ScanCoach Hub — iHeartEcho™
+  ScanCoach Hub — All About Ultrasound™
   FREE coaches shown first, PREMIUM coaches in a separate section at the bottom.
 */
 import { useState } from "react";

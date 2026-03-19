@@ -344,7 +344,7 @@ export default function POCUSAssistHub() {
                   className="text-xs font-semibold uppercase tracking-wider"
                   style={{ color: "#189aa1" }}
                 >
-                  Also in iHeartEcho
+                  Also in All About Ultrasound
                 </span>
               </div>
               <h3

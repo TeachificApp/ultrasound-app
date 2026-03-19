@@ -296,7 +296,7 @@ export default function FlashcardDeck() {
                 <span className="text-xs font-bold text-[#4ad9e0] uppercase tracking-wider">Premium Membership</span>
               </div>
               <p className="text-white font-bold text-sm mb-1">Unlimited Echo Flashcards</p>
-              <p className="text-white/60 text-xs">Study as many flashcards as you want, every day — plus spaced repetition, all categories, and the full iHeartEcho clinical suite.</p>
+              <p className="text-white/60 text-xs">Study as many flashcards as you want, every day — plus spaced repetition, all categories, and the full All About Ultrasound clinical suite.</p>
             </div>
             <Link href="/premium">
               <Button className="w-full text-white font-bold mb-3" style={{ background: "#189aa1" }}>

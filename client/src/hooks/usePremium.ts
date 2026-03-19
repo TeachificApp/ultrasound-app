@@ -1,5 +1,5 @@
 /**
- * usePremium — shared hook for consistent premium access checks across iHeartEcho™.
+ * usePremium — shared hook for consistent premium access checks across All About Ultrasound™.
  *
  * Returns:
  *   isPremium  — true if the user has any premium-tier role or the isPremium DB flag

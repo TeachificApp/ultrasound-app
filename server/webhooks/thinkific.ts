@@ -9,10 +9,10 @@
  *   • subscription.activated     (re-activation after pause/lapse)
  *   • enrollment.created         (direct enrollment, e.g. gifted access)
  *   • enrollment.updated         (status change on an existing enrollment)
- *   • user.signup               (new Thinkific registration without purchase — creates free iHeartEcho account silently)
+ *   • user.signup               (new Thinkific registration without purchase — creates free All About Ultrasound account silently)
  *
  * Allowed products (matched by name substring — case-insensitive):
- *   • iHeartEcho™ App — Premium Access  → grants/revokes "premium_user" role
+ *   • All About Ultrasound™ App — Premium Access  → grants/revokes "premium_user" role
  *   • DIY Accreditation memberships      → grants/revokes "diy_user" or "diy_admin" role
  *
  * product.* events (created/updated/deleted) are intentionally NOT subscribed to
@@ -62,13 +62,21 @@ function isAllowedEvent(resource: string, action: string): boolean {
 // ── Product matchers ─────────────────────────────────────────────────────────
 
 /**
- * Returns true if the product name matches the iHeartEcho™ Premium App Access membership.
- * Canonical name: "iHeartEcho™ App - Premium Access"
+ * Returns true if the product name matches the All About Ultrasound™ Premium App Access membership.
+ * Canonical name: "All About Ultrasound™ App - Premium Access"
  */
 function isPremiumProduct(name: string | null | undefined): boolean {
   if (!name) return false;
   const l = name.toLowerCase();
   return (
+    // AAUS product names (primary)
+    l.includes("all about ultrasound app - premium access") ||
+    l.includes("all about ultrasound app premium access") ||
+    l.includes("allaboutultrasound app - premium access") ||
+    l.includes("allaboutultrasound premium access") ||
+    (l.includes("all about ultrasound") && l.includes("premium")) ||
+    (l.includes("allaboutultrasound") && l.includes("premium")) ||
+    // Legacy iHeartEcho names (backward compat)
     l.includes("iheartecho app - premium access") ||
     l.includes("iheartecho app premium access") ||
     l.includes("iheartecho-app-premium-access") ||
@@ -78,7 +86,7 @@ function isPremiumProduct(name: string | null | undefined): boolean {
 }
 
 /**
- * Returns true if the product name matches any iHeartEcho™ DIY Accreditation membership.
+ * Returns true if the product name matches any All About Ultrasound™ DIY Accreditation membership.
  * Covers both the admin (lab director) tier and the user (sonographer) seat tier.
  */
 function isDIYProduct(name: string | null | undefined): boolean {
@@ -107,7 +115,7 @@ function diyRoleForProduct(name: string): "diy_admin" | "diy_user" {
 }
 
 /**
- * Returns true if the product name matches the iHeartEcho™ Free Membership.
+ * Returns true if the product name matches the All About Ultrasound™ Free Membership.
  * This is the default membership granted to all new users who register via Thinkific.
  * Thinkific bundle: https://member.allaboutultrasound.com/bundles/free-membership
  */
@@ -117,21 +125,29 @@ function isFreeProduct(name: string | null | undefined): boolean {
   return (
     l.includes("free membership") ||
     l.includes("free-membership") ||
-    (l.includes("iheartecho") && l.includes("free")) ||
+    l.includes("free bundle") ||
+    (l.includes("all about ultrasound") && l.includes("free")) ||
     (l.includes("allaboutultrasound") && l.includes("free")) ||
+    (l.includes("iheartecho") && l.includes("free")) ||
     l === "free"
   );
 }
 
 /**
- * Returns true if the product is the new iHeartEcho™ App free membership product.
- * Canonical Thinkific name: "iHeartEcho™ App"
- * This is the only product that triggers a welcome email from iHeartEcho.
+ * Returns true if the product is the All About Ultrasound™ App free membership product.
+ * NOTE: AAUS does NOT send welcome emails — welcome email logic is intentionally suppressed.
+ * This function is kept for backward compat with legacy iHeartEcho product names.
  */
 function isIHeartEchoAppProduct(name: string | null | undefined): boolean {
   if (!name) return false;
   const l = name.toLowerCase().trim();
-  // Match exact product name or close variants
+  // AAUS app product names
+  if (
+    l === "all about ultrasound™ app" ||
+    l === "all about ultrasound app" ||
+    (l.startsWith("all about ultrasound") && (l.endsWith("app") || l.endsWith("app™")))
+  ) return true;
+  // Legacy iHeartEcho names
   return (
     l === "iheartecho™ app" ||
     l === "iheartecho app" ||
@@ -140,7 +156,7 @@ function isIHeartEchoAppProduct(name: string | null | undefined): boolean {
   );
 }
 
-/** Returns true if the product is relevant to iHeartEcho (premium, DIY, or free). */
+/** Returns true if the product is relevant to All About Ultrasound (premium, DIY, or free). */
 function isRelevantProduct(name: string | null | undefined): boolean {
   return isPremiumProduct(name) || isDIYProduct(name) || isFreeProduct(name) || isIHeartEchoAppProduct(name);
 }
@@ -193,7 +209,7 @@ export function registerThinkificWebhook(app: Router) {
       // ── Gate 1: Event type filter ─────────────────────────────────────────
       // Reject any event type not in the allowlist immediately — no DB work done.
       if (!isAllowedEvent(resource, action)) {
-        const msg = `filtered: ${resource}.${action} is not in the iHeartEcho event allowlist`;
+        const msg = `filtered: ${resource}.${action} is not in the All About Ultrasound event allowlist`;
         console.log(`[Thinkific Webhook] ${msg}`);
         await logWebhookEvent({ resource, action, httpStatus: 200, outcome: "filtered", message: msg, rawPayload: payload });
         return res.status(200).json({ ok: true, message: msg });
@@ -220,9 +236,9 @@ export function registerThinkificWebhook(app: Router) {
         return res;
       }
 
-      // ── 0b. user.signup → silently create iHeartEcho account ─────────────
+      // ── 0b. user.signup → silently create All About Ultrasound account ─────────────
       // Fired when a user registers on Thinkific without purchasing anything.
-      // Creates a free iHeartEcho account with base "user" role. No email sent.
+      // Creates a free All About Ultrasound account with base "user" role. No email sent.
       if (resource === "user" && action === "signup") {
         const up = payload as { email?: string; first_name?: string; last_name?: string } | undefined;
         const newUserEmail = (up?.email ?? "").toLowerCase().trim();
@@ -242,7 +258,7 @@ export function registerThinkificWebhook(app: Router) {
           }
           const newId = await createPendingUser(newUserEmail);
           await ensureUserRole(newId);
-          const msg = `user.signup: pending iHeartEcho account created for ${newUserEmail} (userId=${newId})`;
+          const msg = `user.signup: pending All About Ultrasound account created for ${newUserEmail} (userId=${newId})`;
           console.log(`[Thinkific Webhook] ${msg}`);
           await logWebhookEvent({ resource, action, email: newUserEmail, httpStatus: 200, outcome: "pending_created", message: msg, rawPayload: payload });
           return res.status(200).json({ ok: true, message: msg, userId: newId });
@@ -256,7 +272,7 @@ export function registerThinkificWebhook(app: Router) {
 
       // ── Gate 2: Extract user email and product name ───────────────────────
       // NOTE: Gate 2 no longer filters by product — ALL enrollments/orders from
-      // Thinkific create a free iHeartEcho account. Premium/DIY role grants are
+      // Thinkific create a free All About Ultrasound account. Premium/DIY role grants are
       // applied on top of the base account creation.
       const p = payload as {
         product_name?: string;
@@ -274,7 +290,7 @@ export function registerThinkificWebhook(app: Router) {
       if (resource === "order" && action === "created") {
         const orderStatus = (p?.status ?? "").toLowerCase();
 
-        // All orders (any product) create an iHeartEcho account.
+        // All orders (any product) create an All About Ultrasound account.
         // Product-specific role grants (premium, DIY) are applied inside grantAccess.
         if (orderStatus !== "complete") {
           const msg = `ignored: order status is "${orderStatus}", not "complete"`;
@@ -400,31 +416,14 @@ export function registerThinkificWebhook(app: Router) {
 // ── Welcome email helper ────────────────────────────────────────────────────
 
 /**
- * Send a welcome email for the iHeartEcho™ App product enrollment.
- * Only called when the product is the "iHeartEcho™ App" free membership.
+ * Welcome email is intentionally suppressed for All About Ultrasound™.
+ * AAUS does not send automated welcome emails on Thinkific enrollment.
+ * This function is a no-op kept for backward compat.
+ * @deprecated Do not call — welcome emails are disabled for AAUS.
  */
-async function sendIHeartEchoAppWelcome(email: string): Promise<void> {
-  try {
-    const appUrl = process.env.VITE_APP_URL ?? "https://app.iheartecho.com";
-    const payload = buildWelcomeEmail({
-      firstName: email.split("@")[0],
-      loginUrl: `${appUrl}/login`,
-      roles: [], // free account — no special roles to list
-    });
-    const sent = await sendEmail({
-      to: { name: email, email },
-      subject: payload.subject,
-      htmlBody: payload.htmlBody,
-      previewText: payload.previewText,
-    });
-    if (!sent) {
-      console.warn(`[Thinkific Webhook] Welcome email to ${email} could not be sent (SendGrid unavailable)`);
-    } else {
-      console.log(`[Thinkific Webhook] Welcome email sent to ${email} for iHeartEcho™ App enrollment`);
-    }
-  } catch (err) {
-    console.error(`[Thinkific Webhook] Failed to send welcome email to ${email}:`, err);
-  }
+async function sendIHeartEchoAppWelcome(_email: string): Promise<void> {
+  // AAUS: welcome emails are disabled — do nothing.
+  console.log(`[Thinkific Webhook] Welcome email suppressed for AAUS (disabled by design).`);
 }
 
 // ── Shared grant helper ───────────────────────────────────────────────────────
@@ -457,10 +456,7 @@ async function grantAccess(params: {
       } else if (isFreeProduct(productName) || isIHeartEchoAppProduct(productName)) {
         await markThinkificEnrolled(pendingUserId);
       }
-      // Send welcome email ONLY for the iHeartEcho™ App product
-      if (isIHeartEchoAppProduct(productName)) {
-        sendIHeartEchoAppWelcome(userEmail).catch(() => {});
-      }
+      // AAUS: welcome emails are disabled — no welcome email sent on enrollment
       const msg = `pending account created and access granted for ${userEmail} ("${productName}")`;
       console.log(`[Thinkific Webhook] ${msg} (userId=${pendingUserId})`);
       await logWebhookEvent({ resource, action, email: userEmail, productName, httpStatus: 200, outcome: "pending_created", message: msg, rawPayload: payload });
@@ -483,10 +479,7 @@ async function grantAccess(params: {
   } else if (isFreeProduct(productName) || isIHeartEchoAppProduct(productName)) {
     await markThinkificEnrolled(user.id);
   }
-  // Send welcome email ONLY for the iHeartEcho™ App product (new enrollments only)
-  if (isIHeartEchoAppProduct(productName) && action === "created") {
-    sendIHeartEchoAppWelcome(userEmail).catch(() => {});
-  }
+  // AAUS: welcome emails are disabled — no welcome email sent on enrollment
 
   const msg = `access granted to ${userEmail} (userId=${user.id}) for "${productName}"`;
   console.log(`[Thinkific Webhook] ${msg}`);

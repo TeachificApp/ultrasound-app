@@ -1817,7 +1817,7 @@ export const appRouter = router({
             htmlBody: `
               <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                 <div style="background: #189aa1; padding: 24px; border-radius: 8px 8px 0 0;">
-                  <h1 style="color: white; margin: 0; font-size: 22px;">iHeartEcho&#8482; &#8212; Physician Over-Read Request</h1>
+                  <h1 style="color: white; margin: 0; font-size: 22px;">All About Ultrasound&#8482; &#8212; Physician Over-Read Request</h1>
                 </div>
                 <div style="background: #f9fafb; padding: 24px; border-radius: 0 0 8px 8px; border: 1px solid #e5e7eb;">
                   <p style="color: #374151;">Dear ${physicianName},</p>
@@ -1835,7 +1835,7 @@ export const appRouter = router({
                   </div>
                   <p style="color: #6b7280; font-size: 13px;">This link expires in 30 days. If you have questions, please contact the lab directly.</p>
                   <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 16px 0;" />
-                  <p style="color: #9ca3af; font-size: 12px;">Powered by iHeartEcho&#8482; DIY Accreditation Tool&#8482; | All About Ultrasound</p>
+                  <p style="color: #9ca3af; font-size: 12px;">Powered by All About Ultrasound&#8482; DIY Accreditation Tool&#8482; | All About Ultrasound</p>
                 </div>
               </div>
             `,
@@ -1985,7 +1985,7 @@ export const appRouter = router({
               htmlBody: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                   <div style="background: #189aa1; padding: 24px; border-radius: 8px 8px 0 0;">
-                    <h1 style="color: white; margin: 0; font-size: 22px;">iHeartEcho&#8482; &#8212; Over-Read Completed</h1>
+                    <h1 style="color: white; margin: 0; font-size: 22px;">All About Ultrasound&#8482; &#8212; Over-Read Completed</h1>
                   </div>
                   <div style="background: #f9fafb; padding: 24px; border-radius: 0 0 8px 8px; border: 1px solid #e5e7eb;">
                     <p style="color: #374151;">The physician over-read has been completed for the following exam:</p>
@@ -1999,7 +1999,7 @@ export const appRouter = router({
                       <a href="${step2Url}" style="background: #189aa1; color: white; padding: 14px 28px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 16px;">Complete Step 2 Comparison</a>
                     </div>
                     <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 16px 0;" />
-                    <p style="color: #9ca3af; font-size: 12px;">Powered by iHeartEcho&#8482; DIY Accreditation Tool&#8482; | All About Ultrasound</p>
+                    <p style="color: #9ca3af; font-size: 12px;">Powered by All About Ultrasound&#8482; DIY Accreditation Tool&#8482; | All About Ultrasound</p>
                   </div>
                 </div>
               `,

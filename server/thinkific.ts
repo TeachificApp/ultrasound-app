@@ -402,7 +402,7 @@ export async function enrollInFreeMembership(
 
 /**
  * Fetch all users from Thinkific (paginated, up to 250 per page).
- * Used for bulk backfill of iHeartEcho accounts for existing members.
+ * Used for bulk backfill of All About Ultrasound accounts for existing members.
  * NOTE: This can be slow for large user bases — run as a background job.
  */
 export async function getAllThinkificUsers(): Promise<ThinkificUser[]> {

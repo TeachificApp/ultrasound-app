@@ -1,0 +1,20 @@
+{
+  "query": "SELECT id, openId, name, email, loginMethod, isPremium, emailVerified, createdAt FROM users LIMIT 10",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT id, openId, name, email, loginMethod, isPremium, emailVerified, createdAt FROM users LIMIT 10",
+  "rows": [
+    {
+      "id": "1",
+      "openId": "8Rf5JXPawpyd9eN4E94j4K",
+      "name": "larawilliams0501",
+      "email": "larawilliams0501@gmail.com",
+      "loginMethod": "email",
+      "isPremium": "0",
+      "emailVerified": "0",
+      "createdAt": "2026-03-18 19:22:04"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\topenId\tname\temail\tloginMethod\tisPremium\temailVerified\tcreatedAt\n1\t8Rf5JXPawpyd9eN4E94j4K\tlarawilliams0501\tlarawilliams0501@gmail.com\temail\t0\t0\t2026-03-18 19:22:04\n",
+  "stderr": "",
+  "execution_time_ms": 54
+}

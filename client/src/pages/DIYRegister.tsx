@@ -115,7 +115,7 @@ export default function DIYRegister() {
           </div>
           <h2 className="text-xl font-bold text-gray-800 mb-2">Sign in to Register Your Organization</h2>
           <p className="text-sm text-gray-500 mb-6 max-w-sm mx-auto">
-            You need a free iHeartEcho™ account to create a DIY Accreditation organization.
+            You need a free All About Ultrasound™ account to create a DIY Accreditation organization.
           </p>
           <a href="/login">
             <Button style={{ background: BRAND }} className="text-white">Sign In / Create Account</Button>

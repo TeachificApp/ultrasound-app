@@ -84,7 +84,7 @@ function injectUnsubscribeFooter(htmlBody: string, unsubscribeUrl: string): stri
   const footerBlock = `
     <div style="margin-top:24px;padding-top:16px;border-top:1px solid #e2e8f0;text-align:center;">
       <p style="margin:0;font-size:11px;color:#94a3b8;line-height:1.6;">
-        You are receiving this email because you have an account on iHeartEcho™.<br/>
+        You are receiving this email because you have an account on All About Ultrasound™.<br/>
         <a href="${unsubscribeUrl}" style="color:#94a3b8;text-decoration:underline;" target="_blank" rel="noopener noreferrer">Unsubscribe from platform emails</a>
       </p>
     </div>`;

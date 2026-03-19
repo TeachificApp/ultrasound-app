@@ -1,0 +1,10 @@
+import { createPool } from "mysql2/promise";
+const IHE_URL = "mysql://2mhhtxpXA9Esras.root:HJkw07mdx3Eeg9V5P9cK@gateway04.us-east-1.prod.aws.tidbcloud.com:4000/etVPnUidWNWG8W4GHnRqzv";
+const pool = createPool({ uri: IHE_URL, ssl: { rejectUnauthorized: false } });
+const conn = await pool.getConnection();
+const [cols] = await conn.query("SHOW COLUMNS FROM users");
+console.log("iHeartEcho users columns:", cols.map(c => c.Field).join(", "));
+const [[{cnt}]] = await conn.query("SELECT COUNT(*) as cnt FROM users");
+console.log("Total iHeartEcho users:", cnt);
+conn.release();
+await pool.end();

@@ -1,5 +1,5 @@
 /*
-  Accreditation Manager Hub — iHeartEcho™
+  Accreditation Manager Hub — All About Ultrasound™
   Access: platform_admin | accreditation_manager roles
 
   Sections:

@@ -1,5 +1,5 @@
 /*
-  DIY Accreditation Member Portal — iHeartEcho™
+  DIY Accreditation Member Portal — All About Ultrasound™
   Access: diy_member role (and above)
   Shows: org info, assigned tasks, workflow access, upgrade prompts for restricted features
   Brand: Teal #189aa1, Aqua #4ad9e0, Dark Navy #0e1e2e

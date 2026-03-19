@@ -209,7 +209,7 @@ function exportComparisonPDF(review: any) {
 
   doc.setFillColor(14, 74, 80); doc.rect(0, 0, pageW, 14, "F");
   doc.setTextColor(255, 255, 255); doc.setFontSize(11); doc.setFont("helvetica", "bold");
-  doc.text("iHeartEcho™ EchoAccreditation Navigator™ — Physician Peer Review", margin, 9.5);
+  doc.text("All About Ultrasound™ EchoAccreditation Navigator™ — Physician Peer Review", margin, 9.5);
   doc.setFontSize(8); doc.setFont("helvetica", "normal");
   doc.text(`Generated: ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`, pageW - margin, 9.5, { align: "right" });
   y = 22;
@@ -275,7 +275,7 @@ function exportComparisonPDF(review: any) {
   }
 
   const dateTag = new Date().toISOString().slice(0, 10);
-  doc.save(`iHeartEcho_PeerReview_Comparison_${dateTag}.pdf`);
+  doc.save(`AllAboutUltrasound_PeerReview_Comparison_${dateTag}.pdf`);
 }
 
 // ─── Step 1: Send Invitation Form ─────────────────────────────────────────────

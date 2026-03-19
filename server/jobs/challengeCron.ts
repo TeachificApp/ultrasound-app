@@ -24,7 +24,7 @@ import { generateUnsubscribeToken } from "../routes/unsubscribe";
 
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY ?? "";
 const SENDGRID_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL ?? "noreply@iheartecho.com";
-const SENDGRID_FROM_NAME = process.env.SENDGRID_FROM_NAME ?? "iHeartEcho™";
+const SENDGRID_FROM_NAME = process.env.SENDGRID_FROM_NAME ?? "All About Ultrasound™";
 const APP_URL = process.env.VITE_APP_URL ?? "https://app.iheartecho.com";
 
 if (SENDGRID_API_KEY) {
@@ -326,7 +326,7 @@ function buildEmailHtml({
           <!-- Header -->
           <tr>
             <td style="background:linear-gradient(135deg,#0e1e2e 0%,#0e4a50 60%,#189aa1 100%);padding:32px 40px;text-align:center;">
-              <h1 style="margin:0;color:#ffffff;font-size:28px;font-weight:900;letter-spacing:-0.5px;">iHeartEcho™</h1>
+              <h1 style="margin:0;color:#ffffff;font-size:28px;font-weight:900;letter-spacing:-0.5px;">All About Ultrasound™</h1>
               <p style="margin:4px 0 0;color:#4ad9e0;font-size:14px;font-weight:600;">Daily Challenges</p>
             </td>
           </tr>
@@ -364,7 +364,7 @@ function buildEmailHtml({
                 &nbsp;·&nbsp;
                 <a href="${unsubscribeUrl}" style="color:#9ca3af;text-decoration:underline;" target="_blank" rel="noopener noreferrer">Unsubscribe</a>
                 &nbsp;·&nbsp;
-                <a href="${appUrl}" style="color:#189aa1;text-decoration:none;" target="_blank" rel="noopener noreferrer">iHeartEcho™</a>
+                <a href="${appUrl}" style="color:#189aa1;text-decoration:none;" target="_blank" rel="noopener noreferrer">All About Ultrasound™</a>
               </p>
             </td>
           </tr>

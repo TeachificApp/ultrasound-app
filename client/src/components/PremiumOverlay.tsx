@@ -1,5 +1,5 @@
 /*
-  PremiumOverlay.tsx — iHeartEcho™
+  PremiumOverlay.tsx — All About Ultrasound™
   Transparent premium gate: shows content blurred behind a lock overlay
   so free users can see what they're missing before upgrading.
 
@@ -90,8 +90,8 @@ export function PremiumOverlay({ children, featureName, checkoutUrl }: PremiumOv
               </h3>
               <p className="text-white/60 text-xs mb-4 leading-relaxed">
                 {isLoggedIn
-                  ? "Upgrade to iHeartEcho™ Premium to unlock this feature and the full clinical suite."
-                  : "Sign in and upgrade to access this feature and the full iHeartEcho™ clinical suite."}
+                  ? "Upgrade to All About Ultrasound™ Premium to unlock this feature and the full clinical suite."
+                  : "Sign in and upgrade to access this feature and the full All About Ultrasound™ clinical suite."}
               </p>
 
               <div className="flex flex-col gap-2">

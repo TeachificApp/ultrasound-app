@@ -1,5 +1,5 @@
 /**
- * Shared role-check helpers for iHeartEcho™.
+ * Shared role-check helpers for All About Ultrasound™.
  *
  * Role hierarchy:
  *   platform_admin  – full access to everything

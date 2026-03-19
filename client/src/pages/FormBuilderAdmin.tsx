@@ -1,5 +1,5 @@
 /*
-  Form Builder Admin — iHeartEcho™
+  Form Builder Admin — All About Ultrasound™
   Platform-admin-only WYSIWYG editor for accreditation review form templates.
   Features:
   - Template list with create/delete

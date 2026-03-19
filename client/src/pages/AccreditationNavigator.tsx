@@ -1,5 +1,5 @@
 /*
-  EchoAccreditation Navigator™ — iHeartEcho™
+  EchoAccreditation Navigator™ — All About Ultrasound™
   IAC Standards guide with search for TTE, TEE, Stress, Pediatric, Fetal, HOCM
   Case Mix section uses the full IAC structured data from CaseMixSubmission
   Brand: Teal #189aa1, Aqua #4ad9e0

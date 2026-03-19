@@ -44,7 +44,7 @@ export default function Register() {
         {/* Logo */}
         <div className="flex justify-center mb-4">
           {LOGO ? (
-            <img src={LOGO} alt="iHeartEcho" className="w-16 h-16 object-contain" />
+            <img src={LOGO} alt="All About Ultrasound" className="w-16 h-16 object-contain" />
           ) : (
             <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: BRAND }}>
               <Heart className="w-8 h-8 text-white" />
@@ -56,7 +56,7 @@ export default function Register() {
           Create Your Free Account
         </h1>
         <p className="text-gray-500 text-sm mb-6">
-          iHeartEcho membership is managed through All About Ultrasound. You'll be redirected to complete your free enrollment.
+          All About Ultrasound membership is managed through All About Ultrasound. You'll be redirected to complete your free enrollment.
         </p>
 
         {/* Benefits */}

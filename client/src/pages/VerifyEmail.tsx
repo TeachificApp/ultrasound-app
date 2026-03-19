@@ -78,11 +78,11 @@ export default function VerifyEmail() {
               {isEmailChange ? (
                 <Mail className="w-6 h-6 text-white" />
               ) : (
-                <img src={LOGO || "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/tMerpTNEMefRhZwO.png?Expires=1804389585&Signature=WUUmbeKd6gRL-5YievLbV1CH3uu0nlv-Re4ouPNZeR8Uaa5fZGvIpyzCfN4GeYzdNVN-L2Dfhpb6wP3tKMLML8tU2MU77LZNA0Db1Qt~FgBKmBrDM8f98IhyhaIIh3mcPdLcoP5aezbNBOluLkAKxGF1onaa3LNS33jvn6RdWOARg3rQF-iGyCG8t~MaJrqXCHCHnEQWkv8ww0KFZrIE6cKq-EgnS6NZ6Ugc~9fSwQmMSgxfKiJuZdqcca1LwferRwRh3oNdounneCfHfE~QI00U4T7~b0DybwkrOKG0VWDKwXiSGd2AgO7up05Jcgsq7v8V58dmlV9XRRUqXN~soA__&Key-Pair-Id=K2HSFNDJXOU9YS"} alt="iHeartEcho™" className="w-8 h-8 object-contain" />
+                <img src={LOGO || "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/tMerpTNEMefRhZwO.png?Expires=1804389585&Signature=WUUmbeKd6gRL-5YievLbV1CH3uu0nlv-Re4ouPNZeR8Uaa5fZGvIpyzCfN4GeYzdNVN-L2Dfhpb6wP3tKMLML8tU2MU77LZNA0Db1Qt~FgBKmBrDM8f98IhyhaIIh3mcPdLcoP5aezbNBOluLkAKxGF1onaa3LNS33jvn6RdWOARg3rQF-iGyCG8t~MaJrqXCHCHnEQWkv8ww0KFZrIE6cKq-EgnS6NZ6Ugc~9fSwQmMSgxfKiJuZdqcca1LwferRwRh3oNdounneCfHfE~QI00U4T7~b0DybwkrOKG0VWDKwXiSGd2AgO7up05Jcgsq7v8V58dmlV9XRRUqXN~soA__&Key-Pair-Id=K2HSFNDJXOU9YS"} alt="All About Ultrasound™" className="w-8 h-8 object-contain" />
               )}
             </div>
             <h1 className="text-xl font-bold text-white" style={{ fontFamily: "Merriweather, serif" }}>
-              iHeartEcho™
+              All About Ultrasound™
             </h1>
             <p className="text-sm text-[#4ad9e0] mt-1">
               {isEmailChange ? "Email Address Change" : "Account Verification"}
@@ -142,7 +142,7 @@ export default function VerifyEmail() {
                   ) : (
                     <Link href="/">
                       <Button className="w-full font-semibold text-white" style={{ background: "#189aa1" }}>
-                        Go to iHeartEcho™
+                        Go to All About Ultrasound™
                       </Button>
                     </Link>
                   )}

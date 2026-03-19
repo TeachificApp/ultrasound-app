@@ -380,7 +380,7 @@ export const caseLibraryRouter = router({
             adminUrl,
           });
           sendEmail({
-            to: { name: "iHeartEcho™ Admin", email: adminEmail },
+            to: { name: "All About Ultrasound™ Admin", email: adminEmail },
             subject,
             htmlBody,
             previewText,
@@ -637,7 +637,7 @@ export const caseLibraryRouter = router({
           adminUrl: `${appUrl}/admin/cases`,
         });
         sendEmail({
-          to: { name: "iHeartEcho™ Admin", email: adminEmail },
+          to: { name: "All About Ultrasound™ Admin", email: adminEmail },
           subject: `[Resubmission] ${subject}`,
           htmlBody,
           previewText,

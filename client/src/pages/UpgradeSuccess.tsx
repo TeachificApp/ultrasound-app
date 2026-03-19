@@ -116,7 +116,7 @@ export default function UpgradeSuccess() {
               Thank You for Upgrading!
             </h1>
             <p className="text-white/70 text-base mb-8">
-              You're one step away from unlocking the full iHeartEcho™ Premium suite.
+              You're one step away from unlocking the full All About Ultrasound™ Premium suite.
             </p>
 
             {/* ── LOGGED-IN FLOW ── */}
@@ -217,7 +217,7 @@ export default function UpgradeSuccess() {
                       </Button>
                     </form>
                     <div className="mt-5 pt-5 border-t border-gray-100">
-                      <p className="text-gray-400 text-xs mb-3">Already have an iHeartEcho™ account?</p>
+                      <p className="text-gray-400 text-xs mb-3">Already have an All About Ultrasound™ account?</p>
                       <a href="/login">
                         <Button variant="outline" size="sm" className="w-full">
                           Sign In
@@ -245,7 +245,7 @@ export default function UpgradeSuccess() {
                     </a>
                   </div>
                 ) : syncResult?.premiumOnThinkific && !syncResult.userExists ? (
-                  /* Purchase verified but no iHeartEcho™ account yet → prompt to register */
+                  /* Purchase verified but no All About Ultrasound™ account yet → prompt to register */
                   <div className="flex flex-col items-center gap-4">
                     <div className="w-14 h-14 rounded-full bg-[#f0fbfc] flex items-center justify-center">
                       <Crown className="w-7 h-7 text-[#189aa1]" />
@@ -253,7 +253,7 @@ export default function UpgradeSuccess() {
                     <div>
                       <p className="font-bold text-gray-800 text-base mb-1">Purchase Confirmed!</p>
                       <p className="text-gray-500 text-sm max-w-xs mx-auto">
-                        Your purchase was verified. Create your free iHeartEcho™ account using{" "}
+                        Your purchase was verified. Create your free All About Ultrasound™ account using{" "}
                         <strong>{email}</strong> and premium will be activated automatically.
                       </p>
                     </div>

@@ -1,5 +1,5 @@
 /*
-  PremiumModal — iHeartEcho™
+  PremiumModal — All About Ultrasound™
   Shown when a user clicks a Premium-locked card.
   Explains what's included and links to the upgrade flow.
 */

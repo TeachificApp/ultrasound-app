@@ -165,3 +165,13 @@
 - [x] Fix homepage title (30–60 chars)
 - [x] Add meta description (50–160 chars)
 - [x] Add keywords meta tag
+
+## Bugs
+- [x] Magic link login fails on app.allaboutultrasound.com — "failed query" DB error (missing users columns — fixed via ALTER TABLE)
+- [x] Thinkific webhook: new enrollments create free members only, welcome email suppressed
+- [x] Migrate all users from iHeartEcho database to UltrasoundAssist database (11,753 users migrated, 0 errors)
+- [x] Audit and align all auth gates to match iHeartEcho (protectedProcedure, premiumProcedure, adminProcedure)
+- [x] Audit and align all access rules (premium gating, free limits, DIY roles)
+- [x] Audit and align all notification rules (challenge reminders, email scheduler)
+- [x] Fix Thinkific webhook product matchers for AAUS product names, suppress welcome email
+- [x] Replace all iHeartEcho™ brand text with All About Ultrasound™ across entire codebase (UI, emails, logs, comments)

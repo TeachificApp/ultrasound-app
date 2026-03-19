@@ -43,7 +43,7 @@ export const systemRouter = router({
       const user = ctx.user;
       const title = `Access Request — ${user.name ?? user.email ?? "Unknown User"}`;
       const content = [
-        `A user has requested access to a restricted area of iHeartEcho™.`,
+        `A user has requested access to a restricted area of All About Ultrasound™.`,
         ``,
         `**User Details**`,
         `- Name: ${user.name ?? "(not set)"}`,

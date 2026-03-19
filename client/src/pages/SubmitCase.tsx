@@ -689,7 +689,7 @@ export default function SubmitCase() {
                 <label htmlFor="hipaa" className="text-sm text-gray-700 leading-relaxed cursor-pointer">
                   I confirm that all submitted content has been fully de-identified and contains
                   <strong> no Protected Health Information (PHI)</strong>. I understand that submitting PHI
-                  violates HIPAA and iHeartEcho™'s terms of service.
+                  violates HIPAA and All About Ultrasound™'s terms of service.
                 </label>
               </div>
             </CardContent>

@@ -217,7 +217,7 @@ export default function ThinkificWebhookAdmin() {
                   <div>
                     <p className="text-[10px] font-semibold text-amber-700 uppercase tracking-wider mb-1">Premium App Access</p>
                     <div className="flex flex-wrap gap-1">
-                      {["iHeartEcho App - Premium Access", "iHeartEcho Premium Access"].map(p => (
+                      {["All About Ultrasound App - Premium Access", "All About Ultrasound Premium Access"].map(p => (
                         <span key={p} className="inline-block bg-white/60 text-amber-900 text-[10px] font-mono px-1.5 py-0.5 rounded border border-amber-200">{p}</span>
                       ))}
                     </div>

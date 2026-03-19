@@ -39,7 +39,7 @@ function wrapInBrandedEmail(bodyHtml: string, previewText?: string): string {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>iHeartEcho™</title>
+  <title>All About Ultrasound™</title>
 </head>
 <body style="margin:0;padding:0;background:#f4f7f8;font-family:'Open Sans',Arial,sans-serif;">
 ${preview}
@@ -52,7 +52,7 @@ ${preview}
           <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
               <td>
-                <span style="font-family:Merriweather,Georgia,serif;font-size:22px;font-weight:900;color:#ffffff;letter-spacing:-0.5px;">iHeartEcho™</span>
+                <span style="font-family:Merriweather,Georgia,serif;font-size:22px;font-weight:900;color:#ffffff;letter-spacing:-0.5px;">All About Ultrasound™</span>
                 <div style="font-size:11px;color:#4ad9e0;font-weight:600;margin-top:2px;letter-spacing:0.5px;">ECHOCARDIOGRAPHY CLINICAL COMPANION</div>
               </td>
             </tr>
@@ -69,8 +69,8 @@ ${preview}
       <tr>
         <td style="background:#f4f7f8;padding:20px 32px;border-top:1px solid #e5eaec;">
           <p style="margin:0;font-size:11px;color:#8a9bb0;text-align:center;line-height:1.6;">
-            © ${new Date().getFullYear()} iHeartEcho™ · All About Ultrasound<br/>
-            You are receiving this email because you have an account on iHeartEcho™.<br/>
+            © ${new Date().getFullYear()} All About Ultrasound™ · All About Ultrasound<br/>
+            You are receiving this email because you have an account on All About Ultrasound™.<br/>
             <a href="https://app.iheartecho.com/profile" style="color:#189aa1;text-decoration:none;">Manage your preferences</a>
           </p>
         </td>
@@ -86,24 +86,24 @@ ${preview}
 const SEED_TEMPLATES = [
   {
     name: "📣 Platform Announcement",
-    subject: "Important Update from iHeartEcho™",
-    previewText: "A message from the iHeartEcho team",
+    subject: "Important Update from All About Ultrasound™",
+    previewText: "A message from the All About Ultrasound team",
     htmlBody: `<h2 style="font-family:Merriweather,Georgia,serif;color:#0e1e2e;margin-top:0;">Platform Update</h2>
-<p>Dear iHeartEcho™ community,</p>
+<p>Dear All About Ultrasound™ community,</p>
 <p>We have an exciting update to share with you. [Insert announcement here.]</p>
 <p>As always, our mission is to support echocardiographers at every stage of their career with the best clinical decision support tools available.</p>
 <p>If you have any questions, please don't hesitate to reach out.</p>
-<p style="margin-top:28px;">With gratitude,<br/><strong style="color:#189aa1;">The iHeartEcho™ Team</strong></p>
+<p style="margin-top:28px;">With gratitude,<br/><strong style="color:#189aa1;">The All About Ultrasound™ Team</strong></p>
 <hr style="border:none;border-top:1px solid #e5eaec;margin:28px 0;" />
 <p style="font-size:13px;color:#8a9bb0;">Visit us at <a href="https://app.iheartecho.com" style="color:#189aa1;">app.iheartecho.com</a></p>`,
   },
   {
     name: "🎓 New Course / Resource",
-    subject: "New Learning Resource Available on iHeartEcho™",
+    subject: "New Learning Resource Available on All About Ultrasound™",
     previewText: "A new educational resource is now available for you",
     htmlBody: `<h2 style="font-family:Merriweather,Georgia,serif;color:#0e1e2e;margin-top:0;">New Resource Available</h2>
 <p>Hi there,</p>
-<p>We're thrilled to announce a new learning resource is now available on iHeartEcho™:</p>
+<p>We're thrilled to announce a new learning resource is now available on All About Ultrasound™:</p>
 <table width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;">
   <tr>
     <td style="background:#f0fbfc;border-left:4px solid #189aa1;padding:16px 20px;border-radius:0 8px 8px 0;">
@@ -116,7 +116,7 @@ const SEED_TEMPLATES = [
 <p style="margin-top:20px;">
   <a href="https://app.iheartecho.com" style="display:inline-block;background:#189aa1;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:700;font-size:14px;">Access Now →</a>
 </p>
-<p style="margin-top:28px;">Happy learning,<br/><strong style="color:#189aa1;">The iHeartEcho™ Team</strong></p>`,
+<p style="margin-top:28px;">Happy learning,<br/><strong style="color:#189aa1;">The All About Ultrasound™ Team</strong></p>`,
   },
 ];
 
@@ -785,7 +785,7 @@ export default function EmailAdmin() {
             {wrapInTemplate && (
               <p className="text-xs text-gray-400 flex items-center gap-1">
                 <Check className="w-3 h-3 text-green-500" />
-                Email will be wrapped in the iHeartEcho™ branded template
+                Email will be wrapped in the All About Ultrasound™ branded template
               </p>
             )}
             {/* Send Now vs Send Later toggle */}

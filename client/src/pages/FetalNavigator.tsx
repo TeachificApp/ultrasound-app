@@ -1,5 +1,5 @@
 /*
-  iHeartEcho™ — Fetal Echo Navigator
+  All About Ultrasound™ — Fetal Echo Navigator
   Brand: Teal #189aa1, Aqua #4ad9e0
 */
 import { useState } from "react";

@@ -30,7 +30,7 @@ vi.mock("./_core/env", () => ({
     VITE_ANALYTICS_ENDPOINT: "https://analytics.manus.im",
     VITE_ANALYTICS_WEBSITE_ID: "test-website-id",
     VITE_APP_LOGO: "https://example.com/logo.png",
-    VITE_APP_TITLE: "iHeartEcho",
+    VITE_APP_TITLE: "All About Ultrasound",
     VITE_APP_URL: "https://app.iheartecho.com",
     VITE_OAUTH_PORTAL_URL: "https://oauth.manus.im",
     SENDGRID_API_KEY: "test-sendgrid-key",

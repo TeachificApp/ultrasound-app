@@ -1,5 +1,5 @@
 /**
- * RichTextEditor — TipTap-based WYSIWYG editor for iHeartEcho™
+ * RichTextEditor — TipTap-based WYSIWYG editor for All About Ultrasound™
  *
  * Features:
  *  - Full text formatting: bold, italic, underline, strikethrough, code

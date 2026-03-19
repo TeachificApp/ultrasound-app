@@ -51,7 +51,7 @@ export default function Unsubscribe() {
             className="text-2xl font-bold"
             style={{ color: brandDark, fontFamily: "Merriweather, serif" }}
           >
-            iHeartEcho™
+            All About Ultrasound™
           </h1>
           <p className="text-sm text-gray-500 mt-1">Email Preferences</p>
         </div>
@@ -82,8 +82,8 @@ export default function Unsubscribe() {
               </h2>
               <p className="text-gray-500 text-sm leading-relaxed mb-6">
                 {alreadyDone
-                  ? "You have already opted out of platform campaign emails. You will not receive any further marketing emails from iHeartEcho™."
-                  : "You have been removed from our platform email list. You will no longer receive campaign or marketing emails from iHeartEcho™."}
+                  ? "You have already opted out of platform campaign emails. You will not receive any further marketing emails from All About Ultrasound™."
+                  : "You have been removed from our platform email list. You will no longer receive campaign or marketing emails from All About Ultrasound™."}
               </p>
               <p className="text-xs text-gray-400 mb-6">
                 Note: You may still receive transactional emails such as password resets, account
@@ -101,7 +101,7 @@ export default function Unsubscribe() {
                 <Link href="/">
                   <Button variant="outline" className="w-full gap-2">
                     <ArrowLeft className="w-4 h-4" />
-                    Back to iHeartEcho™
+                    Back to All About Ultrasound™
                   </Button>
                 </Link>
               </div>
@@ -120,7 +120,7 @@ export default function Unsubscribe() {
               <Link href="/">
                 <Button variant="outline" className="w-full gap-2">
                   <ArrowLeft className="w-4 h-4" />
-                  Back to iHeartEcho™
+                  Back to All About Ultrasound™
                 </Button>
               </Link>
             </>
@@ -128,7 +128,7 @@ export default function Unsubscribe() {
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-6">
-          © All About Ultrasound · iHeartEcho™ Platform
+          © All About Ultrasound · All About Ultrasound™ Platform
         </p>
       </div>
     </div>

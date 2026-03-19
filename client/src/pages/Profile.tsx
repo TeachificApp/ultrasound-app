@@ -1,5 +1,5 @@
 /*
-  Profile Page — iHeartEcho™
+  Profile Page — All About Ultrasound™
   Allows logged-in users to edit their display name, email, bio, credentials,
   specialty, years of experience, location, website, and change their password.
   Also shows active subscriptions with links to manage them.
@@ -498,7 +498,7 @@ export default function Profile() {
                               <CheckCircle className="w-2.5 h-2.5" /> Active
                             </span>
                           </div>
-                          <p className="text-xs text-gray-500 leading-relaxed">Full access to all iHeartEcho™ premium features — $9.97/month.</p>
+                          <p className="text-xs text-gray-500 leading-relaxed">Full access to all All About Ultrasound™ premium features — $9.97/month.</p>
                           <a
                             href="https://member.allaboutultrasound.com/account/billing"
                             target="_blank"
@@ -1066,7 +1066,7 @@ export default function Profile() {
                   <h2 className="text-sm font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>
                     Notification Preferences
                   </h2>
-                  <p className="text-xs text-gray-500 mt-0.5">Control when iHeartEcho™ sends you email reminders.</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Control when All About Ultrasound™ sends you email reminders.</p>
                 </div>
                 <div className="p-6 space-y-6">
                   {notifLoading ? (

@@ -1,5 +1,5 @@
 /*
-  QualityMeetingsTab — DIY Accreditation Tool™ — iHeartEcho™
+  QualityMeetingsTab — DIY Accreditation Tool™ — All About Ultrasound™
   Upload-based Zoom/Teams meeting management with AI transcription and minutes.
   Brand: Teal #189aa1, Aqua #4ad9e0
 */

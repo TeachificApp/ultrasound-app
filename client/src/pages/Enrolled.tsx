@@ -1,7 +1,7 @@
 /*
-  iHeartEcho™ — Post-Enrollment Decision-Tree Landing Page
+  All About Ultrasound™ — Post-Enrollment Decision-Tree Landing Page
   Shown after completing the free All About Ultrasound membership enrollment.
-  Two paths: All About Ultrasound Community | iHeartEcho™ EchoAssist™ App
+  Two paths: All About Ultrasound Community | All About Ultrasound™ EchoAssist™ App
   Brand: Teal #189aa1, Aqua #4ad9e0, Dark navy #0e1e2e
 */
 import { useEffect } from "react";
@@ -48,14 +48,14 @@ export default function Enrolled() {
       <header className="flex items-center justify-center gap-3 px-6 py-6">
         <img
           src="https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/TTSqgyHlTBmxeODV.png?Expires=1804183007&Signature=tWUrD-cUfgsk0u97qoBm0zB3mj75cGUW2F-hh-3aepkHA9QlDWUbfY2eqgxrIpyY2Zp3wTFpuBC7DXxtNjAMv5Ju2HBWLLcCgaGJrEB5X2wKLtoJQKscrbUUOXFV7xdwiJWP5zeVe7QNQaBw5zHqqyN6EYc6a0WovYLeHtUnM~vCz5pDvUh0L43UEpwlSVUZnU9ULfYO~ML9cpjCX-M~Uwb1QHUU2IxD7Qa9wMXw3nUhLxhbrUVdc-byWsUfQg5~PCwxH3jjLLq-4hlrBvFgkyB5QJJiqv6f~GM6bMh8jFE1GfWCAPzQVdcY97tgqT4GBExpYMkQ-K7AK83Fvd5zEg__&Key-Pair-Id=K2HSFNDJXOU9YS"
-          alt="iHeartEcho™"
+          alt="All About Ultrasound™"
           className="w-10 h-10 object-contain"
         />
         <span
           className="text-white font-bold text-lg"
           style={{ fontFamily: "Merriweather, serif" }}
         >
-          iHeartEcho™
+          All About Ultrasound™
         </span>
       </header>
 
@@ -157,7 +157,7 @@ export default function Enrolled() {
           <div className="flex-1 h-px lg:h-auto lg:w-px bg-white/10" />
         </div>
 
-        {/* ── Path 2: iHeartEcho™ EchoAssist™ App ── */}
+        {/* ── Path 2: All About Ultrasound™ EchoAssist™ App ── */}
         <div
           className="group flex flex-col flex-1 rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl cursor-pointer"
           style={{
@@ -191,7 +191,7 @@ export default function Enrolled() {
                 className="text-xl font-bold text-white leading-snug"
                 style={{ fontFamily: "Merriweather, serif" }}
               >
-                iHeartEcho™ EchoAssist™ Echocardiography Clinical Companion
+                All About Ultrasound™ EchoAssist™ Echocardiography Clinical Companion
               </h2>
             </div>
             <p className="text-white/60 text-sm leading-relaxed">
@@ -231,7 +231,7 @@ export default function Enrolled() {
       {/* ── Footer note ────────────────────────────────────────────────────── */}
       <footer className="text-center pb-8 px-6">
         <p className="text-white/30 text-xs max-w-sm mx-auto leading-relaxed">
-          Your membership is managed through All About Ultrasound. Any changes to your membership are automatically reflected in iHeartEcho™.
+          Your membership is managed through All About Ultrasound. Any changes to your membership are automatically reflected in All About Ultrasound™.
         </p>
       </footer>
     </div>

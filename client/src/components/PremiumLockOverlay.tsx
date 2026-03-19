@@ -1,5 +1,5 @@
 /*
-  PremiumLockOverlay — iHeartEcho™
+  PremiumLockOverlay — All About Ultrasound™
   Wraps any page content with a blurred overlay and upgrade CTA.
   Use `isPremium` prop to conditionally show the lock.
   When locked, the children are rendered but blurred behind the overlay.
