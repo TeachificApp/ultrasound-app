@@ -333,9 +333,12 @@
 ## Get App Banner & Calculators Route (Mar 19)
 - [ ] Get App banner: show on every dashboard page load on mobile unless PWA already installed
 - [ ] Remove 30-day dismiss localStorage — show every time on dashboard load
-- [ ] Fix Calculators 404 — import ObGynCalculators and register /ob-gyn-calculators route in App.tsx
-- [ ] Add Calculators sidebar nav link under Clinical Tools
+- [x] Fix Calculators 404 — registered /calculators route in App.tsx, fixed Home.tsx module card path
+- [x] Add Calculators sidebar nav link under Clinical Tools
 
 ## Flashcard Daily Limit Fix (Mar 19)
 - [x] Fix daily limit: 10 total cards per day across ALL categories (not 10 per category)
 - [x] Server now queries global daily count (no cardIds filter) so switching categories does not reset the count
+
+## Sidebar Calculators Link (Mar 19)
+- [x] Add UltrasoundAssist™ Calculators link to sidebar under Clinical Tools

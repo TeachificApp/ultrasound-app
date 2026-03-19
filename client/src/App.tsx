@@ -30,6 +30,7 @@ import Premium from "./pages/Premium";
 
 // ── UltrasoundAssist™ Hub ────────────────────────────────────────────────────
 import UltrasoundAssistHub from "./pages/UltrasoundAssistHub";
+import ObGynCalculators from "./pages/ObGynCalculators";
 
 // ── Abdominal Ultrasound ──────────────────────────────────────────────────────
 import AbdominalNavigator from "./pages/AbdominalNavigator";
@@ -155,6 +156,7 @@ function Router() {
 
         {/* ── UltrasoundAssist™ Hub ─────────────────────────────────────── */}
         <Route path="/ultrasound-assist" component={UltrasoundAssistHub} />
+        <Route path="/calculators" component={ObGynCalculators} />
 
         {/* ── Abdominal ─────────────────────────────────────────────────── */}
         <Route path="/abdominal-navigator" component={AbdominalNavigator} />

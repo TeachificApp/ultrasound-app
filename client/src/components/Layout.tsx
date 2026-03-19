@@ -59,6 +59,7 @@ const navGroups = [
     label: "Clinical Tools",
     items: [
       { path: "/ultrasound-assist", label: "UltrasoundAssist™", icon: Stethoscope },
+      { path: "/calculators", label: "UltrasoundAssist™ Calculators", icon: Calculator },
       // POCUS-Assist™ and Fetal EchoAssist™ accessible via UltrasoundAssist™ pathway
       // { path: "/pocus-assist-hub", label: "POCUS-Assist™", icon: Shield },
       // { path: "/fetal-echo-assist", label: "Fetal EchoAssist™", icon: Heart },
@@ -126,6 +127,7 @@ const hiddenNavItems = [
   { path: "/diy-member", label: "Member Portal" },
   // Ultrasound specialty navigators
   { path: "/ultrasound-assist", label: "UltrasoundAssist™" },
+  { path: "/calculators", label: "UltrasoundAssist™ Calculators" },
   { path: "/abdominal-navigator", label: "Abdominal Navigator" },
   { path: "/abdominal-scan-coach", label: "Abdominal ScanCoach™" },
   { path: "/pelvic-navigator", label: "Pelvic/Gyn Navigator" },

@@ -62,9 +62,9 @@ const modules: Module[] = [
   // { path: "/pocus-assist-hub", icon: Shield, title: "POCUS-Assist™", ... },
   // { path: "/fetal-echo-assist-hub", icon: Heart, title: "Fetal EchoAssist™", ... },
   {
-    path: "/echoassist",
+    path: "/calculators",
     icon: Calculator,
-    title: "Ultrasound-Assist Calculators",
+    title: "UltrasoundAssist™ Calculators",
     description: "Guideline-based calculators for POCUS (IVC CI, B-line score, eFAST grader) and Fetal Echo (biometrics, cardiac measurements, z-scores).",
     badge: "Guideline-Based",
     color: BRAND,
