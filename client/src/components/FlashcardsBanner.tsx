@@ -6,7 +6,7 @@ import { Link } from "wouter";
 import { Zap, BookOpen } from "lucide-react";
 
 const BANNER_IMG =
-  "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/flashcards-banner-final_482712b7.png";
+  "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/flashcards-banner-final_AAUS_94ef5d55.webp";
 
 interface FlashcardsBannerProps {
   streak?: number;
