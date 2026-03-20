@@ -101,7 +101,7 @@ const caseInputSchema = z.object({
 
 // ─── Router ───────────────────────────────────────────────────────────────────
 export const caseLibraryRouter = router({
-  /** Paginated list of approved cases — free members see max 50 cases */
+  /** Paginated list of approved cases — all logged-in users can browse all cases (login gate only, per iHeartEcho model) */
   listCases: publicProcedure
     .input(
       z.object({
@@ -119,15 +119,7 @@ export const caseLibraryRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
-      // Premium gate: free members can browse at most 50 cases
-      const FREE_CASE_LIMIT = 50;
-      const isPremiumUser = (ctx.user as any)?.isPremium === true || (ctx.user as any)?.role === "admin";
-
       const offset = (input.page - 1) * input.limit;
-      // For free users, block pages beyond the free limit
-      if (!isPremiumUser && offset >= FREE_CASE_LIMIT) {
-        return { cases: [], total: FREE_CASE_LIMIT, page: input.page, limit: input.limit, isPremiumGated: true, freeCaseLimit: FREE_CASE_LIMIT };
-      }
       const conditions: any[] = [eq(echoLibraryCases.status, "approved")];
 
       if (input.modality) conditions.push(eq(echoLibraryCases.modality, input.modality));
@@ -190,29 +182,23 @@ export const caseLibraryRouter = router({
       }
 
       const rawTotal = totalResult[0]?.count ?? 0;
-      // Cap visible total for free users
-      const visibleTotal = isPremiumUser ? rawTotal : Math.min(rawTotal, FREE_CASE_LIMIT);
-      // Trim cases that would exceed the free limit
-      const visibleCases = isPremiumUser
-        ? cases
-        : cases.filter((_, i) => offset + i < FREE_CASE_LIMIT);
 
       return {
-        cases: visibleCases.map((c) => ({
+        cases: cases.map((c) => ({
           ...c,
           tags: c.tags ? JSON.parse(c.tags) : [],
           thumbnail: thumbnails[c.id] ?? null,
         })),
-        total: visibleTotal,
+        total: rawTotal,
         page: input.page,
         limit: input.limit,
-        isPremiumGated: !isPremiumUser && rawTotal > FREE_CASE_LIMIT,
-        freeCaseLimit: FREE_CASE_LIMIT,
+        isPremiumGated: false,
+        freeCaseLimit: null,
       };
     }),
 
-  /** Full case detail with media and questions (increments view count) */
-  getCase: publicProcedure
+  /** Full case detail with media and questions (increments view count) — requires login per iHeartEcho model */
+  getCase: protectedProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .query(async ({ input, ctx }) => {
       const db = await getDb();
