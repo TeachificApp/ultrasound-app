@@ -1,0 +1,94 @@
+{
+  "query": "SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'echoLibraryCases' ORDER BY ORDINAL_POSITION;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'echoLibraryCases' ORDER BY ORDINAL_POSITION;",
+  "rows": [
+    {
+      "COLUMN_NAME": "id",
+      "DATA_TYPE": "int"
+    },
+    {
+      "COLUMN_NAME": "title",
+      "DATA_TYPE": "varchar"
+    },
+    {
+      "COLUMN_NAME": "summary",
+      "DATA_TYPE": "text"
+    },
+    {
+      "COLUMN_NAME": "clinicalHistory",
+      "DATA_TYPE": "text"
+    },
+    {
+      "COLUMN_NAME": "diagnosis",
+      "DATA_TYPE": "varchar"
+    },
+    {
+      "COLUMN_NAME": "teachingPoints",
+      "DATA_TYPE": "text"
+    },
+    {
+      "COLUMN_NAME": "modality",
+      "DATA_TYPE": "enum"
+    },
+    {
+      "COLUMN_NAME": "difficulty",
+      "DATA_TYPE": "enum"
+    },
+    {
+      "COLUMN_NAME": "tags",
+      "DATA_TYPE": "text"
+    },
+    {
+      "COLUMN_NAME": "status",
+      "DATA_TYPE": "enum"
+    },
+    {
+      "COLUMN_NAME": "isAdminSubmission",
+      "DATA_TYPE": "tinyint"
+    },
+    {
+      "COLUMN_NAME": "submittedByUserId",
+      "DATA_TYPE": "int"
+    },
+    {
+      "COLUMN_NAME": "submittedAt",
+      "DATA_TYPE": "timestamp"
+    },
+    {
+      "COLUMN_NAME": "reviewedByUserId",
+      "DATA_TYPE": "int"
+    },
+    {
+      "COLUMN_NAME": "reviewedAt",
+      "DATA_TYPE": "timestamp"
+    },
+    {
+      "COLUMN_NAME": "rejectionReason",
+      "DATA_TYPE": "text"
+    },
+    {
+      "COLUMN_NAME": "hipaaAcknowledged",
+      "DATA_TYPE": "tinyint"
+    },
+    {
+      "COLUMN_NAME": "submitterCreditName",
+      "DATA_TYPE": "varchar"
+    },
+    {
+      "COLUMN_NAME": "submitterLinkedIn",
+      "DATA_TYPE": "varchar"
+    },
+    {
+      "COLUMN_NAME": "viewCount",
+      "DATA_TYPE": "int"
+    },
+    {
+      "COLUMN_NAME": "updatedAt",
+      "DATA_TYPE": "timestamp"
+    }
+  ],
+  "messages": [],
+  "stdout": "COLUMN_NAME\tDATA_TYPE\nid\tint\ntitle\tvarchar\nsummary\ttext\nclinicalHistory\ttext\ndiagnosis\tvarchar\nteachingPoints\ttext\nmodality\tenum\ndifficulty\tenum\ntags\ttext\nstatus\tenum\nisAdminSubmission\ttinyint\nsubmittedByUserId\tint\nsubmittedAt\ttimestamp\nreviewedByUserId\tint\nreviewedAt\ttimestamp\nrejectionReason\ttext\nhipaaAcknowledged\ttinyint\nsubmitterCreditName\tvarchar\nsubmitterLinkedIn\tvarchar\nviewCount\tint\nupdatedAt\ttimestamp\n",
+  "stderr": "",
+  "execution_time_ms": 56
+}
