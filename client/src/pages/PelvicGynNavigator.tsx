@@ -41,12 +41,34 @@ const views = [
 
 const normalValues = [
   {
-    category: "Key Parameters",
+    category: "Uterus",
     values: [
-      { param: "Refer to AIUM guidelines", normal: "See AIUM Practice Parameter for the Performa", borderline: "—", abnormal: "—" },
+      { param: "Uterine length (nulliparous)", normal: "6–8 cm", borderline: "8–9 cm", abnormal: ">9 cm or <5 cm" },
+      { param: "Uterine length (multiparous)", normal: "8–10 cm", borderline: "10–12 cm", abnormal: ">12 cm" },
+      { param: "Endometrial thickness (premenopausal, proliferative)", normal: "4–8 mm", borderline: "8–12 mm", abnormal: ">12 mm" },
+      { param: "Endometrial thickness (postmenopausal, no HRT)", normal: "≤4 mm", borderline: "4–5 mm", abnormal: ">5 mm" },
+      { param: "Endometrial thickness (postmenopausal, on HRT)", normal: "≤8 mm", borderline: "8–10 mm", abnormal: ">10 mm" },
     ],
-  }
+  },
+  {
+    category: "Ovaries",
+    values: [
+      { param: "Ovarian volume (reproductive age)", normal: "≤10 mL", borderline: "10–20 mL", abnormal: ">20 mL" },
+      { param: "Ovarian volume (postmenopausal)", normal: "≤3 mL", borderline: "3–5 mL", abnormal: ">5 mL" },
+      { param: "Dominant follicle (pre-ovulatory)", normal: "18–28 mm", borderline: "—", abnormal: ">30 mm (suspect cyst)" },
+      { param: "Corpus luteum diameter", normal: "≤3 cm", borderline: "3–5 cm", abnormal: ">5 cm" },
+    ],
+  },
+  {
+    category: "Cervix & Adnexa",
+    values: [
+      { param: "Cervical length (non-pregnant)", normal: "3–4 cm", borderline: "2.5–3 cm", abnormal: "<2.5 cm" },
+      { param: "Fallopian tube diameter", normal: "Not visible or <3 mm", borderline: "3–5 mm", abnormal: ">5 mm (hydrosalpinx/PID)" },
+      { param: "Free fluid (cul-de-sac)", normal: "Trace (physiologic)", borderline: "Moderate", abnormal: "Large or complex" },
+    ],
+  },
 ];
+// References: Nalaboff KM et al. Radiographics 2001;21:1371–1383; Pavlik EJ et al. Menopause 2013;20:1263–1268; Goldstein SR. Ultrasound Obstet Gynecol 2010;36:121–123; Patel MD et al. Radiology 2005;236:583–589.
 
 export default function PelvicGynNavigator() {
   const [tab, setTab] = useState<"protocol" | "reference">("protocol");

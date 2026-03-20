@@ -81,12 +81,33 @@ const views = [
 
 const normalValues = [
   {
-    category: "Key Parameters",
+    category: "Aortic Diameter",
     values: [
-      { param: "Refer to AIUM guidelines", normal: "See AIUM Practice Parameter for the Performa", borderline: "—", abnormal: "—" },
+      { param: "Infrarenal aorta (adults)", normal: "<2.0 cm", borderline: "2.0–2.9 cm", abnormal: "≥3.0 cm (AAA)" },
+      { param: "Suprarenal aorta", normal: "<2.5 cm", borderline: "2.5–3.0 cm", abnormal: "≥3.0 cm" },
+      { param: "Common iliac artery", normal: "<1.5 cm", borderline: "1.5–1.9 cm", abnormal: "≥2.0 cm (iliac aneurysm)" },
+      { param: "AAA surveillance (<4.0 cm)", normal: "Every 2–3 years", borderline: "4.0–4.9 cm: annual", abnormal: "≥5.0 cm: surgical referral" },
     ],
-  }
+  },
+  {
+    category: "Doppler Velocities",
+    values: [
+      { param: "Aortic PSV (normal)", normal: "60–100 cm/s", borderline: "100–150 cm/s", abnormal: ">150 cm/s (stenosis)" },
+      { param: "Celiac axis PSV", normal: "<200 cm/s", borderline: "200–250 cm/s", abnormal: ">250 cm/s (≥70% stenosis)" },
+      { param: "SMA PSV (fasting)", normal: "<275 cm/s", borderline: "275–300 cm/s", abnormal: ">275 cm/s (≥70% stenosis)" },
+      { param: "Common iliac PSV", normal: "70–120 cm/s", borderline: "120–180 cm/s", abnormal: ">180 cm/s (stenosis)" },
+    ],
+  },
+  {
+    category: "Endoleak Classification",
+    values: [
+      { param: "Type I (attachment site leak)", normal: "No flow at graft ends", borderline: "—", abnormal: "Flow at proximal/distal attachment" },
+      { param: "Type II (branch vessel retrograde)", normal: "No sac flow", borderline: "Stable sac size", abnormal: "Sac growth >5 mm/year" },
+      { param: "Type III (graft defect)", normal: "No flow through graft", borderline: "—", abnormal: "Flow through graft fabric/junction" },
+    ],
+  },
 ];
+// References: Chaikof EL et al. J Vasc Surg 2018;67:2–77 (SVS AAA guidelines); Moneta GL et al. J Vasc Surg 1993;17:79–86 (mesenteric); Hirsch AT et al. J Am Coll Cardiol 2006;47:1239–1312 (iliac/aortic criteria).
 
 export default function AortaNavigator() {
   const [tab, setTab] = useState<"protocol" | "reference">("protocol");

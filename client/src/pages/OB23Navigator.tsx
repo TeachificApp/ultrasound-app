@@ -95,12 +95,47 @@ const views = [
 
 const normalValues = [
   {
-    category: "Key Parameters",
+    category: "Fetal Biometry (20 wks)",
     values: [
-      { param: "Refer to AIUM guidelines", normal: "See AIUM Practice Parameter for the Performa", borderline: "—", abnormal: "—" },
+      { param: "Biparietal diameter (BPD) at 20 wks", normal: "~47 mm", borderline: "—", abnormal: ">2 SD from mean" },
+      { param: "Head circumference (HC) at 20 wks", normal: "~176 mm", borderline: "—", abnormal: ">2 SD from mean" },
+      { param: "Abdominal circumference (AC) at 20 wks", normal: "~148 mm", borderline: "—", abnormal: ">2 SD from mean" },
+      { param: "Femur length (FL) at 20 wks", normal: "~33 mm", borderline: "—", abnormal: ">2 SD from mean" },
+      { param: "Estimated fetal weight (EFW) at 20 wks", normal: "~300–350 g", borderline: "—", abnormal: "<10th or >90th percentile" },
     ],
-  }
+  },
+  {
+    category: "Fetal Biometry (28 wks)",
+    values: [
+      { param: "BPD at 28 wks", normal: "~71 mm", borderline: "—", abnormal: ">2 SD from mean" },
+      { param: "HC at 28 wks", normal: "~261 mm", borderline: "—", abnormal: ">2 SD from mean" },
+      { param: "AC at 28 wks", normal: "~242 mm", borderline: "—", abnormal: ">2 SD from mean" },
+      { param: "FL at 28 wks", normal: "~53 mm", borderline: "—", abnormal: ">2 SD from mean" },
+    ],
+  },
+  {
+    category: "Amniotic Fluid & Placenta",
+    values: [
+      { param: "Amniotic fluid index (AFI)", normal: "8–18 cm", borderline: "5–8 cm", abnormal: "<5 cm (oligohydramnios) or >24 cm (polyhydramnios)" },
+      { param: "Maximum vertical pocket (MVP)", normal: "2–8 cm", borderline: "1–2 cm", abnormal: "<1 cm (oligohydramnios) or >8 cm (polyhydramnios)" },
+      { param: "Placental thickness", normal: "2–4 cm", borderline: "4–5 cm", abnormal: ">5 cm (placentomegaly) or <1.5 cm" },
+    ],
+  },
+  {
+    category: "Cervical Length (2nd Trimester)",
+    values: [
+      { param: "Cervical length at 18–24 wks (TVS)", normal: "≥25 mm", borderline: "20–25 mm", abnormal: "<20 mm (preterm birth risk)" },
+    ],
+  },
+  {
+    category: "Doppler (3rd Trimester)",
+    values: [
+      { param: "Umbilical artery S/D ratio (28–40 wks)", normal: "<3.0", borderline: "3.0–4.0", abnormal: ">4.0 or absent/reversed end-diastolic flow" },
+      { param: "Middle cerebral artery PSV (MCA-PSV)", normal: "<1.5 MoM", borderline: "1.0–1.5 MoM", abnormal: "≥1.5 MoM (fetal anemia)" },
+    ],
+  },
 ];
+// References: Papageorghiou AT et al. Ultrasound Obstet Gynecol 2014;44:641–648 (INTERGROWTH-21st biometry); Magann EF et al. Obstet Gynecol 2000;96:189–192 (AFI); Iams JD et al. N Engl J Med 1996;334:567–572 (cervical length); Mari G et al. N Engl J Med 2000;342:9–14 (MCA-PSV).
 
 export default function OB23Navigator() {
   const [tab, setTab] = useState<"protocol" | "reference">("protocol");

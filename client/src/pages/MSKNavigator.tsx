@@ -73,12 +73,42 @@ const views = [
 
 const normalValues = [
   {
-    category: "Key Parameters",
+    category: "Rotator Cuff Tendons",
     values: [
-      { param: "Refer to AIUM guidelines", normal: "See AIUM Practice Parameter for the Performa", borderline: "—", abnormal: "—" },
+      { param: "Supraspinatus tendon thickness", normal: "5–7 mm", borderline: "4–5 mm", abnormal: "<4 mm (thinning/tear) or >8 mm (thickening)" },
+      { param: "Supraspinatus echogenicity", normal: "Homogeneous fibrillar", borderline: "Focal hypoechoic area", abnormal: "Full-thickness defect (complete tear)" },
+      { param: "Biceps tendon (long head)", normal: "3–5 mm, round, hyperechoic", borderline: "Flattened or hypoechoic", abnormal: "Absent (rupture) or >6 mm (tendinopathy)" },
     ],
-  }
+  },
+  {
+    category: "Achilles Tendon",
+    values: [
+      { param: "Achilles tendon AP diameter", normal: "4–6 mm", borderline: "6–8 mm", abnormal: ">8 mm (tendinopathy)" },
+      { param: "Echogenicity", normal: "Homogeneous fibrillar", borderline: "Focal hypoechoic", abnormal: "Focal defect (partial/complete tear)" },
+    ],
+  },
+  {
+    category: "Carpal Tunnel (Median Nerve)",
+    values: [
+      { param: "Median nerve CSA at inlet", normal: "<10 mm²", borderline: "10–15 mm²", abnormal: ">15 mm² (carpal tunnel syndrome)" },
+      { param: "Wrist-to-forearm ratio (WFR)", normal: "<1.4", borderline: "1.4–1.5", abnormal: ">1.5 (carpal tunnel syndrome)" },
+    ],
+  },
+  {
+    category: "Hip Joint (Effusion)",
+    values: [
+      { param: "Hip joint effusion (adult)", normal: "<5 mm (anterior recess)", borderline: "5–7 mm", abnormal: ">7 mm or >2 mm asymmetry" },
+      { param: "Pediatric hip effusion", normal: "<3 mm", borderline: "3–5 mm", abnormal: ">5 mm (septic arthritis until proven otherwise)" },
+    ],
+  },
+  {
+    category: "Plantar Fascia",
+    values: [
+      { param: "Plantar fascia thickness at calcaneal insertion", normal: "<4 mm", borderline: "4–5 mm", abnormal: ">5 mm (plantar fasciitis)" },
+    ],
+  },
 ];
+// References: Jacobson JA. Semin Musculoskelet Radiol 2007;11:186–197; Klauser AS et al. Radiology 2009;252:269–276 (carpal tunnel); Hung EH et al. Radiographics 2013;33:1679–1697 (Achilles); Martinoli C. Eur Radiol 2010;20:2073–2082.
 
 export default function MSKNavigator() {
   const [tab, setTab] = useState<"protocol" | "reference">("protocol");

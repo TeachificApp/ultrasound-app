@@ -45,12 +45,33 @@ const views = [
 
 const normalValues = [
   {
-    category: "Key Parameters",
+    category: "Gestational Sac & Embryo",
     values: [
-      { param: "Refer to AIUM guidelines", normal: "See AIUM Practice Parameter for the Performa", borderline: "—", abnormal: "—" },
+      { param: "Gestational sac (MSD) at 5 wks", normal: "2–5 mm", borderline: "—", abnormal: ">25 mm without embryo (failed pregnancy)" },
+      { param: "Yolk sac diameter", normal: "3–6 mm", borderline: "6–7 mm", abnormal: ">7 mm or absent" },
+      { param: "Crown-rump length (CRL) at 6 wks", normal: "~5 mm", borderline: "—", abnormal: "—" },
+      { param: "CRL at 8 wks", normal: "~16 mm", borderline: "—", abnormal: "—" },
+      { param: "CRL at 10 wks", normal: "~31 mm", borderline: "—", abnormal: "—" },
+      { param: "CRL at 12 wks", normal: "~55 mm", borderline: "—", abnormal: "—" },
     ],
-  }
+  },
+  {
+    category: "Fetal Heart Rate",
+    values: [
+      { param: "FHR at 6–7 wks", normal: "100–120 bpm", borderline: "80–100 bpm", abnormal: "<80 bpm (poor prognosis)" },
+      { param: "FHR at 8–10 wks", normal: "150–175 bpm", borderline: "120–150 bpm", abnormal: "<100 bpm" },
+      { param: "FHR at 10–14 wks", normal: "140–170 bpm", borderline: "120–140 bpm", abnormal: "<100 or >200 bpm" },
+    ],
+  },
+  {
+    category: "Nuchal Translucency",
+    values: [
+      { param: "NT thickness (CRL 45–84 mm, 11–14 wks)", normal: "<2.5 mm", borderline: "2.5–3.0 mm", abnormal: "≥3.0 mm (increased aneuploidy risk)" },
+      { param: "Nasal bone visibility", normal: "Present", borderline: "—", abnormal: "Absent (T21 risk marker)" },
+    ],
+  },
 ];
+// References: Doubilet PM et al. N Engl J Med 2013;369:1443–1451; Papageorghiou AT et al. Ultrasound Obstet Gynecol 2014;44:641–648 (INTERGROWTH-21st); Nicolaides KH. Ultrasound Obstet Gynecol 2011;38:613–621.
 
 export default function OB1Navigator() {
   const [tab, setTab] = useState<"protocol" | "reference">("protocol");

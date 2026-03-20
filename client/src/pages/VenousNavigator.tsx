@@ -73,12 +73,24 @@ const views = [
 
 const normalValues = [
   {
-    category: "Key Parameters",
+    category: "Deep Vein Thrombosis (DVT) Criteria",
     values: [
-      { param: "Refer to AIUM guidelines", normal: "See AIUM Practice Parameter for the Performa", borderline: "—", abnormal: "—" },
+      { param: "Vein compressibility", normal: "Fully compressible", borderline: "Partially compressible", abnormal: "Non-compressible (DVT)" },
+      { param: "Spontaneous flow", normal: "Present, phasic with respiration", borderline: "Diminished phasicity", abnormal: "Absent or continuous (obstruction)" },
+      { param: "Augmentation with distal compression", normal: "Brisk increase in flow", borderline: "Sluggish augmentation", abnormal: "Absent augmentation (proximal obstruction)" },
+      { param: "Vein diameter (common femoral)", normal: "<12 mm", borderline: "12–15 mm", abnormal: ">15 mm or >1.5x contralateral" },
     ],
-  }
+  },
+  {
+    category: "Chronic Venous Insufficiency",
+    values: [
+      { param: "Valve reflux duration (great saphenous)", normal: "<0.5 s", borderline: "0.5–1.0 s", abnormal: ">1.0 s (pathologic reflux)" },
+      { param: "Valve reflux duration (deep veins)", normal: "<1.0 s", borderline: "1.0–1.5 s", abnormal: ">1.5 s (pathologic reflux)" },
+      { param: "Great saphenous vein diameter (GSV)", normal: "<3.5 mm", borderline: "3.5–5.5 mm", abnormal: ">5.5 mm (varicose)" },
+    ],
+  },
 ];
+// References: Zierler RE et al. J Vasc Surg 2016;64:e1–e52 (SVU guidelines); Coleridge-Smith P et al. Eur J Vasc Endovasc Surg 2006;31:83–92 (venous reflux); Bates SM et al. J Thromb Haemost 2018;16:1246–1252 (DVT diagnosis).
 
 export default function VenousNavigator() {
   const [tab, setTab] = useState<"protocol" | "reference">("protocol");

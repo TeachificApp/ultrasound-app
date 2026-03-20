@@ -66,12 +66,32 @@ const views = [
 
 const normalValues = [
   {
-    category: "Key Parameters",
+    category: "Thyroid Gland Size",
     values: [
-      { param: "Refer to AIUM guidelines", normal: "See AIUM Practice Parameter for the Performa", borderline: "—", abnormal: "—" },
+      { param: "Lobe length (craniocaudal)", normal: "4–6 cm", borderline: "6–7 cm", abnormal: ">7 cm (goiter)" },
+      { param: "Lobe AP diameter", normal: "1.5–2.0 cm", borderline: "2.0–2.5 cm", abnormal: ">2.5 cm" },
+      { param: "Lobe volume (each)", normal: "4–8 mL", borderline: "8–10 mL", abnormal: ">10 mL per lobe" },
+      { param: "Isthmus AP thickness", normal: "≤3 mm", borderline: "3–5 mm", abnormal: ">5 mm" },
     ],
-  }
+  },
+  {
+    category: "Nodule Assessment (ACR TI-RADS)",
+    values: [
+      { param: "TI-RADS 2 (benign)", normal: "0 pts — no FNA", borderline: "—", abnormal: "—" },
+      { param: "TI-RADS 3 (mildly suspicious)", normal: "2 pts", borderline: "FNA if ≥2.5 cm", abnormal: "≥2.5 cm → FNA" },
+      { param: "TI-RADS 4 (moderately suspicious)", normal: "3 pts", borderline: "FNA if ≥1.5 cm", abnormal: "≥1.5 cm → FNA" },
+      { param: "TI-RADS 5 (highly suspicious)", normal: "≥4 pts", borderline: "FNA if ≥1.0 cm", abnormal: "≥1.0 cm → FNA" },
+    ],
+  },
+  {
+    category: "Cervical Lymph Nodes",
+    values: [
+      { param: "Short-axis diameter (benign)", normal: "<1 cm", borderline: "1.0–1.5 cm", abnormal: ">1.5 cm or round shape, loss of fatty hilum" },
+      { param: "Echogenicity", normal: "Hyperechoic hilum present", borderline: "Hilum indistinct", abnormal: "Cystic, calcified, or hyperechoic (metastasis)" },
+    ],
+  },
 ];
+// References: Tessler FN et al. J Am Coll Radiol 2017;14:587–595 (ACR TI-RADS); Hegedus L. N Engl J Med 2004;351:1764–1771 (thyroid volume); Hoang JK et al. Radiology 2012;262:397–403.
 
 export default function ThyroidNavigator() {
   const [tab, setTab] = useState<"protocol" | "reference">("protocol");

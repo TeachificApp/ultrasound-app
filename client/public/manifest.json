@@ -6,17 +6,18 @@
   "start_url": "https://app.allaboutultrasound.com/",
   "scope": "https://app.allaboutultrasound.com/",
   "display": "standalone",
-  "background_color": "#0e1e2e",
+  "background_color": "#189aa1",
   "theme_color": "#189aa1",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_icon_192_2af50158.png",
+      "src": "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_icon_192_teal_f0c966ce.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_icon_512_27742ae1.png",
+      "src": "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_icon_512_teal_840494a6.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

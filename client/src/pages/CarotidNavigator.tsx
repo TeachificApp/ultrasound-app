@@ -54,12 +54,31 @@ const views = [
 
 const normalValues = [
   {
-    category: "Key Parameters",
+    category: "ICA Stenosis (SRU Consensus Criteria)",
     values: [
-      { param: "Refer to AIUM guidelines", normal: "See AIUM Practice Parameter for the Performa", borderline: "—", abnormal: "—" },
+      { param: "ICA PSV (normal)", normal: "<125 cm/s", borderline: "125–230 cm/s (50–69%)", abnormal: ">230 cm/s (≥70% stenosis)" },
+      { param: "ICA/CCA PSV ratio", normal: "<2.0", borderline: "2.0–4.0", abnormal: ">4.0 (≥70% stenosis)" },
+      { param: "ICA EDV", normal: "<40 cm/s", borderline: "40–70 cm/s", abnormal: ">70 cm/s (≥70% stenosis)" },
+      { param: "Near-occlusion", normal: "—", borderline: "—", abnormal: "Very low PSV with string-like lumen" },
     ],
-  }
+  },
+  {
+    category: "CCA & ECA",
+    values: [
+      { param: "CCA PSV (normal)", normal: "<120 cm/s", borderline: "120–150 cm/s", abnormal: ">150 cm/s (stenosis)" },
+      { param: "CCA IMT (intima-media thickness)", normal: "<0.9 mm", borderline: "0.9–1.0 mm", abnormal: ">1.0 mm (increased CV risk)" },
+      { param: "ECA PSV", normal: "<150 cm/s", borderline: "150–200 cm/s", abnormal: ">200 cm/s" },
+    ],
+  },
+  {
+    category: "Vertebral Arteries",
+    values: [
+      { param: "Vertebral artery flow direction", normal: "Antegrade (toward brain)", borderline: "Alternating", abnormal: "Retrograde (subclavian steal)" },
+      { param: "Vertebral artery PSV", normal: "20–60 cm/s", borderline: "<20 cm/s (hypoplastic)", abnormal: "Absent or retrograde" },
+    ],
+  },
 ];
+// References: Grant EG et al. Radiology 2003;229:340–346 (SRU carotid consensus); Touboul PJ et al. Cerebrovasc Dis 2012;34:290–296 (IMT); Stayman AN et al. Stroke 2011;42:2894–2899 (vertebral artery).
 
 export default function CarotidNavigator() {
   const [tab, setTab] = useState<"protocol" | "reference">("protocol");

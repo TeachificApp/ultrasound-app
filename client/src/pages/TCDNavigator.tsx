@@ -45,12 +45,37 @@ const views = [
 
 const normalValues = [
   {
-    category: "Key Parameters",
+    category: "MCA (Middle Cerebral Artery)",
     values: [
-      { param: "Refer to AIUM guidelines", normal: "See AIUM Practice Parameter for the Performa", borderline: "—", abnormal: "—" },
+      { param: "MCA mean velocity (adults)", normal: "55–80 cm/s", borderline: "80–120 cm/s", abnormal: ">120 cm/s (vasospasm/stenosis)" },
+      { param: "MCA PSV", normal: "<120 cm/s", borderline: "120–160 cm/s", abnormal: ">160 cm/s (severe vasospasm)" },
+      { param: "Lindegaard ratio (MCA/ICA)", normal: "<3.0", borderline: "3.0–6.0", abnormal: ">6.0 (severe vasospasm)" },
     ],
-  }
+  },
+  {
+    category: "ACA, PCA & Basilar",
+    values: [
+      { param: "ACA mean velocity", normal: "40–70 cm/s", borderline: "70–90 cm/s", abnormal: ">90 cm/s" },
+      { param: "PCA mean velocity", normal: "30–60 cm/s", borderline: "60–80 cm/s", abnormal: ">80 cm/s" },
+      { param: "Basilar artery mean velocity", normal: "30–60 cm/s", borderline: "60–80 cm/s", abnormal: ">80 cm/s" },
+    ],
+  },
+  {
+    category: "Pulsatility & Resistance",
+    values: [
+      { param: "Pulsatility index (PI)", normal: "0.6–1.1", borderline: "1.1–1.4", abnormal: ">1.4 (elevated ICP or distal resistance)" },
+      { param: "Resistive index (RI)", normal: "0.50–0.65", borderline: "0.65–0.75", abnormal: ">0.75 (elevated ICP)" },
+    ],
+  },
+  {
+    category: "Neonatal / Infant",
+    values: [
+      { param: "Neonatal MCA mean velocity", normal: "24–42 cm/s", borderline: "42–60 cm/s", abnormal: ">60 cm/s" },
+      { param: "Neonatal RI", normal: "0.60–0.80", borderline: "0.80–0.90", abnormal: ">0.90 (elevated ICP) or <0.55 (hyperperfusion)" },
+    ],
+  },
 ];
+// References: Aaslid R et al. J Neurosurg 1982;57:769–774 (original TCD); Sloan MA et al. J Neuroimaging 2004;14(Suppl 2):2S–57S; Alexandrov AV et al. J Neuroimaging 2012;22(Suppl 1):1S–26S.
 
 export default function TCDNavigator() {
   const [tab, setTab] = useState<"protocol" | "reference">("protocol");

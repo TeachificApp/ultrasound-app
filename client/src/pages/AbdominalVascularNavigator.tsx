@@ -54,12 +54,31 @@ const views = [
 
 const normalValues = [
   {
-    category: "Key Parameters",
+    category: "Renal Artery Stenosis",
     values: [
-      { param: "Refer to AIUM guidelines", normal: "See AIUM Practice Parameter for the Performa", borderline: "—", abnormal: "—" },
+      { param: "Renal artery PSV", normal: "<180 cm/s", borderline: "180–200 cm/s", abnormal: ">200 cm/s (≥60% stenosis)" },
+      { param: "Renal-aortic ratio (RAR)", normal: "<3.5", borderline: "3.5–3.9", abnormal: "≥3.5 (≥60% stenosis)" },
+      { param: "Intrarenal RI (resistive index)", normal: "0.60–0.70", borderline: "0.70–0.80", abnormal: ">0.80 (intrinsic renal disease)" },
+      { param: "Acceleration time (AT)", normal: "<70 ms", borderline: "70–80 ms", abnormal: ">80 ms (proximal stenosis)" },
     ],
-  }
+  },
+  {
+    category: "Kidney Size",
+    values: [
+      { param: "Renal length (adult)", normal: "9–12 cm", borderline: "8–9 cm", abnormal: "<8 cm (atrophy) or >13 cm" },
+      { param: "Cortical thickness", normal: "≥1.0 cm", borderline: "0.7–1.0 cm", abnormal: "<0.7 cm (cortical thinning)" },
+      { param: "Side-to-side length difference", normal: "<1.5 cm", borderline: "1.5–2.0 cm", abnormal: ">2.0 cm (significant asymmetry)" },
+    ],
+  },
+  {
+    category: "Abdominal Aorta",
+    values: [
+      { param: "Infrarenal aorta diameter", normal: "<2.0 cm", borderline: "2.0–2.9 cm", abnormal: "≥3.0 cm (AAA)" },
+      { param: "Aortic PSV", normal: "60–100 cm/s", borderline: "100–150 cm/s", abnormal: ">150 cm/s (stenosis)" },
+    ],
+  },
 ];
+// References: Olin JW et al. J Am Coll Cardiol 2010;55:2499–2507 (renal artery stenosis); Chaikof EL et al. J Vasc Surg 2018;67:2–77 (AAA); Platt JF et al. Radiology 1997;202:36–42 (intrarenal RI).
 
 export default function AbdominalVascularNavigator() {
   const [tab, setTab] = useState<"protocol" | "reference">("protocol");

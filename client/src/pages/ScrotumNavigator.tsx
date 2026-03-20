@@ -53,12 +53,37 @@ const views = [
 
 const normalValues = [
   {
-    category: "Key Parameters",
+    category: "Testicular Size",
     values: [
-      { param: "Refer to AIUM guidelines", normal: "See AIUM Practice Parameter for the Performa", borderline: "—", abnormal: "—" },
+      { param: "Testicular length (adult)", normal: "3.5–5.5 cm", borderline: "2.5–3.5 cm", abnormal: "<2.5 cm (atrophy) or >5.5 cm" },
+      { param: "Testicular width (adult)", normal: "2.5–3.5 cm", borderline: "1.5–2.5 cm", abnormal: "<1.5 cm" },
+      { param: "Testicular volume (adult)", normal: "12–20 mL", borderline: "8–12 mL", abnormal: "<8 mL (atrophy) or >20 mL" },
+      { param: "Side-to-side volume difference", normal: "<20%", borderline: "20–30%", abnormal: ">30% (asymmetric atrophy)" },
     ],
-  }
+  },
+  {
+    category: "Epididymis",
+    values: [
+      { param: "Epididymal head (globus major)", normal: "5–12 mm", borderline: "12–15 mm", abnormal: ">15 mm (epididymitis/cyst)" },
+      { param: "Epididymal body/tail", normal: "2–4 mm", borderline: "4–6 mm", abnormal: ">6 mm (epididymitis)" },
+    ],
+  },
+  {
+    category: "Vascularity (Doppler)",
+    values: [
+      { param: "Testicular arterial flow", normal: "Symmetric, low-resistance", borderline: "Asymmetric", abnormal: "Absent (torsion) or markedly increased (orchitis)" },
+      { param: "Peak systolic velocity (PSV)", normal: "4–20 cm/s", borderline: "<4 cm/s", abnormal: "Absent flow (torsion)" },
+    ],
+  },
+  {
+    category: "Hydrocele & Varicocele",
+    values: [
+      { param: "Hydrocele depth", normal: "<5 mm (trace)", borderline: "5–10 mm", abnormal: ">10 mm or complex fluid" },
+      { param: "Varicocele vein diameter (at rest)", normal: "<2 mm", borderline: "2–3 mm", abnormal: ">3 mm (clinically significant)" },
+    ],
+  },
 ];
+// References: Dogra VS et al. Radiology 2003;227:18–36; Paltiel HJ et al. Radiology 2006;238:250–258; Meacham RB et al. J Urol 2007;177:2060–2066.
 
 export default function ScrotumNavigator() {
   const [tab, setTab] = useState<"protocol" | "reference">("protocol");

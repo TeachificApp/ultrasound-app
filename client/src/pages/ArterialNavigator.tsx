@@ -52,12 +52,40 @@ const views = [
 
 const normalValues = [
   {
-    category: "Key Parameters",
+    category: "Ankle-Brachial Index (ABI)",
     values: [
-      { param: "Refer to AIUM guidelines", normal: "See AIUM Practice Parameter for the Performa", borderline: "—", abnormal: "—" },
+      { param: "ABI (resting)", normal: "1.0–1.4", borderline: "0.91–0.99 (borderline)", abnormal: "≤0.90 (PAD) or >1.4 (non-compressible)" },
+      { param: "ABI mild PAD", normal: "—", borderline: "0.70–0.90", abnormal: "<0.70 (moderate–severe PAD)" },
+      { param: "ABI critical limb ischemia", normal: "—", borderline: "—", abnormal: "<0.40 (critical ischemia)" },
     ],
-  }
+  },
+  {
+    category: "Carotid Artery (ICA/CCA Ratio)",
+    values: [
+      { param: "ICA PSV (normal)", normal: "<125 cm/s", borderline: "125–230 cm/s", abnormal: ">230 cm/s (≥70% stenosis)" },
+      { param: "ICA/CCA PSV ratio", normal: "<2.0", borderline: "2.0–4.0", abnormal: ">4.0 (≥70% stenosis)" },
+      { param: "CCA PSV (normal)", normal: "<120 cm/s", borderline: "120–150 cm/s", abnormal: ">150 cm/s" },
+      { param: "ICA EDV", normal: "<40 cm/s", borderline: "40–70 cm/s", abnormal: ">70 cm/s (≥70% stenosis)" },
+    ],
+  },
+  {
+    category: "Lower Extremity Arterial",
+    values: [
+      { param: "Common femoral artery PSV", normal: "70–100 cm/s", borderline: "100–150 cm/s", abnormal: ">150 cm/s (stenosis)" },
+      { param: "Popliteal artery PSV", normal: "50–80 cm/s", borderline: "80–120 cm/s", abnormal: ">120 cm/s (stenosis)" },
+      { param: "PSV ratio across stenosis", normal: "<2.0", borderline: "2.0–4.0 (50–75% stenosis)", abnormal: ">4.0 (>75% stenosis)" },
+    ],
+  },
+  {
+    category: "Renal Artery",
+    values: [
+      { param: "Renal artery PSV", normal: "<180 cm/s", borderline: "180–200 cm/s", abnormal: ">200 cm/s (≥60% stenosis)" },
+      { param: "Renal-aortic ratio (RAR)", normal: "<3.5", borderline: "3.5–3.9", abnormal: "≥3.5 (≥60% stenosis)" },
+      { param: "Renal artery RI", normal: "0.60–0.70", borderline: "0.70–0.80", abnormal: ">0.80 (intrinsic renal disease)" },
+    ],
+  },
 ];
+// References: Norgren L et al. J Vasc Surg 2007;45(Suppl S):S5–S67 (TASC II, ABI); Grant EG et al. Radiology 2003;229:340–346 (carotid criteria); Olin JW et al. J Am Coll Cardiol 2010;55:2499–2507 (renal artery).
 
 export default function ArterialNavigator() {
   const [tab, setTab] = useState<"protocol" | "reference">("protocol");
