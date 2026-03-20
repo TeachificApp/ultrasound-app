@@ -191,6 +191,7 @@ export default function OB23ScanCoach() {
         </div>
       </div>
 
+      <PremiumGate featureName="OB 2nd/3rd Trimester ScanCoach™">
       <div className="container py-6">
         {/* View selector */}
         <div className="flex gap-2 flex-wrap mb-5">
@@ -210,7 +211,7 @@ export default function OB23ScanCoach() {
           ))}
         </div>
 
-        {/* Current view card */}
+         {/* Current view card */}
         {currentView && (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-5">
             <div
@@ -290,6 +291,7 @@ export default function OB23ScanCoach() {
           Based on: <a href="https://www.aium.org/resources/practice-parameters" target="_blank" rel="noopener noreferrer" className="underline hover:text-[#189aa1]">AIUM Practice Parameter for the Performance of Obstetric Ultrasound Examinations (2018)</a>
         </div>
       </div>
+      </PremiumGate>
     </Layout>
   );
 }

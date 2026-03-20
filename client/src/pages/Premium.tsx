@@ -93,6 +93,8 @@ const FREE_FEATURES = [
   "Ultrasound Flashcards — 10 per day, random rotation, resets at midnight",
   "Adult TTE Navigator & ScanCoach",
   "Pediatric & Adult Congenital Navigators",
+  "Fetal Echo Navigator",
+  "OB 2nd/3rd Trimester Navigator",
   "Strain Navigator & ScanCoach",
   "UEA Navigator & ScanCoach",
   "Diastolic Function Navigator",
@@ -112,7 +114,8 @@ const PREMIUM_ONLY_LABELS = [
   "Unlimited Ultrasound Flashcards (no daily limit)",
   "Daily Challenge Archive (full history)",
   "EchoAccreditation Navigator",
-  "Fetal EchoAssist™ Navigator & ScanCoach",
+  "Fetal Echo ScanCoach",
+  "OB 2nd/3rd Trimester ScanCoach",
 ];
 
 export default function Premium() {
