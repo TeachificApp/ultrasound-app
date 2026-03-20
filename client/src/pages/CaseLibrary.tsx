@@ -49,12 +49,15 @@ import { formatViewCount, getDisplayViewCount } from "@/lib/caseViewCount";
 import CaseLibraryBanner from "@/components/CaseLibraryBanner";
 
 const MODALITY_COLORS: Record<string, string> = {
-  TTE: "bg-blue-100 text-blue-700",
-  TEE: "bg-purple-100 text-purple-700",
-  Stress: "bg-orange-100 text-orange-700",
-  Pediatric: "bg-pink-100 text-pink-700",
-  Fetal: "bg-rose-100 text-rose-700",
+  Abdominal: "bg-blue-100 text-blue-700",
+  Vascular: "bg-purple-100 text-purple-700",
+  "OB/Gyn": "bg-pink-100 text-pink-700",
+  MSK: "bg-orange-100 text-orange-700",
   POCUS: "bg-teal-100 text-teal-700",
+  Thyroid: "bg-indigo-100 text-indigo-700",
+  Breast: "bg-rose-100 text-rose-700",
+  Renal: "bg-cyan-100 text-cyan-700",
+  "Fetal Echo": "bg-emerald-100 text-emerald-700",
   Other: "bg-gray-100 text-gray-600",
 };
 
@@ -76,7 +79,7 @@ const STATUS_ICONS: Record<string, React.ElementType> = {
   rejected: XCircle,
 };
 
-const MODALITIES = ["All", "TTE", "TEE", "Stress", "Pediatric", "Fetal", "POCUS", "Other"];
+const MODALITIES = ["All", "Abdominal", "Vascular", "OB/Gyn", "MSK", "POCUS", "Thyroid", "Breast", "Renal", "Fetal Echo", "Other"];
 const DIFFICULTIES = ["All", "beginner", "intermediate", "advanced"];
 
 type TabType = "browse" | "mySubmissions";

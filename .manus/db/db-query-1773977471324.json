@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE `echoLibraryCases` MODIFY COLUMN `modality` ENUM('Abdominal','Vascular','OB/Gyn','MSK','POCUS','Thyroid','Breast','Renal','Fetal Echo','Other') NOT NULL;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute ALTER TABLE `echoLibraryCases` MODIFY COLUMN `modality` ENUM('Abdominal','Vascular','OB/Gyn','MSK','POCUS','Thyroid','Breast','Renal','Fetal Echo','Other') NOT NULL;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1362
+}

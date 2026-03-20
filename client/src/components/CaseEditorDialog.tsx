@@ -280,7 +280,7 @@ export default function CaseEditorDialog({ caseId, open, onClose, onSaved }: Pro
   const [diagnosis, setDiagnosis] = useState("");
   const [teachingPoints, setTeachingPoints] = useState<string[]>([]);
   const [tags, setTags] = useState<string[]>([]);
-  const [modality, setModality] = useState("TTE");
+  const [modality, setModality] = useState("Abdominal");
   const [difficulty, setDifficulty] = useState("intermediate");
   const [submitterCreditName, setSubmitterCreditName] = useState("");
   const [submitterLinkedIn, setSubmitterLinkedIn] = useState("");
@@ -552,7 +552,7 @@ export default function CaseEditorDialog({ caseId, open, onClose, onSaved }: Pro
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {["TTE", "TEE", "Stress", "Pediatric", "Fetal", "POCUS", "Other"].map((m) => (
+                          {["Abdominal", "Vascular", "OB/Gyn", "MSK", "POCUS", "Thyroid", "Breast", "Renal", "Fetal Echo", "Other"].map((m) => (
                             <SelectItem key={m} value={m}>{m}</SelectItem>
                           ))}
                         </SelectContent>

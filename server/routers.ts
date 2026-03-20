@@ -461,7 +461,7 @@ export const appRouter = router({
     .input(z.object({
       patientId: z.string().optional(),
       studyDate: z.string().optional(),
-      modality: z.enum(["TTE", "TEE", "Stress", "Pediatric", "Fetal", "HOCM", "POCUS"]),
+      modality: z.enum(["Abdominal", "Vascular", "OB/Gyn", "MSK", "POCUS", "Thyroid", "Breast", "Renal", "Fetal Echo", "Other"]),
       sonographerInitials: z.string().optional(),
       imageQuality: z.enum(["excellent", "good", "adequate", "poor"]).optional(),
       imageQualityNotes: z.string().optional(),
@@ -488,7 +488,7 @@ export const appRouter = router({
     .input(z.object({
       title: z.string().min(1),
       category: z.enum(["infection_control", "equipment", "patient_safety", "protocol", "staff_competency", "quality_assurance", "appropriate_use", "report_turnaround", "emergency", "other"]),
-      modality: z.enum(["TTE", "TEE", "Stress", "Pediatric", "Fetal", "HOCM", "POCUS", "All"]).optional(),
+      modality: z.enum(["Abdominal", "Vascular", "OB/Gyn", "MSK", "POCUS", "Thyroid", "Breast", "Renal", "Fetal Echo", "Other", "All"]).optional(),
       content: z.string().min(1),
       version: z.string().optional(),
       effectiveDate: z.string().optional(),
@@ -559,7 +559,7 @@ export const appRouter = router({
       indicationAppropriateness: z.string().optional(),
       reviewComments: z.string().optional(),
       // Legacy fields
-      modality: z.enum(["TTE", "TEE", "Stress", "Pediatric", "Fetal", "HOCM", "POCUS"]).optional(),
+      modality: z.enum(["Abdominal", "Vascular", "OB/Gyn", "MSK", "POCUS", "Thyroid", "Breast", "Renal", "Fetal Echo", "Other"]).optional(),
       indication: z.string().optional(),
       appropriatenessRating: z.enum(["appropriate", "may_be_appropriate", "rarely_appropriate", "unknown"]).optional(),
       clinicalScenario: z.string().optional(),

@@ -317,7 +317,7 @@ export async function createPeerReview(data: {
   reviewerId: number;
   patientId?: string;
   studyDate?: string;
-  modality: "TTE" | "TEE" | "Stress" | "Pediatric" | "Fetal" | "HOCM" | "POCUS";
+  modality: "Abdominal" | "Vascular" | "OB/Gyn" | "MSK" | "POCUS" | "Thyroid" | "Breast" | "Renal" | "Fetal Echo" | "Other";
   sonographerInitials?: string;
   imageQuality?: "excellent" | "good" | "adequate" | "poor";
   imageQualityNotes?: string;
@@ -350,7 +350,7 @@ export async function createPolicy(data: {
   diyOrgId?: number | null;
   title: string;
   category: "infection_control" | "equipment" | "patient_safety" | "protocol" | "staff_competency" | "quality_assurance" | "appropriate_use" | "report_turnaround" | "emergency" | "other";
-  modality?: "TTE" | "TEE" | "Stress" | "Pediatric" | "Fetal" | "HOCM" | "POCUS" | "All";
+  modality?: "Abdominal" | "Vascular" | "OB/Gyn" | "MSK" | "POCUS" | "Thyroid" | "Breast" | "Renal" | "Fetal Echo" | "Other" | "All";
   content: string;
   version?: string;
   effectiveDate?: string;
@@ -438,7 +438,7 @@ export async function createAucEntry(data: {
   indicationAppropriateness?: string;
   reviewComments?: string;
   // Legacy fields
-  modality?: "TTE" | "TEE" | "Stress" | "Pediatric" | "Fetal" | "HOCM" | "POCUS";
+  modality?: "Abdominal" | "Vascular" | "OB/Gyn" | "MSK" | "POCUS" | "Thyroid" | "Breast" | "Renal" | "Fetal Echo" | "Other";
   indication?: string;
   appropriatenessRating?: "appropriate" | "may_be_appropriate" | "rarely_appropriate" | "unknown";
   clinicalScenario?: string;
@@ -452,7 +452,7 @@ export async function createAucEntry(data: {
     ...data,
     // Ensure required fields have defaults
     indication: data.indication ?? data.examTypes ?? "",
-    modality: data.modality ?? "TTE",
+    modality: data.modality ?? "Abdominal",
   }).$returningId();
   return row;
 }

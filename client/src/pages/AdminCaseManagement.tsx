@@ -85,12 +85,15 @@ const DIFFICULTY_COLORS: Record<string, string> = {
 };
 
 const MODALITY_COLORS: Record<string, string> = {
-  TTE: "bg-blue-100 text-blue-700",
-  TEE: "bg-purple-100 text-purple-700",
-  Stress: "bg-orange-100 text-orange-700",
-  Pediatric: "bg-pink-100 text-pink-700",
-  Fetal: "bg-rose-100 text-rose-700",
+  Abdominal: "bg-blue-100 text-blue-700",
+  Vascular: "bg-purple-100 text-purple-700",
+  "OB/Gyn": "bg-pink-100 text-pink-700",
+  MSK: "bg-orange-100 text-orange-700",
   POCUS: "bg-teal-100 text-teal-700",
+  Thyroid: "bg-indigo-100 text-indigo-700",
+  Breast: "bg-rose-100 text-rose-700",
+  Renal: "bg-cyan-100 text-cyan-700",
+  "Fetal Echo": "bg-emerald-100 text-emerald-700",
   Other: "bg-gray-100 text-gray-600",
 };
 
@@ -569,7 +572,7 @@ export default function AdminCaseManagement() {
   // AI case generator
   const [aiCaseOpen, setAiCaseOpen] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
-  const [aiModality, setAiModality] = useState<string>("TTE");
+  const [aiModality, setAiModality] = useState<string>("Abdominal");
   const [aiDifficulty, setAiDifficulty] = useState<string>("intermediate");
   const [aiQCount, setAiQCount] = useState(3);
   const [aiCasePreview, setAiCasePreview] = useState<any | null>(null);
@@ -1000,13 +1003,15 @@ export default function AdminCaseManagement() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Modalities</SelectItem>
-                    <SelectItem value="TTE">TTE</SelectItem>
-                    <SelectItem value="TEE">TEE</SelectItem>
-                    <SelectItem value="Stress">Stress</SelectItem>
-                    <SelectItem value="Pediatric">Pediatric</SelectItem>
-                    <SelectItem value="Fetal">Fetal</SelectItem>
-                    <SelectItem value="HOCM">HOCM</SelectItem>
+                    <SelectItem value="Abdominal">Abdominal</SelectItem>
+                    <SelectItem value="Vascular">Vascular</SelectItem>
+                    <SelectItem value="OB/Gyn">OB/Gyn</SelectItem>
+                    <SelectItem value="MSK">MSK</SelectItem>
                     <SelectItem value="POCUS">POCUS</SelectItem>
+                    <SelectItem value="Thyroid">Thyroid</SelectItem>
+                    <SelectItem value="Breast">Breast</SelectItem>
+                    <SelectItem value="Renal">Renal</SelectItem>
+                    <SelectItem value="Fetal Echo">Fetal Echo</SelectItem>
                     <SelectItem value="Other">Other</SelectItem>
                   </SelectContent>
                 </Select>

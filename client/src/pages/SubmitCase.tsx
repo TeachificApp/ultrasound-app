@@ -59,7 +59,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-const MODALITIES = ["TTE", "TEE", "Stress", "Pediatric", "Fetal", "POCUS", "Other"] as const;
+const MODALITIES = ["Abdominal", "Vascular", "OB/Gyn", "MSK", "POCUS", "Thyroid", "Breast", "Renal", "Fetal Echo", "Other"] as const;
 const DIFFICULTIES = ["beginner", "intermediate", "advanced"] as const;
 const DRAFT_KEY = "ihe_submit_case_draft";
 
@@ -117,7 +117,7 @@ export default function SubmitCase() {
   const [summary, setSummary] = useState("");
   const [clinicalHistory, setClinicalHistory] = useState("");
   const [diagnosis, setDiagnosis] = useState("");
-  const [modality, setModality] = useState<typeof MODALITIES[number]>("TTE");
+  const [modality, setModality] = useState<typeof MODALITIES[number]>("Abdominal");
   const [difficulty, setDifficulty] = useState<typeof DIFFICULTIES[number]>("intermediate");
   const [tagsInput, setTagsInput] = useState("");
   const [teachingPointsInput, setTeachingPointsInput] = useState("");
@@ -156,7 +156,7 @@ export default function SubmitCase() {
     setSummary(existingCase.summary ?? "");
     setClinicalHistory(existingCase.clinicalHistory ?? "");
     setDiagnosis(existingCase.diagnosis ?? "");
-    setModality((existingCase.modality as typeof MODALITIES[number]) ?? "TTE");
+    setModality((existingCase.modality as typeof MODALITIES[number]) ?? "Abdominal");
     setDifficulty((existingCase.difficulty as typeof DIFFICULTIES[number]) ?? "intermediate");
     const tags = Array.isArray(existingCase.tags) ? existingCase.tags : [];
     setTagsInput(tags.join(", "));
@@ -216,7 +216,7 @@ export default function SubmitCase() {
       setSummary(draft.summary ?? "");
       setClinicalHistory(draft.clinicalHistory ?? "");
       setDiagnosis(draft.diagnosis ?? "");
-      setModality(draft.modality ?? "TTE");
+      setModality(draft.modality ?? "Abdominal");
       setDifficulty(draft.difficulty ?? "intermediate");
       setTagsInput(draft.tagsInput ?? "");
       setTeachingPointsInput(draft.teachingPointsInput ?? "");

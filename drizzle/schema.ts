@@ -89,7 +89,7 @@ export const peerReviews = mysqlTable("peerReviews", {
   reviewerId: int("reviewerId").notNull(),
   patientId: varchar("patientId", { length: 64 }), // de-identified
   studyDate: varchar("studyDate", { length: 20 }),
-  modality: mysqlEnum("modality", ["TTE", "TEE", "Stress", "Pediatric", "Fetal", "HOCM", "POCUS"]).notNull(),
+  modality: mysqlEnum("modality", ["Abdominal", "Vascular", "OB/Gyn", "MSK", "POCUS", "Thyroid", "Breast", "Renal", "Fetal Echo", "Other"]).notNull(),
   sonographerInitials: varchar("sonographerInitials", { length: 20 }),
   imageQuality: mysqlEnum("imageQuality", ["excellent", "good", "adequate", "poor"]),
   imageQualityNotes: text("imageQualityNotes"),
@@ -145,7 +145,7 @@ export const policies = mysqlTable("policies", {
     "staff_competency", "quality_assurance", "appropriate_use",
     "report_turnaround", "emergency", "other"
   ]).notNull(),
-  modality: mysqlEnum("modality", ["TTE", "TEE", "Stress", "Pediatric", "Fetal", "HOCM", "POCUS", "All"]).default("All").notNull(),
+  modality: mysqlEnum("modality", ["Abdominal", "Vascular", "OB/Gyn", "MSK", "POCUS", "Thyroid", "Breast", "Renal", "Fetal Echo", "Other", "All"]).default("All").notNull(),
   content: text("content").notNull(),
   version: varchar("version", { length: 20 }).default("1.0").notNull(),
   effectiveDate: varchar("effectiveDate", { length: 20 }),
@@ -175,7 +175,7 @@ export const appropriateUseCases = mysqlTable("appropriateUseCases", {
   indicationAppropriateness: varchar("indicationAppropriateness", { length: 300 }),
   reviewComments: text("reviewComments"),
   // Legacy fields kept for backward compatibility
-  modality: mysqlEnum("modality", ["TTE", "TEE", "Stress", "Pediatric", "Fetal", "HOCM", "POCUS"]),
+  modality: mysqlEnum("modality", ["Abdominal", "Vascular", "OB/Gyn", "MSK", "POCUS", "Thyroid", "Breast", "Renal", "Fetal Echo", "Other"]),
   indication: text("indication"),
   appropriatenessRating: mysqlEnum("appropriatenessRating", ["appropriate", "may_be_appropriate", "rarely_appropriate", "unknown"]).default("unknown").notNull(),
   clinicalScenario: text("clinicalScenario"),
@@ -999,7 +999,7 @@ export const echoLibraryCases = mysqlTable("echoLibraryCases", {
   diagnosis: varchar("diagnosis", { length: 300 }),
   // Teaching points (JSON: string[])
   teachingPoints: text("teachingPoints"),
-  modality: mysqlEnum("modality", ["TTE", "TEE", "Stress", "Pediatric", "Fetal", "HOCM", "POCUS", "Other"]).notNull(),
+  modality: mysqlEnum("modality", ["Abdominal", "Vascular", "OB/Gyn", "MSK", "POCUS", "Thyroid", "Breast", "Renal", "Fetal Echo", "Other"]).notNull(),
   difficulty: mysqlEnum("difficulty", ["beginner", "intermediate", "advanced"]).default("intermediate").notNull(),
   // JSON: string[] — topic tags
   tags: text("tags"),
