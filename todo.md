@@ -436,3 +436,10 @@
 
 ## Bug: Explanation Field Too Short (Mar 19)
 - [x] Fix "Too big: expected string to have <=2000 characters" error on explanation field when adding challenge questions to queue — increased explanation/reviewAnswer to 50,000 chars, question to 10,000 chars across all procedures
+
+## Bulk Select & Duplicate Prevention (Mar 19)
+- [ ] Remove 20-item bulk-select cap in admin question bank (challenges)
+- [ ] Enforce no-duplicate question IDs across challenges (server + UI warning)
+- [ ] Apply same duplicate prevention to Flashcards admin
+- [ ] Apply same duplicate prevention to Case Studies admin
+- [ ] Match iHeartEcho question ID assignment rules

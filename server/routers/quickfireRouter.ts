@@ -2196,13 +2196,31 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
   adminBatchApproveToQueue: adminProcedure
     .input(
       z.object({
-        questionIds: z.array(z.number().int().positive()).min(1).max(100),
+        questionIds: z.array(z.number().int().positive()).min(1).max(500),
         startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      // Duplicate prevention: check if any active/scheduled/draft/live challenge already uses these question IDs
+      const activeChallenges = await db
+        .select({ id: quickfireChallenges.id, questionIds: quickfireChallenges.questionIds, title: quickfireChallenges.title })
+        .from(quickfireChallenges)
+        .where(inArray(quickfireChallenges.status, ["draft", "scheduled", "live"] as any[]));
+      const allUsedIds = new Set<number>();
+      for (const ch of activeChallenges) {
+        const ids: number[] = JSON.parse(ch.questionIds || "[]");
+        ids.forEach((id) => allUsedIds.add(id));
+      }
+      const conflicts = input.questionIds.filter((qid) => allUsedIds.has(qid));
+      if (conflicts.length > 0) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: `${conflicts.length} question(s) are already in the active challenge queue. Remove duplicates and try again. Conflicting IDs: ${conflicts.join(", ")}`,
+        });
+      }
 
       // Fetch all requested questions
       const qs = await db

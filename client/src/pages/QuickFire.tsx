@@ -392,7 +392,7 @@ function SubmitQuestionTab({ isAuthenticated }: { isAuthenticated: boolean }) {
       <div className="rounded-xl p-4 border border-[#189aa1]/20" style={{ background: "#f0fbfc" }}>
         <h3 className="text-xs font-bold text-[#189aa1] mb-2 uppercase tracking-wider">Submission Guidelines</h3>
         <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
-          <li>Questions must be original and clinically relevant to echocardiography or cardiac ultrasound.</li>
+          <li>Questions must be original and clinically relevant to general, vascular, or point-of-care ultrasound.</li>
           <li>Multiple-choice scenario format only (2–6 options, one correct answer).</li>
           <li>Include a clear explanation referencing ASE or relevant guidelines where possible.</li>
           <li>Avoid duplicating existing questions in the platform.</li>
@@ -1012,7 +1012,7 @@ export default function QuickFire() {
                 {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
               </p>
               <p className="text-xs text-gray-500 mt-0.5 max-w-sm leading-relaxed">
-                One question. One case. One chance today. Answer the challenge, see the explanation. Maintain your streak, earn points and compare with other echo professionals.
+                One question. One case. One chance today. Answer the challenge, see the explanation. Maintain your streak, earn points and compare with other ultrasound professionals.
               </p>
             </div>
           </div>
@@ -1184,7 +1184,7 @@ export default function QuickFire() {
                     { cat: "Abdominal" as const, prefKey: "abdominal" as const, Icon: Activity, label: "Abdominal" },
                     { cat: "Vascular" as const, prefKey: "vascular" as const, Icon: Activity, label: "Vascular" },
                     { cat: "OB 2nd/3rd Trimester" as const, prefKey: "ob2nd3rd" as const, Icon: Baby, label: "OB 2nd/3rd" },
-                    { cat: "POCUS" as const, prefKey: "pocus" as const, Icon: ({ className }: { className?: string }) => <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/pocus-icon_0b2e6eff.png" alt="POCUS" className={className} style={{ objectFit: 'contain' }} /> },
+                    { cat: "POCUS" as const, prefKey: "pocus" as const, Icon: Activity, label: "POCUS" },
                   ] as { cat: string; prefKey: "abdominal" | "vascular" | "ob2nd3rd" | "pocus"; Icon: (props: { className?: string }) => import('react').ReactElement; label?: string }[]).map(({ cat, prefKey, Icon, label }) => {
                     const prefs = categoryPrefsQuery.data ?? { abdominal: true, vascular: true, ob2nd3rd: true, pocus: true };
                     const isEnabled = (prefs as any)[prefKey] !== false;
@@ -1201,8 +1201,8 @@ export default function QuickFire() {
                         }`}
                       >
                         {(prefKey === 'pocus') ? (
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center overflow-hidden ${!isEnabled ? "opacity-50 grayscale" : ""}`}>
-                            <Icon className="w-10 h-10" />
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isEnabled ? "bg-[#189aa1]" : "bg-gray-200"}`}>
+                            <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/pocus-icon_0b2e6eff.png" alt="POCUS" className="w-5 h-5 object-contain" />
                           </div>
                         ) : (
                           <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isEnabled ? "bg-[#189aa1]" : "bg-gray-200"}`}>
@@ -1253,14 +1253,13 @@ export default function QuickFire() {
                   const categoryMap: Record<string, number> = (todaySet as any)?.categoryMap ?? {};
                   const todayQuestions: any[] = (todaySet as any)?.questions ?? [];
                   const todayAttempts: Record<number, any> = (todaySet as any)?.userAttempts ?? {};
-                  const catPrefs = categoryPrefsQuery.data ?? { abdominal: true, venous: true, arterial: true, ob2nd3rd: true, pocus: true };
+                  const catPrefs = categoryPrefsQuery.data ?? { abdominal: true, vascular: true, ob2nd3rd: true, pocus: true };
 
                   const CATS = [
-                    { key: "Abdominal", label: "Abdominal", Icon: Activity, desc: "Abdominal Ultrasound", prefKey: "abdominal" as const, mapKey: "abdominal" },
-                    { key: "Venous", label: "Venous", Icon: Activity, desc: "Venous Duplex", prefKey: "venous" as const, mapKey: "venous" },
-                    { key: "Arterial", label: "Arterial", Icon: Activity, desc: "Arterial Duplex", prefKey: "arterial" as const, mapKey: "arterial" },
-                    { key: "OB 2nd/3rd Trimester", label: "OB 2nd/3rd", Icon: Baby, desc: "Obstetric Ultrasound", prefKey: "ob2nd3rd" as const, mapKey: "ob2nd3rd" },
-                    { key: "POCUS", label: "POCUS", Icon: ({ className }: { className?: string }) => <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/pocus-icon_0b2e6eff.png" alt="POCUS" className={className} style={{ objectFit: 'contain' }} />, desc: "Point-of-Care Ultrasound", prefKey: "pocus" as const, mapKey: "pocus" },
+                    { key: "Abdominal", label: "Abdominal", Icon: Activity, desc: "Abdominal Ultrasound", prefKey: "abdominal" as const, mapKey: "abdominal", isPocus: false },
+                    { key: "Vascular", label: "Vascular", Icon: Activity, desc: "Vascular Duplex", prefKey: "vascular" as const, mapKey: "vascular", isPocus: false },
+                    { key: "OB 2nd/3rd Trimester", label: "OB 2nd/3rd", Icon: Baby, desc: "Obstetric Ultrasound", prefKey: "ob2nd3rd" as const, mapKey: "ob2nd3rd", isPocus: false },
+                    { key: "POCUS", label: "POCUS", Icon: Activity, desc: "Point-of-Care Ultrasound", prefKey: "pocus" as const, mapKey: "pocus", isPocus: true },
                   ];
 
                   const enabledCats = CATS.filter((c) => catPrefs[c.prefKey] !== false);
@@ -1364,14 +1363,12 @@ export default function QuickFire() {
                           >
                             <div className="flex items-start justify-between mb-3">
                               <div className="flex items-center gap-2">
-                                {(cat.mapKey === 'pocus') ? (
-                                  <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden ${isDone ? (isCorrect ? 'opacity-80' : 'opacity-60 grayscale') : ''}`}>
-                                    <cat.Icon className="w-9 h-9" />
+                                {(cat.isPocus) ? (
+                                  <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${isDone ? (isCorrect ? 'bg-green-500' : 'bg-orange-400') : 'bg-[#189aa1]'}`}>
+                                    <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/pocus-icon_0b2e6eff.png" alt="POCUS" className="w-5 h-5 object-contain" />
                                   </div>
                                 ) : (
-                                  <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                    isDone ? (isCorrect ? "bg-green-500" : "bg-orange-400") : "bg-[#189aa1]"
-                                  }`}>
+                                  <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${isDone ? (isCorrect ? "bg-green-500" : "bg-orange-400") : "bg-[#189aa1]"}`}>
                                     <cat.Icon className="w-4.5 h-4.5 text-white" />
                                   </div>
                                 )}
@@ -1551,7 +1548,7 @@ export default function QuickFire() {
               const correctCount = sessionResults.filter((r) => r.correct === true).length;
               const pct = Math.round((correctCount / questions.length) * 100);
               const grade =
-                pct >= 80 ? { label: "Echo Ninja 🥷", color: "text-[#4ad9e0]" } :
+                pct >= 80 ? { label: "Ultrasound Ninja 🥷", color: "text-[#4ad9e0]" } :
                 pct >= 60 ? { label: "Good Work! 👍", color: "text-blue-300" } :
                 { label: "Keep Practicing 📚", color: "text-orange-400" };
               return (
@@ -2226,7 +2223,7 @@ export default function QuickFire() {
                   const correctCount = archiveSessionResults.filter((r) => r.correct === true).length;
                   const pct = Math.round((correctCount / archiveQuestions.length) * 100);
                   const grade =
-                    pct >= 80 ? { label: "Echo Ninja 🥷", color: "text-[#4ad9e0]" } :
+                    pct >= 80 ? { label: "Ultrasound Ninja 🥷", color: "text-[#4ad9e0]" } :
                     pct >= 60 ? { label: "Good Work! 👍", color: "text-blue-300" } :
                     { label: "Keep Practicing 📚", color: "text-orange-400" };
                   return (

@@ -1122,17 +1122,17 @@ export default function AdminCaseManagement() {
                 <p className="text-xs text-gray-400 mb-2">Quick topic starters — click to pre-fill, then customise:</p>
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {[
-                    { label: "HOCM", prompt: "Patient with hypertrophic obstructive cardiomyopathy — LVOT obstruction, SAM of the mitral valve, provocable gradient, management options" },
-                    { label: "Strain / GLS", prompt: "Patient referred for LV global longitudinal strain assessment — reduced GLS in the context of preserved EF, subclinical dysfunction" },
-                    { label: "Diastolic Dysfunction", prompt: "Patient with exertional dyspnoea and preserved LVEF — grading diastolic dysfunction using ASE 2025 criteria, E/A, E/e\u2019, LAVI, TR velocity" },
-                    { label: "Dilated CM", prompt: "Patient with dilated cardiomyopathy — severely reduced EF, functional MR, LV dyssynchrony, CRT candidacy assessment" },
-                    { label: "Restrictive CM", prompt: "Patient with suspected cardiac amyloidosis — restrictive filling pattern, speckled myocardium, biatrial enlargement, low-voltage ECG" },
-                    { label: "Constrictive Pericarditis", prompt: "Patient with constrictive pericarditis — septal bounce, respiratory variation in mitral/tricuspid inflow, annulus reversus, hepatic vein expiratory diastolic reversal" },
-                    { label: "Tamponade", prompt: "Patient with large pericardial effusion and haemodynamic compromise — cardiac tamponade, chamber collapse, IVC plethora, respiratory variation" },
-                    { label: "Pulmonary HTN", prompt: "Patient with pulmonary arterial hypertension — elevated RVSP, RV remodeling, TR velocity, PA acceleration time, ASE 2025 PH guidelines" },
-                    { label: "Pulmonary Embolism", prompt: "Patient with acute massive pulmonary embolism — RV strain, McConnell sign, D-sign, IVC dilation, risk stratification by echo" },
-                    { label: "Aortic Stenosis", prompt: "Patient with severe aortic stenosis — AVA calculation, mean gradient, low-flow low-gradient AS, dobutamine stress echo, TAVR planning" },
-                    { label: "Mitral Regurgitation", prompt: "Patient with severe primary mitral regurgitation — vena contracta, EROA, regurgitant volume, LV remodeling, surgical timing" },
+                    { label: "AAA", prompt: "Patient referred for abdominal aortic aneurysm screening — aortic diameter measurement, morphology, surveillance interval, referral criteria" },
+                    { label: "DVT", prompt: "Patient with unilateral leg swelling and suspected deep vein thrombosis — compression ultrasound technique, thrombus characteristics, proximal vs distal DVT" },
+                    { label: "Carotid Stenosis", prompt: "Patient with TIA and carotid bruit — ICA stenosis grading using PSV/EDV criteria, plaque morphology, NASCET criteria, management" },
+                    { label: "Renal Artery Stenosis", prompt: "Patient with resistant hypertension — renal artery duplex, PSV, RAR, waveform morphology, tardus-parvus pattern" },
+                    { label: "Gallstones", prompt: "Patient with right upper quadrant pain — gallstone characteristics, gallbladder wall thickening, pericholecystic fluid, sonographic Murphy sign" },
+                    { label: "Liver Mass", prompt: "Patient with incidental liver lesion on CT — ultrasound characterisation, echogenicity, vascularity on Doppler, differential diagnosis" },
+                    { label: "POCUS Lung", prompt: "Patient with acute dyspnoea — lung ultrasound B-lines, pleural effusion, pneumothorax assessment, BLUE protocol" },
+                    { label: "Thyroid Nodule", prompt: "Patient with incidental thyroid nodule — ACR TIRADS classification, size, echogenicity, margins, vascularity, FNA criteria" },
+                    { label: "MSK Rotator Cuff", prompt: "Patient with shoulder pain and suspected rotator cuff tear — supraspinatus assessment, dynamic manoeuvres, full vs partial thickness tear" },
+                    { label: "OB 2nd Trimester", prompt: "20-week anatomy survey — fetal biometry, placental location, amniotic fluid index, cervical length, structural anomaly screening" },
+                    { label: "Venous Insufficiency", prompt: "Patient with varicose veins — great saphenous vein reflux, sapheno-femoral junction incompetence, perforator mapping, CEAP classification" },
                   ].map(({ label, prompt }) => (
                     <button
                       key={label}
@@ -1151,7 +1151,7 @@ export default function AdminCaseManagement() {
                 <RichTextEditor
                   value={aiPrompt}
                   onChange={setAiPrompt}
-                  placeholder="e.g. 72-year-old male with exertional dyspnea, systolic murmur, and syncope. Describe the echo findings and management..."
+                  placeholder="e.g. 72-year-old male with right upper quadrant pain and suspected gallstones. Describe the ultrasound findings and management..."
                   minHeight={80}
                 />
               </div>
@@ -1161,7 +1161,7 @@ export default function AdminCaseManagement() {
                   <Select value={aiModality} onValueChange={setAiModality}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {["TTE","TEE","Stress","Pediatric","Fetal","POCUS","Other"].map((m) => (
+                      {["Abdominal","Vascular","OB/Gyn","MSK","POCUS","Thyroid","Breast","Renal","Other"].map((m) => (
                         <SelectItem key={m} value={m}>{m}</SelectItem>
                       ))}
                     </SelectContent>

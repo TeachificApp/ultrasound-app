@@ -1359,10 +1359,17 @@ export default function QuickFireAdmin() {
         ) : (
           <>
             <div className="space-y-2">
-              {questions.map((q: any) => {
+              {(() => {
+                // Compute set of question IDs already in the active challenge queue
+                const queuedQuestionIds = new Set<number>();
+                for (const ch of challenges.filter((c: any) => ["draft","scheduled","live"].includes(c.status))) {
+                  try { const ids = JSON.parse((ch as any).questionIds || "[]"); if (Array.isArray(ids)) ids.forEach((id: number) => queuedQuestionIds.add(id)); } catch {}
+                }
+                return questions.map((q: any) => {
                 const meta = TYPE_META[q.type as QuestionType] ?? TYPE_META.scenario;
                 const Icon = meta.icon;
-                const isEligibleForBulk = q.isActive && q.type !== "quickReview";
+                const isAlreadyQueued = queuedQuestionIds.has(q.id);
+                const isEligibleForBulk = q.isActive && q.type !== "quickReview" && !isAlreadyQueued;
                 const isChecked = bulkSelected.has(q.id);
                 return (
                   <div
@@ -1492,7 +1499,8 @@ export default function QuickFireAdmin() {
                     )}
                   </div>
                 );
-              })}
+              });
+              })()}
             </div>
 
             {/* Pagination */}
@@ -2867,6 +2875,8 @@ export default function QuickFireAdmin() {
                     { label: "POCUS", topic: "Point-of-care ultrasound (POCUS) — eFAST, RUSH protocol, lung POCUS, IVC assessment, pleural effusion, bedside assessment", category: "POCUS" as QuestionCategory },
                     { label: "Physics", topic: "Ultrasound physics — transducer types, artifacts, Doppler principles, image optimization, ARDMS physics exam topics", category: "Physics" as QuestionCategory },
                     { label: "Thyroid", topic: "Thyroid ultrasound — nodule characterization, TIRADS scoring, parathyroid, lymph node assessment, biopsy guidance", category: "Thyroid" as QuestionCategory },
+                    { label: "Scrotum", topic: "Scrotal ultrasound — testicular torsion, epididymo-orchitis, varicocele, hydrocele, testicular masses, Doppler assessment", category: "Scrotum" as QuestionCategory },
+                    { label: "Breast", topic: "Breast ultrasound — BI-RADS classification, solid vs cystic lesions, lymph node assessment, biopsy guidance, implant evaluation", category: "Breast" as QuestionCategory },
                     { label: "MSK", topic: "MSK ultrasound — tendon pathology, rotator cuff tears, joint effusions, nerve entrapment, dynamic assessment, guided injections", category: "MSK" as QuestionCategory },
                   ].map(({ label, topic, category }) => (
                     <button
@@ -3372,6 +3382,9 @@ export default function QuickFireAdmin() {
                     { label: "POCUS", topic: "POCUS flashcards — eFAST findings, lung sliding, B-lines, IVC collapsibility, RUSH protocol steps" },
                     { label: "Physics", topic: "Ultrasound physics flashcards — acoustic impedance, attenuation, artifacts (shadowing, enhancement, reverberation), Doppler principles" },
                     { label: "Thyroid", topic: "Thyroid ultrasound flashcards — TIRADS categories, nodule features, echogenicity, vascularity, biopsy criteria" },
+                    { label: "Scrotum", topic: "Scrotal ultrasound flashcards — testicular torsion criteria, epididymis anatomy, varicocele grading, hydrocele types, Doppler findings" },
+                    { label: "Breast", topic: "Breast ultrasound flashcards — BI-RADS lexicon, solid vs cystic features, lymph node criteria, ACR guidelines, biopsy indications" },
+                    { label: "MSK", topic: "MSK ultrasound flashcards — tendon anatomy, rotator cuff pathology, joint effusion grading, nerve identification, dynamic maneuvers" },
                   ].map(({ label, topic }) => (
                     <button
                       key={label}

@@ -137,16 +137,6 @@ function carotidStenosis(psv: number, edv: number, ica_cca_ratio: number): strin
   if (ica_cca_ratio >= 4.0) results.push("ICA/CCA ratio ≥4.0 supports ≥70%");
   return results.join("; ");
 }
-function rvsp(tr_velocity: number, rap: number): string {
-  // RVSP = 4 × TRV² + RAP (modified Bernoulli)
-  const rvsp_val = 4 * tr_velocity * tr_velocity + rap;
-  let interp = "";
-  if (rvsp_val < 36) interp = "Normal RVSP (<36 mmHg)";
-  else if (rvsp_val < 50) interp = "Mild pulmonary hypertension (36–49 mmHg)";
-  else interp = "Moderate–Severe pulmonary hypertension (≥50 mmHg) — echocardiographic confirmation recommended";
-  return `RVSP = ${rvsp_val.toFixed(0)} mmHg — ${interp}`;
-}
-
 // ─── Calculator definitions ───────────────────────────────────────────────────
 const obgynCalcs: CalcDef[] = [
   {
@@ -341,15 +331,6 @@ const vascularCalcs: CalcDef[] = [
     calculate: (v) => v.psv ? { result: carotidStenosis(v.psv, v.edv || 0, v.ica_cca_ratio || 0), label: "Carotid Stenosis Grade", note: "PSV ≥230 cm/s, EDV ≥100 cm/s, or ICA/CCA ratio ≥4.0 each independently suggest ≥70% stenosis. Reference: SRU Consensus 2003." } : null,
   },
   {
-    id: "rvsp", title: "RVSP Estimation (Tricuspid Regurgitation)", subtitle: "Right ventricular systolic pressure via modified Bernoulli",
-    category: "Cardiac / Pulmonary", premium: false,
-    fields: [
-      { key: "tr_velocity", label: "TR Peak Velocity (m/s)", placeholder: "e.g. 3.2", min: 1, max: 6 },
-      { key: "rap", label: "Estimated RAP (mmHg)", placeholder: "e.g. 5", min: 0, max: 20 },
-    ],
-    calculate: (v) => (v.tr_velocity && v.rap !== undefined) ? { result: rvsp(v.tr_velocity, v.rap), label: "RVSP Estimate", note: "RVSP = 4 × TRV² + RAP. RAP: 5 mmHg if IVC <2.1 cm + >50% collapse; 10 mmHg if intermediate; 15–20 mmHg if IVC >2.1 cm + <50% collapse. Reference: ASE Guidelines 2015." } : null,
-  },
-  {
     id: "dvt_wells", title: "DVT Pre-test Probability (Wells Score)", subtitle: "Lower extremity DVT clinical probability",
     category: "Venous / POCUS", premium: true,
     fields: [
@@ -376,7 +357,7 @@ const TABS = [
   { id: "obgyn", label: "OB/Gyn", icon: Baby, calcs: obgynCalcs, badge: "OB · Gyn · Fetal", refs: "ACOG, SMFM, ISUOG, Hadlock 1985, Mari 2000, Snijders 1998" },
   { id: "abdominal", label: "Abdominal", icon: Scan, calcs: abdominalCalcs, badge: "Liver · GB · Spleen", refs: "EASL 2017, WFUMB 2015, Ferraioli 2021" },
   { id: "breast", label: "Breast", icon: Activity, calcs: breastCalcs, badge: "SWE · BI-RADS", refs: "ACR BI-RADS 5th Ed, WFUMB SWE 2017, Berg 2012" },
-  { id: "vascular", label: "Vascular", icon: Heart, calcs: vascularCalcs, badge: "ABI · IVC · Carotid · DVT", refs: "AHA/ACC 2016, SRU 2003, ASE 2015, Wells 1997" },
+  { id: "vascular", label: "Vascular", icon: Heart, calcs: vascularCalcs, badge: "ABI · IVC · Carotid · DVT", refs: "AHA/ACC 2016, SRU 2003, Wells 1997" },
 ] as const;
 
 type TabId = typeof TABS[number]["id"];
