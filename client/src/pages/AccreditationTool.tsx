@@ -38,8 +38,8 @@ import jsPDF from "jspdf";
 import { Link } from "wouter";
 
 const BRAND = "#189aa1";
-const MODALITIES = ["TTE", "TEE", "Stress", "Pediatric", "Fetal"] as const;
-// Appropriate Use Criteria modalities (no HOCM or POCUS — out of scope for IAC accreditation)
+const MODALITIES = ["Abdominal", "Vascular", "OB/Gyn", "MSK", "POCUS", "Thyroid", "Breast", "Renal", "Fetal Echo", "Other"] as const;
+// Appropriate Use Criteria modalities
 const AUC_MODALITIES = MODALITIES;
 
 // ─── Tab Button ───────────────────────────────────────────────────────────────
@@ -851,7 +851,7 @@ export function PolicyBuilderTab() {
     createPolicy.mutate({
       title: form.title,
       category: form.category as "infection_control" | "equipment" | "patient_safety" | "protocol" | "staff_competency" | "quality_assurance" | "appropriate_use" | "report_turnaround" | "emergency" | "other",
-      modality: (form.modality as "TTE" | "TEE" | "Stress" | "Pediatric" | "Fetal" | "All") || undefined,
+      modality: (form.modality as "Abdominal" | "Vascular" | "OB/Gyn" | "MSK" | "POCUS" | "Thyroid" | "Breast" | "Renal" | "Fetal Echo" | "Other" | "All") || undefined,
       content: form.content,
       version: form.version || undefined,
       effectiveDate: form.effectiveDate || undefined,
