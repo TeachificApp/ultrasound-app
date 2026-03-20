@@ -1004,7 +1004,7 @@ export const caseLibraryRouter = router({
     .input(
       z.object({
         prompt: z.string().min(10).max(1000).describe("Clinical scenario description"),
-        modality: z.enum(["TTE", "TEE", "Stress", "Pediatric", "Fetal", "POCUS", "Other"]).default("TTE"),
+        modality: z.enum(["Abdominal", "Vascular", "OB/Gyn", "MSK", "POCUS", "Thyroid", "Breast", "Renal", "Other"]).default("Abdominal"),
         difficulty: z.enum(["beginner", "intermediate", "advanced"]).default("intermediate"),
         questionCount: z.number().int().min(1).max(5).default(3),
       })
@@ -1020,11 +1020,11 @@ export const caseLibraryRouter = router({
         });
       }
 
-      const promptText = `You are an expert echocardiography educator creating a ${input.difficulty} ${input.modality} echo case.
+      const promptText = `You are an expert ultrasound educator creating a ${input.difficulty} ${input.modality} ultrasound case.
 
 Clinical scenario: "${input.prompt}"
 
-Generate a complete, educationally rich echo case. Return ONLY a valid JSON object with NO markdown, NO code fences, NO explanation — just the raw JSON.
+Generate a complete, educationally rich ultrasound case. Return ONLY a valid JSON object with NO markdown, NO code fences, NO explanation — just the raw JSON.
 
 Required JSON format:
 {"title":"...","summary":"...","clinicalHistory":"...","diagnosis":"...","teachingPoints":["...","..."],"tags":["...","..."],"questions":[{"question":"...","options":["A","B","C","D"],"correctAnswer":0,"explanation":"..."}]}
@@ -1032,14 +1032,14 @@ Required JSON format:
 Field requirements:
 - title: concise descriptive case title (max 100 chars)
 - summary: 2-3 sentence overview for the library card
-- clinicalHistory: detailed history (age, sex, presenting symptoms, relevant past history, reason for echo)
+- clinicalHistory: detailed history (age, sex, presenting symptoms, relevant past history, reason for ultrasound)
 - diagnosis: primary diagnosis or key finding (max 100 chars)
 - teachingPoints: array of 2-5 concise clinical teaching points
 - tags: array of 2-8 relevant clinical tags
 - questions: array of exactly ${input.questionCount} MCQ questions, each with exactly 4 options, a 0-indexed correctAnswer (0, 1, 2, or 3), and a clear explanation
 
 Guidelines:
-- Use accurate ASE/AHA/ACC guidelines where applicable
+- Use accurate SVU/ACR/ACOG/AIUM/SRU guidelines where applicable for the ${input.modality} modality
 - Clinical history should be realistic and educational
 - MCQ distractors should be plausible but clearly distinguishable
 - Teaching points should be actionable clinical pearls
