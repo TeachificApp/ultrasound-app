@@ -430,5 +430,6 @@
 - [x] Category filter applied to queued challenges list (live challenges always shown)
 
 ## Admin Queue Randomize Order (Mar 19)
-- [ ] Add "Randomize Order" button to challenge queue — shuffles queued challenges within the selected category filter, interleaving sub-areas to avoid content clustering
-- [ ] Shuffle uses Fisher-Yates algorithm and calls adminReorderChallenges to persist the new order
+- [x] Add "Randomize Order" button to challenge queue — shuffles queued challenges within the selected category filter, interleaving sub-areas to avoid content clustering
+- [x] Shuffle uses Fisher-Yates algorithm and calls adminReorderChallenges to persist the new order
+- [x] Button label dynamically shows "Randomize Vascular" (or whichever category is selected) vs "Randomize All" when no filter is active

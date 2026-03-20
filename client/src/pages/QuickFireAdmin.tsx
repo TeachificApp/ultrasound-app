@@ -518,6 +518,44 @@ export default function QuickFireAdmin() {
     onError: (err) => toast.error(err.message || "Failed to reorder."),
   });
 
+  // Fisher-Yates shuffle helper
+  function fisherYates<T>(arr: T[]): T[] {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function handleRandomizeQueue() {
+    const queued = challenges.filter((c: any) => c.status !== "live");
+    if (queued.length === 0) { toast.info("No queued challenges to randomize."); return; }
+
+    let reordered: any[];
+    if (queueCategoryFilter !== "all") {
+      // Shuffle only the filtered category, keep others in place
+      const inCat = queued.filter((c: any) => c.category === queueCategoryFilter);
+      const shuffled = fisherYates(inCat);
+      // Re-insert shuffled items at their original positions
+      const positions = queued.reduce<number[]>((acc, c: any, i) => {
+        if (c.category === queueCategoryFilter) acc.push(i);
+        return acc;
+      }, []);
+      reordered = [...queued];
+      positions.forEach((pos, i) => { reordered[pos] = shuffled[i]; });
+    } else {
+      reordered = fisherYates(queued);
+    }
+
+    const live = challenges.filter((c: any) => c.status === "live");
+    const finalOrder = [...live, ...reordered];
+    reorderMutation.mutate(
+      { orderedIds: finalOrder.map((c: any) => c.id) },
+      { onSuccess: () => { toast.success(queueCategoryFilter !== "all" ? `Randomized ${queueCategoryFilter} challenges.` : "Queue order randomized."); challengeListQuery.refetch(); } }
+    );
+  }
+
   // DnD sensors for drag-to-reorder
   const dndSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -1098,6 +1136,17 @@ export default function QuickFireAdmin() {
                 >
                   {publishNextMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
                   Publish Next Now
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 border-amber-400 text-amber-600 hover:bg-amber-50"
+                  onClick={handleRandomizeQueue}
+                  disabled={reorderMutation.isPending}
+                  title={queueCategoryFilter !== "all" ? `Shuffle ${queueCategoryFilter} challenges within the queue` : "Shuffle all queued challenges"}
+                >
+                  {reorderMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                  Randomize{queueCategoryFilter !== "all" ? ` ${queueCategoryFilter}` : " All"}
                 </Button>
                 <Button
                   variant="outline"
