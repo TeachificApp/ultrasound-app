@@ -255,6 +255,7 @@ export default function QuickFireAdmin() {
   const [includeInactive, setIncludeInactive] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [challengeSearch, setChallengeSearch] = useState("");
+  const [queueCategoryFilter, setQueueCategoryFilter] = useState<"all" | QuestionCategory>("all");
   const [flashcardSearch, setFlashcardSearch] = useState("");
   const [flashcardEchoCategory, setFlashcardEchoCategory] = useState<"all" | "abdominal" | "pelvic_gyn" | "obstetric_1st" | "obstetric_2nd_3rd" | "fetal_echo" | "venous" | "arterial" | "abdominal_vascular" | "extracranial_carotid" | "intracranial_tcd" | "pocus" | "physics" | "thyroid" | "scrotum" | "breast" | "msk">("all");
   const [flashcardAiOpen, setFlashcardAiOpen] = useState(false);
@@ -1047,12 +1048,38 @@ export default function QuickFireAdmin() {
                 <h2 className="text-base font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>Daily Challenge Queue</h2>
                 <p className="text-xs text-gray-400 mt-0.5">One challenge per category per day. Publishes automatically at 6 AM ET. No dates needed — just set the category and queue position.</p>
               </div>
-              <Input
-                value={challengeSearch}
-                onChange={(e) => setChallengeSearch(e.target.value)}
-                placeholder="Search queue…"
-                className="w-52"
-              />
+              <div className="flex items-center gap-2 flex-wrap">
+                <Input
+                  value={challengeSearch}
+                  onChange={(e) => setChallengeSearch(e.target.value)}
+                  placeholder="Search queue…"
+                  className="w-44"
+                />
+                <Select value={queueCategoryFilter} onValueChange={(v) => setQueueCategoryFilter(v as any)}>
+                  <SelectTrigger className="w-44 h-9 text-xs">
+                    <SelectValue placeholder="All categories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All categories</SelectItem>
+                    <SelectItem value="Abdominal">Abdominal</SelectItem>
+                    <SelectItem value="Pelvic/Gyn">Pelvic/Gyn</SelectItem>
+                    <SelectItem value="OB 1st Trimester">OB 1st Trimester</SelectItem>
+                    <SelectItem value="OB 2nd/3rd Trimester">OB 2nd/3rd Trimester</SelectItem>
+                    <SelectItem value="Vascular">Vascular</SelectItem>
+                    <SelectItem value="Venous">Venous</SelectItem>
+                    <SelectItem value="Arterial">Arterial</SelectItem>
+                    <SelectItem value="Abdominal Vascular">Abdominal Vascular</SelectItem>
+                    <SelectItem value="Extracranial Carotid">Extracranial Carotid</SelectItem>
+                    <SelectItem value="Intracranial Duplex/TCD">Intracranial Duplex/TCD</SelectItem>
+                    <SelectItem value="POCUS">POCUS</SelectItem>
+                    <SelectItem value="Physics">Physics</SelectItem>
+                    <SelectItem value="Thyroid">Thyroid</SelectItem>
+                    <SelectItem value="Scrotum">Scrotum</SelectItem>
+                    <SelectItem value="Breast">Breast</SelectItem>
+                    <SelectItem value="MSK">MSK</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="flex items-center gap-2">
                 <Button
                   size="sm"
@@ -1124,6 +1151,7 @@ export default function QuickFireAdmin() {
                     {/* Queued challenges (sortable) */}
                     {challenges
                       .filter((c: any) => c.status !== "live")
+                      .filter((c: any) => queueCategoryFilter === "all" || c.category === queueCategoryFilter)
                       .filter((c: any) => !challengeSearch.trim() || c.title?.toLowerCase().includes(challengeSearch.toLowerCase()) || c.description?.toLowerCase().includes(challengeSearch.toLowerCase()))
                       .map((c: any, idx: number) => (
                         <SortableQueueItem

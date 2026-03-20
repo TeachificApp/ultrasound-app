@@ -423,3 +423,12 @@
 - [x] Add ™ to all "All About Ultrasound" references on the Registry Review Hub page
 - [x] Remove all "email is pre-filled" / "checkout links are pre-filled" references
 - [x] Updated Home.tsx dashboard card description to match
+
+## Admin QuickFire Queue - Category Sort & Feature Parity (Mar 19)
+- [x] Audit iHeartEcho admin QuickFire queue for all admin features vs UltrasoundAssist™ (full tRPC parity confirmed)
+- [x] Add category filter dropdown to challenge queue header (filter by any category)
+- [x] Category filter applied to queued challenges list (live challenges always shown)
+
+## Admin Queue Randomize Order (Mar 19)
+- [ ] Add "Randomize Order" button to challenge queue — shuffles queued challenges within the selected category filter, interleaving sub-areas to avoid content clustering
+- [ ] Shuffle uses Fisher-Yates algorithm and calls adminReorderChallenges to persist the new order
