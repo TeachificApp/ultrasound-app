@@ -433,3 +433,6 @@
 - [x] Add "Randomize Order" button to challenge queue — shuffles queued challenges within the selected category filter, interleaving sub-areas to avoid content clustering
 - [x] Shuffle uses Fisher-Yates algorithm and calls adminReorderChallenges to persist the new order
 - [x] Button label dynamically shows "Randomize Vascular" (or whichever category is selected) vs "Randomize All" when no filter is active
+
+## Bug: Explanation Field Too Short (Mar 19)
+- [x] Fix "Too big: expected string to have <=2000 characters" error on explanation field when adding challenge questions to queue — increased explanation/reviewAnswer to 50,000 chars, question to 10,000 chars across all procedures
