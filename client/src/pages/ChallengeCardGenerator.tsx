@@ -295,11 +295,13 @@ function parseOptions(raw: string | null): string[] {
 }
 
 async function renderCardToPng(el: HTMLElement): Promise<string> {
+  // Measure the actual rendered height so nothing is clipped
+  const actualHeight = el.scrollHeight || 1080;
   return toPng(el, {
     cacheBust: true,
     pixelRatio: 1,
     width: 1080,
-    height: 1080,
+    height: actualHeight,
   });
 }
 
@@ -312,9 +314,8 @@ function CardShell({ children, t }: { children: React.ReactNode; t: ThemeTokens 
     <div
       style={{
         width: 1080,
-        height: 1080,
+        minHeight: 1080,
         position: "relative",
-        overflow: "hidden",
         fontFamily: "'Segoe UI', 'Open Sans', sans-serif",
         boxSizing: "border-box",
         background: t.cardBg,
@@ -373,7 +374,7 @@ function CardShell({ children, t }: { children: React.ReactNode; t: ThemeTokens 
         style={{
           position: "relative",
           width: "100%",
-          height: "100%",
+          minHeight: 1080,
           display: "flex",
           flexDirection: "column",
           padding: "52px 64px 44px 68px",
@@ -542,11 +543,10 @@ function QuestionCard({
       <div
         style={{
           color: t.headingColor,
-          fontSize: options.length > 0 ? 36 : 48,
+          fontSize: options.length > 0 ? 30 : 44,
           fontWeight: 700,
           lineHeight: 1.45,
-          marginBottom: options.length > 0 ? 28 : 0,
-          flex: options.length > 0 ? "0 0 auto" : "1 1 auto",
+          marginBottom: options.length > 0 ? 20 : 0,
           fontFamily: "'Georgia', 'Merriweather', serif",
           textShadow: t === DARK_THEME ? "0 2px 20px rgba(0,0,0,0.5)" : "none",
         }}
@@ -556,25 +556,25 @@ function QuestionCard({
 
       {/* Options */}
       {options.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 11, flex: "1 1 auto" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 8 }}>
           {options.map((opt, i) => (
             <div
               key={i}
               style={{
                 display: "flex",
-                alignItems: "center",
-                gap: 20,
+                alignItems: "flex-start",
+                gap: 16,
                 background: i % 2 === 0 ? t.optionEvenBg : t.optionOddBg,
                 border: `1px solid ${i % 2 === 0 ? t.optionEvenBorder : t.optionOddBorder}`,
-                borderRadius: 14,
-                padding: "16px 24px",
+                borderRadius: 12,
+                padding: "12px 20px",
               }}
             >
               <div
                 style={{
-                  width: 52,
-                  height: 52,
-                  borderRadius: 13,
+                  width: 44,
+                  height: 44,
+                  borderRadius: 11,
                   flexShrink: 0,
                   background: i % 2 === 0 ? t.bubbleEvenBg : t.bubbleOddBg,
                   border: `2px solid ${i % 2 === 0 ? t.bubbleEvenBorder : t.bubbleOddBorder}`,
@@ -583,13 +583,14 @@ function QuestionCard({
                   justifyContent: "center",
                   color: i % 2 === 0 ? t.bubbleEvenColor : t.bubbleOddColor,
                   fontWeight: 800,
-                  fontSize: 22,
+                  fontSize: 20,
+                  marginTop: 2,
                   boxShadow: i % 2 !== 0 ? `0 0 14px ${BRAND}44` : "none",
                 }}
               >
                 {letters[i]}
               </div>
-              <span style={{ color: t.bodyColor, fontSize: 30, fontWeight: 500, lineHeight: 1.35 }}>
+              <span style={{ color: t.bodyColor, fontSize: 26, fontWeight: 500, lineHeight: 1.4 }}>
                 {stripHtml(opt)}
               </span>
             </div>
@@ -704,7 +705,6 @@ function AnswerCard({
             borderRadius: 16,
             padding: "18px 24px",
             flex: "1 1 auto",
-            overflow: "hidden",
             boxShadow: `0 0 28px ${BRAND}16`,
           }}
         >
@@ -915,11 +915,13 @@ function CategorySection({
   onQuestionRef,
   onAnswerRef,
   theme,
+  date,
 }: {
   item: CategoryItem;
   onQuestionRef: (cat: string, h: DownloadableCardHandle) => void;
   onAnswerRef: (cat: string, h: DownloadableCardHandle) => void;
   theme: CardTheme;
+  date: string;
 }) {
   const t = theme === "dark" ? DARK_THEME : LIGHT_THEME;
   const { category, challenge, questions } = item;
@@ -967,7 +969,7 @@ function CategorySection({
               <span className="text-[10px] font-semibold text-white/50 uppercase tracking-wider">Question Card</span>
             </div>
             <DownloadableCard
-              filename={`${category.replace(/\s+/g, "-")}-question.png`}
+              filename={`${category.replace(/\s+/g, "-")}-${date}-question.png`}
               onRef={(h) => onQuestionRef(category, h)}
             >
               <QuestionCard
@@ -986,7 +988,7 @@ function CategorySection({
               <span className="text-[10px] font-semibold text-white/50 uppercase tracking-wider">Answer Card</span>
             </div>
             <DownloadableCard
-              filename={`${category.replace(/\s+/g, "-")}-answer.png`}
+              filename={`${category.replace(/\s+/g, "-")}-${date}-answer.png`}
               onRef={(h) => onAnswerRef(category, h)}
             >
               <AnswerCard
@@ -1166,25 +1168,38 @@ export default function ChallengeCardGenerator() {
               disabled={!canGoOlder || datesLoading}
               className="p-1.5 rounded-lg transition-colors disabled:opacity-30"
               style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" }}
-              title="Previous set"
+              title="Previous set (older)"
             >
               <ChevronLeft className="w-3.5 h-3.5 text-white/70" />
             </button>
-            <div
-              className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold"
-              style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", minWidth: 90, justifyContent: "center" }}
-            >
-              <Calendar className="w-3 h-3" style={{ color: BRAND_AQUA }} />
-              <span style={{ color: isToday ? BRAND_AQUA : "rgba(255,255,255,0.75)" }}>
-                {formatDateLabel(selectedDate)}
-              </span>
+            {/* Date picker dropdown */}
+            <div className="relative flex items-center" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8 }}>
+              <Calendar className="w-3 h-3 absolute left-2.5 pointer-events-none" style={{ color: BRAND_AQUA }} />
+              <select
+                value={selectedDate}
+                onChange={(e) => {
+                  setSelectedDate(e.target.value);
+                  questionRefs.current = {};
+                  answerRefs.current = {};
+                }}
+                disabled={datesLoading}
+                className="pl-7 pr-6 py-1 rounded-lg text-xs font-semibold bg-transparent appearance-none cursor-pointer outline-none"
+                style={{ color: isToday ? BRAND_AQUA : "rgba(255,255,255,0.85)", minWidth: 110 }}
+              >
+                {dates.map((d) => (
+                  <option key={d} value={d} style={{ background: "#0e1a24", color: "#fff" }}>
+                    {formatDateLabel(d)}{d !== new Date().toISOString().slice(0, 10) ? ` (${d})` : ""}
+                  </option>
+                ))}
+              </select>
+              <ChevronRight className="w-3 h-3 absolute right-1.5 pointer-events-none rotate-90 text-white/40" />
             </div>
             <button
               onClick={goNewer}
               disabled={!canGoNewer || datesLoading}
               className="p-1.5 rounded-lg transition-colors disabled:opacity-30"
               style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" }}
-              title="Next set"
+              title="Next set (newer)"
             >
               <ChevronRight className="w-3.5 h-3.5 text-white/70" />
             </button>
@@ -1302,6 +1317,7 @@ export default function ChallengeCardGenerator() {
                   key={item.category}
                   item={item}
                   theme={cardTheme}
+                  date={selectedDate}
                   onQuestionRef={(cat, h) => { questionRefs.current[cat] = h; }}
                   onAnswerRef={(cat, h) => { answerRefs.current[cat] = h; }}
                 />

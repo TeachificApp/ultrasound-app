@@ -477,3 +477,16 @@
 - [x] ChallengeCardGenerator: Show date label (Today / Yesterday / Mar 20 etc.)
 - [x] ChallengeCardGenerator: Disable Next when on today, disable Previous when at 30-day limit
 - [x] ChallengeCardGenerator: Update batch download filename to include date
+
+## Challenge Card Generator — Date Picker Dropdown (Mar 21)
+- [x] Add date picker dropdown (select) next to navigation arrows to jump to any date in 30-day window
+
+## Challenge Card Generator — Filename Convention (Mar 21)
+- [x] Ensure individual card downloads include date in filename (category-date-question.png)
+- [x] Ensure batch ZIP filename includes date (already done for batch, verify individual)
+- [x] No date label added to card image itself
+
+## Challenge Card Generator — Card Option Overflow Fix (Mar 21)
+- [x] Remove fixed 1080x1080 height constraint so cards auto-size to content
+- [x] Reduce font sizes and padding to fit long options without clipping
+- [x] Ensure QuestionCard and AnswerCard both show all options at all times
