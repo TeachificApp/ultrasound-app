@@ -118,6 +118,7 @@ export const CHALLENGE_CATEGORIES = [
   "Vascular",
   "MSK",
   "POCUS",
+  "Physics",
 ] as const;
 export type ChallengeCategory = typeof CHALLENGE_CATEGORIES[number];
 // Map category label -> JSON key used in questionIds object
@@ -132,6 +133,7 @@ const CAT_KEY: Record<ChallengeCategory, string> = {
   "Vascular": "vascular",
   "MSK": "msk",
   "POCUS": "pocus",
+  "Physics": "physics",
 };
 
 /**
@@ -142,7 +144,7 @@ const CAT_KEY: Record<ChallengeCategory, string> = {
 function parseDailySetIds(raw: string): Record<string, number | null> {
   const defaults: Record<string, number | null> = {
     abdominal: null, smallParts: null, pelvicGyn: null, ob1st: null,
-    ob2nd3rd: null, fetalEcho: null, breast: null, vascular: null, msk: null, pocus: null,
+    ob2nd3rd: null, fetalEcho: null, breast: null, vascular: null, msk: null, pocus: null, physics: null,
   };
   try {
     const parsed = JSON.parse(raw || "{}");
@@ -175,7 +177,7 @@ async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>
 
   const questionMap: Record<string, number | null> = {
     abdominal: null, smallParts: null, pelvicGyn: null, ob1st: null,
-    ob2nd3rd: null, fetalEcho: null, breast: null, vascular: null, msk: null, pocus: null,
+    ob2nd3rd: null, fetalEcho: null, breast: null, vascular: null, msk: null, pocus: null, physics: null,
   };
 
   // 1. Check for queued challenges per category
@@ -271,7 +273,7 @@ export const quickfireRouter = router({
     const questionMap = parseDailySetIds(set.questionIds);
 
     // Determine which categories the user has opted into (default: all)
-    let enabledCats: Set<string> = new Set(["abdominal", "smallParts", "pelvicGyn", "ob1st", "ob2nd3rd", "fetalEcho", "breast", "vascular", "msk", "pocus"]);
+    let enabledCats: Set<string> = new Set(["abdominal", "smallParts", "pelvicGyn", "ob1st", "ob2nd3rd", "fetalEcho", "breast", "vascular", "msk", "pocus", "physics"]);
     if (ctx.user) {
       const [userRow] = await db
         .select({ challengeCategoryPrefs: users.challengeCategoryPrefs })
@@ -289,7 +291,7 @@ export const quickfireRouter = router({
               .map(([k]) => k)
           );
           // If user opted out of everything, show all anyway
-          if (enabledCats.size === 0) enabledCats = new Set(["abdominal", "smallParts", "pelvicGyn", "ob1st", "ob2nd3rd", "fetalEcho", "breast", "vascular", "msk", "pocus"]);
+          if (enabledCats.size === 0) enabledCats = new Set(["abdominal", "smallParts", "pelvicGyn", "ob1st", "ob2nd3rd", "fetalEcho", "breast", "vascular", "msk", "pocus", "physics"]);
         } catch { /* ignore parse errors */ }
       }
     }
@@ -308,7 +310,7 @@ export const quickfireRouter = router({
       .from(quickfireQuestions)
       .where(and(eq(quickfireQuestions.isActive, true), inArray(quickfireQuestions.id, allIds)));
 
-    const catOrder = ["abdominal", "smallParts", "pelvicGyn", "ob1st", "ob2nd3rd", "fetalEcho", "breast", "vascular", "msk", "pocus"];
+    const catOrder = ["abdominal", "smallParts", "pelvicGyn", "ob1st", "ob2nd3rd", "fetalEcho", "breast", "vascular", "msk", "pocus", "physics"];
     const orderedQuestions = catOrder
       .filter((key) => enabledCats.has(key) && questionMap[key] !== null)
       .map((key) => questions.find((q) => q.id === questionMap[key]))
@@ -635,7 +637,7 @@ getUserStats: protectedProcedure.query(async ({ ctx }) => {
         difficulty: z.enum(["beginner", "intermediate", "advanced"]).default("intermediate"),
         tags: z.array(z.string()).default([]),
         echoCategory: z.enum(["abdominal", "pelvic_gyn", "obstetric_1st", "obstetric_2nd_3rd", "fetal_echo", "venous", "arterial", "abdominal_vascular", "extracranial_carotid", "intracranial_tcd", "pocus", "physics", "thyroid", "scrotum", "breast", "msk"]).default("abdominal"),
-        category: z.enum(["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS"]).default("Abdominal"),
+        category: z.enum(["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics"]).default("Abdominal"),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -686,7 +688,7 @@ getUserStats: protectedProcedure.query(async ({ ctx }) => {
         tags: z.array(z.string()).optional(),
         isActive: z.boolean().optional(),
         echoCategory: z.enum(["abdominal", "pelvic_gyn", "obstetric_1st", "obstetric_2nd_3rd", "fetal_echo", "venous", "arterial", "abdominal_vascular", "extracranial_carotid", "intracranial_tcd", "pocus", "physics", "thyroid", "scrotum", "breast", "msk"]).optional(),
-        category: z.enum(["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS"]).optional(),
+        category: z.enum(["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics"]).optional(),
       })
     )
     .mutation(async ({ input }) => {
@@ -847,7 +849,7 @@ getUserStats: protectedProcedure.query(async ({ ctx }) => {
         includeInactive: z.boolean().default(false),
         search: z.string().max(200).optional(),
         echoCategory: z.enum(["abdominal", "pelvic_gyn", "obstetric_1st", "obstetric_2nd_3rd", "fetal_echo", "venous", "arterial", "abdominal_vascular", "extracranial_carotid", "intracranial_tcd", "pocus", "physics", "thyroid", "scrotum", "breast", "msk"]).optional(),
-        category: z.enum(["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS"]).optional(),
+        category: z.enum(["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics"]).optional(),
         ids: z.array(z.number().int().positive()).max(50).optional(),
       })
     )
@@ -1488,7 +1490,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
       .from(users)
       .where(eq(users.id, ctx.user.id))
       .limit(1);
-     const defaults = { abdominal: true, smallParts: true, pelvicGyn: true, ob1st: true, ob2nd3rd: true, fetalEcho: true, breast: true, vascular: true, msk: true, pocus: true };
+     const defaults = { abdominal: true, smallParts: true, pelvicGyn: true, ob1st: true, ob2nd3rd: true, fetalEcho: true, breast: true, vascular: true, msk: true, pocus: true, physics: true };
     if (!userRow?.challengeCategoryPrefs) return defaults;
     try {
       return { ...defaults, ...JSON.parse(userRow.challengeCategoryPrefs) };
@@ -1510,6 +1512,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
         vascular: z.boolean().default(true),
         msk: z.boolean().default(true),
         pocus: z.boolean().default(true),
+        physics: z.boolean().default(true),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -1695,7 +1698,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
       description: z.string().max(2000).optional(),
       questionIds: z.array(z.number().int().positive()).min(1).max(1),  // exactly 1 question per challenge
       priority: z.number().int().min(1).default(100),
-      category: z.enum(["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS"]).optional(),
+      category: z.enum(["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics"]).optional(),
       queuePosition: z.number().int().min(1).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -1736,7 +1739,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
       description: z.string().max(2000).optional().nullable(),
       questionIds: z.array(z.number().int().positive()).min(1).max(1).optional(),  // exactly 1 question per challenge
       priority: z.number().int().min(1).optional(),
-      category: z.enum(["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS"]).optional(),
+      category: z.enum(["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics"]).optional(),
       queuePosition: z.number().int().min(1).optional().nullable(),
     }))
     .mutation(async ({ input }) => {
@@ -1863,7 +1866,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
       id: z.number().int().positive(),
       title: z.string().min(3).max(300).optional(),
       description: z.string().max(5000).optional().nullable(),
-      category: z.enum(["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS"]).optional(),
+      category: z.enum(["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics"]).optional(),
       difficulty: z.enum(["beginner", "intermediate", "advanced"]).optional().nullable(),
       questionIds: z.array(z.number().int().positive()).min(1).max(1).optional(),
     }))
@@ -2369,7 +2372,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
         orderedItems: z.array(z.string().min(1)).min(2).max(10).optional(),
         difficulty: z.enum(["beginner", "intermediate", "advanced"]).default("intermediate"),
         tags: z.array(z.string()).default([]),
-      category: z.enum(["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS"]).default("Abdominal"),
+      category: z.enum(["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics"]).default("Abdominal"),
       submitterName: z.string().max(200).optional(),
         submitterLinkedIn: z.string().max(500).optional(),
       })

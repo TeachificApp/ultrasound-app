@@ -528,3 +528,16 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 
 ## Queue Editor Fix (Mar 21)
 - [x] Fix: Challenge queue items now open edit form on click (content area clickable, drag handle and delete button isolated with stopPropagation)
+
+## Category Taxonomy Fix (Mar 21)
+- [ ] Fix: Small Parts = Scrotum + Thyroid only. Remap misclassified questions: Liver → Abdominal, MSK → MSK (not Small Parts)
+- [ ] Update any AI generator prompts or category routing that incorrectly assigns Liver/MSK to Small Parts
+
+## Physics Category (Mar 21)
+- [x] Add Physics as 11th category (DB enum, server, frontend, card generator)
+- [x] Remap misclassified Small Parts physics questions → Physics
+- [x] Remap misclassified Small Parts MSK questions → MSK
+- [x] Update CATEGORY_HASHTAGS in ChallengeCardGenerator for Physics
+- [x] Update flashcard filter buttons in QuickFireAdmin for Physics
+- [x] Update challengeCron categories list for Physics
+- [x] Update drizzle/schema.ts category enums for Physics

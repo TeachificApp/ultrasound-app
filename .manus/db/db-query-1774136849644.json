@@ -1,0 +1,110 @@
+{
+  "query": "\nSELECT id, question, category\nFROM quickfireQuestions \nWHERE category = 'Small Parts'\nORDER BY id\nLIMIT 20 OFFSET 40;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \nSELECT id, question, category\nFROM quickfireQuestions \nWHERE category = 'Small Parts'\nORDER BY id\nLIMIT 20 OFFSET 40;\n",
+  "rows": [
+    {
+      "id": "246",
+      "question": "What is the sonographic appearance of a seminoma?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "247",
+      "question": "What is the sonographic appearance of a testicular cyst?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "248",
+      "question": "What is a varicocele and how is it identified on ultrasound?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "249",
+      "question": "What is the sonographic appearance of epididymo-orchitis?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "250",
+      "question": "What is a hydrocele?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "251",
+      "question": "What is a spermatocele?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "252",
+      "question": "What is the sonographic appearance of a testicular microlithiasis?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "253",
+      "question": "What is the normal epididymis head size?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "254",
+      "question": "What is the bell-clapper deformity?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "255",
+      "question": "What is the whirlpool sign in testicular torsion?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "290",
+      "question": "What is the normal appendix testis appearance?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "291",
+      "question": "What is the sonographic appearance of a scrotal hematoma?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "292",
+      "question": "What is the sonographic appearance of a Leydig cell tumor?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "293",
+      "question": "What is the normal scrotal wall thickness?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "300",
+      "question": "What is the difference between CW and PW Doppler?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "572",
+      "question": "A 62-year-old male presents with sudden onset of right shoulder pain and weakness after lifting a heavy object. Ultrasound of the shoulder reveals a complete non-retracted tear of the supraspinatus tendon. What key ultrasound finding distinguishes a complete tear from a partial tear?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "573",
+      "question": "A 45-year-old tennis player presents with chronic lateral elbow pain. Ultrasound reveals hypoechoic changes and focal thickening at the common extensor tendon origin, with increased Doppler signal. What is the most appropriate diagnosis?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "574",
+      "question": "A 38-year-old patient with rheumatoid arthritis presents with right knee pain and swelling. Ultrasound reveals an anechoic collection within the suprapatellar bursa with internal debris and synovial hypertrophy. Which of the following best describes this finding?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "575",
+      "question": "A patient presents with numbness and tingling in the thumb, index, and middle fingers, worse at night. Ultrasound of the wrist reveals flattening of the median nerve at the carpal tunnel inlet and a cross-sectional area of 15 mm². What is the most likely diagnosis?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "576",
+      "question": "During a dynamic ultrasound assessment of the shoulder, the sonographer observes impingement of the supraspinatus tendon beneath the acromion during arm abduction. What maneuver is most effective for demonstrating this finding?",
+      "category": "Small Parts"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tquestion\tcategory\n246\tWhat is the sonographic appearance of a seminoma?\tSmall Parts\n247\tWhat is the sonographic appearance of a testicular cyst?\tSmall Parts\n248\tWhat is a varicocele and how is it identified on ultrasound?\tSmall Parts\n249\tWhat is the sonographic appearance of epididymo-orchitis?\tSmall Parts\n250\tWhat is a hydrocele?\tSmall Parts\n251\tWhat is a spermatocele?\tSmall Parts\n252\tWhat is the sonographic appearance of a testicular microlithiasis?\tSmall Parts\n253\tWhat is the normal epididymis head size?\tSmall Parts\n254\tWhat is the bell-clapper deformity?\tSmall Parts\n255\tWhat is the whirlpool sign in testicular torsion?\tSmall Parts\n290\tWhat is the normal appendix testis appearance?\tSmall Parts\n291\tWhat is the sonographic appearance of a scrotal hematoma?\tSmall Parts\n292\tWhat is the sonographic appearance of a Leydig cell tumor?\tSmall Parts\n293\tWhat is the normal scrotal wall thickness?\tSmall Parts\n300\tWhat is the difference between CW and PW Doppler?\tSmall Parts\n572\tA 62-year-old male presents with sudden onset of right shoulder pain and weakness after lifting a heavy object. Ultrasound of the shoulder reveals a complete non-retracted tear of the supraspinatus tendon. What key ultrasound finding distinguishes a complete tear from a partial tear?\tSmall Parts\n573\tA 45-year-old tennis player presents with chronic lateral elbow pain. Ultrasound reveals hypoechoic changes and focal thickening at the common extensor tendon origin, with increased Doppler signal. What is the most appropriate diagnosis?\tSmall Parts\n574\tA 38-year-old patient with rheumatoid arthritis presents with right knee pain and swelling. Ultrasound reveals an anechoic collection within the suprapatellar bursa with internal debris and synovial hypertrophy. Which of the following best describes this finding?\tSmall Parts\n575\tA patient presents with numbness and tingling in the thumb, index, and middle fingers, worse at night. Ultrasound of the wrist reveals flattening of the median nerve at the carpal tunnel inlet and a cross-sectional area of 15 mm². What is the most likely diagnosis?\tSmall Parts\n576\tDuring a dynamic ultrasound assessment of the shoulder, the sonographer observes impingement of the supraspinatus tendon beneath the acromion during arm abduction. What maneuver is most effective for demonstrating this finding?\tSmall Parts\n",
+  "stderr": "",
+  "execution_time_ms": 58
+}

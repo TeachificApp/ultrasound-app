@@ -1,0 +1,110 @@
+{
+  "query": "\nSELECT id, question, category\nFROM quickfireQuestions \nWHERE category = 'Small Parts'\nORDER BY id\nLIMIT 20 OFFSET 20;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \nSELECT id, question, category\nFROM quickfireQuestions \nWHERE category = 'Small Parts'\nORDER BY id\nLIMIT 20 OFFSET 20;\n",
+  "rows": [
+    {
+      "id": "226",
+      "question": "What is the ACR TI-RADS classification?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "227",
+      "question": "What nodule features increase TI-RADS score?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "228",
+      "question": "What is the sonographic appearance of a thyroid cyst?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "229",
+      "question": "What is the sonographic appearance of papillary thyroid carcinoma?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "230",
+      "question": "What is the ACR TI-RADS FNA threshold for TR5 nodules?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "231",
+      "question": "What is the ACR TI-RADS FNA threshold for TR4 nodules?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "232",
+      "question": "What is Hashimoto thyroiditis on ultrasound?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "233",
+      "question": "What is Graves disease on ultrasound?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "234",
+      "question": "What is the thyroid inferno sign?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "235",
+      "question": "What is the sonographic appearance of a colloid cyst?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "236",
+      "question": "What is the normal parathyroid gland size?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "237",
+      "question": "What is the sonographic appearance of a parathyroid adenoma?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "238",
+      "question": "What is the normal thyroid volume?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "239",
+      "question": "What is the ACR TI-RADS score for a purely cystic nodule?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "240",
+      "question": "What is the ACR TI-RADS score for a spongiform nodule?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "241",
+      "question": "What is the taller-than-wide criterion in thyroid nodule assessment?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "242",
+      "question": "What is the normal testicular size?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "243",
+      "question": "What is the normal testicular echogenicity?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "244",
+      "question": "What is the sonographic appearance of testicular torsion?",
+      "category": "Small Parts"
+    },
+    {
+      "id": "245",
+      "question": "What is the most common testicular malignancy?",
+      "category": "Small Parts"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tquestion\tcategory\n226\tWhat is the ACR TI-RADS classification?\tSmall Parts\n227\tWhat nodule features increase TI-RADS score?\tSmall Parts\n228\tWhat is the sonographic appearance of a thyroid cyst?\tSmall Parts\n229\tWhat is the sonographic appearance of papillary thyroid carcinoma?\tSmall Parts\n230\tWhat is the ACR TI-RADS FNA threshold for TR5 nodules?\tSmall Parts\n231\tWhat is the ACR TI-RADS FNA threshold for TR4 nodules?\tSmall Parts\n232\tWhat is Hashimoto thyroiditis on ultrasound?\tSmall Parts\n233\tWhat is Graves disease on ultrasound?\tSmall Parts\n234\tWhat is the thyroid inferno sign?\tSmall Parts\n235\tWhat is the sonographic appearance of a colloid cyst?\tSmall Parts\n236\tWhat is the normal parathyroid gland size?\tSmall Parts\n237\tWhat is the sonographic appearance of a parathyroid adenoma?\tSmall Parts\n238\tWhat is the normal thyroid volume?\tSmall Parts\n239\tWhat is the ACR TI-RADS score for a purely cystic nodule?\tSmall Parts\n240\tWhat is the ACR TI-RADS score for a spongiform nodule?\tSmall Parts\n241\tWhat is the taller-than-wide criterion in thyroid nodule assessment?\tSmall Parts\n242\tWhat is the normal testicular size?\tSmall Parts\n243\tWhat is the normal testicular echogenicity?\tSmall Parts\n244\tWhat is the sonographic appearance of testicular torsion?\tSmall Parts\n245\tWhat is the most common testicular malignancy?\tSmall Parts\n",
+  "stderr": "",
+  "execution_time_ms": 72
+}

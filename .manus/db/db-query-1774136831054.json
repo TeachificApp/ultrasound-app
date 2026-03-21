@@ -1,0 +1,310 @@
+{
+  "query": "\nSELECT id, question, category, tags \nFROM quickfireQuestions \nWHERE category = 'Small Parts' \nLIMIT 50;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \nSELECT id, question, category, tags \nFROM quickfireQuestions \nWHERE category = 'Small Parts' \nLIMIT 50;\n",
+  "rows": [
+    {
+      "id": "206",
+      "question": "What is the piezoelectric effect?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "207",
+      "question": "What is the speed of sound in soft tissue?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "208",
+      "question": "What is the relationship between frequency and resolution vs penetration?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "209",
+      "question": "What is the axial resolution of an ultrasound beam?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "210",
+      "question": "What is the lateral resolution of an ultrasound beam?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "211",
+      "question": "What is acoustic impedance?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "212",
+      "question": "What is the Nyquist limit in Doppler ultrasound?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "213",
+      "question": "What is aliasing in pulsed wave Doppler?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "214",
+      "question": "What is the Doppler equation?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "215",
+      "question": "What is the optimal Doppler angle of insonation?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "216",
+      "question": "What is posterior acoustic shadowing?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "217",
+      "question": "What is posterior acoustic enhancement?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "218",
+      "question": "What is the ALARA principle?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "219",
+      "question": "What are the two main bioeffects of diagnostic ultrasound?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "220",
+      "question": "What is the mechanical index (MI)?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "221",
+      "question": "What is the thermal index (TI)?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "222",
+      "question": "What is reverberation artifact?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "223",
+      "question": "What is the comet-tail artifact?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "224",
+      "question": "What is the normal thyroid lobe size?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "225",
+      "question": "What is the normal thyroid echogenicity?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "226",
+      "question": "What is the ACR TI-RADS classification?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "227",
+      "question": "What nodule features increase TI-RADS score?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "228",
+      "question": "What is the sonographic appearance of a thyroid cyst?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "229",
+      "question": "What is the sonographic appearance of papillary thyroid carcinoma?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "230",
+      "question": "What is the ACR TI-RADS FNA threshold for TR5 nodules?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "231",
+      "question": "What is the ACR TI-RADS FNA threshold for TR4 nodules?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "232",
+      "question": "What is Hashimoto thyroiditis on ultrasound?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "233",
+      "question": "What is Graves disease on ultrasound?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "234",
+      "question": "What is the thyroid inferno sign?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "235",
+      "question": "What is the sonographic appearance of a colloid cyst?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "236",
+      "question": "What is the normal parathyroid gland size?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "237",
+      "question": "What is the sonographic appearance of a parathyroid adenoma?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "238",
+      "question": "What is the normal thyroid volume?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "239",
+      "question": "What is the ACR TI-RADS score for a purely cystic nodule?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "240",
+      "question": "What is the ACR TI-RADS score for a spongiform nodule?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "241",
+      "question": "What is the taller-than-wide criterion in thyroid nodule assessment?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "242",
+      "question": "What is the normal testicular size?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "243",
+      "question": "What is the normal testicular echogenicity?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "244",
+      "question": "What is the sonographic appearance of testicular torsion?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "245",
+      "question": "What is the most common testicular malignancy?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "246",
+      "question": "What is the sonographic appearance of a seminoma?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "247",
+      "question": "What is the sonographic appearance of a testicular cyst?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "248",
+      "question": "What is a varicocele and how is it identified on ultrasound?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "249",
+      "question": "What is the sonographic appearance of epididymo-orchitis?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "250",
+      "question": "What is a hydrocele?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "251",
+      "question": "What is a spermatocele?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "252",
+      "question": "What is the sonographic appearance of a testicular microlithiasis?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "253",
+      "question": "What is the normal epididymis head size?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "254",
+      "question": "What is the bell-clapper deformity?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    },
+    {
+      "id": "255",
+      "question": "What is the whirlpool sign in testicular torsion?",
+      "category": "Small Parts",
+      "tags": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tquestion\tcategory\ttags\n206\tWhat is the piezoelectric effect?\tSmall Parts\tNULL\n207\tWhat is the speed of sound in soft tissue?\tSmall Parts\tNULL\n208\tWhat is the relationship between frequency and resolution vs penetration?\tSmall Parts\tNULL\n209\tWhat is the axial resolution of an ultrasound beam?\tSmall Parts\tNULL\n210\tWhat is the lateral resolution of an ultrasound beam?\tSmall Parts\tNULL\n211\tWhat is acoustic impedance?\tSmall Parts\tNULL\n212\tWhat is the Nyquist limit in Doppler ultrasound?\tSmall Parts\tNULL\n213\tWhat is aliasing in pulsed wave Doppler?\tSmall Parts\tNULL\n214\tWhat is the Doppler equation?\tSmall Parts\tNULL\n215\tWhat is the optimal Doppler angle of insonation?\tSmall Parts\tNULL\n216\tWhat is posterior acoustic shadowing?\tSmall Parts\tNULL\n217\tWhat is posterior acoustic enhancement?\tSmall Parts\tNULL\n218\tWhat is the ALARA principle?\tSmall Parts\tNULL\n219\tWhat are the two main bioeffects of diagnostic ultrasound?\tSmall Parts\tNULL\n220\tWhat is the mechanical index (MI)?\tSmall Parts\tNULL\n221\tWhat is the thermal index (TI)?\tSmall Parts\tNULL\n222\tWhat is reverberation artifact?\tSmall Parts\tNULL\n223\tWhat is the comet-tail artifact?\tSmall Parts\tNULL\n224\tWhat is the normal thyroid lobe size?\tSmall Parts\tNULL\n225\tWhat is the normal thyroid echogenicity?\tSmall Parts\tNULL\n226\tWhat is the ACR TI-RADS classification?\tSmall Parts\tNULL\n227\tWhat nodule features increase TI-RADS score?\tSmall Parts\tNULL\n228\tWhat is the sonographic appearance of a thyroid cyst?\tSmall Parts\tNULL\n229\tWhat is the sonographic appearance of papillary thyroid carcinoma?\tSmall Parts\tNULL\n230\tWhat is the ACR TI-RADS FNA threshold for TR5 nodules?\tSmall Parts\tNULL\n231\tWhat is the ACR TI-RADS FNA threshold for TR4 nodules?\tSmall Parts\tNULL\n232\tWhat is Hashimoto thyroiditis on ultrasound?\tSmall Parts\tNULL\n233\tWhat is Graves disease on ultrasound?\tSmall Parts\tNULL\n234\tWhat is the thyroid inferno sign?\tSmall Parts\tNULL\n235\tWhat is the sonographic appearance of a colloid cyst?\tSmall Parts\tNULL\n236\tWhat is the normal parathyroid gland size?\tSmall Parts\tNULL\n237\tWhat is the sonographic appearance of a parathyroid adenoma?\tSmall Parts\tNULL\n238\tWhat is the normal thyroid volume?\tSmall Parts\tNULL\n239\tWhat is the ACR TI-RADS score for a purely cystic nodule?\tSmall Parts\tNULL\n240\tWhat is the ACR TI-RADS score for a spongiform nodule?\tSmall Parts\tNULL\n241\tWhat is the taller-than-wide criterion in thyroid nodule assessment?\tSmall Parts\tNULL\n242\tWhat is the normal testicular size?\tSmall Parts\tNULL\n243\tWhat is the normal testicular echogenicity?\tSmall Parts\tNULL\n244\tWhat is the sonographic appearance of testicular torsion?\tSmall Parts\tNULL\n245\tWhat is the most common testicular malignancy?\tSmall Parts\tNULL\n246\tWhat is the sonographic appearance of a seminoma?\tSmall Parts\tNULL\n247\tWhat is the sonographic appearance of a testicular cyst?\tSmall Parts\tNULL\n248\tWhat is a varicocele and how is it identified on ultrasound?\tSmall Parts\tNULL\n249\tWhat is the sonographic appearance of epididymo-orchitis?\tSmall Parts\tNULL\n250\tWhat is a hydrocele?\tSmall Parts\tNULL\n251\tWhat is a spermatocele?\tSmall Parts\tNULL\n252\tWhat is the sonographic appearance of a testicular microlithiasis?\tSmall Parts\tNULL\n253\tWhat is the normal epididymis head size?\tSmall Parts\tNULL\n254\tWhat is the bell-clapper deformity?\tSmall Parts\tNULL\n255\tWhat is the whirlpool sign in testicular torsion?\tSmall Parts\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 119
+}

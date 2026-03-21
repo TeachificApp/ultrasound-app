@@ -1,0 +1,34 @@
+{
+  "query": "\nSELECT id, question FROM quickfireQuestions WHERE category = 'Small Parts' ORDER BY id LIMIT 6 OFFSET 40;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \nSELECT id, question FROM quickfireQuestions WHERE category = 'Small Parts' ORDER BY id LIMIT 6 OFFSET 40;\n",
+  "rows": [
+    {
+      "id": "581",
+      "question": "During a follow-up thyroid ultrasound for a known nodule, the sonographer observes a 1.2 cm hypoechoic, oval-shaped lesion posterior to the mid-pole of the left thyroid lobe. The lesion demonstrates internal vascularity on color Doppler and has a more homogeneous echotexture compared to the adjacent thyroid parenchyma. The patient's serum calcium levels are elevated. What is the most likely identity of this lesion?"
+    },
+    {
+      "id": "582",
+      "question": "A sonographer is attempting to visualize a small, deep lesion in the liver. Which of the following transducer frequencies would provide the best balance between penetration and axial resolution for this scenario?"
+    },
+    {
+      "id": "583",
+      "question": "A sonographer is performing a vascular study and notices spectral broadening in the Doppler waveform despite optimizing the sample volume and angle. Which of the following transducer characteristics would most likely contribute to this artifact?"
+    },
+    {
+      "id": "584",
+      "question": "During an abdominal ultrasound, the sonographer observes a hypoechoic area posterior to a highly reflective gallstone that appears anechoic. This phenomenon is known as acoustic shadowing. Which of the following physics principles best explains this artifact?"
+    },
+    {
+      "id": "585",
+      "question": "When performing a color Doppler evaluation of renal artery stenosis, the sonographer notices color aliasing in the stenotic segment. To resolve this, which of the following adjustments would be most appropriate?"
+    },
+    {
+      "id": "586",
+      "question": "A sonographer is performing a musculoskeletal ultrasound and observes an artifact that makes a tendon appear thicker than it truly is due to the sound beam striking it at an oblique angle. What is this artifact called?"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tquestion\n581\tDuring a follow-up thyroid ultrasound for a known nodule, the sonographer observes a 1.2 cm hypoechoic, oval-shaped lesion posterior to the mid-pole of the left thyroid lobe. The lesion demonstrates internal vascularity on color Doppler and has a more homogeneous echotexture compared to the adjacent thyroid parenchyma. The patient's serum calcium levels are elevated. What is the most likely identity of this lesion?\n582\tA sonographer is attempting to visualize a small, deep lesion in the liver. Which of the following transducer frequencies would provide the best balance between penetration and axial resolution for this scenario?\n583\tA sonographer is performing a vascular study and notices spectral broadening in the Doppler waveform despite optimizing the sample volume and angle. Which of the following transducer characteristics would most likely contribute to this artifact?\n584\tDuring an abdominal ultrasound, the sonographer observes a hypoechoic area posterior to a highly reflective gallstone that appears anechoic. This phenomenon is known as acoustic shadowing. Which of the following physics principles best explains this artifact?\n585\tWhen performing a color Doppler evaluation of renal artery stenosis, the sonographer notices color aliasing in the stenotic segment. To resolve this, which of the following adjustments would be most appropriate?\n586\tA sonographer is performing a musculoskeletal ultrasound and observes an artifact that makes a tendon appear thicker than it truly is due to the sound beam striking it at an oblique angle. What is this artifact called?\n",
+  "stderr": "",
+  "execution_time_ms": 111
+}

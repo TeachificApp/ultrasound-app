@@ -1,0 +1,26 @@
+{
+  "query": "\n-- Physics questions misclassified as Small Parts\nUPDATE quickfireQuestions \nSET category = 'Physics'\nWHERE id IN (582, 583, 584, 585);\n\n-- MSK anisotropy artifact question misclassified as Small Parts\nUPDATE quickfireQuestions \nSET category = 'MSK'\nWHERE id = 586;\n\n-- Verify final counts\nSELECT category, COUNT(*) as count \nFROM quickfireQuestions \nWHERE category IN ('Small Parts','Physics','MSK','POCUS')\nGROUP BY category\nORDER BY category;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \n-- Physics questions misclassified as Small Parts\nUPDATE quickfireQuestions \nSET category = 'Physics'\nWHERE id IN (582, 583, 584, 585);\n\n-- MSK anisotropy artifact question misclassified as Small Parts\nUPDATE quickfireQuestions \nSET category = 'MSK'\nWHERE id = 586;\n\n-- Verify final counts\nSELECT category, COUNT(*) as count \nFROM quickfireQuestions \nWHERE category IN ('Small Parts','Physics','MSK','POCUS')\nGROUP BY category\nORDER BY category;\n",
+  "rows": [
+    {
+      "category": "Small Parts",
+      "count": "41"
+    },
+    {
+      "category": "MSK",
+      "count": "24"
+    },
+    {
+      "category": "POCUS",
+      "count": "29"
+    },
+    {
+      "category": "Physics",
+      "count": "23"
+    }
+  ],
+  "messages": [],
+  "stdout": "category\tcount\nSmall Parts\t41\nMSK\t24\nPOCUS\t29\nPhysics\t23\n",
+  "stderr": "",
+  "execution_time_ms": 91
+}

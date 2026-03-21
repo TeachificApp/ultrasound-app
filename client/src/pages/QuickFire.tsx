@@ -155,7 +155,7 @@ function SubmitQuestionTab({ isAuthenticated }: { isAuthenticated: boolean }) {
   // Form state
   const [submitterName, setSubmitterName] = useState("");
   const [submitterLinkedIn, setSubmitterLinkedIn] = useState("");
-  const [category, setCategory] = useState<"Abdominal" | "Small Parts" | "Pelvic/Gyn" | "OB 1st Trimester" | "OB 2nd/3rd Trimester" | "Fetal Echo" | "Breast" | "Vascular" | "MSK" | "POCUS">("Abdominal");
+  const [category, setCategory] = useState<"Abdominal" | "Small Parts" | "Pelvic/Gyn" | "OB 1st Trimester" | "OB 2nd/3rd Trimester" | "Fetal Echo" | "Breast" | "Vascular" | "MSK" | "POCUS" | "Physics">("Abdominal");
   const [difficulty, setDifficulty] = useState<"beginner" | "intermediate" | "advanced">("intermediate");
   const [question, setQuestion] = useState("");
   const [options, setOptions] = useState(["", "", "", ""]);
@@ -245,7 +245,7 @@ function SubmitQuestionTab({ isAuthenticated }: { isAuthenticated: boolean }) {
             <Select value={category} onValueChange={(v) => setCategory(v as any)}>
               <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {(["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS"] as const).map((c) => (
+                {(["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics"] as const).map((c) => (
                   <SelectItem key={c} value={c}>{c}</SelectItem>
                 ))}
               </SelectContent>
@@ -1192,14 +1192,15 @@ export default function QuickFire() {
                     { cat: "Vascular" as const, prefKey: "vascular" as const, Icon: Activity, label: "Vascular" },
                     { cat: "MSK" as const, prefKey: "msk" as const, Icon: Activity, label: "MSK" },
                     { cat: "POCUS" as const, prefKey: "pocus" as const, Icon: Wind, label: "POCUS" },
-                  ] as { cat: string; prefKey: "abdominal" | "smallParts" | "pelvicGyn" | "ob1st" | "ob2nd3rd" | "fetalEcho" | "breast" | "vascular" | "msk" | "pocus"; Icon: (props: { className?: string }) => import('react').ReactElement; label?: string }[]).map(({ cat, prefKey, Icon, label }) => {
-                    const prefs = categoryPrefsQuery.data ?? { abdominal: true, smallParts: true, pelvicGyn: true, ob1st: true, ob2nd3rd: true, fetalEcho: true, breast: true, vascular: true, msk: true, pocus: true };
+                    { cat: "Physics" as const, prefKey: "physics" as const, Icon: Activity, label: "Physics" },
+                  ] as { cat: string; prefKey: "abdominal" | "smallParts" | "pelvicGyn" | "ob1st" | "ob2nd3rd" | "fetalEcho" | "breast" | "vascular" | "msk" | "pocus" | "physics"; Icon: (props: { className?: string }) => import('react').ReactElement; label?: string }[]).map(({ cat, prefKey, Icon, label }) => {
+                    const prefs = categoryPrefsQuery.data ?? { abdominal: true, smallParts: true, pelvicGyn: true, ob1st: true, ob2nd3rd: true, fetalEcho: true, breast: true, vascular: true, msk: true, pocus: true, physics: true };
                     const isEnabled = (prefs as any)[prefKey] !== false;
                     return (
                       <button
                         key={cat}
                         onClick={() => {
-                          const current = categoryPrefsQuery.data ?? { abdominal: true, smallParts: true, pelvicGyn: true, ob1st: true, ob2nd3rd: true, fetalEcho: true, breast: true, vascular: true, msk: true, pocus: true };
+                          const current = categoryPrefsQuery.data ?? { abdominal: true, smallParts: true, pelvicGyn: true, ob1st: true, ob2nd3rd: true, fetalEcho: true, breast: true, vascular: true, msk: true, pocus: true, physics: true };
                           updateCategoryPrefsMutation.mutate({ ...current, [prefKey]: !isEnabled });
                         }}                        className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${
                           isEnabled
@@ -1260,7 +1261,7 @@ export default function QuickFire() {
                   const categoryMap: Record<string, number> = (todaySet as any)?.categoryMap ?? {};
                   const todayQuestions: any[] = (todaySet as any)?.questions ?? [];
                   const todayAttempts: Record<number, any> = (todaySet as any)?.userAttempts ?? {};
-                  const catPrefs = categoryPrefsQuery.data ?? { abdominal: true, smallParts: true, pelvicGyn: true, ob1st: true, ob2nd3rd: true, fetalEcho: true, breast: true, vascular: true, msk: true, pocus: true };
+                  const catPrefs = categoryPrefsQuery.data ?? { abdominal: true, smallParts: true, pelvicGyn: true, ob1st: true, ob2nd3rd: true, fetalEcho: true, breast: true, vascular: true, msk: true, pocus: true, physics: true };
 
                   const CATS = [
                     { key: "Abdominal", label: "Abdominal", Icon: Activity, desc: "Abdominal Ultrasound", prefKey: "abdominal" as const, mapKey: "abdominal", isPocus: false },
@@ -1273,6 +1274,7 @@ export default function QuickFire() {
                     { key: "Vascular", label: "Vascular", Icon: Activity, desc: "Vascular Duplex", prefKey: "vascular" as const, mapKey: "vascular", isPocus: false },
                     { key: "MSK", label: "MSK", Icon: Activity, desc: "Musculoskeletal Ultrasound", prefKey: "msk" as const, mapKey: "msk", isPocus: false },
                     { key: "POCUS", label: "POCUS", Icon: Wind, desc: "Point-of-Care Ultrasound", prefKey: "pocus" as const, mapKey: "pocus", isPocus: false },
+                    { key: "Physics", label: "Physics", Icon: Activity, desc: "Ultrasound Physics & Instrumentation", prefKey: "physics" as const, mapKey: "physics", isPocus: false },
                   ];
 
                   const enabledCats = CATS.filter((c) => catPrefs[c.prefKey] !== false);

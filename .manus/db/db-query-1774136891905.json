@@ -1,0 +1,22 @@
+{
+  "query": "\n-- Physics/instrumentation questions misclassified as Small Parts\nUPDATE quickfireQuestions \nSET category = 'Physics'\nWHERE id IN (206,207,208,209,210,211,212,213,214,215,216,217,218,219,220,221,222,223,300);\n\n-- MSK questions misclassified as Small Parts\nUPDATE quickfireQuestions \nSET category = 'MSK'\nWHERE id IN (572,573,574,575,576);\n\n-- Verify counts\nSELECT category, COUNT(*) as count \nFROM quickfireQuestions \nWHERE category IN ('Small Parts','Physics','MSK')\nGROUP BY category\nORDER BY category;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \n-- Physics/instrumentation questions misclassified as Small Parts\nUPDATE quickfireQuestions \nSET category = 'Physics'\nWHERE id IN (206,207,208,209,210,211,212,213,214,215,216,217,218,219,220,221,222,223,300);\n\n-- MSK questions misclassified as Small Parts\nUPDATE quickfireQuestions \nSET category = 'MSK'\nWHERE id IN (572,573,574,575,576);\n\n-- Verify counts\nSELECT category, COUNT(*) as count \nFROM quickfireQuestions \nWHERE category IN ('Small Parts','Physics','MSK')\nGROUP BY category\nORDER BY category;\n",
+  "rows": [
+    {
+      "category": "Small Parts",
+      "count": "46"
+    },
+    {
+      "category": "MSK",
+      "count": "23"
+    },
+    {
+      "category": "Physics",
+      "count": "19"
+    }
+  ],
+  "messages": [],
+  "stdout": "category\tcount\nSmall Parts\t46\nMSK\t23\nPhysics\t19\n",
+  "stderr": "",
+  "execution_time_ms": 78
+}

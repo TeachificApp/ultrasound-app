@@ -114,7 +114,7 @@ interface ConnectPair { left: string; right: string; }
 interface IdentifierMarker { x: number; y: number; label: string; }
 interface OrderItem { text: string; }
 
-type QuestionCategory = "Abdominal" | "Small Parts" | "Pelvic/Gyn" | "OB 1st Trimester" | "OB 2nd/3rd Trimester" | "Fetal Echo" | "Breast" | "Vascular" | "MSK" | "POCUS";
+type QuestionCategory = "Abdominal" | "Small Parts" | "Pelvic/Gyn" | "OB 1st Trimester" | "OB 2nd/3rd Trimester" | "Fetal Echo" | "Breast" | "Vascular" | "MSK" | "POCUS" | "Physics";
 
 interface QuestionForm {
   type: QuestionType;
@@ -1155,6 +1155,7 @@ export default function QuickFireAdmin() {
                     <SelectItem value="Vascular">Vascular</SelectItem>
                     <SelectItem value="MSK">MSK</SelectItem>
                     <SelectItem value="POCUS">POCUS</SelectItem>
+                    <SelectItem value="Physics">Physics</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1316,6 +1317,7 @@ export default function QuickFireAdmin() {
               <SelectItem value="Vascular">Vascular</SelectItem>
               <SelectItem value="MSK">MSK</SelectItem>
               <SelectItem value="POCUS">POCUS</SelectItem>
+                    <SelectItem value="Physics">Physics</SelectItem>
             </SelectContent>
           </Select>
           <Button
@@ -1737,7 +1739,7 @@ export default function QuickFireAdmin() {
                 className="w-56"
               />
               <div className="flex gap-1 flex-wrap">
-                {(["all", "abdominal", "pelvic_gyn", "obstetric_1st", "obstetric_2nd_3rd", "fetal_echo", "breast", "venous", "arterial", "abdominal_vascular", "extracranial_carotid", "msk", "pocus", "thyroid", "scrotum"] as const).map((cat) => (
+                {(["all", "abdominal", "pelvic_gyn", "obstetric_1st", "obstetric_2nd_3rd", "fetal_echo", "breast", "venous", "arterial", "abdominal_vascular", "extracranial_carotid", "msk", "pocus", "physics", "thyroid", "scrotum"] as const).map((cat) => (
                   <button
                     key={cat}
                     onClick={() => setFlashcardEchoCategory(cat)}
@@ -1747,7 +1749,7 @@ export default function QuickFireAdmin() {
                         : "border-gray-200 bg-gray-50 text-gray-600 hover:border-[#189aa1] hover:text-[#189aa1]"
                     }`}
                   >
-                    {cat === "all" ? "All" : cat === "abdominal" ? "Abdominal" : cat === "pelvic_gyn" ? "Pelvic/Gyn" : cat === "obstetric_1st" ? "OB 1st" : cat === "obstetric_2nd_3rd" ? "OB 2nd/3rd" : cat === "fetal_echo" ? "Fetal Echo" : cat === "breast" ? "Breast" : cat === "venous" ? "Venous" : cat === "arterial" ? "Arterial" : cat === "abdominal_vascular" ? "Abd. Vascular" : cat === "extracranial_carotid" ? "Carotid" : cat === "msk" ? "MSK" : cat === "pocus" ? "POCUS" : cat === "thyroid" ? "Thyroid" : "Scrotum"}
+                    {cat === "all" ? "All" : cat === "abdominal" ? "Abdominal" : cat === "pelvic_gyn" ? "Pelvic/Gyn" : cat === "obstetric_1st" ? "OB 1st" : cat === "obstetric_2nd_3rd" ? "OB 2nd/3rd" : cat === "fetal_echo" ? "Fetal Echo" : cat === "breast" ? "Breast" : cat === "venous" ? "Venous" : cat === "arterial" ? "Arterial" : cat === "abdominal_vascular" ? "Abd. Vascular" : cat === "extracranial_carotid" ? "Carotid" : cat === "msk" ? "MSK" : cat === "pocus" ? "POCUS" : cat === "physics" ? "Physics" : cat === "thyroid" ? "Thyroid" : "Scrotum"}
                   </button>
                 ))}
               </div>
@@ -2133,6 +2135,7 @@ export default function QuickFireAdmin() {
                     <SelectItem value="Vascular">Vascular</SelectItem>
                     <SelectItem value="MSK">MSK</SelectItem>
                     <SelectItem value="POCUS">POCUS</SelectItem>
+                    <SelectItem value="Physics">Physics</SelectItem>
                     <SelectItem value="Mixed">Mixed</SelectItem>
                   </SelectContent>
                 </Select>
@@ -2766,6 +2769,7 @@ export default function QuickFireAdmin() {
                   <SelectItem value="Pediatric Echo">Pediatric Echo</SelectItem>
                   <SelectItem value="Fetal Echo">Fetal Echo</SelectItem>
                   <SelectItem value="POCUS">POCUS</SelectItem>
+                    <SelectItem value="Physics">Physics</SelectItem>
                   <SelectItem value="General">General</SelectItem>
                 </SelectContent>
               </Select>
@@ -2976,6 +2980,7 @@ export default function QuickFireAdmin() {
                         <SelectItem value="Vascular">Vascular</SelectItem>
                         <SelectItem value="MSK">MSK</SelectItem>
                         <SelectItem value="POCUS">POCUS</SelectItem>
+                    <SelectItem value="Physics">Physics</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -3050,6 +3055,7 @@ export default function QuickFireAdmin() {
                         <SelectItem value="Vascular">Vascular</SelectItem>
                         <SelectItem value="MSK">MSK</SelectItem>
                         <SelectItem value="POCUS">POCUS</SelectItem>
+                    <SelectItem value="Physics">Physics</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

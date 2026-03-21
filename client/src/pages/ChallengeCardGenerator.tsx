@@ -179,6 +179,7 @@ const CATEGORY_HASHTAGS: Record<string, string[]> = {
   "Vascular": ["#VascularUltrasound", "#VascularImaging", "#DuplexScan"],
   "MSK": ["#MSKUltrasound", "#MusculoskeletalUltrasound", "#MSKImaging"],
   "POCUS": ["#POCUS", "#PointOfCareUltrasound", "#BedSideUltrasound"],
+  "Physics": ["#UltrasoundPhysics", "#SonographyPhysics", "#UltrasoundInstrumentation"],
 };
 
 function getCategoryHashtags(category: string): string[] {
