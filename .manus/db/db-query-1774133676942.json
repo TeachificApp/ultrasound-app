@@ -1,0 +1,73 @@
+{
+  "query": "\nSELECT DISTINCT category FROM quickfireQuestions ORDER BY category;\nSELECT DISTINCT category FROM quickfireChallenges ORDER BY category;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \nSELECT DISTINCT category FROM quickfireQuestions ORDER BY category;\nSELECT DISTINCT category FROM quickfireChallenges ORDER BY category;\n",
+  "rows": [
+    {
+      "category": "Abdominal"
+    },
+    {
+      "category": "Pelvic/Gyn"
+    },
+    {
+      "category": "OB 1st Trimester"
+    },
+    {
+      "category": "OB 2nd/3rd Trimester"
+    },
+    {
+      "category": "Fetal Echo"
+    },
+    {
+      "category": "Vascular"
+    },
+    {
+      "category": "POCUS"
+    },
+    {
+      "category": "Physics"
+    },
+    {
+      "category": "Thyroid"
+    },
+    {
+      "category": "Scrotum"
+    },
+    {
+      "category": "Breast"
+    },
+    {
+      "category": "MSK"
+    },
+    {
+      "category": "category"
+    },
+    {
+      "category": "Abdominal"
+    },
+    {
+      "category": "Pelvic/Gyn"
+    },
+    {
+      "category": "OB 1st Trimester"
+    },
+    {
+      "category": "OB 2nd/3rd Trimester"
+    },
+    {
+      "category": "Fetal Echo"
+    },
+    {
+      "category": "Vascular"
+    },
+    {
+      "category": "Physics"
+    },
+    {
+      "category": "Thyroid"
+    }
+  ],
+  "messages": [],
+  "stdout": "category\nAbdominal\nPelvic/Gyn\nOB 1st Trimester\nOB 2nd/3rd Trimester\nFetal Echo\nVascular\nPOCUS\nPhysics\nThyroid\nScrotum\nBreast\nMSK\ncategory\nAbdominal\nPelvic/Gyn\nOB 1st Trimester\nOB 2nd/3rd Trimester\nFetal Echo\nVascular\nPhysics\nThyroid\n",
+  "stderr": "",
+  "execution_time_ms": 67
+}

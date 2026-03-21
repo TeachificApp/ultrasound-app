@@ -48,6 +48,7 @@ import {
   Bell,
   X,
   Heart,
+  Wind,
   Stethoscope,
   Baby,
   Scan,
@@ -1182,17 +1183,23 @@ export default function QuickFire() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {([
                     { cat: "Abdominal" as const, prefKey: "abdominal" as const, Icon: Activity, label: "Abdominal" },
-                    { cat: "Vascular" as const, prefKey: "vascular" as const, Icon: Activity, label: "Vascular" },
+                    { cat: "Small Parts" as const, prefKey: "smallParts" as const, Icon: Scan, label: "Small Parts" },
+                    { cat: "Pelvic/Gyn" as const, prefKey: "pelvicGyn" as const, Icon: Activity, label: "Pelvic/Gyn" },
+                    { cat: "OB 1st Trimester" as const, prefKey: "ob1st" as const, Icon: Baby, label: "OB 1st Tri" },
                     { cat: "OB 2nd/3rd Trimester" as const, prefKey: "ob2nd3rd" as const, Icon: Baby, label: "OB 2nd/3rd" },
-                    { cat: "POCUS" as const, prefKey: "pocus" as const, Icon: Activity, label: "POCUS" },
-                  ] as { cat: string; prefKey: "abdominal" | "vascular" | "ob2nd3rd" | "pocus"; Icon: (props: { className?: string }) => import('react').ReactElement; label?: string }[]).map(({ cat, prefKey, Icon, label }) => {
-                    const prefs = categoryPrefsQuery.data ?? { abdominal: true, vascular: true, ob2nd3rd: true, pocus: true };
+                    { cat: "Fetal Echo" as const, prefKey: "fetalEcho" as const, Icon: Heart, label: "Fetal Echo" },
+                    { cat: "Breast" as const, prefKey: "breast" as const, Icon: Activity, label: "Breast" },
+                    { cat: "Vascular" as const, prefKey: "vascular" as const, Icon: Activity, label: "Vascular" },
+                    { cat: "MSK" as const, prefKey: "msk" as const, Icon: Activity, label: "MSK" },
+                    { cat: "POCUS" as const, prefKey: "pocus" as const, Icon: Wind, label: "POCUS" },
+                  ] as { cat: string; prefKey: "abdominal" | "smallParts" | "pelvicGyn" | "ob1st" | "ob2nd3rd" | "fetalEcho" | "breast" | "vascular" | "msk" | "pocus"; Icon: (props: { className?: string }) => import('react').ReactElement; label?: string }[]).map(({ cat, prefKey, Icon, label }) => {
+                    const prefs = categoryPrefsQuery.data ?? { abdominal: true, smallParts: true, pelvicGyn: true, ob1st: true, ob2nd3rd: true, fetalEcho: true, breast: true, vascular: true, msk: true, pocus: true };
                     const isEnabled = (prefs as any)[prefKey] !== false;
                     return (
                       <button
                         key={cat}
                         onClick={() => {
-                          const current = categoryPrefsQuery.data ?? { abdominal: true, vascular: true, ob2nd3rd: true, pocus: true };
+                          const current = categoryPrefsQuery.data ?? { abdominal: true, smallParts: true, pelvicGyn: true, ob1st: true, ob2nd3rd: true, fetalEcho: true, breast: true, vascular: true, msk: true, pocus: true };
                           updateCategoryPrefsMutation.mutate({ ...current, [prefKey]: !isEnabled });
                         }}                        className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${
                           isEnabled
@@ -1253,13 +1260,19 @@ export default function QuickFire() {
                   const categoryMap: Record<string, number> = (todaySet as any)?.categoryMap ?? {};
                   const todayQuestions: any[] = (todaySet as any)?.questions ?? [];
                   const todayAttempts: Record<number, any> = (todaySet as any)?.userAttempts ?? {};
-                  const catPrefs = categoryPrefsQuery.data ?? { abdominal: true, vascular: true, ob2nd3rd: true, pocus: true };
+                  const catPrefs = categoryPrefsQuery.data ?? { abdominal: true, smallParts: true, pelvicGyn: true, ob1st: true, ob2nd3rd: true, fetalEcho: true, breast: true, vascular: true, msk: true, pocus: true };
 
                   const CATS = [
                     { key: "Abdominal", label: "Abdominal", Icon: Activity, desc: "Abdominal Ultrasound", prefKey: "abdominal" as const, mapKey: "abdominal", isPocus: false },
+                    { key: "Small Parts", label: "Small Parts", Icon: Scan, desc: "Small Parts Ultrasound", prefKey: "smallParts" as const, mapKey: "smallParts", isPocus: false },
+                    { key: "Pelvic/Gyn", label: "Pelvic/Gyn", Icon: Activity, desc: "Pelvic/Gynecologic Ultrasound", prefKey: "pelvicGyn" as const, mapKey: "pelvicGyn", isPocus: false },
+                    { key: "OB 1st Trimester", label: "OB 1st Tri", Icon: Baby, desc: "1st Trimester Obstetric", prefKey: "ob1st" as const, mapKey: "ob1st", isPocus: false },
+                    { key: "OB 2nd/3rd Trimester", label: "OB 2nd/3rd", Icon: Baby, desc: "2nd/3rd Trimester Obstetric", prefKey: "ob2nd3rd" as const, mapKey: "ob2nd3rd", isPocus: false },
+                    { key: "Fetal Echo", label: "Fetal Echo", Icon: Heart, desc: "Fetal Echocardiography", prefKey: "fetalEcho" as const, mapKey: "fetalEcho", isPocus: false },
+                    { key: "Breast", label: "Breast", Icon: Activity, desc: "Breast Ultrasound", prefKey: "breast" as const, mapKey: "breast", isPocus: false },
                     { key: "Vascular", label: "Vascular", Icon: Activity, desc: "Vascular Duplex", prefKey: "vascular" as const, mapKey: "vascular", isPocus: false },
-                    { key: "OB 2nd/3rd Trimester", label: "OB 2nd/3rd", Icon: Baby, desc: "Obstetric Ultrasound", prefKey: "ob2nd3rd" as const, mapKey: "ob2nd3rd", isPocus: false },
-                    { key: "POCUS", label: "POCUS", Icon: Activity, desc: "Point-of-Care Ultrasound", prefKey: "pocus" as const, mapKey: "pocus", isPocus: true },
+                    { key: "MSK", label: "MSK", Icon: Activity, desc: "Musculoskeletal Ultrasound", prefKey: "msk" as const, mapKey: "msk", isPocus: false },
+                    { key: "POCUS", label: "POCUS", Icon: Wind, desc: "Point-of-Care Ultrasound", prefKey: "pocus" as const, mapKey: "pocus", isPocus: false },
                   ];
 
                   const enabledCats = CATS.filter((c) => catPrefs[c.prefKey] !== false);

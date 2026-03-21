@@ -407,7 +407,7 @@ export const educatorRouter = router({
         orgId: z.number(),
         title: z.string().min(1).max(300),
         description: z.string().optional(),
-        category: z.enum(["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"]).optional(),
+        category: z.enum(["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS"]).optional(),
         estimatedMinutes: z.number().optional(),
         coverImageUrl: z.string().optional(),
       })
@@ -431,7 +431,7 @@ export const educatorRouter = router({
         orgId: z.number(),
         title: z.string().min(1).max(300).optional(),
         description: z.string().optional(),
-        category: z.enum(["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"]).optional(),
+        category: z.enum(["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS"]).optional(),
         status: z.enum(["draft", "published", "archived"]).optional(),
         estimatedMinutes: z.number().optional(),
         coverImageUrl: z.string().optional(),
@@ -720,7 +720,7 @@ export const educatorRouter = router({
         orgId: z.number(),
         title: z.string().min(1).max(300),
         description: z.string().optional(),
-        category: z.enum(["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"]).optional(),
+        category: z.enum(["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS"]).optional(),
         maxLevel: z.number().min(1).max(10).optional(),
         isRequired: z.boolean().optional(),
       })
@@ -1029,7 +1029,7 @@ export const educatorRouter = router({
         description: z.string().optional(),
         slidesData: z.string().optional(),
         coverImageUrl: z.string().optional(),
-        category: z.enum(["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"]).optional(),
+        category: z.enum(["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS"]).optional(),
         status: z.enum(["draft", "published", "archived"]).optional(),
       })
     )

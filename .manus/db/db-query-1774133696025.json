@@ -1,0 +1,9 @@
+{
+  "query": "\nALTER TABLE quickfireQuestions MODIFY COLUMN category ENUM('Abdominal','Small Parts','Pelvic/Gyn','OB 1st Trimester','OB 2nd/3rd Trimester','Fetal Echo','Breast','Vascular','MSK','POCUS','Physics','Thyroid','Scrotum','Venous','Arterial','Abdominal Vascular','Extracranial Carotid','Intracranial Duplex/TCD','OB/Gyn','category') NOT NULL DEFAULT 'Abdominal';\nALTER TABLE quickfireChallenges MODIFY COLUMN category ENUM('Abdominal','Small Parts','Pelvic/Gyn','OB 1st Trimester','OB 2nd/3rd Trimester','Fetal Echo','Breast','Vascular','MSK','POCUS','Physics','Thyroid','Scrotum','Venous','Arterial','Abdominal Vascular','Extracranial Carotid','Intracranial Duplex/TCD','OB/Gyn') DEFAULT 'Abdominal';\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \nALTER TABLE quickfireQuestions MODIFY COLUMN category ENUM('Abdominal','Small Parts','Pelvic/Gyn','OB 1st Trimester','OB 2nd/3rd Trimester','Fetal Echo','Breast','Vascular','MSK','POCUS','Physics','Thyroid','Scrotum','Venous','Arterial','Abdominal Vascular','Extracranial Carotid','Intracranial Duplex/TCD','OB/Gyn','category') NOT NULL DEFAULT 'Abdominal';\nALTER TABLE quickfireChallenges MODIFY COLUMN category ENUM('Abdominal','Small Parts','Pelvic/Gyn','OB 1st Trimester','OB 2nd/3rd Trimester','Fetal Echo','Breast','Vascular','MSK','POCUS','Physics','Thyroid','Scrotum','Venous','Arterial','Abdominal Vascular','Extracranial Carotid','Intracranial Duplex/TCD','OB/Gyn') DEFAULT 'Abdominal';\n",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1150
+}

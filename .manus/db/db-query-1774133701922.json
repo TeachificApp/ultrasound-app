@@ -1,0 +1,9 @@
+{
+  "query": "\nUPDATE quickfireQuestions SET category = 'Vascular' WHERE category IN ('Venous','Arterial','Abdominal Vascular','Extracranial Carotid','Intracranial Duplex/TCD');\nUPDATE quickfireQuestions SET category = 'Small Parts' WHERE category IN ('Physics','Thyroid','Scrotum');\nUPDATE quickfireQuestions SET category = 'Pelvic/Gyn' WHERE category = 'OB/Gyn';\nUPDATE quickfireQuestions SET category = 'Abdominal' WHERE category = 'category';\nUPDATE quickfireChallenges SET category = 'Vascular' WHERE category IN ('Venous','Arterial','Abdominal Vascular','Extracranial Carotid','Intracranial Duplex/TCD');\nUPDATE quickfireChallenges SET category = 'Small Parts' WHERE category IN ('Physics','Thyroid','Scrotum');\nUPDATE quickfireChallenges SET category = 'Pelvic/Gyn' WHERE category = 'OB/Gyn';\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \nUPDATE quickfireQuestions SET category = 'Vascular' WHERE category IN ('Venous','Arterial','Abdominal Vascular','Extracranial Carotid','Intracranial Duplex/TCD');\nUPDATE quickfireQuestions SET category = 'Small Parts' WHERE category IN ('Physics','Thyroid','Scrotum');\nUPDATE quickfireQuestions SET category = 'Pelvic/Gyn' WHERE category = 'OB/Gyn';\nUPDATE quickfireQuestions SET category = 'Abdominal' WHERE category = 'category';\nUPDATE quickfireChallenges SET category = 'Vascular' WHERE category IN ('Venous','Arterial','Abdominal Vascular','Extracranial Carotid','Intracranial Duplex/TCD');\nUPDATE quickfireChallenges SET category = 'Small Parts' WHERE category IN ('Physics','Thyroid','Scrotum');\nUPDATE quickfireChallenges SET category = 'Pelvic/Gyn' WHERE category = 'OB/Gyn';\n",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 139
+}

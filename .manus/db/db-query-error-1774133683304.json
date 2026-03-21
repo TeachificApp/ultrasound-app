@@ -1,0 +1,8 @@
+{
+  "query": "\nUPDATE quickfireQuestions SET category = 'Small Parts' WHERE category IN ('Physics','Thyroid','Scrotum');\nUPDATE quickfireChallenges SET category = 'Small Parts' WHERE category IN ('Physics','Thyroid','Scrotum');\nUPDATE quickfireQuestions SET category = 'Abdominal' WHERE category = 'category';\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \nUPDATE quickfireQuestions SET category = 'Small Parts' WHERE category IN ('Physics','Thyroid','Scrotum');\nUPDATE quickfireChallenges SET category = 'Small Parts' WHERE category IN ('Physics','Thyroid','Scrotum');\nUPDATE quickfireQuestions SET category = 'Abdominal' WHERE category = 'category';\n",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1265 (01000) at line 2: Data truncated for column '%s' at row %d"
+  ]
+}

@@ -170,15 +170,15 @@ const REQUIRED_HASHTAGS = [
 // Category-specific hashtag map
 const CATEGORY_HASHTAGS: Record<string, string[]> = {
   "Abdominal": ["#AbdominalUltrasound", "#AbdominalImaging", "#GIUltrasound"],
-  "Vascular": ["#VascularUltrasound", "#VascularImaging", "#DuplexScan"],
+  "Small Parts": ["#SmallPartsUltrasound", "#ThyroidUltrasound", "#ScrotalUltrasound"],
+  "Pelvic/Gyn": ["#PelvicUltrasound", "#GynUltrasound", "#PelvicImaging"],
+  "OB 1st Trimester": ["#FirstTrimester", "#ObstetricUltrasound", "#OBUltrasound"],
   "OB 2nd/3rd Trimester": ["#ObstetricUltrasound", "#FetalImaging", "#OBUltrasound"],
-  "OB 2nd/3rd": ["#ObstetricUltrasound", "#FetalImaging", "#OBUltrasound"],
-  "POCUS": ["#POCUS", "#PointOfCareUltrasound", "#BedSideUltrasound"],
-  "MSK": ["#MSKUltrasound", "#MusculoskeletalUltrasound", "#MSKImaging"],
-  "Thyroid": ["#ThyroidUltrasound", "#ThyroidImaging", "#TIRADs"],
-  "Breast": ["#BreastUltrasound", "#BreastImaging", "#BIRADs"],
-  "Renal": ["#RenalUltrasound", "#KidneyUltrasound", "#RenalImaging"],
   "Fetal Echo": ["#FetalEcho", "#FetalCardiology", "#FetalUltrasound"],
+  "Breast": ["#BreastUltrasound", "#BreastImaging", "#BIRADs"],
+  "Vascular": ["#VascularUltrasound", "#VascularImaging", "#DuplexScan"],
+  "MSK": ["#MSKUltrasound", "#MusculoskeletalUltrasound", "#MSKImaging"],
+  "POCUS": ["#POCUS", "#PointOfCareUltrasound", "#BedSideUltrasound"],
 };
 
 function getCategoryHashtags(category: string): string[] {
@@ -198,19 +198,25 @@ function buildSocialPost(
   questionText: string,
   answerText: string | null,
   explanationText: string | null,
+  options?: string[],
 ): string {
   const cleanQ = stripHtml(questionText);
   const cleanA = answerText ? stripHtml(answerText) : null;
   const cleanE = explanationText ? stripHtml(explanationText) : null;
   const categoryTags = getCategoryHashtags(category);
   const allHashtags = [...REQUIRED_HASHTAGS, ...categoryTags].join(" ");
+  const letters = ["A", "B", "C", "D", "E"];
 
   if (type === "question") {
+    const optionsBlock =
+      options && options.length > 0
+        ? "\n\n" + options.map((o, i) => `${letters[i]}. ${stripHtml(o)}`).join("\n")
+        : "";
     return `🔬 Daily Ultrasound Challenge — ${category}
 
 Can you answer today's question?
 
-❓ ${cleanQ}
+❓ ${cleanQ}${optionsBlock}
 
 Drop your answer in the comments and take your place on the leaderboard 🏆 at app.allaboutultrasound.com
 Answer revealed tomorrow. 👇
@@ -218,7 +224,7 @@ Answer revealed tomorrow. 👇
 ${allHashtags}`;
   } else {
     const answerLine = cleanA ? `✅ Answer: ${cleanA}` : "";
-    const explanationLine = cleanE ? `\n💡 ${cleanE}` : "";
+    const explanationLine = cleanE ? `\n\n💡 ${cleanE}` : "";
     return `🔬 Daily Ultrasound Challenge — ${category} | ANSWER
 
 ${answerLine}${explanationLine}
@@ -822,6 +828,7 @@ function SocialPostPanel({
   questionText,
   answerText,
   explanationText,
+  options,
 }: {
   type: "question" | "answer";
   category: string;
@@ -829,10 +836,11 @@ function SocialPostPanel({
   questionText: string;
   answerText: string | null;
   explanationText: string | null;
+  options?: string[];
 }) {
   const [copied, setCopied] = useState(false);
 
-  const post = buildSocialPost(type, category, challengeTitle, questionText, answerText, explanationText);
+  const post = buildSocialPost(type, category, challengeTitle, questionText, answerText, explanationText, options);
 
   const handleCopy = useCallback(async () => {
     try {
@@ -1019,6 +1027,7 @@ function CategorySection({
               questionText={q.question}
               answerText={answerText}
               explanationText={explanationText}
+              options={options}
             />
           </div>
           <div className="flex flex-col gap-2">
@@ -1033,6 +1042,7 @@ function CategorySection({
               questionText={q.question}
               answerText={answerText}
               explanationText={explanationText}
+              options={options}
             />
           </div>
         </div>

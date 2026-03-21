@@ -490,3 +490,19 @@
 - [x] Remove fixed 1080x1080 height constraint so cards auto-size to content
 - [x] Reduce font sizes and padding to fit long options without clipping
 - [x] Ensure QuestionCard and AnswerCard both show all options at all times
+
+## Challenge Queue — Per-Category Count Badges (Mar 21)
+- [ ] Server: Add adminGetQueueCategoryCounts procedure returning count per category for queued challenges
+- [ ] UI: Show per-category count badges in the QuickFireAdmin queue management view
+
+## Category Standardisation (Mar 21)
+New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd/3rd Trimester, Fetal Echo, Breast, Vascular, MSK, POCUS
+- [ ] Update QuestionCategory type in QuickFireAdmin.tsx
+- [ ] Update all category SelectItem lists in QuickFireAdmin.tsx (question bank filter, challenge form, flashcard filter)
+- [ ] Update CHALLENGE_CATEGORIES in quickfireRouter.ts
+- [ ] Update CAT_KEY mapping in quickfireRouter.ts
+- [ ] Update category enum/type in drizzle/schema.ts for questions and challenges
+- [ ] Update category lists in ChallengeCardGenerator.tsx (CATEGORY_HASHTAGS, CATS)
+- [ ] Update case library category dropdowns in CaseAdmin / CaseLibrary pages
+- [ ] Update flashcard category filter in QuickFireAdmin flashcard tab
+- [ ] Run DB migration if enum columns need updating

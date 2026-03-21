@@ -114,7 +114,7 @@ interface ConnectPair { left: string; right: string; }
 interface IdentifierMarker { x: number; y: number; label: string; }
 interface OrderItem { text: string; }
 
-type QuestionCategory = "Abdominal" | "Pelvic/Gyn" | "OB 1st Trimester" | "OB 2nd/3rd Trimester" | "Fetal Echo" | "Venous" | "Arterial" | "Vascular" | "Abdominal Vascular" | "Extracranial Carotid" | "Intracranial Duplex/TCD" | "POCUS" | "Physics" | "Thyroid" | "Scrotum" | "Breast" | "MSK";
+type QuestionCategory = "Abdominal" | "Small Parts" | "Pelvic/Gyn" | "OB 1st Trimester" | "OB 2nd/3rd Trimester" | "Fetal Echo" | "Breast" | "Vascular" | "MSK" | "POCUS";
 
 interface QuestionForm {
   type: QuestionType;
@@ -251,7 +251,7 @@ export default function QuickFireAdmin() {
   // List state
   const [page, setPage] = useState(1);
   const [typeFilter, setTypeFilter] = useState<QuestionType | "all">("all");
-  const [categoryFilter, setCategoryFilter] = useState<"all" | "Abdominal" | "Pelvic/Gyn" | "OB 1st Trimester" | "OB 2nd/3rd Trimester" | "Fetal Echo" | "Venous" | "Arterial" | "Vascular" | "Abdominal Vascular" | "Extracranial Carotid" | "Intracranial Duplex/TCD" | "POCUS" | "Physics" | "Thyroid" | "Scrotum" | "Breast" | "MSK">("all");
+  const [categoryFilter, setCategoryFilter] = useState<"all" | QuestionCategory>("all");
   const [includeInactive, setIncludeInactive] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [challengeSearch, setChallengeSearch] = useState("");
@@ -1080,6 +1080,52 @@ export default function QuickFireAdmin() {
         {/* ── CHALLENGE QUEUE TAB ──────────────────────────────────────────── */}
         {activeAdminTab === "challenges" && (
           <div className="space-y-4">
+            {/* Per-category queue count badges */}
+            {(() => {
+              const queued = challenges.filter((c: any) => c.status !== "live" && c.status !== "archived");
+              const counts: Record<string, number> = {};
+              for (const c of queued) {
+                const cat = (c as any).category as string;
+                if (cat) counts[cat] = (counts[cat] ?? 0) + 1;
+              }
+              const cats = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+              if (cats.length === 0) return null;
+              return (
+                <div className="flex flex-wrap gap-2">
+                  {cats.map(([cat, count]) => (
+                    <button
+                      key={cat}
+                      onClick={() => setQueueCategoryFilter(cat as any)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all hover:shadow-sm"
+                      style={{
+                        background: queueCategoryFilter === cat ? "#189aa1" : "#f0fdfd",
+                        borderColor: queueCategoryFilter === cat ? "#189aa1" : "#99e6e8",
+                        color: queueCategoryFilter === cat ? "#fff" : "#0e7a80",
+                      }}
+                    >
+                      <span>{cat}</span>
+                      <span
+                        className="inline-flex items-center justify-center rounded-full font-bold text-[10px] min-w-[18px] h-[18px] px-1"
+                        style={{
+                          background: queueCategoryFilter === cat ? "rgba(255,255,255,0.3)" : "#189aa1",
+                          color: "#fff",
+                        }}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  ))}
+                  {queueCategoryFilter !== "all" && (
+                    <button
+                      onClick={() => setQueueCategoryFilter("all")}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold border border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300 transition-all"
+                    >
+                      × Show all
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
             {/* Queue header */}
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div>
@@ -1100,21 +1146,15 @@ export default function QuickFireAdmin() {
                   <SelectContent>
                     <SelectItem value="all">All categories</SelectItem>
                     <SelectItem value="Abdominal">Abdominal</SelectItem>
+                    <SelectItem value="Small Parts">Small Parts</SelectItem>
                     <SelectItem value="Pelvic/Gyn">Pelvic/Gyn</SelectItem>
                     <SelectItem value="OB 1st Trimester">OB 1st Trimester</SelectItem>
                     <SelectItem value="OB 2nd/3rd Trimester">OB 2nd/3rd Trimester</SelectItem>
-                    <SelectItem value="Vascular">Vascular</SelectItem>
-                    <SelectItem value="Venous">Venous</SelectItem>
-                    <SelectItem value="Arterial">Arterial</SelectItem>
-                    <SelectItem value="Abdominal Vascular">Abdominal Vascular</SelectItem>
-                    <SelectItem value="Extracranial Carotid">Extracranial Carotid</SelectItem>
-                    <SelectItem value="Intracranial Duplex/TCD">Intracranial Duplex/TCD</SelectItem>
-                    <SelectItem value="POCUS">POCUS</SelectItem>
-                    <SelectItem value="Physics">Physics</SelectItem>
-                    <SelectItem value="Thyroid">Thyroid</SelectItem>
-                    <SelectItem value="Scrotum">Scrotum</SelectItem>
+                    <SelectItem value="Fetal Echo">Fetal Echo</SelectItem>
                     <SelectItem value="Breast">Breast</SelectItem>
+                    <SelectItem value="Vascular">Vascular</SelectItem>
                     <SelectItem value="MSK">MSK</SelectItem>
+                    <SelectItem value="POCUS">POCUS</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1267,22 +1307,15 @@ export default function QuickFireAdmin() {
             <SelectContent>
               <SelectItem value="all">All Categories</SelectItem>
               <SelectItem value="Abdominal">Abdominal</SelectItem>
+              <SelectItem value="Small Parts">Small Parts</SelectItem>
               <SelectItem value="Pelvic/Gyn">Pelvic/Gyn</SelectItem>
               <SelectItem value="OB 1st Trimester">OB 1st Trimester</SelectItem>
               <SelectItem value="OB 2nd/3rd Trimester">OB 2nd/3rd Trimester</SelectItem>
               <SelectItem value="Fetal Echo">Fetal Echo</SelectItem>
-              <SelectItem value="Venous">Venous</SelectItem>
-              <SelectItem value="Arterial">Arterial</SelectItem>
-              <SelectItem value="Vascular">Vascular</SelectItem>
-              <SelectItem value="Abdominal Vascular">Abdominal Vascular</SelectItem>
-              <SelectItem value="Extracranial Carotid">Extracranial Carotid</SelectItem>
-              <SelectItem value="Intracranial Duplex/TCD">Intracranial Duplex/TCD</SelectItem>
-              <SelectItem value="POCUS">POCUS</SelectItem>
-              <SelectItem value="Physics">Physics</SelectItem>
-              <SelectItem value="Thyroid">Thyroid</SelectItem>
-              <SelectItem value="Scrotum">Scrotum</SelectItem>
               <SelectItem value="Breast">Breast</SelectItem>
+              <SelectItem value="Vascular">Vascular</SelectItem>
               <SelectItem value="MSK">MSK</SelectItem>
+              <SelectItem value="POCUS">POCUS</SelectItem>
             </SelectContent>
           </Select>
           <Button
@@ -1416,12 +1449,12 @@ export default function QuickFireAdmin() {
                         }`}>{q.difficulty}</span>
                         {q.category && (
                           <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                            q.category === "Venous" ? "bg-blue-50 text-blue-700" :
-                            q.category === "Arterial" ? "bg-red-50 text-red-600" :
                             q.category === "Vascular" ? "bg-sky-50 text-sky-700" :
                             q.category === "Fetal Echo" ? "bg-purple-50 text-purple-700" :
                             q.category === "POCUS" ? "bg-amber-50 text-amber-700" :
-                            q.category === "Physics" ? "bg-gray-50 text-gray-600" :
+                            q.category === "Breast" ? "bg-pink-50 text-pink-700" :
+                            q.category === "MSK" ? "bg-orange-50 text-orange-700" :
+                            q.category === "Small Parts" ? "bg-gray-50 text-gray-600" :
                             "bg-teal-50 text-teal-700"
                           }`}>{q.category}</span>
                         )}
@@ -1704,7 +1737,7 @@ export default function QuickFireAdmin() {
                 className="w-56"
               />
               <div className="flex gap-1 flex-wrap">
-                {(["all", "abdominal", "pelvic_gyn", "obstetric_1st", "obstetric_2nd_3rd", "fetal_echo", "venous", "arterial", "abdominal_vascular", "extracranial_carotid", "intracranial_tcd", "pocus", "physics", "thyroid", "scrotum", "breast", "msk"] as const).map((cat) => (
+                {(["all", "abdominal", "smallParts", "pelvicGyn", "ob1st", "ob2nd3rd", "fetalEcho", "breast", "vascular", "msk", "pocus"] as const).map((cat) => (
                   <button
                     key={cat}
                     onClick={() => setFlashcardEchoCategory(cat)}
@@ -1714,7 +1747,7 @@ export default function QuickFireAdmin() {
                         : "border-gray-200 bg-gray-50 text-gray-600 hover:border-[#189aa1] hover:text-[#189aa1]"
                     }`}
                   >
-                    {cat === "all" ? "All" : cat === "abdominal" ? "Abdominal" : cat === "pelvic_gyn" ? "Pelvic/Gyn" : cat === "obstetric_1st" ? "OB 1st" : cat === "obstetric_2nd_3rd" ? "OB 2nd/3rd" : cat === "fetal_echo" ? "Fetal Echo" : cat === "venous" ? "Venous" : cat === "arterial" ? "Arterial" : cat === "abdominal_vascular" ? "Abd. Vascular" : cat === "extracranial_carotid" ? "Carotid" : cat === "intracranial_tcd" ? "TCD" : cat === "pocus" ? "POCUS" : cat === "physics" ? "Physics" : cat === "thyroid" ? "Thyroid" : cat === "scrotum" ? "Scrotum" : cat === "breast" ? "Breast" : "MSK"}
+                    {cat === "all" ? "All" : cat === "abdominal" ? "Abdominal" : cat === "smallParts" ? "Small Parts" : cat === "pelvicGyn" ? "Pelvic/Gyn" : cat === "ob1st" ? "OB 1st" : cat === "ob2nd3rd" ? "OB 2nd/3rd" : cat === "fetalEcho" ? "Fetal Echo" : cat === "breast" ? "Breast" : cat === "vascular" ? "Vascular" : cat === "msk" ? "MSK" : "POCUS"}
                   </button>
                 ))}
               </div>
@@ -1920,11 +1953,12 @@ export default function QuickFireAdmin() {
                         <div className="flex items-center gap-2 flex-wrap">
                           {q.qid && <span className="text-[10px] font-mono font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{q.qid}</span>}
                           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                            q.category === "Venous" ? "bg-blue-100 text-blue-700" :
-                            q.category === "Arterial" ? "bg-red-100 text-red-700" :
+                            q.category === "Vascular" ? "bg-sky-100 text-sky-700" :
                             q.category === "Fetal Echo" ? "bg-purple-100 text-purple-700" :
                             q.category === "POCUS" ? "bg-amber-100 text-amber-700" :
-                            q.category === "Physics" ? "bg-gray-100 text-gray-700" :
+                            q.category === "Breast" ? "bg-pink-100 text-pink-700" :
+                            q.category === "MSK" ? "bg-orange-100 text-orange-700" :
+                            q.category === "Small Parts" ? "bg-gray-100 text-gray-700" :
                             "bg-teal-100 text-teal-700"
                           }`}>{q.category}</span>
                           <span className={`text-xs px-1.5 py-0.5 rounded ${
@@ -2078,7 +2112,7 @@ export default function QuickFireAdmin() {
               <div>
                 <p className="text-xs font-semibold text-amber-700">Category assignment is required</p>
                 <p className="text-xs text-amber-600 mt-0.5">
-                  The Daily Challenge shows <strong>one question per category</strong> (Abdominal, Venous, Arterial, POCUS, etc.).
+                  The Daily Challenge shows <strong>one question per category</strong> (Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd/3rd Trimester, Fetal Echo, Breast, Vascular, MSK, POCUS).
                   Set the correct category so this challenge appears in the right slot for users.
                 </p>
               </div>
@@ -2090,22 +2124,15 @@ export default function QuickFireAdmin() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Abdominal">Abdominal</SelectItem>
+                    <SelectItem value="Small Parts">Small Parts</SelectItem>
                     <SelectItem value="Pelvic/Gyn">Pelvic/Gyn</SelectItem>
                     <SelectItem value="OB 1st Trimester">OB 1st Trimester</SelectItem>
                     <SelectItem value="OB 2nd/3rd Trimester">OB 2nd/3rd Trimester</SelectItem>
                     <SelectItem value="Fetal Echo">Fetal Echo</SelectItem>
-                    <SelectItem value="Venous">Venous</SelectItem>
-                    <SelectItem value="Arterial">Arterial</SelectItem>
-                    <SelectItem value="Vascular">Vascular</SelectItem>
-                    <SelectItem value="Abdominal Vascular">Abdominal Vascular</SelectItem>
-                    <SelectItem value="Extracranial Carotid">Extracranial Carotid</SelectItem>
-                    <SelectItem value="Intracranial Duplex/TCD">Intracranial Duplex/TCD</SelectItem>
-                    <SelectItem value="POCUS">POCUS</SelectItem>
-                    <SelectItem value="Physics">Physics</SelectItem>
-                    <SelectItem value="Thyroid">Thyroid</SelectItem>
-                    <SelectItem value="Scrotum">Scrotum</SelectItem>
                     <SelectItem value="Breast">Breast</SelectItem>
+                    <SelectItem value="Vascular">Vascular</SelectItem>
                     <SelectItem value="MSK">MSK</SelectItem>
+                    <SelectItem value="POCUS">POCUS</SelectItem>
                     <SelectItem value="Mixed">Mixed</SelectItem>
                   </SelectContent>
                 </Select>
@@ -2764,7 +2791,7 @@ export default function QuickFireAdmin() {
                   Tags <span className="text-gray-400 font-normal">(comma-separated)</span>
                 </label>
                 <div className="flex flex-wrap gap-1.5 mb-2">
-                  {["Abdominal", "Venous", "Arterial", "OB 2nd/3rd Trimester", "POCUS", "Fetal Echo", "Physics"].map((cat) => {
+                  {["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS"].map((cat) => {
                     const currentTags = form.tags.split(",").map((t) => t.trim()).filter(Boolean);
                     const isActive = currentTags.includes(cat);
                     return (
@@ -2863,21 +2890,15 @@ export default function QuickFireAdmin() {
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {[
                     { label: "Abdominal", topic: "Abdominal ultrasound — liver, gallbladder, pancreas, spleen, kidneys, aorta, Doppler assessment, pathology identification", category: "Abdominal" as QuestionCategory },
-                    { label: "Venous", topic: "Venous duplex ultrasound — DVT diagnosis, compressibility criteria, augmentation, venous reflux, varicose veins, SVT", category: "Venous" as QuestionCategory },
-                    { label: "Arterial", topic: "Arterial duplex ultrasound — ABI interpretation, PAD grading, waveform analysis, stenosis criteria, bypass graft surveillance", category: "Arterial" as QuestionCategory },
-                    { label: "Carotid", topic: "Extracranial carotid duplex — ICA/CCA/ECA stenosis criteria, plaque morphology, velocity ratios, NASCET criteria, stent surveillance", category: "Extracranial Carotid" as QuestionCategory },
-                    { label: "Abd. Vascular", topic: "Abdominal vascular ultrasound — renal artery stenosis, mesenteric artery disease, aortic aneurysm, hepatic/portal Doppler", category: "Abdominal Vascular" as QuestionCategory },
-                    { label: "OB 2nd/3rd", topic: "Obstetric ultrasound 2nd/3rd trimester — fetal biometry, growth assessment, placenta previa, AFI, Doppler surveillance, anomaly screening", category: "OB 2nd/3rd Trimester" as QuestionCategory },
-                    { label: "OB 1st Tri", topic: "Obstetric ultrasound 1st trimester — CRL measurement, NT screening, ectopic pregnancy, early fetal anatomy, dating", category: "OB 1st Trimester" as QuestionCategory },
-                    { label: "Fetal Echo", topic: "Fetal echocardiography — cardiac anatomy, 4-chamber view, outflow tracts, CHD screening, arrhythmia, biometry", category: "Fetal Echo" as QuestionCategory },
+                    { label: "Small Parts", topic: "Small parts ultrasound — thyroid nodule characterization, TIRADS scoring, parathyroid, scrotal/testicular assessment, lymph node evaluation, salivary glands", category: "Small Parts" as QuestionCategory },
                     { label: "Pelvic/Gyn", topic: "Pelvic/gynecologic ultrasound — uterine pathology, ovarian cysts, fibroids, endometrial assessment, adnexal masses, PCOS", category: "Pelvic/Gyn" as QuestionCategory },
-                    { label: "TCD", topic: "Intracranial duplex/TCD — MCA/ACA/PCA velocities, vasospasm monitoring, emboli detection, sickle cell screening, brain death criteria", category: "Intracranial Duplex/TCD" as QuestionCategory },
-                    { label: "POCUS", topic: "Point-of-care ultrasound (POCUS) — eFAST, RUSH protocol, lung POCUS, IVC assessment, pleural effusion, bedside assessment", category: "POCUS" as QuestionCategory },
-                    { label: "Physics", topic: "Ultrasound physics — transducer types, artifacts, Doppler principles, image optimization, ARDMS physics exam topics", category: "Physics" as QuestionCategory },
-                    { label: "Thyroid", topic: "Thyroid ultrasound — nodule characterization, TIRADS scoring, parathyroid, lymph node assessment, biopsy guidance", category: "Thyroid" as QuestionCategory },
-                    { label: "Scrotum", topic: "Scrotal ultrasound — testicular torsion, epididymo-orchitis, varicocele, hydrocele, testicular masses, Doppler assessment", category: "Scrotum" as QuestionCategory },
+                    { label: "OB 1st Tri", topic: "Obstetric ultrasound 1st trimester — CRL measurement, NT screening, ectopic pregnancy, early fetal anatomy, dating", category: "OB 1st Trimester" as QuestionCategory },
+                    { label: "OB 2nd/3rd", topic: "Obstetric ultrasound 2nd/3rd trimester — fetal biometry, growth assessment, placenta previa, AFI, Doppler surveillance, anomaly screening", category: "OB 2nd/3rd Trimester" as QuestionCategory },
+                    { label: "Fetal Echo", topic: "Fetal echocardiography — cardiac anatomy, 4-chamber view, outflow tracts, CHD screening, arrhythmia, biometry", category: "Fetal Echo" as QuestionCategory },
                     { label: "Breast", topic: "Breast ultrasound — BI-RADS classification, solid vs cystic lesions, lymph node assessment, biopsy guidance, implant evaluation", category: "Breast" as QuestionCategory },
+                    { label: "Vascular", topic: "Vascular ultrasound — DVT diagnosis, arterial duplex, carotid stenosis, ABI, renal artery stenosis, aortic aneurysm, Doppler waveform analysis", category: "Vascular" as QuestionCategory },
                     { label: "MSK", topic: "MSK ultrasound — tendon pathology, rotator cuff tears, joint effusions, nerve entrapment, dynamic assessment, guided injections", category: "MSK" as QuestionCategory },
+                    { label: "POCUS", topic: "Point-of-care ultrasound (POCUS) — eFAST, RUSH protocol, lung POCUS, IVC assessment, pleural effusion, bedside assessment", category: "POCUS" as QuestionCategory },
                   ].map(({ label, topic, category }) => (
                     <button
                       key={label}
@@ -2946,22 +2967,15 @@ export default function QuickFireAdmin() {
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="Abdominal">Abdominal</SelectItem>
+                        <SelectItem value="Small Parts">Small Parts</SelectItem>
                         <SelectItem value="Pelvic/Gyn">Pelvic/Gyn</SelectItem>
                         <SelectItem value="OB 1st Trimester">OB 1st Trimester</SelectItem>
                         <SelectItem value="OB 2nd/3rd Trimester">OB 2nd/3rd Trimester</SelectItem>
                         <SelectItem value="Fetal Echo">Fetal Echo</SelectItem>
-                        <SelectItem value="Venous">Venous</SelectItem>
-                        <SelectItem value="Arterial">Arterial</SelectItem>
-                        <SelectItem value="Vascular">Vascular</SelectItem>
-                        <SelectItem value="Abdominal Vascular">Abdominal Vascular</SelectItem>
-                        <SelectItem value="Extracranial Carotid">Extracranial Carotid</SelectItem>
-                        <SelectItem value="Intracranial Duplex/TCD">Intracranial Duplex/TCD</SelectItem>
-                        <SelectItem value="POCUS">POCUS</SelectItem>
-                        <SelectItem value="Physics">Physics</SelectItem>
-                        <SelectItem value="Thyroid">Thyroid</SelectItem>
-                        <SelectItem value="Scrotum">Scrotum</SelectItem>
                         <SelectItem value="Breast">Breast</SelectItem>
+                        <SelectItem value="Vascular">Vascular</SelectItem>
                         <SelectItem value="MSK">MSK</SelectItem>
+                        <SelectItem value="POCUS">POCUS</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -3027,22 +3041,15 @@ export default function QuickFireAdmin() {
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="Abdominal">Abdominal</SelectItem>
+                        <SelectItem value="Small Parts">Small Parts</SelectItem>
                         <SelectItem value="Pelvic/Gyn">Pelvic/Gyn</SelectItem>
                         <SelectItem value="OB 1st Trimester">OB 1st Trimester</SelectItem>
                         <SelectItem value="OB 2nd/3rd Trimester">OB 2nd/3rd Trimester</SelectItem>
                         <SelectItem value="Fetal Echo">Fetal Echo</SelectItem>
-                        <SelectItem value="Venous">Venous</SelectItem>
-                        <SelectItem value="Arterial">Arterial</SelectItem>
-                        <SelectItem value="Vascular">Vascular</SelectItem>
-                        <SelectItem value="Abdominal Vascular">Abdominal Vascular</SelectItem>
-                        <SelectItem value="Extracranial Carotid">Extracranial Carotid</SelectItem>
-                        <SelectItem value="Intracranial Duplex/TCD">Intracranial Duplex/TCD</SelectItem>
-                        <SelectItem value="POCUS">POCUS</SelectItem>
-                        <SelectItem value="Physics">Physics</SelectItem>
-                        <SelectItem value="Thyroid">Thyroid</SelectItem>
-                        <SelectItem value="Scrotum">Scrotum</SelectItem>
                         <SelectItem value="Breast">Breast</SelectItem>
+                        <SelectItem value="Vascular">Vascular</SelectItem>
                         <SelectItem value="MSK">MSK</SelectItem>
+                        <SelectItem value="POCUS">POCUS</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -3373,18 +3380,15 @@ export default function QuickFireAdmin() {
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {[
                     { label: "Abdominal", topic: "Abdominal ultrasound flashcards — liver echogenicity, gallbladder pathology, renal cysts, spleen size, pancreas assessment, Doppler" },
-                    { label: "Venous", topic: "Venous duplex flashcards — DVT criteria, compressibility, augmentation, reflux testing, venous anatomy" },
-                    { label: "Arterial", topic: "Arterial duplex flashcards — ABI values, waveform morphology, stenosis grading, PAD classification" },
-                    { label: "Carotid", topic: "Extracranial carotid flashcards — ICA stenosis criteria, velocity thresholds, plaque types, NASCET vs ECST" },
+                    { label: "Small Parts", topic: "Small parts ultrasound flashcards — thyroid TIRADS scoring, nodule features, scrotal anatomy, testicular torsion criteria, lymph node assessment" },
+                    { label: "Pelvic/Gyn", topic: "Pelvic/gynecologic ultrasound flashcards — endometrial thickness, ovarian cyst types, fibroid classification, PCOS criteria" },
+                    { label: "OB 1st Tri", topic: "Obstetric ultrasound flashcards 1st trimester — CRL measurement, NT screening, ectopic pregnancy, early anatomy" },
                     { label: "OB 2nd/3rd", topic: "Obstetric ultrasound flashcards 2nd/3rd trimester — biometry formulas, BPP scoring, AFI, placenta grading" },
                     { label: "Fetal Echo", topic: "Fetal echocardiography flashcards — cardiac anatomy, 4-chamber view, outflow tracts, CHD patterns" },
-                    { label: "Pelvic/Gyn", topic: "Pelvic/gynecologic ultrasound flashcards — endometrial thickness, ovarian cyst types, fibroid classification, PCOS criteria" },
-                    { label: "POCUS", topic: "POCUS flashcards — eFAST findings, lung sliding, B-lines, IVC collapsibility, RUSH protocol steps" },
-                    { label: "Physics", topic: "Ultrasound physics flashcards — acoustic impedance, attenuation, artifacts (shadowing, enhancement, reverberation), Doppler principles" },
-                    { label: "Thyroid", topic: "Thyroid ultrasound flashcards — TIRADS categories, nodule features, echogenicity, vascularity, biopsy criteria" },
-                    { label: "Scrotum", topic: "Scrotal ultrasound flashcards — testicular torsion criteria, epididymis anatomy, varicocele grading, hydrocele types, Doppler findings" },
                     { label: "Breast", topic: "Breast ultrasound flashcards — BI-RADS lexicon, solid vs cystic features, lymph node criteria, ACR guidelines, biopsy indications" },
+                    { label: "Vascular", topic: "Vascular ultrasound flashcards — DVT criteria, ABI values, carotid stenosis thresholds, renal artery Doppler, waveform morphology" },
                     { label: "MSK", topic: "MSK ultrasound flashcards — tendon anatomy, rotator cuff pathology, joint effusion grading, nerve identification, dynamic maneuvers" },
+                    { label: "POCUS", topic: "POCUS flashcards — eFAST findings, lung sliding, B-lines, IVC collapsibility, RUSH protocol steps" },
                   ].map(({ label, topic }) => (
                     <button
                       key={label}
