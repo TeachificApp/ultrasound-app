@@ -30,7 +30,7 @@ function useCountUp(target: number, duration = 1800) {
   return count;
 }
 import {
-  Calculator, ClipboardList, Activity, BookOpen, FileText,
+  Calculator, Activity, BookOpen, FileText,
   ArrowRight, Users, Award, Zap, Stethoscope, ExternalLink, MessageCircle, GraduationCap, BookMarked, Crown, Shield, Heart, ClipboardCheck
 } from "lucide-react";
 
@@ -232,11 +232,6 @@ export default function Home() {
                 <BookOpen className="w-4 h-4 text-[#4ad9e0]" />
                 <span className="text-lg font-bold text-white">500+</span>
                 <span className="text-xs text-white/60">Ultrasound Cases</span>
-              </div>
-              <div className="flex items-center gap-2 text-white/80">
-                <ClipboardList className="w-4 h-4 text-[#4ad9e0]" />
-                <span className="text-lg font-bold text-white">15</span>
-                <span className="text-xs text-white/60">Protocols Covered</span>
               </div>
               <div className="flex items-center gap-2 text-white/80">
                 <Users className="w-4 h-4 text-[#4ad9e0]" />
