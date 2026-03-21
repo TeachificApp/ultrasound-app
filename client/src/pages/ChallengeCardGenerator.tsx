@@ -3,7 +3,7 @@
  * Generates branded 1080x1080 social media image cards for daily challenges.
  * Adapted from iHeartEcho for UltrasoundAssist™ (All About Ultrasound™)
  */
-import { useRef, useCallback, useState } from "react";
+import { useRef, useCallback, useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
 import { toPng } from "html-to-image";
@@ -12,6 +12,7 @@ import { saveAs } from "file-saver";
 import {
   ArrowLeft, Download, Loader2, AlertCircle, ImageIcon,
   CheckCircle2, Zap, Package, Share2, Copy, Check,
+  ChevronLeft, ChevronRight, Calendar,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -1040,11 +1041,48 @@ function CategorySection({
 
 // ---- Main Page --------------------------------------------------------------
 
+// ---- Date helpers -----------------------------------------------------------
+function formatDateLabel(dateStr: string): string {
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  if (dateStr === today) return "Today";
+  if (dateStr === yesterday) return "Yesterday";
+  // Format as "Mar 20"
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 export default function ChallengeCardGenerator() {
-  const { data, isLoading, error, refetch } = trpc.quickfire.adminGetCardGeneratorData.useQuery(undefined, {
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const [selectedDate, setSelectedDate] = useState<string>(today);
+  const isToday = selectedDate === today;
+
+  // Available dates (up to 30 days back)
+  const { data: availableDates, isLoading: datesLoading } =
+    trpc.quickfire.adminListCardGeneratorDates.useQuery(undefined, { staleTime: 300_000 });
+
+  // Card data for the selected date — use the "next queued" procedure for today,
+  // and the date-specific procedure for past dates.
+  const todayQuery = trpc.quickfire.adminGetCardGeneratorData.useQuery(undefined, {
     staleTime: 60_000,
     retry: false,
+    enabled: isToday,
   });
+  const dateQuery = trpc.quickfire.adminGetCardGeneratorForDate.useQuery(
+    { date: selectedDate },
+    { staleTime: 60_000, retry: false, enabled: !isToday }
+  );
+
+  const isLoading = isToday ? todayQuery.isLoading : dateQuery.isLoading;
+  const error = isToday ? todayQuery.error : dateQuery.error;
+  // Normalise to a flat array of CategoryItem
+  const data: any[] | undefined = useMemo(() => {
+    if (isToday) return todayQuery.data as any[] | undefined;
+    const d = dateQuery.data as { date: string; results: any[] } | undefined;
+    return d?.results;
+  }, [isToday, todayQuery.data, dateQuery.data]);
+
+  const refetch = isToday ? todayQuery.refetch : dateQuery.refetch;
 
   const [cardTheme, setCardTheme] = useState<CardTheme>("dark");
 
@@ -1070,14 +1108,38 @@ export default function ChallengeCardGenerator() {
         })
       );
       const blob = await zip.generateAsync({ type: "blob" });
-      saveAs(blob, `ultrasoundassist-${type}-${new Date().toISOString().slice(0, 10)}.zip`);
+      saveAs(blob, `ultrasoundassist-${type}-${selectedDate}.zip`);
     } catch (err) {
       console.error("Batch export failed:", err);
       toast.error("Batch export failed. Please try again.");
     } finally {
       setBatchLoading(null);
     }
-  }, []);
+  }, [selectedDate]);
+
+  // Navigation helpers
+  const dates = availableDates ?? [today];
+  const currentIdx = dates.indexOf(selectedDate);
+  // dates are sorted newest-first, so index 0 = today, higher index = older
+  const canGoNewer = currentIdx > 0;
+  const canGoOlder = currentIdx < dates.length - 1 && currentIdx !== -1;
+
+  const goNewer = () => {
+    if (canGoNewer) {
+      const next = dates[currentIdx - 1];
+      setSelectedDate(next);
+      questionRefs.current = {};
+      answerRefs.current = {};
+    }
+  };
+  const goOlder = () => {
+    if (canGoOlder) {
+      const next = dates[currentIdx + 1];
+      setSelectedDate(next);
+      questionRefs.current = {};
+      answerRefs.current = {};
+    }
+  };
 
   const hasData = data && data.some((d: any) => d.challenge && d.questions.length > 0);
 
@@ -1096,6 +1158,38 @@ export default function ChallengeCardGenerator() {
           <Badge className="text-[10px] px-1.5 py-0 ml-0.5" style={{ background: BRAND + "22", color: BRAND_AQUA, border: "none" }}>
             Admin
           </Badge>
+
+          {/* Date navigation */}
+          <div className="flex items-center gap-1 ml-4">
+            <button
+              onClick={goOlder}
+              disabled={!canGoOlder || datesLoading}
+              className="p-1.5 rounded-lg transition-colors disabled:opacity-30"
+              style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" }}
+              title="Previous set"
+            >
+              <ChevronLeft className="w-3.5 h-3.5 text-white/70" />
+            </button>
+            <div
+              className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold"
+              style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", minWidth: 90, justifyContent: "center" }}
+            >
+              <Calendar className="w-3 h-3" style={{ color: BRAND_AQUA }} />
+              <span style={{ color: isToday ? BRAND_AQUA : "rgba(255,255,255,0.75)" }}>
+                {formatDateLabel(selectedDate)}
+              </span>
+            </div>
+            <button
+              onClick={goNewer}
+              disabled={!canGoNewer || datesLoading}
+              className="p-1.5 rounded-lg transition-colors disabled:opacity-30"
+              style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" }}
+              title="Next set"
+            >
+              <ChevronRight className="w-3.5 h-3.5 text-white/70" />
+            </button>
+          </div>
+
           <div className="ml-auto flex items-center gap-2">
             {/* Dark / Light toggle */}
             <div
@@ -1166,7 +1260,10 @@ export default function ChallengeCardGenerator() {
           style={{ background: BRAND + "14", border: `1px solid ${BRAND}2a` }}
         >
           <p className="text-white/60">
-            Cards are generated from the <strong className="text-white">next queued challenge</strong> per category.
+            {isToday
+              ? <>Cards are generated from the <strong className="text-white">next queued challenge</strong> per category.</>
+              : <>Showing cards for <strong className="text-white">{selectedDate}</strong> — use ‹ › to browse up to 30 days back.</>
+            }{" "}
             Each card is <strong className="text-white">1080×1080 px</strong> — ideal for Instagram, Facebook, and LinkedIn.
             Post the question card first, then the answer card 24 hours later.
             Use <strong className="text-white">All Questions</strong> or <strong className="text-white">All Answers</strong> to download a ZIP of all cards at once.
@@ -1185,7 +1282,7 @@ export default function ChallengeCardGenerator() {
         {error && (
           <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300 flex items-center gap-2">
             <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            <span>{error.message}</span>
+            <span>{(error as any).message}</span>
           </div>
         )}
 
@@ -1194,7 +1291,10 @@ export default function ChallengeCardGenerator() {
           <div className="space-y-4">
             {data.length === 0 ? (
               <div className="text-center py-12 text-white/40 text-sm">
-                No queued challenges found. Add challenges to the queue first.
+                {isToday
+                  ? "No queued challenges found. Add challenges to the queue first."
+                  : `No challenge cards found for ${formatDateLabel(selectedDate)} (${selectedDate}).`
+                }
               </div>
             ) : (
               data.map((item: any) => (

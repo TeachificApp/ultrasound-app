@@ -462,9 +462,18 @@
 - [ ] Server: Update adminGetCardGeneratorData to accept optional date param
 - [ ] Server: Add adminGetCardGeneratorRange procedure — returns up to 30 days of sets
 - [ ] ChallengeCardGenerator: Add date selector / next-set / previous-set navigation
-- [ ] ChallengeCardGenerator: Show date label on each set (e.g. "Today", "Yesterday", "Mar 20")
+- [x] ChallengeCardGenerator: Show date label (Today / Yesterday / Mar 20 etc.)
 - [ ] ChallengeCardGenerator: Add MSK to CATEGORY_HASHTAGS
 
 ## Social Post Full Text (Mar 21)
 - [x] Remove 160-char question preview truncation in buildSocialPost
 - [x] Remove 200-char explanation truncation in buildSocialPost
+
+## Challenge Card Generator — 30-Day Navigation (Mar 21 — implementing)
+- [x] Server: Add adminGetCardGeneratorForDate procedure (accepts date param, returns per-category challenge+questions for that date's daily set)
+- [x] Server: Add adminListCardGeneratorDates procedure (returns list of up to 30 available set dates)
+- [x] ChallengeCardGenerator: Add selectedDate state (default = today)
+- [x] ChallengeCardGenerator: Add Previous/Next set navigation buttons in header
+- [x] ChallengeCardGenerator: Show date label (Today / Yesterday / Mar 20 etc.)
+- [x] ChallengeCardGenerator: Disable Next when on today, disable Previous when at 30-day limit
+- [x] ChallengeCardGenerator: Update batch download filename to include date

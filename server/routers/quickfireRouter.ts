@@ -2509,4 +2509,131 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
 
     return results.filter((r) => r.challenge !== null);
   }),
+
+  /**
+   * Admin: get challenge + questions per category for a specific date's daily set.
+   * Uses the daily set row if it exists; falls back to challenges published on that date.
+   */
+  adminGetCardGeneratorForDate: adminProcedure
+    .input(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const { date } = input;
+
+      // Helper: fetch full question rows by IDs
+      async function fetchQuestions(ids: number[]) {
+        if (ids.length === 0) return [];
+        return db!.select({
+          id: quickfireQuestions.id,
+          qid: quickfireQuestions.qid,
+          type: quickfireQuestions.type,
+          question: quickfireQuestions.question,
+          options: quickfireQuestions.options,
+          correctAnswer: quickfireQuestions.correctAnswer,
+          explanation: quickfireQuestions.explanation,
+          reviewAnswer: quickfireQuestions.reviewAnswer,
+          imageUrl: quickfireQuestions.imageUrl,
+          difficulty: quickfireQuestions.difficulty,
+          category: quickfireQuestions.category,
+        }).from(quickfireQuestions).where(inArray(quickfireQuestions.id, ids));
+      }
+
+      // 1. Try the daily set row for this date
+      const [setRow] = await db
+        .select()
+        .from(quickfireDailySets)
+        .where(eq(quickfireDailySets.setDate, date))
+        .limit(1);
+
+      // 2. Get challenges published on this date for titles
+      const publishedChallenges = await db
+        .select()
+        .from(quickfireChallenges)
+        .where(
+          and(
+            eq(quickfireChallenges.publishDate, date),
+            inArray(quickfireChallenges.status, ["live", "archived"] as any[])
+          )
+        );
+      const challengeByCategory = new Map(publishedChallenges.map((c) => [c.category as string, c]));
+
+      if (setRow) {
+        const questionMap = parseDailySetIds(setRow.questionIds);
+        const allIds = Object.values(questionMap).filter((id): id is number => id !== null);
+        const allQuestions = await fetchQuestions(allIds);
+        const qMap = new Map(allQuestions.map((q) => [q.id, q]));
+
+        const results = (CHALLENGE_CATEGORIES as readonly string[]).map((cat) => {
+          const key = CAT_KEY[cat as ChallengeCategory] ?? cat.toLowerCase();
+          const qId = questionMap[key] ?? null;
+          const q = qId !== null ? qMap.get(qId) : undefined;
+          const challenge = challengeByCategory.get(cat) ?? null;
+          return {
+            category: cat,
+            challenge: challenge
+              ? { title: challenge.title, status: challenge.status, category: challenge.category }
+              : (q ? { title: `${cat} — ${date}`, status: "archived", category: cat } : null),
+            questions: q ? [q] : [],
+          };
+        });
+        return { date, results: results.filter((r) => r.questions.length > 0) };
+      }
+
+      // 3. No daily set row — use published challenges directly
+      if (publishedChallenges.length === 0) return { date, results: [] };
+
+      const allQIds = Array.from(
+        new Set(publishedChallenges.flatMap((c) => JSON.parse(c.questionIds || "[]") as number[]))
+      );
+      const allQuestions = await fetchQuestions(allQIds);
+      const qMap = new Map(allQuestions.map((q) => [q.id, q]));
+
+      const results = publishedChallenges.map((challenge) => {
+        const qIds: number[] = JSON.parse(challenge.questionIds || "[]");
+        const questions = qIds.map((id) => qMap.get(id)).filter((q): q is NonNullable<typeof q> => q !== undefined);
+        return {
+          category: challenge.category as string,
+          challenge: { title: challenge.title, status: challenge.status, category: challenge.category as string },
+          questions,
+        };
+      });
+
+      return { date, results: results.filter((r) => r.questions.length > 0) };
+    }),
+
+  /**
+   * Admin: list dates that have daily sets or published challenges, up to 30 days back.
+   * Returns array of YYYY-MM-DD strings in descending order (newest first).
+   */
+  adminListCardGeneratorDates: adminProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+    const today = todayDateStr();
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 29);
+    const cutoff = cutoffDate.toISOString().slice(0, 10);
+
+    const [setRows, challengeRows] = await Promise.all([
+      db.select({ setDate: quickfireDailySets.setDate })
+        .from(quickfireDailySets)
+        .where(and(gte(quickfireDailySets.setDate, cutoff), lte(quickfireDailySets.setDate, today))),
+      db.select({ publishDate: quickfireChallenges.publishDate })
+        .from(quickfireChallenges)
+        .where(
+          and(
+            inArray(quickfireChallenges.status, ["live", "archived"] as any[]),
+            gte(quickfireChallenges.publishDate, cutoff),
+            lte(quickfireChallenges.publishDate, today)
+          )
+        ),
+    ]);
+
+    const allDates = new Set<string>([today]);
+    for (const r of setRows) allDates.add(r.setDate);
+    for (const r of challengeRows) if (r.publishDate) allDates.add(r.publishDate);
+
+    return Array.from(allDates).sort().reverse().slice(0, 30);
+  }),
 });
