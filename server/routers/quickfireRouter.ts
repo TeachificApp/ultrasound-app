@@ -2456,4 +2456,57 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
         .where(eq(quickfireQuestions.id, input.id));
       return { success: true };
     }),
+
+  /** Admin: get next queued challenge + questions per category for card generator */
+  adminGetCardGeneratorData: adminProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+    const results = await Promise.all(
+      (CHALLENGE_CATEGORIES as readonly string[]).map(async (cat) => {
+        const [challenge] = await db
+          .select()
+          .from(quickfireChallenges)
+          .where(
+            and(
+              eq(quickfireChallenges.category, cat as any),
+              inArray(quickfireChallenges.status, ["queued", "scheduled", "live", "draft"] as any[])
+            )
+          )
+          .orderBy(quickfireChallenges.queuePosition, quickfireChallenges.priority)
+          .limit(1);
+
+        if (!challenge) return { category: cat, challenge: null, questions: [] };
+
+        const questionIds: number[] = JSON.parse(challenge.questionIds || "[]");
+        if (questionIds.length === 0) return { category: cat, challenge, questions: [] };
+
+        const questions = await db
+          .select({
+            id: quickfireQuestions.id,
+            qid: quickfireQuestions.qid,
+            type: quickfireQuestions.type,
+            question: quickfireQuestions.question,
+            options: quickfireQuestions.options,
+            correctAnswer: quickfireQuestions.correctAnswer,
+            explanation: quickfireQuestions.explanation,
+            reviewAnswer: quickfireQuestions.reviewAnswer,
+            imageUrl: quickfireQuestions.imageUrl,
+            difficulty: quickfireQuestions.difficulty,
+            category: quickfireQuestions.category,
+          })
+          .from(quickfireQuestions)
+          .where(inArray(quickfireQuestions.id, questionIds));
+
+        const qMap = new Map(questions.map((q) => [q.id, q]));
+        const orderedQuestions = questionIds
+          .map((id) => qMap.get(id))
+          .filter((q): q is NonNullable<typeof q> => q !== undefined);
+
+        return { category: cat, challenge, questions: orderedQuestions };
+      })
+    );
+
+    return results.filter((r) => r.challenge !== null);
+  }),
 });

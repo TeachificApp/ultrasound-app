@@ -115,6 +115,7 @@ import SoundBytes from "./pages/SoundBytes";
 // ── Admin & Platform ──────────────────────────────────────────────────────────
 import AdminCaseManagement from "./pages/AdminCaseManagement";
 import QuickFireAdmin from "./pages/QuickFireAdmin";
+import ChallengeCardGenerator from "./pages/ChallengeCardGenerator";
 import ScanCoachEditor from "./pages/ScanCoachEditor";
 import ThinkificWebhookAdmin from "./pages/ThinkificWebhookAdmin";
 import FormBuilderAdmin from "./pages/FormBuilderAdmin";
@@ -247,6 +248,7 @@ function Router() {
         {/* ── Admin ─────────────────────────────────────────────────────── */}
         <Route path="/admin/cases">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminCaseManagement /></RoleGuard>}</Route>
         <Route path="/admin/quickfire">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuickFireAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/challenge-cards">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ChallengeCardGenerator /></RoleGuard>}</Route>
         <Route path="/admin/scancoach">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ScanCoachEditor /></RoleGuard>}</Route>
         <Route path="/admin/thinkific-webhook">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ThinkificWebhookAdmin /></RoleGuard>}</Route>
         <Route path="/admin/form-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>

@@ -443,3 +443,10 @@
 - [ ] Apply same duplicate prevention to Flashcards admin
 - [ ] Apply same duplicate prevention to Case Studies admin
 - [ ] Match iHeartEcho question ID assignment rules
+
+## Challenge Card Generator (Mar 21)
+- [x] ChallengeCardGenerator.tsx component created with UltrasoundAssist branding
+- [x] LOGO_URL and HERO_URL set to correct CDN assets
+- [x] Hashtags and social post text updated for ultrasound (not echo)
+- [x] Route /admin/challenge-cards registered in App.tsx (admin-only via RoleGuard)
+- [x] Challenge Card Generator link added to PlatformAdmin admin tools hub

@@ -58,6 +58,7 @@ import {
   Scan,
   Webhook,
   FlaskConical,
+  Image,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import BulkCsvUploadPanel, { type BulkResult } from "@/components/BulkCsvUploadPanel";
@@ -934,6 +935,13 @@ export default function PlatformAdmin() {
                 label: "Email Campaigns",
                 description: "Compose and send targeted emails to users filtered by interest, role, and subscription",
                 color: "#7c3aed",
+              },
+              {
+                href: "/admin/challenge-cards",
+                icon: Image,
+                label: "Challenge Card Generator",
+                description: "Generate social media cards for Daily Challenge questions",
+                color: "#189aa1",
               },
             ].map(({ href, icon: Icon, label, description, color }) => (
               <Link key={href} href={href}>
