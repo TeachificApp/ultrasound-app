@@ -155,7 +155,7 @@ function SubmitQuestionTab({ isAuthenticated }: { isAuthenticated: boolean }) {
   // Form state
   const [submitterName, setSubmitterName] = useState("");
   const [submitterLinkedIn, setSubmitterLinkedIn] = useState("");
-  const [category, setCategory] = useState<"Abdominal" | "Pelvic/Gyn" | "OB 1st Trimester" | "OB 2nd/3rd Trimester" | "Fetal Echo" | "Venous" | "Arterial" | "Abdominal Vascular" | "Extracranial Carotid" | "Intracranial Duplex/TCD" | "POCUS" | "Physics" | "Thyroid" | "Scrotum" | "Breast" | "MSK">("Abdominal");
+  const [category, setCategory] = useState<"Abdominal" | "Small Parts" | "Pelvic/Gyn" | "OB 1st Trimester" | "OB 2nd/3rd Trimester" | "Fetal Echo" | "Breast" | "Vascular" | "MSK" | "POCUS">("Abdominal");
   const [difficulty, setDifficulty] = useState<"beginner" | "intermediate" | "advanced">("intermediate");
   const [question, setQuestion] = useState("");
   const [options, setOptions] = useState(["", "", "", ""]);
@@ -245,7 +245,7 @@ function SubmitQuestionTab({ isAuthenticated }: { isAuthenticated: boolean }) {
             <Select value={category} onValueChange={(v) => setCategory(v as any)}>
               <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {(["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"] as const).map((c) => (
+                {(["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS"] as const).map((c) => (
                   <SelectItem key={c} value={c}>{c}</SelectItem>
                 ))}
               </SelectContent>

@@ -507,3 +507,24 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Update flashcard category filter in QuickFireAdmin flashcard tab
 - [ ] Run DB migration if enum columns need updating
 - [x] Add CTA to social posts: "Get more challenges and take your place on the leaderboard 🏆 at app.allaboutultrasound.com"
+- [ ] Relabel "Abdominal" calculator category to "Abdominal/Small Parts"
+- [ ] Add TI-RADS Auto Calculator to the calculators section
+
+## Clinical Interpretation Engine (Mar 21)
+- [ ] Build ClinicalInterpretationEngine.tsx with all category tools
+- [ ] Abdominal: LI-RADS, Liver Steatosis, Gallbladder Wall, Spleen Size, Renal Cortex Grader
+- [ ] Small Parts: TI-RADS Auto-Calculator, Testicular Microlithiasis Risk
+- [ ] Pelvic/Gyn: Endometrial Thickness, O-RADS, Uterine Fibroid FIGO, PCOM Detector
+- [ ] OB 1st Trimester: Gestational Age/Viability, NT Risk, Ectopic Risk
+- [ ] OB 2nd/3rd Trimester: Fetal Growth Percentile, AFI, Cervical Length, Placenta Previa
+- [ ] Fetal Echo: Cardiac Axis, Four-Chamber Flagging, Ductus Venosus
+- [ ] Breast: BI-RADS Auto-Classifier, Implant Integrity
+- [ ] Vascular: Carotid Stenosis Grader, Renal Doppler Decision Tool, DVT Scorer, AAA Planner, Portal HTN
+- [ ] MSK: Rotator Cuff Tear, Achilles Tendinopathy, Joint Effusion
+- [ ] POCUS: B-Line Congestion, FAST Interpreter, IVC CI, Bladder Volume, ONSD
+- [ ] Register /clinical-interpretation route in App.tsx
+- [ ] Add Clinical Interpretation Engine link to sidebar Clinical Tools section
+- [ ] Relabel "Abdominal" to "Abdominal/Small Parts" in ObGynCalculators
+
+## Queue Editor Fix (Mar 21)
+- [x] Fix: Challenge queue items now open edit form on click (content area clickable, drag handle and delete button isolated with stopPropagation)

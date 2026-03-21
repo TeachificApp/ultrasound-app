@@ -187,8 +187,8 @@ function SortableQueueItem({ c, idx, openEditChallenge, deleteChallengeMutation 
       <div className="flex-shrink-0 w-8 text-center">
         <span className="text-xs font-bold text-gray-300">#{idx + 1}</span>
       </div>
-      {/* Content */}
-      <div className="flex-1 min-w-0">
+      {/* Content — click anywhere to edit */}
+      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => !isLive && openEditChallenge(c)}>
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-semibold text-sm text-gray-800">{c.title}</span>
           {isLive && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-500 text-white">LIVE</span>}
@@ -226,12 +226,12 @@ function SortableQueueItem({ c, idx, openEditChallenge, deleteChallengeMutation 
       <div className="flex items-center gap-1 flex-shrink-0">
         {!isLive && (
           <>
-            <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-gray-400 hover:text-[#189aa1]" onClick={() => openEditChallenge(c)}>
+            <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-gray-400 hover:text-[#189aa1]" onClick={(e) => { e.stopPropagation(); openEditChallenge(c); }}>
               <Pencil className="w-3.5 h-3.5" />
             </Button>
             <Button
               size="sm" variant="ghost" className="h-8 w-8 p-0 text-gray-400 hover:text-red-500"
-              onClick={() => { if (confirm("Remove this challenge from the queue?")) deleteChallengeMutation.mutate({ id: c.id }); }}
+              onClick={(e) => { e.stopPropagation(); if (confirm("Remove this challenge from the queue?")) deleteChallengeMutation.mutate({ id: c.id }); }}
               disabled={deleteChallengeMutation.isPending}
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -1737,7 +1737,7 @@ export default function QuickFireAdmin() {
                 className="w-56"
               />
               <div className="flex gap-1 flex-wrap">
-                {(["all", "abdominal", "smallParts", "pelvicGyn", "ob1st", "ob2nd3rd", "fetalEcho", "breast", "vascular", "msk", "pocus"] as const).map((cat) => (
+                {(["all", "abdominal", "pelvic_gyn", "obstetric_1st", "obstetric_2nd_3rd", "fetal_echo", "breast", "venous", "arterial", "abdominal_vascular", "extracranial_carotid", "msk", "pocus", "thyroid", "scrotum"] as const).map((cat) => (
                   <button
                     key={cat}
                     onClick={() => setFlashcardEchoCategory(cat)}
@@ -1747,7 +1747,7 @@ export default function QuickFireAdmin() {
                         : "border-gray-200 bg-gray-50 text-gray-600 hover:border-[#189aa1] hover:text-[#189aa1]"
                     }`}
                   >
-                    {cat === "all" ? "All" : cat === "abdominal" ? "Abdominal" : cat === "smallParts" ? "Small Parts" : cat === "pelvicGyn" ? "Pelvic/Gyn" : cat === "ob1st" ? "OB 1st" : cat === "ob2nd3rd" ? "OB 2nd/3rd" : cat === "fetalEcho" ? "Fetal Echo" : cat === "breast" ? "Breast" : cat === "vascular" ? "Vascular" : cat === "msk" ? "MSK" : "POCUS"}
+                    {cat === "all" ? "All" : cat === "abdominal" ? "Abdominal" : cat === "pelvic_gyn" ? "Pelvic/Gyn" : cat === "obstetric_1st" ? "OB 1st" : cat === "obstetric_2nd_3rd" ? "OB 2nd/3rd" : cat === "fetal_echo" ? "Fetal Echo" : cat === "breast" ? "Breast" : cat === "venous" ? "Venous" : cat === "arterial" ? "Arterial" : cat === "abdominal_vascular" ? "Abd. Vascular" : cat === "extracranial_carotid" ? "Carotid" : cat === "msk" ? "MSK" : cat === "pocus" ? "POCUS" : cat === "thyroid" ? "Thyroid" : "Scrotum"}
                   </button>
                 ))}
               </div>

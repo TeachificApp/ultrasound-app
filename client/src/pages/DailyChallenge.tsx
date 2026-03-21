@@ -86,7 +86,7 @@ type AnswerResult = {
 
 type LeaderboardPeriod = "7d" | "30d" | "allTime";
 
-const CATEGORY_TAGS = ["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"] as const;
+const CATEGORY_TAGS = ["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS"] as const;
 const DIFFICULTY_OPTIONS = ["beginner", "intermediate", "advanced"] as const;
 
 const TYPE_LABELS: Record<string, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
@@ -110,15 +110,9 @@ const CATEGORY_COLORS: Record<string, string> = {
   "OB 1st Trimester": "bg-purple-100 text-purple-700",
   "OB 2nd/3rd Trimester": "bg-violet-100 text-violet-700",
   "Fetal Echo": "bg-rose-100 text-rose-700",
-  "Venous": "bg-blue-100 text-blue-700",
-  "Arterial": "bg-red-100 text-red-700",
-  "Abdominal Vascular": "bg-orange-100 text-orange-700",
-  "Extracranial Carotid": "bg-amber-100 text-amber-700",
-  "Intracranial Duplex/TCD": "bg-yellow-100 text-yellow-700",
+  "Vascular": "bg-sky-100 text-sky-700",
   "POCUS": "bg-teal-100 text-teal-700",
-  "Physics": "bg-gray-100 text-gray-700",
-  "Thyroid": "bg-lime-100 text-lime-700",
-  "Scrotum": "bg-emerald-100 text-emerald-700",
+  "Small Parts": "bg-teal-100 text-teal-700",
   "Breast": "bg-fuchsia-100 text-fuchsia-700",
   "MSK": "bg-indigo-100 text-indigo-700",
 };
@@ -154,7 +148,7 @@ function SubmitQuestionTab({ isAuthenticated }: { isAuthenticated: boolean }) {
   // Form state
   const [submitterName, setSubmitterName] = useState("");
   const [submitterLinkedIn, setSubmitterLinkedIn] = useState("");
-  const [category, setCategory] = useState<"Abdominal" | "Pelvic/Gyn" | "OB 1st Trimester" | "OB 2nd/3rd Trimester" | "Fetal Echo" | "Venous" | "Arterial" | "Abdominal Vascular" | "Extracranial Carotid" | "Intracranial Duplex/TCD" | "POCUS" | "Physics" | "Thyroid" | "Scrotum" | "Breast" | "MSK">("Abdominal");
+  const [category, setCategory] = useState<"Abdominal" | "Small Parts" | "Pelvic/Gyn" | "OB 1st Trimester" | "OB 2nd/3rd Trimester" | "Fetal Echo" | "Breast" | "Vascular" | "MSK" | "POCUS">("Abdominal");
   const [difficulty, setDifficulty] = useState<"beginner" | "intermediate" | "advanced">("intermediate");
   const [question, setQuestion] = useState("");
   const [options, setOptions] = useState(["", "", "", ""]);
@@ -244,7 +238,7 @@ function SubmitQuestionTab({ isAuthenticated }: { isAuthenticated: boolean }) {
             <Select value={category} onValueChange={(v) => setCategory(v as any)}>
               <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {(["Abdominal", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Venous", "Arterial", "Abdominal Vascular", "Extracranial Carotid", "Intracranial Duplex/TCD", "POCUS", "Physics", "Thyroid", "Scrotum", "Breast", "MSK"] as const).map((c) => (
+                {(["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS"] as const).map((c) => (
                   <SelectItem key={c} value={c}>{c}</SelectItem>
                 ))}
               </SelectContent>
@@ -489,9 +483,14 @@ export default function QuickFire() {
   // Map display names to server camelCase keys
   const CAT_DISPLAY_TO_KEY: Record<string, string> = {
     "Abdominal": "abdominal",
-    "Venous": "venous",
-    "Arterial": "arterial",
-    "OB 2nd/3rd": "ob2nd3rd",
+    "Small Parts": "smallParts",
+    "Pelvic/Gyn": "pelvicGyn",
+    "OB 1st Trimester": "ob1st",
+    "OB 2nd/3rd Trimester": "ob2nd3rd",
+    "Fetal Echo": "fetalEcho",
+    "Breast": "breast",
+    "Vascular": "vascular",
+    "MSK": "msk",
     "POCUS": "pocus",
   };
   const activeCatMapKey = activeCategory ? (CAT_DISPLAY_TO_KEY[activeCategory] ?? activeCategory) : null;
