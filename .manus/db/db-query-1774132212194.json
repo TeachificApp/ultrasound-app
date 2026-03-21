@@ -1,0 +1,22 @@
+{
+  "query": "SELECT setDate, questionIds FROM quickfireDailySets ORDER BY setDate DESC LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT setDate, questionIds FROM quickfireDailySets ORDER BY setDate DESC LIMIT 10;",
+  "rows": [
+    {
+      "setDate": "2026-03-21",
+      "questionIds": "{\"abdominal\":319,\"vascular\":341,\"ob2nd3rd\":null,\"pocus\":613}"
+    },
+    {
+      "setDate": "2026-03-20",
+      "questionIds": "{\"abdominal\":314,\"vascular\":352,\"ob2nd3rd\":null,\"pocus\":614}"
+    },
+    {
+      "setDate": "2026-03-19",
+      "questionIds": "{\"acs\":null,\"adultEcho\":null,\"pediatricEcho\":null,\"fetalEcho\":null,\"pocus\":null}"
+    }
+  ],
+  "messages": [],
+  "stdout": "setDate\tquestionIds\n2026-03-21\t{\"abdominal\":319,\"vascular\":341,\"ob2nd3rd\":null,\"pocus\":613}\n2026-03-20\t{\"abdominal\":314,\"vascular\":352,\"ob2nd3rd\":null,\"pocus\":614}\n2026-03-19\t{\"acs\":null,\"adultEcho\":null,\"pediatricEcho\":null,\"fetalEcho\":null,\"pocus\":null}\n",
+  "stderr": "",
+  "execution_time_ms": 203
+}

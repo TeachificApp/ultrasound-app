@@ -205,12 +205,11 @@ function buildSocialPost(
   const allHashtags = [...REQUIRED_HASHTAGS, ...categoryTags].join(" ");
 
   if (type === "question") {
-    const questionPreview = cleanQ.length > 160 ? cleanQ.slice(0, 157) + "..." : cleanQ;
     return `🔬 Daily Ultrasound Challenge — ${category}
 
 Can you answer today's question?
 
-❓ ${questionPreview}
+❓ ${cleanQ}
 
 Drop your answer in the comments and take your place on the leaderboard 🏆 at app.allaboutultrasound.com
 Answer revealed tomorrow. 👇
@@ -218,9 +217,7 @@ Answer revealed tomorrow. 👇
 ${allHashtags}`;
   } else {
     const answerLine = cleanA ? `✅ Answer: ${cleanA}` : "";
-    const explanationLine = cleanE
-      ? `\n💡 ${cleanE.length > 200 ? cleanE.slice(0, 197) + "..." : cleanE}`
-      : "";
+    const explanationLine = cleanE ? `\n💡 ${cleanE}` : "";
     return `🔬 Daily Ultrasound Challenge — ${category} | ANSWER
 
 ${answerLine}${explanationLine}

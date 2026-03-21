@@ -450,3 +450,21 @@
 - [x] Hashtags and social post text updated for ultrasound (not echo)
 - [x] Route /admin/challenge-cards registered in App.tsx (admin-only via RoleGuard)
 - [x] Challenge Card Generator link added to PlatformAdmin admin tools hub
+
+## Add MSK as 5th Daily Challenge Category (Mar 21)
+- [ ] Server: Add "MSK" to CHALLENGE_CATEGORIES in quickfireRouter.ts
+- [ ] Server: Add MSK fallback pool (msk echoCategory questions)
+- [ ] Frontend: Add MSK to CATS array in QuickFire.tsx
+- [ ] Frontend: Add MSK to category filter in QuickFireAdmin.tsx
+- [ ] ChallengeCardGenerator: Add MSK to CATEGORY_HASHTAGS
+
+## Challenge Card Generator — 30-Day Navigation (Mar 21)
+- [ ] Server: Update adminGetCardGeneratorData to accept optional date param
+- [ ] Server: Add adminGetCardGeneratorRange procedure — returns up to 30 days of sets
+- [ ] ChallengeCardGenerator: Add date selector / next-set / previous-set navigation
+- [ ] ChallengeCardGenerator: Show date label on each set (e.g. "Today", "Yesterday", "Mar 20")
+- [ ] ChallengeCardGenerator: Add MSK to CATEGORY_HASHTAGS
+
+## Social Post Full Text (Mar 21)
+- [x] Remove 160-char question preview truncation in buildSocialPost
+- [x] Remove 200-char explanation truncation in buildSocialPost
