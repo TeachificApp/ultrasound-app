@@ -218,8 +218,9 @@ Can you answer today's question?
 
 ❓ ${cleanQ}${optionsBlock}
 
-Drop your answer in the comments and take your place on the leaderboard 🏆 at app.allaboutultrasound.com
-Answer revealed tomorrow. 👇
+Drop your answer in the comments below! 👇
+
+Get more challenges and take your place on the leaderboard 🏆 at app.allaboutultrasound.com
 
 ${allHashtags}`;
   } else {
@@ -229,7 +230,7 @@ ${allHashtags}`;
 
 ${answerLine}${explanationLine}
 
-How did you do? Take your place on the leaderboard at app.allaboutultrasound.com and follow for a new ultrasound challenge every day!
+Get more challenges and take your place on the leaderboard 🏆 at app.allaboutultrasound.com
 
 ${allHashtags}`;
   }

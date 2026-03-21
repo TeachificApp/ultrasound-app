@@ -506,3 +506,4 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Update case library category dropdowns in CaseAdmin / CaseLibrary pages
 - [ ] Update flashcard category filter in QuickFireAdmin flashcard tab
 - [ ] Run DB migration if enum columns need updating
+- [x] Add CTA to social posts: "Get more challenges and take your place on the leaderboard 🏆 at app.allaboutultrasound.com"
