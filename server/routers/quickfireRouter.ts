@@ -34,6 +34,7 @@ import {
 } from "../../drizzle/schema";
 import { eq, and, desc, sql, gte, lte, count, inArray } from "drizzle-orm";
 import { sendStreakReminders } from "../streakReminders";
+import { notifyOwner } from "../_core/notification";
 import { generateVirtualLeaderboard } from "../leaderboardSeed";
 import { createHash } from "crypto";
 import { flashcardGuestDailyUsage } from "../../drizzle/schema";
@@ -337,6 +338,15 @@ async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>
       questionMap[key] = picked;
       fallbackLiveNeeded.push({ cat, questionId: picked });
     }
+  }
+
+  // Alert admin if any category has no questions at all
+  const emptyCats = CHALLENGE_CATEGORIES.filter(cat => questionMap[CAT_KEY[cat]] === null);
+  if (emptyCats.length > 0) {
+    notifyOwner({
+      title: `⚠️ Daily Challenge: ${emptyCats.length} categor${emptyCats.length === 1 ? 'y has' : 'ies have'} no available questions`,
+      content: `The following categories had no active questions available for today's (${date}) daily challenge and will show no question card:\n\n${emptyCats.map(c => `• ${c}`).join('\n')}\n\nPlease add active questions for these categories in the admin panel.`,
+    }).catch(() => { /* non-blocking */ });
   }
 
   // Create live quickfireChallenges rows for fallback categories (so admin queue shows all 11)

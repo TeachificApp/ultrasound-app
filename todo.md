@@ -586,3 +586,7 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Ensure 11 live challenges generated daily (one per all 11 categories) — fallback now creates live rows for MSK, Breast, POCUS
 - [x] Fix UI to display all 11 category cards with questions
 - [x] Remove all remaining legacy challenge wording from DailyChallenge.tsx and QuickFireAdmin.tsx
+
+## Challenge Empty Category Handling
+- [x] Alert admin via owner notification when any category has no available questions during daily set generation
+- [ ] Public UI: show most recent archived question for a category if no live question exists (never show empty card)
