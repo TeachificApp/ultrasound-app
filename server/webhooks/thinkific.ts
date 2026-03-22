@@ -37,7 +37,7 @@ import { webhookEvents } from "../../drizzle/schema";
 import { getUserByEmail, setPremiumStatus, createPendingUser, assignRole, removeRole, ensureUserRole, markThinkificEnrolled } from "../db";
 import { syncCatalogToDb } from "../routers/cmeRouter";
 import { getEnrollmentById } from "../thinkific";
-import { sendEmail, buildWelcomeEmail } from "../_core/email";
+import { sendEmail, buildUltrasoundAssistFreeWelcomeEmail, buildUltrasoundAssistPremiumWelcomeEmail } from "../_core/email";
 
 // ── Allowed event allowlist ──────────────────────────────────────────────────
 /** Only these resource+action pairs will be processed. Everything else is filtered. */
@@ -416,14 +416,23 @@ export function registerThinkificWebhook(app: Router) {
 // ── Welcome email helper ────────────────────────────────────────────────────
 
 /**
- * Welcome email is intentionally suppressed for All About Ultrasound™.
- * AAUS does not send automated welcome emails on Thinkific enrollment.
- * This function is a no-op kept for backward compat.
- * @deprecated Do not call — welcome emails are disabled for AAUS.
+ * Sends a welcome email only for UltrasoundAssist™ free or premium membership enrollments.
+ * All other Thinkific products (DIY, generic courses, user.signup) do NOT trigger a welcome email.
  */
-async function sendIHeartEchoAppWelcome(_email: string): Promise<void> {
-  // AAUS: welcome emails are disabled — do nothing.
-  console.log(`[Thinkific Webhook] Welcome email suppressed for AAUS (disabled by design).`);
+async function maybeSendUltrasoundAssistWelcome(email: string, productName: string): Promise<void> {
+  const appUrl = process.env.VITE_APP_URL ?? "https://app.allaboutultrasound.com";
+  const loginUrl = `${appUrl}/login`;
+  const firstName = email.split("@")[0] ?? "there";
+  if (isPremiumProduct(productName)) {
+    const { subject, htmlBody } = buildUltrasoundAssistPremiumWelcomeEmail({ firstName, loginUrl });
+    const sent = await sendEmail({ to: { name: firstName, email }, subject, htmlBody });
+    console.log(`[Thinkific Webhook] Premium welcome email ${sent ? "sent" : "failed"} to ${email}`);
+  } else if (isFreeProduct(productName) || isIHeartEchoAppProduct(productName)) {
+    const { subject, htmlBody } = buildUltrasoundAssistFreeWelcomeEmail({ firstName, loginUrl });
+    const sent = await sendEmail({ to: { name: firstName, email }, subject, htmlBody });
+    console.log(`[Thinkific Webhook] Free welcome email ${sent ? "sent" : "failed"} to ${email}`);
+  }
+  // All other products (DIY, generic courses): no welcome email
 }
 
 // ── Shared grant helper ───────────────────────────────────────────────────────
@@ -456,7 +465,8 @@ async function grantAccess(params: {
       } else if (isFreeProduct(productName) || isIHeartEchoAppProduct(productName)) {
         await markThinkificEnrolled(pendingUserId);
       }
-      // AAUS: welcome emails are disabled — no welcome email sent on enrollment
+      // Send welcome email only for UltrasoundAssist free or premium membership enrollments
+      await maybeSendUltrasoundAssistWelcome(userEmail, productName);
       const msg = `pending account created and access granted for ${userEmail} ("${productName}")`;
       console.log(`[Thinkific Webhook] ${msg} (userId=${pendingUserId})`);
       await logWebhookEvent({ resource, action, email: userEmail, productName, httpStatus: 200, outcome: "pending_created", message: msg, rawPayload: payload });
@@ -479,8 +489,8 @@ async function grantAccess(params: {
   } else if (isFreeProduct(productName) || isIHeartEchoAppProduct(productName)) {
     await markThinkificEnrolled(user.id);
   }
-  // AAUS: welcome emails are disabled — no welcome email sent on enrollment
-
+  // Send welcome email only for UltrasoundAssist free or premium membership enrollments
+  await maybeSendUltrasoundAssistWelcome(userEmail, productName);
   const msg = `access granted to ${userEmail} (userId=${user.id}) for "${productName}"`;
   console.log(`[Thinkific Webhook] ${msg}`);
   await logWebhookEvent({ resource, action, email: userEmail, productName, httpStatus: 200, outcome: "granted", message: msg, rawPayload: payload });

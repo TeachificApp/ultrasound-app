@@ -780,4 +780,82 @@ export function buildMeetingInvitationEmail(opts: {
     </p>
   `);
   return { subject, htmlBody, previewText };
+
+}
+// UltrasoundAssist Free Membership Welcome Email
+export function buildUltrasoundAssistFreeWelcomeEmail(opts: {
+  firstName: string;
+  loginUrl: string;
+}): { subject: string; htmlBody: string; previewText: string } {
+  const subject = "Welcome to UltrasoundAssist - Your Free Account is Ready";
+  const previewText = "Your free UltrasoundAssist account is ready - sign in to get started";
+  const htmlBody = emailWrapper(`
+    <h2 style="margin:0 0 8px;font-size:20px;color:${brandDark};font-family:Georgia,serif;">
+      Welcome to UltrasoundAssist, ${opts.firstName}!
+    </h2>
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
+      Your free UltrasoundAssist account has been created. You now have access to our guideline-driven clinical tools, including the <strong>ACR TI-RADS Thyroid</strong> assessment tool and more.
+    </p>
+    <div style="background:#f0fbfc;border-left:3px solid ${brandColor};padding:12px 16px;border-radius:0 8px 8px 0;margin:0 0 20px;">
+      <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:${brandColor};">Your free access includes:</p>
+      <ul style="margin:0;padding-left:20px;font-size:14px;color:#475569;">
+        <li style="margin:4px 0;">ACR TI-RADS Thyroid Nodule Assessment</li>
+        <li style="margin:4px 0;">Daily Challenge - Thyroid category</li>
+        <li style="margin:4px 0;">Access to the All About Ultrasound community</li>
+      </ul>
+    </div>
+    <p style="margin:0 0 20px;font-size:14px;color:#475569;line-height:1.6;">
+      Upgrade to <strong>Premium</strong> to unlock all 9 Clinical Intelligence tools, unlimited Daily Challenge categories, Ultrasound Flashcards, Case Library, and more.
+    </p>
+    <div style="text-align:center;margin:28px 0;">
+      <a href="${opts.loginUrl}"
+        style="display:inline-block;background:linear-gradient(135deg,${brandColor},#4ad9e0);color:#ffffff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;" target="_blank" rel="noopener noreferrer">
+        Sign In to UltrasoundAssist
+      </a>
+    </div>
+    <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.5;">
+      Questions? Contact us at
+      <a href="mailto:support@allaboutultrasound.com" style="color:${brandColor};" target="_blank" rel="noopener noreferrer">support@allaboutultrasound.com</a>.
+    </p>
+  `);
+  return { subject, htmlBody, previewText };
+}
+
+// UltrasoundAssist Premium Membership Welcome Email
+export function buildUltrasoundAssistPremiumWelcomeEmail(opts: {
+  firstName: string;
+  loginUrl: string;
+}): { subject: string; htmlBody: string; previewText: string } {
+  const subject = "Welcome to UltrasoundAssist Premium - Full Access Unlocked";
+  const previewText = "Your UltrasoundAssist Premium account is ready - full clinical intelligence access awaits";
+  const htmlBody = emailWrapper(`
+    <h2 style="margin:0 0 8px;font-size:20px;color:${brandDark};font-family:Georgia,serif;">
+      Welcome to UltrasoundAssist Premium, ${opts.firstName}!
+    </h2>
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
+      Your premium membership is now active. You have full access to every clinical intelligence tool, learning resource, and feature on the platform.
+    </p>
+    <div style="background:#f0fbfc;border-left:3px solid ${brandColor};padding:12px 16px;border-radius:0 8px 8px 0;margin:0 0 20px;">
+      <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:${brandColor};">Your Premium access includes:</p>
+      <ul style="margin:0;padding-left:20px;font-size:14px;color:#475569;">
+        <li style="margin:4px 0;">All 9 Clinical Intelligence tools (TI-RADS, LI-RADS, BI-RADS, O-RADS, Vascular, Renal, MSK, OB/Gyn, POCUS)</li>
+        <li style="margin:4px 0;">Daily Challenge - all 11 specialty categories</li>
+        <li style="margin:4px 0;">Unlimited Ultrasound Flashcards</li>
+        <li style="margin:4px 0;">Full Case Library (500+ cases)</li>
+        <li style="margin:4px 0;">SoundBytes clinical audio library</li>
+        <li style="margin:4px 0;">UltrasoundAssist AI-powered scan coach</li>
+      </ul>
+    </div>
+    <div style="text-align:center;margin:28px 0;">
+      <a href="${opts.loginUrl}"
+        style="display:inline-block;background:linear-gradient(135deg,${brandColor},#4ad9e0);color:#ffffff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;" target="_blank" rel="noopener noreferrer">
+        Open UltrasoundAssist
+      </a>
+    </div>
+    <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.5;">
+      Questions? Contact us at
+      <a href="mailto:support@allaboutultrasound.com" style="color:${brandColor};" target="_blank" rel="noopener noreferrer">support@allaboutultrasound.com</a>.
+    </p>
+  `);
+  return { subject, htmlBody, previewText };
 }
