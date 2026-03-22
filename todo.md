@@ -609,3 +609,6 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Wire question bank delete button to trash instead of permanent delete
 - [x] Show trashed questions in Trash tab with restore option
 - [x] When a live challenge is deleted (trashed), auto-promote the next scheduled challenge for that category to live
+
+## Admin Queue Live Challenge Buttons (Mar 22 - session 4)
+- [x] Add Edit and Delete (to Trash) buttons to live challenge cards in the admin challenge queue

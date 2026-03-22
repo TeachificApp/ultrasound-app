@@ -188,7 +188,7 @@ function SortableQueueItem({ c, idx, openEditChallenge, deleteChallengeMutation 
         <span className="text-xs font-bold text-gray-300">#{idx + 1}</span>
       </div>
       {/* Content — click anywhere to edit */}
-      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => !isLive && openEditChallenge(c)}>
+      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => openEditChallenge(c)}>
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-semibold text-sm text-gray-800">{c.title}</span>
           {isLive && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-500 text-white">LIVE</span>}
@@ -224,20 +224,18 @@ function SortableQueueItem({ c, idx, openEditChallenge, deleteChallengeMutation 
       </div>
       {/* Actions */}
       <div className="flex items-center gap-1 flex-shrink-0">
-        {!isLive && (
-          <>
-            <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-gray-400 hover:text-[#189aa1]" onClick={(e) => { e.stopPropagation(); openEditChallenge(c); }}>
-              <Pencil className="w-3.5 h-3.5" />
-            </Button>
-            <Button
-              size="sm" variant="ghost" className="h-8 w-8 p-0 text-gray-400 hover:text-red-500"
-              onClick={(e) => { e.stopPropagation(); if (confirm("Remove this challenge from the queue?")) deleteChallengeMutation.mutate({ id: c.id }); }}
-              disabled={deleteChallengeMutation.isPending}
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </Button>
-          </>
-        )}
+        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-gray-400 hover:text-[#189aa1]" title="Edit" onClick={(e) => { e.stopPropagation(); openEditChallenge(c); }}>
+          <Pencil className="w-3.5 h-3.5" />
+        </Button>
+        <Button
+          size="sm" variant="ghost"
+          className="h-8 w-8 p-0 text-gray-400 hover:text-red-500"
+          title={isLive ? "Move to Trash (next queued challenge will auto-promote)" : "Move to Trash"}
+          onClick={(e) => { e.stopPropagation(); if (confirm(isLive ? "Move this live challenge to Trash? The next queued challenge for this category will be auto-promoted to live." : "Move this challenge to Trash?")) deleteChallengeMutation.mutate({ id: c.id }); }}
+          disabled={deleteChallengeMutation.isPending}
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </Button>
       </div>
     </div>
   );
