@@ -651,3 +651,14 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 
 ## Definitive Daily Challenge Fix (Mar 22 - session 6)
 - [x] Definitively fix daily challenge: store question object directly in state on click (eliminates re-derivation timing issue)
+
+## MediaDropzone Integration (Mar 22 - session 7)
+- [x] Create MediaDropzone reusable component with global drag-event prevention (window-level dragover/drop preventDefault)
+- [x] Replace challenge image upload zone in QuickFireAdmin with MediaDropzone
+- [x] Replace flashcard image upload zone in QuickFireAdmin with MediaDropzone
+- [x] Replace flashcard video upload zone in QuickFireAdmin with MediaDropzone
+- [x] MediaDropzone supports both image and video uploads with inline preview
+- [x] MediaDropzone shows drag-over highlight state (teal border + scale)
+- [x] MediaDropzone accessible (role=button, keyboard Enter/Space triggers file picker)
+- [x] Unit tests for MediaDropzone upload logic (5 tests passing)
+- [x] All 742 tests passing after integration
