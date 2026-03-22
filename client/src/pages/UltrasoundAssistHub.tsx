@@ -7,7 +7,7 @@ import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import {
   Activity, Baby, Scan, TrendingUp, BookOpen, Crown, Lock,
-  Stethoscope, Brain, Bone, Circle, Zap, Microscope
+  Stethoscope, Brain, Bone, Circle, Zap, Microscope, FlaskConical
 } from "lucide-react";
 import { usePremium } from "@/hooks/usePremium";
 
@@ -164,15 +164,6 @@ const specialties = [
     title: "MSK Ultrasound",
     description: "Shoulder, elbow, wrist/hand, hip, knee, and ankle/foot — musculoskeletal ultrasound protocol with dynamic assessment per AIUM 2023 guidelines.",
     badge: "MSK",
-    free: false,
-  },
-  {
-    path: "/fetal-navigator",
-    scanCoachPath: "/fetal-echo-assist",
-    icon: Baby,
-    title: "Fetal Echo",
-    description: "Fetal cardiac anatomy, segmental analysis, 4-chamber view, outflow tracts, 3VV, 3VT, and fetal arrhythmia — fetal echocardiography per ASE guidelines.",
-    badge: "Fetal Echo",
     free: false,
   },
 ];
@@ -384,6 +375,96 @@ export default function UltrasoundAssistHub() {
               );
             })}
           </div>
+        </div>
+      </div>
+
+      {/* Clinical Intelligence Engines */}
+      <div className="container pb-10">
+        <div className="mb-4 flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-[#189aa1]" />
+          <h2 className="text-base font-bold text-gray-700" style={{ fontFamily: "Merriweather, serif" }}>
+            Clinical Intelligence Engines
+          </h2>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          {[
+            {
+              icon: Zap,
+              title: "Daily Challenge",
+              description: "One question per category per day — scenario-based and quick-review questions across all 11 ultrasound specialties.",
+              href: "/daily-challenge",
+              badge: "Free",
+              badgeColor: "#16a34a",
+            },
+            {
+              icon: BookOpen,
+              title: "Flashcards",
+              description: "Spaced-repetition flashcard decks for every category — review key concepts, normal values, and pathology recognition.",
+              href: "/flashcards",
+              badge: "Free",
+              badgeColor: "#16a34a",
+            },
+            {
+              icon: Microscope,
+              title: "Case Library",
+              description: "Peer-reviewed ultrasound cases with imaging, clinical context, and expert interpretation across all modalities.",
+              href: "/case-library",
+              badge: "Free",
+              badgeColor: "#16a34a",
+            },
+            {
+              icon: Brain,
+              title: "AI Question Generator",
+              description: "Generate custom AI-powered practice questions on any ultrasound topic — scenario, quick-review, or image-based formats.",
+              href: "/quickfire",
+              badge: "Premium",
+              badgeColor: "#d97706",
+            },
+            {
+              icon: Activity,
+              title: "SoundBytes",
+              description: "Short-form audio and video learning clips — key concepts, scanning tips, and pathology pearls in 60 seconds or less.",
+              href: "/soundbytes",
+              badge: "Free",
+              badgeColor: "#16a34a",
+            },
+            {
+              icon: TrendingUp,
+              title: "Leaderboard & Stats",
+              description: "Track your performance across categories, compare with peers on the leaderboard, and monitor your 14-day activity streak.",
+              href: "/daily-challenge",
+              badge: "Free",
+              badgeColor: "#16a34a",
+            },
+          ].map((engine, i) => {
+            const Icon = engine.icon;
+            return (
+              <Link key={i} href={engine.href}>
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 hover:shadow-md hover:border-[#189aa1]/30 transition-all cursor-pointer h-full">
+                  <div className="flex items-start gap-3 mb-3">
+                    <div
+                      className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{ background: "linear-gradient(135deg, #0e1e2e, #189aa1)" }}
+                    >
+                      <Icon className="w-5 h-5 text-[#4ad9e0]" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span
+                        className="text-xs font-bold px-2 py-0.5 rounded-full text-white"
+                        style={{ background: engine.badgeColor }}
+                      >
+                        {engine.badge}
+                      </span>
+                      <h3 className="font-bold text-gray-900 text-sm mt-1 leading-tight" style={{ fontFamily: "Merriweather, serif" }}>
+                        {engine.title}
+                      </h3>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 leading-relaxed">{engine.description}</p>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       </div>
 

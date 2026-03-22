@@ -53,6 +53,11 @@ import {
   Baby,
   Scan,
   Activity,
+  Circle,
+  Bone,
+  Brain,
+  Microscope,
+  FlaskConical,
 } from "lucide-react";
 import { toast } from "sonner";
 import RichTextEditor from "@/components/RichTextEditor";
@@ -466,8 +471,12 @@ export default function QuickFire() {
   const [orderDragIdx, setOrderDragIdx] = useState<number | null>(null);
   const [orderSubmitted, setOrderSubmitted] = useState(false);
 
-  const allQuestions = data?.questions ?? [];
-  const userAttempts = (data?.userAttempts ?? {}) as Record<number, { selectedAnswer: number | null; selfMarkedCorrect: boolean | null; isCorrect: boolean | null }>;
+  // getLiveChallenge always returns an array of per-category challenge objects
+  const liveArray: any[] = Array.isArray(data) ? data : (data ? [data] : []);
+  // For legacy single-player mode (no activeCategory), use the first challenge in the array
+  const legacySingle = liveArray[0] ?? null;
+  const allQuestions: any[] = legacySingle?.questions ?? [];
+  const userAttempts: Record<number, { selectedAnswer: number | null; selfMarkedCorrect: boolean | null; isCorrect: boolean | null }> = legacySingle?.userAttempts ?? {};
 
   const presentTags = CATEGORY_TAGS.filter((cat) =>
     allQuestions.some((q) => Array.isArray(q.tags) && q.tags.includes(cat))
@@ -1181,17 +1190,17 @@ export default function QuickFire() {
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {([
-                    { cat: "Abdominal" as const, prefKey: "abdominal" as const, Icon: Activity, label: "Abdominal" },
+                    { cat: "Abdominal" as const, prefKey: "abdominal" as const, Icon: Stethoscope, label: "Abdominal" },
                     { cat: "Small Parts" as const, prefKey: "smallParts" as const, Icon: Scan, label: "Small Parts" },
-                    { cat: "Pelvic/Gyn" as const, prefKey: "pelvicGyn" as const, Icon: Activity, label: "Pelvic/Gyn" },
+                    { cat: "Pelvic/Gyn" as const, prefKey: "pelvicGyn" as const, Icon: Circle, label: "Pelvic/Gyn" },
                     { cat: "OB 1st Trimester" as const, prefKey: "ob1st" as const, Icon: Baby, label: "OB 1st Tri" },
                     { cat: "OB 2nd/3rd Trimester" as const, prefKey: "ob2nd3rd" as const, Icon: Baby, label: "OB 2nd/3rd" },
                     { cat: "Fetal Echo" as const, prefKey: "fetalEcho" as const, Icon: Heart, label: "Fetal Echo" },
-                    { cat: "Breast" as const, prefKey: "breast" as const, Icon: Activity, label: "Breast" },
+                    { cat: "Breast" as const, prefKey: "breast" as const, Icon: Microscope, label: "Breast" },
                     { cat: "Vascular" as const, prefKey: "vascular" as const, Icon: Activity, label: "Vascular" },
-                    { cat: "MSK" as const, prefKey: "msk" as const, Icon: Activity, label: "MSK" },
+                    { cat: "MSK" as const, prefKey: "msk" as const, Icon: Bone, label: "MSK" },
                     { cat: "POCUS" as const, prefKey: "pocus" as const, Icon: Wind, label: "POCUS" },
-                    { cat: "Physics" as const, prefKey: "physics" as const, Icon: Activity, label: "Physics" },
+                    { cat: "Physics" as const, prefKey: "physics" as const, Icon: FlaskConical, label: "Physics" },
                   ] as { cat: string; prefKey: "abdominal" | "smallParts" | "pelvicGyn" | "ob1st" | "ob2nd3rd" | "fetalEcho" | "breast" | "vascular" | "msk" | "pocus" | "physics"; Icon: (props: { className?: string }) => import('react').ReactElement; label?: string }[]).map(({ cat, prefKey, Icon, label }) => {
                     const prefs = categoryPrefsQuery.data ?? { abdominal: true, smallParts: true, pelvicGyn: true, ob1st: true, ob2nd3rd: true, fetalEcho: true, breast: true, vascular: true, msk: true, pocus: true, physics: true };
                     const isEnabled = (prefs as any)[prefKey] !== false;
@@ -1257,17 +1266,17 @@ export default function QuickFire() {
                   const todayAttempts: Record<number, any> = (todaySet as any)?.userAttempts ?? {};
                   const catPrefs = categoryPrefsQuery.data ?? { abdominal: true, smallParts: true, pelvicGyn: true, ob1st: true, ob2nd3rd: true, fetalEcho: true, breast: true, vascular: true, msk: true, pocus: true, physics: true };
                   const CATS = [
-                    { key: "Abdominal", label: "Abdominal", Icon: Activity, desc: "Abdominal Ultrasound", prefKey: "abdominal" as const, mapKey: "abdominal" },
+                    { key: "Abdominal", label: "Abdominal", Icon: Stethoscope, desc: "Abdominal Ultrasound", prefKey: "abdominal" as const, mapKey: "abdominal" },
                     { key: "Small Parts", label: "Small Parts", Icon: Scan, desc: "Small Parts Ultrasound", prefKey: "smallParts" as const, mapKey: "smallParts" },
-                    { key: "Pelvic/Gyn", label: "Pelvic/Gyn", Icon: Activity, desc: "Pelvic/Gynecologic Ultrasound", prefKey: "pelvicGyn" as const, mapKey: "pelvicGyn" },
+                    { key: "Pelvic/Gyn", label: "Pelvic/Gyn", Icon: Circle, desc: "Pelvic/Gynecologic Ultrasound", prefKey: "pelvicGyn" as const, mapKey: "pelvicGyn" },
                     { key: "OB 1st Trimester", label: "OB 1st Tri", Icon: Baby, desc: "1st Trimester Obstetric", prefKey: "ob1st" as const, mapKey: "ob1st" },
                     { key: "OB 2nd/3rd Trimester", label: "OB 2nd/3rd", Icon: Baby, desc: "2nd/3rd Trimester Obstetric", prefKey: "ob2nd3rd" as const, mapKey: "ob2nd3rd" },
                     { key: "Fetal Echo", label: "Fetal Echo", Icon: Heart, desc: "Fetal Echocardiography", prefKey: "fetalEcho" as const, mapKey: "fetalEcho" },
-                    { key: "Breast", label: "Breast", Icon: Activity, desc: "Breast Ultrasound", prefKey: "breast" as const, mapKey: "breast" },
+                    { key: "Breast", label: "Breast", Icon: Microscope, desc: "Breast Ultrasound", prefKey: "breast" as const, mapKey: "breast" },
                     { key: "Vascular", label: "Vascular", Icon: Activity, desc: "Vascular Duplex", prefKey: "vascular" as const, mapKey: "vascular" },
-                    { key: "MSK", label: "MSK", Icon: Activity, desc: "Musculoskeletal Ultrasound", prefKey: "msk" as const, mapKey: "msk" },
+                    { key: "MSK", label: "MSK", Icon: Bone, desc: "Musculoskeletal Ultrasound", prefKey: "msk" as const, mapKey: "msk" },
                     { key: "POCUS", label: "POCUS", Icon: Wind, desc: "Point-of-Care Ultrasound", prefKey: "pocus" as const, mapKey: "pocus" },
-                    { key: "Physics", label: "Physics", Icon: Activity, desc: "Ultrasound Physics & Instrumentation", prefKey: "physics" as const, mapKey: "physics" },
+                    { key: "Physics", label: "Physics", Icon: FlaskConical, desc: "Ultrasound Physics & Instrumentation", prefKey: "physics" as const, mapKey: "physics" },
                   ];
                   const enabledCats = CATS.filter((c) => catPrefs[c.prefKey] !== false);
                   const allDone = enabledCats.length > 0 && enabledCats.every((c) => {
@@ -1493,13 +1502,11 @@ export default function QuickFire() {
               </div>
             )}
 
-            {!activeCategory && !isLoading && !error && questions.length === 0 && (
+            {!activeCategory && !isLoading && !error && questions.length === 0 && isPremium && (
               <div className="flex flex-col items-center gap-6 py-4 text-center max-w-lg mx-auto">
-                <p className="text-gray-400 text-sm">No legacy challenge active today. Use the category cards above.</p>            {isPremium && (
-                  <Button variant="outline" onClick={() => setActiveTab("archive")}>
-                    <Archive className="w-4 h-4 mr-2" /> Browse Archive
-                  </Button>
-                )}
+                <Button variant="outline" onClick={() => setActiveTab("archive")}>
+                  <Archive className="w-4 h-4 mr-2" /> Browse Archive
+                </Button>
               </div>
             )}
 

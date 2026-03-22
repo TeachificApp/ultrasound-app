@@ -180,7 +180,23 @@ async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>
     ob2nd3rd: null, fetalEcho: null, breast: null, vascular: null, msk: null, pocus: null, physics: null,
   };
 
-  // 1. Check for queued challenges per category
+  // 0. First, map any already-live challenges for today into the category map
+  const liveChallenges = await db
+    .select()
+    .from(quickfireChallenges)
+    .where(eq(quickfireChallenges.status, "live" as any));
+
+  for (const liveC of liveChallenges) {
+    if (!liveC.category) continue;
+    const key = CAT_KEY[liveC.category as ChallengeCategory];
+    if (!key) continue;
+    const ids: number[] = JSON.parse(liveC.questionIds || "[]");
+    if (ids.length > 0 && questionMap[key] === null) {
+      questionMap[key] = ids[0];
+    }
+  }
+
+  // 1. Check for queued challenges per category (publish next in queue for categories not yet covered)
   const queuedChallenges = await db
     .select()
     .from(quickfireChallenges)
@@ -192,6 +208,8 @@ async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>
 
   for (const cat of CHALLENGE_CATEGORIES) {
     const key = CAT_KEY[cat];
+    // Skip if already covered by a live challenge
+    if (questionMap[key] !== null) continue;
     const match = queuedChallenges.find(
       (c) =>
         !usedChallengeIds.includes(c.id) &&
@@ -261,35 +279,56 @@ async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>
     const key = CAT_KEY[cat];
     if (questionMap[key] !== null) continue;
     const usedIds = Array.from(usedIdsByCategory[cat] ?? new Set<number>());
-    const pool = await db
+    const catFilter = cat === "Vascular"
+      ? sql`${quickfireQuestions.category} IN (${sql.join(VASCULAR_CATS.map(c => sql`${c}`), sql`, `)})` as any
+      : sql`${quickfireQuestions.category} = ${cat}` as any;
+
+    // Try scenario questions first (preferred for challenges)
+    const scenarioPool = await db
       .select({ id: quickfireQuestions.id })
       .from(quickfireQuestions)
-      .where(
-        and(
-          eq(quickfireQuestions.isActive, true),
-          sql`${quickfireQuestions.type} != 'quickReview'` as any,
-          cat === "Vascular"
-            ? sql`${quickfireQuestions.category} IN (${sql.join(VASCULAR_CATS.map(c => sql`${c}`), sql`, `)})` as any
-            : sql`${quickfireQuestions.category} = ${cat}` as any,
-          // Exclude recently used questions; if all have been used, reset (allow repeats)
-          ...(usedIds.length > 0 ? [sql`${quickfireQuestions.id} NOT IN (${sql.join(usedIds.map(id => sql`${id}`), sql`, `)})` as any] : [])
-        )
-      );
-    // If no fresh questions remain, fall back to the full pool (cycle reset)
-    const finalPool = pool.length > 0 ? pool : await db
+      .where(and(
+        eq(quickfireQuestions.isActive, true),
+        sql`${quickfireQuestions.type} != 'quickReview'` as any,
+        catFilter,
+        ...(usedIds.length > 0 ? [sql`${quickfireQuestions.id} NOT IN (${sql.join(usedIds.map(id => sql`${id}`), sql`, `)})` as any] : [])
+      ));
+
+    // Fallback 1: scenario pool without dedup exclusion (cycle reset)
+    const scenarioFull = scenarioPool.length > 0 ? scenarioPool : await db
       .select({ id: quickfireQuestions.id })
       .from(quickfireQuestions)
-      .where(
-        and(
-          eq(quickfireQuestions.isActive, true),
-          sql`${quickfireQuestions.type} != 'quickReview'` as any,
-          cat === "Vascular"
-            ? sql`${quickfireQuestions.category} IN (${sql.join(VASCULAR_CATS.map(c => sql`${c}`), sql`, `)})` as any
-            : sql`${quickfireQuestions.category} = ${cat}` as any
-        )
-      );
-    if (finalPool.length > 0) {
-      questionMap[key] = sampleN(finalPool, 1)[0].id;
+      .where(and(
+        eq(quickfireQuestions.isActive, true),
+        sql`${quickfireQuestions.type} != 'quickReview'` as any,
+        catFilter
+      ));
+
+    if (scenarioFull.length > 0) {
+      questionMap[key] = sampleN(scenarioFull, 1)[0].id;
+      continue;
+    }
+
+    // Fallback 2: if no scenario questions at all, use quickReview questions
+    const reviewPool = await db
+      .select({ id: quickfireQuestions.id })
+      .from(quickfireQuestions)
+      .where(and(
+        eq(quickfireQuestions.isActive, true),
+        catFilter,
+        ...(usedIds.length > 0 ? [sql`${quickfireQuestions.id} NOT IN (${sql.join(usedIds.map(id => sql`${id}`), sql`, `)})` as any] : [])
+      ));
+
+    const reviewFull = reviewPool.length > 0 ? reviewPool : await db
+      .select({ id: quickfireQuestions.id })
+      .from(quickfireQuestions)
+      .where(and(
+        eq(quickfireQuestions.isActive, true),
+        catFilter
+      ));
+
+    if (reviewFull.length > 0) {
+      questionMap[key] = sampleN(reviewFull, 1)[0].id;
     }
   }
 
@@ -1653,9 +1692,8 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
       return { ...challenge, questions: sanitized, userAttempts, setDate, msRemaining };
     });
 
-    // For backward compatibility: if only one live challenge, return it directly (not array)
-    // If multiple, return the array so the frontend can render per-category cards
-    return enriched.length === 1 ? enriched[0] : enriched;
+    // Always return an array — frontend handles per-category rendering
+    return enriched;
   }),
 
   /** Get the challenge archive — premium members only; free users get no archive access */

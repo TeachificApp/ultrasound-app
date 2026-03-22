@@ -573,3 +573,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 
 ## Challenge Queue Admin (Mar 22)
 - [x] Always show all live questions pinned at top of challenge queue regardless of category filter or search
+
+## UltrasoundAssist Hub Fixes (Mar 22)
+- [x] Remove Fetal Echo from premium specialties array (it is already in free section)
+- [x] Restore clinical intelligence engines section to the hub
+- [x] Fix only one MSK challenge showing in daily challenge (all categories now use quickReview fallback)
+- [x] Change challenge category icons so ECG/Activity icon is only used for Vascular; assign appropriate icons to all other categories
+- [x] Daily challenge should display one question per category per day (all 11 categories visible as cards)
