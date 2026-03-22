@@ -10,6 +10,8 @@
 
 import { useState } from "react";
 import Layout from "@/components/Layout";
+import { BlurredOverlay } from "@/components/BlurredOverlay";
+import { usePremium } from "@/hooks/usePremium";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -1335,41 +1337,48 @@ function BladderTool() {
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN PAGE COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
+// access: "free" = login required, "premium" = premium required
 const TOOL_CATEGORIES = [
   {
-    label: "Liver / Hepatic",
-    tools: [
-      { id: "lirads", title: "LI-RADS v2018", subtitle: "Hepatocellular Carcinoma Risk", component: LiRADSTool },
-    ],
-  },
-  {
     label: "Thyroid",
+    access: "free" as const,
     tools: [
       { id: "tirads", title: "ACR TI-RADS 2017", subtitle: "Thyroid Nodule Risk Stratification", component: TIRADSTool },
     ],
   },
   {
-    label: "Gallbladder & Spleen",
+    label: "Breast",
+    access: "premium" as const,
     tools: [
-      { id: "gallbladder", title: "Gallbladder Assessment", subtitle: "Wall thickness, stones, polyps", component: GallbladderTool },
-      { id: "spleen", title: "Spleen Size", subtitle: "Splenomegaly grading", component: SpleenTool },
+      { id: "birads", title: "ACR BI-RADS 5th Ed.", subtitle: "Breast Lesion Risk Stratification", component: BIRADSTool },
+    ],
+  },
+  {
+    label: "Liver / Hepatic",
+    access: "premium" as const,
+    tools: [
+      { id: "lirads", title: "LI-RADS v2018", subtitle: "Hepatocellular Carcinoma Risk", component: LiRADSTool },
     ],
   },
   {
     label: "Renal",
+    access: "premium" as const,
     tools: [
       { id: "renalcortex", title: "Renal Cortex Assessment", subtitle: "Echogenicity & hydronephrosis grading", component: RenalCortexTool },
       { id: "renaldoppler", title: "Renal Doppler", subtitle: "Resistive index & renal artery stenosis", component: RenalDopplerTool },
     ],
   },
   {
-    label: "Breast",
+    label: "Gallbladder & Spleen",
+    access: "premium" as const,
     tools: [
-      { id: "birads", title: "ACR BI-RADS 5th Ed.", subtitle: "Breast Lesion Risk Stratification", component: BIRADSTool },
+      { id: "gallbladder", title: "Gallbladder Assessment", subtitle: "Wall thickness, stones, polyps", component: GallbladderTool },
+      { id: "spleen", title: "Spleen Size", subtitle: "Splenomegaly grading", component: SpleenTool },
     ],
   },
   {
     label: "OB / Gynecology",
+    access: "premium" as const,
     tools: [
       { id: "endometrial", title: "Endometrial Thickness", subtitle: "ACOG/TVUS guidelines", component: EndometrialTool },
       { id: "orads", title: "ACR O-RADS v2022", subtitle: "Ovarian Lesion Risk Stratification", component: ORADSTool },
@@ -1381,6 +1390,7 @@ const TOOL_CATEGORIES = [
   },
   {
     label: "Vascular",
+    access: "premium" as const,
     tools: [
       { id: "carotid", title: "Carotid Stenosis", subtitle: "SRU consensus criteria", component: CarotidTool },
       { id: "dvt", title: "DVT Assessment", subtitle: "Lower extremity venous duplex", component: DVTTool },
@@ -1390,12 +1400,14 @@ const TOOL_CATEGORIES = [
   },
   {
     label: "MSK",
+    access: "premium" as const,
     tools: [
       { id: "rotatorcuff", title: "Rotator Cuff Assessment", subtitle: "Tear grading per ESSR guidelines", component: RotatorCuffTool },
     ],
   },
   {
     label: "POCUS",
+    access: "premium" as const,
     tools: [
       { id: "blines", title: "B-Lines / Lung Ultrasound", subtitle: "Pulmonary edema & pneumothorax", component: BLinesTool },
       { id: "ivc", title: "IVC Collapsibility", subtitle: "Volume status & RA pressure", component: IVCTool },
@@ -1409,10 +1421,19 @@ const TOOL_CATEGORIES = [
 export default function ClinicalInterpretationEngine() {
   const [activeCat, setActiveCat] = useState<string>(TOOL_CATEGORIES[0].label);
   const [activeTool, setActiveTool] = useState<string>(TOOL_CATEGORIES[0].tools[0].id);
+  const { isPremium, isAuthenticated } = usePremium();
 
   const currentCat = TOOL_CATEGORIES.find((c) => c.label === activeCat) ?? TOOL_CATEGORIES[0];
   const currentToolDef = currentCat.tools.find((t) => t.id === activeTool) ?? currentCat.tools[0];
   const ToolComponent = currentToolDef.component;
+
+  // Determine if the current category is accessible
+  const catAccess = currentCat.access;
+  const isLocked =
+    catAccess === "premium" ? !isPremium :
+    catAccess === "free" ? !isAuthenticated :
+    false;
+  const overlayType: "login" | "premium" = catAccess === "premium" ? "premium" : "login";
 
   return (
     <Layout>
@@ -1428,37 +1449,49 @@ export default function ClinicalInterpretationEngine() {
             <p className="text-[#a0d8dc] text-sm max-w-2xl">
               Guideline-driven interpretation tools across all ultrasound specialties. Enter clinical findings to receive structured risk stratification, grading, and next-step recommendations.
             </p>
-            <div className="flex flex-wrap gap-2 mt-4">
-              {["ACR LI-RADS v2018", "ACR TI-RADS 2017", "ACR BI-RADS 5th Ed.", "ACR O-RADS v2022", "SRU Carotid Consensus", "SVU Renal Doppler", "ISUOG Fetal", "ACEP FAST/IVC", "ESSR MSK"].map((g) => (
-                <span key={g} className="text-xs bg-white/10 text-[#4ad9e0] px-2 py-0.5 rounded-full border border-white/20">{g}</span>
-              ))}
-            </div>
           </div>
         </div>
-
         <div className="max-w-5xl mx-auto px-4 py-6 flex flex-col md:flex-row gap-6">
+          {/* Category sidebar */}
           <div className="md:w-56 flex-shrink-0">
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-              {TOOL_CATEGORIES.map((cat) => (
-                <button
-                  key={cat.label}
-                  onClick={() => {
-                    setActiveCat(cat.label);
-                    setActiveTool(cat.tools[0].id);
-                  }}
-                  className={`w-full text-left px-4 py-3 text-sm font-medium border-b border-gray-50 transition-colors ${
-                    activeCat === cat.label
-                      ? "bg-[#189aa1] text-white"
-                      : "text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  {cat.label}
-                </button>
-              ))}
+              {TOOL_CATEGORIES.map((cat) => {
+                const catLocked =
+                  cat.access === "premium" ? !isPremium :
+                  cat.access === "free" ? !isAuthenticated :
+                  false;
+                return (
+                  <button
+                    key={cat.label}
+                    onClick={() => {
+                      setActiveCat(cat.label);
+                      setActiveTool(cat.tools[0].id);
+                    }}
+                    className={`w-full text-left px-4 py-3 text-sm font-medium border-b border-gray-50 transition-colors flex items-center justify-between ${
+                      activeCat === cat.label
+                        ? "bg-[#189aa1] text-white"
+                        : "text-gray-700 hover:bg-gray-50"
+                    }`}
+                  >
+                    <span>{cat.label}</span>
+                    {catLocked && (
+                      <span className={`text-xs px-1.5 py-0.5 rounded font-semibold ${
+                        cat.access === "premium"
+                          ? activeCat === cat.label ? "bg-white/20 text-white" : "bg-amber-100 text-amber-700"
+                          : activeCat === cat.label ? "bg-white/20 text-white" : "bg-teal-50 text-teal-700"
+                      }`}>
+                        {cat.access === "premium" ? "PRO" : "FREE"}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
+          {/* Tool area */}
           <div className="flex-1 min-w-0 space-y-4">
+            {/* Tool tabs within category */}
             {currentCat.tools.length > 1 && (
               <div className="flex flex-wrap gap-2">
                 {currentCat.tools.map((t) => (
@@ -1477,15 +1510,22 @@ export default function ClinicalInterpretationEngine() {
               </div>
             )}
 
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-              <div className="mb-5">
-                <h2 className="text-lg font-bold text-gray-900" style={{ fontFamily: "Merriweather, serif" }}>
-                  {currentToolDef.title}
-                </h2>
-                <p className="text-sm text-gray-500 mt-0.5">{currentToolDef.subtitle}</p>
+            {/* Active tool card — wrapped in BlurredOverlay when locked */}
+            <BlurredOverlay
+              type={overlayType}
+              featureName={currentCat.label}
+              disabled={!isLocked}
+            >
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+                <div className="mb-5">
+                  <h2 className="text-lg font-bold text-gray-900" style={{ fontFamily: "Merriweather, serif" }}>
+                    {currentToolDef.title}
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-0.5">{currentToolDef.subtitle}</p>
+                </div>
+                <ToolComponent />
               </div>
-              <ToolComponent />
-            </div>
+            </BlurredOverlay>
           </div>
         </div>
       </div>
