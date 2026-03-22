@@ -1,0 +1,8 @@
+{
+  "query": "\nSELECT category, COUNT(*) as total, SUM(CASE WHEN isActive = 1 THEN 1 ELSE 0 END) as active_count\nFROM quickfire_questions\nGROUP BY category\nORDER BY category;\n\nSELECT id, title, category, status, publishDate, publishedAt, archivedAt\nFROM quickfire_challenges\nWHERE status = 'live'\nORDER BY category\nLIMIT 20;\n\nSELECT setDate, questionIds FROM quickfire_daily_sets ORDER BY setDate DESC LIMIT 3;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \nSELECT category, COUNT(*) as total, SUM(CASE WHEN isActive = 1 THEN 1 ELSE 0 END) as active_count\nFROM quickfire_questions\nGROUP BY category\nORDER BY category;\n\nSELECT id, title, category, status, publishDate, publishedAt, archivedAt\nFROM quickfire_challenges\nWHERE status = 'live'\nORDER BY category\nLIMIT 20;\n\nSELECT setDate, questionIds FROM quickfire_daily_sets ORDER BY setDate DESC LIMIT 3;\n",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1146 (42S02) at line 2: Table 'urcfdrve8j6mpmnr48qufe.quickfire_questions' doesn't exist"
+  ]
+}

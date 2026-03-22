@@ -1,0 +1,103 @@
+{
+  "query": "\nSELECT id, title, category, status, publishDate, publishedAt\nFROM quickfireChallenges\nWHERE status = 'live'\nORDER BY category\nLIMIT 20;\n\nSELECT setDate, questionIds FROM quickfireDailySets ORDER BY setDate DESC LIMIT 3;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \nSELECT id, title, category, status, publishDate, publishedAt\nFROM quickfireChallenges\nWHERE status = 'live'\nORDER BY category\nLIMIT 20;\n\nSELECT setDate, questionIds FROM quickfireDailySets ORDER BY setDate DESC LIMIT 3;\n",
+  "rows": [
+    {
+      "id": "2",
+      "title": "During a routine abdominal ultrasound, a 48-year-old fema...",
+      "category": "Abdominal",
+      "status": "live",
+      "publishDate": "2026-03-22",
+      "publishedAt": "2026-03-22 01:10:58"
+    },
+    {
+      "id": "210",
+      "title": "A patient with a history of papillary thyroid carcinoma p...",
+      "category": "Small Parts",
+      "status": "live",
+      "publishDate": "2026-03-22",
+      "publishedAt": "2026-03-22 01:10:58"
+    },
+    {
+      "id": "226",
+      "title": "A 55-year-old postmenopausal woman, not on hormone replac...",
+      "category": "Pelvic/Gyn",
+      "status": "live",
+      "publishDate": "2026-03-22",
+      "publishedAt": "2026-03-22 01:10:58"
+    },
+    {
+      "id": "81",
+      "title": "A 25-year-old patient presents for an early first trimest...",
+      "category": "OB 1st Trimester",
+      "status": "live",
+      "publishDate": "2026-03-22",
+      "publishedAt": "2026-03-22 01:10:58"
+    },
+    {
+      "id": "358",
+      "title": "A 30-week pregnant patient undergoes a fetal anomaly scre...",
+      "category": "OB 2nd/3rd Trimester",
+      "status": "live",
+      "publishDate": "2026-03-22",
+      "publishedAt": "2026-03-22 01:10:58"
+    },
+    {
+      "id": "200",
+      "title": "When performing a fetal echocardiogram, visualization of ...",
+      "category": "Fetal Echo",
+      "status": "live",
+      "publishDate": "2026-03-22",
+      "publishedAt": "2026-03-22 01:10:58"
+    },
+    {
+      "id": "888",
+      "title": "A patient with a history of breast cancer presents for a ...",
+      "category": "Breast",
+      "status": "live",
+      "publishDate": "NULL",
+      "publishedAt": "2026-03-22 02:47:19"
+    },
+    {
+      "id": "169",
+      "title": "In the context of brain death criteria using transcranial...",
+      "category": "Vascular",
+      "status": "live",
+      "publishDate": "2026-03-22",
+      "publishedAt": "2026-03-22 01:10:58"
+    },
+    {
+      "id": "494",
+      "title": "MSK Daily Challenge — 2026-03-22",
+      "category": "MSK",
+      "status": "live",
+      "publishDate": "2026-03-22",
+      "publishedAt": "2026-03-22 01:33:21"
+    },
+    {
+      "id": "585",
+      "title": "A 68-year-old female presents with septic shock. During a...",
+      "category": "POCUS",
+      "status": "live",
+      "publishDate": "NULL",
+      "publishedAt": "2026-03-22 02:47:19"
+    },
+    {
+      "id": "459",
+      "title": "When performing a deep abdominal ultrasound, such as imag...",
+      "category": "Physics",
+      "status": "live",
+      "publishDate": "2026-03-22",
+      "publishedAt": "2026-03-22 01:10:58"
+    }
+  ],
+  "messages": [
+    "setDate\tquestionIds",
+    "2026-03-22\t{\"abdominal\": 303, \"breast\": 688, \"fetalEcho\": 568, \"msk\": 575, \"ob1st\": 602, \"ob2nd3rd\": 466, \"pelvicGyn\": 560, \"physics\": 633, \"pocus\": 609, \"smallParts\": 577, \"vascular\": 600}",
+    "2026-03-21\t{\"abdominal\":319,\"vascular\":341,\"ob2nd3rd\":null,\"pocus\":613}",
+    "2026-03-20\t{\"abdominal\":314,\"vascular\":352,\"ob2nd3rd\":null,\"pocus\":614}"
+  ],
+  "stdout": "id\ttitle\tcategory\tstatus\tpublishDate\tpublishedAt\n2\tDuring a routine abdominal ultrasound, a 48-year-old fema...\tAbdominal\tlive\t2026-03-22\t2026-03-22 01:10:58\n210\tA patient with a history of papillary thyroid carcinoma p...\tSmall Parts\tlive\t2026-03-22\t2026-03-22 01:10:58\n226\tA 55-year-old postmenopausal woman, not on hormone replac...\tPelvic/Gyn\tlive\t2026-03-22\t2026-03-22 01:10:58\n81\tA 25-year-old patient presents for an early first trimest...\tOB 1st Trimester\tlive\t2026-03-22\t2026-03-22 01:10:58\n358\tA 30-week pregnant patient undergoes a fetal anomaly scre...\tOB 2nd/3rd Trimester\tlive\t2026-03-22\t2026-03-22 01:10:58\n200\tWhen performing a fetal echocardiogram, visualization of ...\tFetal Echo\tlive\t2026-03-22\t2026-03-22 01:10:58\n888\tA patient with a history of breast cancer presents for a ...\tBreast\tlive\tNULL\t2026-03-22 02:47:19\n169\tIn the context of brain death criteria using transcranial...\tVascular\tlive\t2026-03-22\t2026-03-22 01:10:58\n494\tMSK Daily Challenge — 2026-03-22\tMSK\tlive\t2026-03-22\t2026-03-22 01:33:21\n585\tA 68-year-old female presents with septic shock. During a...\tPOCUS\tlive\tNULL\t2026-03-22 02:47:19\n459\tWhen performing a deep abdominal ultrasound, such as imag...\tPhysics\tlive\t2026-03-22\t2026-03-22 01:10:58\nsetDate\tquestionIds\n2026-03-22\t{\"abdominal\": 303, \"breast\": 688, \"fetalEcho\": 568, \"msk\": 575, \"ob1st\": 602, \"ob2nd3rd\": 466, \"pelvicGyn\": 560, \"physics\": 633, \"pocus\": 609, \"smallParts\": 577, \"vascular\": 600}\n2026-03-21\t{\"abdominal\":319,\"vascular\":341,\"ob2nd3rd\":null,\"pocus\":613}\n2026-03-20\t{\"abdominal\":314,\"vascular\":352,\"ob2nd3rd\":null,\"pocus\":614}\n",
+  "stderr": "",
+  "execution_time_ms": 57
+}

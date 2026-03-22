@@ -1,0 +1,65 @@
+{
+  "query": "\nSELECT category, COUNT(*) as total, SUM(CASE WHEN isActive = 1 THEN 1 ELSE 0 END) as active_count\nFROM quickfireQuestions\nGROUP BY category\nORDER BY category;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \nSELECT category, COUNT(*) as total, SUM(CASE WHEN isActive = 1 THEN 1 ELSE 0 END) as active_count\nFROM quickfireQuestions\nGROUP BY category\nORDER BY category;\n",
+  "rows": [
+    {
+      "category": "Abdominal",
+      "total": "89",
+      "active_count": "59"
+    },
+    {
+      "category": "Small Parts",
+      "total": "61",
+      "active_count": "36"
+    },
+    {
+      "category": "Pelvic/Gyn",
+      "total": "44",
+      "active_count": "19"
+    },
+    {
+      "category": "OB 1st Trimester",
+      "total": "50",
+      "active_count": "20"
+    },
+    {
+      "category": "OB 2nd/3rd Trimester",
+      "total": "196",
+      "active_count": "20"
+    },
+    {
+      "category": "Fetal Echo",
+      "total": "34",
+      "active_count": "19"
+    },
+    {
+      "category": "Breast",
+      "total": "38",
+      "active_count": "38"
+    },
+    {
+      "category": "Vascular",
+      "total": "163",
+      "active_count": "93"
+    },
+    {
+      "category": "MSK",
+      "total": "44",
+      "active_count": "18"
+    },
+    {
+      "category": "POCUS",
+      "total": "49",
+      "active_count": "49"
+    },
+    {
+      "category": "Physics",
+      "total": "63",
+      "active_count": "19"
+    }
+  ],
+  "messages": [],
+  "stdout": "category\ttotal\tactive_count\nAbdominal\t89\t59\nSmall Parts\t61\t36\nPelvic/Gyn\t44\t19\nOB 1st Trimester\t50\t20\nOB 2nd/3rd Trimester\t196\t20\nFetal Echo\t34\t19\nBreast\t38\t38\nVascular\t163\t93\nMSK\t44\t18\nPOCUS\t49\t49\nPhysics\t63\t19\n",
+  "stderr": "",
+  "execution_time_ms": 66
+}

@@ -822,10 +822,115 @@ export default function QuickFire() {
   };
 
   // ── Not logged in: show today's challenge with 24-hour window ─────────────
-  // Unauthenticated users can view today's challenge during its 24-hour window
-  // but cannot submit answers or save progress — prompt them to sign in
+  // Unauthenticated users can view today's challenge category cards and question
+  // previews, but must sign in to submit answers or save progress.
   if (!isAuthenticated) {
-    const challengeExpired = timeLeft !== null && timeLeft <= 0;
+    const catMap: Record<string, number> = (todaySetQuery.data as any)?.categoryMap ?? {};
+    const todayQs: any[] = (todaySetQuery.data as any)?.questions ?? [];
+    const CATS_UNAUTH = [
+      { key: "Abdominal", label: "Abdominal", Icon: Activity, desc: "Abdominal Ultrasound", mapKey: "abdominal" },
+      { key: "Small Parts", label: "Small Parts", Icon: Scan, desc: "Small Parts Ultrasound", mapKey: "smallParts" },
+      { key: "Pelvic/Gyn", label: "Pelvic/Gyn", Icon: Activity, desc: "Pelvic/Gynecologic Ultrasound", mapKey: "pelvicGyn" },
+      { key: "OB 1st Trimester", label: "OB 1st Tri", Icon: Baby, desc: "1st Trimester Obstetric", mapKey: "ob1st" },
+      { key: "OB 2nd/3rd Trimester", label: "OB 2nd/3rd", Icon: Baby, desc: "2nd/3rd Trimester Obstetric", mapKey: "ob2nd3rd" },
+      { key: "Fetal Echo", label: "Fetal Echo", Icon: Heart, desc: "Fetal Echocardiography", mapKey: "fetalEcho" },
+      { key: "Breast", label: "Breast", Icon: Activity, desc: "Breast Ultrasound", mapKey: "breast" },
+      { key: "Vascular", label: "Vascular", Icon: Activity, desc: "Vascular Duplex", mapKey: "vascular" },
+      { key: "MSK", label: "MSK", Icon: Activity, desc: "Musculoskeletal Ultrasound", mapKey: "msk" },
+      { key: "POCUS", label: "POCUS", Icon: Wind, desc: "Point-of-Care Ultrasound", mapKey: "pocus" },
+      { key: "Physics", label: "Physics", Icon: Activity, desc: "Ultrasound Physics", mapKey: "physics" },
+    ] as const;
+
+    // If a category is active, show the question player (read-only, sign-in to submit)
+    if (activeCategory) {
+      const catMapKey = CAT_DISPLAY_TO_KEY[activeCategory] ?? activeCategory;
+      const qId = catMap[catMapKey];
+      const catQ: any = qId ? todayQs.find((q: any) => q.id === qId) : null;
+      const typeInfo = TYPE_LABELS[(catQ?.type ?? "scenario") as keyof typeof TYPE_LABELS] ?? TYPE_LABELS.scenario;
+      return (
+        <Layout>
+          <div className="container py-6 max-w-3xl">
+            <div className="flex items-center gap-3 mb-5">
+              <button
+                onClick={() => setActiveCategory(null)}
+                className="flex items-center gap-1.5 text-sm text-[#189aa1] hover:underline font-medium"
+              >
+                ← Back to Categories
+              </button>
+            </div>
+            {/* Sign-in CTA banner */}
+            <div className="mb-5 rounded-xl p-4 flex items-center gap-4" style={{ background: "linear-gradient(135deg, #0e1e2e, #0e4a50)" }}>
+              <Lock className="w-8 h-8 text-[#4ad9e0] flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-white font-semibold text-sm">Sign in to save your score &amp; streak</p>
+                <p className="text-white/60 text-xs mt-0.5">Free members get access to today's challenge. Sign in to track progress, earn streak points, and compare on the leaderboard.</p>
+              </div>
+              <a href="/login" className="flex-shrink-0">
+                <Button size="sm" className="text-white whitespace-nowrap" style={{ background: "#189aa1" }}>Sign In</Button>
+              </a>
+            </div>
+            {catQ ? (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-bold text-[#189aa1] uppercase tracking-wide">{activeCategory}</span>
+                  <span className="text-gray-300">·</span>
+                  <span className="text-xs text-gray-400">Today's {activeCategory} Question</span>
+                </div>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${typeInfo.color}`}>
+                    <typeInfo.icon className="w-3 h-3" />{typeInfo.label}
+                  </span>
+                  {catQ.difficulty && (
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${DIFFICULTY_COLORS[catQ.difficulty as keyof typeof DIFFICULTY_COLORS] ?? ""}`}>{catQ.difficulty}</span>
+                  )}
+                </div>
+                <p className="text-gray-800 font-medium mb-6 leading-relaxed" dangerouslySetInnerHTML={{ __html: catQ.question ?? "" }} />
+                {(catQ.type === "scenario" || catQ.type === "image") && Array.isArray(catQ.options) && (
+                  <div className="space-y-2">
+                    {catQ.options.map((opt: string, i: number) => (
+                      <a key={i} href="/login" className="block">
+                        <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 hover:border-[#189aa1] hover:bg-[#f0fbfc] cursor-pointer transition-all group">
+                          <div className="w-7 h-7 rounded-full border-2 border-gray-300 group-hover:border-[#189aa1] flex items-center justify-center flex-shrink-0">
+                            <span className="text-xs font-bold text-gray-500 group-hover:text-[#189aa1]">{String.fromCharCode(65 + i)}</span>
+                          </div>
+                          <span className="text-sm text-gray-700">{opt}</span>
+                          <Lock className="w-3.5 h-3.5 text-gray-300 ml-auto group-hover:text-[#189aa1]" />
+                        </div>
+                      </a>
+                    ))}
+                    <p className="text-xs text-center text-gray-400 mt-3">
+                      <a href="/login" className="text-[#189aa1] hover:underline font-medium">Sign in</a> to submit your answer and save your score.
+                    </p>
+                  </div>
+                )}
+                {(catQ.type === "connect" || catQ.type === "identifier" || catQ.type === "order") && (
+                  <div className="flex flex-col items-center gap-3 py-6 text-center">
+                    <Lock className="w-8 h-8 text-gray-300" />
+                    <p className="text-sm text-gray-500">Sign in to play this interactive challenge.</p>
+                    <a href="/login">
+                      <Button size="sm" style={{ background: "#189aa1" }} className="text-white">Sign In to Play</Button>
+                    </a>
+                  </div>
+                )}
+                {Array.isArray(catQ.tags) && catQ.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-4 pt-4 border-t border-gray-100">
+                    {catQ.tags.map((tag: string) => (
+                      <span key={tag} className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{tag}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-4 py-16 text-center">
+                <Zap className="w-12 h-12 text-gray-300" />
+                <p className="text-gray-500">No question available for this category today.</p>
+              </div>
+            )}
+          </div>
+        </Layout>
+      );
+    }
+
     return (
       <Layout>
         <div className="container py-6 max-w-3xl">
@@ -840,18 +945,7 @@ export default function QuickFire() {
                 <p className="text-xs text-gray-400">{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p>
               </div>
             </div>
-            {/* 24-hour countdown badge */}
-            {timeLeft !== null && timeLeft > 0 && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200">
-                <Timer className="w-4 h-4 text-amber-500" />
-                <div>
-                  <p className="text-xs font-semibold text-amber-700">Free access window</p>
-                  <p className="text-xs font-mono text-amber-600">{formatTimeLeft(timeLeft)} remaining</p>
-                </div>
-              </div>
-            )}
           </div>
-
           {/* Sign-in CTA banner */}
           <div className="mb-5 rounded-xl p-4 flex items-center gap-4" style={{ background: "linear-gradient(135deg, #0e1e2e, #0e4a50)" }}>
             <Lock className="w-8 h-8 text-[#4ad9e0] flex-shrink-0" />
@@ -863,108 +957,77 @@ export default function QuickFire() {
               <Button size="sm" className="text-white whitespace-nowrap" style={{ background: "#189aa1" }}>Sign In</Button>
             </a>
           </div>
-
-          {/* Expired state */}
-          {challengeExpired && (
-            <div className="flex flex-col items-center gap-6 py-16 text-center max-w-lg mx-auto">
-              <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center">
-                <Timer className="w-8 h-8 text-amber-500" />
-              </div>
-              <h2 className="text-xl font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>Today's Challenge Has Expired</h2>
-              <p className="text-gray-500 text-sm">The 24-hour free access window for today's challenge has closed. Sign in to access the full challenge archive and never miss a day.</p>
-              <div className="flex gap-2 flex-wrap justify-center">
-                <a href="/login">
-                  <Button style={{ background: "#189aa1" }} className="text-white">Sign In</Button>
-                </a>
-                <a href="https://member.allaboutultrasound.com/enroll/3707211?price_id=4656299" target="_blank" rel="noopener noreferrer">
-                  <Button variant="outline" style={{ borderColor: "#189aa1", color: "#189aa1" }}>Create Free Account</Button>
-                </a>
-              </div>
-            </div>
-          )}
-
-          {/* Today's challenge — read-only preview for unauthenticated users */}
-          {!challengeExpired && !isLoading && !error && questions.length === 0 && (
-            <div className="flex flex-col items-center gap-6 py-16 text-center max-w-lg mx-auto">
-              <Zap className="w-12 h-12 text-gray-300" />
-              <p className="text-gray-500">No challenge available today. Check back soon.</p>
-            </div>
-          )}
-
-          {!challengeExpired && isLoading && (
+          {/* Category grid */}
+          {todaySetQuery.isLoading ? (
             <div className="flex flex-col items-center gap-4 py-16">
               <div className="w-12 h-12 rounded-full border-4 border-[#189aa1] border-t-transparent animate-spin" />
               <p className="text-gray-500 text-sm">Loading today's challenge…</p>
             </div>
-          )}
-
-          {!challengeExpired && !isLoading && !error && questions.length > 0 && (() => {
-            const q = questions[currentIndex];
-            const typeInfo = TYPE_LABELS[q?.type ?? "scenario"] ?? TYPE_LABELS.scenario;
-            return (
-              <div className="space-y-4">
-                {/* Progress */}
-                <div className="flex items-center gap-3">
-                  <Progress value={((currentIndex) / questions.length) * 100} className="flex-1 h-2" />
-                  <span className="text-xs text-gray-400 font-mono">{currentIndex + 1}/{questions.length}</span>
-                </div>
-
-                {/* Question card */}
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${typeInfo.color}`}>
-                      <typeInfo.icon className="w-3 h-3" />{typeInfo.label}
-                    </span>
-                    {q?.difficulty && (
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${DIFFICULTY_COLORS[q.difficulty]}`}>{q.difficulty}</span>
+          ) : todayQs.length === 0 ? (
+            <div className="flex flex-col items-center gap-6 py-16 text-center max-w-lg mx-auto">
+              <Zap className="w-12 h-12 text-gray-300" />
+              <p className="text-gray-500">No challenge available today. Check back soon.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {CATS_UNAUTH.map((cat) => {
+                const qId = catMap[cat.mapKey];
+                const q = qId ? todayQs.find((tq: any) => tq.id === qId) : null;
+                return (
+                  <div
+                    key={cat.key}
+                    className="relative rounded-xl border-2 border-[#189aa1]/30 bg-white hover:border-[#189aa1] hover:shadow-md p-5 cursor-pointer transition-all"
+                    onClick={() => q && setActiveCategory(cat.key)}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-[#189aa1]">
+                          <cat.Icon className="w-4 h-4 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-gray-800">{cat.label}</p>
+                          <p className="text-xs text-gray-500">{cat.desc}</p>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-[#189aa1] flex-shrink-0" />
+                    </div>
+                    {q ? (
+                      <div className="mt-2">
+                        <p className="text-xs text-gray-500 line-clamp-2" dangerouslySetInnerHTML={{ __html: q.question ?? "" }} />
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                            q.difficulty === "beginner" ? "bg-green-100 text-green-700" :
+                            q.difficulty === "advanced" ? "bg-red-100 text-red-700" :
+                            "bg-blue-100 text-blue-700"
+                          }`}>{q.difficulty}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400 mt-2 italic">No question available today</p>
+                    )}
+                    {q && (
+                      <div className="mt-3 flex items-center gap-1 text-xs font-semibold text-[#189aa1]">
+                        View Question <ChevronRight className="w-3 h-3" />
+                      </div>
                     )}
                   </div>
-                  <p className="text-gray-800 font-medium mb-6 leading-relaxed" dangerouslySetInnerHTML={{ __html: q?.question ?? "" }} />
-
-                  {/* MCQ options — shown but require login to submit */}
-                  {(q?.type === "scenario" || q?.type === "image") && Array.isArray(q?.options) && (
-                    <div className="space-y-2">
-                      {q.options.map((opt: string, i: number) => (
-                        <a key={i} href="/login" className="block">
-                          <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 hover:border-[#189aa1] hover:bg-[#f0fbfc] cursor-pointer transition-all group">
-                            <div className="w-7 h-7 rounded-full border-2 border-gray-300 group-hover:border-[#189aa1] flex items-center justify-center flex-shrink-0">
-                              <span className="text-xs font-bold text-gray-500 group-hover:text-[#189aa1]">{String.fromCharCode(65 + i)}</span>
-                            </div>
-                            <span className="text-sm text-gray-700">{opt}</span>
-                            <Lock className="w-3.5 h-3.5 text-gray-300 ml-auto group-hover:text-[#189aa1]" />
-                          </div>
-                        </a>
-                      ))}
-                      <p className="text-xs text-center text-gray-400 mt-3"><a href="/login" className="text-[#189aa1] hover:underline font-medium">Sign in</a> to submit your answer and save your score.</p>
-                    </div>
-                  )}
-
-                  {/* Other question types — prompt sign in */}
-                  {(q?.type === "connect" || q?.type === "identifier" || q?.type === "order") && (
-                    <div className="flex flex-col items-center gap-3 py-6 text-center">
-                      <Lock className="w-8 h-8 text-gray-300" />
-                      <p className="text-sm text-gray-500">Sign in to play this interactive challenge.</p>
-                      <a href="/login">
-                        <Button size="sm" style={{ background: "#189aa1" }} className="text-white">Sign In to Play</Button>
-                      </a>
-                    </div>
-                  )}
-                </div>
-
-                {/* Navigation */}
-                {questions.length > 1 && (
-                  <div className="flex justify-between">
-                    <Button variant="outline" size="sm" onClick={() => setCurrentIndex((i) => Math.max(0, i - 1))} disabled={currentIndex === 0}>
-                      ← Previous
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => setCurrentIndex((i) => Math.min(questions.length - 1, i + 1))} disabled={currentIndex === questions.length - 1}>
-                      Next →
-                    </Button>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
+                );
+              })}
+            </div>
+          )}
+          {/* Register CTA */}
+          <div className="mt-8 rounded-xl border border-[#189aa1]/20 bg-[#f0fbfc] p-5 text-center">
+            <p className="text-sm font-semibold text-gray-800 mb-1">Track your progress &amp; earn streaks</p>
+            <p className="text-xs text-gray-500 mb-3">Create a free account to save scores, build streaks, and access the full challenge archive.</p>
+            <div className="flex gap-2 justify-center flex-wrap">
+              <a href="https://member.allaboutultrasound.com/enroll/3707211?price_id=4656299" target="_blank" rel="noopener noreferrer">
+                <Button style={{ background: "#189aa1" }} className="text-white text-sm">Create Free Account</Button>
+              </a>
+              <a href="/login">
+                <Button variant="outline" style={{ borderColor: "#189aa1", color: "#189aa1" }} className="text-sm">Sign In</Button>
+              </a>
+            </div>
+          </div>
         </div>
       </Layout>
     );
