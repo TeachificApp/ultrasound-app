@@ -612,3 +612,16 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 
 ## Admin Queue Live Challenge Buttons (Mar 22 - session 4)
 - [x] Add Edit and Delete (to Trash) buttons to live challenge cards in the admin challenge queue
+
+## Auto-Promote Fix (Mar 22 - session 4)
+- [ ] Fix: deleting a live challenge does not auto-promote next queued challenge for that category
+
+## Daily Challenge QR Cleanup (Mar 22 - session 4)
+- [x] Remove QR questions from live daily challenges (Breast trashed; POCUS already trashed)
+- [x] Admin UI still allows QR questions to be added to challenges in the future (no restriction added)
+
+## Queue Status & QR Cleanup (Mar 22 - session 4)
+- [x] Mark all existing draft challenges as scheduled (active) in the DB (no drafts existed — all were already scheduled)
+- [x] Fix challenge creation so new challenges added to queue default to 'scheduled' not 'draft' (already was scheduled; fixed restore-from-trash to also use scheduled)
+- [x] Trashed live Breast challenge (no MCQ replacement available — user will add Breast scenario questions)
+- [x] Filter quickReview type questions out of auto-selection in getTodaySet/ensureTodaySet (already filtered; activated all inactive scenario questions across all categories)

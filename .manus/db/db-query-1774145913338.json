@@ -1,0 +1,9 @@
+{
+  "query": "UPDATE quickfireQuestions SET isActive = 1 WHERE id IN (607, 608, 609, 610, 611, 612, 613, 614, 615, 616) AND type = 'scenario';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute UPDATE quickfireQuestions SET isActive = 1 WHERE id IN (607, 608, 609, 610, 611, 612, 613, 614, 615, 616) AND type = 'scenario';",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 114
+}

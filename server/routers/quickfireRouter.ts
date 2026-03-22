@@ -2015,7 +2015,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
         : 30,
     }));
   }),
-  /** Restore a trashed challenge back to draft status. */
+  /** Restore a trashed challenge back to scheduled status. */
   restoreTrashedChallenge: adminProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input }) => {
@@ -2032,7 +2032,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
       }
       await db
         .update(quickfireChallenges)
-        .set({ status: "draft" as any, trashedAt: null })
+        .set({ status: "scheduled" as any, trashedAt: null })
         .where(eq(quickfireChallenges.id, input.id));
       return { success: true };
     }),

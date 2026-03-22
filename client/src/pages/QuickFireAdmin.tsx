@@ -506,7 +506,7 @@ export default function QuickFireAdmin() {
 
   const restoreChallengeMutation = trpc.quickfire.restoreTrashedChallenge.useMutation({
     onSuccess: () => {
-      toast.success("Challenge restored to drafts.");
+      toast.success("Challenge restored to queue (scheduled).");
       trashedChallengesQuery.refetch();
       challengeListQuery.refetch();
     },
@@ -1945,9 +1945,9 @@ export default function QuickFireAdmin() {
                             size="sm"
                             variant="ghost"
                             className="h-8 px-2 text-xs gap-1 text-[#189aa1] hover:bg-[#189aa1]/10 border border-[#189aa1]/30"
-                            title="Restore to Drafts"
+                            title="Restore to Queue"
                             onClick={() => {
-                              if (confirm("Restore this challenge to drafts?")) {
+                              if (confirm("Restore this challenge to the queue as scheduled?")) {
                                 restoreChallengeMutation.mutate({ id: c.id });
                               }
                             }}
