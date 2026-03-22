@@ -13,11 +13,11 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import Layout from "@/components/Layout";
+import { getThinkificPremiumMonthlyUrl, getThinkificPremiumAnnualUrl } from "@/const";
 
-const CHECKOUT_URL_MONTHLY =
-  "https://member.allaboutultrasound.com/enroll/3703267?price_id=4651832";
-const CHECKOUT_URL_ANNUAL =
-  "https://member.allaboutultrasound.com/enroll/3703267?price_id=4656275";
+// Dynamic checkout URLs — include redirect_url so users land on /enrolled after purchase
+const CHECKOUT_URL_MONTHLY = typeof window !== "undefined" ? getThinkificPremiumMonthlyUrl() : "https://member.allaboutultrasound.com/enroll/3714929?price_id=4664974";
+const CHECKOUT_URL_ANNUAL = typeof window !== "undefined" ? getThinkificPremiumAnnualUrl() : "https://member.allaboutultrasound.com/enroll/3714929?price_id=4664977";
 
 const PREMIUM_FEATURES = [
   {

@@ -211,27 +211,72 @@ async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>
     }
   }
 
-  // Archive previously live challenges not re-used today
-  const liveRows = await db
-    .select({ id: quickfireChallenges.id })
-    .from(quickfireChallenges)
-    .where(eq(quickfireChallenges.status, "live"));
-  for (const row of liveRows) {
-    if (!usedChallengeIds.includes(row.id)) {
-      await db
-        .update(quickfireChallenges)
-        .set({ status: "archived", archivedAt: new Date() })
-        .where(eq(quickfireChallenges.id, row.id));
+  // Archive previously live challenges that were replaced today (same category, not re-used)
+  // Only archive live challenges for categories that got a new challenge today
+  const categoriesPublishedToday = queuedChallenges
+    .filter((c) => usedChallengeIds.includes(c.id))
+    .map((c) => c.category)
+    .filter(Boolean) as string[];
+
+  if (categoriesPublishedToday.length > 0) {
+    const liveRows = await db
+      .select({ id: quickfireChallenges.id, category: quickfireChallenges.category })
+      .from(quickfireChallenges)
+      .where(eq(quickfireChallenges.status, "live"));
+    for (const row of liveRows) {
+      // Archive only if: this category got a new challenge today AND this row wasn't the one just published
+      if (!usedChallengeIds.includes(row.id) && row.category && categoriesPublishedToday.includes(row.category)) {
+        await db
+          .update(quickfireChallenges)
+          .set({ status: "archived", archivedAt: new Date() })
+          .where(eq(quickfireChallenges.id, row.id));
+      }
     }
   }
 
   // 2. Fallback: for any category still null, pick a random active question
-  // Vascular pulls from all vascular sub-types
+  // Exclude questions already used in archived/live challenges for the same category (no repeats)
+  // Collect recently used question IDs per category from the last 90 days of archived challenges
+  const recentCutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+  const recentArchived = await db
+    .select({ category: quickfireChallenges.category, questionIds: quickfireChallenges.questionIds })
+    .from(quickfireChallenges)
+    .where(and(
+      inArray(quickfireChallenges.status, ["archived", "live"] as any[]),
+      sql`${quickfireChallenges.publishedAt} >= ${recentCutoff}` as any
+    ));
+
+  const usedIdsByCategory: Record<string, Set<number>> = {};
+  for (const row of recentArchived) {
+    const catKey = row.category ?? "";
+    if (!usedIdsByCategory[catKey]) usedIdsByCategory[catKey] = new Set();
+    try {
+      const ids: number[] = JSON.parse(row.questionIds || "[]");
+      for (const id of ids) usedIdsByCategory[catKey].add(id);
+    } catch { /* ignore */ }
+  }
+
   const VASCULAR_CATS = ["Vascular"];
   for (const cat of CHALLENGE_CATEGORIES) {
     const key = CAT_KEY[cat];
     if (questionMap[key] !== null) continue;
+    const usedIds = Array.from(usedIdsByCategory[cat] ?? new Set<number>());
     const pool = await db
+      .select({ id: quickfireQuestions.id })
+      .from(quickfireQuestions)
+      .where(
+        and(
+          eq(quickfireQuestions.isActive, true),
+          sql`${quickfireQuestions.type} != 'quickReview'` as any,
+          cat === "Vascular"
+            ? sql`${quickfireQuestions.category} IN (${sql.join(VASCULAR_CATS.map(c => sql`${c}`), sql`, `)})` as any
+            : sql`${quickfireQuestions.category} = ${cat}` as any,
+          // Exclude recently used questions; if all have been used, reset (allow repeats)
+          ...(usedIds.length > 0 ? [sql`${quickfireQuestions.id} NOT IN (${sql.join(usedIds.map(id => sql`${id}`), sql`, `)})` as any] : [])
+        )
+      );
+    // If no fresh questions remain, fall back to the full pool (cycle reset)
+    const finalPool = pool.length > 0 ? pool : await db
       .select({ id: quickfireQuestions.id })
       .from(quickfireQuestions)
       .where(
@@ -243,8 +288,8 @@ async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>
             : sql`${quickfireQuestions.category} = ${cat}` as any
         )
       );
-    if (pool.length > 0) {
-      questionMap[key] = sampleN(pool, 1)[0].id;
+    if (finalPool.length > 0) {
+      questionMap[key] = sampleN(finalPool, 1)[0].id;
     }
   }
 
@@ -1526,56 +1571,91 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
     }),
 
   // ─── Challenge Queue ─────────────────────────────────────────────────────────
-  /** Get the currently live challenge (status = 'live') with full question data */
+  /**
+   * Get all currently live challenges (one per category) with full question data.
+   * Returns an array — one entry per category that has a live challenge today.
+   */
   getLiveChallenge: publicProcedure.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
-    const [challenge] = await db
+    // Fetch ALL live challenges (one per category)
+    const liveChallenges = await db
       .select()
       .from(quickfireChallenges)
       .where(eq(quickfireChallenges.status, "live"))
-      .orderBy(desc(quickfireChallenges.publishedAt))
-      .limit(1);
+      .orderBy(quickfireChallenges.category, desc(quickfireChallenges.publishedAt));
 
-    if (!challenge) return null;
+    if (liveChallenges.length === 0) return null;
 
-    const ids: number[] = JSON.parse(challenge.questionIds || "[]");
-    if (ids.length === 0) return { ...challenge, questions: [], userAttempts: {} };
+    // De-duplicate: keep only the most-recently published challenge per category
+    const latestPerCategory = new Map<string, typeof liveChallenges[0]>();
+    for (const ch of liveChallenges) {
+      const key = ch.category ?? "Uncategorized";
+      if (!latestPerCategory.has(key)) latestPerCategory.set(key, ch);
+    }
+    const deduped = Array.from(latestPerCategory.values());
 
-    const allQ = await db.select().from(quickfireQuestions).where(eq(quickfireQuestions.isActive, true));
-    const orderedQuestions = ids.map((id) => allQ.find((q) => q.id === id)).filter(Boolean) as typeof allQ;
+    // Collect all question IDs across all live challenges
+    const allIds = Array.from(new Set(
+      deduped.flatMap((ch) => JSON.parse(ch.questionIds || "[]") as number[])
+    ));
 
+    const allQ = allIds.length > 0
+      ? await db.select().from(quickfireQuestions).where(and(eq(quickfireQuestions.isActive, true), inArray(quickfireQuestions.id, allIds)))
+      : [];
+
+    // Fetch user attempts for all live challenge setDates
     let userAttempts: Record<number, { selectedAnswer: number | null; selfMarkedCorrect: boolean | null; isCorrect: boolean | null }> = {};
-    const setDate = challenge.publishDate ?? challenge.publishedAt?.toISOString().slice(0, 10) ?? "";
-    if (ctx.user && setDate) {
-      const attempts = await db
-        .select()
-        .from(quickfireAttempts)
-        .where(and(eq(quickfireAttempts.userId, ctx.user.id), eq(quickfireAttempts.setDate, setDate)));
-      for (const a of attempts) {
-        userAttempts[a.questionId] = { selectedAnswer: a.selectedAnswer, selfMarkedCorrect: a.selfMarkedCorrect, isCorrect: a.isCorrect };
+    if (ctx.user) {
+      const setDates = Array.from(new Set(
+        deduped.map((ch) => ch.publishDate ?? ch.publishedAt?.toISOString().slice(0, 10) ?? "")
+          .filter(Boolean)
+      ));
+      if (setDates.length > 0) {
+        const attempts = await db
+          .select()
+          .from(quickfireAttempts)
+          .where(and(
+            eq(quickfireAttempts.userId, ctx.user.id),
+            inArray(quickfireAttempts.setDate, setDates)
+          ));
+        for (const a of attempts) {
+          userAttempts[a.questionId] = { selectedAnswer: a.selectedAnswer, selfMarkedCorrect: a.selfMarkedCorrect, isCorrect: a.isCorrect };
+        }
       }
     }
 
-    const sanitized = orderedQuestions.map((q) => {
-      const attempted = userAttempts[q.id];
-      return {
-        ...q,
-        options: q.options ? JSON.parse(q.options) : null,
-        tags: q.tags ? JSON.parse(q.tags) : [],
-        correctAnswer: attempted ? q.correctAnswer : null,
-        explanation: attempted ? q.explanation : null,
-        reviewAnswer: attempted ? q.reviewAnswer : null,
-      };
+    // Build enriched challenge objects
+    const enriched = deduped.map((challenge) => {
+      const ids: number[] = JSON.parse(challenge.questionIds || "[]");
+      const orderedQuestions = ids.map((id) => allQ.find((q) => q.id === id)).filter(Boolean) as typeof allQ;
+      const setDate = challenge.publishDate ?? challenge.publishedAt?.toISOString().slice(0, 10) ?? "";
+      const publishedAt = challenge.publishedAt ? new Date(challenge.publishedAt).getTime() : null;
+      const expiresAt = publishedAt ? publishedAt + 24 * 60 * 60 * 1000 : null;
+      const msRemaining = expiresAt ? Math.max(0, expiresAt - Date.now()) : null;
+
+      const sanitized = orderedQuestions.map((q) => {
+        const attempted = userAttempts[q.id];
+        return {
+          ...q,
+          options: q.options ? JSON.parse(q.options) : null,
+          tags: q.tags ? JSON.parse(q.tags) : [],
+          pairs: q.pairs ? JSON.parse(q.pairs) : null,
+          markers: q.markers ? JSON.parse(q.markers) : null,
+          orderedItems: q.orderedItems ? JSON.parse(q.orderedItems) : null,
+          correctAnswer: attempted ? q.correctAnswer : null,
+          explanation: attempted ? q.explanation : null,
+          reviewAnswer: attempted ? q.reviewAnswer : null,
+        };
+      });
+
+      return { ...challenge, questions: sanitized, userAttempts, setDate, msRemaining };
     });
 
-    // Compute time remaining (24h window from publishedAt)
-    const publishedAt = challenge.publishedAt ? new Date(challenge.publishedAt).getTime() : null;
-    const expiresAt = publishedAt ? publishedAt + 24 * 60 * 60 * 1000 : null;
-    const msRemaining = expiresAt ? Math.max(0, expiresAt - Date.now()) : null;
-
-    return { ...challenge, questions: sanitized, userAttempts, setDate, msRemaining };
+    // For backward compatibility: if only one live challenge, return it directly (not array)
+    // If multiple, return the array so the frontend can render per-category cards
+    return enriched.length === 1 ? enriched[0] : enriched;
   }),
 
   /** Get the challenge archive — premium members only; free users get no archive access */
@@ -1819,22 +1899,30 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
-      // 1. Archive any currently live challenge
       const now = new Date();
-      await db.update(quickfireChallenges).set({ status: "archived", archivedAt: now })
-        .where(eq(quickfireChallenges.status, "live"));
-
-      // 2. Pick next: prefer scheduled (has a publishDate), then draft, ordered by priority
       const today = now.toISOString().slice(0, 10);
+
+      // 1. Pick next queued challenge (prefer scheduled with publishDate <= today, then draft)
       const candidates = await db.select().from(quickfireChallenges)
         .where(inArray(quickfireChallenges.status, ['draft', 'scheduled'] as any[]))
         .orderBy(quickfireChallenges.priority, quickfireChallenges.createdAt)
-        .limit(10);
+        .limit(50);
 
-      // Prefer a challenge whose publishDate <= today, else take the first draft
       const next = candidates.find((c) => !c.publishDate || c.publishDate <= today) ?? candidates[0];
       if (!next) return { published: false, message: "No challenges in queue" };
 
+      // 2. Archive any existing live challenge for the SAME category only
+      //    (one live per category — other categories keep their own live challenge)
+      if (next.category) {
+        await db.update(quickfireChallenges)
+          .set({ status: "archived", archivedAt: now })
+          .where(and(
+            eq(quickfireChallenges.status, "live"),
+            eq(quickfireChallenges.category, next.category)
+          ));
+      }
+
+      // 3. Publish the next challenge
       await db.update(quickfireChallenges).set({
         status: "live",
         publishDate: next.publishDate ?? today,
@@ -1842,7 +1930,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
         archivedAt: null,
       }).where(eq(quickfireChallenges.id, next.id));
 
-      return { published: true, challengeId: next.id, title: next.title, publishDate: next.publishDate ?? today };
+      return { published: true, challengeId: next.id, title: next.title, category: next.category, publishDate: next.publishDate ?? today };
     }),
 
   /** Manually archive the currently live challenge */
@@ -2021,33 +2109,51 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
           }
         }
 
+        // Determine which cards have been seen in the current cycle
+        // A "cycle" = all cards in this category seen at least once since the last reset
+        // We track seen cards via deck attempts (setDate starts with 'deck-')
+        const deckAttempts = attempts.filter((a) => a.setDate?.startsWith('deck-'));
+        const seenInCurrentCycle = new Set(deckAttempts.map((a) => a.questionId));
+        const unseenCards = filtered.filter((c) => !seenInCurrentCycle.has(c.id));
+        const seenCards = filtered.filter((c) => seenInCurrentCycle.has(c.id));
+        // If all cards have been seen, cycle resets — treat all as unseen again
+        const cycleReset = unseenCards.length === 0;
+        const priorityCards = cycleReset ? filtered : unseenCards;
+        const deprioritizedCards = cycleReset ? [] : seenCards;
+
         let orderedCards: typeof filtered;
         if (isPremium) {
-          // Premium: spaced repetition sort
-          const scored = filtered.map((card) => {
-            const s = statsMap[card.id];
-            let score = 0;
-            if (!s || s.gotIt + s.missed === 0) {
-              score = 0;
-            } else if (s.lastResult === false) {
-              score = 1;
-            } else {
-              score = 2;
-            }
-            return { card, score, lastSeen: s?.lastSeen ?? null, stats: s ?? { gotIt: 0, missed: 0, lastSeen: null, lastResult: null } };
-          });
-          scored.sort((a, b) => {
-            if (a.score !== b.score) return a.score - b.score;
-            if (!a.lastSeen && !b.lastSeen) return 0;
-            if (!a.lastSeen) return -1;
-            if (!b.lastSeen) return 1;
-            return a.lastSeen.getTime() - b.lastSeen.getTime();
-          });
-          orderedCards = scored.map(({ card }) => card);
+          // Premium: unseen cards first (spaced-rep sorted), then seen cards (spaced-rep sorted)
+          const sortBySpacedRep = (cards: typeof filtered) => {
+            const scored = cards.map((card) => {
+              const s = statsMap[card.id];
+              let score = 0;
+              if (!s || s.gotIt + s.missed === 0) {
+                score = 0;
+              } else if (s.lastResult === false) {
+                score = 1;
+              } else {
+                score = 2;
+              }
+              return { card, score, lastSeen: s?.lastSeen ?? null };
+            });
+            scored.sort((a, b) => {
+              if (a.score !== b.score) return a.score - b.score;
+              if (!a.lastSeen && !b.lastSeen) return 0;
+              if (!a.lastSeen) return -1;
+              if (!b.lastSeen) return 1;
+              return a.lastSeen.getTime() - b.lastSeen.getTime();
+            });
+            return scored.map(({ card }) => card);
+          };
+          orderedCards = [...sortBySpacedRep(priorityCards), ...sortBySpacedRep(deprioritizedCards)];
         } else {
-          // Free: deterministic daily shuffle (different every day, same within a day)
+          // Free: unseen cards first (shuffled), then seen cards (shuffled)
           const seed = `${today}-${ctx.user.id}`;
-          orderedCards = seededShuffle(filtered, seed);
+          orderedCards = [
+            ...seededShuffle(priorityCards, seed),
+            ...seededShuffle(deprioritizedCards, seed + "-seen"),
+          ];
         }
 
         const cards = orderedCards.map((card) => {
@@ -2070,6 +2176,8 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
         return {
           cards,
           totalCards: filtered.length,
+          unseenCount: cycleReset ? filtered.length : unseenCards.length,
+          cycleReset,
           userStats: { totalAttempts, totalGotIt, totalMissed, accuracy: totalAttempts > 0 ? Math.round((totalGotIt / totalAttempts) * 100) : null },
           dailyLimit,
           dailySeenCount,

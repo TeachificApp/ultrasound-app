@@ -72,7 +72,7 @@ export default function Enrolled() {
           Welcome to <br />All About Ultrasound™!
         </h1>
         <p className="text-white/60 text-base max-w-md leading-relaxed">
-          Your free membership is active. <br />Choose where you'd like to go next.
+          Your membership is active. <br />Choose where you'd like to go next.
         </p>
       </div>
 
@@ -191,7 +191,7 @@ export default function Enrolled() {
                 className="text-xl font-bold text-white leading-snug"
                 style={{ fontFamily: "Merriweather, serif" }}
               >
-                All About Ultrasound™ UltrasoundAssist™ Clinical Intelligence
+                All About Ultrasound™ UltrasoundAssist™ Clinical Intelligence App
               </h2>
             </div>
             <p className="text-white/60 text-sm leading-relaxed">

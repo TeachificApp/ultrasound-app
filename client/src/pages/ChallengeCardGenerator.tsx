@@ -213,7 +213,7 @@ function buildSocialPost(
       options && options.length > 0
         ? "\n\n" + options.map((o, i) => `${letters[i]}. ${stripHtml(o)}`).join("\n")
         : "";
-    return `🔬 Daily Ultrasound Challenge — ${category}
+    return `🏆Daily Ultrasound Challenge — ${category}
 
 Can you answer today's question?
 
@@ -227,7 +227,7 @@ ${allHashtags}`;
   } else {
     const answerLine = cleanA ? `✅ Answer: ${cleanA}` : "";
     const explanationLine = cleanE ? `\n\n💡 ${cleanE}` : "";
-    return `🔬 Daily Ultrasound Challenge — ${category} | ANSWER
+    return `🏆Daily Ultrasound Challenge — ${category} | ANSWER
 
 ${answerLine}${explanationLine}
 

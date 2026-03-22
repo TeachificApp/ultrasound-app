@@ -541,3 +541,32 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Update flashcard filter buttons in QuickFireAdmin for Physics
 - [x] Update challengeCron categories list for Physics
 - [x] Update drizzle/schema.ts category enums for Physics
+
+## Enrolled Page Fixes (Mar 21)
+- [ ] Change "Your free membership is active" → "Your membership is active"
+- [ ] Update card title from "Clinical Intelligence" → "Clinical Intelligence App"
+- [ ] Ensure /enrolled page is accessible to both Free and Premium members (no auth gate blocking)
+
+## Admin Daily Challenge Queue (Mar 21)
+- [ ] Add refresh button to QuickFireAdmin challenge queue panel
+
+## AI Generator & Queue Refresh (Mar 21)
+- [ ] Add Physics as a clinical focus topic in the AI question generator
+- [ ] Add refresh button to challenge queue admin panel
+
+## Category Completeness Audit (Mar 21)
+- [ ] Ensure all 11 categories available in Flashcards filters
+- [ ] Ensure all 11 categories available in Cases filters
+- [ ] Ensure all 11 categories available in SoundBytes filters
+- [ ] Ensure all 11 categories available in Daily Challenge filters
+
+## No-Repeat Deduplication (Mar 21)
+- [x] Add user_seen_questions table to track seen flashcard/challenge question IDs per user per category
+- [x] Update getFlashcardDeck procedure to exclude already-seen questions (reset when all exhausted)
+- [x] Update daily challenge question selection to exclude questions seen in recent challenges
+- [ ] Add reset endpoint so users can manually restart their seen-question pool
+
+## One Live Per Category Per Day (Mar 21)
+- [x] Enforce exactly one live challenge per category per day in ensureTodaySet and adminPublishNextChallenge
+- [x] Archive previous live challenge for a category before publishing a new one for the same category
+- [x] Update getLiveChallenge to return all live challenges (one per category)

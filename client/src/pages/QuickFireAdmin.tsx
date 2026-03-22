@@ -1192,6 +1192,21 @@ export default function QuickFireAdmin() {
                 <Button
                   variant="outline"
                   size="sm"
+                  className="gap-1.5 border-[#189aa1] text-[#189aa1] hover:bg-[#f0fdfd]"
+                  onClick={() => {
+                    challengeListQuery.refetch();
+                    archivedChallengesQuery.refetch();
+                    toast.success("Queue refreshed.");
+                  }}
+                  disabled={challengeListQuery.isFetching}
+                  title="Refresh the challenge queue"
+                >
+                  <RefreshCw className={`w-4 h-4 ${challengeListQuery.isFetching ? "animate-spin" : ""}`} />
+                  Refresh
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   className="gap-1.5"
                   onClick={() => setActiveAdminTab("questions")}
                 >

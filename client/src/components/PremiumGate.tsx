@@ -142,7 +142,8 @@ function UpgradePrompt({
   featureName?: string;
   checkoutUrl?: string;
 }) {
-  const url = checkoutUrl ?? "https://member.allaboutultrasound.com/enroll/3703267?price_id=4651832";
+  const returnUrl = typeof window !== "undefined" ? `${window.location.origin}/enrolled` : "";
+  const url = checkoutUrl ?? `https://member.allaboutultrasound.com/enroll/3714929?price_id=4664974${returnUrl ? `&redirect_url=${encodeURIComponent(returnUrl)}` : ""}`;
 
   return (
     <div className="rounded-2xl border border-amber-200/80 bg-white/95 shadow-2xl p-7 text-center">

@@ -472,8 +472,8 @@ export default function QuickFire() {
   const [orderDragIdx, setOrderDragIdx] = useState<number | null>(null);
   const [orderSubmitted, setOrderSubmitted] = useState(false);
 
-  const allQuestions = data?.questions ?? [];
-  const userAttempts = (data?.userAttempts ?? {}) as Record<number, { selectedAnswer: number | null; selfMarkedCorrect: boolean | null; isCorrect: boolean | null }>;
+  const allQuestions: any[] = (data as any)?.questions ?? [];
+  const userAttempts = ((data as any)?.userAttempts ?? {}) as Record<number, { selectedAnswer: number | null; selfMarkedCorrect: boolean | null; isCorrect: boolean | null }>;
 
   const presentTags = CATEGORY_TAGS.filter((cat) =>
     allQuestions.some((q) => Array.isArray(q.tags) && q.tags.includes(cat))
@@ -498,7 +498,7 @@ export default function QuickFire() {
   const activeCatQId = activeCatMapKey ? todayCategoryMap[activeCatMapKey] : null;
   const activeCatQ = activeCatQId ? todayAllQuestions.find((q: any) => q.id === activeCatQId) : null;
 
-  const questions = activeCategory
+  const questions: any[] = activeCategory
     ? (activeCatQ ? [activeCatQ] : [])
     : legacyQuestions;
 
@@ -507,7 +507,7 @@ export default function QuickFire() {
   const currentQ = questions[currentIndex];
 
   const alreadyCompleted =
-    questions.length > 0 && questions.every((q) => effectiveUserAttempts[q.id] !== undefined);
+    questions.length > 0 && questions.every((q: any) => effectiveUserAttempts[q.id] !== undefined);
 
   // ── Admin edit state (archive) ────────────────────────────────────────────
   const isAdmin = user?.role === "admin";

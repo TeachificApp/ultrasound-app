@@ -20,5 +20,23 @@ export const getThinkificFreeEnrollUrl = () => {
   return `${THINKIFIC_FREE_MEMBERSHIP_URL}&redirect_url=${encodeURIComponent(returnUrl)}`;
 };
 
+/**
+ * Premium monthly enrollment URL with origin-tracking redirect.
+ * Users who purchase Premium are sent back to /enrolled after checkout.
+ */
+export const getThinkificPremiumMonthlyUrl = () => {
+  const returnUrl = `${window.location.origin}/enrolled`;
+  return `${THINKIFIC_PREMIUM_MONTHLY_URL}&redirect_url=${encodeURIComponent(returnUrl)}`;
+};
+
+/**
+ * Premium annual enrollment URL with origin-tracking redirect.
+ * Users who purchase Premium (annual) are sent back to /enrolled after checkout.
+ */
+export const getThinkificPremiumAnnualUrl = () => {
+  const returnUrl = `${window.location.origin}/enrolled`;
+  return `${THINKIFIC_PREMIUM_ANNUAL_URL}&redirect_url=${encodeURIComponent(returnUrl)}`;
+};
+
 // Return the local magic-link login page.
 export const getLoginUrl = () => "/login";

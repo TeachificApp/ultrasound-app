@@ -8,6 +8,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import { trpc } from "@/lib/trpc";
+import { getThinkificPremiumMonthlyUrl } from "@/const";
 
 /** Animates a number from 0 to `target` over `duration` ms */
 function useCountUp(target: number, duration = 1800) {
@@ -352,7 +353,7 @@ export default function Home() {
               </p>
             </div>
             <a
-              href="https://member.allaboutultrasound.com/enroll/3714929?price_id=4664974"
+              href={getThinkificPremiumMonthlyUrl()}
               target="_blank"
               rel="noopener noreferrer"
               className="flex-shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm text-white transition-all hover:opacity-90"
