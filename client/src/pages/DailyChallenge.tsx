@@ -509,8 +509,9 @@ export default function QuickFire() {
   const [activeCatQDirect, setActiveCatQDirect] = useState<any>(null);
   const activeCatMapKey = activeCategory ? (CAT_DISPLAY_TO_KEY[activeCategory] ?? activeCategory) : null;
   const activeCatQId = activeCatMapKey ? todayCategoryMap[activeCatMapKey] : null;
-  // Use the directly stored question if available, otherwise fall back to derived lookup
-  const activeCatQ = activeCatQDirect ?? (activeCatQId ? todayAllQuestions.find((q: any) => q.id === activeCatQId) : null);
+  // Always derive from todayAllQuestions when available (most reliable), fall back to directly stored object
+  const activeCatQFromMap = activeCatQId ? todayAllQuestions.find((q: any) => q.id === activeCatQId) : null;
+  const activeCatQ = activeCatQFromMap ?? activeCatQDirect;
 
   const questions: any[] = activeCategory
     ? (activeCatQ ? [activeCatQ] : [])

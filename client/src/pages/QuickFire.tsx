@@ -490,9 +490,16 @@ export default function QuickFire() {
   // Map display names to server camelCase keys
   const CAT_DISPLAY_TO_KEY: Record<string, string> = {
     "Abdominal": "abdominal",
-    "Vascular": "vascular",
+    "Small Parts": "smallParts",
+    "Pelvic/Gyn": "pelvicGyn",
+    "OB 1st Trimester": "ob1st",
     "OB 2nd/3rd Trimester": "ob2nd3rd",
+    "Fetal Echo": "fetalEcho",
+    "Breast": "breast",
+    "Vascular": "vascular",
+    "MSK": "msk",
     "POCUS": "pocus",
+    "Physics": "physics",
   };
   const activeCatMapKey = activeCategory ? (CAT_DISPLAY_TO_KEY[activeCategory] ?? activeCategory) : null;
   const activeCatQId = activeCatMapKey ? todayCategoryMap[activeCatMapKey] : null;
