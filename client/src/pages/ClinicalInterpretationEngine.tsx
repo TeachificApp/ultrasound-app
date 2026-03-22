@@ -644,7 +644,7 @@ function LiRADSTool() {
   const set = (k: string, val: string) => setV((p) => ({ ...p, [k]: val }));
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FieldRow label="Lesion size (mm)"><Input type="number" value={v.size} onChange={(e) => set("size", e.target.value)} placeholder="e.g. 22" /></FieldRow>
         <FieldRow label="Arterial phase enhancement"><YesNo value={v.arterialEnhancement} onChange={(val) => set("arterialEnhancement", val)} /></FieldRow>
         <FieldRow label="Washout appearance"><YesNo value={v.washout} onChange={(val) => set("washout", val)} /></FieldRow>
@@ -673,7 +673,7 @@ function TIRADSTool() {
   const set = (k: string, val: string) => setV((p) => ({ ...p, [k]: val }));
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FieldRow label="Size (mm)"><Input type="number" value={v.size} onChange={(e) => set("size", e.target.value)} placeholder="e.g. 18" /></FieldRow>
         <FieldRow label="Composition">
           <Select value={v.composition} onValueChange={(val) => set("composition", val)}>
@@ -741,7 +741,7 @@ function GallbladderTool() {
   const set = (k: string, val: string) => setV((p) => ({ ...p, [k]: val }));
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FieldRow label="Wall thickness (mm)"><Input type="number" value={v.wall} onChange={(e) => set("wall", e.target.value)} placeholder="e.g. 4" /></FieldRow>
         <FieldRow label="Fasting patient"><YesNo value={v.fasting} onChange={(val) => set("fasting", val)} /></FieldRow>
         <FieldRow label="Focal / asymmetric thickening"><YesNo value={v.focal} onChange={(val) => set("focal", val)} /></FieldRow>
@@ -772,7 +772,7 @@ function RenalCortexTool() {
   const set = (k: string, val: string) => setV((p) => ({ ...p, [k]: val }));
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FieldRow label="Cortical thickness (mm)"><Input type="number" value={v.thickness} onChange={(e) => set("thickness", e.target.value)} placeholder="e.g. 8" /></FieldRow>
         <FieldRow label="Cortical echogenicity">
           <Select value={v.echogenicity} onValueChange={(val) => set("echogenicity", val)}>
@@ -806,7 +806,7 @@ function BIRADSTool() {
   const set = (k: string, val: string) => setV((p) => ({ ...p, [k]: val }));
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FieldRow label="Size (mm)"><Input type="number" value={v.size} onChange={(e) => set("size", e.target.value)} placeholder="e.g. 14" /></FieldRow>
         <FieldRow label="Shape">
           <Select value={v.shape} onValueChange={(val) => set("shape", val)}>
@@ -884,7 +884,7 @@ function EndometrialTool() {
   const set = (k: string, val: string) => setV((p) => ({ ...p, [k]: val }));
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FieldRow label="Endometrial thickness (mm)"><Input type="number" value={v.et} onChange={(e) => set("et", e.target.value)} placeholder="e.g. 6" /></FieldRow>
         <FieldRow label="Menopausal status">
           <Select value={v.menopausal} onValueChange={(val) => set("menopausal", val)}>
@@ -910,7 +910,7 @@ function ORADSTool() {
   const set = (k: string, val: string) => setV((p) => ({ ...p, [k]: val }));
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FieldRow label="Size (cm)"><Input type="number" value={v.size} onChange={(e) => set("size", e.target.value)} placeholder="e.g. 4.5" /></FieldRow>
         <FieldRow label="Menopausal status">
           <Select value={v.age} onValueChange={(val) => set("age", val)}>
@@ -960,7 +960,7 @@ function CervicalLengthTool() {
   const set = (k: string, val: string) => setV((p) => ({ ...p, [k]: val }));
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FieldRow label="Cervical length (mm)"><Input type="number" value={v.cl} onChange={(e) => set("cl", e.target.value)} placeholder="e.g. 22" /></FieldRow>
         <FieldRow label="Gestational age (weeks)"><Input type="number" value={v.ga} onChange={(e) => set("ga", e.target.value)} placeholder="e.g. 22" /></FieldRow>
         <FieldRow label="Prior preterm birth"><YesNo value={v.history} onChange={(val) => set("history", val)} /></FieldRow>
@@ -978,7 +978,7 @@ function FetalGrowthTool() {
   const set = (k: string, val: string) => setV((p) => ({ ...p, [k]: val }));
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FieldRow label="Estimated fetal weight (g)"><Input type="number" value={v.efw} onChange={(e) => set("efw", e.target.value)} placeholder="e.g. 1250" /></FieldRow>
         <FieldRow label="Gestational age (weeks)"><Input type="number" value={v.ga} onChange={(e) => set("ga", e.target.value)} placeholder="e.g. 30" /></FieldRow>
       </div>
@@ -994,7 +994,7 @@ function AFITool() {
   const set = (k: string, val: string) => setV((p) => ({ ...p, [k]: val }));
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FieldRow label="Method">
           <Select value={v.method} onValueChange={(val) => set("method", val)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
@@ -1019,7 +1019,7 @@ function DuctusVenosusTool() {
   const set = (k: string, val: string) => setV((p) => ({ ...p, [k]: val }));
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FieldRow label="a-wave">
           <Select value={v.aWave} onValueChange={(val) => set("aWave", val)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
@@ -1045,7 +1045,7 @@ function CarotidTool() {
   const set = (k: string, val: string) => setV((p) => ({ ...p, [k]: val }));
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FieldRow label="ICA PSV (cm/s)"><Input type="number" value={v.psv} onChange={(e) => set("psv", e.target.value)} placeholder="e.g. 180" /></FieldRow>
         <FieldRow label="ICA EDV (cm/s)"><Input type="number" value={v.edv} onChange={(e) => set("edv", e.target.value)} placeholder="e.g. 55" /></FieldRow>
         <FieldRow label="ICA/CCA PSV ratio"><Input type="number" step="0.1" value={v.ratio} onChange={(e) => set("ratio", e.target.value)} placeholder="e.g. 2.8" /></FieldRow>
@@ -1078,7 +1078,7 @@ function RenalDopplerTool() {
         <p className="font-semibold mb-1">Advanced Renal Doppler Decision Tool</p>
         <p>Integrates RI, Acceleration Time, RAR, and Parvus et Tardus detection to differentiate intrinsic renal disease, obstruction, and renal artery stenosis.</p>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FieldRow label="Resistive Index (RI)"><Input type="number" step="0.01" value={v.ri} onChange={(e) => set("ri", e.target.value)} placeholder="e.g. 0.72" /></FieldRow>
         <FieldRow label="Acceleration Time (ms)"><Input type="number" value={v.at} onChange={(e) => set("at", e.target.value)} placeholder="e.g. 85 (normal < 70 ms)" /></FieldRow>
         <FieldRow label="Renal-Aortic Ratio (RAR)"><Input type="number" step="0.1" value={v.rar} onChange={(e) => set("rar", e.target.value)} placeholder="e.g. 3.8 (stenosis > 3.5)" /></FieldRow>
@@ -1107,7 +1107,7 @@ function DVTTool() {
   const set = (k: string, val: string) => setV((p) => ({ ...p, [k]: val }));
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FieldRow label="Wells DVT score">
           <Select value={v.wells} onValueChange={(val) => set("wells", val)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
@@ -1161,7 +1161,7 @@ function AAATool() {
   const set = (k: string, val: string) => setV((p) => ({ ...p, [k]: val }));
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FieldRow label="Maximum diameter (cm)"><Input type="number" step="0.1" value={v.diameter} onChange={(e) => set("diameter", e.target.value)} placeholder="e.g. 4.2" /></FieldRow>
         <FieldRow label="Sex">
           <Select value={v.sex} onValueChange={(val) => set("sex", val)}>
@@ -1186,7 +1186,7 @@ function PortalHTNTool() {
   const set = (k: string, val: string) => setV((p) => ({ ...p, [k]: val }));
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FieldRow label="Portal vein diameter (mm)"><Input type="number" value={v.pvDiam} onChange={(e) => set("pvDiam", e.target.value)} placeholder="e.g. 14 (normal < 13 mm)" /></FieldRow>
         <FieldRow label="Portal vein velocity (cm/s)"><Input type="number" value={v.pvVel} onChange={(e) => set("pvVel", e.target.value)} placeholder="e.g. 12 (normal 15–40 cm/s)" /></FieldRow>
         <FieldRow label="Portal flow direction">
@@ -1214,7 +1214,7 @@ function RotatorCuffTool() {
   const set = (k: string, val: string) => setV((p) => ({ ...p, [k]: val }));
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FieldRow label="Tendon continuity">
           <Select value={v.continuity} onValueChange={(val) => set("continuity", val)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
@@ -1251,7 +1251,7 @@ function BLinesTool() {
   const set = (k: string, val: string) => setV((p) => ({ ...p, [k]: val }));
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FieldRow label="Number of B-line zones (0–8)"><Input type="number" min={0} max={8} value={v.zones} onChange={(e) => set("zones", e.target.value)} placeholder="e.g. 4" /></FieldRow>
         <FieldRow label="Bilateral B-lines"><YesNo value={v.bilateral} onChange={(val) => set("bilateral", val)} /></FieldRow>
         <FieldRow label="A-lines present"><YesNo value={v.aLines} onChange={(val) => set("aLines", val)} /></FieldRow>
@@ -1268,7 +1268,7 @@ function IVCTool() {
   const set = (k: string, val: string) => setV((p) => ({ ...p, [k]: val }));
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FieldRow label="IVC max diameter (cm)"><Input type="number" step="0.1" value={v.max} onChange={(e) => set("max", e.target.value)} placeholder="e.g. 2.1" /></FieldRow>
         <FieldRow label="IVC min diameter (cm)"><Input type="number" step="0.1" value={v.min} onChange={(e) => set("min", e.target.value)} placeholder="e.g. 0.9" /></FieldRow>
         <FieldRow label="Mechanically ventilated"><YesNo value={v.ventilated} onChange={(val) => set("ventilated", val)} /></FieldRow>
@@ -1285,7 +1285,7 @@ function ONSDTool() {
   const set = (k: string, val: string) => setV((p) => ({ ...p, [k]: val }));
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FieldRow label="Right ONSD (mm)"><Input type="number" step="0.1" value={v.right} onChange={(e) => set("right", e.target.value)} placeholder="e.g. 5.2" /></FieldRow>
         <FieldRow label="Left ONSD (mm)"><Input type="number" step="0.1" value={v.left} onChange={(e) => set("left", e.target.value)} placeholder="e.g. 5.0" /></FieldRow>
       </div>
@@ -1302,7 +1302,7 @@ function FASTTool() {
   return (
     <div className="space-y-4">
       <p className="text-xs text-gray-500">Select all windows where free fluid was identified:</p>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FieldRow label="RUQ (Morison's pouch)"><YesNo value={v.ruq} onChange={(val) => set("ruq", val)} /></FieldRow>
         <FieldRow label="LUQ (Splenorenal)"><YesNo value={v.luq} onChange={(val) => set("luq", val)} /></FieldRow>
         <FieldRow label="Pelvis (Pouch of Douglas)"><YesNo value={v.pelvis} onChange={(val) => set("pelvis", val)} /></FieldRow>
@@ -1320,7 +1320,7 @@ function BladderTool() {
   const set = (k: string, val: string) => setV((p) => ({ ...p, [k]: val }));
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <FieldRow label="Length (cm)"><Input type="number" step="0.1" value={v.length} onChange={(e) => set("length", e.target.value)} placeholder="e.g. 8" /></FieldRow>
         <FieldRow label="Width (cm)"><Input type="number" step="0.1" value={v.width} onChange={(e) => set("width", e.target.value)} placeholder="e.g. 6" /></FieldRow>
         <FieldRow label="Height (cm)"><Input type="number" step="0.1" value={v.height} onChange={(e) => set("height", e.target.value)} placeholder="e.g. 5" /></FieldRow>
