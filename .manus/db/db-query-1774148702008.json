@@ -1,0 +1,25 @@
+{
+  "query": "SELECT setDate, JSON_EXTRACT(questionIds, '$.pocus') as pocus, JSON_EXTRACT(questionIds, '$.breast') as breast FROM quickfireDailySets ORDER BY setDate DESC LIMIT 3;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT setDate, JSON_EXTRACT(questionIds, '$.pocus') as pocus, JSON_EXTRACT(questionIds, '$.breast') as breast FROM quickfireDailySets ORDER BY setDate DESC LIMIT 3;",
+  "rows": [
+    {
+      "setDate": "2026-03-22",
+      "pocus": "609",
+      "breast": "688"
+    },
+    {
+      "setDate": "2026-03-21",
+      "pocus": "613",
+      "breast": "NULL"
+    },
+    {
+      "setDate": "2026-03-20",
+      "pocus": "614",
+      "breast": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "setDate\tpocus\tbreast\n2026-03-22\t609\t688\n2026-03-21\t613\tNULL\n2026-03-20\t614\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 61
+}

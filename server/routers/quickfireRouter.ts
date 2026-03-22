@@ -389,13 +389,47 @@ const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
 
 export const quickfireRouter = router({
   /** Returns today's question set with full question data, grouped by category */
-  getTodaySet: publicProcedure.query(async ({ ctx }) => {
+   getTodaySet: publicProcedure.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const date = todayDateStr();
     const set = await ensureTodaySet(db, date);
     const questionMap = parseDailySetIds(set.questionIds);
-
+    // Always sync questionMap from current live challenges — overrides stale stored IDs.
+    // This ensures mid-day challenge swaps (trash/promote) are immediately reflected.
+    const liveChallengesNow = await db
+      .select({ category: quickfireChallenges.category, questionIds: quickfireChallenges.questionIds })
+      .from(quickfireChallenges)
+      .where(eq(quickfireChallenges.status, "live" as any));
+    let mapChanged = false;
+    // Build a set of keys that have a live challenge
+    const liveKeys = new Set<string>();
+    for (const lc of liveChallengesNow) {
+      if (!lc.category) continue;
+      const key = CAT_KEY[lc.category as ChallengeCategory];
+      if (!key) continue;
+      liveKeys.add(key);
+      const ids: number[] = JSON.parse(lc.questionIds || "[]");
+      if (ids.length > 0 && questionMap[key] !== ids[0]) {
+        questionMap[key] = ids[0];
+        mapChanged = true;
+      }
+    }
+    // Clear categories that no longer have a live challenge
+    for (const key of Object.keys(questionMap)) {
+      if (!liveKeys.has(key) && questionMap[key] !== null) {
+        questionMap[key] = null;
+        mapChanged = true;
+      }
+    }
+    // Persist the updated map back to the daily set row if it changed
+    if (mapChanged) {
+      await db
+        .update(quickfireDailySets)
+        .set({ questionIds: JSON.stringify(questionMap) })
+        .where(eq(quickfireDailySets.setDate, date))
+        .catch(() => { /* non-blocking — stale row is fine */ });
+    }
     // Determine which categories the user has opted into (default: all)
     let enabledCats: Set<string> = new Set(["abdominal", "smallParts", "pelvicGyn", "ob1st", "ob2nd3rd", "fetalEcho", "breast", "vascular", "msk", "pocus", "physics"]);
     if (ctx.user) {

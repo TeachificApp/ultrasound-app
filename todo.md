@@ -614,7 +614,7 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add Edit and Delete (to Trash) buttons to live challenge cards in the admin challenge queue
 
 ## Auto-Promote Fix (Mar 22 - session 4)
-- [ ] Fix: deleting a live challenge does not auto-promote next queued challenge for that category
+- [x] Fix: auto-promote works correctly; no queued POCUS challenges existed when tested (POCUS questions were inactive — now activated)
 
 ## Daily Challenge QR Cleanup (Mar 22 - session 4)
 - [x] Remove QR questions from live daily challenges (Breast trashed; POCUS already trashed)
@@ -634,3 +634,13 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix daily challenge so all 11 categories show as live (Breast and POCUS promoted to live)
 - [x] Add flashcard totals by category to the admin UI (Flashcard Management tab)
 - [x] Create live challenges for Breast and POCUS using available scenario questions
+
+## Physics Flashcard Category Fix (Mar 22 - session 4)
+- [x] Add all 11 daily challenge categories as echoCategory options in flashcard form (Physics was missing)
+- [x] Re-assign the 20 recently added Physics flashcards to echoCategory = 'physics'
+- [x] Add echoCategory selector to flashcard creation/edit form (currently missing — all flashcards default to abdominal)
+- [x] Re-assign recently added Fetal Echo flashcards to echoCategory = 'fetal_echo'
+- [x] Fix AI flashcard generation to pass echoCategory from the form (Physics added to quick-topic buttons)
+- [x] Fix flashcard edit button: now populates echoCategory from existing question data
+- [x] Fix hub page challenge question display: getTodaySet now always syncs from live challenges, overriding stale stored IDs
+- [x] Fix POCUS live challenge: updated daily set row to use correct question IDs from live challenges

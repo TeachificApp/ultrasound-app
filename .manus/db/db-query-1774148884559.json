@@ -1,0 +1,9 @@
+{
+  "query": "UPDATE quickfireQuestions SET echoCategory = 'physics' WHERE id BETWEEN 792 AND 811 AND type = 'quickReview';\nUPDATE quickfireQuestions SET echoCategory = 'fetal_echo' WHERE id BETWEEN 812 AND 831 AND type = 'quickReview';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute UPDATE quickfireQuestions SET echoCategory = 'physics' WHERE id BETWEEN 792 AND 811 AND type = 'quickReview';\nUPDATE quickfireQuestions SET echoCategory = 'fetal_echo' WHERE id BETWEEN 812 AND 831 AND type = 'quickReview';",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 82
+}

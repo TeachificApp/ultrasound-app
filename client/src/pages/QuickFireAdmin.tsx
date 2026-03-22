@@ -117,6 +117,7 @@ interface OrderItem { text: string; }
 
 type QuestionCategory = "Abdominal" | "Small Parts" | "Pelvic/Gyn" | "OB 1st Trimester" | "OB 2nd/3rd Trimester" | "Fetal Echo" | "Breast" | "Vascular" | "MSK" | "POCUS" | "Physics";
 
+type FlashcardEchoCategory = "abdominal" | "pelvic_gyn" | "obstetric_1st" | "obstetric_2nd_3rd" | "fetal_echo" | "venous" | "arterial" | "abdominal_vascular" | "extracranial_carotid" | "intracranial_tcd" | "pocus" | "physics" | "thyroid" | "scrotum" | "breast" | "msk";
 interface QuestionForm {
   type: QuestionType;
   question: string;
@@ -128,6 +129,7 @@ interface QuestionForm {
   difficulty: Difficulty;
   tags: string;
   category: QuestionCategory;
+  echoCategory: FlashcardEchoCategory;
   // Connect game
   pairs: ConnectPair[];
   // Identifier game
@@ -147,6 +149,7 @@ const EMPTY_FORM: QuestionForm = {
   difficulty: "intermediate",
   tags: "",
   category: "Abdominal",
+  echoCategory: "abdominal",
   pairs: [{ left: "", right: "" }, { left: "", right: "" }, { left: "", right: "" }, { left: "", right: "" }],
   markers: [],
   orderedItems: [{ text: "" }, { text: "" }, { text: "" }, { text: "" }],
@@ -1049,6 +1052,7 @@ export default function QuickFireAdmin() {
       difficulty: q.difficulty,
       tags: (q.tags ?? []).join(", "),
       category: (q.category as QuestionCategory) ?? "Abdominal",
+      echoCategory: (q.echoCategory as FlashcardEchoCategory) ?? "abdominal",
       pairs: q.pairs ?? [{ left: "", right: "" }, { left: "", right: "" }, { left: "", right: "" }, { left: "", right: "" }],
       markers: q.markers ?? [],
       orderedItems: q.orderedItems ?? [{ text: "" }, { text: "" }, { text: "" }, { text: "" }],
@@ -2043,6 +2047,7 @@ export default function QuickFireAdmin() {
                               difficulty: (q.difficulty as Difficulty) ?? "intermediate",
                               tags: tags.join(", "),
                               category: (q.category as QuestionCategory) ?? "Abdominal",
+                              echoCategory: (q.echoCategory as FlashcardEchoCategory) ?? "abdominal",
                               pairs: [{ left: "", right: "" }, { left: "", right: "" }],
                               markers: [],
                               orderedItems: [{ text: "" }, { text: "" }],
@@ -3745,6 +3750,7 @@ export default function QuickFireAdmin() {
                     { label: "Vascular", topic: "Vascular ultrasound flashcards — DVT criteria, ABI values, carotid stenosis thresholds, renal artery Doppler, waveform morphology" },
                     { label: "MSK", topic: "MSK ultrasound flashcards — tendon anatomy, rotator cuff pathology, joint effusion grading, nerve identification, dynamic maneuvers" },
                     { label: "POCUS", topic: "POCUS flashcards — eFAST findings, lung sliding, B-lines, IVC collapsibility, RUSH protocol steps" },
+                    { label: "Physics", topic: "Ultrasound physics flashcards — transducer frequency, resolution, artifacts, Doppler principles, attenuation, acoustic impedance" },
                   ].map(({ label, topic }) => (
                     <button
                       key={label}
@@ -4174,6 +4180,36 @@ export default function QuickFireAdmin() {
               </div>
             </div>
 
+            {/* Echo Category */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Category <span className="text-red-500">*</span></label>
+              <Select
+                value={flashcardForm.echoCategory}
+                onValueChange={(v) => setFlashcardForm((f) => ({ ...f, echoCategory: v as FlashcardEchoCategory }))}
+              >
+                <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="abdominal">Abdominal</SelectItem>
+                  <SelectItem value="smallParts">Small Parts</SelectItem>
+                  <SelectItem value="pelvicGyn">Pelvic / Gyn</SelectItem>
+                  <SelectItem value="obstetric_1st">OB 1st Trimester</SelectItem>
+                  <SelectItem value="obstetric_2nd_3rd">OB 2nd / 3rd Trimester</SelectItem>
+                  <SelectItem value="fetal_echo">Fetal Echo</SelectItem>
+                  <SelectItem value="breast">Breast</SelectItem>
+                  <SelectItem value="venous">Vascular — Venous</SelectItem>
+                  <SelectItem value="arterial">Vascular — Arterial</SelectItem>
+                  <SelectItem value="abdominal_vascular">Vascular — Abdominal</SelectItem>
+                  <SelectItem value="extracranial_carotid">Vascular — Carotid</SelectItem>
+                  <SelectItem value="intracranial_tcd">Vascular — TCD</SelectItem>
+                  <SelectItem value="msk">MSK</SelectItem>
+                  <SelectItem value="pocus">POCUS</SelectItem>
+                  <SelectItem value="physics">Physics</SelectItem>
+                  <SelectItem value="thyroid">Thyroid</SelectItem>
+                  <SelectItem value="scrotum">Scrotum</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Difficulty & Tags */}
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -4217,7 +4253,7 @@ export default function QuickFireAdmin() {
                   videoUrl: (flashcardForm as any).videoUrl || undefined,
                   difficulty: flashcardForm.difficulty,
                   tags: flashcardForm.tags ? flashcardForm.tags.split(",").map((t: string) => t.trim()).filter(Boolean) : [],
-                  category: "Abdominal" as const,
+                  echoCategory: flashcardForm.echoCategory,
                 };
                 if (editingFlashcardId !== null) {
                   updateMutation.mutate({ id: editingFlashcardId, ...payload }, {
