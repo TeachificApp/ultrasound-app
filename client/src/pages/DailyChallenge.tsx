@@ -79,6 +79,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Pencil, Loader2, BookOpen, SendHorizonal, CheckCircle, Clock, XCircle as XCircleIcon, Plus, Minus } from "lucide-react";
 import DailyChallengeBanner from "@/components/DailyChallengeBanner";
+import { getLoginUrl } from "@/const";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1375,7 +1376,7 @@ export default function QuickFire() {
                                 : "border-[#189aa1]/30 bg-white hover:border-[#189aa1] hover:shadow-md"
                             }`}
                             onClick={() => {
-                              if (!isDisabled && q) {
+                              if (!isDisabled) {
                                 setCurrentIndex(0);
                                 setAnswered(false);
                                 setAnswerResult(null);
@@ -1459,37 +1460,51 @@ export default function QuickFire() {
             )}
 
             {/* ── Active category question player ─────────────────────────────────────── */}
-            {activeCategory && (() => {
-              const todaySet = todaySetQuery.data;
-              const categoryMap: Record<string, number> = (todaySet as any)?.categoryMap ?? {};
-              const todayQuestions: any[] = (todaySet as any)?.questions ?? [];
-              const todayAttempts: Record<number, any> = (todaySet as any)?.userAttempts ?? {};
-              const catMapKey = CAT_DISPLAY_TO_KEY[activeCategory] ?? activeCategory;
-              const qId = categoryMap[catMapKey];
-              const catQ = todayQuestions.find((q: any) => q.id === qId);
-              if (!catQ) return (
-                <div className="text-center py-12">
-                  <p className="text-gray-500">No question available for this category today.</p>
-                  <Button variant="outline" className="mt-4" onClick={() => setActiveCategory(null)}>Back to Categories</Button>
+            {activeCategory && (
+              <div>
+                <button
+                  className="flex items-center gap-1.5 text-sm text-[#189aa1] font-semibold mb-4 hover:underline"
+                  onClick={() => setActiveCategory(null)}
+                >
+                  ← Back to Categories
+                </button>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${CATEGORY_COLORS[activeCategory] ?? "bg-gray-100 text-gray-600"}`}>
+                    {activeCategory}
+                  </span>
+                  <span className="text-xs text-gray-400">Today's {activeCategory} Question</span>
                 </div>
-              );
-              return (
-                <div>
-                  <button
-                    className="flex items-center gap-1.5 text-sm text-[#189aa1] font-semibold mb-4 hover:underline"
-                    onClick={() => setActiveCategory(null)}
-                  >
-                    ← Back to Categories
-                  </button>
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${CATEGORY_COLORS[activeCategory] ?? "bg-gray-100 text-gray-600"}`}>
-                      {activeCategory}
-                    </span>
-                    <span className="text-xs text-gray-400">Today's {activeCategory} Question</span>
+                {/* Loading state */}
+                {todaySetQuery.isLoading && (
+                  <div className="flex flex-col items-center gap-4 py-12">
+                    <div className="w-10 h-10 rounded-full border-4 border-[#189aa1] border-t-transparent animate-spin" />
+                    <p className="text-gray-500 text-sm">Loading question…</p>
                   </div>
-                </div>
-              );
-            })()}
+                )}
+                {/* Sign-in CTA for unauthenticated users */}
+                {!todaySetQuery.isLoading && !isAuthenticated && (
+                  <div className="rounded-xl border-2 border-dashed border-[#189aa1]/30 p-8 text-center">
+                    <Lock className="w-10 h-10 mx-auto mb-3 text-[#189aa1]/40" />
+                    <p className="text-gray-700 font-semibold mb-1">Sign in to access today's challenge</p>
+                    <p className="text-sm text-gray-500 mb-4">Daily challenges are free for all registered members.</p>
+                    <Button
+                      className="text-white"
+                      style={{ background: "#189aa1" }}
+                      onClick={() => window.location.href = getLoginUrl()}
+                    >
+                      Sign In to Play
+                    </Button>
+                  </div>
+                )}
+                {/* No question available */}
+                {!todaySetQuery.isLoading && isAuthenticated && !currentQ && !showResults && (
+                  <div className="text-center py-12">
+                    <p className="text-gray-500">No question available for this category today.</p>
+                    <Button variant="outline" className="mt-4" onClick={() => setActiveCategory(null)}>Back to Categories</Button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* ── Legacy getLiveChallenge question player (shown when activeCategory is set) ── */}
             {/* We reuse the existing question player below but feed it the category question */}

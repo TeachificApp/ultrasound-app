@@ -644,3 +644,7 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix flashcard edit button: now populates echoCategory from existing question data
 - [x] Fix hub page challenge question display: getTodaySet now always syncs from live challenges, overriding stale stored IDs
 - [x] Fix POCUS live challenge: updated daily set row to use correct question IDs from live challenges
+
+## Daily Challenge Question Click Fix (Mar 22 - session 5)
+- [x] Fix: clicking a category card on the daily challenge page shows no question or wrong question (removed && q guard from click handler, added loading spinner and sign-in CTA)
+- [x] Add sign-in CTA when an unauthenticated user clicks a category card (daily challenge is free for all registered users)
