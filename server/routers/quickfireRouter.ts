@@ -429,10 +429,11 @@ export const quickfireRouter = router({
       return { setDate: date, questions: [], userAttempts: {}, categoryMap: questionMap };
     }
 
+    // Fetch by ID only — isActive was already enforced when the daily set was built
     const questions = await db
       .select()
       .from(quickfireQuestions)
-      .where(and(eq(quickfireQuestions.isActive, true), inArray(quickfireQuestions.id, allIds)));
+      .where(inArray(quickfireQuestions.id, allIds));
 
     const catOrder = ["abdominal", "smallParts", "pelvicGyn", "ob1st", "ob2nd3rd", "fetalEcho", "breast", "vascular", "msk", "pocus", "physics"];
     const orderedQuestions = catOrder
@@ -1764,12 +1765,15 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
       if (input.difficulty) {
         conditions.push(eq(quickfireChallenges.difficulty, input.difficulty));
       }
-      // Date range filters
+      // Date range filters — use publishedAt timestamp (covers both seeded and admin-published challenges)
       if (input.dateFrom) {
-        conditions.push(gte(quickfireChallenges.publishDate, input.dateFrom));
+        conditions.push(gte(quickfireChallenges.publishedAt, new Date(input.dateFrom)));
       }
       if (input.dateTo) {
-        conditions.push(lte(quickfireChallenges.publishDate, input.dateTo));
+        // Include the full dateTo day by adding 1 day
+        const toDate = new Date(input.dateTo);
+        toDate.setDate(toDate.getDate() + 1);
+        conditions.push(lte(quickfireChallenges.publishedAt, toDate));
       }
       const [rows, totalResult] = await Promise.all([
         db.select({ id: quickfireChallenges.id, title: quickfireChallenges.title, description: quickfireChallenges.description,

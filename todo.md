@@ -590,3 +590,9 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 ## Challenge Empty Category Handling
 - [x] Alert admin via owner notification when any category has no available questions during daily set generation
 - [ ] Public UI: show most recent archived question for a category if no live question exists (never show empty card)
+
+## DailyChallenge UI Fixes (Mar 22 - session 3)
+- [ ] Fix questions not populating in the public daily challenge UI for all 11 categories
+- [ ] Remove all remaining legacy text from DailyChallenge.tsx
+- [x] Re-seed 300+ pre-built archived challenges so they appear in the challenge archive tab (501 archived challenges now available)
+- [x] Remove published dates from the challenge archive display

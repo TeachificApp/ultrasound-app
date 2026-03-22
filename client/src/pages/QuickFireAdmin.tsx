@@ -1701,12 +1701,7 @@ export default function QuickFireAdmin() {
                                "bg-blue-50 text-blue-600"
                              }`}>{(challenge as any).questionDifficulty.charAt(0).toUpperCase() + (challenge as any).questionDifficulty.slice(1)}</span>
                            )}
-                           {challenge.archivedAt && (
-                             <span className="flex items-center gap-1"><Clock className="w-3 h-3" />Archived {new Date(challenge.archivedAt).toLocaleDateString()}</span>
-                           )}
-                           {challenge.publishedAt && (
-                             <span className="flex items-center gap-1"><PlayCircle className="w-3 h-3" />Published {new Date(challenge.publishedAt).toLocaleDateString()}</span>
-                           )}
+
                          </div>
                       </div>
                       <Button
