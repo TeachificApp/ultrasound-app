@@ -4,7 +4,7 @@
  * Each tool: Inputs → Guideline Logic → Interpretation + Severity + Next Step
  *
  * Guidelines: ACR LI-RADS v2018, ACR TI-RADS 2017, ACR BI-RADS 5th Ed,
- *             ACR O-RADS v2022, SRU 2003 Carotid, SVU Renal Doppler,
+ *             ACR O-RADS v2022, SRU Carotid Consensus, SVU Renal Doppler,
  *             ISUOG Fetal Echo, ACOG/SMFM OB, ACEP FAST/IVC, ESSR MSK
  */
 
@@ -381,7 +381,7 @@ function runCarotid(v: Record<string, string>): InterpretationResult {
                              sev = "indeterminate"; interp = "Borderline values — unable to classify definitively.";                                                                                                                                                           next = "Repeat duplex or proceed to CT/MR angiography.";
   }
 
-  return { interpretation: interp, severity: sev, nextStep: next, reference: "SRU 2003 Carotid Consensus / SVU Guidelines" };
+  return { interpretation: interp, severity: sev, nextStep: next, reference: "SRU Carotid Consensus / SVU Guidelines" };
 }
 
 // ── Renal Doppler Decision Tool (SVU Guidelines) ───────────────────────────────
@@ -1382,7 +1382,7 @@ const TOOL_CATEGORIES = [
   {
     label: "Vascular",
     tools: [
-      { id: "carotid", title: "Carotid Stenosis", subtitle: "SRU 2003 consensus criteria", component: CarotidTool },
+      { id: "carotid", title: "Carotid Stenosis", subtitle: "SRU consensus criteria", component: CarotidTool },
       { id: "dvt", title: "DVT Assessment", subtitle: "Lower extremity venous duplex", component: DVTTool },
       { id: "aaa", title: "Abdominal Aortic Aneurysm", subtitle: "AAA size & surveillance", component: AAATool },
       { id: "portalhtn", title: "Portal Hypertension", subtitle: "Portal vein diameter & flow", component: PortalHTNTool },
@@ -1429,7 +1429,7 @@ export default function ClinicalInterpretationEngine() {
               Guideline-driven interpretation tools across all ultrasound specialties. Enter clinical findings to receive structured risk stratification, grading, and next-step recommendations.
             </p>
             <div className="flex flex-wrap gap-2 mt-4">
-              {["ACR LI-RADS v2018", "ACR TI-RADS 2017", "ACR BI-RADS 5th Ed.", "ACR O-RADS v2022", "SRU Carotid 2003", "SVU Renal Doppler", "ISUOG Fetal", "ACEP FAST/IVC", "ESSR MSK"].map((g) => (
+              {["ACR LI-RADS v2018", "ACR TI-RADS 2017", "ACR BI-RADS 5th Ed.", "ACR O-RADS v2022", "SRU Carotid Consensus", "SVU Renal Doppler", "ISUOG Fetal", "ACEP FAST/IVC", "ESSR MSK"].map((g) => (
                 <span key={g} className="text-xs bg-white/10 text-[#4ad9e0] px-2 py-0.5 rounded-full border border-white/20">{g}</span>
               ))}
             </div>
