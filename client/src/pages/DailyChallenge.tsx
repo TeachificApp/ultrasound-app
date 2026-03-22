@@ -498,7 +498,7 @@ export default function QuickFire() {
   const activeCatQId = activeCatMapKey ? todayCategoryMap[activeCatMapKey] : null;
   const activeCatQ = activeCatQId ? todayAllQuestions.find((q: any) => q.id === activeCatQId) : null;
 
-  const questions = activeCategory
+  const questions: any[] = activeCategory
     ? (activeCatQ ? [activeCatQ] : [])
     : legacyQuestions;
 

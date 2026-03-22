@@ -1243,17 +1243,29 @@ export default function QuickFireAdmin() {
                   strategy={verticalListSortingStrategy}
                 >
                   <div className="space-y-2">
-                    {/* Live challenge (not sortable) */}
-                    {challenges.filter((c: any) => c.status === "live").map((c: any, idx: number) => (
-                      <SortableQueueItem
-                        key={c.id}
-                        c={c}
-                        idx={idx}
-                        openEditChallenge={openEditChallenge}
-                        deleteChallengeMutation={deleteChallengeMutation}
-                      />
-                    ))}
-                    {/* Queued challenges (sortable) */}
+                    {/* ── LIVE CHALLENGES — always pinned at top, never filtered ── */}
+                    {challenges.filter((c: any) => c.status === "live").length > 0 && (
+                      <>
+                        <div className="flex items-center gap-2 px-1 pt-1">
+                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-green-700 bg-green-100 border border-green-300 rounded-full px-3 py-1">
+                            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block" />
+                            LIVE NOW — {challenges.filter((c: any) => c.status === "live").length} active
+                          </span>
+                          <span className="text-xs text-gray-400">Pinned regardless of filter</span>
+                        </div>
+                        {challenges.filter((c: any) => c.status === "live").map((c: any, idx: number) => (
+                          <SortableQueueItem
+                            key={c.id}
+                            c={c}
+                            idx={idx}
+                            openEditChallenge={openEditChallenge}
+                            deleteChallengeMutation={deleteChallengeMutation}
+                          />
+                        ))}
+                        <div className="border-t border-dashed border-gray-200 my-2" />
+                      </>
+                    )}
+                    {/* ── QUEUED challenges (sortable, filtered) ── */}
                     {challenges
                       .filter((c: any) => c.status !== "live")
                       .filter((c: any) => queueCategoryFilter === "all" || c.category === queueCategoryFilter)

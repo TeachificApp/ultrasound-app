@@ -570,3 +570,6 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Enforce exactly one live challenge per category per day in ensureTodaySet and adminPublishNextChallenge
 - [x] Archive previous live challenge for a category before publishing a new one for the same category
 - [x] Update getLiveChallenge to return all live challenges (one per category)
+
+## Challenge Queue Admin (Mar 22)
+- [x] Always show all live questions pinned at top of challenge queue regardless of category filter or search
