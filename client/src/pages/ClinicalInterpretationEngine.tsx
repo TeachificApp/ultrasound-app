@@ -1427,13 +1427,38 @@ export default function ClinicalInterpretationEngine() {
   const currentToolDef = currentCat.tools.find((t) => t.id === activeTool) ?? currentCat.tools[0];
   const ToolComponent = currentToolDef.component;
 
-  // Determine if the current category is accessible
+  // Three-tier access logic:
+  // - Non-registered: can see all menus, but clicking a premium category shows login prompt on the tool form
+  // - Registered (free): can open any menu, but premium tool form shows upgrade prompt
+  // - Premium: full access everywhere
+  //
+  // Thyroid (access="free"): free to registered users, login prompt for non-registered
+  // All others (access="premium"): login prompt for non-registered, upgrade prompt for registered non-premium
+
   const catAccess = currentCat.access;
-  const isLocked =
-    catAccess === "premium" ? !isPremium :
-    catAccess === "free" ? !isAuthenticated :
-    false;
-  const overlayType: "login" | "premium" = catAccess === "premium" ? "premium" : "login";
+
+  // Should the tool form be overlaid?
+  const toolFormLocked =
+    catAccess === "free"
+      ? !isAuthenticated          // Thyroid: only locked if not logged in
+      : catAccess === "premium"
+        ? !isPremium               // Premium tools: locked if not premium (includes non-registered)
+        : false;
+
+  // Which overlay type to show on the tool form
+  const toolOverlayType: "login" | "premium" =
+    catAccess === "free"
+      ? "login"
+      : !isAuthenticated
+        ? "login"    // Non-registered clicking premium tool → login first
+        : "premium"; // Registered non-premium → upgrade prompt
+
+  // Sidebar click handler: non-registered users clicking premium cats still navigate to the cat
+  // (they'll see the overlay on the tool form), so no interception needed on sidebar click
+  const handleCatClick = (cat: typeof TOOL_CATEGORIES[0]) => {
+    setActiveCat(cat.label);
+    setActiveTool(cat.tools[0].id);
+  };
 
   return (
     <Layout>
@@ -1452,21 +1477,17 @@ export default function ClinicalInterpretationEngine() {
           </div>
         </div>
         <div className="max-w-5xl mx-auto px-4 py-6 flex flex-col md:flex-row gap-6">
-          {/* Category sidebar */}
+          {/* Category sidebar — always fully visible, no click interception */}
           <div className="md:w-56 flex-shrink-0">
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
               {TOOL_CATEGORIES.map((cat) => {
-                const catLocked =
-                  cat.access === "premium" ? !isPremium :
-                  cat.access === "free" ? !isAuthenticated :
-                  false;
+                // Badge logic: show PRO for premium cats if user isn't premium; FREE for thyroid if not logged in
+                const showProBadge = cat.access === "premium" && !isPremium;
+                const showFreeBadge = cat.access === "free" && !isAuthenticated;
                 return (
                   <button
                     key={cat.label}
-                    onClick={() => {
-                      setActiveCat(cat.label);
-                      setActiveTool(cat.tools[0].id);
-                    }}
+                    onClick={() => handleCatClick(cat)}
                     className={`w-full text-left px-4 py-3 text-sm font-medium border-b border-gray-50 transition-colors flex items-center justify-between ${
                       activeCat === cat.label
                         ? "bg-[#189aa1] text-white"
@@ -1474,13 +1495,13 @@ export default function ClinicalInterpretationEngine() {
                     }`}
                   >
                     <span>{cat.label}</span>
-                    {catLocked && (
+                    {(showProBadge || showFreeBadge) && (
                       <span className={`text-xs px-1.5 py-0.5 rounded font-semibold ${
-                        cat.access === "premium"
+                        showProBadge
                           ? activeCat === cat.label ? "bg-white/20 text-white" : "bg-amber-100 text-amber-700"
                           : activeCat === cat.label ? "bg-white/20 text-white" : "bg-teal-50 text-teal-700"
                       }`}>
-                        {cat.access === "premium" ? "PRO" : "FREE"}
+                        {showProBadge ? "PRO" : "FREE"}
                       </span>
                     )}
                   </button>
@@ -1491,7 +1512,7 @@ export default function ClinicalInterpretationEngine() {
 
           {/* Tool area */}
           <div className="flex-1 min-w-0 space-y-4">
-            {/* Tool tabs within category */}
+            {/* Tool tabs within category — always shown so user can see what's available */}
             {currentCat.tools.length > 1 && (
               <div className="flex flex-wrap gap-2">
                 {currentCat.tools.map((t) => (
@@ -1510,22 +1531,22 @@ export default function ClinicalInterpretationEngine() {
               </div>
             )}
 
-            {/* Active tool card — wrapped in BlurredOverlay when locked */}
-            <BlurredOverlay
-              type={overlayType}
-              featureName={currentCat.label}
-              disabled={!isLocked}
-            >
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-                <div className="mb-5">
-                  <h2 className="text-lg font-bold text-gray-900" style={{ fontFamily: "Merriweather, serif" }}>
-                    {currentToolDef.title}
-                  </h2>
-                  <p className="text-sm text-gray-500 mt-0.5">{currentToolDef.subtitle}</p>
-                </div>
-                <ToolComponent />
+            {/* Tool form — BlurredOverlay only wraps the data-entry form, not the header */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+              <div className="mb-5">
+                <h2 className="text-lg font-bold text-gray-900" style={{ fontFamily: "Merriweather, serif" }}>
+                  {currentToolDef.title}
+                </h2>
+                <p className="text-sm text-gray-500 mt-0.5">{currentToolDef.subtitle}</p>
               </div>
-            </BlurredOverlay>
+              <BlurredOverlay
+                type={toolOverlayType}
+                featureName={currentCat.label}
+                disabled={!toolFormLocked}
+              >
+                <ToolComponent />
+              </BlurredOverlay>
+            </div>
           </div>
         </div>
       </div>
