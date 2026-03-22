@@ -32,7 +32,7 @@ import {
   quickfireChallenges,
   users,
 } from "../../drizzle/schema";
-import { eq, and, desc, sql, gte, lte, count, inArray } from "drizzle-orm";
+import { eq, and, desc, sql, gte, lte, count, inArray, isNull } from "drizzle-orm";
 import { sendStreakReminders } from "../streakReminders";
 import { notifyOwner } from "../_core/notification";
 import { generateVirtualLeaderboard } from "../leaderboardSeed";
@@ -2952,4 +2952,29 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
 
     return Array.from(allDates).sort().reverse().slice(0, 30);
   }),
+
+  /** Get flashcard (quickReview) counts grouped by echoCategory for admin stats */
+  adminGetFlashcardCategoryStats: adminProcedure
+    .query(async () => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const rows = await db
+        .select({
+          echoCategory: quickfireQuestions.echoCategory,
+          total: sql<number>`COUNT(*)`,
+          active: sql<number>`SUM(CASE WHEN ${quickfireQuestions.isActive} = 1 THEN 1 ELSE 0 END)`,
+        })
+        .from(quickfireQuestions)
+        .where(
+          and(
+            eq(quickfireQuestions.type, "quickReview"),
+            isNull(quickfireQuestions.deletedAt)
+          )
+        )
+        .groupBy(quickfireQuestions.echoCategory)
+        .orderBy(quickfireQuestions.echoCategory);
+      // Also get total across all categories
+      const grandTotal = rows.reduce((acc, r) => acc + Number(r.total), 0);
+      return { byCategory: rows, grandTotal };
+    }),
 });

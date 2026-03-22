@@ -625,3 +625,12 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix challenge creation so new challenges added to queue default to 'scheduled' not 'draft' (already was scheduled; fixed restore-from-trash to also use scheduled)
 - [x] Trashed live Breast challenge (no MCQ replacement available — user will add Breast scenario questions)
 - [x] Filter quickReview type questions out of auto-selection in getTodaySet/ensureTodaySet (already filtered; activated all inactive scenario questions across all categories)
+
+## Question Preview in Admin Queue (Mar 22 - session 4)
+- [x] Add a Preview button to challenge queue cards so admins can see how the question will display to members
+
+## Preview Modal & Live Category Fix (Mar 22 - session 4)
+- [x] Fix TypeScript errors in QuestionPreviewModal (questionIds ref + missing props)
+- [x] Fix daily challenge so all 11 categories show as live (Breast and POCUS promoted to live)
+- [x] Add flashcard totals by category to the admin UI (Flashcard Management tab)
+- [x] Create live challenges for Breast and POCUS using available scenario questions

@@ -95,6 +95,7 @@ import {
   CheckCircle,
   XCircle,
   Inbox,
+  Eye,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -151,11 +152,169 @@ const EMPTY_FORM: QuestionForm = {
   orderedItems: [{ text: "" }, { text: "" }, { text: "" }, { text: "" }],
 };
 
+// ── Question Preview Modal ────────────────────────────────────────────────
+function QuestionPreviewModal({ challengeId, challengeQuestionIds, challengeTitle, onClose }: {
+  challengeId: number | null;
+  challengeQuestionIds: number[];
+  challengeTitle: string;
+  onClose: () => void;
+}) {
+  const questionsQuery = trpc.quickfire.listAllQuestions.useQuery(
+    { ids: challengeQuestionIds, limit: 10, page: 1 },
+    { enabled: challengeId !== null && challengeQuestionIds.length > 0 }
+  );
+  const questions = questionsQuery.data?.questions ?? [];
+  const [previewIdx, setPreviewIdx] = useState(0);
+  const q = questions[previewIdx] ?? null;
+
+  // Reset index when challenge changes
+  React.useEffect(() => { setPreviewIdx(0); }, [challengeId]);
+
+  const DIFFICULTY_COLORS: Record<string, string> = {
+    beginner: "bg-green-100 text-green-700",
+    intermediate: "bg-blue-100 text-blue-700",
+    advanced: "bg-red-100 text-red-700",
+  };
+
+  return (
+    <Dialog open={challengeId !== null} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <Eye className="w-4 h-4 text-[#189aa1]" />
+            Member Preview
+            {challengeTitle && (
+              <span className="ml-2 text-xs font-normal text-gray-400">{challengeTitle}</span>
+            )}
+          </DialogTitle>
+        </DialogHeader>
+
+        {/* Loading */}
+        {questionsQuery.isLoading && (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-6 h-6 animate-spin text-[#189aa1]" />
+          </div>
+        )}
+
+        {/* No question assigned */}
+        {!questionsQuery.isLoading && challengeQuestionIds.length === 0 && (
+          <div className="text-center py-10 text-gray-400">
+            <AlertCircle className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+            <p className="text-sm">No question assigned to this challenge.</p>
+          </div>
+        )}
+
+        {/* Question preview */}
+        {q && (
+          <div>
+            {/* Multi-question nav */}
+            {questions.length > 1 && (
+              <div className="flex items-center justify-between mb-3">
+                <Button size="sm" variant="ghost" onClick={() => setPreviewIdx(i => Math.max(0, i - 1))} disabled={previewIdx === 0}>
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <span className="text-xs text-gray-500">Question {previewIdx + 1} of {questions.length}</span>
+                <Button size="sm" variant="ghost" onClick={() => setPreviewIdx(i => Math.min(questions.length - 1, i + 1))} disabled={previewIdx === questions.length - 1}>
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
+
+            {/* Type + difficulty badges */}
+            <div className="flex items-center gap-2 flex-wrap mb-3">
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                q.type === "scenario" ? "bg-blue-100 text-blue-700" :
+                q.type === "image" ? "bg-purple-100 text-purple-700" :
+                q.type === "quickReview" ? "bg-teal-100 text-teal-700" :
+                "bg-gray-100 text-gray-600"
+              }`}>{q.type === "scenario" ? "Scenario (MCQ)" : q.type === "image" ? "Image-Based (MCQ)" : q.type === "quickReview" ? "Quick Review" : q.type}</span>
+              {q.difficulty && (
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${DIFFICULTY_COLORS[q.difficulty] ?? "bg-gray-100 text-gray-600"}`}>
+                  {q.difficulty.charAt(0).toUpperCase() + q.difficulty.slice(1)}
+                </span>
+              )}
+              {Array.isArray(q.tags) && q.tags.map((tag: string) => (
+                <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{tag}</span>
+              ))}
+            </div>
+
+            {/* Question text */}
+            <div
+              className="text-sm font-semibold text-gray-800 leading-snug mb-4 prose prose-sm max-w-none"
+              dangerouslySetInnerHTML={{ __html: q.question ?? "" }}
+            />
+
+            {/* Image / video */}
+            {q.imageUrl && (
+              isVideoUrl(q.imageUrl) ? (
+                <video src={q.imageUrl} controls controlsList="nodownload" className="w-full rounded-lg max-h-48 bg-black mb-4" />
+              ) : (
+                <img src={q.imageUrl} alt="Question image" className="w-full rounded-lg object-cover max-h-48 mb-4" />
+              )
+            )}
+
+            {/* MCQ options */}
+            {(q.type === "scenario" || q.type === "image") && Array.isArray(q.options) && (
+              <div className="space-y-2 mb-4">
+                {q.options.map((opt: string, idx: number) => {
+                  const isCorrect = q.correctAnswer === idx;
+                  return (
+                    <div
+                      key={idx}
+                      className={`flex items-start gap-3 p-3 rounded-lg border-2 text-sm ${
+                        isCorrect
+                          ? "border-green-500 bg-green-50 text-green-800"
+                          : "border-gray-100 bg-gray-50 text-gray-600"
+                      }`}
+                    >
+                      <span className={`w-6 h-6 rounded-full border flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                        isCorrect ? "border-green-500 bg-green-500 text-white" : "border-gray-300 text-gray-500"
+                      }`}>
+                        {String.fromCharCode(65 + idx)}
+                      </span>
+                      <span className="flex-1" dangerouslySetInnerHTML={{ __html: opt }} />
+                      {isCorrect && <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Quick Review answer */}
+            {q.type === "quickReview" && q.reviewAnswer && (
+              <div className="p-3 rounded-lg bg-[#189aa1]/10 border border-[#189aa1]/20 mb-4">
+                <p className="text-xs font-semibold text-[#189aa1] mb-1">Answer</p>
+                <p className="text-sm text-gray-700">{q.reviewAnswer}</p>
+              </div>
+            )}
+
+            {/* Explanation */}
+            {q.explanation && (
+              <div className="p-3 rounded-lg bg-blue-50 border border-blue-100">
+                <p className="text-xs font-semibold text-blue-600 mb-1">Explanation</p>
+                <div
+                  className="text-sm text-gray-700 prose prose-sm max-w-none"
+                  dangerouslySetInnerHTML={{ __html: q.explanation }}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        <DialogFooter className="mt-4">
+          <Button variant="outline" onClick={onClose}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Sortable queue row ─────────────────────────────────────────────────────
-function SortableQueueItem({ c, idx, openEditChallenge, deleteChallengeMutation }: {
+function SortableQueueItem({ c, idx, openEditChallenge, deleteChallengeMutation, onPreview }: {
   c: any; idx: number;
   openEditChallenge: (c: any) => void;
   deleteChallengeMutation: any;
+  onPreview: (id: number) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: c.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
@@ -224,6 +383,9 @@ function SortableQueueItem({ c, idx, openEditChallenge, deleteChallengeMutation 
       </div>
       {/* Actions */}
       <div className="flex items-center gap-1 flex-shrink-0">
+        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-gray-400 hover:text-[#189aa1]" title="Preview question" onClick={(e) => { e.stopPropagation(); onPreview(c.id); }}>
+          <Eye className="w-3.5 h-3.5" />
+        </Button>
         <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-gray-400 hover:text-[#189aa1]" title="Edit" onClick={(e) => { e.stopPropagation(); openEditChallenge(c); }}>
           <Pencil className="w-3.5 h-3.5" />
         </Button>
@@ -466,6 +628,7 @@ export default function QuickFireAdmin() {
   const [flashcardUploadingMedia, setFlashcardUploadingMedia] = useState(false);
   const [challengeFormOpen, setChallengeFormOpen] = useState(false);
   const [editingChallengeId, setEditingChallengeId] = useState<number | null>(null);
+  const [previewChallengeId, setPreviewChallengeId] = useState<number | null>(null);
   const [challengeForm, setChallengeForm] = useState({
     title: "",
     description: "",
@@ -708,6 +871,7 @@ export default function QuickFireAdmin() {
     search: searchQuery.trim() || undefined,
   });
 
+  const flashcardCategoryStatsQuery = trpc.quickfire.adminGetFlashcardCategoryStats.useQuery();
   const flashcardListQuery = trpc.quickfire.listAllQuestions.useQuery({
     page: 1,
     limit: 100,
@@ -1289,6 +1453,7 @@ export default function QuickFireAdmin() {
                             idx={idx}
                             openEditChallenge={openEditChallenge}
                             deleteChallengeMutation={deleteChallengeMutation}
+                            onPreview={(id) => setPreviewChallengeId(id)}
                           />
                         ))}
                         <div className="border-t border-dashed border-gray-200 my-2" />
@@ -1306,6 +1471,7 @@ export default function QuickFireAdmin() {
                           idx={idx + challenges.filter((ch: any) => ch.status === "live").length}
                           openEditChallenge={openEditChallenge}
                           deleteChallengeMutation={deleteChallengeMutation}
+                          onPreview={(id) => setPreviewChallengeId(id)}
                         />
                       ))
                     }
@@ -1781,6 +1947,37 @@ export default function QuickFireAdmin() {
               </div>
             </div>
 
+            {/* Category stats grid */}
+            {flashcardCategoryStatsQuery.data && (
+              <div className="bg-gray-50 rounded-xl border border-gray-100 p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Flashcards by Category</span>
+                  <span className="text-xs font-bold text-[#189aa1]">{flashcardCategoryStatsQuery.data.grandTotal} total</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1.5">
+                  {flashcardCategoryStatsQuery.data.byCategory.map((row: any) => {
+                    const label = row.echoCategory
+                      ? row.echoCategory.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+                      : 'Uncategorized';
+                    return (
+                      <button
+                        key={row.echoCategory ?? 'none'}
+                        onClick={() => setFlashcardEchoCategory((row.echoCategory ?? 'all') as any)}
+                        className={`text-left rounded-lg border px-2.5 py-2 transition-all ${
+                          flashcardEchoCategory === (row.echoCategory ?? 'all')
+                            ? 'border-[#189aa1] bg-[#189aa1]/10'
+                            : 'border-gray-200 bg-white hover:border-[#189aa1]/50'
+                        }`}
+                      >
+                        <div className="text-xs font-semibold text-gray-700 truncate">{label}</div>
+                        <div className="text-lg font-bold text-[#189aa1] leading-tight">{Number(row.total)}</div>
+                        <div className="text-[10px] text-gray-400">{Number(row.active)} active</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             {/* Search + Category filter */}
             <div className="flex gap-2 flex-wrap">
               <Input
@@ -4040,6 +4237,13 @@ export default function QuickFireAdmin() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Question Preview Modal */}
+      <QuestionPreviewModal
+        challengeId={previewChallengeId}
+        challengeQuestionIds={previewChallengeId !== null ? (challenges?.find((c: any) => c.id === previewChallengeId)?.questionIds ?? []) : []}
+        challengeTitle={previewChallengeId !== null ? (challenges?.find((c: any) => c.id === previewChallengeId)?.title ?? "") : ""}
+        onClose={() => setPreviewChallengeId(null)}
+      />
     </Layout>
   );
 }
