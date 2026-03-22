@@ -121,7 +121,7 @@ Advanced, guideline-driven clinical intelligence app designed for sonographers, 
               </p>
               {/* CTA buttons */}
               <div className="flex flex-wrap gap-3 mt-5">
-                <Link href="/echoassist#engine-pocus">
+                <Link href="/calculators">
                   <button
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:opacity-90 hover:scale-105"
                     style={{ background: "#189aa1" }}
@@ -130,14 +130,14 @@ Advanced, guideline-driven clinical intelligence app designed for sonographers, 
                     Open Ultrasound-Assist Calculators
                   </button>
                 </Link>
-                <Link href="/echoassist#engine-frank-starling">
+                <a href="https://app.iheartecho.com/echoassist" target="_blank" rel="noopener noreferrer">
                   <button
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white/80 bg-white/10 border border-white/20 hover:bg-white/20 transition-all"
                   >
                     <ArrowRight className="w-4 h-4" />
                     Frank-Starling Engine
                   </button>
-                </Link>
+                </a>
               </div>
             </div>
           </div>
