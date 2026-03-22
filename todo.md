@@ -648,3 +648,6 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 ## Daily Challenge Question Click Fix (Mar 22 - session 5)
 - [x] Fix: clicking a category card on the daily challenge page shows no question or wrong question (removed && q guard from click handler, added loading spinner and sign-in CTA)
 - [x] Add sign-in CTA when an unauthenticated user clicks a category card (daily challenge is free for all registered users)
+
+## Definitive Daily Challenge Fix (Mar 22 - session 6)
+- [x] Definitively fix daily challenge: store question object directly in state on click (eliminates re-derivation timing issue)

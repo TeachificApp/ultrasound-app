@@ -505,9 +505,12 @@ export default function QuickFire() {
     "POCUS": "pocus",
     "Physics": "physics",
   };
+  // Store the clicked question object directly to avoid re-derivation timing issues
+  const [activeCatQDirect, setActiveCatQDirect] = useState<any>(null);
   const activeCatMapKey = activeCategory ? (CAT_DISPLAY_TO_KEY[activeCategory] ?? activeCategory) : null;
   const activeCatQId = activeCatMapKey ? todayCategoryMap[activeCatMapKey] : null;
-  const activeCatQ = activeCatQId ? todayAllQuestions.find((q: any) => q.id === activeCatQId) : null;
+  // Use the directly stored question if available, otherwise fall back to derived lookup
+  const activeCatQ = activeCatQDirect ?? (activeCatQId ? todayAllQuestions.find((q: any) => q.id === activeCatQId) : null);
 
   const questions: any[] = activeCategory
     ? (activeCatQ ? [activeCatQ] : [])
@@ -1383,6 +1386,7 @@ export default function QuickFire() {
                                 setSessionResults([]);
                                 setShowResults(false);
                                 setFlipped(false);
+                                setActiveCatQDirect(q ?? null); // store the question object directly
                                 setActiveCategory(cat.key);
                               }
                             }}
@@ -1464,7 +1468,7 @@ export default function QuickFire() {
               <div>
                 <button
                   className="flex items-center gap-1.5 text-sm text-[#189aa1] font-semibold mb-4 hover:underline"
-                  onClick={() => setActiveCategory(null)}
+                  onClick={() => { setActiveCategory(null); setActiveCatQDirect(null); }}
                 >
                   ← Back to Categories
                 </button>
