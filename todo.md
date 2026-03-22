@@ -580,3 +580,9 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix only one MSK challenge showing in daily challenge (all categories now use quickReview fallback)
 - [x] Change challenge category icons so ECG/Activity icon is only used for Vascular; assign appropriate icons to all other categories
 - [x] Daily challenge should display one question per category per day (all 11 categories visible as cards)
+
+## Challenge Queue Admin Fixes (Mar 22 - session 2)
+- [x] Add MSK and Breast to admin challenge queue category filter (pill badges are dynamic — now show all 11 categories)
+- [x] Ensure 11 live challenges generated daily (one per all 11 categories) — fallback now creates live rows for MSK, Breast, POCUS
+- [x] Fix UI to display all 11 category cards with questions
+- [x] Remove all remaining legacy challenge wording from DailyChallenge.tsx and QuickFireAdmin.tsx

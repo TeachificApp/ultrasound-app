@@ -275,6 +275,9 @@ async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>
   }
 
   const VASCULAR_CATS = ["Vascular"];
+  // Track which categories need a fallback live challenge row created
+  const fallbackLiveNeeded: { cat: ChallengeCategory; questionId: number }[] = [];
+
   for (const cat of CHALLENGE_CATEGORIES) {
     const key = CAT_KEY[cat];
     if (questionMap[key] !== null) continue;
@@ -305,7 +308,9 @@ async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>
       ));
 
     if (scenarioFull.length > 0) {
-      questionMap[key] = sampleN(scenarioFull, 1)[0].id;
+      const picked = sampleN(scenarioFull, 1)[0].id;
+      questionMap[key] = picked;
+      fallbackLiveNeeded.push({ cat, questionId: picked });
       continue;
     }
 
@@ -328,8 +333,33 @@ async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>
       ));
 
     if (reviewFull.length > 0) {
-      questionMap[key] = sampleN(reviewFull, 1)[0].id;
+      const picked = sampleN(reviewFull, 1)[0].id;
+      questionMap[key] = picked;
+      fallbackLiveNeeded.push({ cat, questionId: picked });
     }
+  }
+
+  // Create live quickfireChallenges rows for fallback categories (so admin queue shows all 11)
+  for (const { cat, questionId } of fallbackLiveNeeded) {
+    // Archive any existing live challenge for this category first
+    await db
+      .update(quickfireChallenges)
+      .set({ status: "archived", archivedAt: new Date() })
+      .where(and(
+        eq(quickfireChallenges.status, "live" as any),
+        eq(quickfireChallenges.category, cat as any)
+      ));
+    // Create a new live challenge row for this category
+    await db.insert(quickfireChallenges).values({
+      title: `${cat} Daily Challenge — ${date}`,
+      description: "",
+      category: cat as any,
+      questionIds: JSON.stringify([questionId]),
+      status: "live" as any,
+      priority: 100,
+      publishDate: date,
+      publishedAt: new Date(),
+    });
   }
 
   const questionIds = JSON.stringify(questionMap);

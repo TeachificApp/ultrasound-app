@@ -2032,7 +2032,7 @@ export default function QuickFire() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-gray-800 truncate">{title}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">Daily Challenge · Adult Echo</p>
+                        <p className="text-xs text-gray-400 mt-0.5">Daily Challenge</p>
                       </div>
                       <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-50 text-green-700">Completed</span>
                     </div>

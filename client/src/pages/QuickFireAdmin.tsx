@@ -576,7 +576,7 @@ export default function QuickFireAdmin() {
 
   function openCreateChallenge() {
     setEditingChallengeId(null);
-    setChallengeForm({ title: "", description: "", category: "Adult Echo", queuePosition: undefined, priority: 100, selectedQuestionIds: [] });
+    setChallengeForm({ title: "", description: "", category: "Abdominal", queuePosition: undefined, priority: 100, selectedQuestionIds: [] });
     setChallengeQSearch("");
     setChallengeFormOpen(true);
   }
@@ -1217,7 +1217,7 @@ export default function QuickFireAdmin() {
 
             {/* Info banner */}
             <div className="bg-teal-50 border border-teal-200 rounded-lg px-4 py-3 text-xs text-teal-700">
-              <strong>Daily Challenge Queue:</strong> Set the <strong>category</strong> (ACS / Adult Echo / Pediatric Echo / Fetal Echo) and optionally a <strong>queue position</strong>. At 6 AM ET each day, the system automatically publishes the next challenge from each category. Drag rows to reorder, or set explicit position numbers.
+              <strong>Daily Challenge Queue:</strong> Set the <strong>category</strong> (Abdominal, Vascular, MSK, POCUS, etc.) and optionally a <strong>queue position</strong>. At 6 AM ET each day, the system automatically publishes the next challenge from each category. Drag rows to reorder, or set explicit position numbers.
             </div>
 
             {/* Challenge list */}
@@ -2122,7 +2122,7 @@ export default function QuickFireAdmin() {
               <Input
                 value={challengeForm.title}
                 onChange={(e) => setChallengeForm((f) => ({ ...f, title: e.target.value }))}
-                placeholder="e.g. ACS Echo Essentials — Week 1"
+                placeholder="e.g. Abdominal Ultrasound — Liver Pathology Week 1"
                 maxLength={300}
               />
             </div>
@@ -2791,13 +2791,17 @@ export default function QuickFireAdmin() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ACS">ACS</SelectItem>
-                  <SelectItem value="Adult Echo">Adult Echo</SelectItem>
-                  <SelectItem value="Pediatric Echo">Pediatric Echo</SelectItem>
+                  <SelectItem value="Abdominal">Abdominal</SelectItem>
+                  <SelectItem value="Small Parts">Small Parts</SelectItem>
+                  <SelectItem value="Pelvic/Gyn">Pelvic/Gyn</SelectItem>
+                  <SelectItem value="OB 1st Trimester">OB 1st Trimester</SelectItem>
+                  <SelectItem value="OB 2nd/3rd Trimester">OB 2nd/3rd Trimester</SelectItem>
                   <SelectItem value="Fetal Echo">Fetal Echo</SelectItem>
+                  <SelectItem value="Breast">Breast</SelectItem>
+                  <SelectItem value="Vascular">Vascular</SelectItem>
+                  <SelectItem value="MSK">MSK</SelectItem>
                   <SelectItem value="POCUS">POCUS</SelectItem>
-                    <SelectItem value="Physics">Physics</SelectItem>
-                  <SelectItem value="General">General</SelectItem>
+                  <SelectItem value="Physics">Physics</SelectItem>
                 </SelectContent>
               </Select>
             </div>
