@@ -1088,8 +1088,8 @@ export const quickfireChallenges = mysqlTable("quickfireChallenges", {
   // Category tag for filtering — determines which daily slot this challenge fills
   category: mysqlEnum("category", ["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics"]).default("Abdominal").notNull(),
   difficulty: mysqlEnum("difficulty", ["beginner", "intermediate", "advanced"]).default("intermediate"),
-  // Lifecycle status — queued = in the auto-publish queue, waiting for its turn
-  status: mysqlEnum("status", ["draft", "queued", "scheduled", "live", "archived"]).default("draft").notNull(),
+  // Lifecycle status — queued = in the auto-publish queue, waiting for its turn; trash = soft-deleted (purged after 30 days)
+  status: mysqlEnum("status", ["draft", "queued", "scheduled", "live", "archived", "trash"]).default("draft").notNull(),
   // Position in the category queue — lower = published first; null = not in queue
   queuePosition: int("queuePosition"),
   // UTC date this challenge went live — YYYY-MM-DD (set automatically on publish)
@@ -1098,6 +1098,8 @@ export const quickfireChallenges = mysqlTable("quickfireChallenges", {
   publishedAt: timestamp("publishedAt"),
   // Exact UTC timestamp when the challenge was archived (24 h after publishedAt)
   archivedAt: timestamp("archivedAt"),
+  // Soft-delete: set when moved to trash. Permanently purged after 30 days.
+  trashedAt: timestamp("trashedAt"),
   createdByUserId: int("createdByUserId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

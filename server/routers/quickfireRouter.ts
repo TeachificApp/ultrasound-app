@@ -955,14 +955,26 @@ getUserStats: protectedProcedure.query(async ({ ctx }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-      const expired = await db
+      // Purge trashed questions older than 30 days
+      const expiredQuestions = await db
         .select({ id: quickfireQuestions.id })
         .from(quickfireQuestions)
         .where(sql`${quickfireQuestions.deletedAt} IS NOT NULL AND ${quickfireQuestions.deletedAt} <= ${cutoff}`);
-      if (expired.length === 0) return { purged: 0 };
-      await db.delete(quickfireQuestions)
-        .where(inArray(quickfireQuestions.id, expired.map((q) => q.id)));
-      return { purged: expired.length };
+      if (expiredQuestions.length > 0) {
+        await db.delete(quickfireQuestions)
+          .where(inArray(quickfireQuestions.id, expiredQuestions.map((q) => q.id)));
+      }
+      // Purge trashed challenges older than 30 days
+      const expiredChallenges = await db
+        .select({ id: quickfireChallenges.id })
+        .from(quickfireChallenges)
+        .where(sql`${quickfireChallenges.status} = 'trash' AND ${quickfireChallenges.trashedAt} IS NOT NULL AND ${quickfireChallenges.trashedAt} <= ${cutoff}`);
+      if (expiredChallenges.length > 0) {
+        await db.delete(quickfireChallenges)
+          .where(inArray(quickfireChallenges.id, expiredChallenges.map((c) => c.id)));
+      }
+      const purged = expiredQuestions.length + expiredChallenges.length;
+      return { purged, purgedQuestions: expiredQuestions.length, purgedChallenges: expiredChallenges.length };
     }),
 
   listAllQuestions: adminProcedure
@@ -1933,29 +1945,114 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
       return { success: true };
     }),
 
-  /** Delete a draft/scheduled challenge and restore its linked questions to the bank */
+  /**
+   * Soft-delete a challenge — moves it to Trash (status='trash', trashedAt=now).
+   * Works for any status including live. When a live challenge is trashed, the next
+   * queued challenge for the same category is auto-promoted to live.
+   * Items are permanently purged after 30 days via purgeExpiredTrash.
+   */
   adminDeleteChallenge: adminProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-      // Only allow deleting drafts/scheduled — never live/archived
-      const [ch] = await db.select({ status: quickfireChallenges.status, questionIds: quickfireChallenges.questionIds })
+      const [ch] = await db
+        .select()
         .from(quickfireChallenges)
-        .where(eq(quickfireChallenges.id, input.id)).limit(1);
+        .where(eq(quickfireChallenges.id, input.id))
+        .limit(1);
       if (!ch) throw new TRPCError({ code: "NOT_FOUND" });
-      if (ch.status === "live" || ch.status === "archived") {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot delete a live or archived challenge" });
+      if ((ch.status as string) === "trash") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Challenge is already in Trash" });
       }
-      // Reactivate linked questions so they return to the question bank
-      const linkedIds: number[] = JSON.parse(ch.questionIds || "[]");
-      if (linkedIds.length > 0) {
-        await db.update(quickfireQuestions)
-          .set({ isActive: true })
-          .where(inArray(quickfireQuestions.id, linkedIds));
+      const wasLive = (ch.status as string) === "live";
+      const category = ch.category;
+      // Soft-delete: move to trash
+      await db
+        .update(quickfireChallenges)
+        .set({ status: "trash" as any, trashedAt: new Date() })
+        .where(eq(quickfireChallenges.id, input.id));
+      // If the deleted challenge was live, auto-promote the next queued challenge for this category
+      let promoted: { id: number; title: string } | null = null;
+      if (wasLive && category) {
+        const [next] = await db
+          .select()
+          .from(quickfireChallenges)
+          .where(
+            and(
+              inArray(quickfireChallenges.status, ["queued", "scheduled", "draft"] as any[]),
+              eq(quickfireChallenges.category, category as any)
+            )
+          )
+          .orderBy(quickfireChallenges.priority, quickfireChallenges.createdAt)
+          .limit(1);
+        if (next) {
+          const now = new Date();
+          const today = now.toISOString().slice(0, 10);
+          await db
+            .update(quickfireChallenges)
+            .set({ status: "live" as any, publishedAt: now, publishDate: today })
+            .where(eq(quickfireChallenges.id, next.id));
+          promoted = { id: next.id, title: next.title };
+        }
+      }
+      return { success: true, promoted };
+    }),
+  /** List all trashed challenges (status='trash', not yet permanently purged). */
+  listTrashedChallenges: adminProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    const rows = await db
+      .select()
+      .from(quickfireChallenges)
+      .where(sql`${quickfireChallenges.status} = 'trash'`)
+      .orderBy(desc(quickfireChallenges.trashedAt));
+    return rows.map((r) => ({
+      ...r,
+      questionIds: JSON.parse(r.questionIds || "[]") as number[],
+      daysUntilPurge: r.trashedAt
+        ? Math.max(0, 30 - Math.floor((Date.now() - new Date(r.trashedAt).getTime()) / 86_400_000))
+        : 30,
+    }));
+  }),
+  /** Restore a trashed challenge back to draft status. */
+  restoreTrashedChallenge: adminProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const [ch] = await db
+        .select({ status: quickfireChallenges.status })
+        .from(quickfireChallenges)
+        .where(eq(quickfireChallenges.id, input.id))
+        .limit(1);
+      if (!ch) throw new TRPCError({ code: "NOT_FOUND" });
+      if ((ch.status as string) !== "trash") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Challenge is not in Trash" });
+      }
+      await db
+        .update(quickfireChallenges)
+        .set({ status: "draft" as any, trashedAt: null })
+        .where(eq(quickfireChallenges.id, input.id));
+      return { success: true };
+    }),
+  /** Permanently delete a single trashed challenge immediately. */
+  purgeTrashedChallenge: adminProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const [ch] = await db
+        .select({ status: quickfireChallenges.status })
+        .from(quickfireChallenges)
+        .where(eq(quickfireChallenges.id, input.id))
+        .limit(1);
+      if (!ch) throw new TRPCError({ code: "NOT_FOUND" });
+      if ((ch.status as string) !== "trash") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Challenge is not in Trash" });
       }
       await db.delete(quickfireChallenges).where(eq(quickfireChallenges.id, input.id));
-      return { success: true, restoredQuestions: linkedIds.length };
+      return { success: true };
     }),
 
   /** Reorder challenge priorities — accepts an ordered array of IDs */

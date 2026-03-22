@@ -1,0 +1,9 @@
+{
+  "query": "\nALTER TABLE `quickfireChallenges`\n  ADD COLUMN `trashedAt` timestamp NULL DEFAULT NULL AFTER `archivedAt`,\n  MODIFY COLUMN `status` enum('draft','queued','scheduled','live','archived','trash') NOT NULL DEFAULT 'draft';\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \nALTER TABLE `quickfireChallenges`\n  ADD COLUMN `trashedAt` timestamp NULL DEFAULT NULL AFTER `archivedAt`,\n  MODIFY COLUMN `status` enum('draft','queued','scheduled','live','archived','trash') NOT NULL DEFAULT 'draft';\n",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 396
+}

@@ -500,8 +500,39 @@ export default function QuickFireAdmin() {
     onError: (err) => toast.error(err.message || "Failed to update challenge."),
   });
 
+  const trashedChallengesQuery = trpc.quickfire.listTrashedChallenges.useQuery(
+    undefined,
+    { enabled: activeAdminTab === "trash" }
+  );
+  const trashedChallenges = trashedChallengesQuery.data ?? [];
+
+  const restoreChallengeMutation = trpc.quickfire.restoreTrashedChallenge.useMutation({
+    onSuccess: () => {
+      toast.success("Challenge restored to drafts.");
+      trashedChallengesQuery.refetch();
+      challengeListQuery.refetch();
+    },
+    onError: (err: any) => toast.error(err.message || "Failed to restore challenge."),
+  });
+
+  const purgeChallengeItemMutation = trpc.quickfire.purgeTrashedChallenge.useMutation({
+    onSuccess: () => {
+      toast.success("Challenge permanently deleted.");
+      trashedChallengesQuery.refetch();
+    },
+    onError: (err: any) => toast.error(err.message || "Failed to permanently delete challenge."),
+  });
+
   const deleteChallengeMutation = trpc.quickfire.adminDeleteChallenge.useMutation({
-    onSuccess: () => { toast.success("Challenge removed from queue."); challengeListQuery.refetch(); },
+    onSuccess: (data) => {
+      if (data.promoted) {
+        toast.success(`Challenge moved to Trash. "${data.promoted.title}" auto-promoted to live.`);
+      } else {
+        toast.success("Challenge moved to Trash.");
+      }
+      challengeListQuery.refetch();
+      trashedChallengesQuery.refetch();
+    },
     onError: (err) => toast.error(err.message || "Failed to delete challenge."),
   });
 
@@ -1857,92 +1888,190 @@ export default function QuickFireAdmin() {
 
         {/* ── TRASH TAB ──────────────────────────────────────────────────────────── */}
         {activeAdminTab === "trash" && (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div>
                 <h2 className="text-base font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>Trash</h2>
-                <p className="text-xs text-gray-400 mt-0.5">Questions deleted from the bank. Automatically purged after 30 days. Restore to recover them.</p>
+                <p className="text-xs text-gray-400 mt-0.5">Deleted challenges and questions. Automatically purged after 30 days. Restore to recover them.</p>
               </div>
             </div>
 
-            {trashQuery.isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-6 h-6 animate-spin text-gray-300" />
-              </div>
-            ) : trashedQuestions.length === 0 ? (
+            {/* ── Trashed Challenges ── */}
+            <div>
+              <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                Challenges
+                {trashedChallenges.length > 0 && (
+                  <span className="bg-red-100 text-red-600 text-xs font-semibold px-1.5 py-0.5 rounded-full">{trashedChallenges.length}</span>
+                )}
+              </h3>
+              {trashedChallengesQuery.isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-5 h-5 animate-spin text-gray-300" />
+                </div>
+              ) : trashedChallenges.length === 0 ? (
+                <div className="text-center py-8 text-gray-400 border border-dashed border-gray-200 rounded-xl">
+                  <p className="text-xs">No trashed challenges</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {trashedChallenges.map((c: any) => {
+                    const trashedDate = c.trashedAt ? new Date(c.trashedAt) : null;
+                    const daysLeft = c.daysUntilPurge ?? 30;
+                    return (
+                      <div key={c.id} className="flex items-start gap-3 p-4 bg-white rounded-xl border border-red-100 opacity-80">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                            {c.category && (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#189aa1]/10 text-[#189aa1]">{c.category}</span>
+                            )}
+                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                              daysLeft <= 3 ? "bg-red-100 text-red-600" :
+                              daysLeft <= 7 ? "bg-orange-100 text-orange-600" :
+                              "bg-gray-100 text-gray-500"
+                            }`}>
+                              {daysLeft === 0 ? "Purges today" : `${daysLeft}d until purge`}
+                            </span>
+                          </div>
+                          <p className="text-sm font-medium text-gray-700 leading-snug line-clamp-2">{c.title}</p>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            {c.difficulty && <span className={`text-xs px-1.5 py-0.5 rounded ${
+                              c.difficulty === "beginner" ? "bg-green-50 text-green-600" :
+                              c.difficulty === "advanced" ? "bg-red-50 text-red-600" :
+                              "bg-blue-50 text-blue-600"
+                            }`}>{c.difficulty}</span>}
+                            {trashedDate && <span className="text-xs text-gray-400">Deleted {trashedDate.toLocaleDateString()}</span>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 px-2 text-xs gap-1 text-[#189aa1] hover:bg-[#189aa1]/10 border border-[#189aa1]/30"
+                            title="Restore to Drafts"
+                            onClick={() => {
+                              if (confirm("Restore this challenge to drafts?")) {
+                                restoreChallengeMutation.mutate({ id: c.id });
+                              }
+                            }}
+                            disabled={restoreChallengeMutation.isPending}
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" /> Restore
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-gray-400 hover:text-red-600"
+                            title="Permanently delete now"
+                            onClick={() => {
+                              if (confirm("Permanently delete this challenge? This cannot be undone.")) {
+                                purgeChallengeItemMutation.mutate({ id: c.id });
+                              }
+                            }}
+                            disabled={purgeChallengeItemMutation.isPending}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* ── Trashed Questions ── */}
+            <div>
+              <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                Questions
+                {trashedQuestions.length > 0 && (
+                  <span className="bg-red-100 text-red-600 text-xs font-semibold px-1.5 py-0.5 rounded-full">{trashedQuestions.length}</span>
+                )}
+              </h3>
+              {trashQuery.isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-5 h-5 animate-spin text-gray-300" />
+                </div>
+              ) : trashedQuestions.length === 0 ? (
+                <div className="text-center py-8 text-gray-400 border border-dashed border-gray-200 rounded-xl">
+                  <p className="text-xs">No trashed questions</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {trashedQuestions.map((q: any) => {
+                    const meta = TYPE_META[q.type as QuestionType] ?? TYPE_META.scenario;
+                    const Icon = meta.icon;
+                    const deletedDate = q.deletedAt ? new Date(q.deletedAt) : null;
+                    const daysLeft = q.daysUntilPurge ?? 30;
+                    return (
+                      <div key={q.id} className="flex items-start gap-3 p-4 bg-white rounded-xl border border-red-100 opacity-80">
+                        <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full flex-shrink-0 mt-0.5 ${meta.color}`}>
+                          <Icon className="w-3 h-3" />
+                          {q.type === "quickReview" ? "QR" : q.type === "image" ? "IMG" : q.type === "connect" ? "MATCH" : q.type === "identifier" ? "ID" : q.type === "order" ? "ORDER" : "MCQ"}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            {q.qid && <span className="text-[10px] font-mono font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{q.qid}</span>}
+                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                              daysLeft <= 3 ? "bg-red-100 text-red-600" :
+                              daysLeft <= 7 ? "bg-orange-100 text-orange-600" :
+                              "bg-gray-100 text-gray-500"
+                            }`}>
+                              {daysLeft === 0 ? "Purges today" : `${daysLeft}d until purge`}
+                            </span>
+                          </div>
+                          <p className="text-sm font-medium text-gray-600 leading-snug line-clamp-2" dangerouslySetInnerHTML={{ __html: q.question ?? "" }} />
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${
+                              q.difficulty === "beginner" ? "bg-green-50 text-green-600" :
+                              q.difficulty === "advanced" ? "bg-red-50 text-red-600" :
+                              "bg-blue-50 text-blue-600"
+                            }`}>{q.difficulty}</span>
+                            {q.category && <span className="text-xs text-gray-400">{q.category}</span>}
+                            {deletedDate && <span className="text-xs text-gray-400">Deleted {deletedDate.toLocaleDateString()}</span>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 px-2 text-xs gap-1 text-[#189aa1] hover:bg-[#189aa1]/10 border border-[#189aa1]/30"
+                            title="Restore to Question Bank"
+                            onClick={() => {
+                              if (confirm("Restore this question to the bank?")) {
+                                restoreQuestionMutation.mutate({ id: q.id });
+                              }
+                            }}
+                            disabled={restoreQuestionMutation.isPending}
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" /> Restore
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-gray-400 hover:text-red-600"
+                            title="Permanently delete now"
+                            onClick={() => {
+                              if (confirm("Permanently delete this question? This cannot be undone.")) {
+                                purgeQuestionMutation.mutate({ id: q.id });
+                              }
+                            }}
+                            disabled={purgeQuestionMutation.isPending}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {trashedChallenges.length === 0 && trashedQuestions.length === 0 && !trashQuery.isLoading && !trashedChallengesQuery.isLoading && (
               <div className="text-center py-16 text-gray-400">
                 <Trash2 className="w-10 h-10 mx-auto mb-3 opacity-20" />
                 <p className="text-sm font-medium">Trash is empty</p>
-                <p className="text-xs mt-1">Deleted questions will appear here for 30 days before being permanently removed.</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {trashedQuestions.map((q: any) => {
-                  const meta = TYPE_META[q.type as QuestionType] ?? TYPE_META.scenario;
-                  const Icon = meta.icon;
-                  const deletedDate = q.deletedAt ? new Date(q.deletedAt) : null;
-                  const daysLeft = q.daysUntilPurge ?? 30;
-                  return (
-                    <div key={q.id} className="flex items-start gap-3 p-4 bg-white rounded-xl border border-red-100 opacity-80">
-                      <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full flex-shrink-0 mt-0.5 ${meta.color}`}>
-                        <Icon className="w-3 h-3" />
-                        {q.type === "quickReview" ? "QR" : q.type === "image" ? "IMG" : q.type === "connect" ? "MATCH" : q.type === "identifier" ? "ID" : q.type === "order" ? "ORDER" : "MCQ"}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 mb-0.5">
-                          {q.qid && <span className="text-[10px] font-mono font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{q.qid}</span>}
-                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                            daysLeft <= 3 ? "bg-red-100 text-red-600" :
-                            daysLeft <= 7 ? "bg-orange-100 text-orange-600" :
-                            "bg-gray-100 text-gray-500"
-                          }`}>
-                            {daysLeft === 0 ? "Purges today" : `${daysLeft}d until purge`}
-                          </span>
-                        </div>
-                        <p className="text-sm font-medium text-gray-600 leading-snug line-clamp-2" dangerouslySetInnerHTML={{ __html: q.question ?? "" }} />
-                        <div className="flex items-center gap-2 mt-1 flex-wrap">
-                          <span className={`text-xs px-1.5 py-0.5 rounded ${
-                            q.difficulty === "beginner" ? "bg-green-50 text-green-600" :
-                            q.difficulty === "advanced" ? "bg-red-50 text-red-600" :
-                            "bg-blue-50 text-blue-600"
-                          }`}>{q.difficulty}</span>
-                          {q.category && <span className="text-xs text-gray-400">{q.category}</span>}
-                          {deletedDate && <span className="text-xs text-gray-400">Deleted {deletedDate.toLocaleDateString()}</span>}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 px-2 text-xs gap-1 text-[#189aa1] hover:bg-[#189aa1]/10 border border-[#189aa1]/30"
-                          title="Restore to Question Bank"
-                          onClick={() => {
-                            if (confirm("Restore this question to the bank?")) {
-                              restoreQuestionMutation.mutate({ id: q.id });
-                            }
-                          }}
-                          disabled={restoreQuestionMutation.isPending}
-                        >
-                          <RefreshCw className="w-3.5 h-3.5" /> Restore
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0 text-gray-400 hover:text-red-600"
-                          title="Permanently delete now"
-                          onClick={() => {
-                            if (confirm("Permanently delete this question? This cannot be undone.")) {
-                              purgeQuestionMutation.mutate({ id: q.id });
-                            }
-                          }}
-                          disabled={purgeQuestionMutation.isPending}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
+                <p className="text-xs mt-1">Deleted challenges and questions will appear here for 30 days before being permanently removed.</p>
               </div>
             )}
           </div>

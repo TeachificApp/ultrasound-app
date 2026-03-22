@@ -592,7 +592,20 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Public UI: show most recent archived question for a category if no live question exists (never show empty card)
 
 ## DailyChallenge UI Fixes (Mar 22 - session 3)
-- [ ] Fix questions not populating in the public daily challenge UI for all 11 categories
+- [x] Fix questions not populating in the public daily challenge UI for all 11 categories (trashedAt migration + currentIndex reset on category switch)
 - [ ] Remove all remaining legacy text from DailyChallenge.tsx
 - [x] Re-seed 300+ pre-built archived challenges so they appear in the challenge archive tab (501 archived challenges now available)
 - [x] Remove published dates from the challenge archive display
+- [x] Add Edit and Delete buttons to live challenge cards in admin queue
+- [x] Add server procedures: adminUpdateLiveChallenge and adminDeleteLiveChallenge (soft-delete to trash)
+- [x] Add 'trash' status to quickfireChallenges schema with trashedAt timestamp (DB migration applied)
+- [x] Add adminTrashChallenge procedure (adminDeleteChallenge now soft-deletes to trash, auto-promotes next queued challenge if live)
+- [x] Add adminRestoreFromTrash procedure (restoreTrashedChallenge)
+- [x] Add adminPurgeTrash procedure (purgeExpiredTrash now purges both questions and challenges older than 30 days)
+- [x] Add Trash tab to admin challenge queue with restore/permanent delete options (challenges + questions sections)
+- [x] Add Edit and Delete (to trash) buttons to live challenge cards in admin queue
+- [x] Add trashedAt column to quickfireChallenges schema and run migration (questions use deletedAt)
+- [x] Add adminTrashQuestion and adminRestoreQuestion procedures (deleteQuestion/restoreQuestion already existed)
+- [x] Wire question bank delete button to trash instead of permanent delete
+- [x] Show trashed questions in Trash tab with restore option
+- [x] When a live challenge is deleted (trashed), auto-promote the next scheduled challenge for that category to live

@@ -502,6 +502,7 @@ export default function QuickFire() {
     "Vascular": "vascular",
     "MSK": "msk",
     "POCUS": "pocus",
+    "Physics": "physics",
   };
   const activeCatMapKey = activeCategory ? (CAT_DISPLAY_TO_KEY[activeCategory] ?? activeCategory) : null;
   const activeCatQId = activeCatMapKey ? todayCategoryMap[activeCatMapKey] : null;
@@ -1374,7 +1375,15 @@ export default function QuickFire() {
                                 : "border-[#189aa1]/30 bg-white hover:border-[#189aa1] hover:shadow-md"
                             }`}
                             onClick={() => {
-                              if (!isDisabled && q) setActiveCategory(cat.key);
+                              if (!isDisabled && q) {
+                                setCurrentIndex(0);
+                                setAnswered(false);
+                                setAnswerResult(null);
+                                setSessionResults([]);
+                                setShowResults(false);
+                                setFlipped(false);
+                                setActiveCategory(cat.key);
+                              }
                             }}
                           >
                             <div className="flex items-start justify-between mb-3">
@@ -1435,7 +1444,7 @@ export default function QuickFire() {
                               <div className="mt-3 flex items-center gap-1 text-xs font-semibold text-gray-500">
                                 <button
                                   className="hover:text-[#189aa1] transition-colors"
-                                  onClick={(e) => { e.stopPropagation(); if (q) setActiveCategory(cat.key); }}
+                                  onClick={(e) => { e.stopPropagation(); if (q) { setCurrentIndex(0); setAnswered(false); setAnswerResult(null); setSessionResults([]); setShowResults(false); setFlipped(false); setActiveCategory(cat.key); } }}
                                 >Review Answer</button>
                               </div>
                             )}
