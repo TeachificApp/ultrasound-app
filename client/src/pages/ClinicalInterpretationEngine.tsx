@@ -23,6 +23,7 @@ import {
   Activity,
   Baby,
   BookOpen,
+  Brain,
   ChevronDown,
   ChevronRight,
   Copy,
@@ -1327,5 +1328,167 @@ function BladderTool() {
       <Button onClick={() => setResult(runBladder(v))} className="bg-[#189aa1] hover:bg-[#147a80] text-white w-full">Calculate Volume</Button>
       {result && <ResultPanel result={result} onCopy={() => { navigator.clipboard.writeText(`${result.interpretation}\n\nNext Step: ${result.nextStep}`); toast.success("Copied"); }} />}
     </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN PAGE COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════════
+const TOOL_CATEGORIES = [
+  {
+    label: "Liver / Hepatic",
+    tools: [
+      { id: "lirads", title: "LI-RADS v2018", subtitle: "Hepatocellular Carcinoma Risk", component: LiRADSTool },
+    ],
+  },
+  {
+    label: "Thyroid",
+    tools: [
+      { id: "tirads", title: "ACR TI-RADS 2017", subtitle: "Thyroid Nodule Risk Stratification", component: TIRADSTool },
+    ],
+  },
+  {
+    label: "Gallbladder & Spleen",
+    tools: [
+      { id: "gallbladder", title: "Gallbladder Assessment", subtitle: "Wall thickness, stones, polyps", component: GallbladderTool },
+      { id: "spleen", title: "Spleen Size", subtitle: "Splenomegaly grading", component: SpleenTool },
+    ],
+  },
+  {
+    label: "Renal",
+    tools: [
+      { id: "renalcortex", title: "Renal Cortex Assessment", subtitle: "Echogenicity & hydronephrosis grading", component: RenalCortexTool },
+      { id: "renaldoppler", title: "Renal Doppler", subtitle: "Resistive index & renal artery stenosis", component: RenalDopplerTool },
+    ],
+  },
+  {
+    label: "Breast",
+    tools: [
+      { id: "birads", title: "ACR BI-RADS 5th Ed.", subtitle: "Breast Lesion Risk Stratification", component: BIRADSTool },
+    ],
+  },
+  {
+    label: "OB / Gynecology",
+    tools: [
+      { id: "endometrial", title: "Endometrial Thickness", subtitle: "ACOG/TVUS guidelines", component: EndometrialTool },
+      { id: "orads", title: "ACR O-RADS v2022", subtitle: "Ovarian Lesion Risk Stratification", component: ORADSTool },
+      { id: "cervicallength", title: "Cervical Length", subtitle: "Preterm birth risk assessment", component: CervicalLengthTool },
+      { id: "fetalgrowth", title: "Fetal Growth", subtitle: "EFW & biometry percentiles", component: FetalGrowthTool },
+      { id: "afi", title: "Amniotic Fluid Index", subtitle: "AFI & MVP assessment", component: AFITool },
+      { id: "ductusvenosus", title: "Ductus Venosus Doppler", subtitle: "Fetal cardiac function", component: DuctusVenosusTool },
+    ],
+  },
+  {
+    label: "Vascular",
+    tools: [
+      { id: "carotid", title: "Carotid Stenosis", subtitle: "SRU 2003 consensus criteria", component: CarotidTool },
+      { id: "dvt", title: "DVT Assessment", subtitle: "Lower extremity venous duplex", component: DVTTool },
+      { id: "aaa", title: "Abdominal Aortic Aneurysm", subtitle: "AAA size & surveillance", component: AAATool },
+      { id: "portalhtn", title: "Portal Hypertension", subtitle: "Portal vein diameter & flow", component: PortalHTNTool },
+    ],
+  },
+  {
+    label: "MSK",
+    tools: [
+      { id: "rotatorcuff", title: "Rotator Cuff Assessment", subtitle: "Tear grading per ESSR guidelines", component: RotatorCuffTool },
+    ],
+  },
+  {
+    label: "POCUS",
+    tools: [
+      { id: "blines", title: "B-Lines / Lung Ultrasound", subtitle: "Pulmonary edema & pneumothorax", component: BLinesTool },
+      { id: "ivc", title: "IVC Collapsibility", subtitle: "Volume status & RA pressure", component: IVCTool },
+      { id: "onsd", title: "Optic Nerve Sheath Diameter", subtitle: "Elevated ICP screening", component: ONSDTool },
+      { id: "fast", title: "eFAST Exam", subtitle: "Trauma free fluid assessment", component: FASTTool },
+      { id: "bladder", title: "Bladder Volume", subtitle: "Post-void residual calculation", component: BladderTool },
+    ],
+  },
+];
+
+export default function ClinicalInterpretationEngine() {
+  const [activeCat, setActiveCat] = useState<string>(TOOL_CATEGORIES[0].label);
+  const [activeTool, setActiveTool] = useState<string>(TOOL_CATEGORIES[0].tools[0].id);
+
+  const currentCat = TOOL_CATEGORIES.find((c) => c.label === activeCat) ?? TOOL_CATEGORIES[0];
+  const currentToolDef = currentCat.tools.find((t) => t.id === activeTool) ?? currentCat.tools[0];
+  const ToolComponent = currentToolDef.component;
+
+  return (
+    <Layout>
+      <div className="min-h-screen bg-gray-50">
+        <div className="bg-gradient-to-r from-[#0e1e2e] to-[#1a3a4a] text-white px-6 py-8">
+          <div className="max-w-5xl mx-auto">
+            <div className="flex items-center gap-3 mb-2">
+              <Brain className="w-7 h-7 text-[#4ad9e0]" />
+              <h1 className="text-2xl font-bold" style={{ fontFamily: "Merriweather, serif" }}>
+                Clinical Intelligence
+              </h1>
+            </div>
+            <p className="text-[#a0d8dc] text-sm max-w-2xl">
+              Guideline-driven interpretation tools across all ultrasound specialties. Enter clinical findings to receive structured risk stratification, grading, and next-step recommendations.
+            </p>
+            <div className="flex flex-wrap gap-2 mt-4">
+              {["ACR LI-RADS v2018", "ACR TI-RADS 2017", "ACR BI-RADS 5th Ed.", "ACR O-RADS v2022", "SRU Carotid 2003", "SVU Renal Doppler", "ISUOG Fetal", "ACEP FAST/IVC", "ESSR MSK"].map((g) => (
+                <span key={g} className="text-xs bg-white/10 text-[#4ad9e0] px-2 py-0.5 rounded-full border border-white/20">{g}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-5xl mx-auto px-4 py-6 flex flex-col md:flex-row gap-6">
+          <div className="md:w-56 flex-shrink-0">
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+              {TOOL_CATEGORIES.map((cat) => (
+                <button
+                  key={cat.label}
+                  onClick={() => {
+                    setActiveCat(cat.label);
+                    setActiveTool(cat.tools[0].id);
+                  }}
+                  className={`w-full text-left px-4 py-3 text-sm font-medium border-b border-gray-50 transition-colors ${
+                    activeCat === cat.label
+                      ? "bg-[#189aa1] text-white"
+                      : "text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex-1 min-w-0 space-y-4">
+            {currentCat.tools.length > 1 && (
+              <div className="flex flex-wrap gap-2">
+                {currentCat.tools.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setActiveTool(t.id)}
+                    className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-all ${
+                      activeTool === t.id
+                        ? "bg-[#189aa1] text-white border-[#189aa1]"
+                        : "bg-white text-gray-600 border-gray-200 hover:border-[#189aa1]"
+                    }`}
+                  >
+                    {t.title}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+              <div className="mb-5">
+                <h2 className="text-lg font-bold text-gray-900" style={{ fontFamily: "Merriweather, serif" }}>
+                  {currentToolDef.title}
+                </h2>
+                <p className="text-sm text-gray-500 mt-0.5">{currentToolDef.subtitle}</p>
+              </div>
+              <ToolComponent />
+            </div>
+          </div>
+        </div>
+      </div>
+    </Layout>
   );
 }

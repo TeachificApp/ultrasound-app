@@ -10,7 +10,7 @@ import {
   Scan, BookOpen, FileText, Menu, X, ChevronRight,
   Stethoscope, Zap, ExternalLink, ShoppingBag, FlaskConical, MessageCircle, Award, Shield, GraduationCap,
   BookMarked, Library, Plus, Crown, Droplets, Building2, Users, UserPlus,
-  LogIn, LogOut, Settings, ChevronDown, Webhook, Layers, CreditCard, Lock, ClipboardCheck
+  LogIn, LogOut, Settings, ChevronDown, Webhook, Layers, CreditCard, Lock, ClipboardCheck, Brain
 } from "lucide-react";
 
 import { trpc } from "@/lib/trpc";
@@ -60,6 +60,7 @@ const navGroups = [
     items: [
       { path: "/ultrasound-assist", label: "UltrasoundAssist™", icon: Stethoscope },
       { path: "/calculators", label: "UltrasoundAssist™ Calculators", icon: Calculator },
+      { path: "/clinical-intelligence", label: "Clinical Intelligence", icon: Brain },
       // POCUS-Assist™ and Fetal EchoAssist™ accessible via UltrasoundAssist™ pathway
       // { path: "/pocus-assist-hub", label: "POCUS-Assist™", icon: Shield },
       // { path: "/fetal-echo-assist", label: "Fetal EchoAssist™", icon: Heart },
