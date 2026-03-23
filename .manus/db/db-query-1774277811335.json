@@ -1,0 +1,15 @@
+{
+  "query": "SELECT COUNT(*) as total, SUM(CASE WHEN isPending = 1 THEN 1 ELSE 0 END) as pending, SUM(CASE WHEN isPending = 0 OR isPending IS NULL THEN 1 ELSE 0 END) as active FROM users;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT COUNT(*) as total, SUM(CASE WHEN isPending = 1 THEN 1 ELSE 0 END) as pending, SUM(CASE WHEN isPending = 0 OR isPending IS NULL THEN 1 ELSE 0 END) as active FROM users;",
+  "rows": [
+    {
+      "total": "11755",
+      "pending": "11723",
+      "active": "32"
+    }
+  ],
+  "messages": [],
+  "stdout": "total\tpending\tactive\n11755\t11723\t32\n",
+  "stderr": "",
+  "execution_time_ms": 235
+}

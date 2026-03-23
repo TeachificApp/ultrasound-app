@@ -50,11 +50,13 @@ export async function runThinkificMemberSync(): Promise<{
   let skipped = 0;
   let errors = 0;
 
+  const { ensureUserRole } = await import("../db");
+
   for (const tUser of thinkificUsers) {
     if (!tUser.email) { errors++; continue; }
     const normalised = tUser.email.trim().toLowerCase();
     try {
-      // Check if a user with this email already exists (pending or active)
+      // Case-insensitive check: skip if a user with this email already exists (pending or active)
       const existing = await db
         .select({ id: users.id })
         .from(users)
@@ -66,20 +68,32 @@ export async function runThinkificMemberSync(): Promise<{
         continue;
       }
 
-      // Create a pending stub — no email sent
-      const syntheticOpenId = `pending_${normalised}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      // Build a globally unique synthetic openId using email + timestamp + random suffix
+      // Use crypto.randomUUID() for guaranteed uniqueness
+      const { randomUUID } = await import("crypto");
+      const syntheticOpenId = `pending_${randomUUID()}`;
       const firstName = tUser.first_name?.trim() ?? "";
       const lastName = tUser.last_name?.trim() ?? "";
       const fullName = [firstName, lastName].filter(Boolean).join(" ") || normalised;
 
-      await db.insert(users).values({
-        openId: syntheticOpenId,
-        email: normalised,
-        name: fullName,
-        isPending: true,
-        pendingCreatedAt: new Date(),
-        lastSignedIn: new Date(),
-      });
+      try {
+        await db.insert(users).values({
+          openId: syntheticOpenId,
+          email: normalised,
+          name: fullName,
+          isPending: true,
+          pendingCreatedAt: new Date(),
+          lastSignedIn: new Date(),
+        });
+      } catch (insertErr: unknown) {
+        // Duplicate email or openId — treat as skipped (race condition or case mismatch)
+        const msg = insertErr instanceof Error ? insertErr.message : String(insertErr);
+        if (msg.includes("Duplicate entry") || msg.includes("UNIQUE") || msg.includes("ER_DUP")) {
+          skipped++;
+          continue;
+        }
+        throw insertErr;
+      }
 
       // Ensure base "user" role
       const newUser = await db
@@ -89,7 +103,6 @@ export async function runThinkificMemberSync(): Promise<{
         .limit(1);
 
       if (newUser[0]) {
-        const { ensureUserRole } = await import("../db");
         await ensureUserRole(newUser[0].id);
       }
 

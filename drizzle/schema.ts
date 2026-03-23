@@ -15,7 +15,7 @@ import {
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
-  openId: varchar("openId", { length: 64 }).unique(), // nullable for email/password users
+  openId: varchar("openId", { length: 128 }).unique(), // nullable for email/password users
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
