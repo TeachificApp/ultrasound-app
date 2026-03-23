@@ -34,6 +34,7 @@ import {
 } from "../../drizzle/schema";
 import { eq, and, desc, sql, gte, lte, count, inArray, isNull } from "drizzle-orm";
 import { sendStreakReminders } from "../streakReminders";
+import { runChallengeCron } from "../jobs/challengeCron";
 import { notifyOwner } from "../_core/notification";
 import { generateVirtualLeaderboard } from "../leaderboardSeed";
 import { createHash } from "crypto";
@@ -2144,6 +2145,17 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
       }).where(eq(quickfireChallenges.id, next.id));
 
       return { published: true, challengeId: next.id, title: next.title, category: next.category, publishDate: next.publishDate ?? today };
+    }),
+
+  /**
+   * Force-trigger the daily challenge publish cron immediately.
+   * Useful when the 6 AM ET window was missed (e.g. server restart).
+   * Idempotent: if today's challenges are already live, this is a no-op.
+   */
+  adminTriggerDailyChallenges: adminProcedure
+    .mutation(async () => {
+      await runChallengeCron();
+      return { triggered: true };
     }),
 
   /** Manually archive the currently live challenge */

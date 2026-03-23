@@ -1,0 +1,22 @@
+{
+  "query": "\nSELECT status, COUNT(*) as count FROM quickfireChallenges GROUP BY status ORDER BY status;\nSELECT id, title, status, category, publishDate, publishedAt, queuePosition FROM quickfireChallenges WHERE status IN ('live', 'queued') ORDER BY status, category, queuePosition LIMIT 30;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \nSELECT status, COUNT(*) as count FROM quickfireChallenges GROUP BY status ORDER BY status;\nSELECT id, title, status, category, publishDate, publishedAt, queuePosition FROM quickfireChallenges WHERE status IN ('live', 'queued') ORDER BY status, category, queuePosition LIMIT 30;\n",
+  "rows": [
+    {
+      "status": "scheduled",
+      "count": "475"
+    },
+    {
+      "status": "archived",
+      "count": "512"
+    },
+    {
+      "status": "trash",
+      "count": "2"
+    }
+  ],
+  "messages": [],
+  "stdout": "status\tcount\nscheduled\t475\narchived\t512\ntrash\t2\n",
+  "stderr": "",
+  "execution_time_ms": 242
+}

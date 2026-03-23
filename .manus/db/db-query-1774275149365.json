@@ -1,0 +1,54 @@
+{
+  "query": "\nSELECT category, COUNT(*) as count FROM quickfireChallenges WHERE status = 'scheduled' GROUP BY category ORDER BY category;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \nSELECT category, COUNT(*) as count FROM quickfireChallenges WHERE status = 'scheduled' GROUP BY category ORDER BY category;\n",
+  "rows": [
+    {
+      "category": "Abdominal",
+      "count": "27"
+    },
+    {
+      "category": "Small Parts",
+      "count": "24"
+    },
+    {
+      "category": "Pelvic/Gyn",
+      "count": "24"
+    },
+    {
+      "category": "OB 1st Trimester",
+      "count": "29"
+    },
+    {
+      "category": "OB 2nd/3rd Trimester",
+      "count": "174"
+    },
+    {
+      "category": "Fetal Echo",
+      "count": "14"
+    },
+    {
+      "category": "Breast",
+      "count": "19"
+    },
+    {
+      "category": "Vascular",
+      "count": "69"
+    },
+    {
+      "category": "MSK",
+      "count": "23"
+    },
+    {
+      "category": "POCUS",
+      "count": "29"
+    },
+    {
+      "category": "Physics",
+      "count": "43"
+    }
+  ],
+  "messages": [],
+  "stdout": "category\tcount\nAbdominal\t27\nSmall Parts\t24\nPelvic/Gyn\t24\nOB 1st Trimester\t29\nOB 2nd/3rd Trimester\t174\nFetal Echo\t14\nBreast\t19\nVascular\t69\nMSK\t23\nPOCUS\t29\nPhysics\t43\n",
+  "stderr": "",
+  "execution_time_ms": 60
+}

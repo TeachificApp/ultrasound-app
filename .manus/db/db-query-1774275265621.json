@@ -1,0 +1,9 @@
+{
+  "query": "\nUPDATE quickfireChallenges\nSET status = 'live',\n    publishedAt = NOW(),\n    publishDate = '2026-03-23',\n    queuePosition = NULL\nWHERE id IN (608, 617, 516, 595, 637, 556, 889, 599, 615, 586, 536);\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \nUPDATE quickfireChallenges\nSET status = 'live',\n    publishedAt = NOW(),\n    publishDate = '2026-03-23',\n    queuePosition = NULL\nWHERE id IN (608, 617, 516, 595, 637, 556, 889, 599, 615, 586, 536);\n",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 70
+}

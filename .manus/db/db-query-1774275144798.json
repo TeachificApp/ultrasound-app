@@ -1,0 +1,190 @@
+{
+  "query": "\nSELECT id, title, status, category, publishDate, queuePosition, createdAt FROM quickfireChallenges WHERE status = 'scheduled' ORDER BY publishDate ASC, category, queuePosition LIMIT 20;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \nSELECT id, title, status, category, publishDate, queuePosition, createdAt FROM quickfireChallenges WHERE status = 'scheduled' ORDER BY publishDate ASC, category, queuePosition LIMIT 20;\n",
+  "rows": [
+    {
+      "id": "884",
+      "title": "A 72-year-old male with a history of peripheral vascular ...",
+      "status": "scheduled",
+      "category": "Abdominal",
+      "publishDate": "NULL",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 02:34:01"
+    },
+    {
+      "id": "882",
+      "title": "During a routine abdominal ultrasound on a 68-year-old as...",
+      "status": "scheduled",
+      "category": "Abdominal",
+      "publishDate": "NULL",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 02:34:00"
+    },
+    {
+      "id": "879",
+      "title": "A 55-year-old male presents with right upper quadrant pai...",
+      "status": "scheduled",
+      "category": "Abdominal",
+      "publishDate": "NULL",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 02:34:00"
+    },
+    {
+      "id": "883",
+      "title": "A 60-year-old male with a history of hypertension and hyp...",
+      "status": "scheduled",
+      "category": "Abdominal",
+      "publishDate": "NULL",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 02:34:01"
+    },
+    {
+      "id": "881",
+      "title": "A 70-year-old male with a known abdominal aortic aneurysm...",
+      "status": "scheduled",
+      "category": "Abdominal",
+      "publishDate": "NULL",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 02:34:00"
+    },
+    {
+      "id": "610",
+      "title": "During a routine abdominal ultrasound, a sonographer iden...",
+      "status": "scheduled",
+      "category": "Abdominal",
+      "publishDate": "NULL",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 02:28:51"
+    },
+    {
+      "id": "878",
+      "title": "During a routine abdominal ultrasound on a 60-year-old pa...",
+      "status": "scheduled",
+      "category": "Abdominal",
+      "publishDate": "NULL",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 02:34:00"
+    },
+    {
+      "id": "875",
+      "title": "A 40-year-old patient with a history of chronic pancreati...",
+      "status": "scheduled",
+      "category": "Abdominal",
+      "publishDate": "NULL",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 02:34:00"
+    },
+    {
+      "id": "880",
+      "title": "A 50-year-old male with a history of chronic pancreatitis...",
+      "status": "scheduled",
+      "category": "Abdominal",
+      "publishDate": "NULL",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 02:34:00"
+    },
+    {
+      "id": "872",
+      "title": "A 55-year-old male presents with right upper quadrant pai...",
+      "status": "scheduled",
+      "category": "Abdominal",
+      "publishDate": "NULL",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 02:34:00"
+    },
+    {
+      "id": "612",
+      "title": "During a renal ultrasound, the sonographer notes a decrea...",
+      "status": "scheduled",
+      "category": "Abdominal",
+      "publishDate": "NULL",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 02:28:51"
+    },
+    {
+      "id": "611",
+      "title": "A 45-year-old female presents with right upper quadrant p...",
+      "status": "scheduled",
+      "category": "Abdominal",
+      "publishDate": "NULL",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 02:28:51"
+    },
+    {
+      "id": "609",
+      "title": "A 62-year-old male presents with sudden onset of severe, ...",
+      "status": "scheduled",
+      "category": "Abdominal",
+      "publishDate": "NULL",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 02:28:51"
+    },
+    {
+      "id": "608",
+      "title": "A patient with a history of chronic alcoholism presents f...",
+      "status": "scheduled",
+      "category": "Abdominal",
+      "publishDate": "NULL",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 02:28:51"
+    },
+    {
+      "id": "877",
+      "title": "A 55-year-old male presents with right upper quadrant pai...",
+      "status": "scheduled",
+      "category": "Abdominal",
+      "publishDate": "NULL",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 02:34:00"
+    },
+    {
+      "id": "876",
+      "title": "During a routine abdominal ultrasound on a 68-year-old as...",
+      "status": "scheduled",
+      "category": "Abdominal",
+      "publishDate": "NULL",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 02:34:00"
+    },
+    {
+      "id": "874",
+      "title": "An ultrasound is performed on a 30-year-old male presenti...",
+      "status": "scheduled",
+      "category": "Abdominal",
+      "publishDate": "NULL",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 02:34:00"
+    },
+    {
+      "id": "873",
+      "title": "A 35-year-old diabetic patient presents with acute onset ...",
+      "status": "scheduled",
+      "category": "Abdominal",
+      "publishDate": "NULL",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 02:34:00"
+    },
+    {
+      "id": "871",
+      "title": "A 45-year-old male with a history of hypertension present...",
+      "status": "scheduled",
+      "category": "Abdominal",
+      "publishDate": "NULL",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 02:34:00"
+    },
+    {
+      "id": "885",
+      "title": "A 30-year-old female presents with acute left flank pain....",
+      "status": "scheduled",
+      "category": "Abdominal",
+      "publishDate": "NULL",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 02:34:01"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttitle\tstatus\tcategory\tpublishDate\tqueuePosition\tcreatedAt\n884\tA 72-year-old male with a history of peripheral vascular ...\tscheduled\tAbdominal\tNULL\tNULL\t2026-03-22 02:34:01\n882\tDuring a routine abdominal ultrasound on a 68-year-old as...\tscheduled\tAbdominal\tNULL\tNULL\t2026-03-22 02:34:00\n879\tA 55-year-old male presents with right upper quadrant pai...\tscheduled\tAbdominal\tNULL\tNULL\t2026-03-22 02:34:00\n883\tA 60-year-old male with a history of hypertension and hyp...\tscheduled\tAbdominal\tNULL\tNULL\t2026-03-22 02:34:01\n881\tA 70-year-old male with a known abdominal aortic aneurysm...\tscheduled\tAbdominal\tNULL\tNULL\t2026-03-22 02:34:00\n610\tDuring a routine abdominal ultrasound, a sonographer iden...\tscheduled\tAbdominal\tNULL\tNULL\t2026-03-22 02:28:51\n878\tDuring a routine abdominal ultrasound on a 60-year-old pa...\tscheduled\tAbdominal\tNULL\tNULL\t2026-03-22 02:34:00\n875\tA 40-year-old patient with a history of chronic pancreati...\tscheduled\tAbdominal\tNULL\tNULL\t2026-03-22 02:34:00\n880\tA 50-year-old male with a history of chronic pancreatitis...\tscheduled\tAbdominal\tNULL\tNULL\t2026-03-22 02:34:00\n872\tA 55-year-old male presents with right upper quadrant pai...\tscheduled\tAbdominal\tNULL\tNULL\t2026-03-22 02:34:00\n612\tDuring a renal ultrasound, the sonographer notes a decrea...\tscheduled\tAbdominal\tNULL\tNULL\t2026-03-22 02:28:51\n611\tA 45-year-old female presents with right upper quadrant p...\tscheduled\tAbdominal\tNULL\tNULL\t2026-03-22 02:28:51\n609\tA 62-year-old male presents with sudden onset of severe, ...\tscheduled\tAbdominal\tNULL\tNULL\t2026-03-22 02:28:51\n608\tA patient with a history of chronic alcoholism presents f...\tscheduled\tAbdominal\tNULL\tNULL\t2026-03-22 02:28:51\n877\tA 55-year-old male presents with right upper quadrant pai...\tscheduled\tAbdominal\tNULL\tNULL\t2026-03-22 02:34:00\n876\tDuring a routine abdominal ultrasound on a 68-year-old as...\tscheduled\tAbdominal\tNULL\tNULL\t2026-03-22 02:34:00\n874\tAn ultrasound is performed on a 30-year-old male presenti...\tscheduled\tAbdominal\tNULL\tNULL\t2026-03-22 02:34:00\n873\tA 35-year-old diabetic patient presents with acute onset ...\tscheduled\tAbdominal\tNULL\tNULL\t2026-03-22 02:34:00\n871\tA 45-year-old male with a history of hypertension present...\tscheduled\tAbdominal\tNULL\tNULL\t2026-03-22 02:34:00\n885\tA 30-year-old female presents with acute left flank pain....\tscheduled\tAbdominal\tNULL\tNULL\t2026-03-22 02:34:01\n",
+  "stderr": "",
+  "execution_time_ms": 67
+}

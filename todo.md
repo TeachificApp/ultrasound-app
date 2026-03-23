@@ -669,3 +669,11 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Update CaseLibrary.tsx frontend to reflect new default sort ("Mixed Order" option)
 - [x] Keep "newest" and "mostViewed" sort options available
 - [x] Add 4 unit tests for sortBy enum validation (746 tests passing)
+
+## Daily Challenge Auto-Posting Fix (Mar 23 - session 8)
+- [x] Diagnose: 475 challenges in 'scheduled' status with NULL publishDate; cron only picked up 'queued' status
+- [x] Fix cron to treat both 'queued' AND 'scheduled' (with null/past publishDate) as the publish pool
+- [x] Remove strict 6:00-6:09 AM window; cron now publishes any time after 6 AM ET if today's challenges are missing (catch-up logic)
+- [x] Immediately published 11 challenges for today (one per category) via SQL
+- [x] Added adminTriggerDailyChallenges tRPC procedure for manual admin override
+- [x] Cron confirmed working: logs show 'Already published challenges for 2026-03-23, skipping' on next run

@@ -18,7 +18,7 @@
 
 import { getDb } from "../db";
 import { quickfireChallenges, users } from "../../drizzle/schema";
-import { eq, and, asc } from "drizzle-orm";
+import { eq, and, asc, or, isNull, lte, sql } from "drizzle-orm";
 import sgMail from "@sendgrid/mail";
 import { generateUnsubscribeToken } from "../routes/unsubscribe";
 
@@ -85,12 +85,13 @@ export async function runChallengeCron() {
       }
     }
 
-    // ── Step 2: Check if it's the 6 AM ET publish window (6:00–6:09 AM ET) ───
+    // ── Step 2: Check if we're past 6 AM ET (publish window: 6 AM onward) ──────
+    // We publish any time after 6 AM ET if today's challenges haven't been published yet.
+    // This ensures catch-up if the server was down during the 6 AM window.
     const currentHourET = hourET();
-    const currentMinute = minuteNow();
-    const isPublishWindow = currentHourET === 6 && currentMinute < 10;
+    const isPastPublishTime = currentHourET >= 6;
 
-    if (!isPublishWindow) return;
+    if (!isPastPublishTime) return;
 
     // ── Step 3: Check if we already published today (any live challenge today) ─
     const alreadyPublishedToday = await db
@@ -121,7 +122,9 @@ export async function runChallengeCron() {
       return;
     }
 
-    // ── Step 4: Pick the next queued challenge per category ───────────────────
+    // ── Step 4: Pick the next challenge per category ────────────────────────────
+    // Pool: status="queued" OR status="scheduled" (covers bulk-imported challenges
+    // that were created with "scheduled" status but no explicit publishDate).
     const categories = ["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics"] as const;
     const toPublish: typeof quickfireChallenges.$inferSelect[] = [];
 
@@ -131,36 +134,26 @@ export async function runChallengeCron() {
         .from(quickfireChallenges)
         .where(
           and(
-            eq(quickfireChallenges.status, "queued"),
+            // Accept both "queued" and "scheduled" (with no future publishDate)
+            or(
+              eq(quickfireChallenges.status, "queued"),
+              and(
+                eq(quickfireChallenges.status, "scheduled"),
+                or(
+                  isNull(quickfireChallenges.publishDate),
+                  lte(quickfireChallenges.publishDate, todayStr)
+                )
+              )
+            ),
             eq(quickfireChallenges.category, category)
           )
         )
-        // Challenges with explicit position come first; null positions fall back to createdAt
+        // Explicit queuePosition first; null positions fall back to createdAt
         .orderBy(asc(quickfireChallenges.queuePosition), asc(quickfireChallenges.createdAt))
         .limit(1);
 
       if (next) {
         toPublish.push(next);
-      }
-    }
-
-    // Also include any "scheduled" challenges with publishDate <= today (legacy support)
-    const scheduledChallenges = await db
-      .select()
-      .from(quickfireChallenges)
-      .where(
-        and(
-          eq(quickfireChallenges.status, "scheduled"),
-          // publishDate <= todayStr
-        )
-      )
-      .orderBy(asc(quickfireChallenges.priority), asc(quickfireChallenges.createdAt))
-      .limit(4);
-
-    // Merge scheduled into toPublish (avoid duplicates)
-    for (const sc of scheduledChallenges) {
-      if (sc.publishDate && sc.publishDate <= todayStr && !toPublish.find(p => p.id === sc.id)) {
-        toPublish.push(sc);
       }
     }
 

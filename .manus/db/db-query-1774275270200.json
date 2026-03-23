@@ -1,0 +1,98 @@
+{
+  "query": "\nSELECT id, title, category, status, publishDate, publishedAt FROM quickfireChallenges WHERE status = 'live' ORDER BY category;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \nSELECT id, title, category, status, publishDate, publishedAt FROM quickfireChallenges WHERE status = 'live' ORDER BY category;\n",
+  "rows": [
+    {
+      "id": "608",
+      "title": "A patient with a history of chronic alcoholism presents f...",
+      "category": "Abdominal",
+      "status": "live",
+      "publishDate": "2026-03-23",
+      "publishedAt": "2026-03-23 14:14:25"
+    },
+    {
+      "id": "617",
+      "title": "During ultrasound-guided fine needle aspiration (FNA) of ...",
+      "category": "Small Parts",
+      "status": "live",
+      "publishDate": "2026-03-23",
+      "publishedAt": "2026-03-23 14:14:25"
+    },
+    {
+      "id": "516",
+      "title": "A 45-year-old patient presents with heavy menstrual bleed...",
+      "category": "Pelvic/Gyn",
+      "status": "live",
+      "publishDate": "2026-03-23",
+      "publishedAt": "2026-03-23 14:14:25"
+    },
+    {
+      "id": "595",
+      "title": "A 32-year-old G2P1 patient with an estimated gestational ...",
+      "category": "OB 1st Trimester",
+      "status": "live",
+      "publishDate": "2026-03-23",
+      "publishedAt": "2026-03-23 14:14:25"
+    },
+    {
+      "id": "637",
+      "title": "A 29-week pregnant patient with a history of poorly contr...",
+      "category": "OB 2nd/3rd Trimester",
+      "status": "live",
+      "publishDate": "2026-03-23",
+      "publishedAt": "2026-03-23 14:14:25"
+    },
+    {
+      "id": "556",
+      "title": "During a 20-week fetal anatomy scan, the sonographer iden...",
+      "category": "Fetal Echo",
+      "status": "live",
+      "publishDate": "2026-03-23",
+      "publishedAt": "2026-03-23 14:14:25"
+    },
+    {
+      "id": "889",
+      "title": "A 45-year-old patient presents for a screening breast ult...",
+      "category": "Breast",
+      "status": "live",
+      "publishDate": "2026-03-23",
+      "publishedAt": "2026-03-23 14:14:25"
+    },
+    {
+      "id": "599",
+      "title": "During a transcranial Doppler (TCD) study on a 7-year-old...",
+      "category": "Vascular",
+      "status": "live",
+      "publishDate": "2026-03-23",
+      "publishedAt": "2026-03-23 14:14:25"
+    },
+    {
+      "id": "615",
+      "title": "A sonographer is performing a musculoskeletal ultrasound ...",
+      "category": "MSK",
+      "status": "live",
+      "publishDate": "2026-03-23",
+      "publishedAt": "2026-03-23 14:14:25"
+    },
+    {
+      "id": "586",
+      "title": "A 45-year-old male presents to the emergency department w...",
+      "category": "POCUS",
+      "status": "live",
+      "publishDate": "2026-03-23",
+      "publishedAt": "2026-03-23 14:14:25"
+    },
+    {
+      "id": "536",
+      "title": "A sonographer is performing an abdominal ultrasound on an...",
+      "category": "Physics",
+      "status": "live",
+      "publishDate": "2026-03-23",
+      "publishedAt": "2026-03-23 14:14:25"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttitle\tcategory\tstatus\tpublishDate\tpublishedAt\n608\tA patient with a history of chronic alcoholism presents f...\tAbdominal\tlive\t2026-03-23\t2026-03-23 14:14:25\n617\tDuring ultrasound-guided fine needle aspiration (FNA) of ...\tSmall Parts\tlive\t2026-03-23\t2026-03-23 14:14:25\n516\tA 45-year-old patient presents with heavy menstrual bleed...\tPelvic/Gyn\tlive\t2026-03-23\t2026-03-23 14:14:25\n595\tA 32-year-old G2P1 patient with an estimated gestational ...\tOB 1st Trimester\tlive\t2026-03-23\t2026-03-23 14:14:25\n637\tA 29-week pregnant patient with a history of poorly contr...\tOB 2nd/3rd Trimester\tlive\t2026-03-23\t2026-03-23 14:14:25\n556\tDuring a 20-week fetal anatomy scan, the sonographer iden...\tFetal Echo\tlive\t2026-03-23\t2026-03-23 14:14:25\n889\tA 45-year-old patient presents for a screening breast ult...\tBreast\tlive\t2026-03-23\t2026-03-23 14:14:25\n599\tDuring a transcranial Doppler (TCD) study on a 7-year-old...\tVascular\tlive\t2026-03-23\t2026-03-23 14:14:25\n615\tA sonographer is performing a musculoskeletal ultrasound ...\tMSK\tlive\t2026-03-23\t2026-03-23 14:14:25\n586\tA 45-year-old male presents to the emergency department w...\tPOCUS\tlive\t2026-03-23\t2026-03-23 14:14:25\n536\tA sonographer is performing an abdominal ultrasound on an...\tPhysics\tlive\t2026-03-23\t2026-03-23 14:14:25\n",
+  "stderr": "",
+  "execution_time_ms": 67
+}

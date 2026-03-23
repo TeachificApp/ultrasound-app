@@ -1,0 +1,98 @@
+{
+  "query": "\nSELECT id, title, category, status, queuePosition, createdAt\nFROM quickfireChallenges\nWHERE status IN ('queued', 'scheduled')\n  AND (publishDate IS NULL OR publishDate <= '2026-03-23')\n  AND (id, category) IN (\n    SELECT MIN(id), category\n    FROM quickfireChallenges\n    WHERE status IN ('queued', 'scheduled')\n      AND (publishDate IS NULL OR publishDate <= '2026-03-23')\n    GROUP BY category\n  )\nORDER BY category;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \nSELECT id, title, category, status, queuePosition, createdAt\nFROM quickfireChallenges\nWHERE status IN ('queued', 'scheduled')\n  AND (publishDate IS NULL OR publishDate <= '2026-03-23')\n  AND (id, category) IN (\n    SELECT MIN(id), category\n    FROM quickfireChallenges\n    WHERE status IN ('queued', 'scheduled')\n      AND (publishDate IS NULL OR publishDate <= '2026-03-23')\n    GROUP BY category\n  )\nORDER BY category;\n",
+  "rows": [
+    {
+      "id": "608",
+      "title": "A patient with a history of chronic alcoholism presents f...",
+      "category": "Abdominal",
+      "status": "scheduled",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 02:28:51"
+    },
+    {
+      "id": "617",
+      "title": "During ultrasound-guided fine needle aspiration (FNA) of ...",
+      "category": "Small Parts",
+      "status": "scheduled",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 02:29:40"
+    },
+    {
+      "id": "516",
+      "title": "A 45-year-old patient presents with heavy menstrual bleed...",
+      "category": "Pelvic/Gyn",
+      "status": "scheduled",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 01:50:09"
+    },
+    {
+      "id": "595",
+      "title": "A 32-year-old G2P1 patient with an estimated gestational ...",
+      "category": "OB 1st Trimester",
+      "status": "scheduled",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 02:28:51"
+    },
+    {
+      "id": "637",
+      "title": "A 29-week pregnant patient with a history of poorly contr...",
+      "category": "OB 2nd/3rd Trimester",
+      "status": "scheduled",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 02:30:46"
+    },
+    {
+      "id": "556",
+      "title": "During a 20-week fetal anatomy scan, the sonographer iden...",
+      "category": "Fetal Echo",
+      "status": "scheduled",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 02:28:13"
+    },
+    {
+      "id": "889",
+      "title": "A 45-year-old patient presents for a screening breast ult...",
+      "category": "Breast",
+      "status": "scheduled",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 02:36:39"
+    },
+    {
+      "id": "599",
+      "title": "During a transcranial Doppler (TCD) study on a 7-year-old...",
+      "category": "Vascular",
+      "status": "scheduled",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 02:28:51"
+    },
+    {
+      "id": "615",
+      "title": "A sonographer is performing a musculoskeletal ultrasound ...",
+      "category": "MSK",
+      "status": "scheduled",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 02:29:40"
+    },
+    {
+      "id": "586",
+      "title": "A 45-year-old male presents to the emergency department w...",
+      "category": "POCUS",
+      "status": "scheduled",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 02:28:32"
+    },
+    {
+      "id": "536",
+      "title": "A sonographer is performing an abdominal ultrasound on an...",
+      "category": "Physics",
+      "status": "scheduled",
+      "queuePosition": "NULL",
+      "createdAt": "2026-03-22 02:27:24"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttitle\tcategory\tstatus\tqueuePosition\tcreatedAt\n608\tA patient with a history of chronic alcoholism presents f...\tAbdominal\tscheduled\tNULL\t2026-03-22 02:28:51\n617\tDuring ultrasound-guided fine needle aspiration (FNA) of ...\tSmall Parts\tscheduled\tNULL\t2026-03-22 02:29:40\n516\tA 45-year-old patient presents with heavy menstrual bleed...\tPelvic/Gyn\tscheduled\tNULL\t2026-03-22 01:50:09\n595\tA 32-year-old G2P1 patient with an estimated gestational ...\tOB 1st Trimester\tscheduled\tNULL\t2026-03-22 02:28:51\n637\tA 29-week pregnant patient with a history of poorly contr...\tOB 2nd/3rd Trimester\tscheduled\tNULL\t2026-03-22 02:30:46\n556\tDuring a 20-week fetal anatomy scan, the sonographer iden...\tFetal Echo\tscheduled\tNULL\t2026-03-22 02:28:13\n889\tA 45-year-old patient presents for a screening breast ult...\tBreast\tscheduled\tNULL\t2026-03-22 02:36:39\n599\tDuring a transcranial Doppler (TCD) study on a 7-year-old...\tVascular\tscheduled\tNULL\t2026-03-22 02:28:51\n615\tA sonographer is performing a musculoskeletal ultrasound ...\tMSK\tscheduled\tNULL\t2026-03-22 02:29:40\n586\tA 45-year-old male presents to the emergency department w...\tPOCUS\tscheduled\tNULL\t2026-03-22 02:28:32\n536\tA sonographer is performing an abdominal ultrasound on an...\tPhysics\tscheduled\tNULL\t2026-03-22 02:27:24\n",
+  "stderr": "",
+  "execution_time_ms": 108
+}
