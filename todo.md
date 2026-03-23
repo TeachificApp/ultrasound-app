@@ -677,3 +677,14 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Immediately published 11 challenges for today (one per category) via SQL
 - [x] Added adminTriggerDailyChallenges tRPC procedure for manual admin override
 - [x] Cron confirmed working: logs show 'Already published challenges for 2026-03-23, skipping' on next run
+
+## Thinkific Member Import Fix (Mar 23 - session 8)
+- [x] Audit: webhook receives stub payloads {id:111} (test events); all 37 enrollment events were ignored
+- [x] Root cause: 13,672 Thinkific users vs 11,754 in DB — ~1,918 members missing
+- [x] Fixed upsertUser to activate pending accounts by email on first OAuth login (no duplicate rows)
+- [x] Suppressed all welcome emails from webhook — emails only fire on explicit registration/login
+- [x] Created thinkificMemberSync.ts: runs every 6 hours, imports all new Thinkific members as pending
+- [x] Wired job to server startup (startThinkificMemberSync in _core/index.ts)
+- [x] Updated syncAllThinkificMembers admin procedure to delegate to the shared job
+- [x] First sync run started at 14:40 UTC — importing ~1,918 missing members
+- [x] All 746 tests passing after changes

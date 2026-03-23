@@ -101,6 +101,36 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   if (!user.openId) throw new Error("User openId is required for upsert");
   const db = await getDb();
   if (!db) return;
+
+  // ── Pending user activation ───────────────────────────────────────────────
+  // If a pending stub exists for this email (created by the Thinkific webhook
+  // or bulk import), activate it with the real OAuth identity instead of
+  // creating a duplicate row.
+  if (user.email) {
+    const normalised = user.email.trim().toLowerCase();
+    const pending = await db
+      .select({ id: users.id, role: users.role })
+      .from(users)
+      .where(sql`LOWER(${users.email}) = ${normalised} AND ${users.isPending} = 1`)
+      .limit(1);
+    if (pending[0]) {
+      const updatePayload: Record<string, unknown> = {
+        openId: user.openId,
+        isPending: false,
+        pendingCreatedAt: null,
+        lastSignedIn: user.lastSignedIn ?? new Date(),
+      };
+      if (user.name) updatePayload.name = user.name;
+      if (user.loginMethod) updatePayload.loginMethod = user.loginMethod;
+      // Preserve existing role; only promote to admin for owner
+      if (user.openId === ENV.ownerOpenId) updatePayload.role = "admin";
+      await db.update(users).set(updatePayload).where(eq(users.id, pending[0].id));
+      console.log(`[upsertUser] Activated pending account for ${normalised} (userId=${pending[0].id})`);
+      return;
+    }
+  }
+
+  // ── Normal upsert (new or returning OAuth user) ───────────────────────────
   const values: InsertUser = { openId: user.openId };
   const updateSet: Record<string, unknown> = {};
   const textFields = ["name", "email", "loginMethod"] as const;

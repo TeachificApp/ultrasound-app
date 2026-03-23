@@ -1,0 +1,24 @@
+{
+  "query": "\nSELECT source, resource, action, outcome, COUNT(*) as count FROM webhookEvents WHERE source = 'thinkific' GROUP BY source, resource, action, outcome ORDER BY count DESC LIMIT 20;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \nSELECT source, resource, action, outcome, COUNT(*) as count FROM webhookEvents WHERE source = 'thinkific' GROUP BY source, resource, action, outcome ORDER BY count DESC LIMIT 20;\n",
+  "rows": [
+    {
+      "source": "thinkific",
+      "resource": "product",
+      "action": "archived",
+      "outcome": "filtered",
+      "count": "37"
+    },
+    {
+      "source": "thinkific",
+      "resource": "enrollment",
+      "action": "created",
+      "outcome": "ignored",
+      "count": "37"
+    }
+  ],
+  "messages": [],
+  "stdout": "source\tresource\taction\toutcome\tcount\nthinkific\tproduct\tarchived\tfiltered\t37\nthinkific\tenrollment\tcreated\tignored\t37\n",
+  "stderr": "",
+  "execution_time_ms": 201
+}

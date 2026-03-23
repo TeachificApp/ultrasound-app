@@ -1,0 +1,22 @@
+{
+  "query": "\nSELECT id, rawPayload FROM webhookEvents WHERE source = 'thinkific' AND resource = 'enrollment' ORDER BY createdAt DESC LIMIT 3;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \nSELECT id, rawPayload FROM webhookEvents WHERE source = 'thinkific' AND resource = 'enrollment' ORDER BY createdAt DESC LIMIT 3;\n",
+  "rows": [
+    {
+      "id": "73",
+      "rawPayload": "{\"id\":111}"
+    },
+    {
+      "id": "71",
+      "rawPayload": "{\"id\":111}"
+    },
+    {
+      "id": "69",
+      "rawPayload": "{\"id\":111}"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\trawPayload\n73\t{\"id\":111}\n71\t{\"id\":111}\n69\t{\"id\":111}\n",
+  "stderr": "",
+  "execution_time_ms": 61
+}

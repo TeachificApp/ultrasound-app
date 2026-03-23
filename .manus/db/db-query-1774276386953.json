@@ -1,0 +1,25 @@
+{
+  "query": "\nSELECT COUNT(*) as total_users FROM users;\nSELECT COUNT(*) as pending_users FROM users WHERE emailVerified = 0 OR emailVerified IS NULL;\nSELECT COUNT(*) as active_users FROM users WHERE emailVerified = 1;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \nSELECT COUNT(*) as total_users FROM users;\nSELECT COUNT(*) as pending_users FROM users WHERE emailVerified = 0 OR emailVerified IS NULL;\nSELECT COUNT(*) as active_users FROM users WHERE emailVerified = 1;\n",
+  "rows": [
+    {
+      "total_users": "11754"
+    },
+    {
+      "total_users": "pending_users"
+    },
+    {
+      "total_users": "11716"
+    },
+    {
+      "total_users": "active_users"
+    },
+    {
+      "total_users": "38"
+    }
+  ],
+  "messages": [],
+  "stdout": "total_users\n11754\npending_users\n11716\nactive_users\n38\n",
+  "stderr": "",
+  "execution_time_ms": 105
+}

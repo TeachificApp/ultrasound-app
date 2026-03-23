@@ -416,23 +416,14 @@ export function registerThinkificWebhook(app: Router) {
 // ── Welcome email helper ────────────────────────────────────────────────────
 
 /**
- * Sends a welcome email only for UltrasoundAssist™ free or premium membership enrollments.
- * All other Thinkific products (DIY, generic courses, user.signup) do NOT trigger a welcome email.
+ * Welcome emails are intentionally suppressed for all webhook-triggered account creation.
+ * A welcome email is only sent when a user explicitly registers or logs in for the
+ * first time via magic link or the UltrasoundAssist™ registration form.
+ * This prevents unsolicited emails to Thinkific members who have not yet visited the app.
  */
-async function maybeSendUltrasoundAssistWelcome(email: string, productName: string): Promise<void> {
-  const appUrl = process.env.VITE_APP_URL ?? "https://app.allaboutultrasound.com";
-  const loginUrl = `${appUrl}/login`;
-  const firstName = email.split("@")[0] ?? "there";
-  if (isPremiumProduct(productName)) {
-    const { subject, htmlBody } = buildUltrasoundAssistPremiumWelcomeEmail({ firstName, loginUrl });
-    const sent = await sendEmail({ to: { name: firstName, email }, subject, htmlBody });
-    console.log(`[Thinkific Webhook] Premium welcome email ${sent ? "sent" : "failed"} to ${email}`);
-  } else if (isFreeProduct(productName) || isIHeartEchoAppProduct(productName)) {
-    const { subject, htmlBody } = buildUltrasoundAssistFreeWelcomeEmail({ firstName, loginUrl });
-    const sent = await sendEmail({ to: { name: firstName, email }, subject, htmlBody });
-    console.log(`[Thinkific Webhook] Free welcome email ${sent ? "sent" : "failed"} to ${email}`);
-  }
-  // All other products (DIY, generic courses): no welcome email
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function maybeSendUltrasoundAssistWelcome(_email: string, _productName: string): Promise<void> {
+  // No-op: welcome emails are deferred until first explicit login/registration.
 }
 
 // ── Shared grant helper ───────────────────────────────────────────────────────

@@ -1,0 +1,110 @@
+{
+  "query": "\nSELECT id, resource, action, outcome, email, productName, message, createdAt FROM webhookEvents WHERE source = 'thinkific' AND resource = 'enrollment' ORDER BY createdAt DESC LIMIT 10;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \nSELECT id, resource, action, outcome, email, productName, message, createdAt FROM webhookEvents WHERE source = 'thinkific' AND resource = 'enrollment' ORDER BY createdAt DESC LIMIT 10;\n",
+  "rows": [
+    {
+      "id": "73",
+      "resource": "enrollment",
+      "action": "created",
+      "outcome": "ignored",
+      "email": "NULL",
+      "productName": "",
+      "message": "ignored: no user email in enrollment payload and could not resolve from API",
+      "createdAt": "2026-03-23 14:18:06"
+    },
+    {
+      "id": "71",
+      "resource": "enrollment",
+      "action": "created",
+      "outcome": "ignored",
+      "email": "NULL",
+      "productName": "",
+      "message": "ignored: no user email in enrollment payload and could not resolve from API",
+      "createdAt": "2026-03-23 14:16:45"
+    },
+    {
+      "id": "69",
+      "resource": "enrollment",
+      "action": "created",
+      "outcome": "ignored",
+      "email": "NULL",
+      "productName": "",
+      "message": "ignored: no user email in enrollment payload and could not resolve from API",
+      "createdAt": "2026-03-23 00:56:20"
+    },
+    {
+      "id": "67",
+      "resource": "enrollment",
+      "action": "created",
+      "outcome": "ignored",
+      "email": "NULL",
+      "productName": "",
+      "message": "ignored: no user email in enrollment payload and could not resolve from API",
+      "createdAt": "2026-03-23 00:54:58"
+    },
+    {
+      "id": "65",
+      "resource": "enrollment",
+      "action": "created",
+      "outcome": "ignored",
+      "email": "NULL",
+      "productName": "",
+      "message": "ignored: no user email in enrollment payload and could not resolve from API",
+      "createdAt": "2026-03-22 23:06:39"
+    },
+    {
+      "id": "63",
+      "resource": "enrollment",
+      "action": "created",
+      "outcome": "ignored",
+      "email": "NULL",
+      "productName": "",
+      "message": "ignored: no user email in enrollment payload and could not resolve from API",
+      "createdAt": "2026-03-22 03:08:25"
+    },
+    {
+      "id": "61",
+      "resource": "enrollment",
+      "action": "created",
+      "outcome": "ignored",
+      "email": "NULL",
+      "productName": "",
+      "message": "ignored: no user email in enrollment payload and could not resolve from API",
+      "createdAt": "2026-03-22 02:51:48"
+    },
+    {
+      "id": "59",
+      "resource": "enrollment",
+      "action": "created",
+      "outcome": "ignored",
+      "email": "NULL",
+      "productName": "",
+      "message": "ignored: no user email in enrollment payload and could not resolve from API",
+      "createdAt": "2026-03-22 02:23:32"
+    },
+    {
+      "id": "57",
+      "resource": "enrollment",
+      "action": "created",
+      "outcome": "ignored",
+      "email": "NULL",
+      "productName": "",
+      "message": "ignored: no user email in enrollment payload and could not resolve from API",
+      "createdAt": "2026-03-22 02:04:31"
+    },
+    {
+      "id": "55",
+      "resource": "enrollment",
+      "action": "created",
+      "outcome": "ignored",
+      "email": "NULL",
+      "productName": "",
+      "message": "ignored: no user email in enrollment payload and could not resolve from API",
+      "createdAt": "2026-03-22 01:47:23"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tresource\taction\toutcome\temail\tproductName\tmessage\tcreatedAt\n73\tenrollment\tcreated\tignored\tNULL\t\tignored: no user email in enrollment payload and could not resolve from API\t2026-03-23 14:18:06\n71\tenrollment\tcreated\tignored\tNULL\t\tignored: no user email in enrollment payload and could not resolve from API\t2026-03-23 14:16:45\n69\tenrollment\tcreated\tignored\tNULL\t\tignored: no user email in enrollment payload and could not resolve from API\t2026-03-23 00:56:20\n67\tenrollment\tcreated\tignored\tNULL\t\tignored: no user email in enrollment payload and could not resolve from API\t2026-03-23 00:54:58\n65\tenrollment\tcreated\tignored\tNULL\t\tignored: no user email in enrollment payload and could not resolve from API\t2026-03-22 23:06:39\n63\tenrollment\tcreated\tignored\tNULL\t\tignored: no user email in enrollment payload and could not resolve from API\t2026-03-22 03:08:25\n61\tenrollment\tcreated\tignored\tNULL\t\tignored: no user email in enrollment payload and could not resolve from API\t2026-03-22 02:51:48\n59\tenrollment\tcreated\tignored\tNULL\t\tignored: no user email in enrollment payload and could not resolve from API\t2026-03-22 02:23:32\n57\tenrollment\tcreated\tignored\tNULL\t\tignored: no user email in enrollment payload and could not resolve from API\t2026-03-22 02:04:31\n55\tenrollment\tcreated\tignored\tNULL\t\tignored: no user email in enrollment payload and could not resolve from API\t2026-03-22 01:47:23\n",
+  "stderr": "",
+  "execution_time_ms": 64
+}

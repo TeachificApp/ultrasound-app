@@ -331,9 +331,9 @@ export const platformAdminRouter = router({
   }),
 
   /**
-   * Bulk backfill: fetch all users from Thinkific and create All About Ultrasound™ accounts
+   * Bulk backfill: fetch all users from Thinkific and create UltrasoundAssist™ pending accounts
    * for anyone not already registered. Runs silently (no emails sent).
-   * Returns counts of created, skipped (already existed), and errors.
+   * Delegates to the shared runThinkificMemberSync job so logic is not duplicated.
    */
   syncAllThinkificMembers: protectedProcedure.mutation(async ({ ctx }) => {
     const myRoles = await getUserRoles(ctx.user.id);
@@ -342,35 +342,9 @@ export const platformAdminRouter = router({
     if (!isOwner && !isPlatformAdmin) {
       throw new TRPCError({ code: "FORBIDDEN", message: "Platform admin access required" });
     }
-
-    const { getAllThinkificUsers } = await import("../thinkific");
-    const { findUserByEmail, ensureUserRole } = await import("../db");
-
-    const thinkificUsers = await getAllThinkificUsers();
-    let created = 0;
-    let skipped = 0;
-    let errors = 0;
-
-    for (const tUser of thinkificUsers) {
-      if (!tUser.email) { errors++; continue; }
-      try {
-        const existing = await findUserByEmail(tUser.email);
-        if (existing) {
-          await ensureUserRole(existing.id);
-          skipped++;
-        } else {
-          const newId = await createPendingUser(tUser.email);
-          await ensureUserRole(newId);
-          created++;
-        }
-      } catch (err) {
-        console.error(`[SyncThinkific] Error processing ${tUser.email}:`, err);
-        errors++;
-      }
-    }
-
-    console.log(`[SyncThinkific] Bulk sync complete: ${created} created, ${skipped} skipped, ${errors} errors out of ${thinkificUsers.length} Thinkific users`);
-    return { total: thinkificUsers.length, created, skipped, errors, syncedAt: new Date() };
+    const { runThinkificMemberSync } = await import("../jobs/thinkificMemberSync");
+    const result = await runThinkificMemberSync();
+    return { ...result, syncedAt: new Date() };
   }),
 });
 

@@ -17,6 +17,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { startChallengeCron } from "../jobs/challengeCron";
 import { startEmailCampaignScheduler } from "../routers/emailCampaignRouter";
+import { startThinkificMemberSync } from "../jobs/thinkificMemberSync";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -91,6 +92,8 @@ async function startServer() {
     startChallengeCron();
     // Start the email campaign scheduler (sends scheduled campaigns every 5 minutes)
     startEmailCampaignScheduler();
+    // Start the Thinkific member sync job (imports new members every 6 hours, no emails sent)
+    startThinkificMemberSync();
   });
 }
 
