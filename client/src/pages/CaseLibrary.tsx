@@ -38,11 +38,12 @@ import {
   FileText,
   RefreshCw,
   UserCheck,
-  Link2,
   TrendingUp,
   ArrowUpDown,
+  Shuffle,
   Lock,
   LogIn,
+  Link2,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { formatViewCount, getDisplayViewCount } from "@/lib/caseViewCount";
@@ -92,7 +93,7 @@ export default function CaseLibrary() {
   const [search, setSearch] = useState("");
   const [modality, setModality] = useState("All");
   const [difficulty, setDifficulty] = useState("All");
-  const [sortBy, setSortBy] = useState<"newest" | "mostViewed">("newest");
+  const [sortBy, setSortBy] = useState<"random" | "newest" | "mostViewed">("random");
   const [page, setPage] = useState(1);
   const limit = 12;
 
@@ -135,7 +136,7 @@ export default function CaseLibrary() {
   };
 
   const handleSortBy = (val: string) => {
-    setSortBy(val as "newest" | "mostViewed");
+    setSortBy(val as "random" | "newest" | "mostViewed");
     setPage(1);
   };
 
@@ -253,6 +254,11 @@ export default function CaseLibrary() {
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="random">
+                    <span className="flex items-center gap-1.5">
+                      <Shuffle className="w-3.5 h-3.5" /> Mixed Order
+                    </span>
+                  </SelectItem>
                   <SelectItem value="newest">
                     <span className="flex items-center gap-1.5">
                       <Clock className="w-3.5 h-3.5" /> Newest First

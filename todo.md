@@ -662,3 +662,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] MediaDropzone accessible (role=button, keyboard Enter/Space triggers file picker)
 - [x] Unit tests for MediaDropzone upload logic (5 tests passing)
 - [x] All 742 tests passing after integration
+
+## Case Library Randomization (Mar 22 - session 7)
+- [x] Add "random" as default sort option in listCases procedure (LCG hash on case ID)
+- [x] Update sortBy enum to include "random" and default to "random"
+- [x] Update CaseLibrary.tsx frontend to reflect new default sort ("Mixed Order" option)
+- [x] Keep "newest" and "mostViewed" sort options available
+- [x] Add 4 unit tests for sortBy enum validation (746 tests passing)

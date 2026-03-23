@@ -112,7 +112,7 @@ export const caseLibraryRouter = router({
           .optional(),
         difficulty: z.enum(["beginner", "intermediate", "advanced"]).optional(),
         search: z.string().max(100).optional(),
-        sortBy: z.enum(["newest", "mostViewed"]).default("newest").optional(),
+        sortBy: z.enum(["random", "newest", "mostViewed"]).default("random").optional(),
       })
     )
     .query(async ({ ctx, input }) => {
@@ -152,7 +152,9 @@ export const caseLibraryRouter = router({
           .orderBy(
             input.sortBy === "mostViewed"
               ? desc(echoLibraryCases.viewCount)
-              : desc(echoLibraryCases.submittedAt)
+              : input.sortBy === "newest"
+              ? desc(echoLibraryCases.submittedAt)
+              : sql`((${echoLibraryCases.id} * 1103515245 + 12345) & 0x7fffffff) % 1000000`
           )
           .limit(input.limit)
           .offset(offset),

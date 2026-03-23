@@ -404,3 +404,37 @@ describe("caseLibrary.aiGenerateCase", () => {
     ).rejects.toThrow();
   });
 });
+
+// ─── listCases sortBy validation ─────────────────────────────────────────────
+
+describe("caseLibrary.listCases sortBy", () => {
+  it("accepts sortBy=random (default) without throwing a validation error", async () => {
+    const caller = appRouter.createCaller(makeCtx(null));
+    // DB is mocked to return null → INTERNAL_SERVER_ERROR, not a validation error.
+    // This confirms the enum accepts "random".
+    await expect(
+      caller.caseLibrary.listCases({ page: 1, limit: 10, sortBy: "random" })
+    ).rejects.toThrow("DB unavailable");
+  });
+
+  it("accepts sortBy=newest without throwing a validation error", async () => {
+    const caller = appRouter.createCaller(makeCtx(null));
+    await expect(
+      caller.caseLibrary.listCases({ page: 1, limit: 10, sortBy: "newest" })
+    ).rejects.toThrow("DB unavailable");
+  });
+
+  it("accepts sortBy=mostViewed without throwing a validation error", async () => {
+    const caller = appRouter.createCaller(makeCtx(null));
+    await expect(
+      caller.caseLibrary.listCases({ page: 1, limit: 10, sortBy: "mostViewed" })
+    ).rejects.toThrow("DB unavailable");
+  });
+
+  it("rejects an unknown sortBy value with a validation error", async () => {
+    const caller = appRouter.createCaller(makeCtx(null));
+    await expect(
+      caller.caseLibrary.listCases({ page: 1, limit: 10, sortBy: "alphabetical" as any })
+    ).rejects.toThrow();
+  });
+});
