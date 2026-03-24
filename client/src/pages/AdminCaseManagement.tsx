@@ -1124,7 +1124,7 @@ export default function AdminCaseManagement() {
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Clinical Scenario <span className="text-red-500">*</span></label>
-                <p className="text-xs text-gray-400 mb-2">Quick topic starters — click to pre-fill, then customise:</p>
+                <p className="text-xs text-gray-400 mb-2">Quick topic starters — click to pre-fill, then customize:</p>
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {[
                     { label: "AAA", prompt: "Patient referred for abdominal aortic aneurysm screening — aortic diameter measurement, morphology, surveillance interval, referral criteria" },

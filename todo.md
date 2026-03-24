@@ -688,3 +688,18 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Updated syncAllThinkificMembers admin procedure to delegate to the shared job
 - [x] First sync run started at 14:40 UTC — importing ~1,918 missing members
 - [x] All 746 tests passing after changes
+
+## Challenge Email Language Fix (Mar 24)
+- [x] Fixed email subject: "Today's Echo Challenges" → "Today's Ultrasound Challenges"
+- [x] Fixed fallback username: "Echo Enthusiast" → "Ultrasound Enthusiast"
+- [x] Fixed fallback category: "Echo" → "Ultrasound"
+- [x] Fixed HTML title: "Daily Echo Challenges" → "Daily Ultrasound Challenges"
+- [x] Fixed physician over-read email: "echocardiogram study" → "ultrasound study"
+- [x] All 746 tests passing after changes
+
+## US English Spelling & Date Format Audit (Mar 24)
+- [ ] Fix challenge email date format to "Month DD, YYYY" (e.g., March 24, 2026)
+- [ ] Audit all email templates for non-US English spelling
+- [ ] Audit all client UI pages/components for non-US English spelling
+- [ ] Audit all server-side user-facing strings for non-US English spelling
+- [ ] Fix all occurrences: colour→color, organisation→organization, analyse→analyze, centre→center, behaviour→behavior, etc.

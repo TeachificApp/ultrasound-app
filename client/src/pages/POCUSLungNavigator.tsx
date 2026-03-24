@@ -38,8 +38,8 @@ const lungZones: ZoneSection[] = [
     items: [
       { id: "rua_sliding", label: "Pleural sliding — present / absent", detail: "Shimmering movement of visceral pleura in real-time. Absent sliding = pneumothorax until proven otherwise.", critical: true },
       { id: "rua_alines", label: "A-lines — horizontal reverberation artefacts", detail: "A-lines = air-filled lung. A-lines + absent sliding = pneumothorax. A-lines + present sliding = normal or COPD/asthma.", critical: true },
-      { id: "rua_blines", label: "B-lines — vertical laser-like artefacts", detail: "B-lines (comet tails) = interstitial syndrome. ≥3 B-lines per zone = significant. Bilateral B-lines = pulmonary oedema, ARDS, ILD.", critical: true },
-      { id: "rua_bline_count", label: "B-line count (0 / 1–2 / ≥3)", detail: "0 B-lines: normal. 1–2 B-lines: borderline. ≥3 B-lines: interstitial syndrome. Confluent B-lines = severe oedema." },
+      { id: "rua_blines", label: "B-lines — vertical laser-like artefacts", detail: "B-lines (comet tails) = interstitial syndrome. ≥3 B-lines per zone = significant. Bilateral B-lines = pulmonary edema, ARDS, ILD.", critical: true },
+      { id: "rua_bline_count", label: "B-line count (0 / 1–2 / ≥3)", detail: "0 B-lines: normal. 1–2 B-lines: borderline. ≥3 B-lines: interstitial syndrome. Confluent B-lines = severe edema." },
     ],
     pearls: [
       "Zone 1 (upper anterior) is the most sensitive site for pneumothorax in supine patients",
@@ -56,7 +56,7 @@ const lungZones: ZoneSection[] = [
     items: [
       { id: "rla_sliding", label: "Pleural sliding — present / absent", detail: "Absent sliding = pneumothorax. Combined with Zone 1 absent sliding = large PTX.", critical: true },
       { id: "rla_alines", label: "A-lines — normal lung pattern", detail: "A-lines + present sliding = normal. A-lines + absent sliding = PTX." },
-      { id: "rla_blines", label: "B-lines — count per zone", detail: "≥3 B-lines = interstitial syndrome. BLUE protocol: bilateral anterior B-lines = pulmonary oedema." },
+      { id: "rla_blines", label: "B-lines — count per zone", detail: "≥3 B-lines = interstitial syndrome. BLUE protocol: bilateral anterior B-lines = pulmonary edema." },
     ],
   },
   {
@@ -85,7 +85,7 @@ const lungZones: ZoneSection[] = [
     items: [
       { id: "lua_sliding", label: "Pleural sliding — present / absent", detail: "Cardiac pulsation can mimic lung sliding — use M-mode to distinguish. Absent sliding = PTX.", critical: true },
       { id: "lua_alines", label: "A-lines — normal lung pattern", detail: "A-lines + present sliding = normal. A-lines + absent sliding = PTX. Cardiac artefacts may interfere." },
-      { id: "lua_blines", label: "B-lines — count per zone", detail: "≥3 B-lines = interstitial syndrome. Bilateral anterior B-lines = pulmonary oedema (BLUE protocol)." },
+      { id: "lua_blines", label: "B-lines — count per zone", detail: "≥3 B-lines = interstitial syndrome. Bilateral anterior B-lines = pulmonary edema (BLUE protocol)." },
     ],
     pearls: [
       "Cardiac pulsation can mimic lung sliding — use M-mode: seashore sign = normal, barcode = PTX",
@@ -147,7 +147,7 @@ const lungZones: ZoneSection[] = [
 
 const blueProtocol = [
   { pattern: "Bilateral anterior A-lines + DVT", diagnosis: "Pulmonary embolism (PE)" },
-  { pattern: "Bilateral anterior B-lines (≥3/zone)", diagnosis: "Pulmonary oedema (cardiogenic)" },
+  { pattern: "Bilateral anterior B-lines (≥3/zone)", diagnosis: "Pulmonary edema (cardiogenic)" },
   { pattern: "Anterior A-lines + absent sliding (lung point)", diagnosis: "Pneumothorax" },
   { pattern: "Posterior consolidation + effusion", diagnosis: "Pneumonia" },
   { pattern: "Anterior A-lines + no DVT", diagnosis: "COPD/asthma exacerbation" },

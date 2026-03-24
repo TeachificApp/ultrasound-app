@@ -1,7 +1,7 @@
 /**
  * MediaDropzone — reusable drag-and-drop + click-to-upload media zone.
  *
- * Key behaviour:
+ * Key behavior:
  *  - Suppresses the browser's default "open file in new tab" action by
  *    attaching window-level dragover/drop listeners while the component
  *    is mounted.  This prevents the browser from stealing the drop event

@@ -228,7 +228,7 @@ const EFAST_VIEWS = [
     pitfalls: [
       "Bilateral absent sliding in intubated patients — consider main-stem intubation",
       "Previous pleurodesis causes absent sliding without PTX",
-      "Subcutaneous emphysema prevents pleural line visualisation",
+      "Subcutaneous emphysema prevents pleural line visualization",
     ],
     measurements: ["Lung point location (ICS)", "Pleural effusion depth (cm)"],
     criticalFindings: [
@@ -270,7 +270,7 @@ const EFAST_VIEWS = [
     pitfalls: [
       "Cardiac shadow may obscure anterior left thorax — use M-mode",
       "Left pleural effusion may be partially obscured by cardiac window",
-      "Subcutaneous emphysema prevents pleural line visualisation",
+      "Subcutaneous emphysema prevents pleural line visualization",
     ],
     measurements: ["Lung point location (ICS)", "Left pleural effusion depth (cm)"],
     criticalFindings: [

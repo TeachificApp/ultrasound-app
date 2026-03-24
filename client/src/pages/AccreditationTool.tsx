@@ -1348,7 +1348,7 @@ function exportCSV(filename: string, rows: Record<string, unknown>[]) {
   URL.revokeObjectURL(url);
 }
 
-// ─── Score colour helper ───────────────────────────────────────────────────────
+// ─── Score color helper ───────────────────────────────────────────────────────
 function scoreColor(score: number) {
   return score >= 85 ? "#16a34a" : score >= 70 ? "#d97706" : "#dc2626";
 }

@@ -506,7 +506,7 @@ export function buildPhysicianOverReadInvitationEmail(opts: {
       Dear ${opts.physicianName},
     </p>
     <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
-      <strong>${opts.labName}</strong> has requested your independent blind over-read for the following echocardiogram study:
+      <strong>${opts.labName}</strong> has requested your independent blind over-read for the following ultrasound study:
     </p>
     <div style="background:#f0fbfc;border:1px solid #b2e8eb;border-radius:8px;padding:16px 20px;margin:0 0 24px;">
       <table style="width:100%;border-collapse:collapse;font-size:14px;">

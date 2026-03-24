@@ -227,7 +227,7 @@ function SASScore({ onResult }: { onResult: (r: CalcResult | null) => void }) {
           : total <= 5
           ? "Score 3–5 indicates moderate severity. Multidisciplinary fetal cardiac team review recommended. Serial monitoring every 2–4 weeks."
           : total <= 7
-          ? "Score 6–7 indicates high severity. Perinatal mortality risk is substantially elevated. Fetal medicine, neonatology, and paediatric cardiology consultation required. Delivery planning at a tertiary centre."
+          ? "Score 6–7 indicates high severity. Perinatal mortality risk is substantially elevated. Fetal medicine, neonatology, and pediatric cardiology consultation required. Delivery planning at a tertiary center."
           : "Score ≥8 is associated with very high perinatal mortality. Counsel family regarding guarded prognosis. Consider palliative care discussion alongside active management options."
       }`
     : undefined;
@@ -236,7 +236,7 @@ function SASScore({ onResult }: { onResult: (r: CalcResult | null) => void }) {
     ? `FetalEchoAssist™ Note: The SAS score (Simpson-Andrews-Sharland, 2008) is a validated fetal prognostic tool for Ebstein anomaly and tricuspid valve dysplasia. It combines five echocardiographic parameters (CTR, Celermajer index, RV/LV ratio, pulmonary flow, ductal flow) scored 0–2 each (total 0–10). Higher scores predict greater perinatal mortality risk. The score should be interpreted alongside gestational age, hydrops status, and functional pulmonary atresia.`
     : undefined;
 
-  const tip = "FetalEchoAssist™ Tip: Measure CTR and Celermajer index on the 4-chamber view at end-diastole. Assess pulmonary flow with colour and spectral Doppler at the pulmonary valve. Evaluate ductal flow direction with colour Doppler from the ductal arch view. Retrograde ductal flow ('circle of death' physiology) is the single most ominous finding.";
+  const tip = "FetalEchoAssist™ Tip: Measure CTR and Celermajer index on the 4-chamber view at end-diastole. Assess pulmonary flow with color and spectral Doppler at the pulmonary valve. Evaluate ductal flow direction with color Doppler from the ductal arch view. Retrograde ductal flow ('circle of death' physiology) is the single most ominous finding.";
 
   useEffect(() => {
     if (total !== null) {

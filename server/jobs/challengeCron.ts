@@ -4,7 +4,7 @@
  * Runs every 5 minutes to:
  *  1. Archive any "live" challenges whose 24-hour window has expired.
  *  2. At 6 AM Eastern Time: auto-publish the next queued challenge from EACH
- *     category (ACS, Adult Echo, Pediatric Echo, Fetal Echo, POCUS) — picking the
+ *     category (Abdominal, Vascular, POCUS, Fetal Echo, etc.) — picking the
  *     lowest queuePosition per category. No publishDate required from admin.
  *  3. Send a SendGrid notification email to opted-in users at 6 AM ET when
  *     new challenges go live.
@@ -38,6 +38,16 @@ let cronRunning = false;
 /** Returns today's date string in YYYY-MM-DD format in Eastern Time. */
 function todayET(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
+}
+
+/** Returns today's date formatted as "Month DD, YYYY" in Eastern Time (e.g., "March 24, 2026"). */
+function todayETLong(): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date());
 }
 
 /** Returns current hour (0–23) in Eastern Time. */
@@ -245,7 +255,7 @@ async function sendChallengeNotifications(
 
   for (const user of usersToNotify) {
     try {
-      const userName = user.displayName || user.name || "Echo Enthusiast";
+      const userName = user.displayName || user.name || "Ultrasound Enthusiast";
       const unsubToken = user.unsubscribeToken || generateUnsubscribeToken(user.id);
       const unsubscribeUrl = `${APP_URL}/unsubscribe?token=${unsubToken}&type=challenge`;
       const challengeUrl = `${APP_URL}/quickfire`;
@@ -255,7 +265,7 @@ async function sendChallengeNotifications(
         challengeCount: publishedChallenges.length,
         challengeSummary,
         primaryTitle: primaryChallenge.title,
-        primaryCategory: primaryChallenge.category || "Echo",
+        primaryCategory: primaryChallenge.category || "Ultrasound",
         challengeUrl,
         appUrl: APP_URL,
         unsubscribeUrl,
@@ -264,7 +274,7 @@ async function sendChallengeNotifications(
       await sgMail.send({
         to: user.email!,
         from: { email: SENDGRID_FROM_EMAIL, name: SENDGRID_FROM_NAME },
-        subject: `🔥 Today's Echo Challenges Are Live — ${todayStr}`,
+        subject: `🔥 Today's Ultrasound Challenges Are Live — ${todayETLong()}`,
         html,
       });
 
@@ -309,7 +319,7 @@ function buildEmailHtml({
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Daily Echo Challenges</title>
+  <title>Daily Ultrasound Challenges</title>
 </head>
 <body style="margin:0;padding:0;background:#f4f7f9;font-family:'Helvetica Neue',Arial,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f7f9;padding:32px 0;">

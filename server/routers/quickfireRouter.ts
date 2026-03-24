@@ -1298,7 +1298,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
 
         const raw = JSON.parse(cleaned);
 
-        // Step 3: normalise — accept both {questions:[]} and a root array
+        // Step 3: normalize — accept both {questions:[]} and a root array
         if (Array.isArray(raw)) {
           parsedResult = { questions: raw };
         } else if (raw && Array.isArray(raw.questions)) {

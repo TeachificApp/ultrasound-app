@@ -52,7 +52,7 @@ const LUNG_VIEWS = [
     ],
     pitfalls: [
       "Previous pleurodesis causes absent sliding without PTX",
-      "Subcutaneous emphysema prevents pleural line visualisation",
+      "Subcutaneous emphysema prevents pleural line visualization",
       "Bilateral absent sliding in intubated patients = consider main-stem intubation",
     ],
     measurements: ["Lung point location (ICS, distance from midline)", "M-mode pattern (seashore / barcode)"],
@@ -64,14 +64,14 @@ const LUNG_VIEWS = [
   },
   {
     id: "anterior_blines",
-    group: "Anterior Zones — B-lines / Pulmonary Oedema",
+    group: "Anterior Zones — B-lines / Pulmonary edema",
     groupColor: GROUP_COLOR,
     name: "Anterior: B-line Assessment",
     probe: "Curvilinear 3.5–5 MHz or linear",
     depth: "8–12 cm",
     markerDirection: "Cephalad (longitudinal orientation)",
     patientPosition: "Supine or semi-recumbent. Bilateral anterior zones — 2nd–5th ICS, midclavicular line.",
-    description: "B-lines (comet tails) arise from the pleural line and extend to the bottom of the screen without fading. ≥3 B-lines per zone = interstitial syndrome. Bilateral anterior B-lines = pulmonary oedema (BLUE protocol). Unilateral B-lines = pneumonia, contusion.",
+    description: "B-lines (comet tails) arise from the pleural line and extend to the bottom of the screen without fading. ≥3 B-lines per zone = interstitial syndrome. Bilateral anterior B-lines = pulmonary edema (BLUE protocol). Unilateral B-lines = pneumonia, contusion.",
     howToGet: [
       "Place curvilinear probe at 2nd–3rd ICS, midclavicular line",
       "Longitudinal orientation, probe marker cephalad",
@@ -88,17 +88,17 @@ const LUNG_VIEWS = [
     tips: [
       "B-lines: arise from pleural line, extend to screen bottom, move with lung sliding",
       "≥3 B-lines per zone = interstitial syndrome",
-      "Bilateral anterior B-lines = pulmonary oedema (BLUE protocol)",
-      "Confluent B-lines (white lung) = severe oedema or ARDS",
+      "Bilateral anterior B-lines = pulmonary edema (BLUE protocol)",
+      "Confluent B-lines (white lung) = severe edema or ARDS",
     ],
     pitfalls: [
       "1–2 B-lines per zone can be normal — significance requires ≥3",
       "B-lines that don't move with lung sliding = pleural artefacts",
-      "Unilateral B-lines = pneumonia, contusion (not oedema)",
+      "Unilateral B-lines = pneumonia, contusion (not edema)",
     ],
     measurements: ["B-line count per zone (0 / 1–2 / ≥3 / confluent)", "Bilateral vs. unilateral distribution"],
     criticalFindings: [
-      "Bilateral anterior confluent B-lines = severe pulmonary oedema",
+      "Bilateral anterior confluent B-lines = severe pulmonary edema",
       "Unilateral B-lines + consolidation = pneumonia",
     ],
   },

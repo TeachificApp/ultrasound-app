@@ -1089,7 +1089,7 @@ export default function ChallengeCardGenerator() {
 
   const isLoading = isToday ? todayQuery.isLoading : dateQuery.isLoading;
   const error = isToday ? todayQuery.error : dateQuery.error;
-  // Normalise to a flat array of CategoryItem
+  // normalize to a flat array of CategoryItem
   const data: any[] | undefined = useMemo(() => {
     if (isToday) return todayQuery.data as any[] | undefined;
     const d = dateQuery.data as { date: string; results: any[] } | undefined;

@@ -1,5 +1,5 @@
 /**
- * Unit tests for MediaDropzone upload endpoint behaviour.
+ * Unit tests for MediaDropzone upload endpoint behavior.
  *
  * We test the /api/upload-question-media route logic via the server
  * rather than the React component (which requires a browser environment).

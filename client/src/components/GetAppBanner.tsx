@@ -1,7 +1,7 @@
 /**
  * GetAppBanner — PWA "Get App" install banner.
  *
- * Behaviour:
+ * behavior:
  * - Shows on every dashboard page load on mobile (< 768px) unless already running in standalone/PWA mode
  * - Android/Chrome: uses native beforeinstallprompt for one-tap install
  * - iOS Safari: shows "Add to Home Screen" instruction overlay

@@ -92,7 +92,7 @@ function runLiRADS(v: Record<string, string>): InterpretationResult {
     };
   if (anc === "benign")
     return {
-      interpretation: "LR-1 — Definitely benign. Ancillary features favour benign entity.",
+      interpretation: "LR-1 — Definitely benign. Ancillary features favor benign entity.",
       severity: "normal",
       nextStep: "Routine surveillance per underlying liver disease protocol.",
       reference: "ACR LI-RADS v2018",
@@ -310,7 +310,7 @@ function runCervicalLength(v: Record<string, string>): InterpretationResult {
     return { interpretation: `Cervical length ${cl} mm at ${ga} weeks — borderline short.`, severity: "mild", nextStep: history ? "Progesterone therapy recommended. Obstetric review." : "Repeat cervical length in 2 weeks. Consider progesterone if < 20 mm confirmed.", reference: "SMFM/ACOG" };
   if (cl >= 10 && cl < 20)
     return { interpretation: `Short cervix — ${cl} mm at ${ga} weeks. Elevated risk of preterm birth.`, severity: "moderate", nextStep: "Vaginal progesterone 200 mg nightly. Maternal-fetal medicine referral. Consider cerclage if prior preterm birth.", reference: "SMFM/ACOG" };
-  return { interpretation: `Very short cervix — ${cl} mm at ${ga} weeks. High risk of imminent preterm labour.`, severity: "critical", nextStep: "Urgent MFM referral. Hospital admission may be required. Corticosteroids and tocolysis per obstetric protocol.", reference: "SMFM/ACOG" };
+  return { interpretation: `Very short cervix — ${cl} mm at ${ga} weeks. High risk of imminent preterm labor.`, severity: "critical", nextStep: "Urgent MFM referral. Hospital admission may be required. Corticosteroids and tocolysis per obstetric protocol.", reference: "SMFM/ACOG" };
 }
 
 // ── Fetal Growth ───────────────────────────────────────────────────────────────
@@ -374,7 +374,7 @@ function runCarotid(v: Record<string, string>): InterpretationResult {
   let sev: Severity, interp: string, next: string;
   if (psv < 125 && ratio < 2.0) {
     if (plaque === "none") { sev = "normal";   interp = "Normal ICA. No significant stenosis. No plaque identified.";                                                                                                                                                         next = "Routine follow-up per cardiovascular risk profile."; }
-    else                   { sev = "mild";     interp = `< 50% ICA stenosis. Plaque present (${plaque}). PSV ${psv} cm/s.`;                                                                                                                                                   next = "Optimise cardiovascular risk factors. Repeat duplex in 12 months."; }
+    else                   { sev = "mild";     interp = `< 50% ICA stenosis. Plaque present (${plaque}). PSV ${psv} cm/s.`;                                                                                                                                                   next = "optimize cardiovascular risk factors. Repeat duplex in 12 months."; }
   } else if (psv < 230 && edv < 100 && ratio < 4.0) {
                              sev = "moderate"; interp = `50–69% ICA stenosis. PSV ${psv} cm/s, EDV ${edv} cm/s, ICA/CCA ratio ${ratio}.`;                                                                                                                                    next = "Vascular surgery referral. CT/MR angiography for surgical planning. Antiplatelet therapy.";
   } else if (psv >= 230 || edv >= 100 || ratio >= 4.0) {
@@ -494,11 +494,11 @@ function runRotatorCuff(v: Record<string, string>): InterpretationResult {
   if (continuity === "intact") return { interpretation: "Intact rotator cuff. No tear identified.", severity: "normal", nextStep: "Physiotherapy for symptom management.", reference: "ESSR/ACR MSK Guidelines" };
   if (continuity === "partial") {
     const sev: Severity = width < 5 ? "mild" : "moderate";
-    return { interpretation: `Partial-thickness rotator cuff tear. Width ${width} mm.`, severity: sev, nextStep: "Orthopaedic referral. Physiotherapy. Consider corticosteroid injection for pain management.", reference: "ESSR/ACR MSK Guidelines" };
+    return { interpretation: `Partial-thickness rotator cuff tear. Width ${width} mm.`, severity: sev, nextStep: "orthopedic referral. Physiotherapy. Consider corticosteroid injection for pain management.", reference: "ESSR/ACR MSK Guidelines" };
   }
   let sev: Severity = "moderate";
-  let next = "Orthopaedic referral for surgical assessment.";
-  if (width > 30 || retraction > 30 || fatty === "severe") { sev = "severe"; next = "Urgent orthopaedic referral. Large/massive tear with fatty infiltration — surgical repair may be limited."; }
+  let next = "orthopedic referral for surgical assessment.";
+  if (width > 30 || retraction > 30 || fatty === "severe") { sev = "severe"; next = "Urgent orthopedic referral. Large/massive tear with fatty infiltration — surgical repair may be limited."; }
   return { interpretation: `Full-thickness rotator cuff tear. Width ${width} mm, retraction ${retraction} mm${fatty !== "none" ? `, fatty infiltration: ${fatty}` : ""}.`, severity: sev, nextStep: next, reference: "ESSR/ACR MSK Guidelines" };
 }
 
@@ -510,7 +510,7 @@ function runBLines(v: Record<string, string>): InterpretationResult {
 
   if (aLines && zones === 0) return { interpretation: "A-lines present bilaterally. No B-lines. Normal lung aeration.", severity: "normal", nextStep: "No pulmonary congestion on POCUS.", reference: "BLUE Protocol / EACVI/ASE Guidelines" };
   if (zones < 2)             return { interpretation: `Focal B-lines in ${zones} zone(s). Localised finding — may represent focal consolidation or contusion.`, severity: "mild", nextStep: "Correlate with clinical context. Consider chest X-ray.", reference: "BLUE Protocol / EACVI/ASE Guidelines" };
-  if (zones >= 2 && bilateral) return { interpretation: `Bilateral B-lines in ${zones} zones. Pulmonary congestion pattern. Consistent with cardiogenic pulmonary oedema or ARDS.`, severity: "severe", nextStep: "Correlate with BNP/NT-proBNP, clinical status, and echo. Diuresis if cardiogenic. Urgent medical review.", reference: "BLUE Protocol / EACVI/ASE Guidelines" };
+  if (zones >= 2 && bilateral) return { interpretation: `Bilateral B-lines in ${zones} zones. Pulmonary congestion pattern. Consistent with cardiogenic pulmonary edema or ARDS.`, severity: "severe", nextStep: "Correlate with BNP/NT-proBNP, clinical status, and echo. Diuresis if cardiogenic. Urgent medical review.", reference: "BLUE Protocol / EACVI/ASE Guidelines" };
   return { interpretation: `B-lines in ${zones} zones (unilateral or limited). Possible early congestion or focal pathology.`, severity: "moderate", nextStep: "Correlate with clinical context. Repeat assessment after diuresis or position change.", reference: "BLUE Protocol / EACVI/ASE Guidelines" };
 }
 
@@ -657,8 +657,8 @@ function LiRADSTool() {
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="none">None</SelectItem>
-              <SelectItem value="benign">Favour benign</SelectItem>
-              <SelectItem value="malignant">Favour malignant (non-HCC)</SelectItem>
+              <SelectItem value="benign">favor benign</SelectItem>
+              <SelectItem value="malignant">favor malignant (non-HCC)</SelectItem>
             </SelectContent>
           </Select>
         </FieldRow>
