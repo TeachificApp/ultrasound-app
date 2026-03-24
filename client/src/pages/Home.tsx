@@ -32,7 +32,7 @@ function useCountUp(target: number, duration = 1800) {
 }
 import {
   Calculator, Activity, BookOpen, FileText,
-  ArrowRight, Users, Award, Zap, Stethoscope, ExternalLink, MessageCircle, GraduationCap, BookMarked, Crown, Shield, Heart, ClipboardCheck
+  ArrowRight, Users, Award, Zap, Stethoscope, ExternalLink, MessageCircle, GraduationCap, BookMarked, Crown, Shield, Heart, ClipboardCheck, BrainCircuit
 } from "lucide-react";
 
 const BRAND = "#189aa1";
@@ -68,6 +68,14 @@ const modules: Module[] = [
     title: "UltrasoundAssist™ Calculators",
     description: "Guideline-based calculators for POCUS (IVC CI, B-line score, eFAST grader) and Fetal Echo (biometrics, cardiac measurements, z-scores).",
     badge: "Guideline-Based",
+    color: BRAND,
+  },
+  {
+    path: "/clinical-intelligence",
+    icon: BrainCircuit,
+    title: "Clinical Intelligence",
+    description: "AI-powered clinical interpretation engine for ultrasound findings — structured reports, differential diagnoses, and guideline-based next steps across all specialties.",
+    badge: "AI-Powered",
     color: BRAND,
   },
   {

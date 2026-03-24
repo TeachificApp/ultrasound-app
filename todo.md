@@ -703,3 +703,6 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Audit all client UI pages/components for non-US English spelling
 - [ ] Audit all server-side user-facing strings for non-US English spelling
 - [ ] Fix all occurrences: colour→color, organisation→organization, analyse→analyze, centre→center, behaviour→behavior, etc.
+
+## Dashboard Card Addition (Mar 24)
+- [x] Add Clinical Intelligence card between Calculators and Daily Challenge cards on dashboard
