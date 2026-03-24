@@ -44,7 +44,9 @@ import {
   Lock,
   LogIn,
   Link2,
+  Crown,
 } from "lucide-react";
+import { getThinkificPremiumMonthlyUrl } from "@/const";
 import { formatDistanceToNow } from "date-fns";
 import { formatViewCount, getDisplayViewCount } from "@/lib/caseViewCount";
 import CaseLibraryBanner from "@/components/CaseLibraryBanner";
@@ -119,6 +121,7 @@ export default function CaseLibrary() {
   const total = data?.total ?? 0;
   const totalPages = Math.ceil(total / limit);
   const mySubmissions = mySubmissionsQuery.data ?? [];
+  const accessStatus = data?.accessStatus;
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearch(e.target.value);
@@ -182,6 +185,41 @@ export default function CaseLibrary() {
             </a>
           )}
         </div>
+
+        {/* Access status banner for non-premium users */}
+        {isAuthenticated && accessStatus && !accessStatus.isPremium && (
+          <div className={`mb-5 rounded-xl border px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+            accessStatus.limitReached
+              ? "bg-amber-50 border-amber-200"
+              : "bg-teal-50 border-teal-200"
+          }`}>
+            <div className="flex items-center gap-2.5">
+              {accessStatus.limitReached
+                ? <Lock className="w-4 h-4 text-amber-600 shrink-0" />
+                : <BookOpen className="w-4 h-4 text-teal-600 shrink-0" />
+              }
+              <div>
+                <p className={`text-sm font-medium ${accessStatus.limitReached ? "text-amber-800" : "text-teal-800"}`}>
+                  {accessStatus.limitReached
+                    ? `You've reached your ${accessStatus.caseLimit}-case limit`
+                    : `${accessStatus.casesViewed} of ${accessStatus.caseLimit} cases viewed`
+                  }
+                </p>
+                <p className={`text-xs ${accessStatus.limitReached ? "text-amber-600" : "text-teal-600"}`}>
+                  {accessStatus.limitReached
+                    ? "Upgrade to UltrasoundAssist\u2122 Premium for unlimited access to all cases."
+                    : `Upgrade to Premium for unlimited access to all ${total.toLocaleString()} cases.`
+                  }
+                </p>
+              </div>
+            </div>
+            <a href={getThinkificPremiumMonthlyUrl()} target="_blank" rel="noopener noreferrer">
+              <Button size="sm" className="gap-1.5 text-white shrink-0" style={{ background: "#189aa1" }}>
+                <Crown className="w-3.5 h-3.5" /> Upgrade to Premium
+              </Button>
+            </a>
+          </div>
+        )}
 
         {/* Tabs (only show My Submissions when authenticated) */}
         {isAuthenticated && (

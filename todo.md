@@ -706,3 +706,19 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 
 ## Dashboard Card Addition (Mar 24)
 - [x] Add Clinical Intelligence card between Calculators and Daily Challenge cards on dashboard
+
+## Case Library Tiered Access (Mar 24)
+- [ ] Non-premium users: show only 10 cases with media (locked after 10)
+- [ ] Free users: allow 1 case view only, then show upgrade prompt
+- [ ] Track free-user case views server-side
+- [ ] Build upgrade prompt UI modal/banner for both tiers
+
+## Case Library Tiered Access (Mar 24)
+- [x] Created userCaseViews table (userId + caseId unique index) for tracking distinct cases opened per user
+- [x] Applied DB migration: CREATE TABLE userCaseViews
+- [x] Updated getCase to enforce tiered limits: free users (no thinkificEnrolledAt) = 1 case, non-premium Thinkific members = 10 cases, premium/admin = unlimited
+- [x] Updated listCases to return accessStatus (isPremium, isFreeUser, caseLimit, casesViewed, limitReached) for frontend
+- [x] Built upgrade prompt page in CaseDetail.tsx for FREE_LIMIT_REACHED and PREMIUM_LIMIT_REACHED errors
+- [x] Added access status banner to CaseLibrary.tsx showing cases viewed / limit with upgrade CTA
+- [x] Updated caseLibrary.auth.test.ts to cover new tiered access model (5 tests)
+- [x] 747 tests passing after all changes

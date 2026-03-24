@@ -32,6 +32,7 @@ import {
   echoLibraryCaseQuestions,
   echoLibraryCaseAttempts,
   caseViewEvents,
+  userCaseViews,
   users,
 } from "../../drizzle/schema";
 import { eq, and, desc, sql, count, like, or, gte } from "drizzle-orm";
@@ -185,6 +186,35 @@ export const caseLibraryRouter = router({
 
       const rawTotal = totalResult[0]?.count ?? 0;
 
+      // ─── Access status for the current user ───────────────────────────────────────────
+      let accessStatus: {
+        isPremium: boolean;
+        isFreeUser: boolean;
+        caseLimit: number | null;
+        casesViewed: number;
+        limitReached: boolean;
+      } = { isPremium: true, isFreeUser: false, caseLimit: null, casesViewed: 0, limitReached: false };
+
+      if (ctx.user) {
+        const isAdminUser = ctx.user.role === "admin";
+        const isPremiumUser = ctx.user.isPremium === true;
+        if (!isAdminUser && !isPremiumUser) {
+          const isFreeUser = !ctx.user.thinkificEnrolledAt && !isPremiumUser;
+          const caseLimit = isFreeUser ? 1 : 10;
+          const [{ viewedCount }] = await db
+            .select({ viewedCount: count(userCaseViews.id) })
+            .from(userCaseViews)
+            .where(eq(userCaseViews.userId, ctx.user.id));
+          accessStatus = {
+            isPremium: false,
+            isFreeUser,
+            caseLimit,
+            casesViewed: viewedCount,
+            limitReached: viewedCount >= caseLimit,
+          };
+        }
+      }
+
       return {
         cases: cases.map((c) => ({
           ...c,
@@ -194,8 +224,7 @@ export const caseLibraryRouter = router({
         total: rawTotal,
         page: input.page,
         limit: input.limit,
-        isPremiumGated: false,
-        freeCaseLimit: null,
+        accessStatus,
       };
     }),
 
@@ -215,6 +244,52 @@ export const caseLibraryRouter = router({
       if (!caseRow) throw new TRPCError({ code: "NOT_FOUND", message: "Case not found" });
       if (caseRow.status !== "approved" && ctx.user?.role !== "admin") {
         throw new TRPCError({ code: "NOT_FOUND", message: "Case not found" });
+      }
+
+      // ─── Tiered access gating ─────────────────────────────────────────────
+      // Admins: unlimited access
+      // Premium users (isPremium=true): unlimited access
+      // Non-premium logged-in users: 10 distinct cases max
+      // Free / unauthenticated: 1 distinct case max (protectedProcedure ensures login)
+      const isAdmin = ctx.user.role === "admin";
+      const isPremium = ctx.user.isPremium === true;
+
+      if (!isAdmin && !isPremium) {
+        // Determine limit: free users (never paid, no premium) get 1; non-premium Thinkific members get 10
+        // We treat all non-premium logged-in users as "non-premium" with a limit of 10.
+        // If the user has no thinkificEnrolledAt and no premium, they are a free user with limit 1.
+        const isFreeUser = !ctx.user.thinkificEnrolledAt && !isPremium;
+        const caseLimit = isFreeUser ? 1 : 10;
+
+        // Check if this case is already in their viewed set
+        const [existingView] = await db
+          .select({ id: userCaseViews.id })
+          .from(userCaseViews)
+          .where(and(eq(userCaseViews.userId, ctx.user.id), eq(userCaseViews.caseId, input.id)))
+          .limit(1);
+
+        if (!existingView) {
+          // Count distinct cases already viewed
+          const [{ viewedCount }] = await db
+            .select({ viewedCount: count(userCaseViews.id) })
+            .from(userCaseViews)
+            .where(eq(userCaseViews.userId, ctx.user.id));
+
+          if (viewedCount >= caseLimit) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: isFreeUser
+                ? `FREE_LIMIT_REACHED:${caseLimit}`
+                : `PREMIUM_LIMIT_REACHED:${caseLimit}`,
+            });
+          }
+
+          // Record this new distinct case view
+          await db
+            .insert(userCaseViews)
+            .values({ userId: ctx.user.id, caseId: input.id })
+            .catch(() => {}); // ignore duplicate key on race condition
+        }
       }
 
       // Increment view count and log event (fire-and-forget)

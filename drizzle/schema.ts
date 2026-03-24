@@ -1444,6 +1444,21 @@ export const caseViewEvents = mysqlTable("caseViewEvents", {
 });
 export type CaseViewEvent = typeof caseViewEvents.$inferSelect;
 
+// ─── User Case Views (distinct cases opened per user, for access gating) ────
+export const userCaseViews = mysqlTable(
+  "userCaseViews",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    caseId: int("caseId").notNull(),
+    firstViewedAt: timestamp("firstViewedAt").defaultNow().notNull(),
+  },
+  (t) => ({
+    uniq: uniqueIndex("userCaseViews_userId_caseId_uniq").on(t.userId, t.caseId),
+  })
+);
+export type UserCaseView = typeof userCaseViews.$inferSelect;
+
 // ─── Possible Case Studies (IAC Submission Candidates) ───────────────────────
 // Tracks echo cases identified during quality reviews as potential IAC case
 // submissions. Each record gets a unique human-readable case study ID.
