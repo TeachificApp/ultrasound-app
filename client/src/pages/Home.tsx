@@ -74,8 +74,8 @@ const modules: Module[] = [
     path: "/clinical-intelligence",
     icon: BrainCircuit,
     title: "Clinical Intelligence",
-    description: "AI-powered clinical interpretation engine for ultrasound findings — structured reports, differential diagnoses, and guideline-based next steps across all specialties.",
-    badge: "AI-Powered",
+    description: "Clinical interpretation engine for ultrasound findings — structured reports, differential diagnoses, and guideline-based next steps across all specialties.",
+    badge: "Clinical",
     color: BRAND,
   },
   {
