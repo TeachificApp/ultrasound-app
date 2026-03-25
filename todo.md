@@ -730,3 +730,9 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Student play route: /quiz/:joinCode — public (no auth required to play)
 - [x] No public nav links or dashboard cards — hidden from all non-admin users
 - [x] 747 tests passing after implementation
+
+## Unsubscribe Link Fix & GIF Search (Mar 25)
+- [ ] Diagnose broken unsubscribe link in challenge emails
+- [ ] Fix unsubscribe endpoint and token generation
+- [ ] Add GIF/media search widget to SonoQuiz question editor
+- [x] Restrict daily challenge emails to users who have logged in at least once (isPending = false)

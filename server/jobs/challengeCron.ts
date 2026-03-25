@@ -20,7 +20,19 @@ import { getDb } from "../db";
 import { quickfireChallenges, users } from "../../drizzle/schema";
 import { eq, and, asc, or, isNull, lte, sql } from "drizzle-orm";
 import sgMail from "@sendgrid/mail";
-import { generateUnsubscribeToken } from "../routes/unsubscribe";
+import { randomBytes } from "crypto";
+
+/** Get or create the stored hex unsubscribe token for a user (matches what the frontend /unsubscribe page expects). */
+async function getOrCreateUnsubscribeToken(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  userId: number,
+  existingToken: string | null
+): Promise<string> {
+  if (existingToken) return existingToken;
+  const token = randomBytes(32).toString("hex");
+  await db.update(users).set({ unsubscribeToken: token }).where(eq(users.id, userId));
+  return token;
+}
 
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY ?? "";
 const SENDGRID_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL ?? "noreply@allaboutultrasound.com";
@@ -221,7 +233,13 @@ async function sendChallengeNotifications(
       unsubscribeToken: users.unsubscribeToken,
     })
     .from(users)
-    .where(eq(users.isDemo, false));
+    .where(
+      and(
+        eq(users.isDemo, false),
+        // Only notify users who have logged in at least once (not pending pre-registrations)
+        eq(users.isPending, false)
+      )
+    );
 
   const usersToNotify = eligibleUsers.filter((u) => {
     if (!u.email) return false;
@@ -256,8 +274,8 @@ async function sendChallengeNotifications(
   for (const user of usersToNotify) {
     try {
       const userName = user.displayName || user.name || "Ultrasound Enthusiast";
-      const unsubToken = user.unsubscribeToken || generateUnsubscribeToken(user.id);
-      const unsubscribeUrl = `${APP_URL}/unsubscribe?token=${unsubToken}&type=challenge`;
+      const unsubToken = await getOrCreateUnsubscribeToken(db, user.id, user.unsubscribeToken ?? null);
+      const unsubscribeUrl = `${APP_URL}/unsubscribe?token=${unsubToken}`;
       const challengeUrl = `${APP_URL}/quickfire`;
 
       const html = buildEmailHtml({
