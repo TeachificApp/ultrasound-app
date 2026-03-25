@@ -1,0 +1,16 @@
+{
+  "query": "SELECT id, email, unsubscribeToken, lastChallengeNotifDate FROM users WHERE unsubscribeToken IS NOT NULL AND unsubscribeToken != '' LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT id, email, unsubscribeToken, lastChallengeNotifDate FROM users WHERE unsubscribeToken IS NOT NULL AND unsubscribeToken != '' LIMIT 10;",
+  "rows": [
+    {
+      "id": "175",
+      "email": "lmiller1002@gmail.com",
+      "unsubscribeToken": "d876404d3e4885be18dd1dc40aa2ad205b1a0b666cfd8a238dd3f676066b2b17",
+      "lastChallengeNotifDate": "2026-03-25"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\temail\tunsubscribeToken\tlastChallengeNotifDate\n175\tlmiller1002@gmail.com\td876404d3e4885be18dd1dc40aa2ad205b1a0b666cfd8a238dd3f676066b2b17\t2026-03-25\n",
+  "stderr": "",
+  "execution_time_ms": 111
+}

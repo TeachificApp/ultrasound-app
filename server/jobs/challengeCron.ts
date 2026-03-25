@@ -20,18 +20,23 @@ import { getDb } from "../db";
 import { quickfireChallenges, users } from "../../drizzle/schema";
 import { eq, and, asc, or, isNull, lte, sql } from "drizzle-orm";
 import sgMail from "@sendgrid/mail";
-import { randomBytes } from "crypto";
+import crypto from "crypto";
+import { ENV } from "../_core/env";
+import { syncIheUnsubscribes } from "./syncIheUnsubscribes";
 
-/** Get or create the stored hex unsubscribe token for a user (matches what the frontend /unsubscribe page expects). */
-async function getOrCreateUnsubscribeToken(
-  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
-  userId: number,
-  existingToken: string | null
-): Promise<string> {
-  if (existingToken) return existingToken;
-  const token = randomBytes(32).toString("hex");
-  await db.update(users).set({ unsubscribeToken: token }).where(eq(users.id, userId));
-  return token;
+/**
+ * Generate a self-contained HMAC-signed unsubscribe token.
+ * Format (base64url): userId:timestamp:hmac
+ * No DB write required — verified server-side at /api/unsubscribe.
+ */
+function generateUnsubscribeToken(userId: number): string {
+  const timestamp = Date.now();
+  const payload = `${userId}:${timestamp}`;
+  const hmac = crypto
+    .createHmac("sha256", ENV.cookieSecret)
+    .update(payload)
+    .digest("hex");
+  return Buffer.from(`${payload}:${hmac}`).toString("base64url");
 }
 
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY ?? "";
@@ -199,7 +204,11 @@ export async function runChallengeCron() {
       console.log(`[ChallengeCron] Published challenge #${challenge.id}: "${challenge.title}" (${challenge.category})`);
     }
 
-    // ── Step 6: Send notification emails at 6 AM ET ───────────────────────────
+    // ── Step 6: Sync iHeartEcho unsubscribes before sending emails ─────────────
+    // Ensures anyone who opted out of iHeartEcho emails is also excluded here.
+    await syncIheUnsubscribes();
+
+    // ── Step 7: Send notification emails ─────────────────────────────────────
     await sendChallengeNotifications(db, toPublish, todayStr);
 
   } catch (err) {
@@ -230,7 +239,6 @@ async function sendChallengeNotifications(
       name: users.name,
       lastChallengeNotifDate: users.lastChallengeNotifDate,
       notificationPrefs: users.notificationPrefs,
-      unsubscribeToken: users.unsubscribeToken,
     })
     .from(users)
     .where(
@@ -274,8 +282,9 @@ async function sendChallengeNotifications(
   for (const user of usersToNotify) {
     try {
       const userName = user.displayName || user.name || "Ultrasound Enthusiast";
-      const unsubToken = await getOrCreateUnsubscribeToken(db, user.id, user.unsubscribeToken ?? null);
-      const unsubscribeUrl = `${APP_URL}/unsubscribe?token=${unsubToken}`;
+      // Use HMAC-signed token — no DB write needed, verified at /api/unsubscribe
+      const unsubToken = generateUnsubscribeToken(user.id);
+      const unsubscribeUrl = `${APP_URL}/api/unsubscribe?token=${unsubToken}`;
       const challengeUrl = `${APP_URL}/quickfire`;
 
       const html = buildEmailHtml({

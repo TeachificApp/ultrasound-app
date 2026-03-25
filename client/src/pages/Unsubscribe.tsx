@@ -1,6 +1,13 @@
 /**
- * Unsubscribe page — one-click opt-out from platform campaign emails
- * Route: /unsubscribe?token=<token>
+ * Unsubscribe page — one-click opt-out from platform emails.
+ *
+ * Two flows:
+ *  1. Server-side HMAC redirect (challenge cron emails):
+ *     /api/unsubscribe?token=<hmac> → server processes → redirects to
+ *     /unsubscribe?status=success|already|invalid|notfound|error
+ *
+ *  2. Legacy tRPC token flow (campaign emails):
+ *     /unsubscribe?token=<hex> → calls trpc.emailCampaign.unsubscribe
  */
 import { useEffect, useState } from "react";
 import { useSearch, Link } from "wouter";
@@ -14,24 +21,32 @@ const brandDark = "#0e1e2e";
 export default function Unsubscribe() {
   const search = useSearch();
   const params = new URLSearchParams(search);
-  const token = params.get("token") ?? "";
+  const status = params.get("status"); // from HMAC server redirect
+  const token = params.get("token");   // from legacy tRPC flow
 
   const [attempted, setAttempted] = useState(false);
-
   const unsubscribeMutation = trpc.emailCampaign.unsubscribe.useMutation();
 
+  // Only call tRPC mutation if we have a raw token (legacy campaign emails)
+  // and no server-side status (HMAC flow already processed server-side)
   useEffect(() => {
-    if (token && !attempted) {
+    if (token && !status && !attempted) {
       setAttempted(true);
       unsubscribeMutation.mutate({ token });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, status]);
 
-  const isLoading = unsubscribeMutation.isPending || (!attempted && !!token);
-  const isSuccess = unsubscribeMutation.isSuccess;
-  const isError = unsubscribeMutation.isError || (!token);
-  const alreadyDone = unsubscribeMutation.data?.alreadyUnsubscribed;
+  // Determine display state
+  const isServerFlow = !!status;
+  const serverSuccess = status === "success" || status === "already";
+  const serverAlready = status === "already";
+  const serverError = status === "invalid" || status === "notfound" || status === "error";
+
+  const isLoading = !isServerFlow && (unsubscribeMutation.isPending || (!attempted && !!token));
+  const isSuccess = isServerFlow ? serverSuccess : unsubscribeMutation.isSuccess;
+  const isError = isServerFlow ? serverError : (unsubscribeMutation.isError || !token);
+  const alreadyDone = isServerFlow ? serverAlready : unsubscribeMutation.data?.alreadyUnsubscribed;
 
   return (
     <div
@@ -82,22 +97,14 @@ export default function Unsubscribe() {
               </h2>
               <p className="text-gray-500 text-sm leading-relaxed mb-6">
                 {alreadyDone
-                  ? "You have already opted out of platform campaign emails. You will not receive any further marketing emails from All About Ultrasound™."
-                  : "You have been removed from our platform email list. You will no longer receive campaign or marketing emails from All About Ultrasound™."}
+                  ? "You have already opted out of platform emails. You will not receive any further marketing emails from All About Ultrasound™."
+                  : "You have been removed from our email list. You will no longer receive daily challenge notifications or campaign emails from All About Ultrasound™."}
               </p>
               <p className="text-xs text-gray-400 mb-6">
-                Note: You may still receive transactional emails such as password resets, account
-                notifications, and daily challenge reminders (if enabled in your profile).
+                Note: You may still receive transactional emails such as password resets and
+                account notifications.
               </p>
               <div className="flex flex-col gap-3">
-                <Link href="/profile#interests">
-                  <Button
-                    className="w-full"
-                    style={{ background: brandColor, color: "#fff" }}
-                  >
-                    Manage Interest Preferences
-                  </Button>
-                </Link>
                 <Link href="/">
                   <Button variant="outline" className="w-full gap-2">
                     <ArrowLeft className="w-4 h-4" />
@@ -113,8 +120,10 @@ export default function Unsubscribe() {
               <XCircle className="w-14 h-14 mx-auto mb-4 text-red-400" />
               <h2 className="text-xl font-bold text-gray-800 mb-2">Invalid Link</h2>
               <p className="text-gray-500 text-sm leading-relaxed mb-6">
-                {!token
-                  ? "No unsubscribe token was found in the link. Please use the unsubscribe link from your email."
+                {status === "notfound"
+                  ? "We could not find an account associated with this unsubscribe link."
+                  : status === "error"
+                  ? "Something went wrong processing your request. Please try again or contact support."
                   : "This unsubscribe link is invalid or has expired. Please use the link from your most recent email."}
               </p>
               <Link href="/">

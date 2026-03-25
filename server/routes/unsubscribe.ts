@@ -5,6 +5,12 @@
  * Token format (base64url): userId:timestamp:hmac
  * HMAC uses JWT_SECRET so tokens cannot be forged.
  * Tokens expire after 30 days.
+ *
+ * On success: sets unsubscribedAt + disables dailyChallenge in notificationPrefs,
+ * then redirects to /unsubscribe?status=success (React page shows confirmation UI).
+ *
+ * NOTE: iHeartEcho and UltrasoundAssist share the same database, so any unsubscribe
+ * here is automatically respected across both apps.
  */
 import type { Express } from "express";
 import crypto from "crypto";
@@ -56,46 +62,58 @@ export function registerUnsubscribeRoute(app: Express) {
     const token = req.query.token as string | undefined;
 
     if (!token) {
-      return res.redirect(302, "/profile#notifications?unsubscribe=invalid");
+      return res.redirect(302, "/unsubscribe?status=invalid");
     }
 
     const parsed = verify(token);
     if (!parsed) {
-      return res.redirect(302, "/profile#notifications?unsubscribe=invalid");
+      return res.redirect(302, "/unsubscribe?status=invalid");
     }
 
     try {
-      // Parse current notificationPrefs and disable quickfireReminder
       const db = await getDb();
-      if (!db) return res.redirect(302, "/profile#notifications?unsubscribe=error");
+      if (!db) return res.redirect(302, "/unsubscribe?status=error");
 
       const [userRow] = await db
-        .select({ notificationPrefs: users.notificationPrefs })
+        .select({
+          id: users.id,
+          unsubscribedAt: users.unsubscribedAt,
+          notificationPrefs: users.notificationPrefs,
+        })
         .from(users)
         .where(eq(users.id, parsed.userId))
         .limit(1);
 
       if (!userRow) {
-        return res.redirect(302, "/profile#notifications?unsubscribe=notfound");
+        return res.redirect(302, "/unsubscribe?status=notfound");
       }
 
+      // Already unsubscribed — just show success
+      if (userRow.unsubscribedAt) {
+        return res.redirect(302, "/unsubscribe?status=already");
+      }
+
+      // Parse prefs and disable dailyChallenge
       let prefs: Record<string, unknown> = {};
       try {
-        prefs = JSON.parse(userRow.notificationPrefs ?? "{}");
+        prefs = JSON.parse((userRow.notificationPrefs as string) ?? "{}");
       } catch {
         prefs = {};
       }
-      prefs.quickfireReminder = false;
+      prefs.dailyChallenge = false;
 
       await db
         .update(users)
-        .set({ notificationPrefs: JSON.stringify(prefs) })
-        .where(eq(users.id, parsed.userId));
+        .set({
+          unsubscribedAt: new Date(),
+          notificationPrefs: JSON.stringify(prefs),
+        })
+        .where(eq(users.id, userRow.id));
 
-      return res.redirect(302, "/profile#notifications?unsubscribe=success");
+      return res.redirect(302, "/unsubscribe?status=success");
     } catch (err) {
       console.error("[Unsubscribe] Error:", err);
-      return res.redirect(302, "/profile#notifications?unsubscribe=error");
+      return res.redirect(302, "/unsubscribe?status=error");
     }
   });
 }

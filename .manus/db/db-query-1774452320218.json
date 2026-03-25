@@ -1,0 +1,16 @@
+{
+  "query": "SELECT COUNT(*) as total_users, SUM(CASE WHEN unsubscribeToken IS NOT NULL AND unsubscribeToken != '' THEN 1 ELSE 0 END) as has_token, SUM(CASE WHEN lastChallengeNotifDate = '2026-03-25' THEN 1 ELSE 0 END) as notified_today, SUM(CASE WHEN isPending = 0 AND isDemo = 0 THEN 1 ELSE 0 END) as active_users FROM users;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT COUNT(*) as total_users, SUM(CASE WHEN unsubscribeToken IS NOT NULL AND unsubscribeToken != '' THEN 1 ELSE 0 END) as has_token, SUM(CASE WHEN lastChallengeNotifDate = '2026-03-25' THEN 1 ELSE 0 END) as notified_today, SUM(CASE WHEN isPending = 0 AND isDemo = 0 THEN 1 ELSE 0 END) as active_users FROM users;",
+  "rows": [
+    {
+      "total_users": "13727",
+      "has_token": "1",
+      "notified_today": "13699",
+      "active_users": "4"
+    }
+  ],
+  "messages": [],
+  "stdout": "total_users\thas_token\tnotified_today\tactive_users\n13727\t1\t13699\t4\n",
+  "stderr": "",
+  "execution_time_ms": 74
+}

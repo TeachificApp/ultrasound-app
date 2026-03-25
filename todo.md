@@ -736,3 +736,5 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Fix unsubscribe endpoint and token generation
 - [ ] Add GIF/media search widget to SonoQuiz question editor
 - [x] Restrict daily challenge emails to users who have logged in at least once (isPending = false)
+- [x] Fix broken unsubscribe link in challenge emails (shows Invalid Link)
+- [x] Sync iHeartEcho unsubscribe list into UltrasoundAssist to prevent cross-posting (shared DB — already unified)

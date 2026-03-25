@@ -1,0 +1,28 @@
+{
+  "query": "\nUPDATE users \nSET \n  unsubscribedAt = NOW(),\n  notificationPrefs = JSON_SET(COALESCE(notificationPrefs, '{}'), '$.dailyChallenge', FALSE)\nWHERE LOWER(email) IN (\n  'mademarina@gmail.com',\n  'courtney-collazo@smh.com',\n  'chassellsc@gmail.com'\n);\n\nSELECT id, email, unsubscribedAt, notificationPrefs \nFROM users \nWHERE LOWER(email) IN (\n  'mademarina@gmail.com',\n  'courtney-collazo@smh.com',\n  'chassellsc@gmail.com'\n);\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \nUPDATE users \nSET \n  unsubscribedAt = NOW(),\n  notificationPrefs = JSON_SET(COALESCE(notificationPrefs, '{}'), '$.dailyChallenge', FALSE)\nWHERE LOWER(email) IN (\n  'mademarina@gmail.com',\n  'courtney-collazo@smh.com',\n  'chassellsc@gmail.com'\n);\n\nSELECT id, email, unsubscribedAt, notificationPrefs \nFROM users \nWHERE LOWER(email) IN (\n  'mademarina@gmail.com',\n  'courtney-collazo@smh.com',\n  'chassellsc@gmail.com'\n);\n",
+  "rows": [
+    {
+      "id": "1811",
+      "email": "mademarina@gmail.com",
+      "unsubscribedAt": "2026-03-25 15:27:48",
+      "notificationPrefs": "{\"dailyChallenge\": false}"
+    },
+    {
+      "id": "11541",
+      "email": "chassellsc@gmail.com",
+      "unsubscribedAt": "2026-03-25 15:27:48",
+      "notificationPrefs": "{\"dailyChallenge\": false}"
+    },
+    {
+      "id": "19807",
+      "email": "courtney-collazo@smh.com",
+      "unsubscribedAt": "2026-03-25 15:27:48",
+      "notificationPrefs": "{\"dailyChallenge\": false}"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\temail\tunsubscribedAt\tnotificationPrefs\n1811\tmademarina@gmail.com\t2026-03-25 15:27:48\t{\"dailyChallenge\": false}\n11541\tchassellsc@gmail.com\t2026-03-25 15:27:48\t{\"dailyChallenge\": false}\n19807\tcourtney-collazo@smh.com\t2026-03-25 15:27:48\t{\"dailyChallenge\": false}\n",
+  "stderr": "",
+  "execution_time_ms": 215
+}
