@@ -738,3 +738,4 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Restrict daily challenge emails to users who have logged in at least once (isPending = false)
 - [x] Fix broken unsubscribe link in challenge emails (shows Invalid Link)
 - [x] Sync iHeartEcho unsubscribe list into UltrasoundAssist to prevent cross-posting (shared DB — already unified)
+- [x] Add unsubscribed emails to SendGrid Global Unsubscribe list for cross-app suppression

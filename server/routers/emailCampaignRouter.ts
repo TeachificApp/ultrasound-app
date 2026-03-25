@@ -28,6 +28,7 @@ import {
 } from "../../drizzle/schema";
 import { sendEmail } from "../_core/email";
 import { randomBytes } from "crypto";
+import { addToSendGridGlobalUnsubscribes } from "../lib/sendgridSuppressions";
 
 // ─── Shared Zod schemas ───────────────────────────────────────────────────────
 
@@ -367,7 +368,7 @@ export const emailCampaignRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [u] = await db
-        .select({ id: users.id, unsubscribedAt: users.unsubscribedAt })
+        .select({ id: users.id, email: users.email, unsubscribedAt: users.unsubscribedAt })
         .from(users)
         .where(eq(users.unsubscribeToken, input.token))
         .limit(1);
@@ -379,6 +380,10 @@ export const emailCampaignRouter = router({
           .update(users)
           .set({ unsubscribedAt: new Date() })
           .where(eq(users.id, u.id));
+        // Add to SendGrid Global Unsubscribe list — blocks delivery across all apps
+        if (u.email) {
+          await addToSendGridGlobalUnsubscribes([u.email]);
+        }
       }
       return { success: true, alreadyUnsubscribed: !!u.unsubscribedAt };
     }),
