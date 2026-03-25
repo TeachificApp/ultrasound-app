@@ -7,6 +7,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { registerChatRoutes } from "./chat";
 import { registerThinkificWebhook } from "../webhooks/thinkific";
 import { registerStripeWebhook } from "../webhooks/stripe";
+import { registerSendGridWebhook } from "../webhooks/sendgrid";
 import { registerUploadCaseMediaRoute } from "../routes/uploadCaseMedia";
 import { registerUploadQuestionImageRoute } from "../routes/uploadQuestionImage";
 import { registerUploadQuestionMediaRoute } from "../routes/uploadQuestionMedia";
@@ -55,6 +56,8 @@ async function startServer() {
   registerThinkificWebhook(app);
   // Stripe webhook for Concierge purchase activation
   registerStripeWebhook(app);
+  // SendGrid Event Webhook for unsubscribe/spamreport sync
+  registerSendGridWebhook(app);
   // Case media upload endpoint (multipart/form-data)
   registerUploadCaseMediaRoute(app);
   // Question image upload endpoint (admin only)

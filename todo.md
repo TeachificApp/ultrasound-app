@@ -739,3 +739,4 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix broken unsubscribe link in challenge emails (shows Invalid Link)
 - [x] Sync iHeartEcho unsubscribe list into UltrasoundAssist to prevent cross-posting (shared DB — already unified)
 - [x] Add unsubscribed emails to SendGrid Global Unsubscribe list for cross-app suppression
+- [x] SendGrid Event Webhook handler for unsubscribe/spamreport events
