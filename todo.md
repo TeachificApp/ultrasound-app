@@ -698,20 +698,15 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] All 746 tests passing after changes
 
 ## US English Spelling & Date Format Audit (Mar 24)
-- [ ] Fix challenge email date format to "Month DD, YYYY" (e.g., March 24, 2026)
-- [ ] Audit all email templates for non-US English spelling
-- [ ] Audit all client UI pages/components for non-US English spelling
-- [ ] Audit all server-side user-facing strings for non-US English spelling
-- [ ] Fix all occurrences: colour→color, organisation→organization, analyse→analyze, centre→center, behaviour→behavior, etc.
+- [x] Fixed challenge email date format to "Month DD, YYYY" (e.g., March 24, 2026) using todayETLong()
+- [x] Audited all email templates, client UI pages, and server strings for non-US English spelling
+- [x] Fixed all occurrences across 12 files: oedema→edema, optimise→optimize, visualise→visualize, orthopaedic→orthopedic, colour→color, behaviour→behavior, labour→labor, favour→favor, programme→program, dialogue→dialog, defence→defense, licence→license, practise→practice
+- [x] Zero non-US English spellings remain (verified with grep)
 
 ## Dashboard Card Addition (Mar 24)
 - [x] Add Clinical Intelligence card between Calculators and Daily Challenge cards on dashboard
 
-## Case Library Tiered Access (Mar 24)
-- [ ] Non-premium users: show only 10 cases with media (locked after 10)
-- [ ] Free users: allow 1 case view only, then show upgrade prompt
-- [ ] Track free-user case views server-side
-- [ ] Build upgrade prompt UI modal/banner for both tiers
+## Case Library Tiered Access (Mar 24) — SUPERSEDED by implementation below
 
 ## Case Library Tiered Access (Mar 24)
 - [x] Created userCaseViews table (userId + caseId unique index) for tracking distinct cases opened per user
@@ -722,3 +717,16 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Added access status banner to CaseLibrary.tsx showing cases viewed / limit with upgrade CTA
 - [x] Updated caseLibrary.auth.test.ts to cover new tiered access model (5 tests)
 - [x] 747 tests passing after all changes
+
+## SonoQuiz — Live Kahoot-Style Quiz Platform (Mar 25) — COMPLETED
+- [x] Added 5 new DB tables: sonoQuizSessions, sonoQuizParticipants, sonoQuizAnswers, sonoQuizSessionEvents, sonoQuizMusicTracks
+- [x] Applied DB migration for all new tables
+- [x] Built sonoQuizRouter.ts: 18 procedures (listQuizzes, getQuiz, createQuiz, updateQuiz, deleteQuiz, upsertQuestion, deleteQuestion, reorderQuestions, createSession, getSession, joinSession, startSession, advanceQuestion, endSession, submitAnswer, getLeaderboard, getSessionByCode, listSessions)
+- [x] Built sonoQuizHub.ts: WebSocket hub for real-time events (question_started, answer_locked, question_results, session_ended, participant_joined)
+- [x] Built SonoQuizCreator.tsx: quiz list, create/edit quiz, question editor with media URL, per-question time limit, music selection, theme picker, answer options
+- [x] Built SonoQuizHost.tsx: session launch, QR code (qrcode.react), participant list, advance questions, live results bar chart, leaderboard, end session
+- [x] Built SonoQuizPlay.tsx: join by code, anonymous ultrasound-themed name picker, countdown timer, answer selection, score reveal, final leaderboard
+- [x] Admin-only routes: /admin/sonoquiz (creator), /admin/sonoquiz/host/:sessionId (host) — platform_admin only
+- [x] Student play route: /quiz/:joinCode — public (no auth required to play)
+- [x] No public nav links or dashboard cards — hidden from all non-admin users
+- [x] 747 tests passing after implementation

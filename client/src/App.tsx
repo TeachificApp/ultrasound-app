@@ -123,6 +123,9 @@ import FormBuilderAdmin from "./pages/FormBuilderAdmin";
 import EmailAdmin from "./pages/EmailAdmin";
 import PlatformAdmin from "./pages/PlatformAdmin";
 import EducatorAssist from "./pages/EducatorAssist";
+import SonoQuizCreator from "./pages/SonoQuizCreator";
+import SonoQuizHost from "./pages/SonoQuizHost";
+import SonoQuizPlay from "./pages/SonoQuizPlay";
 import ImageQualityReview from "./pages/ImageQualityReview";
 
 // ── DIY Accreditation™ (hidden, backend use) ──────────────────────────────────
@@ -258,6 +261,10 @@ function Router() {
         <Route path="/admin/email">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><EmailAdmin /></RoleGuard>}</Route>
         <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
         <Route path="/educator-assist">{() => <EducatorAssist />}</Route>
+        {/* ── SonoQuiz (admin-only during testing) ──────────────────────── */}
+        <Route path="/admin/sonoquiz">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SonoQuizCreator /></RoleGuard>}</Route>
+        <Route path="/admin/sonoquiz/host/:sessionId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SonoQuizHost /></RoleGuard>}</Route>
+        <Route path="/quiz/:joinCode">{() => <SonoQuizPlay />}</Route>
         <Route path="/image-quality-review">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ImageQualityReview /></RoleGuard>}</Route>
 
         {/* ── DIY Accreditation™ (hidden backend) ───────────────────────── */}

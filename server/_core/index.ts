@@ -18,6 +18,7 @@ import { serveStatic, setupVite } from "./vite";
 import { startChallengeCron } from "../jobs/challengeCron";
 import { startEmailCampaignScheduler } from "../routers/emailCampaignRouter";
 import { startThinkificMemberSync } from "../jobs/thinkificMemberSync";
+import { initSonoQuizHub } from "../sonoQuizHub";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -85,6 +86,9 @@ async function startServer() {
   if (port !== preferredPort) {
     console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
   }
+
+  // Initialize SonoQuiz WebSocket hub BEFORE server.listen so it binds to the same HTTP server
+  initSonoQuizHub(server);
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);

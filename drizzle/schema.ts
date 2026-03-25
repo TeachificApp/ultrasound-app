@@ -2385,3 +2385,124 @@ export const educatorAnnouncements = mysqlTable("educatorAnnouncements", {
 });
 export type EducatorAnnouncement = typeof educatorAnnouncements.$inferSelect;
 export type InsertEducatorAnnouncement = typeof educatorAnnouncements.$inferInsert;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SONOQUIZ — Live Kahoot-Style Quiz Platform
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── SonoQuiz Quizzes ─────────────────────────────────────────────────────────
+// A quiz is a reusable collection of questions that can be hosted as a live session.
+export const sonoQuizzes = mysqlTable("sonoQuizzes", {
+  id: int("id").autoincrement().primaryKey(),
+  createdByUserId: int("createdByUserId").notNull(),
+  title: varchar("title", { length: 300 }).notNull(),
+  description: text("description"),
+  // Time limit per question in seconds (null = no limit, default 20s)
+  timeLimitSeconds: int("timeLimitSeconds").default(20).notNull(),
+  // Background music track key (null = no music)
+  musicTrack: varchar("musicTrack", { length: 100 }),
+  // Visual theme: "teal" | "dark" | "ocean" | "sunset" | "neon"
+  theme: varchar("theme", { length: 50 }).default("teal").notNull(),
+  // Cover image URL (CDN)
+  coverImageUrl: text("coverImageUrl"),
+  // Category tag
+  category: mysqlEnum("category", ["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics", "General"]).default("General").notNull(),
+  // Number of questions (denormalized for quick display)
+  questionCount: int("questionCount").default(0).notNull(),
+  status: mysqlEnum("status", ["draft", "published", "archived"]).default("draft").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type SonoQuiz = typeof sonoQuizzes.$inferSelect;
+export type InsertSonoQuiz = typeof sonoQuizzes.$inferInsert;
+
+// ─── SonoQuiz Questions ───────────────────────────────────────────────────────
+export const sonoQuizQuestions = mysqlTable("sonoQuizQuestions", {
+  id: int("id").autoincrement().primaryKey(),
+  quizId: int("quizId").notNull(),
+  // Question text
+  question: longtext("question").notNull(),
+  // JSON array of 2–4 option strings: ["Option A", "Option B", ...]
+  options: text("options").notNull(),
+  // 0-indexed correct answer
+  correctAnswer: int("correctAnswer").notNull(),
+  // Optional explanation shown after answer reveal
+  explanation: longtext("explanation"),
+  // Media attached to the question
+  mediaUrl: text("mediaUrl"),
+  mediaType: mysqlEnum("mediaType", ["image", "video", "gif"]),
+  // Per-question time override (null = use quiz default)
+  timeLimitSeconds: int("timeLimitSeconds"),
+  // Points awarded for correct answer (speed bonus applied on top)
+  points: int("points").default(100).notNull(),
+  sortOrder: int("sortOrder").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type SonoQuizQuestion = typeof sonoQuizQuestions.$inferSelect;
+export type InsertSonoQuizQuestion = typeof sonoQuizQuestions.$inferInsert;
+
+// ─── SonoQuiz Live Sessions ───────────────────────────────────────────────────
+// A session is a single live run of a quiz hosted by an educator.
+export const sonoQuizSessions = mysqlTable("sonoQuizSessions", {
+  id: int("id").autoincrement().primaryKey(),
+  quizId: int("quizId").notNull(),
+  hostUserId: int("hostUserId").notNull(),
+  // 6-character uppercase join code (e.g. "SONO42")
+  joinCode: varchar("joinCode", { length: 10 }).notNull().unique(),
+  // Session state machine
+  status: mysqlEnum("status", ["lobby", "active", "paused", "ended"]).default("lobby").notNull(),
+  // Index of the currently active question (null = lobby/ended)
+  currentQuestionIndex: int("currentQuestionIndex"),
+  // When the current question was revealed (for timer calculation)
+  questionStartedAt: timestamp("questionStartedAt"),
+  // Whether to allow anonymous participants (no login required)
+  allowAnonymous: boolean("allowAnonymous").default(true).notNull(),
+  // Whether to show the leaderboard between questions
+  showLeaderboard: boolean("showLeaderboard").default(true).notNull(),
+  // Snapshot of quiz settings at session start
+  quizSnapshot: longtext("quizSnapshot"),
+  participantCount: int("participantCount").default(0).notNull(),
+  startedAt: timestamp("startedAt"),
+  endedAt: timestamp("endedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type SonoQuizSession = typeof sonoQuizSessions.$inferSelect;
+export type InsertSonoQuizSession = typeof sonoQuizSessions.$inferInsert;
+
+// ─── SonoQuiz Participants ────────────────────────────────────────────────────
+export const sonoQuizParticipants = mysqlTable("sonoQuizParticipants", {
+  id: int("id").autoincrement().primaryKey(),
+  sessionId: int("sessionId").notNull(),
+  // Null for anonymous participants
+  userId: int("userId"),
+  // Fun ultrasound-themed anonymous name (e.g. "SonoNinja42")
+  displayName: varchar("displayName", { length: 100 }).notNull(),
+  // Avatar emoji or color index for visual differentiation
+  avatarSeed: varchar("avatarSeed", { length: 50 }),
+  // Cumulative score across all questions answered
+  totalScore: int("totalScore").default(0).notNull(),
+  // Rank at end of session (1 = winner)
+  finalRank: int("finalRank"),
+  isActive: boolean("isActive").default(true).notNull(),
+  joinedAt: timestamp("joinedAt").defaultNow().notNull(),
+});
+export type SonoQuizParticipant = typeof sonoQuizParticipants.$inferSelect;
+export type InsertSonoQuizParticipant = typeof sonoQuizParticipants.$inferInsert;
+
+// ─── SonoQuiz Answers ─────────────────────────────────────────────────────────
+export const sonoQuizAnswers = mysqlTable("sonoQuizAnswers", {
+  id: int("id").autoincrement().primaryKey(),
+  sessionId: int("sessionId").notNull(),
+  participantId: int("participantId").notNull(),
+  questionId: int("questionId").notNull(),
+  // 0-indexed selected answer (-1 = no answer / timed out)
+  selectedAnswer: int("selectedAnswer").notNull().default(-1),
+  isCorrect: boolean("isCorrect").default(false).notNull(),
+  pointsEarned: int("pointsEarned").default(0).notNull(),
+  // How fast they answered (ms from question reveal)
+  responseTimeMs: int("responseTimeMs"),
+  answeredAt: timestamp("answeredAt").defaultNow().notNull(),
+});
+export type SonoQuizAnswer = typeof sonoQuizAnswers.$inferSelect;
+export type InsertSonoQuizAnswer = typeof sonoQuizAnswers.$inferInsert;

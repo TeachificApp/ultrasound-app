@@ -17,6 +17,7 @@ import { meetingRouter } from "./routers/meetingRouter";
 import { formBuilderRouter } from "./routers/formBuilderRouter";
 import { accreditationManagerRouter } from "./routers/accreditationManagerRouter";
 import { educatorRouter } from "./routers/educatorRouter";
+import { sonoQuizRouter } from "./routers/sonoQuizRouter";
 import { emailCampaignRouter } from "./routers/emailCampaignRouter";
 import {
   getUserById,
@@ -1744,6 +1745,7 @@ export const appRouter = router({
   // ─── Daily Challenge Engine ───────────────────────────────────────────────────
   quickfire: quickfireRouter,
   educator: educatorRouter,
+  sonoQuiz: sonoQuizRouter,
 
   // ─── Echo Case Library ────────────────────────────────────────────────────────
   caseLibrary: caseLibraryRouter,
