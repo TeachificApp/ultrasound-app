@@ -1,0 +1,9 @@
+{
+  "query": "\nCREATE TABLE IF NOT EXISTS `appSettings` (\n  `key` varchar(128) NOT NULL,\n  `value` text NOT NULL,\n  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n  PRIMARY KEY (`key`)\n);\n\n-- Seed the three Learn link defaults\nINSERT INTO `appSettings` (`key`, `value`) VALUES\n  ('learnFetalEchoUrl', 'https://www.allaboutultrasound.net/fetal-echo-preview-access-pass'),\n  ('learnEchoUrl', ''),\n  ('learnPocusUrl', '')\nON DUPLICATE KEY UPDATE `value` = VALUES(`value`);\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \nCREATE TABLE IF NOT EXISTS `appSettings` (\n  `key` varchar(128) NOT NULL,\n  `value` text NOT NULL,\n  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n  PRIMARY KEY (`key`)\n);\n\n-- Seed the three Learn link defaults\nINSERT INTO `appSettings` (`key`, `value`) VALUES\n  ('learnFetalEchoUrl', 'https://www.allaboutultrasound.net/fetal-echo-preview-access-pass'),\n  ('learnEchoUrl', ''),\n  ('learnPocusUrl', '')\nON DUPLICATE KEY UPDATE `value` = VALUES(`value`);\n",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 185
+}

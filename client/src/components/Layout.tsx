@@ -48,7 +48,8 @@ function PendingBadge() {
   );
 }
 
-const navGroups = [
+// navGroups is built dynamically in the Layout component using live Learn link URLs from DB
+const BASE_NAV_GROUPS = [
   {
     label: "Overview",
     items: [
@@ -61,9 +62,6 @@ const navGroups = [
       { path: "/ultrasound-assist", label: "UltrasoundAssist™", icon: Stethoscope },
       { path: "/calculators", label: "UltrasoundAssist™ Calculators", icon: Calculator },
       { path: "/clinical-intelligence", label: "Clinical Intelligence", icon: Brain },
-      // POCUS-Assist™ and Fetal EchoAssist™ accessible via UltrasoundAssist™ pathway
-      // { path: "/pocus-assist-hub", label: "POCUS-Assist™", icon: Shield },
-      // { path: "/fetal-echo-assist", label: "Fetal EchoAssist™", icon: Heart },
     ],
   },
   {
@@ -75,7 +73,11 @@ const navGroups = [
       { path: "/soundbytes", label: "SoundBytes™", icon: BookMarked },
       { path: "/cme", label: "CME Hub", icon: GraduationCap },
       { path: "/registry-review", label: "Registry Review Hub", icon: ClipboardCheck },
-      { path: "https://www.allaboutultrasound.net/fetal-echo-preview-access-pass", label: "Learn Fetal Echo", icon: BookOpen, external: true },
+      // Learn links below use __LEARN_FETAL_ECHO_URL__, __LEARN_ECHO_URL__, __LEARN_POCUS_URL__
+      // as placeholders — replaced at runtime in the Layout component with DB values
+      { path: "__LEARN_FETAL_ECHO_URL__", label: "Learn Fetal Echo", icon: BookOpen, external: true },
+      { path: "__LEARN_ECHO_URL__", label: "Learn Echo", icon: BookOpen, external: true },
+      { path: "__LEARN_POCUS_URL__", label: "Learn POCUS", icon: BookOpen, external: true },
     ],
   },
   // Accreditation section hidden until requested
@@ -120,6 +122,8 @@ const hiddenNavItems = [
   { path: "/ecg-coach", label: "ECG Coach" },
   { path: "/ecg-assist", label: "ECG-Assist™" },
   { path: "/fetal-echo-assist", label: "FetalEchoAssist™" },
+  { path: "/fetal-navigator", label: "Fetal Echo Navigator" },
+  { path: "/fetal-scan-coach", label: "Fetal Echo ScanCoach™" },
   { path: "/pediatric-echo-assist", label: "PediatricEchoAssist™" },
   { path: "/achd-echo-assist", label: "ACHDEchoAssist™" },
   { path: "/diy-accreditation-plans", label: "DIY Accreditation™ Plans" },
@@ -163,7 +167,8 @@ const hiddenNavItems = [
   { path: "/soundbytes", label: "SoundBytes™" },
   { path: "/educator-assist", label: "EducatorAssist™" },
 ];
-const navItems = [...navGroups.flatMap(g => g.items), ...hiddenNavItems];
+// navItems is built inside the Layout component after navGroups is resolved dynamically
+const staticNavItems = [...BASE_NAV_GROUPS.flatMap((g: { label: string; items: { path: string; label: string; icon: React.ElementType; external?: boolean }[] }) => g.items), ...hiddenNavItems];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [rawLocation] = useLocation();
@@ -193,6 +198,29 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const hasDiyAccess = appRoles.includes("diy_user") || appRoles.includes("diy_admin") || appRoles.includes("platform_admin") || isAdmin;
   const hasDiyAdmin = appRoles.includes("diy_admin");
   const isDemoMode = !!(user as any)?.demoMode;
+
+  // Fetch dynamic Learn link URLs from DB
+  const { data: learnLinks } = trpc.menuLinks.getLearnLinks.useQuery(undefined, {
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+
+  // Build navGroups with resolved Learn link URLs
+  const navGroups = BASE_NAV_GROUPS.map(group => ({
+    ...group,
+    items: group.items.map((item: { path: string; label: string; icon: React.ElementType; external?: boolean }) => {
+      if (item.path === "__LEARN_FETAL_ECHO_URL__")
+        return { ...item, path: learnLinks?.learnFetalEchoUrl || "https://www.allaboutultrasound.net/fetal-echo-preview-access-pass" };
+      if (item.path === "__LEARN_ECHO_URL__")
+        return { ...item, path: learnLinks?.learnEchoUrl || "" };
+      if (item.path === "__LEARN_POCUS_URL__")
+        return { ...item, path: learnLinks?.learnPocusUrl || "" };
+      return item;
+    // Hide Learn Echo / Learn POCUS if no URL is configured yet
+    }).filter((item: { path: string; label: string; icon: React.ElementType; external?: boolean }) =>
+      !item.path.startsWith("__") && !(item.external && !item.path)
+    ),
+  }));
 
   return (
     <div className={`flex min-h-screen bg-[#f0fbfc]${isDemoMode ? ' pt-10' : ''}`}>
@@ -325,7 +353,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-[#4ad9e0] animate-pulse" />
             <span className="text-sm font-semibold text-[#189aa1]" style={{ fontFamily: "Merriweather, serif" }}>
-              {navItems.find(n => n.path === location)?.label ?? "All About Ultrasound™"}
+              {staticNavItems.find((n: { path: string; label: string }) => n.path === location)?.label ?? "All About Ultrasound™"}
             </span>
           </div>
           <div className="ml-auto flex items-center gap-2">

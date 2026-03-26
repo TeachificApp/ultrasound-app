@@ -19,6 +19,7 @@ import { accreditationManagerRouter } from "./routers/accreditationManagerRouter
 import { educatorRouter } from "./routers/educatorRouter";
 import { sonoQuizRouter } from "./routers/sonoQuizRouter";
 import { emailCampaignRouter } from "./routers/emailCampaignRouter";
+import { menuLinksRouter } from "./routers/menuLinksRouter";
 import {
   getUserById,
   getUsersByIds,
@@ -1763,6 +1764,7 @@ export const appRouter = router({
   // ─── Accreditation Manager ────────────────────────────────────────────────────────
   accreditationManager: accreditationManagerRouter,
   emailCampaign: emailCampaignRouter,
+  menuLinks: menuLinksRouter,
 
   // ─── Physician Over-Read Workflow (Step 1 & Step 2) ──────────────────────────
   physicianOverRead: router({

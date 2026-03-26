@@ -62,7 +62,7 @@
 
 ## Fetal EchoAssist™ (kept from original)
 - [x] Fetal Echo Navigator
-- [x] Fetal Echo ScanCoach
+- [x] Fetal Echo ScanCoach (dedicated /fetal-scan-coach route — fixed 404 from FetalNavigator)
 - [x] FetalEchoAssist™ Calculators (6 calculators: CT ratio, cardiac axis, DV PI, MCA PSV, FHR, Ao/PA ratio)
 
 ## SoundBytes™ (Updated Mar 19)
@@ -747,3 +747,16 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Fix ScanCoach editor admin page to show all 19 modules (not just old iHeartEcho ones)
 - [x] Rename "Clinical Echo Image" to "Clinical Ultrasound Image" in ScanCoach editor
 - [x] Reorder abdominal ScanCoach views: Pancreas, Aorta, IVC, Liver, Gallbladder/Biliary, Kidneys, Spleen
+- [ ] Add Learn Echo and Learn POCUS sidebar nav links after Learn Fetal Echo
+- [ ] Build admin panel "Menu Links" section to manage URLs for Learn Fetal Echo, Learn Echo, Learn POCUS
+- [ ] Fix raw JSON tips rendering in AbdominalScanCoach (tips showing as objects not text)
+- [ ] Move SWE/UDFF section to Liver only in AbdominalScanCoach (not Pancreas)
+- [ ] Rename "General Scanning Tips" to "Exam Tips" with pre-filled relevant content
+- [ ] Fix Fetal ScanCoach 404 - wrong route (/scan-coach?tab=fetal should go to correct Fetal ScanCoach page)
+- [ ] Complete admin menu links UI in PlatformAdmin for Learn Fetal Echo, Learn Echo, Learn POCUS URLs
+
+## ScanCoach Fixes (Mar 26)
+- [x] AbdominalScanCoach: tips rendered as structured text (not raw JSON), SWE/UDFF under Liver only, section renamed to "Exam Tips"
+- [x] FetalScanCoach: created dedicated /fetal-scan-coach page with 7 views (Situs, 4CV, LVOT, RVOT/3VV, Aortic Arch, Ductal Arch, Pulmonary Veins) + Exam Tips
+- [x] FetalNavigator "Open in ScanCoach" button: fixed broken /scan-coach?tab=fetal link → now points to /fetal-scan-coach
+- [x] PlatformAdmin: added Sidebar Learn Links panel (above user search) to manage Learn Fetal Echo / Learn Echo / Learn POCUS URLs

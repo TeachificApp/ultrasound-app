@@ -606,6 +606,108 @@ function DIYOrgsPanel() {
   );
 }
 
+// ─── Menu Links Panel ─────────────────────────────────────────────────────────
+
+function MenuLinksPanel() {
+  const { data: links, isLoading } = trpc.menuLinks.getLearnLinks.useQuery();
+  const utils = trpc.useUtils();
+  const [fetalUrl, setFetalUrl] = useState("");
+  const [echoUrl, setEchoUrl] = useState("");
+  const [pocusUrl, setPocusUrl] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (links) {
+      setFetalUrl(links.learnFetalEchoUrl ?? "");
+      setEchoUrl(links.learnEchoUrl ?? "");
+      setPocusUrl(links.learnPocusUrl ?? "");
+    }
+  }, [links]);
+
+  const update = trpc.menuLinks.updateLearnLinks.useMutation({
+    onSuccess: () => {
+      utils.menuLinks.getLearnLinks.invalidate();
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    },
+    onError: (err) => toast.error(`Failed to save: ${err.message}`),
+  });
+
+  return (
+    <Card className="mb-6 border-0 shadow-sm">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-semibold text-gray-800 flex items-center gap-2">
+          <ExternalLink className="w-4 h-4 text-[#189aa1]" />
+          Sidebar Learn Links
+        </CardTitle>
+        <p className="text-xs text-gray-500 mt-1">
+          Configure the external URLs for the three “Learn” links shown in the sidebar navigation.
+          Leave a field blank to hide that link from the sidebar.
+        </p>
+      </CardHeader>
+      <CardContent className="pt-0 space-y-4">
+        {isLoading ? (
+          <div className="flex items-center gap-2 py-4 text-gray-400 text-sm">
+            <RefreshCw className="w-4 h-4 animate-spin" /> Loading...
+          </div>
+        ) : (
+          <>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Learn Fetal Echo URL</label>
+              <Input
+                value={fetalUrl}
+                onChange={(e) => setFetalUrl(e.target.value)}
+                placeholder="https://www.allaboutultrasound.net/..."
+                className="text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Learn Echo URL</label>
+              <Input
+                value={echoUrl}
+                onChange={(e) => setEchoUrl(e.target.value)}
+                placeholder="https://..."
+                className="text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Learn POCUS URL</label>
+              <Input
+                value={pocusUrl}
+                onChange={(e) => setPocusUrl(e.target.value)}
+                placeholder="https://..."
+                className="text-sm"
+              />
+            </div>
+            <Button
+              size="sm"
+              className="flex items-center gap-2 text-white"
+              style={{ background: "#189aa1" }}
+              disabled={update.isPending}
+              onClick={() =>
+                update.mutate({
+                  learnFetalEchoUrl: fetalUrl,
+                  learnEchoUrl: echoUrl,
+                  learnPocusUrl: pocusUrl,
+                })
+              }
+            >
+              {update.isPending ? (
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              ) : saved ? (
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              ) : (
+                <ExternalLink className="w-3.5 h-3.5" />
+              )}
+              {saved ? "Saved!" : "Save Links"}
+            </Button>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Demo Mode Panel ─────────────────────────────────────────────────────────
 
 function DemoModePanel() {
@@ -961,6 +1063,9 @@ export default function PlatformAdmin() {
             ))}
           </div>
         </div>
+
+        {/* Sidebar Learn Links */}
+        <MenuLinksPanel />
 
         {/* Add User by Email */}
         <AddUserByEmailPanel onSuccess={() => refetchUsers()} isPlatformAdminOrOwner={isPlatformAdminOrOwner} />

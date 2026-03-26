@@ -103,6 +103,7 @@ import POCUSLungScanCoach from "./pages/POCUSLungScanCoach";
 // ── Fetal EchoAssist™ ─────────────────────────────────────────────────────────
 import FetalEchoAssist from "./pages/FetalEchoAssist";
 import FetalNavigator from "./pages/FetalNavigator";
+import FetalScanCoach from "./pages/FetalScanCoach";
 
 // ── LMS Engines ───────────────────────────────────────────────────────────────
 import QuickFire from "./pages/QuickFire";
@@ -236,6 +237,7 @@ function Router() {
         {/* ── Fetal EchoAssist™ ─────────────────────────────────────────── */}
         <Route path="/fetal-echo-assist" component={FetalEchoAssist} />
         <Route path="/fetal-navigator" component={FetalNavigator} />
+        <Route path="/fetal-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><FetalScanCoach /></RoleGuard>}</Route>
 
         {/* ── Learn Fetal Echo ──────────────────────────────────────────── */}
         <Route path="/learn-fetal-echo" component={LearnFetalEcho} />

@@ -1,0 +1,20 @@
+{
+  "query": "SELECT module, viewId, tips FROM scanCoachOverrides WHERE module = 'abdominal' LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT module, viewId, tips FROM scanCoachOverrides WHERE module = 'abdominal' LIMIT 10;",
+  "rows": [
+    {
+      "module": "abdominal",
+      "viewId": "test-view-1774551480153",
+      "tips": "[\"Tip 1\",\"Tip 2\"]"
+    },
+    {
+      "module": "abdominal",
+      "viewId": "test-view-1774552628557",
+      "tips": "[\"Tip 1\",\"Tip 2\"]"
+    }
+  ],
+  "messages": [],
+  "stdout": "module\tviewId\ttips\nabdominal\ttest-view-1774551480153\t[\"Tip 1\",\"Tip 2\"]\nabdominal\ttest-view-1774552628557\t[\"Tip 1\",\"Tip 2\"]\n",
+  "stderr": "",
+  "execution_time_ms": 55
+}

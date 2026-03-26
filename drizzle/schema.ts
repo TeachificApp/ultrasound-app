@@ -2506,3 +2506,12 @@ export const sonoQuizAnswers = mysqlTable("sonoQuizAnswers", {
 });
 export type SonoQuizAnswer = typeof sonoQuizAnswers.$inferSelect;
 export type InsertSonoQuizAnswer = typeof sonoQuizAnswers.$inferInsert;
+
+// ─── App Settings (key-value store for platform-wide config) ──────────────────
+export const appSettings = mysqlTable("appSettings", {
+  key: varchar("key", { length: 128 }).primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type AppSetting = typeof appSettings.$inferSelect;
+export type InsertAppSetting = typeof appSettings.$inferInsert;
