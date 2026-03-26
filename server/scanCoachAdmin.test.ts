@@ -57,25 +57,25 @@ describe("scanCoachAdmin.listOverrides", () => {
   // listOverrides is a publicProcedure — accessible by all users including unauthenticated
   it("allows unauthenticated callers (public procedure)", async () => {
     const caller = appRouter.createCaller(makeUnauthCtx());
-    const result = await caller.scanCoachAdmin.listOverrides({ module: "tte" });
+    const result = await caller.scanCoachAdmin.listOverrides({ module: "abdominal" });
     expect(Array.isArray(result)).toBe(true);
   });
 
   it("allows non-admin users to read overrides (public procedure)", async () => {
     const caller = appRouter.createCaller(makeUserCtx());
-    const result = await caller.scanCoachAdmin.listOverrides({ module: "tte" });
+    const result = await caller.scanCoachAdmin.listOverrides({ module: "venous" });
     expect(Array.isArray(result)).toBe(true);
   });
 
   it("returns an array for admin users", async () => {
     const caller = appRouter.createCaller(makeAdminCtx());
-    const result = await caller.scanCoachAdmin.listOverrides({ module: "tte" });
+    const result = await caller.scanCoachAdmin.listOverrides({ module: "fetal" });
     expect(Array.isArray(result)).toBe(true);
   });
 
   it("accepts all valid module values", async () => {
     const caller = appRouter.createCaller(makeAdminCtx());
-    const modules = ["tte", "tee", "ice", "uea", "strain"] as const;
+    const modules = ["abdominal", "pelvic_gyn", "ob1", "ob23", "venous"] as const;
     for (const mod of modules) {
       const result = await caller.scanCoachAdmin.listOverrides({ module: mod });
       expect(Array.isArray(result)).toBe(true);
@@ -94,8 +94,8 @@ describe("scanCoachAdmin.upsertOverride", () => {
     const caller = appRouter.createCaller(makeUserCtx());
     await expect(
       caller.scanCoachAdmin.upsertOverride({
-        module: "tte",
-        viewId: "plax",
+        module: "abdominal",
+        viewId: "liver",
         description: "Test description",
       })
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
@@ -104,7 +104,7 @@ describe("scanCoachAdmin.upsertOverride", () => {
   it("creates a new override for admin", async () => {
     const caller = appRouter.createCaller(makeAdminCtx());
     const result = await caller.scanCoachAdmin.upsertOverride({
-      module: "tte",
+      module: "abdominal",
       viewId: `test-view-${Date.now()}`,
       viewName: "Test View",
       description: "Test override description",
@@ -121,7 +121,7 @@ describe("scanCoachAdmin.upsertOverride", () => {
 
     // First insert
     const first = await caller.scanCoachAdmin.upsertOverride({
-      module: "tee",
+      module: "venous",
       viewId,
       description: "Initial description",
     });
@@ -130,7 +130,7 @@ describe("scanCoachAdmin.upsertOverride", () => {
 
     // Second call should update, not create
     const second = await caller.scanCoachAdmin.upsertOverride({
-      module: "tee",
+      module: "venous",
       viewId,
       description: "Updated description",
     });
@@ -144,7 +144,7 @@ describe("scanCoachAdmin.upsertOverride", () => {
     await expect(
       caller.scanCoachAdmin.upsertOverride({
         module: "invalid" as any,
-        viewId: "plax",
+        viewId: "liver",
       })
     ).rejects.toThrow();
   });
@@ -164,7 +164,7 @@ describe("scanCoachAdmin.deleteOverride", () => {
 
     // Create first
     const created = await caller.scanCoachAdmin.upsertOverride({
-      module: "ice",
+      module: "carotid",
       viewId,
       description: "To be deleted",
     });
@@ -196,7 +196,7 @@ describe("scanCoachAdmin.clearImageField", () => {
 
     // Create with an image URL
     const created = await caller.scanCoachAdmin.upsertOverride({
-      module: "uea",
+      module: "msk",
       viewId,
       echoImageUrl: "https://example.com/image.png",
     });
