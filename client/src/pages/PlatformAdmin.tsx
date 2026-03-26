@@ -673,19 +673,19 @@ function MenuLinksPanel() {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Learn POCUS URL</label>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Learn Vascular URL</label>
               <Input
-                value={pocusUrl}
-                onChange={(e) => setPocusUrl(e.target.value)}
+                value={vascularUrl}
+                onChange={(e) => setVascularUrl(e.target.value)}
                 placeholder="https://..."
                 className="text-sm"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Learn Vascular URL</label>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Learn POCUS URL</label>
               <Input
-                value={vascularUrl}
-                onChange={(e) => setVascularUrl(e.target.value)}
+                value={pocusUrl}
+                onChange={(e) => setPocusUrl(e.target.value)}
                 placeholder="https://..."
                 className="text-sm"
               />

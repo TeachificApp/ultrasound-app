@@ -77,8 +77,8 @@ const BASE_NAV_GROUPS = [
       // as placeholders — replaced at runtime in the Layout component with DB values
       { path: "__LEARN_FETAL_ECHO_URL__", label: "Learn Fetal Echo", icon: BookOpen, external: true },
       { path: "__LEARN_ECHO_URL__", label: "Learn Echo", icon: BookOpen, external: true },
-      { path: "__LEARN_POCUS_URL__", label: "Learn POCUS", icon: BookOpen, external: true },
       { path: "__LEARN_VASCULAR_URL__", label: "Learn Vascular", icon: BookOpen, external: true },
+      { path: "__LEARN_POCUS_URL__", label: "Learn POCUS", icon: BookOpen, external: true },
     ],
   },
   // Accreditation section hidden until requested

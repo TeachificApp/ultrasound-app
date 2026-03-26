@@ -173,6 +173,7 @@ export default defineConfig({
     allowedHosts: [
       ".manuspre.computer",
       ".manus.computer",
+      ".us2.manus.computer",
       ".manus-asia.computer",
       ".manuscomputer.ai",
       ".manusvm.computer",
