@@ -339,7 +339,7 @@ export function getViewMeta(module: ScanCoachModule, viewId: string): ScanCoachV
 
 /** All editable image slots */
 export const IMAGE_SLOTS = [
-  { key: "echoImageUrl",        label: "Clinical Echo Image",       hint: "The echo image shown in the view reference panel" },
+  { key: "echoImageUrl",        label: "Clinical Ultrasound Image",  hint: "The ultrasound image shown in the view reference panel" },
   { key: "anatomyImageUrl",     label: "Anatomy Reference Image",   hint: "Anatomy diagram or labelled schematic" },
   { key: "transducerImageUrl",  label: "Transducer Position Image", hint: "Probe/transducer positioning photograph or diagram" },
 ] as const;

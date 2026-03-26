@@ -1,7 +1,7 @@
 /*
   ScanCoachEditor.tsx — WYSIWYG ScanCoach content editor for platform admins.
   Allows admins to:
-    • Select any ScanCoach module (TTE, TEE, ICE, UEA, Strain)
+    • Select any ScanCoach module (Abdominal, Venous, Fetal Echo, POCUS, etc.)
     • Browse all views in a sidebar list
     • Upload / replace / remove images (echo, anatomy, transducer) via drag-and-drop or file picker
     • Edit text fields (description, howToGet, tips, pitfalls, structures, measurements, criticalFindings)
@@ -406,10 +406,10 @@ function _legacyStaticPreviewContent({
           <div className={`bg-gray-950 grid gap-2 p-4 ${echoImageUrl && anatomyImageUrl ? "grid-cols-2" : "grid-cols-1"}`}>
             {echoImageUrl && (
               <div className="flex flex-col items-center gap-1">
-                <p className="text-xs text-gray-400">Clinical Echo</p>
+                <p className="text-xs text-gray-400">Clinical Ultrasound</p>
                 <img
                   src={echoImageUrl}
-                  alt={`${viewName} clinical echo`}
+                  alt={`${viewName} clinical ultrasound`}
                   className="max-h-64 object-contain rounded w-full"
                   style={{ background: "#030712" }}
                 />
