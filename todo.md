@@ -742,3 +742,4 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] SendGrid Event Webhook handler for unsubscribe/spamreport events
 - [ ] Replace old iHeartEcho categories in ScanCoach editor with correct ScanCoach options
 - [x] Replace old iHeartEcho categories in ScanCoach editor with correct ScanCoach options (keep only Fetal Echo + 4 POCUS modules)
+- [x] Fix Vite HMR WebSocket connection error in sandboxed preview
