@@ -225,6 +225,7 @@ function Router() {
 
         {/* ── POCUS-Assist™ ─────────────────────────────────────────────── */}
         <Route path="/pocus-assist" component={POCUSAssistHub} />
+        <Route path="/pocus-assist-hub" component={POCUSAssistHub} />
         <Route path="/pocus-efast-navigator" component={POCUSEfastNavigator} />
         <Route path="/pocus-rush-navigator" component={POCUSRushNavigator} />
         <Route path="/pocus-cardiac-navigator" component={POCUSCardiacNavigator} />

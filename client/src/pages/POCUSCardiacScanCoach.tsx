@@ -378,7 +378,7 @@ function ViewDetail({ view }: { view: typeof CARDIAC_VIEWS[0] }) {
           <div className="px-5 pb-4 space-y-3">
             <div>
               <p className="text-xs font-semibold text-green-700 mb-1.5 flex items-center gap-1">
-                <CheckCircle className="w-3.5 h-3.5" /> Scanning Tips
+                <CheckCircle className="w-3.5 h-3.5" /> Exam Tips
               </p>
               <ul className="space-y-1">
                 {view.tips.map((t, i) => (

@@ -93,7 +93,7 @@ const views = [
   }
 ];
 
-const generalTips = [
+const examTips = [
   { category: "Scanning Tip", text: "{\'tip_title\': \'Patient Positioning\', \'tip_content\': \"Ensure the patient\'s neck is adequately hyperextended to bring the thyroid gland into a more supe" },
   { category: "Scanning Tip", text: "{\'tip_title\': \'Transducer Selection\', \'tip_content\': \'Use a high-frequency linear transducer for optimal resolution of the superficial thyroid gland a" },
   { category: "Scanning Tip", text: "{\'tip_title\': \'Complete Gland Survey\', \'tip_content\': \"Systematically scan through the entire gland in both transverse and longitudinal planes, from t" },
@@ -119,7 +119,7 @@ export default function ThyroidScanCoach() {
   const { isPremium } = usePremium();
   const [selectedView, setSelectedView] = useState(0);
   const [expandedTip, setExpandedTip] = useState<number | null>(null);
-  const [showGeneral, setShowGeneral] = useState(false);
+  const [showExamTips, setShowGeneral] = useState(false);
 
   const currentView = views[selectedView];
 
@@ -237,17 +237,17 @@ export default function ThyroidScanCoach() {
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-5">
           <button
             className="w-full flex items-center gap-3 px-5 py-3 hover:bg-[#f0fbfc] transition-all"
-            onClick={() => setShowGeneral(!showGeneral)}
+            onClick={() => setShowGeneral(!showExamTips)}
           >
             <Lightbulb className="w-4 h-4 text-[#189aa1] flex-shrink-0" />
             <span className="font-bold text-sm text-gray-700 flex-1 text-left" style={{ fontFamily: "Merriweather, serif" }}>
-              General Scanning Tips
+              Exam Tips
             </span>
-            {showGeneral ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+            {showExamTips ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
           </button>
-          {showGeneral && (
+          {showExamTips && (
             <div className="border-t border-gray-100 p-5 space-y-3">
-              {generalTips.map((tip, ti) => (
+              {examTips.map((tip, ti) => (
                 <div key={ti} className="rounded-xl p-4 border" style={{ borderColor: "#189aa140", background: "#f0fbfc" }}>
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-xs font-bold uppercase tracking-wider text-[#189aa1]">{tip.category}</span>

@@ -765,3 +765,26 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add "Learn Vascular" sidebar nav link (external URL, configurable from admin)
 - [x] Add learnVascularUrl key to menuLinksRouter (default empty)
 - [x] Add Learn Vascular field to PlatformAdmin Sidebar Learn Links panel
+
+## ScanCoach & Navigator Content Fill (Mar 26)
+- [ ] BreastScanCoach: rewrite with full clinical tips (remove raw JSON strings)
+- [ ] TCDScanCoach: rewrite with full clinical tips (remove raw JSON strings, fix truncated text)
+- [ ] POCUSCardiacScanCoach: verify/fill clinical content
+- [ ] POCUSEfastScanCoach: verify/fill clinical content
+- [ ] POCUSLungScanCoach: verify/fill clinical content
+- [ ] POCUSRushScanCoach: verify/fill clinical content
+- [ ] FetalScanCoach: verify all 7 views have complete clinical content
+- [ ] All other ScanCoaches: verify no raw JSON or truncated tips remain
+- [ ] PelvicGynScanCoach: add TA / TVS approach tabs; rename "Uterus - Sagittal" to "Uterus"
+
+## Carotid ScanCoach Additions (Mar 26)
+- [ ] Add Subclavian Artery view to Extracranial Carotid ScanCoach (bilateral, proximal/distal, Doppler criteria)
+- [ ] Add blood pressure documentation section to Carotid ScanCoach (bilateral arm BP, ABI context)
+- [ ] Add inline ICA/CCA PSV ratio calculator to Carotid ScanCoach
+- [ ] Fix Vite HMR WebSocket error permanently (clientPort + allowedHosts wildcard)
+- [ ] Fix POCUS ScanCoach breadcrumb 404 — /pocus-assist-hub route missing or BackToEchoAssist points to wrong path
+- [ ] Rename "General Scanning Tips" / "General Tips" to "Exam Tips" across ALL ScanCoach pages
+- [x] Fix POCUS ScanCoach breadcrumb 404 — /pocus-assist-hub route missing
+- [ ] OB23Navigator: expand protocol checklist — each comma-separated item becomes its own individual checkbox
+- [ ] VenousNavigator: add External Iliac Vein section before Common Femoral Vein (CFV)
+- [x] ArterialNavigator: rename "CW Doppler Waveforms" to "Duplex Ultrasound" and move to first position before Segmental Limb Pressures
