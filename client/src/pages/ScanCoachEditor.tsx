@@ -652,7 +652,7 @@ function ImageUploadZone({
 
 export default function ScanCoachEditor() {
   const { user } = useAuth();
-  const [selectedModule, setSelectedModule] = useState<ScanCoachModule>("tte");
+  const [selectedModule, setSelectedModule] = useState<ScanCoachModule>("fetal");
   const [selectedViewId, setSelectedViewId] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftState | null>(null);
   const [uploadingSlot, setUploadingSlot] = useState<ImageSlotKey | null>(null);
@@ -1034,7 +1034,7 @@ export default function ScanCoachEditor() {
                         <span className="text-xs text-gray-400">Upload images to override the static defaults</span>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {IMAGE_SLOTS.filter((slot) => !(selectedModule === "ice" && slot.key === "transducerImageUrl")).map((slot) => (
+                        {IMAGE_SLOTS.map((slot) => (
                           <ImageUploadZone
                             key={slot.key}
                             slot={slot}

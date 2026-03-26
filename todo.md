@@ -740,3 +740,5 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Sync iHeartEcho unsubscribe list into UltrasoundAssist to prevent cross-posting (shared DB — already unified)
 - [x] Add unsubscribed emails to SendGrid Global Unsubscribe list for cross-app suppression
 - [x] SendGrid Event Webhook handler for unsubscribe/spamreport events
+- [ ] Replace old iHeartEcho categories in ScanCoach editor with correct ScanCoach options
+- [x] Replace old iHeartEcho categories in ScanCoach editor with correct ScanCoach options (keep only Fetal Echo + 4 POCUS modules)
