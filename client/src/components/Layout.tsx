@@ -78,6 +78,7 @@ const BASE_NAV_GROUPS = [
       { path: "__LEARN_FETAL_ECHO_URL__", label: "Learn Fetal Echo", icon: BookOpen, external: true },
       { path: "__LEARN_ECHO_URL__", label: "Learn Echo", icon: BookOpen, external: true },
       { path: "__LEARN_POCUS_URL__", label: "Learn POCUS", icon: BookOpen, external: true },
+      { path: "__LEARN_VASCULAR_URL__", label: "Learn Vascular", icon: BookOpen, external: true },
     ],
   },
   // Accreditation section hidden until requested
@@ -215,6 +216,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         return { ...item, path: learnLinks?.learnEchoUrl || "" };
       if (item.path === "__LEARN_POCUS_URL__")
         return { ...item, path: learnLinks?.learnPocusUrl || "" };
+      if (item.path === "__LEARN_VASCULAR_URL__")
+        return { ...item, path: learnLinks?.learnVascularUrl || "" };
       return item;
     // Hide Learn Echo / Learn POCUS if no URL is configured yet
     }).filter((item: { path: string; label: string; icon: React.ElementType; external?: boolean }) =>

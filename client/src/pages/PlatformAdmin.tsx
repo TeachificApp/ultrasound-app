@@ -614,6 +614,7 @@ function MenuLinksPanel() {
   const [fetalUrl, setFetalUrl] = useState("");
   const [echoUrl, setEchoUrl] = useState("");
   const [pocusUrl, setPocusUrl] = useState("");
+  const [vascularUrl, setVascularUrl] = useState("");
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -621,6 +622,7 @@ function MenuLinksPanel() {
       setFetalUrl(links.learnFetalEchoUrl ?? "");
       setEchoUrl(links.learnEchoUrl ?? "");
       setPocusUrl(links.learnPocusUrl ?? "");
+      setVascularUrl(links.learnVascularUrl ?? "");
     }
   }, [links]);
 
@@ -641,7 +643,7 @@ function MenuLinksPanel() {
           Sidebar Learn Links
         </CardTitle>
         <p className="text-xs text-gray-500 mt-1">
-          Configure the external URLs for the three “Learn” links shown in the sidebar navigation.
+          Configure the external URLs for the four "Learn" links shown in the sidebar navigation.
           Leave a field blank to hide that link from the sidebar.
         </p>
       </CardHeader>
@@ -679,6 +681,15 @@ function MenuLinksPanel() {
                 className="text-sm"
               />
             </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Learn Vascular URL</label>
+              <Input
+                value={vascularUrl}
+                onChange={(e) => setVascularUrl(e.target.value)}
+                placeholder="https://..."
+                className="text-sm"
+              />
+            </div>
             <Button
               size="sm"
               className="flex items-center gap-2 text-white"
@@ -689,6 +700,7 @@ function MenuLinksPanel() {
                   learnFetalEchoUrl: fetalUrl,
                   learnEchoUrl: echoUrl,
                   learnPocusUrl: pocusUrl,
+                  learnVascularUrl: vascularUrl,
                 })
               }
             >

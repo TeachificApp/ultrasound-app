@@ -760,3 +760,8 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] FetalScanCoach: created dedicated /fetal-scan-coach page with 7 views (Situs, 4CV, LVOT, RVOT/3VV, Aortic Arch, Ductal Arch, Pulmonary Veins) + Exam Tips
 - [x] FetalNavigator "Open in ScanCoach" button: fixed broken /scan-coach?tab=fetal link → now points to /fetal-scan-coach
 - [x] PlatformAdmin: added Sidebar Learn Links panel (above user search) to manage Learn Fetal Echo / Learn Echo / Learn POCUS URLs
+
+## Learn Vascular (Mar 26)
+- [x] Add "Learn Vascular" sidebar nav link (external URL, configurable from admin)
+- [x] Add learnVascularUrl key to menuLinksRouter (default empty)
+- [x] Add Learn Vascular field to PlatformAdmin Sidebar Learn Links panel
