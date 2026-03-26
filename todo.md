@@ -746,3 +746,4 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add all UltrasoundAssist ScanCoach modules to the editor registry (19 modules: 14 specialty + Fetal Echo + 4 POCUS)
 - [ ] Fix ScanCoach editor admin page to show all 19 modules (not just old iHeartEcho ones)
 - [x] Rename "Clinical Echo Image" to "Clinical Ultrasound Image" in ScanCoach editor
+- [x] Reorder abdominal ScanCoach views: Pancreas, Aorta, IVC, Liver, Gallbladder/Biliary, Kidneys, Spleen

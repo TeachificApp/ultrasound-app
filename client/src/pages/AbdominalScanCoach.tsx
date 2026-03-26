@@ -15,56 +15,12 @@ import { usePremium } from "@/hooks/usePremium";
 
 const views = [
   {
-    view: "Liver",
-    probe: "Subcostal and intercostal approaches",
-    tips: [
-      { category: "Patient Positioning", text: "Primarily supine. Decubitus, erect, or prone positioning may be used to optimize visualization of specific organs like the gallbladder and kidneys." },
-      { category: "Transducer Positioning", text: "Subcostal and intercostal approaches" },
-      { category: "What to Assess", text: "Long-axis and transverse views of all lobes (right, left, caudate). Parenchymal echogenicity (compared to right kidney), surface nodularity, focal/diffuse abnormalities. Major hepatic and perihepatic " },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Optimizing Liver Visualization\', \'tip_content\': \'Use both subcostal and intercostal w" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Assessing the Gallbladder Wall\', \'tip_content\': \'Ensure the patient is appropriately " }
-    ],
-  },
-  {
-    view: "Gallbladder and Biliary Tract",
-    probe: "Subcostal and intercostal approaches",
-    tips: [
-      { category: "Patient Positioning", text: "Primarily supine. Decubitus, erect, or prone positioning may be used to optimize visualization of specific organs like the gallbladder and kidneys." },
-      { category: "Transducer Positioning", text: "Subcostal and intercostal approaches" },
-      { category: "What to Assess", text: "Long-axis and transverse views of the gallbladder. Wall thickness, presence of gallstones, sludge, or polyps. Intrahepatic and extrahepatic bile ducts for dilatation or other abnormalities. Sonographi" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Optimizing Liver Visualization\', \'tip_content\': \'Use both subcostal and intercostal w" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Assessing the Gallbladder Wall\', \'tip_content\': \'Ensure the patient is appropriately " }
-    ],
-  },
-  {
     view: "Pancreas",
     probe: "Transverse epigastric approach",
     tips: [
       { category: "Patient Positioning", text: "Primarily supine. Decubitus, erect, or prone positioning may be used to optimize visualization of specific organs like the gallbladder and kidneys." },
       { category: "Transducer Positioning", text: "Transverse epigastric approach" },
       { category: "What to Assess", text: "Head, uncinate process, body, and tail. Parenchymal echotexture, masses, calcifications, ductal dilatation. Peripancreatic region for adenopathy or collections." },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Optimizing Liver Visualization\', \'tip_content\': \'Use both subcostal and intercostal w" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Assessing the Gallbladder Wall\', \'tip_content\': \'Ensure the patient is appropriately " }
-    ],
-  },
-  {
-    view: "Spleen",
-    probe: "Left intercostal and coronal approaches",
-    tips: [
-      { category: "Patient Positioning", text: "Primarily supine. Decubitus, erect, or prone positioning may be used to optimize visualization of specific organs like the gallbladder and kidneys." },
-      { category: "Transducer Positioning", text: "Left intercostal and coronal approaches" },
-      { category: "What to Assess", text: "Long-axis and transverse views. Parenchymal echogenicity (compared to left kidney), focal lesions. Splenic hilum and vasculature. Left hemidiaphragm and adjacent pleural space." },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Optimizing Liver Visualization\', \'tip_content\': \'Use both subcostal and intercostal w" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Assessing the Gallbladder Wall\', \'tip_content\': \'Ensure the patient is appropriately " }
-    ],
-  },
-  {
-    view: "Kidneys",
-    probe: "Flank (coronal) and transverse approaches",
-    tips: [
-      { category: "Patient Positioning", text: "Primarily supine. Decubitus, erect, or prone positioning may be used to optimize visualization of specific organs like the gallbladder and kidneys." },
-      { category: "Transducer Positioning", text: "Flank (coronal) and transverse approaches" },
-      { category: "What to Assess", text: "Long-axis and transverse views of both kidneys. Cortical thickness, echogenicity (compared to liver/spleen), collecting system for hydronephrosis, calculi, masses. Perirenal spaces." },
       { category: "Scanning Tip", text: "{\'tip_title\': \'Optimizing Liver Visualization\', \'tip_content\': \'Use both subcostal and intercostal w" },
       { category: "Scanning Tip", text: "{\'tip_title\': \'Assessing the Gallbladder Wall\', \'tip_content\': \'Ensure the patient is appropriately " }
     ],
@@ -90,7 +46,51 @@ const views = [
       { category: "Scanning Tip", text: "{\'tip_title\': \'Optimizing Liver Visualization\', \'tip_content\': \'Use both subcostal and intercostal w" },
       { category: "Scanning Tip", text: "{\'tip_title\': \'Assessing the Gallbladder Wall\', \'tip_content\': \'Ensure the patient is appropriately " }
     ],
-  }
+  },
+  {
+    view: "Liver",
+    probe: "Subcostal and intercostal approaches",
+    tips: [
+      { category: "Patient Positioning", text: "Primarily supine. Decubitus, erect, or prone positioning may be used to optimize visualization of specific organs like the gallbladder and kidneys." },
+      { category: "Transducer Positioning", text: "Subcostal and intercostal approaches" },
+      { category: "What to Assess", text: "Long-axis and transverse views of all lobes (right, left, caudate). Parenchymal echogenicity (compared to right kidney), surface nodularity, focal/diffuse abnormalities. Major hepatic and perihepatic " },
+      { category: "Scanning Tip", text: "{\'tip_title\': \'Optimizing Liver Visualization\', \'tip_content\': \'Use both subcostal and intercostal w" },
+      { category: "Scanning Tip", text: "{\'tip_title\': \'Assessing the Gallbladder Wall\', \'tip_content\': \'Ensure the patient is appropriately " }
+    ],
+  },
+  {
+    view: "Gallbladder and Biliary Tract",
+    probe: "Subcostal and intercostal approaches",
+    tips: [
+      { category: "Patient Positioning", text: "Primarily supine. Decubitus, erect, or prone positioning may be used to optimize visualization of specific organs like the gallbladder and kidneys." },
+      { category: "Transducer Positioning", text: "Subcostal and intercostal approaches" },
+      { category: "What to Assess", text: "Long-axis and transverse views of the gallbladder. Wall thickness, presence of gallstones, sludge, or polyps. Intrahepatic and extrahepatic bile ducts for dilatation or other abnormalities. Sonographi" },
+      { category: "Scanning Tip", text: "{\'tip_title\': \'Optimizing Liver Visualization\', \'tip_content\': \'Use both subcostal and intercostal w" },
+      { category: "Scanning Tip", text: "{\'tip_title\': \'Assessing the Gallbladder Wall\', \'tip_content\': \'Ensure the patient is appropriately " }
+    ],
+  },
+  {
+    view: "Kidneys",
+    probe: "Flank (coronal) and transverse approaches",
+    tips: [
+      { category: "Patient Positioning", text: "Primarily supine. Decubitus, erect, or prone positioning may be used to optimize visualization of specific organs like the gallbladder and kidneys." },
+      { category: "Transducer Positioning", text: "Flank (coronal) and transverse approaches" },
+      { category: "What to Assess", text: "Long-axis and transverse views of both kidneys. Cortical thickness, echogenicity (compared to liver/spleen), collecting system for hydronephrosis, calculi, masses. Perirenal spaces." },
+      { category: "Scanning Tip", text: "{\'tip_title\': \'Optimizing Liver Visualization\', \'tip_content\': \'Use both subcostal and intercostal w" },
+      { category: "Scanning Tip", text: "{\'tip_title\': \'Assessing the Gallbladder Wall\', \'tip_content\': \'Ensure the patient is appropriately " }
+    ],
+  },
+  {
+    view: "Spleen",
+    probe: "Left intercostal and coronal approaches",
+    tips: [
+      { category: "Patient Positioning", text: "Primarily supine. Decubitus, erect, or prone positioning may be used to optimize visualization of specific organs like the gallbladder and kidneys." },
+      { category: "Transducer Positioning", text: "Left intercostal and coronal approaches" },
+      { category: "What to Assess", text: "Long-axis and transverse views. Parenchymal echogenicity (compared to left kidney), focal lesions. Splenic hilum and vasculature. Left hemidiaphragm and adjacent pleural space." },
+      { category: "Scanning Tip", text: "{\'tip_title\': \'Optimizing Liver Visualization\', \'tip_content\': \'Use both subcostal and intercostal w" },
+      { category: "Scanning Tip", text: "{\'tip_title\': \'Assessing the Gallbladder Wall\', \'tip_content\': \'Ensure the patient is appropriately " }
+    ],
+  },
 ];
 
 const generalTips = [

@@ -14,6 +14,30 @@ import ProtocolProgressBar from "../components/ProtocolProgressBar";
 
 const views = [
   {
+    view: "Pancreas",
+    probe: "Transverse epigastric approach",
+    items: [
+    { id: "abdominalnavigator_2_0", label: "Head, uncinate process, body, and tail", detail: "", critical: false },
+    { id: "abdominalnavigator_2_1", label: "Parenchymal echotexture, masses, calcifications, ductal dilatation", detail: "", critical: false },
+    { id: "abdominalnavigator_2_2", label: "Peripancreatic region for adenopathy or collections", detail: "", critical: false }
+    ],
+  },
+  {
+    view: "Aorta",
+    probe: "Midline transverse and longitudinal approaches",
+    items: [
+    { id: "abdominalnavigator_5_0", label: "Proximal, mid, and distal segments for aneurysm or other abnormalities", detail: "", critical: false }
+    ],
+  },
+  {
+    view: "Inferior Vena Cava (IVC)",
+    probe: "Subcostal and parasagittal approaches",
+    items: [
+    { id: "abdominalnavigator_6_0", label: "Patency, diameter, and respiratory variation", detail: "", critical: false },
+    { id: "abdominalnavigator_6_1", label: "Presence of thrombus or filters", detail: "", critical: false }
+    ],
+  },
+  {
     view: "Liver",
     probe: "Subcostal and intercostal approaches",
     items: [
@@ -34,12 +58,12 @@ const views = [
     ],
   },
   {
-    view: "Pancreas",
-    probe: "Transverse epigastric approach",
+    view: "Kidneys",
+    probe: "Flank (coronal) and transverse approaches",
     items: [
-    { id: "abdominalnavigator_2_0", label: "Head, uncinate process, body, and tail", detail: "", critical: false },
-    { id: "abdominalnavigator_2_1", label: "Parenchymal echotexture, masses, calcifications, ductal dilatation", detail: "", critical: false },
-    { id: "abdominalnavigator_2_2", label: "Peripancreatic region for adenopathy or collections", detail: "", critical: false }
+    { id: "abdominalnavigator_4_0", label: "Long-axis and transverse views of both kidneys", detail: "", critical: false },
+    { id: "abdominalnavigator_4_1", label: "Cortical thickness, echogenicity (compared to liver/spleen), collecting system f", detail: "", critical: false },
+    { id: "abdominalnavigator_4_2", label: "Perirenal spaces", detail: "", critical: false }
     ],
   },
   {
@@ -52,30 +76,6 @@ const views = [
     { id: "abdominalnavigator_3_3", label: "Left hemidiaphragm and adjacent pleural space", detail: "", critical: false }
     ],
   },
-  {
-    view: "Kidneys",
-    probe: "Flank (coronal) and transverse approaches",
-    items: [
-    { id: "abdominalnavigator_4_0", label: "Long-axis and transverse views of both kidneys", detail: "", critical: false },
-    { id: "abdominalnavigator_4_1", label: "Cortical thickness, echogenicity (compared to liver/spleen), collecting system f", detail: "", critical: false },
-    { id: "abdominalnavigator_4_2", label: "Perirenal spaces", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Aorta",
-    probe: "Midline transverse and longitudinal approaches",
-    items: [
-    { id: "abdominalnavigator_5_0", label: "Proximal, mid, and distal segments for aneurysm or other abnormalities", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Inferior Vena Cava (IVC)",
-    probe: "Subcostal and parasagittal approaches",
-    items: [
-    { id: "abdominalnavigator_6_0", label: "Patency, diameter, and respiratory variation", detail: "", critical: false },
-    { id: "abdominalnavigator_6_1", label: "Presence of thrombus or filters", detail: "", critical: false }
-    ],
-  }
 ];
 
 const normalValues = [
