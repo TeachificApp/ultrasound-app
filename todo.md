@@ -788,3 +788,8 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] OB23Navigator: expand protocol checklist — each comma-separated item becomes its own individual checkbox
 - [ ] VenousNavigator: add External Iliac Vein section before Common Femoral Vein (CFV)
 - [x] ArterialNavigator: rename "CW Doppler Waveforms" to "Duplex Ultrasound" and move to first position before Segmental Limb Pressures
+
+## Abdominal Vascular Restructure (Mar 26)
+- [x] AbdominalVascularNavigator: split into 3 tabs — Liver Duplex, Mesenteric Duplex, Renal Artery Duplex (Aorta stays standalone)
+- [x] AbdominalVascularScanCoach: split into 3 tabs with view-specific tips, protocols, and exam criteria
+- [x] Remove duplicate TCD card from UltrasoundAssist hub page (keep second one, remove first)

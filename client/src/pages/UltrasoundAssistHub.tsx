@@ -107,18 +107,7 @@ const specialties = [
     free: true,
     freeScanCoach: false,
   },
-  // ── PREMIUM NAVIGATOR + SCANCOACH ─────────────────────────────────────────
-  {
-    path: "/tcd-navigator",
-    scanCoachPath: "/tcd-scan-coach",
-    icon: Brain,
-    title: "Vascular — Intracranial Duplex/TCD",
-    description: "Transcranial Doppler and duplex — MCA, ACA, PCA, basilar, and vertebral arteries via temporal, orbital, and suboccipital windows per AIUM guidelines.",
-    badge: "TCD",
-    free: false,
-    freeScanCoach: false,
-  },
-  // ── FREE NAVIGATOR, PREMIUM SCANCOACH ─────────────────────────────────────
+  // ── FREE NAVIGATOR, PREMIUM SCANCOACH ─────────────────────────────────────────────────────
   {
     path: "/pocus-assist",
     scanCoachPath: "/pocus-assist",
