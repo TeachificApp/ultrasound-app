@@ -362,7 +362,7 @@ export default function UltrasoundAssistHub() {
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs border border-amber-200 bg-amber-50 text-amber-600 transition-all hover:bg-amber-100"
                           onClick={(e) => { e.stopPropagation(); setUpgradeModal({ title: spec.title, type: "scancoach" }); }}
                         >
-                          <Lock className="w-3 h-3" />
+                          <Crown className="w-3 h-3" />
                           ScanCoach™
                         </button>
                       ) : (

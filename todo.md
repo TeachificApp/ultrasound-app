@@ -890,3 +890,4 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 ## Navigator Editor & Hub CTA (Mar 27)
 - [ ] Fix drag-and-drop section reorder in Navigator Editor (sections not persisting new order)
 - [ ] Add iHeartEcho EchoAssist CTA at bottom of UltrasoundAssistHub linking to app.iheartecho.com
+- [x] Add small Crown icon to locked ScanCoach buttons (instead of Lock icon) to signal premium gating
