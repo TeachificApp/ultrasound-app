@@ -877,3 +877,8 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 ## Hub Ordering Fix (Mar 27)
 - [x] Move MSK to second-to-last position (immediately before POCUS) in specialties array
 - [x] Reorder hub: General → OB/Fetal → Vascular (all 6) → Small Parts → Appendix/Invasive → MSK → POCUS
+
+## Hub Card Access Badges (Mar 27)
+- [x] Add green "Free" badge on cards where both navigatorFree and scanCoachFree are true
+- [x] Add amber/gold "Premium" badge on cards where both navigatorFree and scanCoachFree are false
+- [x] Partially-gated cards (mixed) show no card-level badge — per-button indicators only

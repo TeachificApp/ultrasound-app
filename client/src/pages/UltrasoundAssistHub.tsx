@@ -254,6 +254,8 @@ export default function UltrasoundAssistHub() {
             const coachLocked = !spec.scanCoachFree && !isPremium;
             // Card is "fully locked" only when both buttons require premium and user isn't premium
             const fullyLocked = navLocked && coachLocked;
+            // Card is "fully free" when both Navigator and ScanCoach are free to all members
+            const fullyFree = spec.navigatorFree && spec.scanCoachFree;
 
             return (
               <div
@@ -275,6 +277,19 @@ export default function UltrasoundAssistHub() {
                     >
                       <Crown className="w-2.5 h-2.5" />
                       PREMIUM
+                    </div>
+                  </div>
+                )}
+
+                {/* Free corner badge for fully-free cards */}
+                {fullyFree && (
+                  <div className="absolute top-0 right-0 overflow-hidden rounded-tr-xl rounded-bl-xl">
+                    <div
+                      className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-white"
+                      style={{ background: "linear-gradient(135deg, #10b981, #059669)" }}
+                    >
+                      <span className="text-[10px]">✓</span>
+                      FREE
                     </div>
                   </div>
                 )}
