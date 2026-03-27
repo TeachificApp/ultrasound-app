@@ -10,7 +10,7 @@
  *  - Reorder sections via up/down arrows
  *  - Save / discard changes per section
  */
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
 import Layout from "@/components/Layout";
 import { trpc } from "@/lib/trpc";
@@ -408,6 +408,8 @@ export default function NavigatorEditor() {
   const [deletingSection, setDeletingSection] = useState<number | null>(null);
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
+  const dragSectionIdx = useRef<number | null>(null);
+  const dragItemKey = useRef<{ sectionIdx: number; itemIdx: number } | null>(null);
 
   // Redirect non-admins
   useEffect(() => {
@@ -519,17 +521,80 @@ export default function NavigatorEditor() {
     const targetIdx = direction === "up" ? sectionIdx - 1 : sectionIdx + 1;
     if (targetIdx < 0 || targetIdx >= newSections.length) return;
     [newSections[sectionIdx], newSections[targetIdx]] = [newSections[targetIdx], newSections[sectionIdx]];
-    const reordered = newSections.map((s, i) => ({ ...s, sortOrder: i }));
+    const reordered = newSections.map((s, i) => ({ ...s, sortOrder: i, isDirty: true }));
     setSections(reordered);
-    setExpandedSection(targetIdx);
+    // Keep the same section expanded after move
+    if (expandedSection === sectionIdx) setExpandedSection(targetIdx);
+    else if (expandedSection === targetIdx) setExpandedSection(sectionIdx);
     // Persist reorder if all sections are in DB
     const allInDb = reordered.every(s => s.id);
     if (allInDb) {
-      await reorderSections.mutateAsync({
-        module: selectedModule,
-        orderedIds: reordered.map(s => s.id!),
-      });
+      try {
+        await reorderSections.mutateAsync({
+          module: selectedModule,
+          orderedIds: reordered.map(s => s.id!),
+        });
+      } catch { /* non-fatal */ }
     }
+  };
+
+  // Drag-to-reorder: sections
+  const handleSectionDragStart = (e: React.DragEvent, idx: number) => {
+    dragSectionIdx.current = idx;
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(idx));
+  };
+  const handleSectionDragOver = (e: React.DragEvent, idx: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const from = dragSectionIdx.current;
+    if (from === null || from === idx) return;
+    const newSections = [...sections];
+    const [moved] = newSections.splice(from, 1);
+    newSections.splice(idx, 0, moved);
+    const reordered = newSections.map((s, i) => ({ ...s, sortOrder: i, isDirty: true }));
+    dragSectionIdx.current = idx;
+    if (expandedSection === from) setExpandedSection(idx);
+    else if (expandedSection === idx) setExpandedSection(from);
+    setSections(reordered);
+  };
+  const handleSectionDragEnd = async () => {
+    const allInDb = sections.every(s => s.id);
+    if (allInDb) {
+      try {
+        await reorderSections.mutateAsync({
+          module: selectedModule,
+          orderedIds: sections.map(s => s.id!),
+        });
+      } catch { /* non-fatal */ }
+    }
+    dragSectionIdx.current = null;
+  };
+
+  // Drag-to-reorder: items within a section
+  const handleItemDragStart = (e: React.DragEvent, sectionIdx: number, itemIdx: number) => {
+    dragItemKey.current = { sectionIdx, itemIdx };
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", `${sectionIdx}-${itemIdx}`);
+    e.stopPropagation();
+  };
+  const handleItemDragOver = (e: React.DragEvent, sectionIdx: number, itemIdx: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "move";
+    const key = dragItemKey.current;
+    if (!key || key.sectionIdx !== sectionIdx || key.itemIdx === itemIdx) return;
+    setSections(prev => prev.map((s, si) => {
+      if (si !== sectionIdx) return s;
+      const newItems = [...s.items];
+      const [moved] = newItems.splice(key.itemIdx, 1);
+      newItems.splice(itemIdx, 0, moved);
+      dragItemKey.current = { sectionIdx, itemIdx };
+      return { ...s, items: newItems.map((item, i) => ({ ...item, sortOrder: i })), isDirty: true };
+    }));
+  };
+  const handleItemDragEnd = () => {
+    dragItemKey.current = null;
   };
 
   const handleUpdateSectionField = (sectionIdx: number, field: "sectionName" | "probe", value: string) => {
@@ -681,10 +746,17 @@ export default function NavigatorEditor() {
           {sections.map((section, si) => {
             const isExpanded = expandedSection === si;
             return (
-              <div key={si} className={`bg-white rounded-xl border shadow-sm overflow-hidden ${section.isDirty ? "border-amber-300" : "border-gray-100"}`}>
+              <div
+                key={si}
+                className={`bg-white rounded-xl border shadow-sm overflow-hidden ${section.isDirty ? "border-amber-300" : "border-gray-100"}`}
+                draggable
+                onDragStart={e => handleSectionDragStart(e, si)}
+                onDragOver={e => handleSectionDragOver(e, si)}
+                onDragEnd={handleSectionDragEnd}
+              >
                 {/* Section header */}
                 <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border-b border-gray-100">
-                  <GripVertical className="w-4 h-4 text-gray-300 flex-shrink-0" />
+                  <GripVertical className="w-4 h-4 text-gray-400 flex-shrink-0 cursor-grab active:cursor-grabbing" />
                   <div className="flex-1 min-w-0">
                     <input
                       className="font-bold text-sm text-gray-800 bg-transparent border-none outline-none w-full"
@@ -739,9 +811,16 @@ export default function NavigatorEditor() {
                     {section.items.map((item, ii) => {
                       const isEditingThis = editingItem === item.id;
                       return (
-                        <div key={item.id} className={`border-b border-gray-50 last:border-0 ${item.critical ? "bg-amber-50/30" : ""}`}>
+                        <div
+                          key={item.id}
+                          className={`border-b border-gray-50 last:border-0 ${item.critical ? "bg-amber-50/30" : ""}`}
+                          draggable
+                          onDragStart={e => handleItemDragStart(e, si, ii)}
+                          onDragOver={e => handleItemDragOver(e, si, ii)}
+                          onDragEnd={handleItemDragEnd}
+                        >
                           <div className="flex items-start gap-2 px-4 py-2.5">
-                            <GripVertical className="w-4 h-4 text-gray-200 flex-shrink-0 mt-1" />
+                            <GripVertical className="w-4 h-4 text-gray-400 flex-shrink-0 mt-1 cursor-grab active:cursor-grabbing" />
                             <div className="flex-1 min-w-0">
                               {isEditingThis ? (
                                 <div className="space-y-1.5">

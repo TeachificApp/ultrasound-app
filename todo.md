@@ -829,3 +829,4 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] "Seed to Database" button to persist all static content to DB in one click
 - [x] Route /admin/navigator registered in App.tsx with admin guard
 - [x] Navigator Editor link added to PlatformAdmin admin tools grid
+- [x] NavigatorEditor: fix drag-to-reorder for both main sections and subitems (HTML5 drag-and-drop on GripVertical handles + fixed arrow buttons to preserve expanded state)
