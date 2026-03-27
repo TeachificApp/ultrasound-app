@@ -41,6 +41,8 @@ export const NAVIGATOR_MODULES = [
   "tcd",
   "thyroid",
   "venous",
+  "appendix",
+  "invasive_procedures",
 ] as const;
 
 export type NavigatorModule = (typeof NAVIGATOR_MODULES)[number];
@@ -204,6 +206,8 @@ export const navigatorAdminRouter = router({
       { key: "tcd",               label: "Intracranial TCD" },
       { key: "thyroid",           label: "Thyroid / Parathyroid" },
       { key: "venous",            label: "Peripheral Venous" },
+      { key: "appendix",           label: "Appendix Ultrasound" },
+      { key: "invasive_procedures", label: "Invasive Procedures (Paracentesis / Thoracentesis)" },
     ];
   }),
 });

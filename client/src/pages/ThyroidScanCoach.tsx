@@ -103,6 +103,18 @@ const views = [
       { category: "Pitfall", text: "Posterior thyroid nodules, lymph nodes, and the esophagus can all mimic parathyroid adenomas. Key differentiators: parathyroid adenomas are hypoechoic relative to thyroid (posterior nodules are part of the thyroid and isoechoic); the esophagus moves with swallowing; lymph nodes have a fatty hilum." },
     ],
   },
+  {
+    view: "Ultrasound-Guided FNA / Core Biopsy",
+    probe: "Linear 12–18 MHz",
+    tips: [
+      { category: "Patient Positioning", text: "Supine with neck hyperextended (pillow under shoulders). Turn the patient's head slightly away from the side being biopsied to open the lateral neck. Warn the patient not to swallow or speak during needle passes." },
+      { category: "Transducer Positioning", text: "Transverse orientation with the needle entering in-plane from the lateral aspect (lateral-to-medial approach). This keeps the needle parallel to the trachea and away from the carotid artery and IJV. Visualise the full needle shaft and tip within the nodule at all times." },
+      { category: "What to Assess", text: "Confirm the target nodule meets ACR TI-RADS biopsy thresholds: TR5 ≥1 cm, TR4 ≥1.5 cm, TR3 ≥2.5 cm, TR2 ≥3 cm. Identify the safest trajectory — avoid the carotid artery, IJV, trachea, and oesophagus. For cystic-solid nodules, target the solid component. Confirm the nodule is not an intrathyroidal parathyroid or lymph node." },
+      { category: "Scanning Tip", text: "For FNA, use a 25–27 gauge needle with a fanning technique (redirecting the needle tip within the nodule without withdrawing) to maximise cellular yield. Apply gentle suction (1–2 mL) or use the capillary technique (no syringe suction) for bloody aspirates. A minimum of 6 passes per nodule is recommended if on-site cytology is not available." },
+      { category: "Pearl", text: "Core biopsy (18–20 gauge, 2–3 cores) is preferred over FNA when molecular testing (ThyroSeq, Afirma) is planned or for follicular neoplasm evaluation. The ACR TI-RADS system (2017) guides biopsy decisions — TR5 nodules (highly suspicious: irregular margins, microcalcifications, taller-than-wide, extrathyroidal extension) should be biopsied at ≥1 cm." },
+      { category: "Pitfall", text: "Cystic nodules with minimal solid component have a high non-diagnostic rate on FNA — always target the solid mural component or cyst wall rather than the fluid. Aspirating cyst fluid without sampling the solid component is the most common cause of a non-diagnostic result. If predominantly cystic, aspirate the fluid first, then sample the residual solid component." },
+    ],
+  },
 ];
 
 const examTips = [

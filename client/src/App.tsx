@@ -104,6 +104,10 @@ import POCUSLungScanCoach from "./pages/POCUSLungScanCoach";
 import FetalEchoAssist from "./pages/FetalEchoAssist";
 import FetalNavigator from "./pages/FetalNavigator";
 import FetalScanCoach from "./pages/FetalScanCoach";
+import AppendixNavigator from "./pages/AppendixNavigator";
+import AppendixScanCoach from "./pages/AppendixScanCoach";
+import InvasiveProceduresNavigator from "./pages/InvasiveProceduresNavigator";
+import InvasiveProceduresScanCoach from "./pages/InvasiveProceduresScanCoach";
 
 // ── LMS Engines ───────────────────────────────────────────────────────────────
 import QuickFire from "./pages/QuickFire";
@@ -195,6 +199,14 @@ function Router() {
         {/* ── Breast ────────────────────────────────────────────────────── */}
         <Route path="/breast-navigator" component={BreastNavigator} />
         <Route path="/breast-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><BreastScanCoach /></RoleGuard>}</Route>
+
+        {/* Appendix */}
+        <Route path="/appendix-navigator" component={AppendixNavigator} />
+        <Route path="/appendix-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><AppendixScanCoach /></RoleGuard>}</Route>
+
+        {/* Invasive Procedures */}
+        <Route path="/invasive-procedures-navigator" component={InvasiveProceduresNavigator} />
+        <Route path="/invasive-procedures-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><InvasiveProceduresScanCoach /></RoleGuard>}</Route>
 
         {/* ── Vascular — Venous ─────────────────────────────────────────── */}
         <Route path="/venous-navigator" component={VenousNavigator} />

@@ -1,18 +1,20 @@
 /*
   UltrasoundAssist™ — Ultrasound Protocol Navigator & ScanCoach Hub
-  Exact pattern from EchoAssistHub — AAUS teal/aqua brand colors
+  Unified grid — no Free/Premium section split. Gating shown per-button.
 */
 import { useState } from "react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import {
   Activity, Baby, Scan, TrendingUp, BookOpen, Crown, Lock,
-  Stethoscope, Brain, Bone, Circle, Zap, Microscope, FlaskConical
+  Stethoscope, Brain, Bone, Circle, Zap, Search, Syringe
 } from "lucide-react";
 import { usePremium } from "@/hooks/usePremium";
 
+// navigatorFree: true  → Navigator accessible to all registered users
+// scanCoachFree: true  → ScanCoach accessible to all registered users
+// false on either      → requires Premium membership
 const specialties = [
-  // ── FREE NAVIGATORS (registered users) ───────────────────────────────────
   {
     path: "/abdominal-navigator",
     scanCoachPath: "/abdominal-scan-coach",
@@ -20,8 +22,8 @@ const specialties = [
     title: "Abdominal Ultrasound",
     description: "Liver, gallbladder, bile ducts, pancreas, spleen, kidneys, aorta, and IVC — complete abdominal protocol with view-by-view checklist and AIUM-based reference values.",
     badge: "Abdominal",
-    free: true,
-    freeScanCoach: true,
+    navigatorFree: true,
+    scanCoachFree: true,
   },
   {
     path: "/pelvic-gyn-navigator",
@@ -30,8 +32,8 @@ const specialties = [
     title: "Pelvic/Gyn Ultrasound",
     description: "Uterus, endometrium, ovaries, adnexa, and cul-de-sac — transabdominal and transvaginal pelvic ultrasound protocol per AIUM guidelines.",
     badge: "Pelvic/Gyn",
-    free: true,
-    freeScanCoach: true,
+    navigatorFree: true,
+    scanCoachFree: true,
   },
   {
     path: "/ob1-navigator",
@@ -40,10 +42,9 @@ const specialties = [
     title: "OB 1st Trimester",
     description: "Gestational sac, yolk sac, embryo/fetus, CRL, NT measurement, and early anatomy — first trimester obstetric ultrasound per AIUM guidelines.",
     badge: "OB 1st Tri",
-    free: true,
-    freeScanCoach: true,
+    navigatorFree: true,
+    scanCoachFree: true,
   },
-  // ── PREMIUM NAVIGATOR + SCANCOACH ─────────────────────────────────────────
   {
     path: "/ob23-navigator",
     scanCoachPath: "/ob23-scan-coach",
@@ -51,10 +52,9 @@ const specialties = [
     title: "OB 2nd/3rd Trimester",
     description: "Fetal biometry, anatomy survey, placenta, amniotic fluid, umbilical cord, and cervical length — second and third trimester obstetric ultrasound per AIUM guidelines.",
     badge: "OB 2nd/3rd Tri",
-    free: false,
-    freeScanCoach: false,
+    navigatorFree: false,
+    scanCoachFree: false,
   },
-  // ── FREE NAVIGATOR, PREMIUM SCANCOACH ─────────────────────────────────────
   {
     path: "/fetal-navigator",
     scanCoachPath: "/fetal-echo-assist",
@@ -62,10 +62,9 @@ const specialties = [
     title: "Fetal Echo",
     description: "Fetal cardiac anatomy, segmental analysis, 4-chamber view, outflow tracts, 3VV, 3VT, and fetal arrhythmia — fetal echocardiography per ASE guidelines.",
     badge: "Fetal Echo",
-    free: true,
-    freeScanCoach: false,
+    navigatorFree: true,
+    scanCoachFree: false,
   },
-  // ── PREMIUM NAVIGATOR + SCANCOACH ─────────────────────────────────────────
   {
     path: "/venous-navigator",
     scanCoachPath: "/venous-scan-coach",
@@ -73,8 +72,8 @@ const specialties = [
     title: "Vascular — Venous (Upper & Lower)",
     description: "DVT evaluation of upper and lower extremity veins — compression technique, color Doppler, and spectral waveform analysis per AIUM/SVU guidelines.",
     badge: "Venous",
-    free: false,
-    freeScanCoach: false,
+    navigatorFree: false,
+    scanCoachFree: false,
   },
   {
     path: "/arterial-navigator",
@@ -83,8 +82,8 @@ const specialties = [
     title: "Vascular — Arterial (Upper & Lower)",
     description: "Peripheral arterial disease evaluation — ABI, segmental pressures, and duplex imaging of upper and lower extremity arteries per AIUM guidelines.",
     badge: "Arterial",
-    free: false,
-    freeScanCoach: false,
+    navigatorFree: false,
+    scanCoachFree: false,
   },
   {
     path: "/abdominal-vascular-navigator",
@@ -93,32 +92,9 @@ const specialties = [
     title: "Vascular — Abdominal/Renal/Mesenteric",
     description: "Renal arteries, mesenteric arteries, celiac axis, and portal venous system — abdominal vascular duplex ultrasound per AIUM guidelines.",
     badge: "Abdominal Vascular",
-    free: false,
-    freeScanCoach: false,
+    navigatorFree: false,
+    scanCoachFree: false,
   },
-  // ── FREE NAVIGATOR, PREMIUM SCANCOACH ─────────────────────────────────────
-  {
-    path: "/carotid-navigator",
-    scanCoachPath: "/carotid-scan-coach",
-    icon: Activity,
-    title: "Vascular — Extracranial Carotid Artery",
-    description: "CCA, ICA, ECA, and vertebral artery — extracranial carotid duplex ultrasound with SRU consensus stenosis grading per AIUM guidelines.",
-    badge: "Carotid",
-    free: true,
-    freeScanCoach: false,
-  },
-  // ── FREE NAVIGATOR, PREMIUM SCANCOACH ─────────────────────────────────────────────────────
-  {
-    path: "/pocus-assist",
-    scanCoachPath: "/pocus-assist",
-    icon: Zap,
-    title: "POCUS — Lung, eFAST, RUSH",
-    description: "Point-of-care ultrasound protocols — Lung B-lines, eFAST trauma survey, and RUSH hemodynamic assessment with view-by-view checklists and ScanCoach.",
-    badge: "POCUS",
-    free: true,
-    freeScanCoach: false,
-  },
-  // ── ADDITIONAL PREMIUM ────────────────────────────────────────────────────
   {
     path: "/aorta-navigator",
     scanCoachPath: "/aorta-scan-coach",
@@ -126,7 +102,8 @@ const specialties = [
     title: "Vascular — Abdominal Aorta/EndoLeak",
     description: "Abdominal aortic aneurysm measurement, surveillance, and post-EVAR endoleak detection — aorta ultrasound protocol per AIUM 2025 guidelines.",
     badge: "Aorta/EndoLeak",
-    free: false,
+    navigatorFree: false,
+    scanCoachFree: false,
   },
   {
     path: "/carotid-navigator",
@@ -135,7 +112,8 @@ const specialties = [
     title: "Vascular — Extracranial Carotid Artery",
     description: "CCA, ICA, ECA, and vertebral artery — extracranial carotid duplex ultrasound with SRU consensus stenosis grading per AIUM guidelines.",
     badge: "Carotid",
-    free: false,
+    navigatorFree: true,
+    scanCoachFree: false,
   },
   {
     path: "/tcd-navigator",
@@ -144,7 +122,18 @@ const specialties = [
     title: "Vascular — Intracranial Duplex/TCD",
     description: "Transcranial Doppler and duplex — MCA, ACA, PCA, basilar, and vertebral arteries via temporal, orbital, and suboccipital windows per AIUM guidelines.",
     badge: "TCD",
-    free: false,
+    navigatorFree: false,
+    scanCoachFree: false,
+  },
+  {
+    path: "/pocus-assist",
+    scanCoachPath: "/pocus-assist",
+    icon: Zap,
+    title: "POCUS — Lung, eFAST, RUSH",
+    description: "Point-of-care ultrasound protocols — Lung B-lines, eFAST trauma survey, and RUSH hemodynamic assessment with view-by-view checklists and ScanCoach.",
+    badge: "POCUS",
+    navigatorFree: true,
+    scanCoachFree: false,
   },
   {
     path: "/msk-navigator",
@@ -153,15 +142,64 @@ const specialties = [
     title: "MSK Ultrasound",
     description: "Shoulder, elbow, wrist/hand, hip, knee, and ankle/foot — musculoskeletal ultrasound protocol with dynamic assessment per AIUM 2023 guidelines.",
     badge: "MSK",
-    free: false,
+    navigatorFree: false,
+    scanCoachFree: false,
+  },
+  {
+    path: "/thyroid-navigator",
+    scanCoachPath: "/thyroid-scan-coach",
+    icon: Activity,
+    title: "Thyroid & Small Parts",
+    description: "Thyroid lobes, isthmus, nodule characterization (ACR TI-RADS), cervical lymph nodes, and ultrasound-guided FNA/core biopsy — per ACR TI-RADS 2017 guidelines.",
+    badge: "Thyroid",
+    navigatorFree: true,
+    scanCoachFree: false,
+  },
+  {
+    path: "/scrotum-navigator",
+    scanCoachPath: "/scrotum-scan-coach",
+    icon: Circle,
+    title: "Scrotum Ultrasound",
+    description: "Testes, epididymis, and extratesticular structures — scrotal ultrasound protocol with torsion assessment and color Doppler per AIUM guidelines.",
+    badge: "Scrotum",
+    navigatorFree: true,
+    scanCoachFree: false,
+  },
+  {
+    path: "/breast-navigator",
+    scanCoachPath: "/breast-scan-coach",
+    icon: Circle,
+    title: "Breast Ultrasound",
+    description: "Systematic breast survey, lesion characterization (ACR BI-RADS), ultrasound-guided biopsy (core/FNA/VAB), and pre-surgical lumpectomy localisation.",
+    badge: "Breast",
+    navigatorFree: false,
+    scanCoachFree: false,
+  },
+  {
+    path: "/appendix-navigator",
+    scanCoachPath: "/appendix-scan-coach",
+    icon: Search,
+    title: "Appendix Ultrasound",
+    description: "Graded compression technique for appendicitis — RLQ survey, appendix identification, periappendiceal assessment, and alternative RLQ diagnoses per ACR 2022 guidelines.",
+    badge: "Appendix",
+    navigatorFree: false,
+    scanCoachFree: false,
+  },
+  {
+    path: "/invasive-procedures-navigator",
+    scanCoachPath: "/invasive-procedures-scan-coach",
+    icon: Syringe,
+    title: "Invasive Procedures",
+    description: "Ultrasound-guided paracentesis and thoracentesis — site selection, real-time needle guidance, and post-procedure assessment per ACCP/ATS/SHM/SCCM 2020 consensus.",
+    badge: "Procedures",
+    navigatorFree: false,
+    scanCoachFree: false,
   },
 ];
 
 export default function UltrasoundAssistHub() {
   const { isPremium } = usePremium();
-  const [upgradeModal, setUpgradeModal] = useState<{ title: string } | null>(null);
-  const freeCount = specialties.filter(s => s.free).length;
-  const premiumCount = specialties.filter(s => !s.free).length;
+  const [upgradeModal, setUpgradeModal] = useState<{ title: string; type: "navigator" | "scancoach" } | null>(null);
 
   return (
     <Layout>
@@ -182,14 +220,7 @@ export default function UltrasoundAssistHub() {
               <div className="flex flex-wrap items-center gap-2 mb-3">
                 <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-3 py-1">
                   <div className="w-2 h-2 rounded-full bg-[#4ad9e0] animate-pulse" />
-                  <span className="text-sm text-white/80 font-medium">16 Specialties · Protocol + ScanCoach</span>
-                </div>
-                <div className="inline-flex items-center gap-1.5 bg-emerald-500/20 border border-emerald-400/30 rounded-full px-3 py-1">
-                  <span className="text-sm text-emerald-300 font-medium">{freeCount} Free</span>
-                </div>
-                <div className="inline-flex items-center gap-1.5 bg-amber-500/20 border border-amber-400/30 rounded-full px-3 py-1">
-                  <Crown className="w-3 h-3 text-amber-300" />
-                  <span className="text-sm text-amber-300 font-medium">{premiumCount} Premium</span>
+                  <span className="text-sm text-white/80 font-medium">{specialties.length} Specialties · Protocol + ScanCoach</span>
                 </div>
               </div>
               <h1
@@ -207,166 +238,131 @@ export default function UltrasoundAssistHub() {
         </div>
       </div>
 
-      {/* Specialty Grid */}
+      {/* Unified Specialty Grid */}
       <div className="container py-8">
-        {/* Free section */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-2 h-2 rounded-full bg-emerald-500" />
-            <h2 className="text-base font-bold text-gray-700" style={{ fontFamily: "Merriweather, serif" }}>
-              Free — Available to All Members
-            </h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {specialties.filter(s => s.free).map((spec, i) => {
-              const Icon = spec.icon;
-              return (
-                <div key={i} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-all">
-                  <div className="p-5">
-                    <div className="flex items-start gap-3 mb-3">
-                      <div
-                        className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                        style={{ background: "linear-gradient(135deg, #0e1e2e, #189aa1)" }}
-                      >
-                        <Icon className="w-5 h-5 text-[#4ad9e0]" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-full text-white" style={{ background: "#189aa1" }}>
-                            {spec.badge}
-                          </span>
-                          <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Free</span>
-                        </div>
-                        <h3 className="font-bold text-gray-900 text-sm mt-1 leading-tight" style={{ fontFamily: "Merriweather, serif" }}>
-                          {spec.title}
-                        </h3>
-                      </div>
-                    </div>
-                    <p className="text-xs text-gray-500 leading-relaxed mb-4">{spec.description}</p>
-                    <div className="flex gap-2">
-                      <Link href={spec.path}>
-                        <button
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs text-white transition-all hover:opacity-90"
-                          style={{ background: "#189aa1" }}
-                        >
-                          <BookOpen className="w-3 h-3" />
-                          Navigator
-                        </button>
-                      </Link>
-                      <Link href={spec.scanCoachPath}>
-                        <button
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs border bg-white transition-all hover:bg-[#f0fbfc]"
-                          style={{ borderColor: "#189aa1" + "50", color: "#189aa1" }}
-                        >
-                          <Scan className="w-3 h-3" />
-                          ScanCoach™
-                        </button>
-                      </Link>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {specialties.map((spec, i) => {
+            const Icon = spec.icon;
+            const navLocked = !spec.navigatorFree && !isPremium;
+            const coachLocked = !spec.scanCoachFree && !isPremium;
+            // Card is "fully locked" only when both buttons require premium and user isn't premium
+            const fullyLocked = navLocked && coachLocked;
+
+            return (
+              <div
+                key={i}
+                className={`relative bg-white rounded-xl border shadow-sm overflow-hidden transition-all ${
+                  fullyLocked
+                    ? "border-amber-100 hover:shadow-md hover:border-amber-300/50 cursor-pointer"
+                    : "border-gray-100 hover:shadow-md hover:border-[#189aa1]/30"
+                }`}
+                style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}
+                onClick={fullyLocked ? () => setUpgradeModal({ title: spec.title, type: "navigator" }) : undefined}
+              >
+                {/* Premium corner badge for fully locked cards */}
+                {fullyLocked && (
+                  <div className="absolute top-0 right-0 overflow-hidden rounded-tr-xl rounded-bl-xl">
+                    <div
+                      className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-white"
+                      style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}
+                    >
+                      <Crown className="w-2.5 h-2.5" />
+                      PREMIUM
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+                )}
 
-        {/* Premium section */}
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <Crown className="w-4 h-4 text-amber-500" />
-            <h2 className="text-base font-bold text-gray-700" style={{ fontFamily: "Merriweather, serif" }}>
-              Premium — Upgrade for Full Access
-            </h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {specialties.filter(s => !s.free).map((spec, i) => {
-              const Icon = spec.icon;
-              const locked = !isPremium;
-              return (
-                <div
-                  key={i}
-                  className={`relative bg-white rounded-xl border shadow-sm overflow-hidden transition-all cursor-pointer ${
-                    locked
-                      ? "border-amber-100 hover:shadow-md hover:border-amber-300/50"
-                      : "border-gray-100 hover:shadow-md hover:border-[#189aa1]/30"
-                  }`}
-                  style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}
-                  onClick={locked ? () => setUpgradeModal({ title: spec.title }) : undefined}
-                >
-                  {/* Amber corner badge for locked cards — iHeartEcho style */}
-                  {locked && (
-                    <div className="absolute top-0 right-0 overflow-hidden rounded-tr-xl rounded-bl-xl">
-                      <div
-                        className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-white"
-                        style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}
-                      >
-                        <Crown className="w-2.5 h-2.5" />
-                        PREMIUM
-                      </div>
+                <div className="p-5">
+                  <div className="flex items-start gap-3 mb-3">
+                    <div
+                      className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{
+                        background: fullyLocked
+                          ? "#f59e0b15"
+                          : "linear-gradient(135deg, #0e1e2e, #189aa1)",
+                      }}
+                    >
+                      <Icon className={`w-5 h-5 ${fullyLocked ? "text-amber-500" : "text-[#4ad9e0]"}`} />
                     </div>
-                  )}
-                  <div className="p-5">
-                    <div className="flex items-start gap-3 mb-3">
-                      <div
-                        className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                        style={{ background: locked ? "#f59e0b15" : "linear-gradient(135deg, #0e1e2e, #189aa1)" }}
-                      >
-                        <Icon className={`w-5 h-5 ${locked ? "text-amber-500" : "text-[#4ad9e0]"}`} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span
-                            className="text-xs font-bold px-2 py-0.5 rounded-full text-white"
-                            style={{ background: locked ? "#9ca3af" : "#189aa1" }}
-                          >
-                            {spec.badge}
-                          </span>
-                        </div>
-                        <h3
-                          className="font-bold text-sm mt-1 leading-tight text-gray-800"
-                          style={{ fontFamily: "Merriweather, serif" }}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span
+                          className="text-xs font-bold px-2 py-0.5 rounded-full text-white"
+                          style={{ background: fullyLocked ? "#9ca3af" : "#189aa1" }}
                         >
-                          {spec.title}
-                        </h3>
+                          {spec.badge}
+                        </span>
                       </div>
+                      <h3
+                        className="font-bold text-sm mt-1 leading-tight text-gray-800"
+                        style={{ fontFamily: "Merriweather, serif" }}
+                      >
+                        {spec.title}
+                      </h3>
                     </div>
-                    <p className="text-xs leading-relaxed mb-4 text-gray-500">
-                      {spec.description}
-                    </p>
-                    {locked ? (
-                      <div className="flex items-center gap-1 text-xs font-semibold text-amber-600">
-                        <Lock className="w-3 h-3" /> Upgrade to Access
-                      </div>
-                    ) : (
-                      <div className="flex gap-2">
+                  </div>
+
+                  <p className="text-xs leading-relaxed mb-4 text-gray-500">
+                    {spec.description}
+                  </p>
+
+                  {fullyLocked ? (
+                    <div className="flex items-center gap-1 text-xs font-semibold text-amber-600">
+                      <Lock className="w-3 h-3" /> Upgrade to Access
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      {/* Navigator button */}
+                      {navLocked ? (
+                        <button
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs border border-amber-200 bg-amber-50 text-amber-600 transition-all hover:bg-amber-100"
+                          onClick={(e) => { e.stopPropagation(); setUpgradeModal({ title: spec.title, type: "navigator" }); }}
+                        >
+                          <Lock className="w-3 h-3" />
+                          Navigator
+                        </button>
+                      ) : (
                         <Link href={spec.path}>
                           <button
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs text-white transition-all hover:opacity-90"
                             style={{ background: "#189aa1" }}
+                            onClick={(e) => e.stopPropagation()}
                           >
                             <BookOpen className="w-3 h-3" />
                             Navigator
                           </button>
                         </Link>
+                      )}
+
+                      {/* ScanCoach button */}
+                      {coachLocked ? (
+                        <button
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs border border-amber-200 bg-amber-50 text-amber-600 transition-all hover:bg-amber-100"
+                          onClick={(e) => { e.stopPropagation(); setUpgradeModal({ title: spec.title, type: "scancoach" }); }}
+                        >
+                          <Lock className="w-3 h-3" />
+                          ScanCoach™
+                        </button>
+                      ) : (
                         <Link href={spec.scanCoachPath}>
                           <button
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs border bg-white transition-all hover:bg-[#f0fbfc]"
                             style={{ borderColor: "#189aa1" + "50", color: "#189aa1" }}
+                            onClick={(e) => e.stopPropagation()}
                           >
                             <Scan className="w-3 h-3" />
                             ScanCoach™
                           </button>
                         </Link>
-                      </div>
-                    )}
-                  </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            );
+          })}
         </div>
       </div>
-
 
       {/* Upgrade modal */}
       {upgradeModal && (
@@ -387,7 +383,8 @@ export default function UltrasoundAssistHub() {
             <div>
               <h3 className="text-lg font-bold text-gray-900" style={{ fontFamily: "Merriweather, serif" }}>Premium Feature</h3>
               <p className="text-sm text-gray-500 mt-1">
-                <strong>{upgradeModal.title}</strong> requires a Premium membership.
+                <strong>{upgradeModal.title}</strong>{" "}
+                {upgradeModal.type === "scancoach" ? "ScanCoach™" : "Navigator"} requires a Premium membership.
               </p>
             </div>
             <div className="flex flex-col gap-2">

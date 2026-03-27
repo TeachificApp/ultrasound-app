@@ -74,6 +74,30 @@ const views = [
       { category: "Pitfall", text: "Absence of Doppler signal does NOT exclude malignancy — small or avascular tumors (e.g., DCIS, small invasive lobular carcinoma) may show no detectable flow. Doppler is most useful as a supplementary finding, not a primary diagnostic criterion." },
     ],
   },
+  {
+    view: "Ultrasound-Guided Biopsy (Core / FNA / VAB)",
+    probe: "Linear 12–18 MHz",
+    tips: [
+      { category: "Patient Positioning", text: "Supine with ipsilateral arm elevated and externally rotated. Position the patient so the target lesion is in the most superficial and accessible location. Ensure the needle path avoids the chest wall — rotate the patient slightly toward the ipsilateral side if needed to increase the distance between the lesion and the pleura." },
+      { category: "Transducer Positioning", text: "Orient the transducer so the needle enters in-plane (parallel to the long axis of the transducer). This provides real-time visualisation of the entire needle shaft and tip. The needle should approach from the lateral aspect of the breast, travelling parallel to the chest wall to minimise pneumothorax risk." },
+      { category: "What to Assess", text: "Confirm target lesion identity (size, location, depth, distance from skin and chest wall). Identify the safest needle trajectory — parallel to chest wall, avoiding vessels and implants. For core biopsy: confirm the throw distance of the biopsy gun will not reach the chest wall. For FNA: identify the most cellular (hypoechoic, vascular) portion of the lesion. For VAB: plan the aperture orientation for optimal sampling." },
+      { category: "Scanning Tip", text: "Use the freehand technique with the needle entering at the edge of the transducer footprint. Visualise the needle tip at all times — if the tip is lost, stop advancing. A 14-gauge core biopsy needle is standard for solid lesions (minimum 3 passes). A 25-gauge needle is used for FNA. Vacuum-assisted biopsy (VAB, 7–11 gauge) is preferred for calcifications, small lesions, and complete excision of small benign lesions." },
+      { category: "Pearl", text: "Always document the clip marker deployment after core biopsy — the clip confirms the biopsied site for surgical correlation and is essential if the lesion disappears after biopsy. Confirm clip position with post-procedure mammogram. For BI-RADS 4–5 lesions, a minimum of 3 core samples is recommended; for calcifications, specimen radiograph confirms calcification retrieval." },
+      { category: "Pitfall", text: "The most common pitfall is loss of needle visualisation — the needle tip must be confirmed before firing the biopsy gun. Acoustic shadowing from the needle can obscure the tip; angling the transducer (heel-toe) toward the needle improves visualisation. Always confirm the needle tip is within the lesion, not beyond it, before firing." },
+    ],
+  },
+  {
+    view: "Pre-Surgical Lumpectomy Localisation",
+    probe: "Linear 12–18 MHz",
+    tips: [
+      { category: "Patient Positioning", text: "Supine with ipsilateral arm elevated. Position the patient in the same orientation as the planned surgical approach. For wire localisation, position to optimise the wire trajectory relative to the planned incision site." },
+      { category: "Transducer Positioning", text: "Identify the target lesion or biopsy clip marker. Measure the lesion's distance from the skin surface and from the nipple (clock-face position and radial distance). For wire-guided localisation, plan the needle approach to place the wire tip within or just deep to the lesion. For radioactive seed (RSL) or SAVI SCOUT® localisation, confirm device placement within the lesion." },
+      { category: "What to Assess", text: "Confirm target identity — compare with prior imaging. Identify the biopsy clip if the lesion is occult. Measure lesion size, depth from skin, and distance from chest wall. Document the planned localisation device trajectory. After device placement, confirm tip position relative to the lesion in two planes." },
+      { category: "Scanning Tip", text: "For clip-only targets (lesion no longer visible after biopsy), use the clip's acoustic shadow or reverberation artefact to confirm its position. Correlate with the post-biopsy mammogram before localisation. For wire localisation, the wire should be placed so the hook/tip is within 1 cm of the lesion." },
+      { category: "Pearl", text: "Ultrasound-guided localisation is preferred over stereotactic guidance for sonographically visible lesions — it is faster, uses no radiation, and allows real-time confirmation of device placement. The SAVI SCOUT® reflector and radioactive seed localisation (RSL) are increasingly replacing wire localisation as they allow placement days before surgery." },
+      { category: "Pitfall", text: "Clip migration is a well-recognised phenomenon — clips can migrate up to several centimetres from the biopsy site, particularly in fatty breasts. Always correlate the ultrasound clip position with the post-biopsy mammogram before localisation. If the clip is not visible on ultrasound, stereotactic or tomosynthesis-guided localisation may be required." },
+    ],
+  },
 ];
 
 const examTips = [

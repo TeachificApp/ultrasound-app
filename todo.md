@@ -848,3 +848,28 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Export STATIC_NAVIGATOR_DATA from NavigatorEditor into a shared lib file
 - [x] Refactor all 19 Navigator display pages to use the hook
 - [x] Verify all pages compile and render correctly
+
+## New Modules & Section Additions (Mar 27)
+- [x] BreastNavigator: add Ultrasound-Guided Biopsy section (core biopsy, FNA, vacuum-assisted)
+- [x] BreastNavigator: add Pre-Surgical Lumpectomy Localisation section
+- [x] BreastScanCoach: add Ultrasound-Guided Biopsy view
+- [x] BreastScanCoach: add Pre-Surgical Lumpectomy Localisation view
+- [x] navigatorStaticData.ts: add breast biopsy/lumpectomy sections
+- [x] ThyroidNavigator: add Ultrasound-Guided Biopsy/FNA section
+- [x] ThyroidScanCoach: add Ultrasound-Guided Biopsy/FNA view
+- [x] navigatorStaticData.ts: add thyroid biopsy/FNA section
+- [x] Build AppendixNavigator page (appendix scanning protocol, graded compression, McBurney's, perforation signs)
+- [x] Build AppendixScanCoach page (graded compression technique, RLQ survey, appendix identification)
+- [x] Build InvasiveProceduresNavigator page (paracentesis, thoracentesis, pre-procedure checklist)
+- [x] Build InvasiveProceduresScanCoach page (paracentesis site selection, thoracentesis site selection)
+- [x] navigatorStaticData.ts: add appendix and invasive_procedures module data
+- [x] navigatorAdminRouter.ts: register appendix and invasive_procedures module keys
+- [x] UltrasoundAssistHub.tsx: add Appendix and Invasive Procedures specialty cards
+- [x] App.tsx: register routes for all 4 new pages
+- [x] Seed appendix and invasive_procedures modules to DB
+
+## Hub UI Fixes (Mar 27)
+- [x] Remove "Free — Available to All Members" section header from UltrasoundAssistHub
+- [x] Remove "Free" badge from any specialty where ScanCoach is premium-gated
+- [x] Merge free and premium specialties into a single unified grid (no section split)
+- [x] Appendix and Invasive Procedures cards confirmed visible in hub

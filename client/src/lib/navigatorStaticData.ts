@@ -220,6 +220,14 @@ export const STATIC_NAVIGATOR_DATA: NavigatorStaticData = {
       { id: "thyroid_ln_0", label: "Bilateral cervical chain levels II–VI — size, shape, echogenicity, vascularity", detail: "Suspicious: round shape, loss of fatty hilum, cystic change, microcalcifications", critical: true },
       { id: "thyroid_ln_1", label: "Short-axis diameter of largest node", detail: "Short axis >1 cm = abnormal; <1 cm with suspicious features = biopsy consideration", critical: false },
     ]},
+    { sectionName: "Ultrasound-Guided FNA / Core Biopsy", probe: "Linear 12–18 MHz | Freehand in-plane technique", items: [
+      { id: "thyroid_bx_0", label: "Target nodule confirmed — ACR TI-RADS category and size meet biopsy threshold", detail: "ACR TI-RADS biopsy thresholds: TR5 ≥1 cm, TR4 ≥1.5 cm, TR3 ≥2.5 cm, TR2 ≥3 cm. TR1 = no biopsy.", critical: true },
+      { id: "thyroid_bx_1", label: "Needle trajectory planned — lateral to medial, parallel to trachea, avoiding carotid and IJV", detail: "Transverse approach (needle in-plane with transducer) preferred for thyroid FNA.", critical: true },
+      { id: "thyroid_bx_2", label: "Real-time needle visualisation — tip confirmed within nodule throughout sampling", detail: "Fanning technique (redirecting needle within nodule) increases cellular yield for FNA.", critical: true },
+      { id: "thyroid_bx_3", label: "FNA: 25–27 gauge, 10–20 passes | Core biopsy: 18–20 gauge, 2–3 cores", detail: "Core biopsy preferred for follicular neoplasm evaluation and molecular testing.", critical: false },
+      { id: "thyroid_bx_4", label: "On-site cytology adequacy confirmed (if available) or minimum 6 passes per nodule", detail: "Rapid on-site evaluation (ROSE) reduces non-diagnostic rate to <5%.", critical: false },
+      { id: "thyroid_bx_5", label: "Post-procedure haematoma assessed — apply pressure for 5–10 minutes", detail: "Haematoma is the most common complication; rarely requires intervention.", critical: false },
+    ]},
   ],
   scrotum: [
     { sectionName: "Right Testis", probe: "High-frequency linear 10–18 MHz; patient supine, towel under scrotum", items: [
@@ -262,6 +270,21 @@ export const STATIC_NAVIGATOR_DATA: NavigatorStaticData = {
       { id: "breast_lesion_4", label: "Posterior features: no posterior features / enhancement / shadowing / combined", detail: "", critical: false },
       { id: "breast_lesion_5", label: "Calcifications: macrocalcifications / microcalcifications in mass", detail: "Microcalcifications in mass = BI-RADS 4B–5", critical: true },
       { id: "breast_lesion_6", label: "Vascularity: color Doppler — internal vs peripheral", detail: "", critical: false },
+    ]},
+    { sectionName: "Ultrasound-Guided Biopsy (Core / FNA / VAB)", probe: "Linear 12–18 MHz | Freehand in-plane technique", items: [
+      { id: "breast_biopsy_0", label: "Target lesion confirmed — size, location, depth from skin and chest wall", detail: "Compare with prior imaging. Confirm BI-RADS category warrants biopsy.", critical: true },
+      { id: "breast_biopsy_1", label: "Needle trajectory planned — parallel to chest wall, avoiding vessels and implants", detail: "Lateral approach preferred. Confirm throw distance will not reach pleura.", critical: true },
+      { id: "breast_biopsy_2", label: "Real-time needle visualisation — tip confirmed within lesion before firing", detail: "Heel-toe transducer angulation improves tip visualisation if obscured by shadowing.", critical: true },
+      { id: "breast_biopsy_3", label: "Core biopsy: minimum 3 passes (14-gauge) | FNA: 25-gauge | VAB: 7–11 gauge", detail: "Specimen radiograph for calcifications confirms retrieval.", critical: false },
+      { id: "breast_biopsy_4", label: "Biopsy clip marker deployed and confirmed post-procedure", detail: "Post-procedure mammogram confirms clip position. Essential if lesion resolves after biopsy.", critical: true },
+      { id: "breast_biopsy_5", label: "Post-procedure haematoma assessed — apply pressure, document size", detail: "", critical: false },
+    ]},
+    { sectionName: "Pre-Surgical Lumpectomy Localisation", probe: "Linear 12–18 MHz | Freehand in-plane technique", items: [
+      { id: "breast_lump_0", label: "Target lesion or biopsy clip confirmed — correlate with prior mammogram", detail: "Clip migration can occur — always correlate with post-biopsy mammogram before localisation.", critical: true },
+      { id: "breast_lump_1", label: "Lesion depth from skin and distance from chest wall measured", detail: "", critical: true },
+      { id: "breast_lump_2", label: "Localisation device trajectory planned (wire / RSL seed / SAVI SCOUT®)", detail: "Wire tip should be within 1 cm of lesion. RSL/SAVI SCOUT® placed within lesion.", critical: true },
+      { id: "breast_lump_3", label: "Device tip position confirmed within lesion in two planes post-placement", detail: "", critical: true },
+      { id: "breast_lump_4", label: "Post-procedure mammogram performed to confirm device position", detail: "Required for wire and RSL localisation before patient leaves department.", critical: true },
     ]},
   ],
   pelvic_gyn: [
@@ -693,6 +716,83 @@ export const STATIC_NAVIGATOR_DATA: NavigatorStaticData = {
       { id: "fetal_check_aarch", label: "Aortic arch: sidedness, isthmus size, retrograde flow?", detail: "", critical: true },
       { id: "fetal_check_pvein", label: "Pulmonary veins: all 4 draining to LA (color Doppler)", detail: "", critical: true },
       { id: "fetal_check_rhythm", label: "Cardiac rhythm: regular rate 120–160 bpm", detail: "", critical: true },
+    ]},
+  ],
+
+  // ── Appendix ────────────────────────────────────────────────────────────────────────────────
+  appendix: [
+    { sectionName: "RLQ Survey — Graded Compression Technique", probe: "Linear 9–15 MHz | Start at point of maximal tenderness", items: [
+      { id: "app_survey_0", label: "Identify point of maximal tenderness (McBurney's point)", detail: "One-third of the way from RASIS to umbilicus", critical: true },
+      { id: "app_survey_1", label: "Apply graded compression to displace bowel gas", detail: "Slow, steady pressure — do not release suddenly", critical: true },
+      { id: "app_survey_2", label: "Identify psoas muscle as posterior landmark", detail: "Hyperechoic linear structure in the right iliac fossa", critical: false },
+      { id: "app_survey_3", label: "Identify iliac vessels (CIA, EIA, EIV)", detail: "Pulsatile artery and compressible vein", critical: false },
+      { id: "app_survey_4", label: "Identify cecum (blind-ending saccular structure with haustra)", detail: "Trace inferiorly to find the appendix origin", critical: true },
+      { id: "app_survey_5", label: "Scan in grid pattern over the RLQ", detail: "Systematic approach reduces non-visualization rate", critical: false },
+      { id: "app_survey_6", label: "If not found: check retrocecal position (roll patient left)", detail: "Retrocecal appendix is the most common cause of non-visualization", critical: false },
+    ]},
+    { sectionName: "Appendix Identification and Measurement", probe: "Linear 9–15 MHz | Transverse and longitudinal planes", items: [
+      { id: "app_id_0", label: "Identify appendix arising from posteromedial cecum", detail: "2–3 cm below the ileocecal valve", critical: true },
+      { id: "app_id_1", label: "Confirm blind-ending structure (no peristalsis)", detail: "Distinguish from terminal ileum (which peristalsises)", critical: true },
+      { id: "app_id_2", label: "Measure outer-wall-to-outer-wall diameter (transverse plane)", detail: "Normal ≤6 mm; >7 mm = appendicitis", critical: true },
+      { id: "app_id_3", label: "Assess compressibility (normal appendix compresses)", detail: "Non-compressible = abnormal", critical: true },
+      { id: "app_id_4", label: "Assess mural stratification (3 layers: mucosa, muscularis, serosa)", detail: "Loss of stratification = gangrenous appendicitis", critical: true },
+      { id: "app_id_5", label: "Look for appendicolith (hyperechoic focus with posterior shadowing)", detail: "Appendicolith + tenderness = high risk for perforation", critical: true },
+      { id: "app_id_6", label: "Assess wall thickness (normal <3 mm)", detail: ">3 mm = wall thickening", critical: false },
+    ]},
+    { sectionName: "Periappendiceal Assessment (Inflammation / Perforation)", probe: "Linear 9–15 MHz | Reduce compression slightly", items: [
+      { id: "app_peri_0", label: "Assess periappendiceal fat echogenicity", detail: "Hyperechoic fat = periappendiceal inflammation", critical: true },
+      { id: "app_peri_1", label: "Assess for free fluid (periappendiceal or pelvic)", detail: "Free fluid = perforation or peritonitis", critical: true },
+      { id: "app_peri_2", label: "Assess for appendiceal abscess (complex fluid collection)", detail: "Complex fluid adjacent to appendix = complicated appendicitis", critical: true },
+      { id: "app_peri_3", label: "Scan right paracolic gutter for free fluid", detail: "Fluid tracking superiorly = significant peritonitis", critical: false },
+      { id: "app_peri_4", label: "Scan pelvis (pouch of Douglas / rectovesical pouch) for free fluid", detail: "Pelvic free fluid in RLQ pain = perforation until proven otherwise", critical: false },
+      { id: "app_peri_5", label: "Assess for mesenteric lymphadenopathy", detail: "Nodes >1 cm short axis in cluster = mesenteric adenitis", critical: false },
+    ]},
+    { sectionName: "Alternative RLQ Diagnoses", probe: "Linear 9–15 MHz; curvilinear 3–5 MHz for pelvic structures", items: [
+      { id: "app_alt_0", label: "Assess right ovary and adnexa (women of reproductive age)", detail: "Absent Doppler flow = torsion (surgical emergency)", critical: true },
+      { id: "app_alt_1", label: "Assess terminal ileum wall thickness", detail: ">4 mm = Crohn's disease / ileitis", critical: false },
+      { id: "app_alt_2", label: "Assess mesenteric lymph nodes (cluster ≥3 nodes >5 mm)", detail: "Mesenteric adenitis — most common alternative in children", critical: false },
+      { id: "app_alt_3", label: "Assess right ureter for dilatation (ureteral calculus)", detail: "Absent ureteral jet on Doppler = ureteral obstruction", critical: false },
+      { id: "app_alt_4", label: "Assess psoas muscle for abscess (hypoechoic collection)", detail: "Psoas abscess can mimic appendicitis", critical: false },
+      { id: "app_alt_5", label: "Document: 'Appendix not visualized — CT recommended' if not found", detail: "Never report normal if appendix was not directly visualized", critical: true },
+    ]},
+  ],
+
+  // ── Invasive Procedures ──────────────────────────────────────────────────────────────────
+  invasive_procedures: [
+    { sectionName: "Thoracentesis — Pre-Procedure Assessment", probe: "Curvilinear 3–5 MHz | Posterior chest wall, longitudinal plane", items: [
+      { id: "thora_pre_0", label: "Position patient upright (tripod position) or lateral decubitus", detail: "Tripod position maximizes posterior pleural space", critical: true },
+      { id: "thora_pre_1", label: "Identify diaphragm (hyperechoic curvilinear structure with respiratory motion)", detail: "Confirm diaphragm position before marking site", critical: true },
+      { id: "thora_pre_2", label: "Measure fluid depth (minimum ≥10 mm for safe thoracentesis)", detail: "<10 mm = high risk; consider IR guidance", critical: true },
+      { id: "thora_pre_3", label: "Assess fluid echogenicity (anechoic vs. complex/septated)", detail: "Complex/septated = exudate or empyema — may need drain", critical: true },
+      { id: "thora_pre_4", label: "Confirm lung is not in the needle path", detail: "Lung above the fluid level — confirm with B-mode", critical: true },
+      { id: "thora_pre_5", label: "Identify optimal rib interspace (needle above superior rib margin)", detail: "Avoid subcostal groove — neurovascular bundle runs there", critical: true },
+      { id: "thora_pre_6", label: "Mark site with patient in procedural position", detail: "Re-scan immediately before needle insertion to confirm", critical: true },
+      { id: "thora_pre_7", label: "Confirm site during same respiratory phase as procedure", detail: "Diaphragm rises significantly with expiration", critical: false },
+    ]},
+    { sectionName: "Thoracentesis — Real-Time Guidance and Post-Procedure", probe: "Linear 9–12 MHz (sterile cover) | Longitudinal, in-plane", items: [
+      { id: "thora_rt_0", label: "Apply sterile transducer cover and sterile gel", detail: "Maintain sterile field throughout", critical: true },
+      { id: "thora_rt_1", label: "Confirm needle tip in fluid before aspirating", detail: "Real-time visualization of needle tip is essential", critical: true },
+      { id: "thora_rt_2", label: "Monitor for lung re-expansion during aspiration", detail: "Stop if patient develops cough or chest tightness", critical: false },
+      { id: "thora_rt_3", label: "Post-procedure: assess for pneumothorax (lung sliding)", detail: "Anterior chest wall, 2nd ICS, MCL — confirm seashore sign", critical: true },
+      { id: "thora_rt_4", label: "Absent lung sliding: look for lung point (pathognomonic for PTX)", detail: "Transition from absent to present sliding = lung point", critical: true },
+      { id: "thora_rt_5", label: "Assess residual pleural fluid post-procedure", detail: "Document residual volume if significant", critical: false },
+    ]},
+    { sectionName: "Paracentesis — Pre-Procedure Assessment", probe: "Curvilinear 3–5 MHz | LLQ, transverse and longitudinal planes", items: [
+      { id: "para_pre_0", label: "Position patient supine or slight lateral decubitus (affected side down)", detail: "Lateral decubitus pools fluid for easier access", critical: true },
+      { id: "para_pre_1", label: "Measure fluid pocket depth (minimum ≥3 cm for safe paracentesis)", detail: "<2 cm = high risk of bowel injury — reposition", critical: true },
+      { id: "para_pre_2", label: "Confirm no bowel loops in the needle path", detail: "Bowel shows peristalsis and layered wall — confirm absence", critical: true },
+      { id: "para_pre_3", label: "Identify inferior epigastric artery with color Doppler", detail: "Runs in lateral rectus sheath — must be avoided", critical: true },
+      { id: "para_pre_4", label: "Assess fluid echogenicity (anechoic vs. complex)", detail: "Complex fluid = exudate, hemoperitoneum, or infection", critical: false },
+      { id: "para_pre_5", label: "Mark optimal entry site (LLQ, lateral to rectus sheath)", detail: "Lateral to inferior epigastric artery, ≥3 cm fluid depth", critical: true },
+      { id: "para_pre_6", label: "Confirm no visible vessels in needle path on color Doppler", detail: "Scan the entire planned needle path with color Doppler", critical: true },
+    ]},
+    { sectionName: "Paracentesis — Real-Time Guidance and Post-Procedure", probe: "Linear 9–12 MHz (sterile cover) | Longitudinal, in-plane", items: [
+      { id: "para_rt_0", label: "Apply sterile transducer cover and sterile gel", detail: "Maintain sterile field throughout", critical: true },
+      { id: "para_rt_1", label: "Confirm needle tip in fluid pocket before aspirating", detail: "Real-time visualization of needle tip is essential", critical: true },
+      { id: "para_rt_2", label: "Monitor fluid pocket size during large-volume paracentesis", detail: "Reposition if pocket becomes <2 cm", critical: false },
+      { id: "para_rt_3", label: "Use Z-track technique (displace skin laterally before insertion)", detail: "Reduces post-procedure ascitic fluid leak", critical: false },
+      { id: "para_rt_4", label: "For LVP: albumin replacement 6–8 g per liter drained", detail: "Prevents paracentesis-induced circulatory dysfunction", critical: true },
+      { id: "para_rt_5", label: "Post-procedure: assess for hematoma at entry site", detail: ">2 cm or expanding hematoma — apply pressure, monitor", critical: true },
     ]},
   ],
 };
