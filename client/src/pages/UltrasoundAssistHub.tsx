@@ -396,10 +396,10 @@ export default function UltrasoundAssistHub() {
                 className="text-lg md:text-xl font-black text-white leading-tight"
                 style={{ fontFamily: "Merriweather, serif" }}
               >
-                Looking for Echo-Focused ScanCoach?
+                Looking for Echo-Focused ScanCoach™?
               </h3>
               <p className="text-white/60 text-sm mt-1.5 max-w-lg">
-                iHeartEcho EchoAssist™ provides dedicated echocardiography ScanCoach guidance — cardiac views, measurements, and clinical decision support for echo-focused practitioners.
+                iHeartEcho EchoAssist™ provides dedicated echocardiography ScanCoach™ guidance — cardiac views, measurements, and clinical decision support for echo-focused practitioners.
               </p>
             </div>
             <a
