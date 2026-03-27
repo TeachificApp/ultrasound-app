@@ -98,10 +98,7 @@ export default function ArterialNavigator() {
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">Protocol Checklist &amp; Reference Values</p>
               <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
-                Probe: CW Doppler instrument operating at 5–10 MHz; Appropriately sized blood pressure cuffs; Photoelectric plethysmograph; Air
-              </p>
-              <p className="text-white/60 text-xs mt-1 max-w-xl">
-                Positioning: The examination is best performed in a warm room to minimize the effects of peripheral vasoconstriction. The patient should be recumbent and ideally a
+                Systematic lower extremity arterial protocol checklist for PAD evaluation and post-intervention surveillance. Aligned with current SVU guidelines, with integrated ABI reference thresholds and Doppler waveform criteria for stenosis classification.
               </p>
               <div className="mt-3">
                 <Link href="/arterial-scan-coach">

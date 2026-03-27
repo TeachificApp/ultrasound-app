@@ -112,8 +112,8 @@ export default function AppendixScanCoach() {
                 Appendix Ultrasound ScanCoach™
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">View-by-View Scanning Tips &amp; Technique</p>
-              <p className="text-white/70 text-sm mt-2 max-w-xl">
-                Step-by-step guidance for graded compression appendix ultrasound — positioning, technique, and interpretation pearls.
+              <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
+                View-by-view acquisition guidance for appendix ultrasound, aligned with current AIUM guidelines. Covers graded-compression technique, secondary sign identification, and image optimization to support confident acute appendicitis evaluation.
               </p>
               <div className="mt-3">
                 <Link href="/appendix-navigator">

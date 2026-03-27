@@ -560,8 +560,8 @@ export default function CarotidScanCoach() {
                 Vascular Extracranial Carotid Artery ScanCoach™
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">View-by-View Acquisition Guidance</p>
-              <p className="text-white/70 text-xs mt-1 max-w-xl">
-                Probe: High-frequency linear array (7–15 MHz) · Curved array (5–2 MHz) for subclavian
+              <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
+                View-by-view acquisition guidance for extracranial carotid and vertebral artery ultrasound, aligned with current AIUM and SVU guidelines. Covers B-mode, color Doppler, and spectral Doppler technique with image optimization tips and stenosis grading criteria.
               </p>
               <div className="mt-3">
                 <Link href="/carotid-navigator">

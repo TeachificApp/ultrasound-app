@@ -142,8 +142,8 @@ export default function ScrotumScanCoach() {
                 Small Parts Scrotal Ultrasound ScanCoach™
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">View-by-View Acquisition Guidance</p>
-              <p className="text-white/70 text-xs mt-1 max-w-xl">
-                Probe: Linear 12–18 MHz · AIUM 2015 Guidelines
+              <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
+                View-by-view acquisition guidance for scrotal ultrasound, aligned with current AIUM guidelines. Covers bilateral testicular and epididymal survey with color Doppler technique, image optimization tips, and normal appearance criteria.
               </p>
               <div className="mt-3">
                 <Link href="/scrotum-navigator">

@@ -182,7 +182,7 @@ export default function AbdominalVascularNavigator() {
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">Liver Duplex · Mesenteric Duplex · Renal Artery Duplex</p>
               <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
-                Protocol checklists and reference values for abdominal vascular duplex examinations per SVU and AIUM guidelines.
+                Comprehensive vascular protocol checklist covering the mesenteric, renal, and portal systems. Aligned with current AIUM and SVU guidelines to support systematic Doppler interrogation and accurate stenosis grading.
               </p>
               <div className="mt-3">
                 <Link href={scanCoachPath}>

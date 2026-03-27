@@ -169,8 +169,8 @@ export default function ThyroidScanCoach() {
                 Small Parts Thyroid Ultrasound ScanCoach™
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">View-by-View Acquisition Guidance</p>
-              <p className="text-white/70 text-xs mt-1 max-w-xl">
-                Probe: Linear 12–18 MHz · ACR TI-RADS 2017 · AIUM 2019 Guidelines
+              <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
+                View-by-view acquisition guidance for thyroid and parathyroid ultrasound, aligned with current AIUM guidelines. Covers complete gland survey, nodule characterization, and lymph node assessment with image optimization tips and TI-RADS documentation criteria.
               </p>
               <div className="mt-3">
                 <Link href="/thyroid-navigator">

@@ -1,0 +1,9 @@
+{
+  "query": "SELECT module, viewId, LEFT(tips, 200) as tips_preview FROM scanCoachOverrides WHERE tips LIKE '%tip_title%' OR tips LIKE '%tip_content%' LIMIT 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT module, viewId, LEFT(tips, 200) as tips_preview FROM scanCoachOverrides WHERE tips LIKE '%tip_title%' OR tips LIKE '%tip_content%' LIMIT 20;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 344
+}

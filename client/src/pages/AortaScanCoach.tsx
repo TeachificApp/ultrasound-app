@@ -8,107 +8,104 @@ import { useState } from "react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
-import { Scan, ChevronDown, ChevronUp, Lightbulb, Info, ExternalLink } from "lucide-react";
+import { Scan, ChevronDown, ChevronUp, Lightbulb, Info } from "lucide-react";
 import { PremiumGate } from "@/components/PremiumGate";
 import { BlurredOverlay } from "@/components/BlurredOverlay";
 import { usePremium } from "@/hooks/usePremium";
+
+const AORTA_SCANNING_TIPS = [
+  { category: "Scanning Tip", text: "Optimizing Aortic Visualization: Use graded compression with the transducer to displace overlying bowel gas. Having the patient fast for 4–6 hours before the exam significantly reduces bowel gas. A left lateral decubitus position can help shift gas away from the midline." },
+  { category: "Scanning Tip", text: "Accurate Aortic Measurements: Ensure measurements are taken perpendicular to the long axis of the aorta and from outer wall to outer wall in both longitudinal and transverse planes. Oblique measurements overestimate diameter. Always document the largest diameter obtained." },
+];
 
 const views = [
   {
     view: "Proximal Aorta - Long",
     probe: "Subxiphoid, sagittal plane",
     tips: [
-      { category: "Patient Positioning", text: "The patient should be in a supine position. A left lateral decubitus (LLD) or right lateral decubitus (RLD) position may be used as needed to improve " },
-      { category: "Transducer Positioning", text: "Subxiphoid, sagittal plane" },
-      { category: "What to Assess", text: "Visualize the aorta as it passes through the diaphragm. Assess for plaque, thrombus, or dissection." },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Optimizing Aortic Visualization\', \'tip_content\': \'Use graded compression with the tra" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Accurate Aortic Measurements\', \'tip_content\': \'Ensure measurements are taken perpendi" }
+      { category: "Patient Positioning", text: "The patient should be in a supine position. A left lateral decubitus (LLD) or right lateral decubitus (RLD) position may be used as needed to improve visualization by displacing overlying bowel gas away from the midline." },
+      { category: "Transducer Positioning", text: "Subxiphoid, sagittal plane — angle superiorly to visualize the aorta as it passes through the diaphragmatic hiatus. The proximal aorta is identified just below the xiphoid process." },
+      { category: "What to Assess", text: "Visualize the aorta as it passes through the diaphragm. Assess for plaque, thrombus, or dissection. Note the relationship to the celiac axis origin." },
+      ...AORTA_SCANNING_TIPS,
     ],
   },
   {
     view: "Proximal Aorta - Trans",
     probe: "Subxiphoid, transverse plane",
     tips: [
-      { category: "Patient Positioning", text: "The patient should be in a supine position. A left lateral decubitus (LLD) or right lateral decubitus (RLD) position may be used as needed to improve " },
-      { category: "Transducer Positioning", text: "Subxiphoid, transverse plane" },
-      { category: "What to Assess", text: "Visualize the celiac and superior mesenteric arteries. Assess for plaque, thrombus, or dissection." },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Optimizing Aortic Visualization\', \'tip_content\': \'Use graded compression with the tra" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Accurate Aortic Measurements\', \'tip_content\': \'Ensure measurements are taken perpendi" }
+      { category: "Patient Positioning", text: "The patient should be in a supine position. A left lateral decubitus (LLD) or right lateral decubitus (RLD) position may be used as needed to improve visualization." },
+      { category: "Transducer Positioning", text: "Subxiphoid, transverse plane — sweep inferiorly from the diaphragm to identify the celiac axis and superior mesenteric artery origins. The aorta appears as a round pulsatile structure anterior to the spine." },
+      { category: "What to Assess", text: "Visualize the celiac and superior mesenteric arteries. Assess for plaque, thrombus, or dissection. Measure the anteroposterior and transverse diameters." },
+      ...AORTA_SCANNING_TIPS,
     ],
   },
   {
     view: "Mid Aorta - Long",
     probe: "Mid-abdomen, sagittal plane",
     tips: [
-      { category: "Patient Positioning", text: "The patient should be in a supine position. A left lateral decubitus (LLD) or right lateral decubitus (RLD) position may be used as needed to improve " },
-      { category: "Transducer Positioning", text: "Mid-abdomen, sagittal plane" },
-      { category: "What to Assess", text: "Visualize the aorta at the level of the renal arteries. Assess for plaque, thrombus, or dissection." },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Optimizing Aortic Visualization\', \'tip_content\': \'Use graded compression with the tra" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Accurate Aortic Measurements\', \'tip_content\': \'Ensure measurements are taken perpendi" }
+      { category: "Patient Positioning", text: "The patient should be in a supine position. A left lateral decubitus (LLD) or right lateral decubitus (RLD) position may be used as needed to improve visualization." },
+      { category: "Transducer Positioning", text: "Mid-abdomen, sagittal plane — at the level of the umbilicus. The renal arteries arise from the lateral walls of the aorta at approximately L1–L2." },
+      { category: "What to Assess", text: "Visualize the aorta at the level of the renal arteries. Assess for plaque, thrombus, or dissection. This is the most common level for AAA formation." },
+      ...AORTA_SCANNING_TIPS,
     ],
   },
   {
     view: "Mid Aorta - Trans",
     probe: "Mid-abdomen, transverse plane",
     tips: [
-      { category: "Patient Positioning", text: "The patient should be in a supine position. A left lateral decubitus (LLD) or right lateral decubitus (RLD) position may be used as needed to improve " },
-      { category: "Transducer Positioning", text: "Mid-abdomen, transverse plane" },
-      { category: "What to Assess", text: "Visualize the renal arteries branching off the aorta. Assess for plaque, thrombus, or dissection." },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Optimizing Aortic Visualization\', \'tip_content\': \'Use graded compression with the tra" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Accurate Aortic Measurements\', \'tip_content\': \'Ensure measurements are taken perpendi" }
+      { category: "Patient Positioning", text: "The patient should be in a supine position. A left lateral decubitus (LLD) or right lateral decubitus (RLD) position may be used as needed to improve visualization." },
+      { category: "Transducer Positioning", text: "Mid-abdomen, transverse plane — rotate 90° from the sagittal view. The left renal vein is a useful landmark, crossing anterior to the aorta at the level of the renal arteries." },
+      { category: "What to Assess", text: "Visualize the renal arteries branching off the aorta. Assess for plaque, thrombus, or dissection. Measure the maximum transverse diameter." },
+      ...AORTA_SCANNING_TIPS,
     ],
   },
   {
     view: "Distal Aorta - Long",
     probe: "Lower abdomen, sagittal plane",
     tips: [
-      { category: "Patient Positioning", text: "The patient should be in a supine position. A left lateral decubitus (LLD) or right lateral decubitus (RLD) position may be used as needed to improve " },
-      { category: "Transducer Positioning", text: "Lower abdomen, sagittal plane" },
-      { category: "What to Assess", text: "Visualize the aorta to the bifurcation. Assess for plaque, thrombus, or dissection." },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Optimizing Aortic Visualization\', \'tip_content\': \'Use graded compression with the tra" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Accurate Aortic Measurements\', \'tip_content\': \'Ensure measurements are taken perpendi" }
+      { category: "Patient Positioning", text: "The patient should be in a supine position. A left lateral decubitus (LLD) or right lateral decubitus (RLD) position may be used as needed to improve visualization." },
+      { category: "Transducer Positioning", text: "Lower abdomen, sagittal plane — trace the aorta inferiorly from the mid-abdomen to the bifurcation. The bifurcation typically occurs at the L4 level, just below the umbilicus." },
+      { category: "What to Assess", text: "Visualize the aorta to the bifurcation. Assess for plaque, thrombus, or dissection. The distal aorta is a common site for AAA extension." },
+      ...AORTA_SCANNING_TIPS,
     ],
   },
   {
     view: "Distal Aorta - Trans",
     probe: "Lower abdomen, transverse plane",
     tips: [
-      { category: "Patient Positioning", text: "The patient should be in a supine position. A left lateral decubitus (LLD) or right lateral decubitus (RLD) position may be used as needed to improve " },
-      { category: "Transducer Positioning", text: "Lower abdomen, transverse plane" },
-      { category: "What to Assess", text: "Visualize the aortic bifurcation into the common iliac arteries. Assess for plaque, thrombus, or dissection." },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Optimizing Aortic Visualization\', \'tip_content\': \'Use graded compression with the tra" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Accurate Aortic Measurements\', \'tip_content\': \'Ensure measurements are taken perpendi" }
+      { category: "Patient Positioning", text: "The patient should be in a supine position. A left lateral decubitus (LLD) or right lateral decubitus (RLD) position may be used as needed to improve visualization." },
+      { category: "Transducer Positioning", text: "Lower abdomen, transverse plane — follow the aorta to where it divides into the two common iliac arteries. The bifurcation appears as a 'Y' shape in the transverse view." },
+      { category: "What to Assess", text: "Visualize the aortic bifurcation into the common iliac arteries. Assess for plaque, thrombus, or dissection. Note any extension of AAA into the iliac arteries." },
+      ...AORTA_SCANNING_TIPS,
     ],
   },
   {
     view: "Common Iliac Arteries - Long",
     probe: "Just inferior to the aortic bifurcation, sagittal oblique plane for each iliac artery",
     tips: [
-      { category: "Patient Positioning", text: "The patient should be in a supine position. A left lateral decubitus (LLD) or right lateral decubitus (RLD) position may be used as needed to improve " },
-      { category: "Transducer Positioning", text: "Just inferior to the aortic bifurcation, sagittal oblique plane for each iliac artery" },
-      { category: "What to Assess", text: "Visualize the proximal common iliac arteries. Assess for aneurysmal dilation." },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Optimizing Aortic Visualization\', \'tip_content\': \'Use graded compression with the tra" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Accurate Aortic Measurements\', \'tip_content\': \'Ensure measurements are taken perpendi" }
+      { category: "Patient Positioning", text: "The patient should be in a supine position. A left lateral decubitus (LLD) or right lateral decubitus (RLD) position may be used as needed to improve visualization." },
+      { category: "Transducer Positioning", text: "Just inferior to the aortic bifurcation, sagittal oblique plane — angle obliquely to follow each common iliac artery laterally. Normal common iliac artery diameter is <1.5 cm." },
+      { category: "What to Assess", text: "Visualize the proximal common iliac arteries. Assess for aneurysmal dilation (>1.5 cm is considered aneurysmal). Color Doppler confirms patency." },
+      ...AORTA_SCANNING_TIPS,
     ],
   },
   {
     view: "Common Iliac Arteries - Trans",
     probe: "Just inferior to the aortic bifurcation, transverse plane",
     tips: [
-      { category: "Patient Positioning", text: "The patient should be in a supine position. A left lateral decubitus (LLD) or right lateral decubitus (RLD) position may be used as needed to improve " },
-      { category: "Transducer Positioning", text: "Just inferior to the aortic bifurcation, transverse plane" },
-      { category: "What to Assess", text: "Visualize the proximal common iliac arteries. Assess for aneurysmal dilation." },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Optimizing Aortic Visualization\', \'tip_content\': \'Use graded compression with the tra" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Accurate Aortic Measurements\', \'tip_content\': \'Ensure measurements are taken perpendi" }
+      { category: "Patient Positioning", text: "The patient should be in a supine position. A left lateral decubitus (LLD) or right lateral decubitus (RLD) position may be used as needed to improve visualization." },
+      { category: "Transducer Positioning", text: "Just inferior to the aortic bifurcation, transverse plane — both common iliac arteries are visible simultaneously in transverse, flanking the common iliac veins." },
+      { category: "What to Assess", text: "Visualize the proximal common iliac arteries. Assess for aneurysmal dilation. Measure the maximum diameter of each artery in the transverse plane." },
+      ...AORTA_SCANNING_TIPS,
     ],
-  }
+  },
 ];
 
 const examTips = [
-  { category: "Scanning Tip", text: "{\'tip_title\': \'Optimizing Aortic Visualization\', \'tip_content\': \'Use graded compression with the transducer to displace overlying bowel gas. Having th" },
-  { category: "Scanning Tip", text: "{\'tip_title\': \'Accurate Aortic Measurements\', \'tip_content\': \'Ensure measurements are taken perpendicular to the long axis of the aorta and from outer" },
-  { category: "Scanning Tip", text: "{\'tip_title\': \'Identifying the Renal Arteries\', \'tip_content\': \'The left renal vein can be seen crossing anterior to the aorta in the transverse view," },
-  { category: "Scanning Tip", text: "{\'tip_title\': \'Endoleak Detection\', \'tip_content\': \'Use a low-flow color Doppler scale and power Doppler to increase sensitivity for detecting endolea" }
+  { category: "Scanning Tip", text: "Optimizing Aortic Visualization: Use graded compression with the transducer to displace overlying bowel gas. Having the patient fast for 4–6 hours before the exam significantly reduces bowel gas. A left lateral decubitus position can help shift gas away from the midline." },
+  { category: "Scanning Tip", text: "Accurate Aortic Measurements: Ensure measurements are taken perpendicular to the long axis of the aorta and from outer wall to outer wall in both longitudinal and transverse planes. Oblique measurements overestimate diameter. Always document the largest diameter obtained." },
+  { category: "Scanning Tip", text: "Identifying the Renal Arteries: The left renal vein can be seen crossing anterior to the aorta in the transverse view, providing a reliable landmark for the renal artery origins. The renal arteries arise from the lateral walls of the aorta at approximately the same level." },
+  { category: "Scanning Tip", text: "Endoleak Detection: Use a low-flow color Doppler scale and power Doppler to increase sensitivity for detecting endoleaks after EVAR. A persistent color signal within the aneurysm sac outside the stent graft indicates an endoleak requiring further evaluation." },
 ];
 
 const TIP_COLORS: Record<string, string> = {
@@ -151,11 +148,11 @@ export default function AortaScanCoach() {
                 <span className="text-sm text-white/80 font-medium">Aorta/EndoLeak · ScanCoach™</span>
               </div>
               <h1 className="text-2xl md:text-3xl font-black text-white leading-tight" style={{ fontFamily: "Merriweather, serif" }}>
-                Vascular Abdominal Aorta/EndoLeak (Abdominal Aorta 2025) ScanCoach™
+                Vascular Abdominal Aorta/EndoLeak ScanCoach™
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">View-by-View Acquisition Guidance</p>
-              <p className="text-white/70 text-xs mt-1 max-w-xl">
-                Probe: Curvilinear 2-5 MHz
+              <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
+                View-by-view acquisition guidance for aortic ultrasound, aligned with current AIUM guidelines. Guides complete aortic survey with image optimization tips, measurement technique, and normal appearance criteria for AAA screening and surveillance.
               </p>
               <div className="mt-3">
                 <Link href="/aorta-navigator">
@@ -218,24 +215,26 @@ export default function AortaScanCoach() {
 
             {/* Tips */}
             <div className="p-5 space-y-3">
-              {currentView.tips.map((tip, ti) => (
-                <div
-                  key={ti}
-                  className="rounded-xl p-4 border"
-                  style={{
-                    borderColor: (TIP_COLORS[tip.category] || "#189aa1") + "30",
-                    background: (TIP_COLORS[tip.category] || "#189aa1") + "08",
-                  }}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <Lightbulb className="w-3.5 h-3.5 flex-shrink-0" style={{ color: TIP_COLORS[tip.category] || "#189aa1" }} />
-                    <span className="text-xs font-bold uppercase tracking-wider" style={{ color: TIP_COLORS[tip.category] || "#189aa1" }}>
-                      {tip.category}
-                    </span>
+              <PremiumGate featureName="Scan Coach Tips">
+                {currentView.tips.map((tip, ti) => (
+                  <div
+                    key={ti}
+                    className="rounded-xl p-4 border"
+                    style={{
+                      borderColor: (TIP_COLORS[tip.category] || "#189aa1") + "30",
+                      background: (TIP_COLORS[tip.category] || "#189aa1") + "08",
+                    }}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <Lightbulb className="w-3.5 h-3.5 flex-shrink-0" style={{ color: TIP_COLORS[tip.category] || "#189aa1" }} />
+                      <span className="text-xs font-bold uppercase tracking-wider" style={{ color: TIP_COLORS[tip.category] || "#189aa1" }}>
+                        {tip.category}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-700 leading-relaxed">{tip.text}</p>
                   </div>
-                  <p className="text-sm text-gray-700 leading-relaxed">{tip.text}</p>
-                </div>
-              ))}
+                ))}
+              </PremiumGate>
             </div>
           </div>
         )}
@@ -268,7 +267,7 @@ export default function AortaScanCoach() {
 
         {/* Reference */}
         <div className="text-xs text-gray-400 px-1 mt-4">
-          Based on: <a href="https://www.aium.org/resources/practice-parameters" target="_blank" rel="noopener noreferrer" className="underline hover:text-[#189aa1]">AIUM Practice Parameter for the Performance of an Ultrasound Examination of the Abdominal Aorta (2025)</a>
+          Based on: <a href="https://www.aium.org/resources/practice-parameters" target="_blank" rel="noopener noreferrer" className="underline hover:text-[#189aa1]">AIUM Practice Parameter for the Performance of an Ultrasound Examination of the Abdominal Aorta</a>
         </div>
       </div>
     </Layout>

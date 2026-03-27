@@ -99,10 +99,7 @@ export default function MSKNavigator() {
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">Protocol Checklist &amp; Reference Values</p>
               <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
-                Probe: High-frequency linear array transducer. A lower-frequency transducer may be required for deeper structures.
-              </p>
-              <p className="text-white/60 text-xs mt-1 max-w-xl">
-                Positioning: Patient positioning for specific examinations may vary depending on the structure being examined and the patient’s clinical condition. For example, a 
+                Region-by-region MSK ultrasound protocol checklist aligned with current AIUM guidelines. Guides systematic tendon, ligament, nerve, and joint assessment with built-in normal measurement references for confident clinical reporting.
               </p>
               <div className="mt-3">
                 <Link href="/msk-scan-coach">

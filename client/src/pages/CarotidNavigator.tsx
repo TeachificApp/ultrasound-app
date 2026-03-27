@@ -89,10 +89,7 @@ export default function CarotidNavigator() {
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">Protocol Checklist &amp; Reference Values</p>
               <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
-                Probe: High-frequency linear array transducer (7-4 MHz or higher)
-              </p>
-              <p className="text-white/60 text-xs mt-1 max-w-xl">
-                Positioning: Supine position with the head supported and turned away from the side being examined. A pillow may be placed under the shoulders to improve neck exten
+                Comprehensive extracranial carotid and vertebral artery protocol checklist aligned with current AIUM and SVU guidelines. Integrates PSV/EDV reference thresholds and stenosis grading criteria for consistent, high-quality vascular reporting.
               </p>
               <div className="mt-3">
                 <Link href="/carotid-scan-coach">

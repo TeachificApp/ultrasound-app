@@ -95,10 +95,7 @@ export default function TCDNavigator() {
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">Protocol Checklist &amp; Reference Values</p>
               <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
-                Probe: **Infants Prior to Fontanelle Closure:** Sector, curvilinear, or linear transducers with frequencies from approximately 
-              </p>
-              <p className="text-white/60 text-xs mt-1 max-w-xl">
-                Positioning: **Foramen Magnum Approach (Vertebral and Basilar Arteries):** Patient turned to one side with the neck flexed so that the chin touches the chest. The 
+                Transcranial Doppler protocol checklist aligned with current AIUM guidelines for intracranial vascular assessment. Guides systematic insonation of cerebral arteries with integrated velocity reference ranges and criteria for vasospasm and stenosis grading.
               </p>
               <div className="mt-3">
                 <Link href="/tcd-scan-coach">

@@ -88,10 +88,7 @@ export default function InvasiveProceduresNavigator() {
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">Paracentesis &amp; Thoracentesis — Pre-Procedure Checklist &amp; Reference Values</p>
               <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
-                Probe: Curvilinear 3–5 MHz for site selection and fluid assessment. Linear 9–12 MHz for real-time needle guidance.
-              </p>
-              <p className="text-white/60 text-xs mt-1 max-w-xl">
-                Ultrasound guidance reduces complication rates for both paracentesis and thoracentesis — site marking or real-time guidance is recommended for all procedures.
+                Ultrasound-guided procedural protocol checklist covering paracentesis, thoracentesis, and related interventions. Aligned with current AIUM guidelines to support safe site selection, real-time needle guidance, and post-procedure verification.
               </p>
               <div className="mt-3">
                 <Link href="/invasive-procedures-scan-coach">

@@ -111,8 +111,8 @@ export default function InvasiveProceduresScanCoach() {
                 Invasive Procedures ScanCoach™
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">Paracentesis &amp; Thoracentesis — Site Selection &amp; Real-Time Guidance</p>
-              <p className="text-white/70 text-sm mt-2 max-w-xl">
-                Step-by-step guidance for ultrasound-guided paracentesis and thoracentesis — positioning, site selection, real-time guidance, and post-procedure assessment.
+              <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
+                View-by-view acquisition guidance for ultrasound-guided procedures, aligned with current AIUM guidelines. Covers site selection, real-time needle visualization, and post-procedure verification with image optimization tips for safe, effective guidance.
               </p>
               <div className="mt-3">
                 <Link href="/invasive-procedures-navigator">

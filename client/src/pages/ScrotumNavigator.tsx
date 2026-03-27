@@ -95,10 +95,7 @@ export default function ScrotumNavigator() {
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">Protocol Checklist &amp; Reference Values</p>
               <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
-                Probe: 12-MHz or higher linear array transducer. A lower frequency (5-10 MHz) curved or linear transducer may be used for an en
-              </p>
-              <p className="text-white/60 text-xs mt-1 max-w-xl">
-                Positioning: The patient is typically in a supine position. Upright positioning may be used to increase the sensitivity for detecting varicoceles, especially durin
+                Focused scrotal ultrasound protocol checklist aligned with current AIUM guidelines. Ensures complete bilateral testicular and epididymal survey with integrated normal measurement references and critical finding flags.
               </p>
               <div className="mt-3">
                 <Link href="/scrotum-scan-coach">

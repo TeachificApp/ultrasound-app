@@ -258,7 +258,7 @@ export default function AbdominalVascularScanCoach() {
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">Liver Duplex · Mesenteric Duplex · Renal Artery Duplex</p>
               <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
-                Bedside scanning guide with view-by-view tips, Doppler optimization, and clinical pearls per SVU guidelines.
+                View-by-view acquisition guidance for abdominal vascular ultrasound, aligned with current AIUM and SVU guidelines. Covers mesenteric, renal, and portal Doppler technique with image optimization tips and normal waveform criteria.
               </p>
               <div className="mt-3">
                 <Link href={navigatorPath}>

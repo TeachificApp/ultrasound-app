@@ -138,8 +138,8 @@ export default function OB1ScanCoach() {
                 Obstetric 1st Trimester Ultrasound ScanCoach™
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">View-by-View Acquisition Guidance</p>
-              <p className="text-white/70 text-xs mt-1 max-w-xl">
-                Probe: Transabdominal and/or transvaginal transducers. Higher-frequency transabdominal linear or curvilinea
+              <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
+                View-by-view acquisition guidance for first trimester obstetric ultrasound, aligned with current AIUM guidelines. Guides transabdominal and transvaginal technique with image optimization tips and normal appearance criteria for early pregnancy evaluation.
               </p>
               <div className="mt-3">
                 <Link href="/ob1-navigator">

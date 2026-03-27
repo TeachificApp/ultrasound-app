@@ -1,6 +1,6 @@
 /*
   UltrasoundAssist™ — Peripheral Venous Ultrasound ScanCoach
-  Based on: AIUM Practice Parameter for the Performance of Peripheral Venous Ultrasound Examinations (2020)
+  Based on: AIUM Practice Parameter for the Performance of Peripheral Venous Ultrasound Examinations
   Brand: Teal #189aa1, Aqua #4ad9e0
   Fonts: Merriweather headings, Open Sans body
 */
@@ -8,108 +8,105 @@ import { useState } from "react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
-import { Scan, ChevronDown, ChevronUp, Lightbulb, Info, ExternalLink } from "lucide-react";
-import { PremiumGate } from "@/components/PremiumGate";
-import { BlurredOverlay } from "@/components/BlurredOverlay";
+import { Scan, ChevronDown, ChevronUp, Lightbulb, Info } from "lucide-react";
 import { usePremium } from "@/hooks/usePremium";
+
+const PATIENT_POSITIONING = "The patient is typically positioned in a reverse Trendelenburg position (head elevated 15–30°) to facilitate venous filling in the lower extremities. For popliteal and calf vein assessment, the patient may be seated with the legs dependent or placed prone with the knee slightly flexed.";
+
+const VENOUS_SCANNING_TIPS = [
+  { category: "Scanning Tip", text: "Comprehensive Evaluation: The evaluation should extend from the inguinal ligament to the ankle whenever feasible to avoid missing isolated calf DVT. Current AIUM and SVU guidelines recommend a complete bilateral study when clinically indicated, including assessment of the deep femoral vein and saphenofemoral junction." },
+  { category: "Scanning Tip", text: "Systematic Compression: Apply venous compression every 2 cm or less in the transverse plane throughout the entire examination. A normal vein collapses completely with gentle transducer pressure. Incomplete compressibility is the primary diagnostic criterion for DVT. Never rely on colour Doppler alone to exclude DVT." },
+];
 
 const views = [
   {
     view: "Common Femoral Vein (CFV)",
     probe: "Transverse, inguinal ligament",
     tips: [
-      { category: "Patient Positioning", text: "The patient is typically positioned in a reverse Trendelenburg position to facilitate venous filling in the lower extremities. The examination should " },
-      { category: "Transducer Positioning", text: "Transverse, inguinal ligament" },
-      { category: "What to Assess", text: "Compressibility, spectral Doppler waveform for symmetry and respiratory phasicity" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Comprehensive Evaluation\', \'tip_content\': \'The evaluation should extend from the ingu" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Systematic Compression\', \'tip_content\': \'Apply venous compression every 2 cm or less " }
+      { category: "Patient Positioning", text: PATIENT_POSITIONING },
+      { category: "Transducer Positioning", text: "Transverse plane at the inguinal ligament. The CFV lies medial to the common femoral artery. Identify the saphenofemoral junction where the great saphenous vein joins the CFV from the anteromedial aspect." },
+      { category: "What to Assess", text: "Complete compressibility of the CFV in transverse plane. Obtain spectral Doppler waveform — normal shows spontaneous, phasic flow with respiration and augmentation with distal compression. Absent phasicity suggests proximal (iliac/IVC) obstruction." },
+      ...VENOUS_SCANNING_TIPS,
     ],
   },
   {
     view: "Femoral Vein (FV)",
     probe: "Transverse, from CFV down the thigh",
     tips: [
-      { category: "Patient Positioning", text: "The patient is typically positioned in a reverse Trendelenburg position to facilitate venous filling in the lower extremities. The examination should " },
-      { category: "Transducer Positioning", text: "Transverse, from CFV down the thigh" },
-      { category: "What to Assess", text: "Compressibility every 2 cm" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Comprehensive Evaluation\', \'tip_content\': \'The evaluation should extend from the ingu" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Systematic Compression\', \'tip_content\': \'Apply venous compression every 2 cm or less " }
+      { category: "Patient Positioning", text: PATIENT_POSITIONING },
+      { category: "Transducer Positioning", text: "Transverse plane, tracing the femoral vein from the CFV distally through the thigh. The FV (previously called superficial femoral vein) runs with the superficial femoral artery in the adductor (Hunter's) canal. Apply compression every 2 cm throughout its length." },
+      { category: "What to Assess", text: "Complete compressibility every 2 cm along the entire length of the FV. The FV is the most common site for DVT. Assess for echogenic thrombus, partial compressibility, or absent colour Doppler flow." },
+      ...VENOUS_SCANNING_TIPS,
     ],
   },
   {
     view: "Deep Femoral Vein (DFV)",
     probe: "Transverse, at the confluence with the FV",
     tips: [
-      { category: "Patient Positioning", text: "The patient is typically positioned in a reverse Trendelenburg position to facilitate venous filling in the lower extremities. The examination should " },
-      { category: "Transducer Positioning", text: "Transverse, at the confluence with the FV" },
-      { category: "What to Assess", text: "Compressibility" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Comprehensive Evaluation\', \'tip_content\': \'The evaluation should extend from the ingu" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Systematic Compression\', \'tip_content\': \'Apply venous compression every 2 cm or less " }
+      { category: "Patient Positioning", text: PATIENT_POSITIONING },
+      { category: "Transducer Positioning", text: "Transverse plane at the proximal thigh, where the DFV (profunda femoris vein) joins the FV. The DFV is typically only assessed at its proximal portion near the confluence. It is not routinely traced distally." },
+      { category: "What to Assess", text: "Compressibility at the DFV origin. Isolated DFV DVT is uncommon but clinically significant. Assess for echogenic thrombus extending from the FV into the DFV at the confluence." },
+      ...VENOUS_SCANNING_TIPS,
     ],
   },
   {
     view: "Great Saphenous Vein (GSV)",
     probe: "Transverse, at the saphenofemoral junction",
     tips: [
-      { category: "Patient Positioning", text: "The patient is typically positioned in a reverse Trendelenburg position to facilitate venous filling in the lower extremities. The examination should " },
-      { category: "Transducer Positioning", text: "Transverse, at the saphenofemoral junction" },
-      { category: "What to Assess", text: "Compressibility" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Comprehensive Evaluation\', \'tip_content\': \'The evaluation should extend from the ingu" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Systematic Compression\', \'tip_content\': \'Apply venous compression every 2 cm or less " }
+      { category: "Patient Positioning", text: PATIENT_POSITIONING },
+      { category: "Transducer Positioning", text: "Transverse plane at the saphenofemoral junction (SFJ) in the groin. The GSV joins the CFV anteromedially. Assess the proximal 10 cm of the GSV for superficial vein thrombosis (SVT) that may extend to or through the SFJ." },
+      { category: "What to Assess", text: "Compressibility at the SFJ and proximal GSV. SVT within 3 cm of the SFJ carries significant risk of DVT extension and may require anticoagulation per current AIUM and SVU guidelines. Document the distance of any thrombus from the SFJ." },
+      ...VENOUS_SCANNING_TIPS,
     ],
   },
   {
     view: "Popliteal Vein",
     probe: "Transverse, popliteal fossa",
     tips: [
-      { category: "Patient Positioning", text: "The patient is typically positioned in a reverse Trendelenburg position to facilitate venous filling in the lower extremities. The examination should " },
-      { category: "Transducer Positioning", text: "Transverse, popliteal fossa" },
-      { category: "What to Assess", text: "Compressibility, spectral Doppler waveform" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Comprehensive Evaluation\', \'tip_content\': \'The evaluation should extend from the ingu" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Systematic Compression\', \'tip_content\': \'Apply venous compression every 2 cm or less " }
+      { category: "Patient Positioning", text: "The patient may be positioned prone with the knee slightly flexed, or seated with the legs dependent. The prone or lateral decubitus position provides optimal access to the popliteal fossa." },
+      { category: "Transducer Positioning", text: "Transverse plane in the popliteal fossa. The popliteal vein lies superficial (posterior) to the popliteal artery in this position. The small saphenous vein (SSV) joins the popliteal vein at the saphenopopliteal junction — assess this junction for SVT extension." },
+      { category: "What to Assess", text: "Complete compressibility of the popliteal vein. Obtain spectral Doppler waveform — augment with calf squeeze. Assess the saphenopopliteal junction for SVT. The popliteal vein is the second most common site for DVT." },
+      ...VENOUS_SCANNING_TIPS,
     ],
   },
   {
     view: "Posterior Tibial Veins (PTV)",
-    probe: "Transverse, from popliteal fossa to ankle",
+    probe: "Transverse, medial calf",
     tips: [
-      { category: "Patient Positioning", text: "The patient is typically positioned in a reverse Trendelenburg position to facilitate venous filling in the lower extremities. The examination should " },
-      { category: "Transducer Positioning", text: "Transverse, from popliteal fossa to ankle" },
-      { category: "What to Assess", text: "Compressibility" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Comprehensive Evaluation\', \'tip_content\': \'The evaluation should extend from the ingu" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Systematic Compression\', \'tip_content\': \'Apply venous compression every 2 cm or less " }
+      { category: "Patient Positioning", text: "The patient is seated with the legs dependent or in the reverse Trendelenburg position. Dependent positioning maximises venous filling in the calf veins and improves visualisation." },
+      { category: "Transducer Positioning", text: "Transverse plane along the medial calf, posterior to the tibia. The posterior tibial veins (paired) run with the posterior tibial artery. Trace from the ankle to the popliteal fossa. Use a high-frequency linear transducer." },
+      { category: "What to Assess", text: "Compressibility of the paired posterior tibial veins throughout their course. Calf DVT (isolated distal DVT) carries a 15–25% risk of proximal propagation if untreated. Current AIUM and SVU guidelines recommend documenting calf vein assessment." },
+      ...VENOUS_SCANNING_TIPS,
     ],
   },
   {
     view: "Peroneal Veins",
-    probe: "Transverse, from popliteal fossa to ankle",
+    probe: "Transverse, lateral/posterior calf",
     tips: [
-      { category: "Patient Positioning", text: "The patient is typically positioned in a reverse Trendelenburg position to facilitate venous filling in the lower extremities. The examination should " },
-      { category: "Transducer Positioning", text: "Transverse, from popliteal fossa to ankle" },
-      { category: "What to Assess", text: "Compressibility" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Comprehensive Evaluation\', \'tip_content\': \'The evaluation should extend from the ingu" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Systematic Compression\', \'tip_content\': \'Apply venous compression every 2 cm or less " }
+      { category: "Patient Positioning", text: "The patient is seated with the legs dependent or in the reverse Trendelenburg position. Dependent positioning maximises venous filling in the calf veins and improves visualisation." },
+      { category: "Transducer Positioning", text: "Transverse plane along the posterior/lateral calf, adjacent to the fibula. The peroneal veins (paired) run with the peroneal artery. They are the deepest of the calf veins and can be challenging to visualise in obese patients." },
+      { category: "What to Assess", text: "Compressibility of the paired peroneal veins. The peroneal veins are a common site for isolated calf DVT. Use colour Doppler and augmentation to confirm patency when direct compression is difficult due to patient habitus." },
+      ...VENOUS_SCANNING_TIPS,
     ],
   },
   {
     view: "Gastrocnemius and Soleal Veins",
-    probe: "Transverse, calf",
+    probe: "Transverse, posterior calf",
     tips: [
-      { category: "Patient Positioning", text: "The patient is typically positioned in a reverse Trendelenburg position to facilitate venous filling in the lower extremities. The examination should " },
-      { category: "Transducer Positioning", text: "Transverse, calf" },
-      { category: "What to Assess", text: "Compressibility, especially if focal symptoms are present" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Comprehensive Evaluation\', \'tip_content\': \'The evaluation should extend from the ingu" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Systematic Compression\', \'tip_content\': \'Apply venous compression every 2 cm or less " }
+      { category: "Patient Positioning", text: "The patient is seated with the legs dependent or in the reverse Trendelenburg position. Dependent positioning maximises venous filling in the calf veins and improves visualisation." },
+      { category: "Transducer Positioning", text: "Transverse plane in the posterior calf. The gastrocnemius veins drain into the popliteal vein. The soleal sinusoids are large venous lakes within the soleus muscle. These are assessed when focal calf symptoms are present." },
+      { category: "What to Assess", text: "Compressibility of the gastrocnemius and soleal veins, especially when focal calf tenderness or swelling is present. Soleal and gastrocnemius vein DVT are common after immobility or surgery. Document any non-compressible segments and their distance from the popliteal vein." },
+      ...VENOUS_SCANNING_TIPS,
     ],
-  }
+  },
 ];
 
 const examTips = [
-  { category: "Scanning Tip", text: "{\'tip_title\': \'Comprehensive Evaluation\', \'tip_content\': \'The evaluation should extend from the inguinal ligament to the ankle whenever feasible to av" },
-  { category: "Scanning Tip", text: "{\'tip_title\': \'Systematic Compression\', \'tip_content\': \'Apply venous compression every 2 cm or less in the transverse plane to ensure no segment of th" },
-  { category: "Scanning Tip", text: "{\'tip_title\': \'Focal Symptom Evaluation\', \'tip_content\': \'If the patient presents with focal symptoms, such as tenderness in the calf, a targeted eval" },
-  { category: "Scanning Tip", text: "{\'tip_title\': \'Doppler Waveform Symmetry\', \'tip_content\': \'Always compare the spectral Doppler waveforms of the common femoral veins on both sides to " },
-  { category: "Scanning Tip", text: "{\'tip_title\': \'Optimal Doppler Technique\', \'tip_content\': \'Obtain all spectral Doppler waveforms from the long axis of the vessel for the most accurat" }
+  { category: "Scanning Tip", text: "Comprehensive Evaluation: The evaluation should extend from the inguinal ligament to the ankle whenever feasible to avoid missing isolated calf DVT. Current AIUM and SVU guidelines recommend a complete bilateral study when clinically indicated, including assessment of the deep femoral vein and saphenofemoral junction." },
+  { category: "Scanning Tip", text: "Systematic Compression: Apply venous compression every 2 cm or less in the transverse plane throughout the entire examination. A normal vein collapses completely with gentle transducer pressure. Incomplete compressibility is the primary diagnostic criterion for DVT. Never rely on colour Doppler alone to exclude DVT." },
+  { category: "Scanning Tip", text: "Focal Symptom Evaluation: If the patient presents with focal symptoms such as tenderness in the calf, perform a targeted evaluation of that specific region in addition to the complete proximal study. Isolated calf DVT may be missed if only a limited two-point compression study is performed." },
+  { category: "Scanning Tip", text: "Doppler Waveform Symmetry: Always compare the spectral Doppler waveforms of the common femoral veins on both sides. Asymmetric phasicity or absent respiratory variation on one side suggests proximal (iliac or IVC) obstruction that may not be directly visualised with standard lower extremity ultrasound." },
+  { category: "Scanning Tip", text: "Optimal Doppler Technique: Obtain all spectral Doppler waveforms from the long axis of the vessel for the most accurate assessment of flow direction and phasicity. Use a low wall filter and low PRF setting to detect low-velocity venous flow. Augment with distal limb compression to confirm patency when spontaneous flow is absent." },
 ];
 
 const TIP_COLORS: Record<string, string> = {
@@ -126,7 +123,6 @@ const TIP_COLORS: Record<string, string> = {
 export default function VenousScanCoach() {
   const { isPremium } = usePremium();
   const [selectedView, setSelectedView] = useState(0);
-  const [expandedTip, setExpandedTip] = useState<number | null>(null);
   const [showExamTips, setShowGeneral] = useState(false);
 
   const currentView = views[selectedView];
@@ -155,14 +151,12 @@ export default function VenousScanCoach() {
                 Peripheral Venous Ultrasound ScanCoach™
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">View-by-View Acquisition Guidance</p>
-              <p className="text-white/70 text-xs mt-1 max-w-xl">
-                Probe: High-frequency linear transducer (5-12 MHz) is standard for peripheral venous imaging, though not ex
+              <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
+                View-by-view acquisition guidance for lower extremity venous duplex ultrasound, aligned with current AIUM and SVU guidelines. Guides compression and Doppler technique from iliac to calf with DVT diagnostic criteria and optimisation tips.
               </p>
               <div className="mt-3">
                 <Link href="/venous-navigator">
-                  <button
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg font-semibold text-sm border border-white/30 text-white/90 hover:bg-white/10 transition-all"
-                  >
+                  <button className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg font-semibold text-sm border border-white/30 text-white/90 hover:bg-white/10 transition-all">
                     <Info className="w-3.5 h-3.5" />
                     Open Navigator
                   </button>
@@ -269,7 +263,7 @@ export default function VenousScanCoach() {
 
         {/* Reference */}
         <div className="text-xs text-gray-400 px-1 mt-4">
-          Based on: <a href="https://www.aium.org/resources/practice-parameters" target="_blank" rel="noopener noreferrer" className="underline hover:text-[#189aa1]">AIUM Practice Parameter for the Performance of Peripheral Venous Ultrasound Examinations (2020)</a>
+          Based on: <a href="https://www.aium.org/resources/practice-parameters" target="_blank" rel="noopener noreferrer" className="underline hover:text-[#189aa1]">AIUM Practice Parameter for the Performance of Peripheral Venous Ultrasound Examinations</a>
         </div>
       </div>
     </Layout>

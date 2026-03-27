@@ -92,10 +92,7 @@ export default function PelvicGynNavigator() {
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">Protocol Checklist &amp; Reference Values</p>
               <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
-                Probe: Sector, curved linear, and/or endocavitary transducers. The transducer should be adjusted to operate at the highest freq
-              </p>
-              <p className="text-white/60 text-xs mt-1 max-w-xl">
-                Positioning: For transabdominal scans, the bladder may be distended. For transvaginal scans, the bladder is preferably empty. The patient may be positioned for tra
+                Structured pelvic and gynecologic ultrasound protocol checklist aligned with current AIUM guidelines. Guides systematic uterine and adnexal evaluation with built-in normal measurement references and critical finding flags.
               </p>
               <div className="mt-3">
                 <Link href="/pelvic-gyn-scan-coach">

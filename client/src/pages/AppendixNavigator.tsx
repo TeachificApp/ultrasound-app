@@ -90,10 +90,7 @@ export default function AppendixNavigator() {
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">Protocol Checklist &amp; Reference Values</p>
               <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
-                Probe: High-frequency linear 9–15 MHz (graded compression technique). Curvilinear 3–5 MHz for deep or obese patients.
-              </p>
-              <p className="text-white/60 text-xs mt-1 max-w-xl">
-                Positioning: Supine. Begin at the point of maximal tenderness (McBurney's point). Graded compression displaces bowel gas and brings the appendix into view.
+                Focused protocol checklist for appendix ultrasound, supporting rapid and reproducible evaluation of acute right lower quadrant pain. Aligned with current AIUM guidelines to guide systematic graded-compression technique and secondary sign assessment.
               </p>
               <div className="mt-3">
                 <Link href="/appendix-scan-coach">

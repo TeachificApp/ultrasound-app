@@ -145,8 +145,8 @@ export default function AbdominalScanCoach() {
                 Abdominal Ultrasound ScanCoach™
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">View-by-View Acquisition Guidance</p>
-              <p className="text-white/70 text-xs mt-1 max-w-xl">
-                Probe: Curvilinear 2–5 MHz · High-frequency linear for superficial structures · Based on AIUM 2021 Practice Parameter
+              <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
+                View-by-view acquisition guidance for abdominal ultrasound, aligned with current AIUM guidelines. Delivers step-by-step transducer placement, image optimization tips, and normal appearance criteria to build scanning confidence and consistency.
               </p>
               <div className="mt-3">
                 <Link href="/abdominal-navigator">

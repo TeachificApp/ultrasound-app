@@ -90,10 +90,7 @@ export default function ThyroidNavigator() {
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">Protocol Checklist &amp; Reference Values</p>
               <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
-                Probe: High-frequency linear array transducer (10-14 MHz or higher)
-              </p>
-              <p className="text-white/60 text-xs mt-1 max-w-xl">
-                Positioning: Supine with the neck hyperextended, with a pad or pillow under the shoulders. Upright positioning may be used if the patient cannot tolerate hyperexte
+                Comprehensive thyroid and parathyroid ultrasound protocol checklist aligned with current AIUM guidelines. Supports systematic gland survey, nodule characterization, and lymph node assessment with integrated TI-RADS reference criteria.
               </p>
               <div className="mt-3">
                 <Link href="/thyroid-scan-coach">

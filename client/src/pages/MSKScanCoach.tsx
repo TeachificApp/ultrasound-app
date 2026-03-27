@@ -161,8 +161,8 @@ export default function MSKScanCoach() {
                 MSK Ultrasound ScanCoach™
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">View-by-View Acquisition Guidance</p>
-              <p className="text-white/70 text-xs mt-1 max-w-xl">
-                Probe: High-frequency linear array transducer. A lower-frequency transducer may be required for deeper stru
+              <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
+                View-by-view acquisition guidance for MSK ultrasound, aligned with current AIUM guidelines. Delivers region-by-region transducer placement, dynamic assessment techniques, and image optimization tips to build scanning confidence across all major joints.
               </p>
               <div className="mt-3">
                 <Link href="/msk-navigator">

@@ -91,10 +91,7 @@ export default function AortaNavigator() {
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">Protocol Checklist &amp; Reference Values</p>
               <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
-                Probe: Curvilinear 2-5 MHz
-              </p>
-              <p className="text-white/60 text-xs mt-1 max-w-xl">
-                Positioning: The patient should be in a supine position. A left lateral decubitus (LLD) or right lateral decubitus (RLD) position may be used as needed to improve 
+                Evidence-based aorta protocol checklist for AAA screening, surveillance, and post-intervention follow-up. Aligned with current AIUM and SVU guidelines, with built-in diameter reference thresholds and critical measurement flags.
               </p>
               <div className="mt-3">
                 <Link href="/aorta-scan-coach">

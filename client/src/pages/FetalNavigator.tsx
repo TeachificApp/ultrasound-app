@@ -384,7 +384,7 @@ export default function FetalNavigator() {
                 EchoAssist™ Navigator — Fetal Echo
               </h1>
               <p className="text-white/70 text-sm mt-1 max-w-xl">
-                Select a fetal cardiac finding to generate a differential diagnosis and clinical guidance.
+                Detailed fetal echocardiography protocol checklist aligned with current AIUM guidelines. Guides systematic evaluation of cardiac anatomy, rhythm, and function with built-in biometric reference ranges and CHD differential diagnosis support.
               </p>
               <div className="mt-3">
                 <Link href="/fetal-scan-coach">

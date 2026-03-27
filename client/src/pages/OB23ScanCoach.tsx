@@ -195,8 +195,8 @@ export default function OB23ScanCoach() {
                 Obstetric 2nd/3rd Trimester Ultrasound ScanCoach™
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">View-by-View Acquisition Guidance</p>
-              <p className="text-white/70 text-xs mt-1 max-w-xl">
-                Probe: Real-time scanners, using a transabdominal and/or transvaginal approach. 3-MHz and higher abdominal 
+              <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
+                View-by-view acquisition guidance for second and third trimester obstetric ultrasound, aligned with current AIUM guidelines. Covers complete fetal anatomy survey, biometric measurements, and placental assessment with image optimization tips and normal appearance criteria.
               </p>
               <div className="mt-3">
                 <Link href="/ob23-navigator">

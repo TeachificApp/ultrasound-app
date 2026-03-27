@@ -82,10 +82,7 @@ export default function VenousNavigator() {
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">Protocol Checklist &amp; Reference Values</p>
               <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
-                Probe: High-frequency linear transducer (5-12 MHz) is standard for peripheral venous imaging, though not explicitly stated in t
-              </p>
-              <p className="text-white/60 text-xs mt-1 max-w-xl">
-                Positioning: The patient is typically positioned in a reverse Trendelenburg position to facilitate venous filling in the lower extremities. The examination should 
+                Lower extremity venous duplex protocol checklist aligned with current AIUM and SVU guidelines. Guides complete compression and Doppler survey from iliac to calf veins with integrated reflux criteria and DVT diagnostic thresholds.
               </p>
               <div className="mt-3">
                 <Link href="/venous-scan-coach">

@@ -116,7 +116,7 @@ export default function BreastNavigator() {
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">Protocol Checklist · BI-RADS Reference · SWE</p>
               <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
-                High-resolution linear-array transducer ≥12 MHz. Systematic survey of all quadrants with lesion characterization per ACR BI-RADS® 5th Edition lexicon.
+                Structured breast ultrasound protocol checklist aligned with current AIUM guidelines. Supports complete bilateral survey, targeted lesion characterization, and BI-RADS-consistent documentation for reproducible reporting.
               </p>
               <div className="mt-3">
                 <Link href="/breast-scan-coach">

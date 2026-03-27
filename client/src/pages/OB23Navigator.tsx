@@ -105,10 +105,7 @@ export default function OB23Navigator() {
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">Protocol Checklist &amp; Reference Values</p>
               <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
-                Probe: Real-time scanners, using a transabdominal and/or transvaginal approach. 3-MHz and higher abdominal transducers are gene
-              </p>
-              <p className="text-white/60 text-xs mt-1 max-w-xl">
-                Positioning: Not explicitly stated in the document. The examination uses transabdominal and/or transvaginal approach.
+                Second and third trimester obstetric ultrasound protocol checklist aligned with current AIUM guidelines. Supports comprehensive fetal anatomy survey, growth assessment, and placental evaluation with integrated biometric reference ranges.
               </p>
               <div className="mt-3">
                 <Link href="/ob23-scan-coach">

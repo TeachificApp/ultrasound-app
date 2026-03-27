@@ -91,10 +91,7 @@ export default function OB1Navigator() {
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">Protocol Checklist &amp; Reference Values</p>
               <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
-                Probe: Transabdominal and/or transvaginal transducers. Higher-frequency transabdominal linear or curvilinear transducers may be
-              </p>
-              <p className="text-white/60 text-xs mt-1 max-w-xl">
-                Positioning: The document does not specify patient positioning. Supine position is standard for transabdominal scans, and lithotomy position for transvaginal scans
+                First trimester obstetric ultrasound protocol checklist aligned with current AIUM guidelines. Ensures complete embryonic and fetal survey with integrated biometric reference ranges and critical finding flags for early pregnancy evaluation.
               </p>
               <div className="mt-3">
                 <Link href="/ob1-scan-coach">

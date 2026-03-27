@@ -129,10 +129,7 @@ export default function AbdominalNavigator() {
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">Protocol Checklist &amp; Reference Values</p>
               <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
-                Probe: Curvilinear 2-5 MHz, High-frequency linear for specific applications (e.g., liver surface, bowel wall)
-              </p>
-              <p className="text-white/60 text-xs mt-1 max-w-xl">
-                Positioning: Primarily supine. Decubitus, erect, or prone positioning may be used to optimize visualization of specific organs like the gallbladder and kidneys.
+                Structured protocol checklist aligned with current AIUM guidelines for abdominal ultrasound. Ensures complete organ survey with built-in critical findings flags and normal reference values for confident, reproducible reporting.
               </p>
               <div className="mt-3">
                 <Link href="/abdominal-scan-coach">

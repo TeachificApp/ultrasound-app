@@ -1,6 +1,6 @@
 /*
   UltrasoundAssist™ — Vascular Arterial Ultrasound Upper and Lower Extremity ScanCoach
-  Based on: AIUM Practice Parameter for the Performance of Peripheral Arterial Ultrasound Examinations (2020)
+  Based on: AIUM Practice Parameter for the Performance of Peripheral Arterial Ultrasound Examinations
   Brand: Teal #189aa1, Aqua #4ad9e0
   Fonts: Merriweather headings, Open Sans body
 */
@@ -8,75 +8,75 @@ import { useState } from "react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
-import { Scan, ChevronDown, ChevronUp, Lightbulb, Info, ExternalLink } from "lucide-react";
+import { Scan, ChevronDown, ChevronUp, Lightbulb, Info } from "lucide-react";
 import { PremiumGate } from "@/components/PremiumGate";
 import { BlurredOverlay } from "@/components/BlurredOverlay";
 import { usePremium } from "@/hooks/usePremium";
 
+const ARTERIAL_SCANNING_TIPS = [
+  { category: "Scanning Tip", text: "Patient Preparation: Perform the examination in a warm room to minimize peripheral vasoconstriction. The patient should be recumbent and ideally acclimatized for at least 10–15 minutes before testing. Cold extremities cause vasoconstriction that artificially lowers segmental pressures and waveform amplitudes." },
+  { category: "Scanning Tip", text: "Exercise Testing for Claudication: For claudication assessment when resting ABI is normal or higher than anticipated, perform post-exercise ABI testing. Have the patient walk on a treadmill (3.5 km/h, 12% grade) for up to 5 minutes or until symptoms occur. A post-exercise ABI drop of ≥20% is diagnostic of significant PAD." },
+];
+
 const views = [
   {
     view: "Segmental Limb Pressures and Waveforms",
-    probe: "Upper thigh, lower thigh, calf, ankle, metatarsals (lower extremity); Upper arm, upper forearm, abov",
+    probe: "Upper thigh, lower thigh, calf, ankle, metatarsals (lower extremity); Upper arm, upper forearm, above the wrist (upper extremity); Digits (toes and fingers)",
     tips: [
-      { category: "Patient Positioning", text: "The examination is best performed in a warm room to minimize the effects of peripheral vasoconstriction. The patient should be recumbent and ideally a" },
-      { category: "Transducer Positioning", text: "Upper thigh, lower thigh, calf, ankle, metatarsals (lower extremity); Upper arm, upper forearm, above the wrist (upper extremity); Digits (toes and fi" },
-      { category: "What to Assess", text: "Segmental or digital blood pressure readings, Ulnar Doppler waveforms, return of blood flow as cuff deflates" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Patient Preparation\', \'tip_content\': \'Perform examination in a warm room to minimize " },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Exercise Testing for Claudication\', \'tip_content\': \'For claudication assessment when " }
+      { category: "Patient Positioning", text: "The examination is best performed in a warm room to minimize the effects of peripheral vasoconstriction. The patient should be recumbent and ideally acclimatized for at least 10–15 minutes before testing begins." },
+      { category: "Transducer Positioning", text: "Upper thigh, lower thigh, calf, ankle, metatarsals (lower extremity); Upper arm, upper forearm, above the wrist (upper extremity); Digits (toes and fingers). Place cuffs snugly — a loose cuff overestimates the pressure." },
+      { category: "What to Assess", text: "Segmental or digital blood pressure readings, Doppler waveforms at each level, return of blood flow as cuff deflates. A pressure gradient >20 mmHg between adjacent segments indicates significant disease at that level." },
+      ...ARTERIAL_SCANNING_TIPS,
     ],
   },
   {
     view: "CW Doppler Waveforms",
-    probe: "Common femoral, superficial femoral, popliteal, posterior tibial, dorsalis pedis (lower extremity); ",
+    probe: "Common femoral, superficial femoral, popliteal, posterior tibial, dorsalis pedis (lower extremity); Subclavian, axillary, brachial, radial, ulnar (upper extremity)",
     tips: [
-      { category: "Patient Positioning", text: "The examination is best performed in a warm room to minimize the effects of peripheral vasoconstriction. The patient should be recumbent and ideally a" },
-      { category: "Transducer Positioning", text: "Common femoral, superficial femoral, popliteal, posterior tibial, dorsalis pedis (lower extremity); Subclavian, axillary, brachial, radial, ulnar (upp" },
-      { category: "What to Assess", text: "Arterial waveforms, audible and visual optimization, Doppler angle consistency" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Patient Preparation\', \'tip_content\': \'Perform examination in a warm room to minimize " },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Exercise Testing for Claudication\', \'tip_content\': \'For claudication assessment when " }
+      { category: "Patient Positioning", text: "The examination is best performed in a warm room to minimize the effects of peripheral vasoconstriction. The patient should be recumbent and ideally acclimatized for at least 10–15 minutes before testing begins." },
+      { category: "Transducer Positioning", text: "Common femoral, superficial femoral, popliteal, posterior tibial, dorsalis pedis (lower extremity); Subclavian, axillary, brachial, radial, ulnar (upper extremity). Maintain a consistent Doppler angle throughout the examination." },
+      { category: "What to Assess", text: "Arterial waveforms at each level — normal is triphasic (high-resistance). Biphasic waveforms indicate mild-moderate disease; monophasic indicates severe disease or proximal occlusion. Always compare bilaterally." },
+      ...ARTERIAL_SCANNING_TIPS,
     ],
   },
   {
     view: "Pulse Volume Recordings (PVRs)",
-    probe: "Upper thigh, lower thigh, calf, ankle, metatarsals (lower extremity); Upper arm, upper forearm, abov",
+    probe: "Upper thigh, lower thigh, calf, ankle, metatarsals (lower extremity); Upper arm, upper forearm, above the wrist (upper extremity); Toes and digits",
     tips: [
-      { category: "Patient Positioning", text: "The examination is best performed in a warm room to minimize the effects of peripheral vasoconstriction. The patient should be recumbent and ideally a" },
-      { category: "Transducer Positioning", text: "Upper thigh, lower thigh, calf, ankle, metatarsals (lower extremity); Upper arm, upper forearm, above the wrist (upper extremity); Toes and digits (us" },
-      { category: "What to Assess", text: "Global tissue perfusion" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Patient Preparation\', \'tip_content\': \'Perform examination in a warm room to minimize " },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Exercise Testing for Claudication\', \'tip_content\': \'For claudication assessment when " }
+      { category: "Patient Positioning", text: "The examination is best performed in a warm room to minimize the effects of peripheral vasoconstriction. The patient should be recumbent and ideally acclimatized for at least 10–15 minutes before testing begins." },
+      { category: "Transducer Positioning", text: "Upper thigh, lower thigh, calf, ankle, metatarsals (lower extremity); Upper arm, upper forearm, above the wrist (upper extremity); Toes and digits. Cuffs are inflated to 65 mmHg for PVR recording." },
+      { category: "What to Assess", text: "Global tissue perfusion at each level. Normal PVR shows a sharp upstroke, clear peak, and dicrotic notch. Flattened waveforms indicate reduced perfusion. PVRs are particularly useful when arteries are non-compressible due to calcification." },
+      ...ARTERIAL_SCANNING_TIPS,
     ],
   },
   {
     view: "Transcutaneous Oxygen Tension (tcPO2) Measurements",
     probe: "Foot, ankle, calf (lower extremities), with a reference point on the chest",
     tips: [
-      { category: "Patient Positioning", text: "The examination is best performed in a warm room to minimize the effects of peripheral vasoconstriction. The patient should be recumbent and ideally a" },
-      { category: "Transducer Positioning", text: "Foot, ankle, calf (lower extremities), with a reference point on the chest" },
-      { category: "What to Assess", text: "Delivery of oxygen to the skin in an area of questionable viability" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Patient Preparation\', \'tip_content\': \'Perform examination in a warm room to minimize " },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Exercise Testing for Claudication\', \'tip_content\': \'For claudication assessment when " }
+      { category: "Patient Positioning", text: "The examination is best performed in a warm room to minimize the effects of peripheral vasoconstriction. The patient should be recumbent and ideally acclimatized for at least 10–15 minutes before testing begins." },
+      { category: "Transducer Positioning", text: "Foot, ankle, calf (lower extremities), with a reference point on the chest. Allow 15–20 minutes for the electrodes to equilibrate before recording values." },
+      { category: "What to Assess", text: "Delivery of oxygen to the skin in an area of questionable viability. Normal tcPO2 is >40 mmHg. Values of 20–40 mmHg indicate impaired healing potential; <20 mmHg indicates critical ischemia with poor wound healing prognosis." },
+      ...ARTERIAL_SCANNING_TIPS,
     ],
   },
   {
     view: "Photoplethysmography (PPG)",
-    probe: "Digits",
+    probe: "Digits (toes and fingers)",
     tips: [
-      { category: "Patient Positioning", text: "The examination is best performed in a warm room to minimize the effects of peripheral vasoconstriction. The patient should be recumbent and ideally a" },
-      { category: "Transducer Positioning", text: "Digits" },
-      { category: "What to Assess", text: "Blood volume changes in a microvascular bed, perfusion of measured tissue bed, presence of atherosclerotic disease" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Patient Preparation\', \'tip_content\': \'Perform examination in a warm room to minimize " },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Exercise Testing for Claudication\', \'tip_content\': \'For claudication assessment when " }
+      { category: "Patient Positioning", text: "The examination is best performed in a warm room to minimize the effects of peripheral vasoconstriction. The patient should be recumbent and ideally acclimatized for at least 10–15 minutes before testing begins." },
+      { category: "Transducer Positioning", text: "Digits (toes and fingers). The PPG sensor detects changes in light absorption caused by blood volume changes in the microvascular bed beneath the sensor." },
+      { category: "What to Assess", text: "Blood volume changes in the microvascular bed, perfusion of the measured tissue bed, and presence of atherosclerotic disease. A flat PPG waveform at the digit indicates absent or severely reduced digital perfusion." },
+      ...ARTERIAL_SCANNING_TIPS,
     ],
-  }
+  },
 ];
 
 const examTips = [
-  { category: "Scanning Tip", text: "{\'tip_title\': \'Patient Preparation\', \'tip_content\': \'Perform examination in a warm room to minimize peripheral vasoconstriction. Patient should be rec" },
-  { category: "Scanning Tip", text: "{\'tip_title\': \'Exercise Testing for Claudication\', \'tip_content\': \'For claudication assessment when resting ABI is normal or higher than anticipated, " },
-  { category: "Scanning Tip", text: "{\'tip_title\': \'Non-Compressible Calcified Arteries\', \'tip_content\': \'For non-compressible calcified arteries, perform a toe-brachial index as distal s" },
-  { category: "Scanning Tip", text: "{\'tip_title\': \'Doppler Waveform Optimization\', \'tip_content\': \'Audibly and visually optimize Doppler waveforms. Maintain a constant Doppler angle thro" },
-  { category: "Scanning Tip", text: "{\'tip_title\': \'Segmental Pressure Measurements\', \'tip_content\': \'Use appropriately sized blood pressure cuffs. A rapid inflation device is helpful. Us" }
+  { category: "Scanning Tip", text: "Patient Preparation: Perform the examination in a warm room to minimize peripheral vasoconstriction. The patient should be recumbent and ideally acclimatized for at least 10–15 minutes before testing. Cold extremities cause vasoconstriction that artificially lowers segmental pressures and waveform amplitudes." },
+  { category: "Scanning Tip", text: "Exercise Testing for Claudication: For claudication assessment when resting ABI is normal or higher than anticipated, perform post-exercise ABI testing. Have the patient walk on a treadmill (3.5 km/h, 12% grade) for up to 5 minutes or until symptoms occur. A post-exercise ABI drop of ≥20% is diagnostic of significant PAD." },
+  { category: "Scanning Tip", text: "Non-Compressible Calcified Arteries: For non-compressible calcified arteries (ABI >1.4), perform a toe-brachial index (TBI) as distal small vessels are less affected by calcification. A TBI <0.7 is considered abnormal. PVRs and tcPO2 are also valuable in this setting." },
+  { category: "Scanning Tip", text: "Doppler Waveform Optimization: Audibly and visually optimize Doppler waveforms. Maintain a consistent Doppler angle throughout the examination (45–60°). Use the highest frequency CW Doppler probe that allows adequate penetration. Always compare bilateral waveforms at the same level." },
+  { category: "Scanning Tip", text: "Segmental Pressure Measurements: Use appropriately sized blood pressure cuffs — a cuff that is too small will overestimate pressure. A rapid inflation device is helpful. Use the highest Doppler signal obtained at the ankle (posterior tibial or dorsalis pedis) for ABI calculation." },
 ];
 
 const TIP_COLORS: Record<string, string> = {
@@ -119,11 +119,11 @@ export default function ArterialScanCoach() {
                 <span className="text-sm text-white/80 font-medium">Arterial · ScanCoach™</span>
               </div>
               <h1 className="text-2xl md:text-3xl font-black text-white leading-tight" style={{ fontFamily: "Merriweather, serif" }}>
-                Vascular Arterial Ultrasound Upper and Lower Extremity ScanCoach™
+                Vascular Arterial Ultrasound ScanCoach™
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">View-by-View Acquisition Guidance</p>
-              <p className="text-white/70 text-xs mt-1 max-w-xl">
-                Probe: CW Doppler instrument operating at 5–10 MHz; Appropriately sized blood pressure cuffs; Photoelectric
+              <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
+                View-by-view acquisition guidance for lower and upper extremity arterial assessment, aligned with current AIUM and SVU guidelines. Covers duplex scanning, ABI measurement, and PVR technique with Doppler optimization tips and waveform interpretation criteria.
               </p>
               <div className="mt-3">
                 <Link href="/arterial-navigator">
@@ -186,24 +186,26 @@ export default function ArterialScanCoach() {
 
             {/* Tips */}
             <div className="p-5 space-y-3">
-              {currentView.tips.map((tip, ti) => (
-                <div
-                  key={ti}
-                  className="rounded-xl p-4 border"
-                  style={{
-                    borderColor: (TIP_COLORS[tip.category] || "#189aa1") + "30",
-                    background: (TIP_COLORS[tip.category] || "#189aa1") + "08",
-                  }}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <Lightbulb className="w-3.5 h-3.5 flex-shrink-0" style={{ color: TIP_COLORS[tip.category] || "#189aa1" }} />
-                    <span className="text-xs font-bold uppercase tracking-wider" style={{ color: TIP_COLORS[tip.category] || "#189aa1" }}>
-                      {tip.category}
-                    </span>
+              <PremiumGate featureName="Scan Coach Tips">
+                {currentView.tips.map((tip, ti) => (
+                  <div
+                    key={ti}
+                    className="rounded-xl p-4 border"
+                    style={{
+                      borderColor: (TIP_COLORS[tip.category] || "#189aa1") + "30",
+                      background: (TIP_COLORS[tip.category] || "#189aa1") + "08",
+                    }}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <Lightbulb className="w-3.5 h-3.5 flex-shrink-0" style={{ color: TIP_COLORS[tip.category] || "#189aa1" }} />
+                      <span className="text-xs font-bold uppercase tracking-wider" style={{ color: TIP_COLORS[tip.category] || "#189aa1" }}>
+                        {tip.category}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-700 leading-relaxed">{tip.text}</p>
                   </div>
-                  <p className="text-sm text-gray-700 leading-relaxed">{tip.text}</p>
-                </div>
-              ))}
+                ))}
+              </PremiumGate>
             </div>
           </div>
         )}
@@ -236,7 +238,7 @@ export default function ArterialScanCoach() {
 
         {/* Reference */}
         <div className="text-xs text-gray-400 px-1 mt-4">
-          Based on: <a href="https://www.aium.org/resources/practice-parameters" target="_blank" rel="noopener noreferrer" className="underline hover:text-[#189aa1]">AIUM Practice Parameter for the Performance of Peripheral Arterial Ultrasound Examinations (2020)</a>
+          Based on: <a href="https://www.aium.org/resources/practice-parameters" target="_blank" rel="noopener noreferrer" className="underline hover:text-[#189aa1]">AIUM Practice Parameter for the Performance of Peripheral Arterial Ultrasound Examinations</a>
         </div>
       </div>
     </Layout>

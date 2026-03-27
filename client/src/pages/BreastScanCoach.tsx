@@ -152,8 +152,8 @@ export default function BreastScanCoach() {
                 Breast Ultrasound ScanCoach™
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">View-by-View Acquisition Guidance</p>
-              <p className="text-white/70 text-xs mt-1 max-w-xl">
-                Probe: High-resolution, real-time, linear-array transducer operating at a center frequency of at least 12 M
+              <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
+                View-by-view acquisition guidance for breast ultrasound, aligned with current AIUM guidelines. Guides systematic bilateral survey and targeted lesion evaluation with image optimization tips and BI-RADS-consistent documentation criteria.
               </p>
               <div className="mt-3">
                 <Link href="/breast-navigator">

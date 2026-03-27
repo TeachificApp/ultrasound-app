@@ -125,8 +125,8 @@ export default function TCDScanCoach() {
                 Transcranial Doppler ScanCoach™
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">View-by-View Acquisition Guidance</p>
-              <p className="text-white/70 text-xs mt-1 max-w-xl">
-                Probe: 2 MHz phased array (adults) · 5–7.5 MHz sector (neonates) · Reduce to MI &lt;0.23 for orbital window
+              <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
+                View-by-view acquisition guidance for transcranial Doppler ultrasound, aligned with current AIUM guidelines. Guides systematic insonation through temporal, orbital, and suboccipital windows with Doppler optimization tips and normal velocity criteria.
               </p>
               <div className="mt-3">
                 <Link href="/tcd-navigator">
