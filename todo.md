@@ -882,3 +882,11 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add green "Free" badge on cards where both navigatorFree and scanCoachFree are true
 - [x] Add amber/gold "Premium" badge on cards where both navigatorFree and scanCoachFree are false
 - [x] Partially-gated cards (mixed) show no card-level badge — per-button indicators only
+
+## Hub Fixes Round 2 (Mar 27)
+- [x] Fix Premium badge: use spec config (not isPremium state) so it always shows on fully-gated cards
+- [x] Fix vascular ordering: confirmed correct in code but not reflecting in live site — full rewrite to ensure
+
+## Navigator Editor & Hub CTA (Mar 27)
+- [ ] Fix drag-and-drop section reorder in Navigator Editor (sections not persisting new order)
+- [ ] Add iHeartEcho EchoAssist CTA at bottom of UltrasoundAssistHub linking to app.iheartecho.com

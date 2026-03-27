@@ -1,6 +1,7 @@
 /*
   UltrasoundAssist™ — Ultrasound Protocol Navigator & ScanCoach Hub
   Unified grid — no Free/Premium section split. Gating shown per-button.
+  Canonical order: General → OB/Fetal → Vascular (×6) → Small Parts → Procedural → MSK → POCUS
 */
 import { useState } from "react";
 import { Link } from "wouter";
@@ -15,7 +16,7 @@ import { usePremium } from "@/hooks/usePremium";
 // scanCoachFree: true  → ScanCoach accessible to all registered users
 // false on either      → requires Premium membership
 const specialties = [
-  // ── GENERAL ────────────────────────────────────────────
+  // ── GENERAL ──────────────────────────────────────────────────────────────
   {
     path: "/abdominal-navigator",
     scanCoachPath: "/abdominal-scan-coach",
@@ -36,7 +37,7 @@ const specialties = [
     navigatorFree: true,
     scanCoachFree: true,
   },
-  // ── OB / FETAL ────────────────────────────────────────────
+  // ── OB / FETAL ────────────────────────────────────────────────────────────
   {
     path: "/ob1-navigator",
     scanCoachPath: "/ob1-scan-coach",
@@ -67,7 +68,7 @@ const specialties = [
     navigatorFree: true,
     scanCoachFree: false,
   },
-  // ── VASCULAR ────────────────────────────────────────────
+  // ── VASCULAR ──────────────────────────────────────────────────────────────
   {
     path: "/venous-navigator",
     scanCoachPath: "/venous-scan-coach",
@@ -128,7 +129,7 @@ const specialties = [
     navigatorFree: false,
     scanCoachFree: false,
   },
-  // ── SMALL PARTS ───────────────────────────────────────────
+  // ── SMALL PARTS ───────────────────────────────────────────────────────────
   {
     path: "/thyroid-navigator",
     scanCoachPath: "/thyroid-scan-coach",
@@ -159,7 +160,7 @@ const specialties = [
     navigatorFree: false,
     scanCoachFree: false,
   },
-  // ── PROCEDURAL ────────────────────────────────────────────
+  // ── PROCEDURAL ────────────────────────────────────────────────────────────
   {
     path: "/appendix-navigator",
     scanCoachPath: "/appendix-scan-coach",
@@ -191,7 +192,7 @@ const specialties = [
     navigatorFree: false,
     scanCoachFree: false,
   },
-  // ── POCUS (always last) ───────────────────────────────────────────────
+  // ── POCUS (always last) ───────────────────────────────────────────────────
   {
     path: "/pocus-assist",
     scanCoachPath: "/pocus-assist",
@@ -252,10 +253,11 @@ export default function UltrasoundAssistHub() {
             const Icon = spec.icon;
             const navLocked = !spec.navigatorFree && !isPremium;
             const coachLocked = !spec.scanCoachFree && !isPremium;
-            // Card is "fully locked" only when both buttons require premium and user isn't premium
+            // Runtime lock state (depends on user's subscription)
             const fullyLocked = navLocked && coachLocked;
-            // Card is "fully free" when both Navigator and ScanCoach are free to all members
-            const fullyFree = spec.navigatorFree && spec.scanCoachFree;
+            // Static access tier badges (based on spec config, not user state)
+            const isFullyFree = spec.navigatorFree && spec.scanCoachFree;
+            const isFullyPremium = !spec.navigatorFree && !spec.scanCoachFree;
 
             return (
               <div
@@ -268,11 +270,11 @@ export default function UltrasoundAssistHub() {
                 style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}
                 onClick={fullyLocked ? () => setUpgradeModal({ title: spec.title, type: "navigator" }) : undefined}
               >
-                {/* Premium corner badge for fully locked cards */}
-                {fullyLocked && (
-                  <div className="absolute top-0 right-0 overflow-hidden rounded-tr-xl rounded-bl-xl">
+                {/* Access tier corner badge — always visible regardless of user state */}
+                {isFullyPremium && (
+                  <div className="absolute top-0 right-0">
                     <div
-                      className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-white"
+                      className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-white rounded-bl-xl"
                       style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}
                     >
                       <Crown className="w-2.5 h-2.5" />
@@ -280,12 +282,10 @@ export default function UltrasoundAssistHub() {
                     </div>
                   </div>
                 )}
-
-                {/* Free corner badge for fully-free cards */}
-                {fullyFree && (
-                  <div className="absolute top-0 right-0 overflow-hidden rounded-tr-xl rounded-bl-xl">
+                {isFullyFree && (
+                  <div className="absolute top-0 right-0">
                     <div
-                      className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-white"
+                      className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-white rounded-bl-xl"
                       style={{ background: "linear-gradient(135deg, #10b981, #059669)" }}
                     >
                       <span className="text-[10px]">✓</span>
@@ -299,18 +299,18 @@ export default function UltrasoundAssistHub() {
                     <div
                       className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                       style={{
-                        background: fullyLocked
+                        background: isFullyPremium
                           ? "#f59e0b15"
                           : "linear-gradient(135deg, #0e1e2e, #189aa1)",
                       }}
                     >
-                      <Icon className={`w-5 h-5 ${fullyLocked ? "text-amber-500" : "text-[#4ad9e0]"}`} />
+                      <Icon className={`w-5 h-5 ${isFullyPremium ? "text-amber-500" : "text-[#4ad9e0]"}`} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span
                           className="text-xs font-bold px-2 py-0.5 rounded-full text-white"
-                          style={{ background: fullyLocked ? "#9ca3af" : "#189aa1" }}
+                          style={{ background: isFullyPremium ? "#9ca3af" : "#189aa1" }}
                         >
                           {spec.badge}
                         </span>
