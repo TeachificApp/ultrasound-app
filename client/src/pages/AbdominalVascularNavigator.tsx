@@ -85,6 +85,44 @@ const mesentericExamTips = [
   { category: "Post-Prandial Protocol", text: "For post-prandial assessment, have the patient eat a standardized meal (e.g., 400–600 kcal liquid meal) and rescan the SMA at 30–45 minutes. Normal response: PSV increases and waveform becomes low-resistance (diastolic flow increases significantly)." },
 ];
 
+// ── TIPS (TRANSJUGULAR INTRAHEPATIC PORTOSYSTEMIC SHUNT) ─────────────────────
+
+const tipsNormalValues = [
+  {
+    category: "TIPS Velocity (SVU / AIUM Guidelines)",
+    values: [
+      { param: "Main TIPS velocity (PSV)", normal: "90–190 cm/s", borderline: "50–90 cm/s or 190–220 cm/s", abnormal: "<50 cm/s or >220 cm/s (dysfunction)" },
+      { param: "Hepatic vein at TIPS outflow", normal: "Continuous forward flow", borderline: "Reduced phasicity", abnormal: "Absent or reversed flow (obstruction)" },
+      { param: "Portal vein flow direction", normal: "Hepatopetal or hepatofugal (post-TIPS)", borderline: "—", abnormal: "Absent flow (thrombosis)" },
+      { param: "Main portal vein PSV", normal: "≥30 cm/s (post-TIPS)", borderline: "20–30 cm/s", abnormal: "<20 cm/s (shunt dysfunction)" },
+    ],
+  },
+  {
+    category: "TIPS Dysfunction Criteria",
+    values: [
+      { param: "TIPS PSV decrease from baseline", normal: "<50 cm/s change", borderline: "50–75 cm/s decrease", abnormal: ">50 cm/s decrease from prior exam" },
+      { param: "TIPS PSV increase from baseline", normal: "<50 cm/s change", borderline: "—", abnormal: ">50 cm/s increase (focal stenosis)" },
+      { param: "Velocity gradient within TIPS", normal: "Uniform", borderline: "Mild variation", abnormal: "Focal velocity step-up >2× (stenosis site)" },
+    ],
+  },
+  {
+    category: "Portal Hypertension Response",
+    values: [
+      { param: "Portosystemic pressure gradient (PPG)", normal: "<12 mmHg (post-TIPS target)", borderline: "12–15 mmHg", abnormal: ">15 mmHg (inadequate decompression)" },
+      { param: "Ascites response", normal: "Resolved within 4–6 weeks", borderline: "Partial resolution", abnormal: "No change (shunt dysfunction)" },
+    ],
+  },
+];
+
+const tipsExamTips = [
+  { category: "Preparation", text: "No specific fasting required for TIPS surveillance. Obtain the patient's post-procedure baseline study (typically performed within 24–48 hours of TIPS placement) for comparison. Always compare to the most recent prior study, as velocity trends are more clinically meaningful than single absolute values." },
+  { category: "Positioning", text: "Begin supine. A right intercostal approach provides the best window to the TIPS stent, which courses from the right hepatic vein to the right portal vein. Deep inspiration moves the liver inferiorly and improves intercostal access." },
+  { category: "Doppler Optimization", text: "Set PRF to 100–200 cm/s for the TIPS stent. Use color Doppler to identify the stent and confirm flow direction. Sample the stent at the hepatic vein end, mid-stent, and portal vein end. Maintain Doppler angle ≤60°." },
+  { category: "Pearl", text: "TIPS dysfunction is best detected by velocity trends rather than single absolute values. A decrease of >50 cm/s from the patient's own baseline, or a focal velocity step-up of >2× within the stent, is more reliable than comparing to population reference ranges." },
+  { category: "Pitfall", text: "Hepatic encephalopathy can worsen after TIPS placement due to increased portosystemic shunting. If the TIPS appears patent and velocities are normal but the patient has worsening encephalopathy, this is a clinical (not sonographic) complication and does not indicate shunt dysfunction." },
+  { category: "Pitfall", text: "TIPS stents are echogenic and may cause acoustic shadowing that obscures the lumen. Always use color Doppler to confirm intrastent flow, and obtain spectral waveforms from both ends and the mid-stent to identify focal stenosis." },
+];
+
 // ── RENAL ARTERY DUPLEX ───────────────────────────────────────────────────────
 
 const renalNormalValues = [
@@ -117,14 +155,14 @@ const renalExamTips = [
 ];
 
 // ── COMPONENT ─────────────────────────────────────────────────────────────────
-type ExamTab = "liver" | "mesenteric" | "renal";
+type ExamTab = "liver" | "tips" | "mesenteric" | "renal";
 
 export default function AbdominalVascularNavigator() {
   const [examTab, setExamTab] = useState<ExamTab>("liver");
   const [infoTab, setInfoTab] = useState<"protocol" | "reference" | "tips">("protocol");
   const [expandedView, setExpandedView] = useState<number | null>(0);
   const [checked, setChecked] = useState<Record<ExamTab, Set<string>>>({
-    liver: new Set(), mesenteric: new Set(), renal: new Set(),
+    liver: new Set(), tips: new Set(), mesenteric: new Set(), renal: new Set(),
   });
   const [expandedRef, setExpandedRef] = useState<number | null>(0);
 
@@ -134,8 +172,8 @@ export default function AbdominalVascularNavigator() {
     view: s.sectionName.replace(examTab + ":", ""),
     sectionName: s.sectionName.replace(examTab + ":", ""),
   }));
-  const normalValues = examTab === "liver" ? liverNormalValues : examTab === "mesenteric" ? mesentericNormalValues : renalNormalValues;
-  const examTips = examTab === "liver" ? liverExamTips : examTab === "mesenteric" ? mesentericExamTips : renalExamTips;
+  const normalValues = examTab === "liver" ? liverNormalValues : examTab === "tips" ? tipsNormalValues : examTab === "mesenteric" ? mesentericNormalValues : renalNormalValues;
+  const examTips = examTab === "liver" ? liverExamTips : examTab === "tips" ? tipsExamTips : examTab === "mesenteric" ? mesentericExamTips : renalExamTips;
   const currentChecked = checked[examTab];
 
   const totalItems = views.reduce((sum, v) => sum + v.items.length, 0);
@@ -154,11 +192,13 @@ export default function AbdominalVascularNavigator() {
 
   const EXAM_TABS: { key: ExamTab; label: string; short: string }[] = [
     { key: "liver", label: "Liver Duplex", short: "Liver" },
+    { key: "tips", label: "TIPS Surveillance", short: "TIPS" },
     { key: "mesenteric", label: "Mesenteric Duplex", short: "Mesenteric" },
     { key: "renal", label: "Renal Artery Duplex", short: "Renal" },
   ];
 
   const scanCoachPath = examTab === "liver" ? "/abdominal-vascular-scan-coach?tab=liver"
+    : examTab === "tips" ? "/abdominal-vascular-scan-coach?tab=tips"
     : examTab === "mesenteric" ? "/abdominal-vascular-scan-coach?tab=mesenteric"
     : "/abdominal-vascular-scan-coach?tab=renal";
 
@@ -180,7 +220,7 @@ export default function AbdominalVascularNavigator() {
               <h1 className="text-2xl md:text-3xl font-black text-white leading-tight" style={{ fontFamily: "Merriweather, serif" }}>
                 Abdominal Vascular Ultrasound Navigator
               </h1>
-              <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">Liver Duplex · Mesenteric Duplex · Renal Artery Duplex</p>
+              <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">Liver Duplex · TIPS Surveillance · Mesenteric Duplex · Renal Artery Duplex</p>
               <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
                 Comprehensive vascular protocol checklist covering the mesenteric, renal, and portal systems. Aligned with current AIUM and SVU guidelines to support systematic Doppler interrogation and accurate stenosis grading.
               </p>

@@ -13,7 +13,7 @@ import { PremiumGate } from "@/components/PremiumGate";
 import { BlurredOverlay } from "@/components/BlurredOverlay";
 import { usePremium } from "@/hooks/usePremium";
 
-type ExamTab = "liver" | "mesenteric" | "renal";
+type ExamTab = "liver" | "tips" | "mesenteric" | "renal";
 
 // ── LIVER DUPLEX VIEWS ────────────────────────────────────────────────────────
 const liverViews = [
@@ -129,6 +129,93 @@ const mesentericExamTips = [
   { category: "Pitfall", text: "Median arcuate ligament syndrome (MALS) can cause a false-positive celiac stenosis on expiration. Always obtain celiac axis velocities in both inspiration and expiration to differentiate MALS from atherosclerotic stenosis." },
 ];
 
+// ── TIPS SURVEILLANCE VIEWS ────────────────────────────────────────────────────────────
+const tipsViews = [
+  {
+    view: "TIPS Stent — B-mode Survey",
+    probe: "Curvilinear 2–5 MHz",
+    tips: [
+      { category: "Patient Positioning", text: "Supine; right intercostal or subcostal approach. The TIPS stent courses from the right hepatic vein to the right portal vein within the hepatic parenchyma. Deep inspiration improves intercostal access." },
+      { category: "Transducer Positioning", text: "Right intercostal approach, angled toward the liver hilum. The stent appears as two parallel echogenic lines (stent walls) within the liver parenchyma. Identify the hepatic vein end (superior) and portal vein end (inferior)." },
+      { category: "What to Assess", text: "Stent position and integrity; stent patency on B-mode (echogenic material within stent suggests thrombosis); liver parenchyma for focal lesions; ascites (residual or new); splenomegaly." },
+      { category: "Scanning Tip", text: "The TIPS stent is echogenic and may be difficult to distinguish from surrounding hepatic parenchyma. Use color Doppler immediately after B-mode survey to confirm intrastent flow. A stent that appears echo-filled on B-mode may still be patent — always confirm with Doppler." },
+      { category: "Pearl", text: "Covered TIPS stents (e.g., Viatorr) have a lower restenosis rate than bare metal stents. The covered portion typically extends from the hepatic vein to the parenchymal tract; the uncovered portion extends into the portal vein. Identify both segments during surveillance." },
+    ],
+  },
+  {
+    view: "TIPS Stent — Color Doppler",
+    probe: "Curvilinear 2–5 MHz",
+    tips: [
+      { category: "Patient Positioning", text: "Supine; right intercostal approach. Adjust patient position to optimize the angle between the stent and the Doppler beam." },
+      { category: "Transducer Positioning", text: "Align the color box along the long axis of the stent. The stent should be angled relative to the transducer to allow adequate Doppler insonation (avoid 90° angle). Adjust transducer angulation to achieve a Doppler angle ≤60°." },
+      { category: "What to Assess", text: "Intrastent flow: confirm continuous color fill throughout the stent from portal vein end to hepatic vein end. Identify any focal color void (stenosis or thrombosis). Assess flow direction (should be from portal vein toward hepatic vein — hepatofugal within stent)." },
+      { category: "Scanning Tip", text: "A focal color void within the stent indicates either stenosis (with aliasing at the stenotic site) or thrombosis (absent flow). Increase color gain and reduce PRF to detect low-velocity flow before concluding thrombosis. Aliasing within the stent at a focal site is a reliable sign of stenosis." },
+      { category: "Pitfall", text: "The stent angle relative to the transducer changes along its length. Adjust transducer angulation as you scan from the hepatic vein end to the portal vein end to maintain adequate Doppler angles throughout. A single fixed transducer position will not adequately assess the entire stent." },
+    ],
+  },
+  {
+    view: "TIPS Stent — Spectral Doppler (Hepatic Vein End)",
+    probe: "Curvilinear 2–5 MHz",
+    tips: [
+      { category: "Patient Positioning", text: "Supine; right intercostal approach. The hepatic vein end of the stent is the most superior portion, where the stent enters the hepatic vein." },
+      { category: "Transducer Positioning", text: "Place the sample volume at the hepatic vein end of the stent (superior aspect). Adjust Doppler angle to ≤60°. The waveform at this end should reflect the hepatic vein flow pattern." },
+      { category: "What to Assess", text: "PSV at the hepatic vein end of the stent; waveform character (should be continuous forward flow); compare to mid-stent and portal vein end velocities to identify focal velocity gradients." },
+      { category: "Scanning Tip", text: "A focal velocity step-up of >2× at any point within the stent compared to adjacent segments indicates a stenosis at that site. Always sample at three points: hepatic vein end, mid-stent, and portal vein end. Document all three velocities for comparison with prior studies." },
+      { category: "Pearl", text: "The hepatic vein end is the most common site of TIPS stenosis for covered stents (intimal hyperplasia at the stent-vein junction). For bare metal stents, stenosis more commonly occurs within the parenchymal tract. Sample both ends carefully." },
+    ],
+  },
+  {
+    view: "TIPS Stent — Spectral Doppler (Mid-Stent)",
+    probe: "Curvilinear 2–5 MHz",
+    tips: [
+      { category: "Patient Positioning", text: "Supine; right intercostal approach. The mid-stent is the parenchymal portion of the TIPS, which courses through the hepatic parenchyma between the hepatic and portal veins." },
+      { category: "Transducer Positioning", text: "Place the sample volume at the mid-point of the stent within the hepatic parenchyma. Adjust Doppler angle to ≤60°. This is often the most technically challenging sampling site due to stent angulation." },
+      { category: "What to Assess", text: "PSV at mid-stent (normal range 90–190 cm/s); waveform character; compare to hepatic vein end and portal vein end velocities. A velocity >220 cm/s at mid-stent suggests focal stenosis at this level." },
+      { category: "Scanning Tip", text: "Normal TIPS velocity range is 90–190 cm/s. A PSV <50 cm/s suggests shunt dysfunction (stenosis or thrombosis causing reduced flow). A PSV >220 cm/s suggests focal stenosis with a jet effect. Both extremes warrant further evaluation." },
+    ],
+  },
+  {
+    view: "TIPS Stent — Spectral Doppler (Portal Vein End)",
+    probe: "Curvilinear 2–5 MHz",
+    tips: [
+      { category: "Patient Positioning", text: "Supine; right intercostal or subcostal approach. The portal vein end of the stent opens into the right portal vein at the liver hilum." },
+      { category: "Transducer Positioning", text: "Place the sample volume at the portal vein end of the stent, where it enters the right portal vein. Adjust Doppler angle to ≤60°." },
+      { category: "What to Assess", text: "PSV at the portal vein end of the stent; portal vein flow direction (hepatofugal flow into the stent is expected post-TIPS); main portal vein PSV (≥30 cm/s post-TIPS indicates adequate decompression)." },
+      { category: "Pearl", text: "Post-TIPS, portal vein flow direction may be hepatopetal (toward liver) or hepatofugal (away from liver, into the stent), depending on the degree of portal hypertension and shunt fraction. Both can be normal. What is abnormal is absent or reversed flow in the main portal vein, which suggests stent thrombosis." },
+      { category: "Pitfall", text: "Do not confuse the right portal vein with the right hepatic vein when sampling the portal vein end of the stent. Use color Doppler to confirm you are sampling within the stent at its portal vein junction, not in the adjacent hepatic vein." },
+    ],
+  },
+  {
+    view: "Main Portal Vein — Post-TIPS Assessment",
+    probe: "Curvilinear 2–5 MHz",
+    tips: [
+      { category: "Patient Positioning", text: "Supine; subcostal or right intercostal approach. The main portal vein is best visualized in the porta hepatis." },
+      { category: "Transducer Positioning", text: "Oblique subcostal approach along the long axis of the portal vein. Place the sample volume in the main portal vein proximal to the TIPS stent entry point." },
+      { category: "What to Assess", text: "Main portal vein PSV (≥30 cm/s post-TIPS indicates adequate decompression); flow direction (hepatopetal or hepatofugal); portal vein diameter (should decrease post-TIPS if adequately decompressed); assess for portal vein thrombosis." },
+      { category: "Scanning Tip", text: "A main portal vein PSV <20 cm/s post-TIPS is a reliable indicator of shunt dysfunction. Compare to the patient's own post-procedure baseline — a decrease of >50 cm/s from baseline is more clinically significant than the absolute value alone." },
+      { category: "Pearl", text: "Successful TIPS decompression typically results in: (1) increased portal vein velocity, (2) decreased portal vein diameter, (3) resolution of varices on follow-up imaging, and (4) decreased spleen size over weeks to months. These indirect signs support adequate shunt function even when direct stent velocities are borderline." },
+    ],
+  },
+  {
+    view: "Hepatic Veins — Post-TIPS Assessment",
+    probe: "Curvilinear 2–5 MHz",
+    tips: [
+      { category: "Patient Positioning", text: "Supine; right intercostal or subcostal approach. The hepatic veins are best visualized in the right upper quadrant, angled toward the IVC." },
+      { category: "Transducer Positioning", text: "Right intercostal approach, angled superiorly toward the IVC. Identify the right, middle, and left hepatic veins at their IVC confluence. The TIPS stent enters the right or middle hepatic vein." },
+      { category: "What to Assess", text: "Hepatic vein waveform at the TIPS outflow (should be continuous forward flow post-TIPS); assess for hepatic vein stenosis at the stent-vein junction; IVC patency; assess for hepatic vein thrombosis." },
+      { category: "Scanning Tip", text: "Post-TIPS, the hepatic vein receiving the stent outflow will show continuous, high-velocity turbulent flow rather than the normal triphasic waveform. This is expected and should not be misinterpreted as pathology. The non-TIPS hepatic veins should retain their normal triphasic waveform." },
+      { category: "Pitfall", text: "Hepatic vein stenosis at the TIPS outflow is a common cause of late TIPS dysfunction. If the hepatic vein at the stent junction shows focal velocity elevation or color aliasing, this site should be sampled with spectral Doppler and compared to the mid-stent and portal vein end velocities." },
+    ],
+  },
+];
+
+const tipsExamTips = [
+  { category: "Preparation", text: "No specific fasting required for TIPS surveillance. Obtain the patient's post-procedure baseline study for comparison — always compare velocity trends rather than single absolute values, as individual variation is significant." },
+  { category: "Doppler Optimization", text: "Set PRF to 100–200 cm/s for the TIPS stent. Use color Doppler to identify the stent and confirm flow direction before spectral sampling. Sample at three points: hepatic vein end, mid-stent, and portal vein end. Maintain Doppler angle ≤60°." },
+  { category: "Pearl", text: "TIPS dysfunction is best detected by velocity trends. A decrease of >50 cm/s from the patient's own baseline, or a focal velocity step-up of >2× within the stent, is more reliable than comparing to population reference ranges." },
+  { category: "Pitfall", text: "TIPS stents are echogenic and may cause acoustic shadowing. Always use color Doppler to confirm intrastent flow, and obtain spectral waveforms from all three sampling sites to identify focal stenosis." },
+];
+
 // ── RENAL ARTERY DUPLEX VIEWS ─────────────────────────────────────────────────
 const renalViews = [
   {
@@ -213,7 +300,11 @@ export default function AbdominalVascularScanCoach() {
   const params = new URLSearchParams(search);
   const tabParam = params.get("tab") as ExamTab | null;
 
-  const [examTab, setExamTab] = useState<ExamTab>(tabParam === "mesenteric" ? "mesenteric" : tabParam === "renal" ? "renal" : "liver");
+  const [examTab, setExamTab] = useState<ExamTab>(
+    tabParam === "tips" ? "tips" :
+    tabParam === "mesenteric" ? "mesenteric" :
+    tabParam === "renal" ? "renal" : "liver"
+  );
   const [selectedView, setSelectedView] = useState(0);
   const [expandedTip, setExpandedTip] = useState<number | null>(null);
   const [showExamTips, setShowExamTips] = useState(false);
@@ -224,17 +315,19 @@ export default function AbdominalVascularScanCoach() {
     setShowExamTips(false);
   }, [examTab]);
 
-  const views = examTab === "liver" ? liverViews : examTab === "mesenteric" ? mesentericViews : renalViews;
-  const examTips = examTab === "liver" ? liverExamTips : examTab === "mesenteric" ? mesentericExamTips : renalExamTips;
+  const views = examTab === "liver" ? liverViews : examTab === "tips" ? tipsViews : examTab === "mesenteric" ? mesentericViews : renalViews;
+  const examTips = examTab === "liver" ? liverExamTips : examTab === "tips" ? tipsExamTips : examTab === "mesenteric" ? mesentericExamTips : renalExamTips;
   const currentView = views[selectedView];
 
   const EXAM_TABS: { key: ExamTab; label: string; short: string }[] = [
     { key: "liver", label: "Liver Duplex", short: "Liver" },
+    { key: "tips", label: "TIPS Surveillance", short: "TIPS" },
     { key: "mesenteric", label: "Mesenteric Duplex", short: "Mesenteric" },
     { key: "renal", label: "Renal Artery Duplex", short: "Renal" },
   ];
 
   const navigatorPath = examTab === "liver" ? "/abdominal-vascular-navigator?tab=liver"
+    : examTab === "tips" ? "/abdominal-vascular-navigator?tab=tips"
     : examTab === "mesenteric" ? "/abdominal-vascular-navigator?tab=mesenteric"
     : "/abdominal-vascular-navigator?tab=renal";
 
