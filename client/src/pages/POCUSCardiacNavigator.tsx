@@ -8,6 +8,7 @@ import { useState } from "react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import ProtocolProgressBar from "../components/ProtocolProgressBar";
+import { useNavigatorSections } from "@/hooks/useNavigatorSections";
 import {
   CheckCircle2, Circle, ChevronDown, ChevronUp, Info,
   Heart, AlertTriangle, ArrowRight, Shield,
@@ -140,6 +141,12 @@ const interpretationTable = [
 ];
 
 export default function POCUSCardiacNavigator() {
+  const { sections: _dbSections } = useNavigatorSections("pocus_cardiac");
+  const _dbItemMap = Object.fromEntries(_dbSections.map(s => [s.sectionName, s.items]));
+  const cardiacViewsMerged = cardiacViews.map(s => {
+    const dbItems = _dbItemMap[s.view];
+    return dbItems && dbItems.length > 0 ? { ...s, items: dbItems } : s;
+  });
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ plax: true });
   const [showDetail, setShowDetail] = useState<string | null>(null);
@@ -147,12 +154,12 @@ export default function POCUSCardiacNavigator() {
   const toggle = (id: string) => setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
   const toggleSection = (id: string) => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
 
-  const totalItems = cardiacViews.flatMap((v) => v.items).length;
+  const totalItems = cardiacViewsMerged.flatMap((v) => v.items).length;
   const checkedCount = Object.values(checked).filter(Boolean).length;
   const resetAll = () => setChecked({});
   const progress = Math.round((checkedCount / totalItems) * 100);
 
-  const criticalUnchecked = cardiacViews
+  const criticalUnchecked = cardiacViewsMerged
     .flatMap((v) => v.items)
     .filter((item) => item.critical && !checked[item.id]);
 
@@ -216,7 +223,7 @@ export default function POCUSCardiacNavigator() {
         </div>
 
         {/* Views */}
-        {cardiacViews.map((section) => {
+        {cardiacViewsMerged.map((section) => {
           const sectionItems = section.items;
           const sectionChecked = sectionItems.filter((i) => checked[i.id]).length;
           const isExpanded = expanded[section.id] ?? false;

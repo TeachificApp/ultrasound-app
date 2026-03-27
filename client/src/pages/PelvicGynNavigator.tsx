@@ -11,33 +11,8 @@ import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { CheckCircle2, Circle, ChevronDown, ChevronUp, Info, Scan, ExternalLink } from "lucide-react";
 import { PremiumGate } from "@/components/PremiumGate";
 import ProtocolProgressBar from "../components/ProtocolProgressBar";
+import { useNavigatorSections } from "@/hooks/useNavigatorSections";
 
-const views = [
-  {
-    view: "Uterus - Sagittal",
-    probe: "Transabdominal/Transvaginal",
-    items: [
-    { id: "pelvicgynnavigator_0_0", label: "Uterine size, shape, and orientation", detail: "", critical: false },
-    { id: "pelvicgynnavigator_0_1", label: "endometrium", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Adnexa (Ovaries and Fallopian Tubes)",
-    probe: "Transabdominal/Transvaginal",
-    items: [
-    { id: "pelvicgynnavigator_1_0", label: "Presence of adnexal pathology, ovarian abnormalities, masses, dilated tubular st", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Cul-de-Sac",
-    probe: "Transabdominal/Transvaginal/Transrectal",
-    items: [
-    { id: "pelvicgynnavigator_2_0", label: "Presence of free fluid, loculated fluid, or a mass", detail: "", critical: false },
-    { id: "pelvicgynnavigator_2_1", label: "Relationship of mass with ovaries and uterus", detail: "", critical: false },
-    { id: "pelvicgynnavigator_2_2", label: "Rectosigmoid colon wall", detail: "", critical: false }
-    ],
-  }
-];
 
 const normalValues = [
   {
@@ -71,6 +46,7 @@ const normalValues = [
 // References: Nalaboff KM et al. Radiographics 2001;21:1371–1383; Pavlik EJ et al. Menopause 2013;20:1263–1268; Goldstein SR. Ultrasound Obstet Gynecol 2010;36:121–123; Patel MD et al. Radiology 2005;236:583–589.
 
 export default function PelvicGynNavigator() {
+  const { sections: views, isLoading: _navLoading } = useNavigatorSections("pelvic_gyn");
   const [tab, setTab] = useState<"protocol" | "reference">("protocol");
   const [expandedView, setExpandedView] = useState<number | null>(0);
   const [checked, setChecked] = useState<Set<string>>(new Set());

@@ -11,73 +11,8 @@ import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { CheckCircle2, Circle, ChevronDown, ChevronUp, Info, Scan, ExternalLink } from "lucide-react";
 import { PremiumGate } from "@/components/PremiumGate";
 import ProtocolProgressBar from "../components/ProtocolProgressBar";
+import { useNavigatorSections } from "@/hooks/useNavigatorSections";
 
-const views = [
-  {
-    view: "Proximal Aorta - Long",
-    probe: "Subxiphoid, sagittal plane",
-    items: [
-    { id: "aortanavigator_0_0", label: "Visualize the aorta as it passes through the diaphragm", detail: "", critical: false },
-    { id: "aortanavigator_0_1", label: "Assess for plaque, thrombus, or dissection", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Proximal Aorta - Trans",
-    probe: "Subxiphoid, transverse plane",
-    items: [
-    { id: "aortanavigator_1_0", label: "Visualize the celiac and superior mesenteric arteries", detail: "", critical: false },
-    { id: "aortanavigator_1_1", label: "Assess for plaque, thrombus, or dissection", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Mid Aorta - Long",
-    probe: "Mid-abdomen, sagittal plane",
-    items: [
-    { id: "aortanavigator_2_0", label: "Visualize the aorta at the level of the renal arteries", detail: "", critical: false },
-    { id: "aortanavigator_2_1", label: "Assess for plaque, thrombus, or dissection", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Mid Aorta - Trans",
-    probe: "Mid-abdomen, transverse plane",
-    items: [
-    { id: "aortanavigator_3_0", label: "Visualize the renal arteries branching off the aorta", detail: "", critical: false },
-    { id: "aortanavigator_3_1", label: "Assess for plaque, thrombus, or dissection", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Distal Aorta - Long",
-    probe: "Lower abdomen, sagittal plane",
-    items: [
-    { id: "aortanavigator_4_0", label: "Visualize the aorta to the bifurcation", detail: "", critical: false },
-    { id: "aortanavigator_4_1", label: "Assess for plaque, thrombus, or dissection", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Distal Aorta - Trans",
-    probe: "Lower abdomen, transverse plane",
-    items: [
-    { id: "aortanavigator_5_0", label: "Visualize the aortic bifurcation into the common iliac arteries", detail: "", critical: false },
-    { id: "aortanavigator_5_1", label: "Assess for plaque, thrombus, or dissection", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Common Iliac Arteries - Long",
-    probe: "Just inferior to the aortic bifurcation, sagittal oblique plane for each iliac artery",
-    items: [
-    { id: "aortanavigator_6_0", label: "Visualize the proximal common iliac arteries", detail: "", critical: false },
-    { id: "aortanavigator_6_1", label: "Assess for aneurysmal dilation", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Common Iliac Arteries - Trans",
-    probe: "Just inferior to the aortic bifurcation, transverse plane",
-    items: [
-    { id: "aortanavigator_7_0", label: "Visualize the proximal common iliac arteries", detail: "", critical: false },
-    { id: "aortanavigator_7_1", label: "Assess for aneurysmal dilation", detail: "", critical: false }
-    ],
-  }
-];
 
 const normalValues = [
   {
@@ -110,6 +45,7 @@ const normalValues = [
 // References: Chaikof EL et al. J Vasc Surg 2018;67:2–77 (SVS AAA guidelines); Moneta GL et al. J Vasc Surg 1993;17:79–86 (mesenteric); Hirsch AT et al. J Am Coll Cardiol 2006;47:1239–1312 (iliac/aortic criteria).
 
 export default function AortaNavigator() {
+  const { sections: views, isLoading: _navLoading } = useNavigatorSections("aorta");
   const [tab, setTab] = useState<"protocol" | "reference">("protocol");
   const [expandedView, setExpandedView] = useState<number | null>(0);
   const [checked, setChecked] = useState<Set<string>>(new Set());

@@ -11,46 +11,8 @@ import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { CheckCircle2, Circle, ChevronDown, ChevronUp, Info, Scan, ExternalLink } from "lucide-react";
 import { PremiumGate } from "@/components/PremiumGate";
 import ProtocolProgressBar from "../components/ProtocolProgressBar";
+import { useNavigatorSections } from "@/hooks/useNavigatorSections";
 
-const views = [
-  {
-    view: "Common Carotid Artery (CCA)",
-    probe: "Longitudinal and transverse planes, from clavicle to bifurcation",
-    items: [
-    { id: "carotidnavigator_0_0", label: "Plaque presence, location, extent, and characteristics", detail: "", critical: false },
-    { id: "carotidnavigator_0_1", label: "Vessel wall abnormalities", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Carotid Bifurcation",
-    probe: "Longitudinal and transverse planes",
-    items: [
-    { id: "carotidnavigator_1_0", label: "Plaque at the bifurcation, flow division into ICA and ECA", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Internal Carotid Artery (ICA)",
-    probe: "Longitudinal and transverse planes, from origin to as far distally as possible",
-    items: [
-    { id: "carotidnavigator_2_0", label: "Plaque presence, location, extent, and characteristics", detail: "", critical: false },
-    { id: "carotidnavigator_2_1", label: "Stenosis assessment", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "External Carotid Artery (ECA)",
-    probe: "Longitudinal plane, with identification of a branch if possible",
-    items: [
-    { id: "carotidnavigator_3_0", label: "Flow direction and waveform characteristics to differentiate from ICA", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Vertebral Artery",
-    probe: "Longitudinal plane, in the mid-neck between transverse processes or at the origin",
-    items: [
-    { id: "carotidnavigator_4_0", label: "Flow direction and waveform", detail: "", critical: false }
-    ],
-  }
-];
 
 const normalValues = [
   {
@@ -81,6 +43,7 @@ const normalValues = [
 // References: Grant EG et al. Radiology 2003;229:340–346 (SRU carotid consensus); Touboul PJ et al. Cerebrovasc Dis 2012;34:290–296 (IMT); Stayman AN et al. Stroke 2011;42:2894–2899 (vertebral artery).
 
 export default function CarotidNavigator() {
+  const { sections: views, isLoading: _navLoading } = useNavigatorSections("carotid");
   const [tab, setTab] = useState<"protocol" | "reference">("protocol");
   const [expandedView, setExpandedView] = useState<number | null>(0);
   const [checked, setChecked] = useState<Set<string>>(new Set());

@@ -11,37 +11,8 @@ import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { CheckCircle2, Circle, ChevronDown, ChevronUp, Info, Scan, ExternalLink } from "lucide-react";
 import { PremiumGate } from "@/components/PremiumGate";
 import ProtocolProgressBar from "../components/ProtocolProgressBar";
+import { useNavigatorSections } from "@/hooks/useNavigatorSections";
 
-const views = [
-  {
-    view: "Gestational Sac",
-    probe: "Transabdominal or transvaginal",
-    items: [
-    { id: "ob1navigator_0_0", label: "Presence, location, and number of gestational sacs", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Embryo/Fetus",
-    probe: "Transabdominal or transvaginal",
-    items: [
-    { id: "ob1navigator_1_0", label: "Presence of embryo/fetus, cardiac activity", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Nuchal Translucency (NT)",
-    probe: "Transabdominal or transvaginal, midsagittal plane",
-    items: [
-    { id: "ob1navigator_2_0", label: "The subcutaneous space between the skin and the cervical spine", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Fetal Anatomy - Head",
-    probe: "Axial and sagittal planes",
-    items: [
-    { id: "ob1navigator_3_0", label: "Calvarium, falx cerebri, choroid plexus, ventricles", detail: "", critical: false }
-    ],
-  }
-];
 
 const normalValues = [
   {
@@ -74,6 +45,7 @@ const normalValues = [
 // References: Doubilet PM et al. N Engl J Med 2013;369:1443–1451; Papageorghiou AT et al. Ultrasound Obstet Gynecol 2014;44:641–648 (INTERGROWTH-21st); Nicolaides KH. Ultrasound Obstet Gynecol 2011;38:613–621.
 
 export default function OB1Navigator() {
+  const { sections: views, isLoading: _navLoading } = useNavigatorSections("ob1");
   const [tab, setTab] = useState<"protocol" | "reference">("protocol");
   const [expandedView, setExpandedView] = useState<number | null>(0);
   const [checked, setChecked] = useState<Set<string>>(new Set());

@@ -11,58 +11,8 @@ import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { CheckCircle2, Circle, ChevronDown, ChevronUp, Info, Scan, ExternalLink } from "lucide-react";
 import { PremiumGate } from "@/components/PremiumGate";
 import ProtocolProgressBar from "../components/ProtocolProgressBar";
+import { useNavigatorSections } from "@/hooks/useNavigatorSections";
 
-const views = [
-  {
-    view: "Transverse Right Lobe",
-    probe: "Superior, Mid, and Inferior Right Lobe",
-    items: [
-    { id: "thyroidnavigator_0_0", label: "Thyroid parenchyma, nodules, and surrounding structures", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Longitudinal Right Lobe",
-    probe: "Medial, Mid, and Lateral Right Lobe",
-    items: [
-    { id: "thyroidnavigator_1_0", label: "Thyroid parenchyma, nodules, and surrounding structures", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Transverse Left Lobe",
-    probe: "Superior, Mid, and Inferior Left Lobe",
-    items: [
-    { id: "thyroidnavigator_2_0", label: "Thyroid parenchyma, nodules, and surrounding structures", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Longitudinal Left Lobe",
-    probe: "Medial, Mid, and Lateral Left Lobe",
-    items: [
-    { id: "thyroidnavigator_3_0", label: "Thyroid parenchyma, nodules, and surrounding structures", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Transverse Isthmus",
-    probe: "Midline, between the right and left lobes",
-    items: [
-    { id: "thyroidnavigator_4_0", label: "Isthmus parenchyma and thickness", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Cervical Lymph Nodes",
-    probe: "Levels I-VI of the neck",
-    items: [
-    { id: "thyroidnavigator_5_0", label: "Size, shape, echogenicity, and vascularity of lymph nodes", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Parathyroid Glands",
-    probe: "Posterior to the thyroid lobes",
-    items: [
-    { id: "thyroidnavigator_6_0", label: "Size, shape, and echogenicity of parathyroid glands", detail: "", critical: false }
-    ],
-  }
-];
 
 const normalValues = [
   {
@@ -94,6 +44,7 @@ const normalValues = [
 // References: Tessler FN et al. J Am Coll Radiol 2017;14:587–595 (ACR TI-RADS); Hegedus L. N Engl J Med 2004;351:1764–1771 (thyroid volume); Hoang JK et al. Radiology 2012;262:397–403.
 
 export default function ThyroidNavigator() {
+  const { sections: views, isLoading: _navLoading } = useNavigatorSections("thyroid");
   const [tab, setTab] = useState<"protocol" | "reference">("protocol");
   const [expandedView, setExpandedView] = useState<number | null>(0);
   const [checked, setChecked] = useState<Set<string>>(new Set());

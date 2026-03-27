@@ -11,93 +11,8 @@ import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { CheckCircle2, Circle, ChevronDown, ChevronUp, Info, Scan, ExternalLink } from "lucide-react";
 import { PremiumGate } from "@/components/PremiumGate";
 import ProtocolProgressBar from "../components/ProtocolProgressBar";
+import { useNavigatorSections } from "@/hooks/useNavigatorSections";
 
-const views = [
-  {
-    view: "External Iliac Vein (EIV)",
-    probe: "Curvilinear 3–5 MHz — transverse & longitudinal, suprainguinal approach",
-    items: [
-      { id: "venous_eiv_0", label: "Compressibility (transverse compression above inguinal ligament)", detail: "Apply gentle transverse compression just above the inguinal ligament; the EIV should fully collapse. Non-compressibility indicates DVT.", critical: true },
-      { id: "venous_eiv_1", label: "Color Doppler flow (confirm antegrade flow)", detail: "Confirm antegrade flow toward the heart; assess for intraluminal filling defect or absent flow suggesting thrombus", critical: true },
-      { id: "venous_eiv_2", label: "Spectral Doppler waveform (phasicity)", detail: "Phasic waveform with respiratory variation is normal; absent phasicity suggests proximal obstruction at the iliac or IVC level", critical: true },
-      { id: "venous_eiv_3", label: "Augmentation with distal compression", detail: "Compress the thigh distal to the transducer — brisk augmentation confirms patency between compression site and sample volume", critical: false },
-      { id: "venous_eiv_4", label: "Vessel diameter and wall assessment", detail: "Measure AP diameter in transverse; note any wall thickening, echogenic thrombus, or extrinsic compression (e.g., May-Thurner syndrome on left)", critical: false },
-    ],
-  },
-  {
-    view: "Common Femoral Vein (CFV)",
-    probe: "Linear 7–12 MHz — transverse, at the inguinal ligament",
-    items: [
-      { id: "venous_cfv_0", label: "Compressibility (transverse compression)", detail: "The CFV should fully collapse with gentle transverse pressure at the inguinal ligament. Non-compressibility is the primary criterion for DVT.", critical: true },
-      { id: "venous_cfv_1", label: "Spectral Doppler waveform (phasicity and symmetry)", detail: "Compare bilateral CFV waveforms; phasic variation with respiration is normal. Continuous non-phasic flow suggests proximal obstruction.", critical: true },
-      { id: "venous_cfv_2", label: "Color Doppler flow", detail: "Confirm antegrade flow; assess for partial or complete filling defect", critical: true },
-      { id: "venous_cfv_3", label: "Augmentation with distal compression", detail: "Compress the thigh below the transducer — brisk augmentation confirms distal patency", critical: false },
-      { id: "venous_cfv_4", label: "Saphenofemoral junction (SFJ)", detail: "Assess the junction of the great saphenous vein (GSV) with the CFV; document any reflux or thrombus extension", critical: false },
-    ],
-  },
-  {
-    view: "Femoral Vein (FV)",
-    probe: "Linear 7–12 MHz — transverse, from CFV distally through the thigh",
-    items: [
-      { id: "venous_fv_0", label: "Compressibility every 2 cm (proximal, mid, distal)", detail: "Compress every 2 cm along the entire thigh segment; document any non-compressible segment", critical: true },
-      { id: "venous_fv_1", label: "Color Doppler flow", detail: "Confirm antegrade flow throughout; assess for intraluminal thrombus", critical: true },
-      { id: "venous_fv_2", label: "Spectral Doppler at mid-thigh", detail: "Obtain spectral waveform at mid-thigh level; phasic flow should be present", critical: false },
-      { id: "venous_fv_3", label: "Adductor canal (Hunter's canal) segment", detail: "The FV passes through the adductor canal in the distal thigh — a common site for isolated DVT; ensure this segment is compressed", critical: false },
-    ],
-  },
-  {
-    view: "Deep Femoral Vein (DFV / Profunda Femoris)",
-    probe: "Linear 7–12 MHz — transverse, at the confluence with the FV",
-    items: [
-      { id: "venous_dfv_0", label: "Compressibility at the origin (confluence with FV)", detail: "Compress the DFV at its junction with the FV; the proximal DFV is the minimum required segment", critical: true },
-      { id: "venous_dfv_1", label: "Color Doppler flow at origin", detail: "Confirm flow in the DFV at its origin; isolated DFV DVT is uncommon but clinically significant", critical: false },
-    ],
-  },
-  {
-    view: "Great Saphenous Vein (GSV)",
-    probe: "Linear 7–12 MHz — transverse, at the saphenofemoral junction and along the medial thigh",
-    items: [
-      { id: "venous_gsv_0", label: "Compressibility at the saphenofemoral junction (SFJ)", detail: "Compress the GSV at its junction with the CFV; thrombus at the SFJ may extend into the deep system", critical: true },
-      { id: "venous_gsv_1", label: "Diameter measurement", detail: "Measure GSV diameter in transverse at the SFJ and mid-thigh; >5.5 mm suggests varicosity", critical: false },
-      { id: "venous_gsv_2", label: "Reflux assessment (Valsalva or cuff deflation)", detail: "Apply Valsalva or release a cuff inflated distal to the transducer; reflux >0.5 s is pathologic", critical: false },
-    ],
-  },
-  {
-    view: "Popliteal Vein",
-    probe: "Linear 7–12 MHz — transverse, popliteal fossa (patient prone or lateral decubitus)",
-    items: [
-      { id: "venous_pop_0", label: "Compressibility (transverse compression)", detail: "The popliteal vein should fully collapse; non-compressibility indicates DVT. This is the most common site for symptomatic DVT.", critical: true },
-      { id: "venous_pop_1", label: "Spectral Doppler waveform", detail: "Phasic flow with respiratory variation; augmentation with calf compression confirms distal patency", critical: true },
-      { id: "venous_pop_2", label: "Color Doppler flow", detail: "Confirm antegrade flow; assess for filling defect", critical: true },
-      { id: "venous_pop_3", label: "Popliteal fossa assessment (Baker's cyst)", detail: "Assess for Baker's cyst (gastrocnemio-semimembranosus bursa) which can mimic DVT clinically", critical: false },
-    ],
-  },
-  {
-    view: "Posterior Tibial Veins (PTV)",
-    probe: "Linear 7–15 MHz — transverse, medial calf from popliteal fossa to ankle",
-    items: [
-      { id: "venous_ptv_0", label: "Compressibility (proximal, mid, distal calf)", detail: "Compress the paired PTVs at multiple levels along the medial calf; they run alongside the posterior tibial artery", critical: true },
-      { id: "venous_ptv_1", label: "Color Doppler flow", detail: "Confirm flow in both paired veins; isolated calf DVT carries lower PE risk but may propagate proximally", critical: false },
-    ],
-  },
-  {
-    view: "Peroneal Veins",
-    probe: "Linear 7–15 MHz — transverse, posterior/lateral calf",
-    items: [
-      { id: "venous_per_0", label: "Compressibility (proximal, mid, distal calf)", detail: "Compress the paired peroneal veins along the lateral calf; they run alongside the peroneal artery deep to the fibula", critical: true },
-      { id: "venous_per_1", label: "Color Doppler flow", detail: "Confirm flow in both paired veins", critical: false },
-    ],
-  },
-  {
-    view: "Gastrocnemius and Soleal Veins",
-    probe: "Linear 7–15 MHz — transverse, posterior calf",
-    items: [
-      { id: "venous_gast_0", label: "Compressibility of gastrocnemius veins (medial and lateral heads)", detail: "Compress the gastrocnemius veins in the posterior calf; they drain into the popliteal vein and are a common site for isolated muscular DVT", critical: true },
-      { id: "venous_gast_1", label: "Compressibility of soleal veins", detail: "Soleal veins are large, thin-walled sinusoids in the soleus muscle; they drain into the posterior tibial or peroneal veins and are a common site for DVT in immobilized patients", critical: true },
-      { id: "venous_gast_2", label: "Color Doppler flow", detail: "Confirm flow in muscular veins, especially if focal tenderness or swelling is present", critical: false },
-    ],
-  },
-];
 
 const normalValues = [
   {
@@ -121,6 +36,7 @@ const normalValues = [
 // References: Zierler RE et al. J Vasc Surg 2016;64:e1–e52 (SVU guidelines); Coleridge-Smith P et al. Eur J Vasc Endovasc Surg 2006;31:83–92 (venous reflux); Bates SM et al. J Thromb Haemost 2018;16:1246–1252 (DVT diagnosis).
 
 export default function VenousNavigator() {
+  const { sections: views, isLoading: _navLoading } = useNavigatorSections("venous");
   const [tab, setTab] = useState<"protocol" | "reference">("protocol");
   const [expandedView, setExpandedView] = useState<number | null>(0);
   const [checked, setChecked] = useState<Set<string>>(new Set());

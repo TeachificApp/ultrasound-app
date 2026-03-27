@@ -10,6 +10,7 @@ import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import { PremiumGate } from "@/components/PremiumGate";
 import ProtocolProgressBar from "../components/ProtocolProgressBar";
+import { useNavigatorSections } from "@/hooks/useNavigatorSections";
 import {
   CheckCircle2, Circle, ChevronDown, ChevronUp, Info,
   Zap, Heart, Droplets, Wind, AlertTriangle, ArrowRight, Shield,
@@ -188,6 +189,12 @@ const componentConfig = {
 };
 
 export default function POCUSRushNavigator() {
+  const { sections: _dbSections } = useNavigatorSections("pocus_rush");
+  const _dbItemMap = Object.fromEntries(_dbSections.map(s => [s.sectionName, s.items]));
+  const rushSectionsMerged = rushSections.map(s => {
+    const dbItems = _dbItemMap[s.title];
+    return dbItems && dbItems.length > 0 ? { ...s, items: dbItems } : s;
+  });
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ pump_plax: true });
   const [showDetail, setShowDetail] = useState<string | null>(null);
@@ -195,7 +202,7 @@ export default function POCUSRushNavigator() {
   const toggle = (id: string) => setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
   const toggleSection = (id: string) => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
 
-  const totalItems = rushSections.flatMap((s) => s.items).length;
+  const totalItems = rushSectionsMerged.flatMap((s) => s.items).length;
   const checkedCount = Object.values(checked).filter(Boolean).length;
   const resetAll = () => setChecked({});
   const progress = Math.round((checkedCount / totalItems) * 100);
@@ -251,7 +258,7 @@ export default function POCUSRushNavigator() {
           <div className="grid grid-cols-3 gap-3">
             {(["pump", "tank", "pipes"] as const).map((comp) => {
               const cfg = componentConfig[comp];
-              const compSections = rushSections.filter((s) => s.component === comp);
+              const compSections = rushSectionsMerged.filter((s) => s.component === comp);
               const compTotal = compSections.flatMap((s) => s.items).length;
               const compChecked = compSections.flatMap((s) => s.items).filter((i) => checked[i.id]).length;
               return (
@@ -267,7 +274,7 @@ export default function POCUSRushNavigator() {
           {/* Sections by component */}
           {(["pump", "tank", "pipes"] as const).map((comp) => {
             const cfg = componentConfig[comp];
-            const compSections = rushSections.filter((s) => s.component === comp);
+            const compSections = rushSectionsMerged.filter((s) => s.component === comp);
             return (
               <div key={comp}>
                 <div className="flex items-center gap-2 mb-3">

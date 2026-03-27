@@ -11,53 +11,8 @@ import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { CheckCircle2, Circle, ChevronDown, ChevronUp, Info, Scan } from "lucide-react";
 import ProtocolProgressBar from "../components/ProtocolProgressBar";
+import { useNavigatorSections } from "@/hooks/useNavigatorSections";
 
-const views = [
-  {
-    view: "Breast Lesion Characterization",
-    probe: "High-frequency linear ≥12 MHz; supine, ipsilateral arm elevated",
-    items: [
-      { id: "breast_0_0", label: "Document lesion size in 3 orthogonal planes (length × width × height in cm)", detail: "Measure at widest dimensions in two orthogonal planes.", critical: true },
-      { id: "breast_0_1", label: "Assess shape: oval, round, or irregular", detail: "Irregular shape is the highest-risk BI-RADS descriptor.", critical: true },
-      { id: "breast_0_2", label: "Assess orientation: parallel (wider than tall) vs. not parallel (taller than wide)", detail: "Not parallel orientation is associated with malignancy.", critical: true },
-      { id: "breast_0_3", label: "Assess margins: circumscribed, not circumscribed (indistinct, angular, microlobulated, spiculated)", detail: "Spiculated and angular margins are highest-risk descriptors.", critical: true },
-      { id: "breast_0_4", label: "Assess echo pattern: anechoic, hyperechoic, complex cystic/solid, hypoechoic, isoechoic, heterogeneous", detail: "Complex cystic/solid and hypoechoic patterns require further evaluation.", critical: false },
-      { id: "breast_0_5", label: "Assess posterior acoustic features: no posterior features, enhancement, shadowing, combined pattern", detail: "Posterior shadowing is associated with malignancy; enhancement with benign lesions.", critical: false },
-      { id: "breast_0_6", label: "Evaluate calcifications: macrocalcifications vs. microcalcifications within mass", detail: "Microcalcifications within a mass are suspicious.", critical: false },
-      { id: "breast_0_7", label: "Document associated features: architectural distortion, duct changes, skin changes, edema, vascularity", detail: "Skin thickening >2 mm and increased vascularity are suspicious features.", critical: false },
-      { id: "breast_0_8", label: "Assign BI-RADS category (0, 1, 2, 3, 4A/4B/4C, 5, 6)", detail: "BI-RADS 4A: low suspicion 2–10%; 4B: moderate 10–50%; 4C: high 50–95%; 5: >95%.", critical: true },
-      { id: "breast_0_9", label: "View lesion in 2 orthogonal projections with clock-face and distance from nipple notation", detail: "Document as clock position and cm from nipple (e.g., 2 o'clock, 5 cm from nipple).", critical: false },
-    ],
-  },
-  {
-    view: "Whole Breast Survey",
-    probe: "Systematic survey of all 4 quadrants plus retroareolar region",
-    items: [
-      { id: "breast_1_0", label: "Survey all quadrants: UOQ, UIQ, LOQ, LIQ, and retroareolar region", detail: "Systematic survey reduces missed lesions. Use radial and antiradial technique.", critical: false },
-      { id: "breast_1_1", label: "Document breast tissue composition: fatty, fibroglandular, heterogeneous fibroglandular", detail: "Tissue density affects lesion conspicuity and sensitivity.", critical: false },
-      { id: "breast_1_2", label: "Evaluate skin and subcutaneous tissue for thickening, edema, or masses", detail: "Skin thickening >2 mm is abnormal except in dependent portions.", critical: false },
-      { id: "breast_1_3", label: "Evaluate nipple-areolar complex for inversion, retraction, or mass", detail: "Nipple inversion may indicate subareolar malignancy.", critical: false },
-    ],
-  },
-  {
-    view: "Axillary Lymph Node Evaluation",
-    probe: "Arm slightly abducted and externally rotated; linear ≥12 MHz",
-    items: [
-      { id: "breast_2_0", label: "Evaluate axillary lymph nodes: size, shape, cortical thickness, hilum", detail: "Normal: cortical thickness ≤3 mm with preserved echogenic hilum.", critical: true },
-      { id: "breast_2_1", label: "Measure cortical thickness at thickest point (abnormal if >3 mm or focal bulge)", detail: "Focal cortical bulge or eccentric thickening is suspicious for metastasis.", critical: true },
-      { id: "breast_2_2", label: "Assess hilar compression or displacement", detail: "Loss of echogenic hilum is suspicious for nodal replacement.", critical: false },
-      { id: "breast_2_3", label: "Assign BI-RADS category for any suspicious nodes", detail: "Abnormal nodes should be correlated with primary breast lesion.", critical: false },
-    ],
-  },
-  {
-    view: "Doppler Evaluation (when indicated)",
-    probe: "Color and spectral Doppler; low PRF settings for slow flow",
-    items: [
-      { id: "breast_3_0", label: "Apply color Doppler to assess vascularity: avascular, internal vascularity, peripheral vascularity", detail: "Internal vascularity in a solid mass is more suspicious than peripheral.", critical: false },
-      { id: "breast_3_1", label: "Document increased vascularity pattern if present", detail: "Hypervascular masses with chaotic internal flow patterns are more suspicious.", critical: false },
-    ],
-  },
-];
 
 const normalValues = [
   {
@@ -116,6 +71,7 @@ const sweBreastData = {
 };
 
 export default function BreastNavigator() {
+  const { sections: views, isLoading: _navLoading } = useNavigatorSections("breast");
   const [tab, setTab] = useState<"protocol" | "reference" | "swe">("protocol");
   const [expandedView, setExpandedView] = useState<number | null>(0);
   const [checked, setChecked] = useState<Set<string>>(new Set());

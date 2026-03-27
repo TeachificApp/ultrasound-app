@@ -10,65 +10,8 @@ import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { CheckCircle2, Circle, ChevronDown, ChevronUp, Info, Scan, ExternalLink } from "lucide-react";
 import { PremiumGate } from "@/components/PremiumGate";
 import ProtocolProgressBar from "../components/ProtocolProgressBar";
+import { useNavigatorSections } from "@/hooks/useNavigatorSections";
 
-const views = [
-  {
-    view: "Shoulder",
-    probe: "Varies depending on the structure being examined.",
-    items: [
-    { id: "msknavigator_0_0", label: "Rotator cuff, biceps tendon, subacromial-subdeltoid bursa, joint effusion, acrom", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Elbow",
-    probe: "Varies depending on the structure being examined.",
-    items: [
-    { id: "msknavigator_1_0", label: "Joint effusion, synovial hypertrophy, intra-articular bodies, ulnar nerve, and s", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Wrist",
-    probe: "Varies depending on the structure being examined.",
-    items: [
-    { id: "msknavigator_2_0", label: "Tendons, median nerve, ulnar nerve, joint recesses, and ligaments", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Hand",
-    probe: "Varies depending on the structure being examined.",
-    items: [
-    { id: "msknavigator_3_0", label: "Tendons, pulleys, joints, and volar plates", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Hip",
-    probe: "Varies depending on the structure being examined.",
-    items: [
-    { id: "msknavigator_4_0", label: "Joint effusion, synovitis, labral tears, and surrounding tendons and muscles", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Knee",
-    probe: "Varies depending on the structure being examined.",
-    items: [
-    { id: "msknavigator_5_0", label: "Joint effusion, menisci, ligaments, tendons, and surrounding bursae", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Ankle",
-    probe: "Varies depending on the structure being examined.",
-    items: [
-    { id: "msknavigator_6_0", label: "Tendons, ligaments, joint recesses, and nerves", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Foot",
-    probe: "Varies depending on the structure being examined.",
-    items: [
-    { id: "msknavigator_7_0", label: "Joints, tendons, plantar fascia, and interdigital nerves", detail: "", critical: false }
-    ],
-  }
-];
 
 const normalValues = [
   {
@@ -110,6 +53,7 @@ const normalValues = [
 // References: Jacobson JA. Semin Musculoskelet Radiol 2007;11:186–197; Klauser AS et al. Radiology 2009;252:269–276 (carpal tunnel); Hung EH et al. Radiographics 2013;33:1679–1697 (Achilles); Martinoli C. Eur Radiol 2010;20:2073–2082.
 
 export default function MSKNavigator() {
+  const { sections: views, isLoading: _navLoading } = useNavigatorSections("msk");
   const [tab, setTab] = useState<"protocol" | "reference">("protocol");
   const [expandedView, setExpandedView] = useState<number | null>(0);
   const [checked, setChecked] = useState<Set<string>>(new Set());

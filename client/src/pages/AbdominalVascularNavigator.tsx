@@ -12,58 +12,9 @@ import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { CheckCircle2, Circle, ChevronDown, ChevronUp, Scan } from "lucide-react";
 import { PremiumGate } from "@/components/PremiumGate";
 import ProtocolProgressBar from "../components/ProtocolProgressBar";
+import { useNavigatorSections } from "@/hooks/useNavigatorSections";
 
 // ── LIVER DUPLEX ─────────────────────────────────────────────────────────────
-const liverViews = [
-  {
-    view: "Portal Vein — Main",
-    probe: "Curvilinear 2–5 MHz — transverse/oblique subcostal or intercostal",
-    items: [
-      { id: "liver_0_0", label: "B-mode: diameter of main portal vein (MPV)", detail: "Normal MPV diameter <13 mm; >13 mm suggests portal hypertension. Measure at the porta hepatis in transverse.", critical: true },
-      { id: "liver_0_1", label: "Color Doppler: hepatopetal (toward liver) flow direction", detail: "Normal flow is hepatopetal (toward liver). Hepatofugal (away from liver) flow is a sign of portal hypertension.", critical: true },
-      { id: "liver_0_2", label: "Spectral Doppler: portal vein waveform and velocity", detail: "Normal: continuous, mildly phasic waveform, 15–40 cm/s. Flat, non-phasic waveform or velocity <12 cm/s suggests portal hypertension.", critical: true },
-      { id: "liver_0_3", label: "Assess for portal vein thrombosis (PVT)", detail: "Look for echogenic material within the lumen; confirm with color Doppler absence of flow. Distinguish bland thrombus from tumor thrombus (vascular signal within thrombus on color Doppler).", critical: true },
-    ],
-  },
-  {
-    view: "Portal Vein — Right and Left Branches",
-    probe: "Curvilinear 2–5 MHz — intercostal or subcostal",
-    items: [
-      { id: "liver_1_0", label: "Color Doppler: flow in right and left portal branches", detail: "Confirm hepatopetal flow in both branches; absence or reversal indicates segmental thrombosis or cavernous transformation", critical: true },
-      { id: "liver_1_1", label: "Assess for cavernous transformation of portal vein", detail: "Multiple small collateral vessels replacing the main portal vein — seen in chronic PVT; confirm with color Doppler", critical: false },
-    ],
-  },
-  {
-    view: "Hepatic Veins (Right, Middle, Left)",
-    probe: "Curvilinear 2–5 MHz — subcostal or intercostal, angled superiorly toward IVC",
-    items: [
-      { id: "liver_2_0", label: "B-mode: hepatic vein diameter and patency", detail: "Assess all three hepatic veins (right, middle, left) for dilation, compression, or thrombosis", critical: true },
-      { id: "liver_2_1", label: "Spectral Doppler: triphasic hepatic vein waveform", detail: "Normal: triphasic waveform with two antegrade phases (S and D waves) and one retrograde phase (A wave). Loss of phasicity (monophasic) suggests hepatic congestion, cirrhosis, or Budd-Chiari syndrome.", critical: true },
-      { id: "liver_2_2", label: "Assess for Budd-Chiari syndrome (hepatic vein thrombosis)", detail: "Look for absent or reversed flow in hepatic veins; thrombus in hepatic vein or IVC; caudate lobe hypertrophy is a classic finding", critical: true },
-      { id: "liver_2_3", label: "IVC patency at hepatic vein confluence", detail: "Assess IVC for thrombus, compression, or tumor invasion at the hepatic vein–IVC junction", critical: false },
-    ],
-  },
-  {
-    view: "Hepatic Artery",
-    probe: "Curvilinear 2–5 MHz — transverse/oblique at porta hepatis",
-    items: [
-      { id: "liver_3_0", label: "Color Doppler: hepatic artery identification at porta hepatis", detail: "The proper hepatic artery runs alongside the portal vein and common bile duct in the hepatoduodenal ligament (portal triad)", critical: true },
-      { id: "liver_3_1", label: "Spectral Doppler: hepatic artery waveform and RI", detail: "Normal: low-resistance waveform, RI 0.55–0.70. Elevated RI (>0.80) suggests hepatic artery stenosis or rejection (post-transplant). Absent diastolic flow (RI = 1.0) indicates severe disease.", critical: true },
-      { id: "liver_3_2", label: "Peak systolic velocity (PSV) at hepatic artery origin", detail: "Normal PSV 60–100 cm/s; PSV >200 cm/s with post-stenotic turbulence suggests hepatic artery stenosis (especially post-transplant)", critical: false },
-      { id: "liver_3_3", label: "Assess for hepatic artery thrombosis (post-transplant)", detail: "Absent hepatic artery flow on color and spectral Doppler is a surgical emergency in liver transplant recipients", critical: true },
-    ],
-  },
-  {
-    view: "Liver Parenchyma and Morphology",
-    probe: "Curvilinear 2–5 MHz — subcostal and intercostal",
-    items: [
-      { id: "liver_4_0", label: "Liver size and morphology (right lobe length, caudate-to-right lobe ratio)", detail: "Normal right lobe length 13–17 cm; caudate-to-right lobe ratio >0.65 suggests cirrhosis", critical: false },
-      { id: "liver_4_1", label: "Parenchymal echotexture (coarse, heterogeneous, nodular surface)", detail: "Coarse, heterogeneous echotexture with nodular surface contour and posterior acoustic attenuation suggests cirrhosis", critical: false },
-      { id: "liver_4_2", label: "Splenomegaly (splenic length >13 cm)", detail: "Splenomegaly is a key indirect sign of portal hypertension; measure splenic length in the longest axis", critical: false },
-      { id: "liver_4_3", label: "Ascites", detail: "Free fluid in the perihepatic space, Morrison's pouch, or pelvis; a sign of portal hypertension or hepatic failure", critical: false },
-    ],
-  },
-];
 
 const liverNormalValues = [
   {
@@ -98,52 +49,6 @@ const liverExamTips = [
 ];
 
 // ── MESENTERIC DUPLEX ─────────────────────────────────────────────────────────
-const mesentericViews = [
-  {
-    view: "Superior Mesenteric Artery (SMA) — Fasting",
-    probe: "Curvilinear 2–5 MHz — transverse/longitudinal, midline epigastric",
-    items: [
-      { id: "mes_0_0", label: "B-mode: SMA origin from aorta and proximal segment", detail: "The SMA arises from the anterior aorta at approximately the L1 level, 1–2 cm below the celiac axis. Identify the SMA in longitudinal and transverse planes.", critical: true },
-      { id: "mes_0_1", label: "Color Doppler: SMA patency and flow direction", detail: "Confirm antegrade flow; identify areas of flow acceleration, turbulence, or absence suggesting stenosis or occlusion", critical: true },
-      { id: "mes_0_2", label: "Spectral Doppler: fasting SMA waveform and PSV", detail: "Fasting SMA: high-resistance triphasic waveform (similar to peripheral arteries). PSV >275 cm/s or EDV >45 cm/s at origin suggests ≥70% stenosis.", critical: true },
-      { id: "mes_0_3", label: "SMA PSV at origin and proximal 2 cm", detail: "Measure PSV at the SMA origin (within 1 cm of aorta) and at 1–2 cm distal; PSV ratio SMA/aorta >3.0 suggests significant stenosis", critical: true },
-    ],
-  },
-  {
-    view: "Superior Mesenteric Artery (SMA) — Post-prandial (if indicated)",
-    probe: "Curvilinear 2–5 MHz — same approach as fasting",
-    items: [
-      { id: "mes_1_0", label: "Post-prandial SMA waveform (45–60 min after meal)", detail: "Normal post-prandial SMA: low-resistance waveform with increased diastolic flow (EDV increases significantly). Failure to increase diastolic flow post-prandially suggests mesenteric ischemia.", critical: false },
-      { id: "mes_1_1", label: "Post-prandial SMA PSV and EDV comparison to fasting", detail: "Normal: PSV increases ≥20% and EDV increases ≥100% post-prandially. Blunted response suggests proximal stenosis.", critical: false },
-    ],
-  },
-  {
-    view: "Celiac Axis (CA)",
-    probe: "Curvilinear 2–5 MHz — transverse/longitudinal, midline epigastric, angled superiorly",
-    items: [
-      { id: "mes_2_0", label: "B-mode: celiac axis origin from aorta", detail: "The celiac axis arises from the anterior aorta at the T12–L1 level. Identify the 'seagull sign' (celiac trifurcation into left gastric, splenic, and common hepatic arteries) in transverse.", critical: true },
-      { id: "mes_2_1", label: "Color Doppler: celiac axis patency", detail: "Confirm antegrade flow in the celiac axis and its branches; assess for turbulence at the origin", critical: true },
-      { id: "mes_2_2", label: "Spectral Doppler: celiac axis PSV and waveform", detail: "Normal celiac axis: low-resistance waveform (continuous forward diastolic flow). PSV >200 cm/s at origin suggests ≥70% stenosis.", critical: true },
-      { id: "mes_2_3", label: "Median arcuate ligament compression (MALS) assessment", detail: "With expiration, the celiac axis may be compressed by the median arcuate ligament — PSV increases on expiration and decreases on inspiration. Classic 'hooked' appearance on longitudinal B-mode.", critical: false },
-    ],
-  },
-  {
-    view: "Inferior Mesenteric Artery (IMA) — if indicated",
-    probe: "Curvilinear 2–5 MHz — left paramedian, angled toward aorta",
-    items: [
-      { id: "mes_3_0", label: "B-mode: IMA origin from aorta (L3 level)", detail: "The IMA arises from the anterior-left aorta at approximately the L3 level. It is smaller than the SMA and may be difficult to visualize.", critical: false },
-      { id: "mes_3_1", label: "Spectral Doppler: IMA PSV at origin", detail: "PSV >200 cm/s at the IMA origin suggests significant stenosis; IMA stenosis is less commonly symptomatic due to collateral supply", critical: false },
-    ],
-  },
-  {
-    view: "Splenic Artery",
-    probe: "Curvilinear 2–5 MHz — transverse, following the tortuous course to the splenic hilum",
-    items: [
-      { id: "mes_4_0", label: "Color Doppler: splenic artery patency and course", detail: "The splenic artery is the most tortuous branch of the celiac axis; follow its course from the celiac origin to the splenic hilum", critical: false },
-      { id: "mes_4_1", label: "Assess for splenic artery aneurysm (SAA)", detail: "SAA is the most common visceral artery aneurysm; measure maximum diameter. Repair is indicated for diameter >2 cm or in women of childbearing age.", critical: true },
-    ],
-  },
-];
 
 const mesentericNormalValues = [
   {
@@ -181,55 +86,6 @@ const mesentericExamTips = [
 ];
 
 // ── RENAL ARTERY DUPLEX ───────────────────────────────────────────────────────
-const renalViews = [
-  {
-    view: "Kidneys — B-mode Survey",
-    probe: "Curvilinear 2–5 MHz — flank/posterior oblique approach",
-    items: [
-      { id: "renal_0_0", label: "Bilateral renal length (longest axis)", detail: "Normal adult renal length 9–12 cm. Asymmetry >1.5 cm between sides is significant. Small kidney (<8 cm) suggests chronic renal artery stenosis or intrinsic renal disease.", critical: true },
-      { id: "renal_0_1", label: "Cortical thickness and echogenicity", detail: "Normal cortical thickness ≥1.0 cm. Increased cortical echogenicity (brighter than liver) suggests chronic kidney disease. Cortical thinning indicates parenchymal loss.", critical: true },
-      { id: "renal_0_2", label: "Collecting system (hydronephrosis)", detail: "Assess for hydronephrosis which may indicate obstructive uropathy; grade mild/moderate/severe", critical: false },
-    ],
-  },
-  {
-    view: "Aorta at Renal Artery Level",
-    probe: "Curvilinear 2–5 MHz — midline longitudinal and transverse",
-    items: [
-      { id: "renal_1_0", label: "Aortic PSV at renal artery level (for RAR calculation)", detail: "Measure aortic PSV at the level of the renal artery origins. Required for renal-aortic ratio (RAR) calculation. Normal aortic PSV 60–100 cm/s.", critical: true },
-      { id: "renal_1_1", label: "Aortic diameter at renal artery level", detail: "Document aortic diameter in transverse; assess for juxtarenal or pararenal AAA that may involve the renal arteries", critical: false },
-    ],
-  },
-  {
-    view: "Main Renal Artery — Origin and Proximal Segment",
-    probe: "Curvilinear 2–5 MHz — anterior midline or flank approach; multiple windows often required",
-    items: [
-      { id: "renal_2_0", label: "Color Doppler: renal artery origin identification (bilateral)", detail: "The right renal artery (RRA) arises from the right lateral/anterolateral aorta and courses posterior to the IVC. The left renal artery (LRA) arises from the left lateral aorta. Use color Doppler to identify the origins.", critical: true },
-      { id: "renal_2_1", label: "Spectral Doppler: PSV at renal artery origin", detail: "Obtain PSV within 1 cm of the aortic origin. PSV >180–200 cm/s at origin suggests ≥60% stenosis. This is the most sensitive site for detecting renal artery stenosis.", critical: true },
-      { id: "renal_2_2", label: "Renal-Aortic Ratio (RAR) calculation", detail: "RAR = renal artery PSV ÷ aortic PSV. RAR ≥3.5 indicates ≥60% stenosis. RAR is particularly useful when absolute PSV is difficult to obtain.", critical: true },
-      { id: "renal_2_3", label: "Spectral Doppler: PSV at proximal and mid renal artery", detail: "Sample PSV at the proximal (1–2 cm from origin) and mid-renal artery segments; document the highest PSV obtained along the entire course", critical: true },
-      { id: "renal_2_4", label: "Search for accessory renal arteries", detail: "Up to 30% of individuals have accessory renal arteries (most commonly to the lower pole). Scan the entire aorta from the celiac axis to the iliac bifurcation with color Doppler to identify accessory vessels.", critical: true },
-    ],
-  },
-  {
-    view: "Intrarenal Arteries — Spectral Doppler",
-    probe: "Curvilinear 2–5 MHz — flank approach, color Doppler to identify segmental arteries",
-    items: [
-      { id: "renal_3_0", label: "Spectral Doppler: segmental or interlobar artery waveforms (upper, mid, lower poles)", detail: "Obtain spectral waveforms from segmental or interlobar arteries in the upper, middle, and lower poles of each kidney. Use color Doppler to identify the vessels.", critical: true },
-      { id: "renal_3_1", label: "Resistive Index (RI) calculation — bilateral", detail: "RI = (PSV − EDV) ÷ PSV. Normal RI 0.60–0.70. RI >0.80 suggests intrinsic renal parenchymal disease. RI <0.40 suggests AV fistula or renal artery stenosis with post-stenotic dilation.", critical: true },
-      { id: "renal_3_2", label: "Acceleration time (AT) and acceleration index (AI)", detail: "AT = time from onset of systole to first systolic peak. Normal AT <70 ms. AT >80 ms with a 'parvus et tardus' waveform (slow rise, rounded peak) indicates proximal renal artery stenosis.", critical: true },
-      { id: "renal_3_3", label: "Parvus et tardus waveform assessment", detail: "A slow-rising, rounded systolic peak (parvus = small, tardus = delayed) in the intrarenal arteries is a reliable indirect sign of significant proximal renal artery stenosis when the main renal artery cannot be directly visualized.", critical: true },
-    ],
-  },
-  {
-    view: "Renal Veins",
-    probe: "Curvilinear 2–5 MHz — anterior midline or flank",
-    items: [
-      { id: "renal_4_0", label: "Color Doppler: main renal vein patency (bilateral)", detail: "The right renal vein is short and drains directly into the IVC. The left renal vein is longer and crosses anterior to the aorta. Assess for thrombosis (renal cell carcinoma, nephrotic syndrome).", critical: true },
-      { id: "renal_4_1", label: "Spectral Doppler: renal vein waveform", detail: "Normal: continuous, mildly phasic flow. Absent or reversed flow suggests renal vein thrombosis or severe renal vein compression.", critical: false },
-      { id: "renal_4_2", label: "Nutcracker syndrome assessment (left renal vein)", detail: "The left renal vein passes between the aorta and SMA. Compression (nutcracker syndrome) causes left flank pain and hematuria. Assess LRV diameter in the aorto-mesenteric angle vs. at the IVC confluence; ratio >5:1 is significant.", critical: false },
-    ],
-  },
-];
 
 const renalNormalValues = [
   {
@@ -272,7 +128,12 @@ export default function AbdominalVascularNavigator() {
   });
   const [expandedRef, setExpandedRef] = useState<number | null>(0);
 
-  const views = examTab === "liver" ? liverViews : examTab === "mesenteric" ? mesentericViews : renalViews;
+  const { sections: allAbVascSections } = useNavigatorSections("abdominal_vascular");
+  const views = allAbVascSections.filter(s => s.sectionName.startsWith(examTab + ":")).map(s => ({
+    ...s,
+    view: s.sectionName.replace(examTab + ":", ""),
+    sectionName: s.sectionName.replace(examTab + ":", ""),
+  }));
   const normalValues = examTab === "liver" ? liverNormalValues : examTab === "mesenteric" ? mesentericNormalValues : renalNormalValues;
   const examTips = examTab === "liver" ? liverExamTips : examTab === "mesenteric" ? mesentericExamTips : renalExamTips;
   const currentChecked = checked[examTab];

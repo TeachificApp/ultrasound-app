@@ -11,65 +11,8 @@ import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { CheckCircle2, Circle, ChevronDown, ChevronUp, Info, Scan, ExternalLink } from "lucide-react";
 import { PremiumGate } from "@/components/PremiumGate";
 import ProtocolProgressBar from "../components/ProtocolProgressBar";
+import { useNavigatorSections } from "@/hooks/useNavigatorSections";
 
-const views = [
-  {
-    view: "Transtemporal Window",
-    probe: "Phased array 2 MHz (adults) or 2.5 MHz (children); temporal bone above zygomatic arch, anterior to ear",
-    items: [
-      { id: "tcd_tt_0", label: "Identify temporal window (thin bone above zygomatic arch, anterior to ear)", detail: "The transtemporal window is the thinnest part of the temporal bone. Up to 10–15% of adults (especially elderly women) have inadequate windows. Try anterior, middle, and posterior window positions.", critical: true },
-      { id: "tcd_tt_1", label: "MCA: sample at 45–65 mm depth; flow toward transducer (positive deflection)", detail: "MCA mean velocity: normal 55–80 cm/s (adults). Depth 45–65 mm. Angle the probe anteriorly and superiorly. The MCA is the most commonly assessed vessel in TCD.", critical: true },
-      { id: "tcd_tt_2", label: "ACA: sample at 60–80 mm depth; flow away from transducer (negative deflection)", detail: "ACA mean velocity: normal 40–70 cm/s. Depth 60–80 mm. Angle the probe anteriorly. The ACA flows away from the transducer (negative Doppler signal).", critical: true },
-      { id: "tcd_tt_3", label: "PCA P1 segment: sample at 60–70 mm depth; flow toward transducer", detail: "PCA P1 mean velocity: normal 30–60 cm/s. Depth 60–70 mm. Angle the probe posteriorly. P1 flows toward the transducer; P2 flows away.", critical: false },
-      { id: "tcd_tt_4", label: "PCA P2 segment: sample at 60–70 mm depth; flow away from transducer", detail: "PCA P2 is distal to the posterior communicating artery. Flows away from the transducer. Assess for stenosis or vasospasm.", critical: false },
-      { id: "tcd_tt_5", label: "ICA bifurcation (terminal ICA): sample at 60–70 mm depth; bidirectional flow", detail: "The terminal ICA bifurcation shows bidirectional flow (MCA toward, ACA away). Used for the Lindegaard ratio (MCA/ICA mean velocity). Lindegaard ratio >3 suggests vasospasm; >6 = severe vasospasm.", critical: true },
-      { id: "tcd_tt_6", label: "Record PSV, EDV, mean velocity, and pulsatility index (PI) for each vessel", detail: "PI = (PSV - EDV) / mean velocity. Normal PI: 0.6–1.1. PI >1.4 suggests elevated ICP or distal resistance. PI <0.6 suggests hyperemia or AV malformation.", critical: true },
-      { id: "tcd_tt_7", label: "Compare bilateral MCA velocities (asymmetry >30% is significant)", detail: "Significant asymmetry (>30% difference in mean velocity between sides) may indicate ipsilateral stenosis, occlusion, or contralateral hyperemia. Always compare bilateral values.", critical: true },
-    ],
-  },
-  {
-    view: "Transorbital Window",
-    probe: "Phased array 2 MHz; through closed eyelid with reduced power (MI <0.23, TI <1.0)",
-    items: [
-      { id: "tcd_to_0", label: "REDUCE output power before scanning (MI <0.23, TI <1.0 per AIUM guidelines)", detail: "The transorbital window requires reduced acoustic output to protect the lens and retina. Set MI <0.23 and TI <1.0. Minimize scan time over the eye. This is a safety-critical step.", critical: true },
-      { id: "tcd_to_1", label: "Ophthalmic artery (OA): sample at 40–60 mm depth; flow toward transducer", detail: "OA mean velocity: normal 20–40 cm/s. Depth 40–60 mm. The OA flows toward the transducer (positive signal). Reversal of OA flow indicates severe ipsilateral ICA stenosis/occlusion with collateral flow via the OA.", critical: true },
-      { id: "tcd_to_2", label: "ICA siphon (carotid siphon): sample at 60–80 mm depth; bidirectional or away", detail: "ICA siphon mean velocity: normal 40–70 cm/s. Depth 60–80 mm. The carotid siphon is the S-shaped portion of the ICA in the cavernous sinus. Flow direction depends on the segment sampled.", critical: false },
-      { id: "tcd_to_3", label: "Document flow direction and velocity for collateral assessment", detail: "Reversed OA flow (away from transducer) is a sign of severe ipsilateral ICA stenosis with extracranial-to-intracranial collateral flow via the OA. This is an important collateral pathway.", critical: true },
-    ],
-  },
-  {
-    view: "Transforaminal (Suboccipital) Window",
-    probe: "Phased array 2 MHz; patient prone or chin-to-chest; probe at foramen magnum",
-    items: [
-      { id: "tcd_tf_0", label: "Position: prone or seated with chin to chest; probe at foramen magnum midline", detail: "The foramen magnum window provides access to the vertebral arteries and basilar artery. Flex the neck to open the foramen magnum. The probe is placed at the base of the skull, angled superiorly.", critical: false },
-      { id: "tcd_tf_1", label: "Vertebral arteries (VA): sample at 40–80 mm depth; flow away from transducer", detail: "VA mean velocity: normal 35–55 cm/s. Depth 40–80 mm. Both VAs flow away from the transducer (negative signal). Compare bilateral VA velocities. Asymmetry >30% or absent flow suggests VA stenosis or occlusion.", critical: true },
-      { id: "tcd_tf_2", label: "Basilar artery (BA): sample at 80–120 mm depth; flow away from transducer", detail: "BA mean velocity: normal 30–60 cm/s. Depth 80–120 mm. The BA is formed by the confluence of the two VAs. Flows away from the transducer. Assess for vasospasm (post-SAH), stenosis, or occlusion.", critical: true },
-      { id: "tcd_tf_3", label: "Assess for subclavian steal: compare VA flow direction bilaterally", detail: "In subclavian steal syndrome, retrograde flow in the ipsilateral VA is seen. The VA flow reverses (toward the transducer) to supply the arm via the vertebrobasilar system. Compare bilateral VA flow direction.", critical: false },
-      { id: "tcd_tf_4", label: "Record PSV, EDV, mean velocity, and PI for each vessel", detail: "BA PI >1.4 suggests elevated posterior fossa ICP or distal resistance. Low BA velocities with high PI may indicate basilar artery stenosis or occlusion.", critical: true },
-    ],
-  },
-  {
-    view: "Submandibular Window",
-    probe: "Phased array 2 MHz; probe under the jaw angled superiorly",
-    items: [
-      { id: "tcd_sm_0", label: "Position: probe under the mandible, angled superiorly toward the skull base", detail: "The submandibular window provides access to the distal extracranial and proximal intracranial ICA. Useful when the transtemporal window is inadequate.", critical: false },
-      { id: "tcd_sm_1", label: "Distal ICA: sample at 40–80 mm depth; flow away from transducer", detail: "Distal ICA mean velocity: normal 40–70 cm/s. Depth 40–80 mm. Used for the Lindegaard ratio (MCA/ICA). The ICA flows away from the transducer at this window.", critical: true },
-      { id: "tcd_sm_2", label: "Calculate Lindegaard ratio (MCA mean velocity / ICA mean velocity)", detail: "Lindegaard ratio: <3.0 = normal or hyperemia; 3.0–6.0 = mild-moderate vasospasm; >6.0 = severe vasospasm. Essential for differentiating vasospasm from hyperemia in post-SAH monitoring.", critical: true },
-    ],
-  },
-  {
-    view: "Anterior Fontanelle (Neonates/Infants)",
-    probe: "High-frequency linear or sector probe through the open anterior fontanelle; coronal and sagittal planes",
-    items: [
-      { id: "tcd_af_0", label: "Coronal plane: assess bilateral MCA, ACA, and ICA bifurcation", detail: "The anterior fontanelle provides excellent acoustic access in neonates and infants. Coronal plane: angle anteriorly for ACA, posteriorly for MCA. Normal neonatal MCA mean velocity: 24–42 cm/s.", critical: true },
-      { id: "tcd_af_1", label: "Sagittal plane: assess ACA (pericallosal artery), ICA, and basilar artery", detail: "Sagittal plane: the ACA (pericallosal artery) is seen arching over the corpus callosum. The basilar artery is seen in the posterior fossa. Assess for IVH, hydrocephalus, and periventricular leukomalacia.", critical: true },
-      { id: "tcd_af_2", label: "Measure RI for each vessel (normal neonatal RI: 0.60–0.80)", detail: "Neonatal RI >0.90 suggests elevated ICP (IVH, hydrocephalus, hypoxic-ischemic encephalopathy). RI <0.55 suggests hyperperfusion (patent ductus arteriosus, AV malformation). RI is more reliable than mean velocity in neonates.", critical: true },
-      { id: "tcd_af_3", label: "Assess superior sagittal sinus via sagittal suture (if open)", detail: "The superior sagittal sinus is assessed via the sagittal suture. Normal flow is away from the transducer (toward the occipital region). Absent or reversed flow suggests sinus thrombosis.", critical: false },
-      { id: "tcd_af_4", label: "Assess posterior fossa via posterolateral fontanelle (if open)", detail: "The posterolateral (mastoid) fontanelle provides access to the posterior fossa in neonates. Assess the vertebral arteries and basilar artery. Useful for diagnosing posterior fossa hemorrhage and cerebellar pathology.", critical: false },
-      { id: "tcd_af_5", label: "Compare bilateral velocities and RI values", detail: "Significant asymmetry in RI (>0.10 difference) or mean velocity (>30%) between sides may indicate unilateral IVH, periventricular leukomalacia, or arterial occlusion. Always compare bilateral values.", critical: true },
-    ],
-  },
-];
 
 const normalValues = [
   {
@@ -106,6 +49,7 @@ const normalValues = [
 // References: Aaslid R et al. J Neurosurg 1982;57:769–774 (original TCD); Sloan MA et al. J Neuroimaging 2004;14(Suppl 2):2S–57S; Alexandrov AV et al. J Neuroimaging 2012;22(Suppl 1):1S–26S.
 
 export default function TCDNavigator() {
+  const { sections: views, isLoading: _navLoading } = useNavigatorSections("tcd");
   const [tab, setTab] = useState<"protocol" | "reference">("protocol");
   const [expandedView, setExpandedView] = useState<number | null>(0);
   const [checked, setChecked] = useState<Set<string>>(new Set());

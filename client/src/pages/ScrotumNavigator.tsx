@@ -11,45 +11,8 @@ import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { CheckCircle2, Circle, ChevronDown, ChevronUp, Info, Scan, ExternalLink } from "lucide-react";
 import { PremiumGate } from "@/components/PremiumGate";
 import ProtocolProgressBar from "../components/ProtocolProgressBar";
+import { useNavigatorSections } from "@/hooks/useNavigatorSections";
 
-const views = [
-  {
-    view: "Global View",
-    probe: "Transverse, coronal, or coronal oblique",
-    items: [
-    { id: "scrotumnavigator_0_0", label: "Presence of two testes", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Testis",
-    probe: "Longitudinal and Transverse",
-    items: [
-    { id: "scrotumnavigator_1_0", label: "Size, echogenicity, and blood flow of each testis", detail: "", critical: false },
-    { id: "scrotumnavigator_1_1", label: "Evaluate in superior, mid, and inferior portions (transverse) and centrally, med", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Epididymis",
-    probe: "Longitudinal and Transverse",
-    items: [
-    { id: "scrotumnavigator_2_0", label: "Head, body, and tail of the epididymis for size, echogenicity, and blood flow", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Spermatic Cord",
-    probe: "Transverse and Longitudinal",
-    items: [
-    { id: "scrotumnavigator_3_0", label: "Evaluate for signs of torsion", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Scrotal Wall",
-    probe: "Transverse and Longitudinal",
-    items: [
-    { id: "scrotumnavigator_4_0", label: "Evaluate the scrotal wall and overlying skin", detail: "", critical: false }
-    ],
-  }
-];
 
 const normalValues = [
   {
@@ -86,6 +49,7 @@ const normalValues = [
 // References: Dogra VS et al. Radiology 2003;227:18–36; Paltiel HJ et al. Radiology 2006;238:250–258; Meacham RB et al. J Urol 2007;177:2060–2066.
 
 export default function ScrotumNavigator() {
+  const { sections: views, isLoading: _navLoading } = useNavigatorSections("scrotum");
   const [tab, setTab] = useState<"protocol" | "reference">("protocol");
   const [expandedView, setExpandedView] = useState<number | null>(0);
   const [checked, setChecked] = useState<Set<string>>(new Set());

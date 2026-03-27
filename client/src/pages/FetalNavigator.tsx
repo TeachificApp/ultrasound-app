@@ -9,6 +9,7 @@ import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { Baby, AlertCircle, CheckCircle2, HelpCircle, Scan, ClipboardList, ChevronDown, ChevronUp, Calculator, Crown } from "lucide-react";
 import { PremiumGate } from "@/components/PremiumGate";
 import ProtocolProgressBar from "../components/ProtocolProgressBar";
+import { useNavigatorSections } from "@/hooks/useNavigatorSections";
 
 const findings3VV = [
   {
@@ -216,24 +217,6 @@ const fetalViews = [
   },
 ];
 
-const fetalProtocol = [
-  { id: "fp_situs", label: "Situs determination (stomach, liver, IVC, Ao)", critical: true },
-  { id: "fp_axis", label: "Cardiac axis (normal 45° ± 20°)", critical: true },
-  { id: "fp_position", label: "Cardiac position (levocardia, mesocardia, dextrocardia)", critical: true },
-  { id: "fp_4cv", label: "4-Chamber view: chamber size, AV valves, IVS, IAS", critical: true },
-  { id: "fp_lvot", label: "LVOT / 5-Chamber view: aortic continuity, VSD", critical: true },
-  { id: "fp_rvot", label: "RVOT / 3-Vessel view: PA, Ao, SVC, ductus", critical: true },
-  { id: "fp_3vtv", label: "3-Vessel Trachea view: vessel alignment, arch sidedness", critical: true },
-  { id: "fp_aarch", label: "Aortic arch: sidedness, isthmus size, retrograde flow?", critical: true },
-  { id: "fp_darch", label: "Ductal arch: patency, flow direction", critical: false },
-  { id: "fp_pvein", label: "Pulmonary veins: all 4 draining to LA (color Doppler)", critical: true },
-  { id: "fp_ivc", label: "IVC / SVC: confirm connections to RA", critical: false },
-  { id: "fp_rhythm", label: "Cardiac rhythm: regular rate 120–160 bpm", critical: true },
-  { id: "fp_peri", label: "Pericardial effusion", critical: false },
-  { id: "fp_biom", label: "Biometry: GA, EFW, cardiothoracic ratio", critical: false },
-  { id: "fp_mr", label: "AV valve regurgitation (color Doppler)", critical: false },
-  { id: "fp_ductven", label: "Ductus venosus waveform (if indicated)", critical: false },
-];
 
 function FetalScanCoach() {
   const [activeView, setActiveView] = useState(0);
@@ -314,6 +297,8 @@ function FetalScanCoach() {
 }
 
 function FetalProtocolChecklist() {
+  const { sections: _fetalSections } = useNavigatorSections("fetal");
+  const fetalProtocol = _fetalSections.find(s => s.sectionName === "Fetal Echo Protocol Checklist")?.items ?? [];
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const total = fetalProtocol.length;
   const criticalItems = fetalProtocol.filter(i => i.critical).length;

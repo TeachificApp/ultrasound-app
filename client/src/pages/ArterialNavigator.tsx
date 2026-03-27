@@ -11,60 +11,8 @@ import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { CheckCircle2, Circle, ChevronDown, ChevronUp, Info, Scan, ExternalLink } from "lucide-react";
 import { PremiumGate } from "@/components/PremiumGate";
 import ProtocolProgressBar from "../components/ProtocolProgressBar";
+import { useNavigatorSections } from "@/hooks/useNavigatorSections";
 
-const views = [
-  {
-    view: "Duplex Ultrasound",
-    probe: "Linear 7–12 MHz — Common femoral, superficial femoral, popliteal, posterior tibial, dorsalis pedis (lower extremity); brachial, radial, ulnar (upper extremity)",
-    items: [
-      { id: "arterial_dup_0", label: "B-mode imaging — vessel wall, lumen, and plaque assessment", detail: "Evaluate vessel wall for intimal thickening, calcification, or plaque; document plaque morphology (echogenic, echolucent, heterogeneous, calcified)", critical: true },
-      { id: "arterial_dup_1", label: "Color Doppler flow mapping at each level", detail: "Confirm antegrade flow; identify areas of flow acceleration, turbulence, or absence indicating stenosis or occlusion", critical: true },
-      { id: "arterial_dup_2", label: "Spectral Doppler waveform at each arterial level", detail: "Normal triphasic waveform (systolic peak, early diastolic reversal, late diastolic forward flow); biphasic or monophasic waveforms indicate proximal disease", critical: true },
-      { id: "arterial_dup_3", label: "Peak systolic velocity (PSV) at each level", detail: "Measure PSV at each segment; PSV ratio >2.0 across a stenosis indicates ≥50% stenosis; >4.0 indicates ≥75% stenosis", critical: true },
-      { id: "arterial_dup_4", label: "Doppler angle consistency (≤60°)", detail: "Maintain a consistent insonation angle ≤60° to the vessel wall for accurate velocity measurements; document angle used", critical: true },
-      { id: "arterial_dup_5", label: "Audible waveform optimization", detail: "Optimize gain, wall filter, and PRF settings for each vessel; use the audible Doppler signal to confirm waveform quality", critical: false },
-      { id: "arterial_dup_6", label: "End-diastolic velocity (EDV) at stenotic segments", detail: "Elevated EDV (>0 cm/s in normally reversed diastole) at a stenosis indicates hemodynamically significant disease", critical: false },
-    ],
-  },
-  {
-    view: "Segmental Limb Pressures",
-    probe: "Pneumatic cuffs at upper thigh, lower thigh, calf, ankle, metatarsals (lower extremity); upper arm, upper forearm, above wrist (upper extremity) — CW Doppler probe for signal detection",
-    items: [
-      { id: "arterial_slp_0", label: "Ankle-Brachial Index (ABI) — bilateral", detail: "ABI = highest ankle pressure (PT or DP) ÷ highest brachial pressure. Normal: 1.00–1.40; borderline: 0.91–0.99; mild PAD: 0.71–0.90; moderate: 0.41–0.70; severe: ≤0.40; >1.40 = non-compressible (calcified vessels)", critical: true },
-      { id: "arterial_slp_1", label: "Segmental pressure measurements (upper thigh, lower thigh, calf, ankle)", detail: "A pressure gradient >20 mmHg between adjacent segments indicates hemodynamically significant disease at that level", critical: true },
-      { id: "arterial_slp_2", label: "Toe-Brachial Index (TBI) when ABI >1.40", detail: "TBI = toe pressure ÷ brachial pressure; normal ≥0.70; <0.70 indicates PAD in patients with non-compressible ankle vessels (diabetes, CKD)", critical: true },
-      { id: "arterial_slp_3", label: "Digital (toe) pressures", detail: "Absolute toe pressure <30 mmHg indicates critical limb ischemia (CLI); used for wound healing prediction", critical: false },
-      { id: "arterial_slp_4", label: "Return of Doppler signal after cuff deflation", detail: "Document the level at which the Doppler signal returns after cuff inflation above systolic pressure; confirms pressure measurement accuracy", critical: false },
-    ],
-  },
-  {
-    view: "Pulse Volume Recordings (PVRs)",
-    probe: "Pneumatic cuffs at upper thigh, lower thigh, calf, ankle, metatarsals (lower extremity); upper arm, upper forearm, above wrist (upper extremity)",
-    items: [
-      { id: "arterial_pvr_0", label: "PVR waveform morphology at each level", detail: "Normal: sharp upstroke, narrow systolic peak, dicrotic notch, downsloping diastole. Abnormal: rounded peak, absent dicrotic notch, flat waveform", critical: true },
-      { id: "arterial_pvr_1", label: "Global tissue perfusion assessment", detail: "PVRs reflect global volume changes in the limb segment; useful in patients with calcified vessels where pressure measurements are unreliable", critical: true },
-      { id: "arterial_pvr_2", label: "Waveform amplitude comparison (bilateral)", detail: "Compare amplitude between sides; significant asymmetry suggests unilateral proximal disease", critical: false },
-    ],
-  },
-  {
-    view: "Transcutaneous Oxygen Tension (tcPO2)",
-    probe: "Clark-type electrodes at foot, ankle, calf (lower extremities), with a reference point on the chest",
-    items: [
-      { id: "arterial_tcpo2_0", label: "Resting tcPO2 at foot/ankle", detail: "Normal: >50 mmHg; borderline: 30–50 mmHg; critical limb ischemia: <30 mmHg; <20 mmHg indicates very poor wound healing potential", critical: true },
-      { id: "arterial_tcpo2_1", label: "Delivery of oxygen to skin in area of questionable viability", detail: "Used to predict wound healing potential and guide amputation level selection; values >40 mmHg predict healing with >90% accuracy", critical: true },
-      { id: "arterial_tcpo2_2", label: "Regional Perfusion Index (RPI = tcPO2 site / tcPO2 chest reference)", detail: "RPI <0.6 indicates regional ischemia; accounts for systemic oxygenation variation", critical: false },
-    ],
-  },
-  {
-    view: "Photoplethysmography (PPG)",
-    probe: "Infrared sensor applied to digits (toes or fingers)",
-    items: [
-      { id: "arterial_ppg_0", label: "Digital waveform morphology", detail: "Normal: smooth upstroke, rounded peak, dicrotic notch on downstroke. Abnormal: peaked, flat, or absent waveform indicates digital artery disease", critical: true },
-      { id: "arterial_ppg_1", label: "Blood volume changes in microvascular bed", detail: "PPG detects pulsatile blood volume changes in the digital microcirculation; useful for Raynaud's assessment and digital artery occlusion", critical: true },
-      { id: "arterial_ppg_2", label: "Perfusion of measured tissue bed", detail: "Compare bilateral digit waveforms; asymmetry or absence indicates digital artery occlusion or vasospasm", critical: false },
-    ],
-  },
-];
 
 const normalValues = [
   {
@@ -104,6 +52,7 @@ const normalValues = [
 // References: Norgren L et al. J Vasc Surg 2007;45(Suppl S):S5–S67 (TASC II, ABI); Grant EG et al. Radiology 2003;229:340–346 (carotid criteria); Olin JW et al. J Am Coll Cardiol 2010;55:2499–2507 (renal artery).
 
 export default function ArterialNavigator() {
+  const { sections: views, isLoading: _navLoading } = useNavigatorSections("arterial");
   const [tab, setTab] = useState<"protocol" | "reference">("protocol");
   const [expandedView, setExpandedView] = useState<number | null>(0);
   const [checked, setChecked] = useState<Set<string>>(new Set());

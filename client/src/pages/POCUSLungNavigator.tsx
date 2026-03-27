@@ -9,6 +9,7 @@ import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import { PremiumGate } from "@/components/PremiumGate";
 import ProtocolProgressBar from "../components/ProtocolProgressBar";
+import { useNavigatorSections } from "@/hooks/useNavigatorSections";
 import {
   CheckCircle2, Circle, ChevronDown, ChevronUp, Info,
   Wind, AlertTriangle, ArrowRight, Shield,
@@ -155,6 +156,12 @@ const blueProtocol = [
 ];
 
 export default function POCUSLungNavigator() {
+  const { sections: _dbSections } = useNavigatorSections("pocus_lung");
+  const _dbItemMap = Object.fromEntries(_dbSections.map(s => [s.sectionName, s.items]));
+  const lungZonesMerged = lungZones.map(s => {
+    const dbItems = _dbItemMap[s.zone];
+    return dbItems && dbItems.length > 0 ? { ...s, items: dbItems } : s;
+  });
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ rua: true });
   const [showDetail, setShowDetail] = useState<string | null>(null);
@@ -162,17 +169,17 @@ export default function POCUSLungNavigator() {
   const toggle = (id: string) => setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
   const toggleSection = (id: string) => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
 
-  const totalItems = lungZones.flatMap((z) => z.items).length;
+  const totalItems = lungZonesMerged.flatMap((z) => z.items).length;
   const checkedCount = Object.values(checked).filter(Boolean).length;
   const resetAll = () => setChecked({});
   const progress = Math.round((checkedCount / totalItems) * 100);
 
-  const criticalUnchecked = lungZones
+  const criticalUnchecked = lungZonesMerged
     .flatMap((z) => z.items)
     .filter((item) => item.critical && !checked[item.id]);
 
-  const rightZones = lungZones.filter((z) => z.side === "right");
-  const leftZones = lungZones.filter((z) => z.side === "left");
+  const rightZones = lungZonesMerged.filter((z) => z.side === "right");
+  const leftZones = lungZonesMerged.filter((z) => z.side === "left");
 
   return (
     <Layout>

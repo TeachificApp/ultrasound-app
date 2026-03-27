@@ -11,87 +11,8 @@ import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { CheckCircle2, Circle, ChevronDown, ChevronUp, Info, Scan, ExternalLink } from "lucide-react";
 import { PremiumGate } from "@/components/PremiumGate";
 import ProtocolProgressBar from "../components/ProtocolProgressBar";
+import { useNavigatorSections } from "@/hooks/useNavigatorSections";
 
-const views = [
-  {
-    view: "Head and neck",
-    probe: "Not specified",
-    items: [
-    { id: "ob23navigator_0_0", label: "Lateral cerebral ventricles, Choroid plexus, Midline falx, Cavum septi pellucidi", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Face",
-    probe: "Not specified",
-    items: [
-    { id: "ob23navigator_1_0", label: "Upper lip, Profile, Nasal bone (15–22 wk), Coronal face (nose/lips/lens), Palate", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Chest",
-    probe: "Not specified",
-    items: [
-    { id: "ob23navigator_2_0", label: "Heart: Cardiac activity, 4-chamber view, Left ventricular outflow tract, Right v", detail: "", critical: false },
-    { id: "ob23navigator_2_1", label: "Thorax: Lungs, Integrity of diaphragm, Ribs", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Abdomen",
-    probe: "Not specified",
-    items: [
-    { id: "ob23navigator_3_0", label: "Stomach (presence, size, and situs), Kidneys, Urinary bladder, Cord insertion si", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Spine",
-    probe: "Not specified",
-    items: [
-    { id: "ob23navigator_4_0", label: "Cervical, Thoracic, Lumbar, Sacral spine, Integrity of spine and overlying soft ", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Extremities",
-    probe: "Not specified",
-    items: [
-    { id: "ob23navigator_5_0", label: "Legs, Arms, Hands, Feet, Number, architecture, and position of extremities, Digi", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Genitalia",
-    probe: "Not specified",
-    items: [
-    { id: "ob23navigator_6_0", label: "External genitalia", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Placenta",
-    probe: "Not specified",
-    items: [
-    { id: "ob23navigator_7_0", label: "Location, Relationship to internal os, Appearance, Placental cord insertion, Mas", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Amniotic Fluid",
-    probe: "Not specified",
-    items: [
-    { id: "ob23navigator_8_0", label: "Qualitative or semiquantitative estimate of amniotic fluid", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Biometry",
-    probe: "Not specified",
-    items: [
-    { id: "ob23navigator_9_0", label: "Fetal weight estimate", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Maternal Anatomy",
-    probe: "Not specified",
-    items: [
-    { id: "ob23navigator_10_0", label: "Cervix (transvaginal when indicated), Uterus, Adnexa", detail: "", critical: false }
-    ],
-  }
-];
 
 const normalValues = [
   {
@@ -138,6 +59,7 @@ const normalValues = [
 // References: Papageorghiou AT et al. Ultrasound Obstet Gynecol 2014;44:641–648 (INTERGROWTH-21st biometry); Magann EF et al. Obstet Gynecol 2000;96:189–192 (AFI); Iams JD et al. N Engl J Med 1996;334:567–572 (cervical length); Mari G et al. N Engl J Med 2000;342:9–14 (MCA-PSV).
 
 export default function OB23Navigator() {
+  const { sections: views, isLoading: _navLoading } = useNavigatorSections("ob23");
   const [tab, setTab] = useState<"protocol" | "reference">("protocol");
   const [expandedView, setExpandedView] = useState<number | null>(0);
   const [checked, setChecked] = useState<Set<string>>(new Set());

@@ -11,72 +11,8 @@ import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { CheckCircle2, Circle, ChevronDown, ChevronUp, Info, Scan, ExternalLink } from "lucide-react";
 import { PremiumGate } from "@/components/PremiumGate";
 import ProtocolProgressBar from "../components/ProtocolProgressBar";
+import { useNavigatorSections } from "@/hooks/useNavigatorSections";
 
-const views = [
-  {
-    view: "Pancreas",
-    probe: "Transverse epigastric approach",
-    items: [
-    { id: "abdominalnavigator_2_0", label: "Head, uncinate process, body, and tail", detail: "", critical: false },
-    { id: "abdominalnavigator_2_1", label: "Parenchymal echotexture, masses, calcifications, ductal dilatation", detail: "", critical: false },
-    { id: "abdominalnavigator_2_2", label: "Peripancreatic region for adenopathy or collections", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Aorta",
-    probe: "Midline transverse and longitudinal approaches",
-    items: [
-    { id: "abdominalnavigator_5_0", label: "Proximal, mid, and distal segments for aneurysm or other abnormalities", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Inferior Vena Cava (IVC)",
-    probe: "Subcostal and parasagittal approaches",
-    items: [
-    { id: "abdominalnavigator_6_0", label: "Patency, diameter, and respiratory variation", detail: "", critical: false },
-    { id: "abdominalnavigator_6_1", label: "Presence of thrombus or filters", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Liver",
-    probe: "Subcostal and intercostal approaches",
-    items: [
-    { id: "abdominalnavigator_0_0", label: "Long-axis and transverse views of all lobes (right, left, caudate)", detail: "", critical: false },
-    { id: "abdominalnavigator_0_1", label: "Parenchymal echogenicity (compared to right kidney), surface nodularity, focal/d", detail: "", critical: false },
-    { id: "abdominalnavigator_0_2", label: "Major hepatic and perihepatic vessels (IVC, hepatic veins, portal vein)", detail: "", critical: false },
-    { id: "abdominalnavigator_0_3", label: "Right hemidiaphragm and adjacent pleural space", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Gallbladder and Biliary Tract",
-    probe: "Subcostal and intercostal approaches",
-    items: [
-    { id: "abdominalnavigator_1_0", label: "Long-axis and transverse views of the gallbladder", detail: "", critical: false },
-    { id: "abdominalnavigator_1_1", label: "Wall thickness, presence of gallstones, sludge, or polyps", detail: "", critical: false },
-    { id: "abdominalnavigator_1_2", label: "Intrahepatic and extrahepatic bile ducts for dilatation or other abnormalities", detail: "", critical: false },
-    { id: "abdominalnavigator_1_3", label: "Sonographic Murphy sign if pain is present", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Kidneys",
-    probe: "Flank (coronal) and transverse approaches",
-    items: [
-    { id: "abdominalnavigator_4_0", label: "Long-axis and transverse views of both kidneys", detail: "", critical: false },
-    { id: "abdominalnavigator_4_1", label: "Cortical thickness, echogenicity (compared to liver/spleen), collecting system f", detail: "", critical: false },
-    { id: "abdominalnavigator_4_2", label: "Perirenal spaces", detail: "", critical: false }
-    ],
-  },
-  {
-    view: "Spleen",
-    probe: "Left intercostal and coronal approaches",
-    items: [
-    { id: "abdominalnavigator_3_0", label: "Long-axis and transverse views", detail: "", critical: false },
-    { id: "abdominalnavigator_3_1", label: "Parenchymal echogenicity (compared to left kidney), focal lesions", detail: "", critical: false },
-    { id: "abdominalnavigator_3_2", label: "Splenic hilum and vasculature", detail: "", critical: false },
-    { id: "abdominalnavigator_3_3", label: "Left hemidiaphragm and adjacent pleural space", detail: "", critical: false }
-    ],
-  },
-];
 
 const normalValues = [
   {
@@ -147,6 +83,7 @@ const sweUdffData = {
 };
 
 export default function AbdominalNavigator() {
+  const { sections: views, isLoading: _navLoading } = useNavigatorSections("abdominal");
   const [tab, setTab] = useState<"protocol" | "reference" | "swe">("protocol");
   const [expandedView, setExpandedView] = useState<number | null>(0);
   const [checked, setChecked] = useState<Set<string>>(new Set());
