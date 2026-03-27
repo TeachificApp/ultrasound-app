@@ -2,6 +2,7 @@
   UltrasoundAssist™ — Ultrasound Protocol Navigator & ScanCoach Hub
   Unified grid — no Free/Premium section split. Gating shown per-button.
   Canonical order: General → OB/Fetal → Vascular (×6) → Small Parts → Procedural → MSK → POCUS
+  v2: teal color scheme restored, no Premium badges, 3 FREE badges, Carotid first in Vascular, iHeartEcho CTA
 */
 import { useState } from "react";
 import { Link } from "wouter";
