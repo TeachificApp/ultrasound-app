@@ -1,8 +1,8 @@
 /*
   UltrasoundAssist™ — Ultrasound Protocol Navigator & ScanCoach Hub
-  Unified grid — no Free/Premium section split. Gating shown per-button.
-  Canonical order: General → OB/Fetal → Vascular (×6) → Small Parts → Procedural → MSK → POCUS
-  v2: teal color scheme restored, no Premium badges, 3 FREE badges, Carotid first in Vascular, iHeartEcho CTA
+  v3 — clean rewrite: no conditional colors, no Premium badges, 3 FREE badges only.
+  Order: General → OB/Fetal → Vascular (Carotid, Venous, Arterial, AbdVascular, Aorta, TCD)
+       → Small Parts → Procedural → MSK → POCUS
 */
 import { useState } from "react";
 import { Link } from "wouter";
@@ -13,9 +13,6 @@ import {
 } from "lucide-react";
 import { usePremium } from "@/hooks/usePremium";
 
-// navigatorFree: true  → Navigator accessible to all registered users
-// scanCoachFree: true  → ScanCoach accessible to all registered users
-// false on either      → requires Premium membership
 const specialties = [
   // ── GENERAL ──────────────────────────────────────────────────────────────
   {
@@ -69,7 +66,17 @@ const specialties = [
     navigatorFree: true,
     scanCoachFree: false,
   },
-  // ── VASCULAR ──────────────────────────────────────────────────────────────
+  // ── VASCULAR — Carotid always first ──────────────────────────────────────
+  {
+    path: "/carotid-navigator",
+    scanCoachPath: "/carotid-scan-coach",
+    icon: Activity,
+    title: "Vascular — Extracranial Carotid Artery",
+    description: "CCA, ICA, ECA, and vertebral artery — extracranial carotid duplex ultrasound with SRU consensus stenosis grading per AIUM guidelines.",
+    badge: "Carotid",
+    navigatorFree: true,
+    scanCoachFree: false,
+  },
   {
     path: "/venous-navigator",
     scanCoachPath: "/venous-scan-coach",
@@ -108,16 +115,6 @@ const specialties = [
     description: "Abdominal aortic aneurysm measurement, surveillance, and post-EVAR endoleak detection — aorta ultrasound protocol per AIUM 2025 guidelines.",
     badge: "Aorta/EndoLeak",
     navigatorFree: false,
-    scanCoachFree: false,
-  },
-  {
-    path: "/carotid-navigator",
-    scanCoachPath: "/carotid-scan-coach",
-    icon: Activity,
-    title: "Vascular — Extracranial Carotid Artery",
-    description: "CCA, ICA, ECA, and vertebral artery — extracranial carotid duplex ultrasound with SRU consensus stenosis grading per AIUM guidelines.",
-    badge: "Carotid",
-    navigatorFree: true,
     scanCoachFree: false,
   },
   {
@@ -240,7 +237,7 @@ export default function UltrasoundAssistHub() {
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-base mt-0.5">Ultrasound Protocol Navigator &amp; ScanCoach</p>
               <p className="text-white/70 text-sm md:text-base mt-2 max-w-xl leading-relaxed">
-                Advanced, guideline-driven clinical intelligence app designed for sonographers, physicians, and ultrasound learners across general, vascular, and point-of-care imaging—serving as the ultimate pocket reference for real-time scanning and clinical decision support.
+                Advanced, guideline-driven clinical intelligence app designed for sonographers, physicians, and ultrasound learners across general, vascular, and point-of-care imaging — serving as the ultimate pocket reference for real-time scanning and clinical decision support.
               </p>
             </div>
           </div>
@@ -254,42 +251,28 @@ export default function UltrasoundAssistHub() {
             const Icon = spec.icon;
             const navLocked = !spec.navigatorFree && !isPremium;
             const coachLocked = !spec.scanCoachFree && !isPremium;
-            // Runtime lock state (depends on user's subscription)
             const fullyLocked = navLocked && coachLocked;
-            // Static access tier badges (based on spec config, not user state)
             const isFullyFree = spec.navigatorFree && spec.scanCoachFree;
-            const isFullyPremium = !spec.navigatorFree && !spec.scanCoachFree;
 
             return (
               <div
                 key={i}
                 className={`relative bg-white rounded-xl border shadow-sm overflow-hidden transition-all ${
                   fullyLocked
-                    ? "border-amber-100 hover:shadow-md hover:border-amber-300/50 cursor-pointer"
+                    ? "border-gray-100 hover:shadow-md cursor-pointer"
                     : "border-gray-100 hover:shadow-md hover:border-[#189aa1]/30"
                 }`}
                 style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}
                 onClick={fullyLocked ? () => setUpgradeModal({ title: spec.title, type: "navigator" }) : undefined}
               >
-                {/* Access tier corner badge — always visible regardless of user state */}
-                {isFullyPremium && (
-                  <div className="absolute top-0 right-0">
-                    <div
-                      className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-white rounded-bl-xl"
-                      style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}
-                    >
-                      <Crown className="w-2.5 h-2.5" />
-                      PREMIUM
-                    </div>
-                  </div>
-                )}
+                {/* FREE corner badge — only on fully-free cards */}
                 {isFullyFree && (
                   <div className="absolute top-0 right-0">
                     <div
                       className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-white rounded-bl-xl"
                       style={{ background: "linear-gradient(135deg, #10b981, #059669)" }}
                     >
-                      <span className="text-[10px]">✓</span>
+                      <span>✓</span>
                       FREE
                     </div>
                   </div>
@@ -297,21 +280,19 @@ export default function UltrasoundAssistHub() {
 
                 <div className="p-5">
                   <div className="flex items-start gap-3 mb-3">
+                    {/* Icon — always teal, no conditional color */}
                     <div
                       className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                      style={{
-                        background: isFullyPremium
-                          ? "#f59e0b15"
-                          : "linear-gradient(135deg, #0e1e2e, #189aa1)",
-                      }}
+                      style={{ background: "linear-gradient(135deg, #0e1e2e, #189aa1)" }}
                     >
-                      <Icon className={`w-5 h-5 ${isFullyPremium ? "text-amber-500" : "text-[#4ad9e0]"}`} />
+                      <Icon className="w-5 h-5 text-[#4ad9e0]" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
+                        {/* Badge — always teal, no conditional color */}
                         <span
                           className="text-xs font-bold px-2 py-0.5 rounded-full text-white"
-                          style={{ background: isFullyPremium ? "#9ca3af" : "#189aa1" }}
+                          style={{ background: "#189aa1" }}
                         >
                           {spec.badge}
                         </span>
@@ -330,15 +311,15 @@ export default function UltrasoundAssistHub() {
                   </p>
 
                   {fullyLocked ? (
-                    <div className="flex items-center gap-1 text-xs font-semibold text-amber-600">
-                      <Lock className="w-3 h-3" /> Upgrade to Access
+                    <div className="flex items-center gap-1 text-xs font-semibold text-gray-400">
+                      <Lock className="w-3 h-3" /> Premium Access Required
                     </div>
                   ) : (
                     <div className="flex gap-2">
                       {/* Navigator button */}
                       {navLocked ? (
                         <button
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs border border-amber-200 bg-amber-50 text-amber-600 transition-all hover:bg-amber-100"
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs border border-gray-200 bg-gray-50 text-gray-400 transition-all hover:bg-gray-100"
                           onClick={(e) => { e.stopPropagation(); setUpgradeModal({ title: spec.title, type: "navigator" }); }}
                         >
                           <Lock className="w-3 h-3" />
@@ -357,10 +338,10 @@ export default function UltrasoundAssistHub() {
                         </Link>
                       )}
 
-                      {/* ScanCoach button */}
+                      {/* ScanCoach button — Crown icon when locked */}
                       {coachLocked ? (
                         <button
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs border border-amber-200 bg-amber-50 text-amber-600 transition-all hover:bg-amber-100"
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs border border-gray-200 bg-gray-50 text-gray-400 transition-all hover:bg-gray-100"
                           onClick={(e) => { e.stopPropagation(); setUpgradeModal({ title: spec.title, type: "scancoach" }); }}
                         >
                           <Crown className="w-3 h-3" />
@@ -370,7 +351,7 @@ export default function UltrasoundAssistHub() {
                         <Link href={spec.scanCoachPath}>
                           <button
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs border bg-white transition-all hover:bg-[#f0fbfc]"
-                            style={{ borderColor: "#189aa1" + "50", color: "#189aa1" }}
+                            style={{ borderColor: "#189aa150", color: "#189aa1" }}
                             onClick={(e) => e.stopPropagation()}
                           >
                             <Scan className="w-3 h-3" />
@@ -387,6 +368,60 @@ export default function UltrasoundAssistHub() {
         </div>
       </div>
 
+      {/* iHeartEcho EchoAssist CTA */}
+      <div className="container pb-10">
+        <div
+          className="relative overflow-hidden rounded-2xl p-6 md:p-8"
+          style={{ background: "linear-gradient(135deg, #0e1e2e 0%, #1a1040 60%, #2d1b69 100%)" }}
+        >
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
+            <div
+              className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
+              style={{ background: "rgba(255,255,255,0.1)" }}
+            >
+              <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 21C12 21 3 15 3 9C3 6.23858 5.23858 4 8 4C9.65685 4 11.1217 4.7835 12 6C12.8783 4.7835 14.3431 4 16 4C18.7614 4 21 6.23858 21 9C21 15 12 21 12 21Z" fill="#e879f9" stroke="#e879f9" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span
+                  className="text-xs font-bold px-2 py-0.5 rounded-full text-white"
+                  style={{ background: "rgba(232,121,249,0.25)", border: "1px solid rgba(232,121,249,0.4)" }}
+                >
+                  Echo-Focused
+                </span>
+              </div>
+              <h3
+                className="text-lg md:text-xl font-black text-white leading-tight"
+                style={{ fontFamily: "Merriweather, serif" }}
+              >
+                Looking for Echo-Focused ScanCoach?
+              </h3>
+              <p className="text-white/60 text-sm mt-1.5 max-w-lg">
+                iHeartEcho EchoAssist™ provides dedicated echocardiography ScanCoach guidance — cardiac views, measurements, and clinical decision support for echo-focused practitioners.
+              </p>
+            </div>
+            <a
+              href="https://app.iheartecho.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-shrink-0"
+            >
+              <button
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 hover:scale-105"
+                style={{ background: "linear-gradient(135deg, #a855f7, #e879f9)" }}
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 21C12 21 3 15 3 9C3 6.23858 5.23858 4 8 4C9.65685 4 11.1217 4.7835 12 6C12.8783 4.7835 14.3431 4 16 4C18.7614 4 21 6.23858 21 9C21 15 12 21 12 21Z" fill="white" stroke="white" strokeWidth="1.5"/>
+                </svg>
+                Try EchoAssist™
+              </button>
+            </a>
+          </div>
+        </div>
+      </div>
+
       {/* Upgrade modal */}
       {upgradeModal && (
         <div
@@ -399,8 +434,11 @@ export default function UltrasoundAssistHub() {
             onClick={e => e.stopPropagation()}
           >
             <div className="flex justify-center">
-              <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}>
-                <Crown className="w-8 h-8 text-white" />
+              <div
+                className="w-16 h-16 rounded-full flex items-center justify-center"
+                style={{ background: "linear-gradient(135deg, #0e1e2e, #189aa1)" }}
+              >
+                <Crown className="w-8 h-8 text-[#4ad9e0]" />
               </div>
             </div>
             <div>
@@ -414,7 +452,7 @@ export default function UltrasoundAssistHub() {
               <Link href="/premium" onClick={() => setUpgradeModal(null)}>
                 <button
                   className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm text-white"
-                  style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}
+                  style={{ background: "#189aa1" }}
                 >
                   <Crown className="w-4 h-4" /> Upgrade to Premium
                 </button>
