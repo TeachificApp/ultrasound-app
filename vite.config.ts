@@ -175,9 +175,9 @@ export default defineConfig({
       // When running behind the Manus sandbox proxy the browser connects via
       // HTTPS/WSS on port 443. Tell Vite's HMR client to use the same host
       // and the standard TLS port so the WebSocket handshake succeeds.
+      // Do NOT set host here — the client must use window.location.hostname.
       clientPort: 443,
       protocol: "wss",
-      host: "0.0.0.0",
     },
     fs: {
       strict: true,

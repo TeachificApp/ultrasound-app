@@ -841,3 +841,4 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] CarotidScanCoach: add Subclavian Artery view (supraclavicular approach, subclavian steal, reactive hyperaemia test)
 - [x] CarotidScanCoach: add bilateral brachial blood pressure documentation panel (inter-arm difference alert >15 mmHg)
 - [x] CarotidScanCoach: add inline ICA/CCA PSV ratio calculator with SVU/SRU stenosis grading table (Grant et al. 2003)
+- [x] NavigatorEditor: fix main section reordering — moved draggable/drag events from outer div to GripVertical handle only; arrow buttons now work without interference from drag events
