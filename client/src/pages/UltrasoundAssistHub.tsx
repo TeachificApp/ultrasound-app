@@ -15,6 +15,7 @@ import { usePremium } from "@/hooks/usePremium";
 // scanCoachFree: true  → ScanCoach accessible to all registered users
 // false on either      → requires Premium membership
 const specialties = [
+  // ── GENERAL ────────────────────────────────────────────
   {
     path: "/abdominal-navigator",
     scanCoachPath: "/abdominal-scan-coach",
@@ -35,6 +36,7 @@ const specialties = [
     navigatorFree: true,
     scanCoachFree: true,
   },
+  // ── OB / FETAL ────────────────────────────────────────────
   {
     path: "/ob1-navigator",
     scanCoachPath: "/ob1-scan-coach",
@@ -65,6 +67,7 @@ const specialties = [
     navigatorFree: true,
     scanCoachFree: false,
   },
+  // ── VASCULAR ────────────────────────────────────────────
   {
     path: "/venous-navigator",
     scanCoachPath: "/venous-scan-coach",
@@ -125,26 +128,7 @@ const specialties = [
     navigatorFree: false,
     scanCoachFree: false,
   },
-  {
-    path: "/pocus-assist",
-    scanCoachPath: "/pocus-assist",
-    icon: Zap,
-    title: "POCUS — Lung, eFAST, RUSH",
-    description: "Point-of-care ultrasound protocols — Lung B-lines, eFAST trauma survey, and RUSH hemodynamic assessment with view-by-view checklists and ScanCoach.",
-    badge: "POCUS",
-    navigatorFree: true,
-    scanCoachFree: false,
-  },
-  {
-    path: "/msk-navigator",
-    scanCoachPath: "/msk-scan-coach",
-    icon: Bone,
-    title: "MSK Ultrasound",
-    description: "Shoulder, elbow, wrist/hand, hip, knee, and ankle/foot — musculoskeletal ultrasound protocol with dynamic assessment per AIUM 2023 guidelines.",
-    badge: "MSK",
-    navigatorFree: false,
-    scanCoachFree: false,
-  },
+  // ── SMALL PARTS ───────────────────────────────────────────
   {
     path: "/thyroid-navigator",
     scanCoachPath: "/thyroid-scan-coach",
@@ -175,6 +159,7 @@ const specialties = [
     navigatorFree: false,
     scanCoachFree: false,
   },
+  // ── PROCEDURAL ────────────────────────────────────────────
   {
     path: "/appendix-navigator",
     scanCoachPath: "/appendix-scan-coach",
@@ -193,6 +178,28 @@ const specialties = [
     description: "Ultrasound-guided paracentesis and thoracentesis — site selection, real-time needle guidance, and post-procedure assessment per ACCP/ATS/SHM/SCCM 2020 consensus.",
     badge: "Procedures",
     navigatorFree: false,
+    scanCoachFree: false,
+  },
+  // ── MSK (always second-to-last) ───────────────────────────────────────────
+  {
+    path: "/msk-navigator",
+    scanCoachPath: "/msk-scan-coach",
+    icon: Bone,
+    title: "MSK Ultrasound",
+    description: "Shoulder, elbow, wrist/hand, hip, knee, and ankle/foot — musculoskeletal ultrasound protocol with dynamic assessment per AIUM 2023 guidelines.",
+    badge: "MSK",
+    navigatorFree: false,
+    scanCoachFree: false,
+  },
+  // ── POCUS (always last) ───────────────────────────────────────────────
+  {
+    path: "/pocus-assist",
+    scanCoachPath: "/pocus-assist",
+    icon: Zap,
+    title: "POCUS — Lung, eFAST, RUSH",
+    description: "Point-of-care ultrasound protocols — Lung B-lines, eFAST trauma survey, and RUSH hemodynamic assessment with view-by-view checklists and ScanCoach.",
+    badge: "POCUS",
+    navigatorFree: true,
     scanCoachFree: false,
   },
 ];

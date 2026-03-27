@@ -873,3 +873,7 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Remove "Free" badge from any specialty where ScanCoach is premium-gated
 - [x] Merge free and premium specialties into a single unified grid (no section split)
 - [x] Appendix and Invasive Procedures cards confirmed visible in hub
+
+## Hub Ordering Fix (Mar 27)
+- [x] Move MSK to second-to-last position (immediately before POCUS) in specialties array
+- [x] Reorder hub: General → OB/Fetal → Vascular (all 6) → Small Parts → Appendix/Invasive → MSK → POCUS
