@@ -15,34 +15,73 @@ import { usePremium } from "@/hooks/usePremium";
 
 const views = [
   {
-    view: "Breast Lesion Characterization",
-    probe: "Varies based on lesion location and orientation",
+    view: "Whole-Breast Survey (Bilateral)",
+    probe: "Linear 12–18 MHz",
     tips: [
-      { category: "Patient Positioning", text: "The patient should be supine or in a slight oblique position with the ipsilateral arm abducted and elevated above the head. This position helps to fla" },
-      { category: "Transducer Positioning", text: "Varies based on lesion location and orientation" },
-      { category: "What to Assess", text: "Lesion size (3 orthogonal planes), shape, orientation, margins, echo pattern, posterior acoustic features, associated features (architectural distortion, ductal/skin changes, vascularity, tissue stiff" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Systematic Scanning Approach\', \'tip_content\': \'Use a systematic scanning approach (ra" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Optimize Image Quality\', \'tip_content\': \'Adjust gain and focal zone settings to optim" }
+      { category: "Patient Positioning", text: "Supine with ipsilateral arm elevated above the head. For large or pendulous breasts, a slight oblique position (30–45°) flattens the lateral breast tissue against the chest wall, reducing tissue thickness and improving visualization." },
+      { category: "Transducer Positioning", text: "Begin at the nipple and scan in a systematic radial/anti-radial or transverse/longitudinal grid pattern. Cover all quadrants (UOQ, UIQ, LOQ, LIQ) and the retroareolar region. Extend coverage to the axillary tail." },
+      { category: "What to Assess", text: "Breast tissue composition (homogeneous fat, scattered fibroglandular, heterogeneous, extremely dense); skin thickness (normal <2 mm); Cooper ligaments; ductal architecture; symmetry between sides; any focal mass, asymmetry, or architectural distortion." },
+      { category: "Scanning Tip", text: "Use light, consistent transducer pressure throughout — excessive pressure compresses lesions and reduces their apparent size. Apply enough gel to maintain full contact. Adjust focal zone to the depth of interest and use tissue harmonic imaging to improve contrast resolution." },
+      { category: "Pearl", text: "Radial/anti-radial scanning (parallel to ductal anatomy) is preferred by many breast imagers because ducts run radially from the nipple. This approach is more sensitive for intraductal pathology (DCIS, papilloma) than a grid pattern." },
+      { category: "Pitfall", text: "Fat lobules can mimic oval hypoechoic masses. Confirm by scanning in two orthogonal planes — fat lobules will be isoechoic to surrounding fat and show no posterior features. Compressibility and lack of internal vascularity also favor fat lobule." },
     ],
   },
   {
-    view: "Axillary Lymph Node Characterization",
-    probe: "Arm slightly abducted and externally rotated",
+    view: "Breast Lesion Characterization",
+    probe: "Linear 12–18 MHz (standoff pad for superficial lesions)",
     tips: [
-      { category: "Patient Positioning", text: "The patient should be supine or in a slight oblique position with the ipsilateral arm abducted and elevated above the head. This position helps to fla" },
-      { category: "Transducer Positioning", text: "Arm slightly abducted and externally rotated" },
-      { category: "What to Assess", text: "Size, shape, cortical thickness, margin, hilar compression or displacement, BI-RADS features. Evaluate for lymphadenopathy." },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Systematic Scanning Approach\', \'tip_content\': \'Use a systematic scanning approach (ra" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Optimize Image Quality\', \'tip_content\': \'Adjust gain and focal zone settings to optim" }
+      { category: "Patient Positioning", text: "Supine, ipsilateral arm elevated. For lesions in the lateral breast, slight oblique positioning brings the lesion closer to the transducer. Document clock position, distance from nipple, and depth (anterior/middle/posterior third)." },
+      { category: "Transducer Positioning", text: "Center the lesion in the field of view. Scan in two orthogonal planes (radial/anti-radial or transverse/sagittal). Measure in three orthogonal dimensions: longest diameter, perpendicular diameter, and depth." },
+      { category: "What to Assess", text: "BI-RADS descriptors — Shape (oval, round, irregular); Orientation (parallel = wider than tall, not parallel = taller than wide); Margin (circumscribed vs. not circumscribed: indistinct, angular, microlobulated, spiculated); Echo pattern (anechoic, hyperechoic, complex, hypoechoic, isoechoic, heterogeneous); Posterior features (no features, enhancement, shadowing, combined); Associated features (architectural distortion, duct changes, skin changes, edema, vascularity, elasticity)." },
+      { category: "Scanning Tip", text: "Taller-than-wide orientation (not parallel) is the single most suspicious BI-RADS feature on ultrasound — it indicates the lesion is growing across tissue planes rather than along them. Always measure orientation in the radial plane where the lesion appears largest." },
+      { category: "Pearl", text: "Posterior acoustic shadowing is the most specific feature for malignancy (especially IDC). Posterior enhancement is most common in cysts and some fibroadenomas but can also occur in mucinous carcinoma. Combined pattern (mixed shadowing and enhancement) is indeterminate." },
+      { category: "Pitfall", text: "Microlobulated margins (≥3 lobulations) are suspicious (BI-RADS 4B) and should not be confused with macrolobulated margins, which are a feature of fibroadenomas. Use high-frequency (≥15 MHz) to resolve margin detail accurately." },
     ],
-  }
+  },
+  {
+    view: "Cyst Assessment",
+    probe: "Linear 12–18 MHz",
+    tips: [
+      { category: "Patient Positioning", text: "Supine, ipsilateral arm elevated. Cysts are most commonly found in the upper outer quadrant and retroareolar region." },
+      { category: "Transducer Positioning", text: "Center the cyst in the field of view. Scan in two orthogonal planes. Apply light pressure — cysts are compressible." },
+      { category: "What to Assess", text: "Simple cyst criteria (all must be met): anechoic, circumscribed margins, imperceptible wall, posterior acoustic enhancement. Complicated cyst: homogeneous low-level internal echoes, no solid component. Complex cystic and solid mass: thick wall (>0.5 mm), thick internal septations, solid component, intracystic mass." },
+      { category: "Scanning Tip", text: "Simple cysts are BI-RADS 2 (benign) — no follow-up needed. Complicated cysts are BI-RADS 3 (probably benign) — 6-month follow-up is appropriate. Complex cystic and solid masses are BI-RADS 4 and require tissue sampling. Use high-frequency and harmonic imaging to differentiate internal echoes from artifact." },
+      { category: "Pearl", text: "Clustered microcysts (multiple anechoic foci <2–3 mm each in a cluster) are BI-RADS 3 if no solid component. Milk of calcium in microcysts shows dependent layering on decubitus views — this is a benign finding (BI-RADS 2)." },
+      { category: "Pitfall", text: "Echogenic debris in a cyst (from hemorrhage or infection) can mimic a solid mass. Use color Doppler — absence of internal vascularity supports a cystic diagnosis. Aspiration may be needed for definitive diagnosis in ambiguous cases." },
+    ],
+  },
+  {
+    view: "Axillary Lymph Node Assessment",
+    probe: "Linear 12–18 MHz",
+    tips: [
+      { category: "Patient Positioning", text: "Supine with ipsilateral arm abducted and externally rotated (hand behind head). This opens the axilla and brings lymph nodes into view. Scan from the anterior axillary fold to the apex of the axilla." },
+      { category: "Transducer Positioning", text: "Longitudinal and transverse planes through the axilla. Follow the axillary vessels (axillary artery and vein) as a guide — lymph nodes cluster around these vessels at levels I, II, and III." },
+      { category: "What to Assess", text: "Node size (short axis diameter); cortical thickness (normal ≤3 mm); cortical morphology (uniform vs. focal thickening); fatty hilum (present = normal); shape (oval/reniform = normal; round = suspicious); vascularity (hilar = normal; peripheral/cortical = suspicious)." },
+      { category: "Scanning Tip", text: "The most reliable criterion for pathologic lymphadenopathy is cortical thickness >3 mm (focal or diffuse). Loss of the fatty hilum combined with a round shape and peripheral vascularity is highly suspicious for metastatic involvement. Always measure the short axis diameter and cortical thickness." },
+      { category: "Pearl", text: "In breast cancer staging, axillary lymph node status is the most important prognostic factor. Ultrasound-guided FNA or core biopsy of suspicious nodes (cortex >3 mm, absent hilum) can upstage patients and change surgical management (sentinel node biopsy vs. axillary dissection)." },
+      { category: "Pitfall", text: "Reactive lymphadenopathy (from infection, vaccination, or inflammatory conditions) can mimic metastatic nodes. Clinical correlation is essential — recent ipsilateral COVID-19 vaccination is a common cause of axillary lymphadenopathy that should be documented and followed at 4–6 weeks." },
+    ],
+  },
+  {
+    view: "Doppler Assessment of Breast Lesions",
+    probe: "Linear 12–18 MHz",
+    tips: [
+      { category: "Patient Positioning", text: "Supine, ipsilateral arm elevated. Minimize transducer pressure to avoid compressing vessels within the lesion." },
+      { category: "Transducer Positioning", text: "Center the lesion. Use color Doppler to map vascularity, then power Doppler for more sensitive detection of slow flow. Use spectral Doppler to characterize flow pattern if needed." },
+      { category: "What to Assess", text: "Presence/absence of internal vascularity; distribution (central/hilar vs. peripheral/penetrating); resistive index (RI) — malignant lesions often show RI >0.70; compare vascularity to surrounding tissue." },
+      { category: "Scanning Tip", text: "Reduce the color Doppler scale (PRF) to 3–5 cm/s and use a low wall filter to detect slow intratumoral flow. Power Doppler is more sensitive than color Doppler for detecting vascularity in small lesions. Avoid excessive transducer pressure which collapses small vessels." },
+      { category: "Pearl", text: "Penetrating (peripheral) vascularity entering the lesion from the periphery is more suspicious for malignancy than central/hilar vascularity. However, Doppler findings alone are insufficient to characterize a lesion — always integrate with B-mode BI-RADS descriptors." },
+      { category: "Pitfall", text: "Absence of Doppler signal does NOT exclude malignancy — small or avascular tumors (e.g., DCIS, small invasive lobular carcinoma) may show no detectable flow. Doppler is most useful as a supplementary finding, not a primary diagnostic criterion." },
+    ],
+  },
 ];
 
 const examTips = [
-  { category: "Scanning Tip", text: "{\'tip_title\': \'Systematic Scanning Approach\', \'tip_content\': \'Use a systematic scanning approach (radial or anti-radial, or combination) to ensure com" },
-  { category: "Scanning Tip", text: "{\'tip_title\': \'Optimize Image Quality\', \'tip_content\': \'Adjust gain and focal zone settings to optimize image quality. Use a standoff pad or generous " },
-  { category: "Scanning Tip", text: "{\'tip_title\': \'Doppler Imaging\', \'tip_content\': \'Use color and power Doppler to assess vascularity of lesions.\', \'pitfall\': \'N/A\'}" },
-  { category: "Scanning Tip", text: "{\'tip_title\': \'Correlation\', \'tip_content\': \'Correlate ultrasound findings with clinical history and other imaging modalities.\', \'pitfall\': \"Misinterp" }
+  { category: "Preparation", text: "No patient preparation is required for breast ultrasound. Ideally, premenopausal patients should be scanned in the first half of the menstrual cycle (days 7–14) when breast tissue is least hormonally stimulated, reducing background nodularity. Document the date of last menstrual period (LMP) and any hormone use." },
+  { category: "Equipment", text: "Use a high-frequency linear transducer (12–18 MHz) for most breast examinations. A standoff pad improves visualization of very superficial lesions (<5 mm from skin). Tissue harmonic imaging improves contrast resolution and reduces artifact. Spatial compound imaging reduces speckle noise and improves margin definition." },
+  { category: "Documentation", text: "Document lesion location using clock position, distance from nipple, and depth (anterior/middle/posterior third). Measure in three orthogonal planes. Record BI-RADS category and final assessment. Bilateral comparison views are recommended for any identified lesion." },
+  { category: "Pearl", text: "Ultrasound is the modality of choice for evaluating palpable breast masses in women under 30 and in pregnant/lactating women. In women ≥30, ultrasound complements mammography. Ultrasound-guided biopsy is the preferred method for tissue sampling of sonographically visible lesions." },
+  { category: "Pitfall", text: "Ultrasound alone is not a screening tool for breast cancer in average-risk women — it misses microcalcifications (the primary sign of DCIS) and has a high false-positive rate. It is used as a problem-solving tool and adjunct to mammography, or as a primary modality in high-risk patients with dense breasts." },
 ];
 
 const TIP_COLORS: Record<string, string> = {
@@ -60,7 +99,7 @@ export default function BreastScanCoach() {
   const { isPremium } = usePremium();
   const [selectedView, setSelectedView] = useState(0);
   const [expandedTip, setExpandedTip] = useState<number | null>(null);
-  const [showExamTips, setShowGeneral] = useState(false);
+  const [showExamTips, setShowExamTips] = useState(false);
   const [showSWE, setShowSWE] = useState(false);
 
   const currentView = views[selectedView];
@@ -179,7 +218,7 @@ export default function BreastScanCoach() {
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-5">
           <button
             className="w-full flex items-center gap-3 px-5 py-3 hover:bg-[#f0fbfc] transition-all"
-            onClick={() => setShowGeneral(!showExamTips)}
+            onClick={() => setShowExamTips(!showExamTips)}
           >
             <Lightbulb className="w-4 h-4 text-[#189aa1] flex-shrink-0" />
             <span className="font-bold text-sm text-gray-700 flex-1 text-left" style={{ fontFamily: "Merriweather, serif" }}>

@@ -8,56 +8,76 @@ import { useState } from "react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
-import { Scan, ChevronDown, ChevronUp, Lightbulb, Info, ExternalLink } from "lucide-react";
+import { Scan, ChevronDown, ChevronUp, Lightbulb, Info } from "lucide-react";
 import { PremiumGate } from "@/components/PremiumGate";
 import { BlurredOverlay } from "@/components/BlurredOverlay";
 import { usePremium } from "@/hooks/usePremium";
 
 const views = [
   {
-    view: "Anterior Fontanelle (Infants)",
-    probe: "Through the anterior fontanelle in coronal and sagittal planes",
+    view: "Transtemporal Window — MCA/ACA/PCA",
+    probe: "Phased array 2 MHz (adults); 2–3 MHz sector probe",
     tips: [
-      { category: "Patient Positioning", text: "**Foramen Magnum Approach (Vertebral and Basilar Arteries):** Patient turned to one side with the neck flexed so that the chin touches the chest. The " },
-      { category: "Transducer Positioning", text: "Through the anterior fontanelle in coronal and sagittal planes" },
-      { category: "What to Assess", text: "Distal Internal Carotid Artery (ICA) and branches of the circle of Willis, pericallosal branch of the Anterior Cerebral Artery (ACA) for global cerebral arterial flow and spectral waveform analysis, e" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Optimal Acoustic Windows\', \'tip_content\': \'For infants, open fontanelles (anterior, p" }
+      { category: "Patient Positioning", text: "Patient supine with head in neutral position or slight contralateral rotation. The transtemporal window is located at the thinnest portion of the temporal bone (pterion), cephalad to the zygomatic arch and anterior to the ear. Scan bilaterally for comparison." },
+      { category: "Transducer Positioning", text: "Place the transducer at the temporal window (just above the zygomatic arch, anterior to the ear). Angle slightly superiorly and medially. The ipsilateral cerebral peduncle (butterfly-shaped hyperechoic structure) is the key landmark for identifying the circle of Willis." },
+      { category: "What to Assess", text: "Middle Cerebral Artery (MCA): depth 45–65 mm, flow toward probe (positive), normal mean velocity 55–80 cm/s. Anterior Cerebral Artery (ACA): depth 60–75 mm, flow away from probe (negative). Posterior Cerebral Artery (PCA): P1 segment toward probe, P2 away; depth 60–70 mm. Assess for asymmetry, elevated velocities (vasospasm), or absent flow." },
+      { category: "Scanning Tip", text: "The MCA is the most reliably insonated vessel via the transtemporal window. Start at depth 50–55 mm and optimize the signal before moving to other vessels. Use color Doppler to confirm vessel identity before spectral sampling. Always obtain bilateral MCA velocities for comparison." },
+      { category: "Pearl", text: "MCA mean velocity >120 cm/s with Lindegaard ratio >3 indicates vasospasm after subarachnoid hemorrhage. Lindegaard ratio = MCA mean velocity ÷ extracranial ICA mean velocity; ratio >3 = mild vasospasm, >6 = severe vasospasm. This distinguishes true vasospasm from hyperemia." },
+      { category: "Pitfall", text: "Up to 10–15% of adults (higher in elderly, women, and African Americans) have inadequate temporal bone windows. If no signal is obtained, try a more anterior or posterior position along the temporal squama. Document the window quality in the report." },
     ],
   },
   {
-    view: "Superior Sagittal Sinus (Infants)",
-    probe: "Through an open sagittal suture",
+    view: "Transorbital Window — Ophthalmic Artery / ICA Siphon",
+    probe: "Phased array 2 MHz — REDUCE POWER to MI <0.23 for orbital use",
     tips: [
-      { category: "Patient Positioning", text: "**Foramen Magnum Approach (Vertebral and Basilar Arteries):** Patient turned to one side with the neck flexed so that the chin touches the chest. The " },
-      { category: "Transducer Positioning", text: "Through an open sagittal suture" },
-      { category: "What to Assess", text: "Patency" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Optimal Acoustic Windows\', \'tip_content\': \'For infants, open fontanelles (anterior, p" }
+      { category: "Patient Positioning", text: "Patient supine with eyes closed. Apply gel to the closed eyelid. Use the minimum acoustic output necessary (MI <0.23 per AIUM guidelines) to minimize ocular exposure. Limit orbital scanning time to the minimum required." },
+      { category: "Transducer Positioning", text: "Place the transducer gently on the closed eyelid. Angle slightly medially to insonate the ophthalmic artery (OA) at depth 40–60 mm. Increase depth to 60–80 mm for the ICA siphon (carotid siphon)." },
+      { category: "What to Assess", text: "Ophthalmic artery (OA): depth 40–60 mm, flow toward probe (positive), normal PSV 20–40 cm/s. ICA siphon: depth 60–80 mm, bidirectional flow. Reversed OA flow (away from probe) is a sign of ipsilateral severe ICA stenosis/occlusion with collateral flow reversal." },
+      { category: "Scanning Tip", text: "Reversed ophthalmic artery flow is a critical finding indicating severe ipsilateral ICA disease with collateral supply from the contralateral ICA via the anterior communicating artery. Always compare OA flow direction bilaterally." },
+      { category: "Pitfall", text: "CRITICAL: Reduce acoustic output to MI <0.23 BEFORE placing the transducer on the eye. Do NOT use standard cardiac or abdominal presets for orbital scanning — these have much higher output levels that can cause thermal injury to the lens. Use a dedicated ophthalmic or TCD preset." },
     ],
   },
   {
-    view: "Posterior Circulation (Infants)",
-    probe: "Via the foramen magnum or posterolateral fontanelle",
+    view: "Suboccipital Window — Vertebral/Basilar Arteries",
+    probe: "Phased array 2 MHz",
     tips: [
-      { category: "Patient Positioning", text: "**Foramen Magnum Approach (Vertebral and Basilar Arteries):** Patient turned to one side with the neck flexed so that the chin touches the chest. The " },
-      { category: "Transducer Positioning", text: "Via the foramen magnum or posterolateral fontanelle" },
-      { category: "What to Assess", text: "Posterior circulation vessels" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Optimal Acoustic Windows\', \'tip_content\': \'For infants, open fontanelles (anterior, p" }
+      { category: "Patient Positioning", text: "Patient seated with neck flexed (chin to chest), or lateral decubitus with neck flexed. The suboccipital window is located at the foramen magnum, between the occiput and C1 spinous process. This window provides access to the vertebral arteries (VA) and basilar artery (BA)." },
+      { category: "Transducer Positioning", text: "Place the transducer at the suboccipital midline, angled superiorly toward the foramen magnum. The basilar artery is at depth 80–120 mm (flow away from probe). The vertebral arteries are at depth 60–80 mm, lateral to midline (flow away from probe)." },
+      { category: "What to Assess", text: "Basilar artery (BA): depth 80–120 mm, flow away from probe, normal mean velocity 35–60 cm/s. Vertebral arteries (VA): depth 60–80 mm, flow away from probe, normal mean velocity 35–55 cm/s. Assess for asymmetry, absent flow (VA occlusion), or elevated velocities." },
+      { category: "Scanning Tip", text: "The basilar artery is identified by its midline position and depth >80 mm. The vertebral arteries are lateral to the midline. Absent or reversed VA flow on one side with normal contralateral VA suggests VA occlusion or subclavian steal syndrome." },
+      { category: "Pearl", text: "Subclavian steal syndrome: reversed VA flow ipsilateral to a proximal subclavian artery stenosis/occlusion. The VA flow reversal may be intermittent (latent steal) or continuous (manifest steal). Provocative testing (arm exercise or reactive hyperemia) can unmask latent steal." },
     ],
   },
   {
-    view: "Transtemporal Window (Adults/Children after fontanelle closure)",
-    probe: "Thinnest portion of the temporal bone (pterion), cephalad to the zygomatic arch and anterior to the ",
+    view: "Submandibular Window — Distal ICA (Lindegaard Ratio)",
+    probe: "Phased array 2 MHz",
     tips: [
-      { category: "Patient Positioning", text: "**Foramen Magnum Approach (Vertebral and Basilar Arteries):** Patient turned to one side with the neck flexed so that the chin touches the chest. The " },
-      { category: "Transducer Positioning", text: "Thinnest portion of the temporal bone (pterion), cephalad to the zygomatic arch and anterior to the ear" },
-      { category: "What to Assess", text: "Middle Cerebral Artery (MCA), Anterior Cerebral Artery (ACA), Posterior Cerebral Artery (PCA)" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Optimal Acoustic Windows\', \'tip_content\': \'For infants, open fontanelles (anterior, p" }
+      { category: "Patient Positioning", text: "Patient supine with neck slightly extended and head rotated contralaterally. The submandibular window is located beneath the angle of the mandible. This window provides access to the distal extracranial ICA and the proximal intracranial ICA." },
+      { category: "Transducer Positioning", text: "Place the transducer beneath the angle of the mandible, angled superiorly and medially. The distal ICA is at depth 40–60 mm (flow toward probe). This window is used to obtain the extracranial ICA velocity for the Lindegaard ratio calculation." },
+      { category: "What to Assess", text: "Distal extracranial ICA: depth 40–60 mm, flow toward probe, normal PSV 40–80 cm/s. Used to calculate the Lindegaard ratio (MCA/ICA mean velocity) for vasospasm assessment. Also used to assess ICA patency in patients with poor temporal windows." },
+      { category: "Scanning Tip", text: "The submandibular ICA velocity is required for accurate Lindegaard ratio calculation. Without the extracranial ICA velocity, elevated MCA velocities cannot be reliably distinguished from hyperemia vs. true vasospasm. Always obtain bilateral submandibular ICA velocities in SAH patients." },
+      { category: "Pearl", text: "Lindegaard Ratio interpretation: <3 = normal or hyperemia; 3–6 = mild-moderate vasospasm; >6 = severe vasospasm. A ratio <3 with elevated MCA velocity indicates global hyperemia (e.g., from fever, anemia, or hyperdynamic state), NOT vasospasm." },
     ],
-  }
+  },
+  {
+    view: "Anterior Fontanelle — Neonates/Infants",
+    probe: "Phased array or sector 5–7.5 MHz (neonates); 3–5 MHz (older infants)",
+    tips: [
+      { category: "Patient Positioning", text: "Neonate/infant supine. The anterior fontanelle is the primary acoustic window in neonates (closes at 9–18 months). The posterolateral (mastoid) fontanelle provides access to posterior fossa vessels. No sedation required for routine neonatal TCD." },
+      { category: "Transducer Positioning", text: "Coronal plane through the anterior fontanelle: assess the distal ICA, ACA (pericallosal branch), and MCA. Sagittal plane: assess the ACA and pericallosal artery. Posterolateral fontanelle: assess the basilar artery and cerebellar arteries." },
+      { category: "What to Assess", text: "Distal ICA, ACA (pericallosal branch), MCA, basilar artery. Assess for IVH (intraventricular hemorrhage) — echogenic material in the ventricles. Resistive index (RI) of the ACA: normal 0.65–0.80 in term neonates; RI >0.80 suggests elevated ICP." },
+      { category: "Pearl", text: "In neonates with suspected ICP elevation (hydrocephalus, IVH), the ACA resistive index (RI) is a useful non-invasive marker. RI >0.80 correlates with elevated ICP. Serial RI measurements can track response to treatment (e.g., ventricular drainage). RI <0.55 may indicate brain death." },
+      { category: "Pitfall", text: "Neonatal TCD velocities are lower than adult values and increase with gestational age. Do not apply adult velocity thresholds to neonates. Use age-specific reference ranges. Premature neonates have lower velocities than term neonates." },
+    ],
+  },
 ];
 
 const examTips = [
-  { category: "Scanning Tip", text: "{\'tip_title\': \'Optimal Acoustic Windows\', \'tip_content\': \'For infants, open fontanelles (anterior, posterolateral) and the foramen magnum provide acou" }
+  { category: "Preparation", text: "No special patient preparation is required for TCD. The patient should be supine and relaxed. Ensure the room is quiet and the patient is not talking or moving during spectral Doppler acquisition, as movement and vocalization alter cerebral blood flow velocities." },
+  { category: "Doppler Optimization", text: "Use a 2 MHz pulsed Doppler probe (non-imaging) or a phased array imaging probe with 2 MHz Doppler. Set sample volume to 4–8 mm. Set PRF to 100–150 cm/s. Use a low wall filter (100–150 Hz). For orbital scanning, reduce MI to <0.23 before placing the transducer on the eye." },
+  { category: "Pearl", text: "The Lindegaard ratio (MCA mean velocity ÷ extracranial ICA mean velocity) is the gold standard for differentiating cerebral vasospasm from hyperemia after subarachnoid hemorrhage. Always obtain the submandibular ICA velocity to calculate this ratio. Ratio >3 = vasospasm; ratio <3 with elevated MCA velocity = hyperemia." },
+  { category: "Pitfall", text: "Inadequate temporal bone windows (10–15% of adults) are the most common technical limitation of TCD. Elderly patients, women, and patients of African or Asian descent have higher rates of inadequate windows. Document the window quality and any technical limitations in the report." },
+  { category: "Pitfall", text: "TCD velocities are affected by hematocrit, cardiac output, pCO2, and patient age. Hyperventilation (decreased pCO2) causes cerebral vasoconstriction and reduces velocities. Hypercapnia causes vasodilation and increases velocities. Always document the patient's clinical status and any factors that may affect velocities." },
 ];
 
 const TIP_COLORS: Record<string, string> = {
@@ -69,13 +89,15 @@ const TIP_COLORS: Record<string, string> = {
   "Optimization": "#0e4a50",
   "Pitfall": "#d97706",
   "Pearl": "#059669",
+  "Preparation": "#0e4a50",
+  "Doppler Optimization": "#189aa1",
 };
 
 export default function TCDScanCoach() {
   const { isPremium } = usePremium();
   const [selectedView, setSelectedView] = useState(0);
   const [expandedTip, setExpandedTip] = useState<number | null>(null);
-  const [showExamTips, setShowGeneral] = useState(false);
+  const [showExamTips, setShowExamTips] = useState(false);
 
   const currentView = views[selectedView];
 
@@ -104,7 +126,7 @@ export default function TCDScanCoach() {
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">View-by-View Acquisition Guidance</p>
               <p className="text-white/70 text-xs mt-1 max-w-xl">
-                Probe: **Infants Prior to Fontanelle Closure:** Sector, curvilinear, or linear transducers with frequencies
+                Probe: 2 MHz phased array (adults) · 5–7.5 MHz sector (neonates) · Reduce to MI &lt;0.23 for orbital window
               </p>
               <div className="mt-3">
                 <Link href="/tcd-navigator">
@@ -167,33 +189,35 @@ export default function TCDScanCoach() {
 
             {/* Tips */}
             <div className="p-5 space-y-3">
-              {currentView.tips.map((tip, ti) => (
-                <div
-                  key={ti}
-                  className="rounded-xl p-4 border"
-                  style={{
-                    borderColor: (TIP_COLORS[tip.category] || "#189aa1") + "30",
-                    background: (TIP_COLORS[tip.category] || "#189aa1") + "08",
-                  }}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <Lightbulb className="w-3.5 h-3.5 flex-shrink-0" style={{ color: TIP_COLORS[tip.category] || "#189aa1" }} />
-                    <span className="text-xs font-bold uppercase tracking-wider" style={{ color: TIP_COLORS[tip.category] || "#189aa1" }}>
-                      {tip.category}
-                    </span>
+              <PremiumGate>
+                {currentView.tips.map((tip, ti) => (
+                  <div
+                    key={ti}
+                    className="rounded-xl p-4 border"
+                    style={{
+                      borderColor: (TIP_COLORS[tip.category] || "#189aa1") + "30",
+                      background: (TIP_COLORS[tip.category] || "#189aa1") + "08",
+                    }}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <Lightbulb className="w-3.5 h-3.5 flex-shrink-0" style={{ color: TIP_COLORS[tip.category] || "#189aa1" }} />
+                      <span className="text-xs font-bold uppercase tracking-wider" style={{ color: TIP_COLORS[tip.category] || "#189aa1" }}>
+                        {tip.category}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-700 leading-relaxed">{tip.text}</p>
                   </div>
-                  <p className="text-sm text-gray-700 leading-relaxed">{tip.text}</p>
-                </div>
-              ))}
+                ))}
+              </PremiumGate>
             </div>
           </div>
         )}
 
-        {/* General tips section */}
+        {/* Exam Tips section */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-5">
           <button
             className="w-full flex items-center gap-3 px-5 py-3 hover:bg-[#f0fbfc] transition-all"
-            onClick={() => setShowGeneral(!showExamTips)}
+            onClick={() => setShowExamTips(!showExamTips)}
           >
             <Lightbulb className="w-4 h-4 text-[#189aa1] flex-shrink-0" />
             <span className="font-bold text-sm text-gray-700 flex-1 text-left" style={{ fontFamily: "Merriweather, serif" }}>
@@ -204,9 +228,9 @@ export default function TCDScanCoach() {
           {showExamTips && (
             <div className="border-t border-gray-100 p-5 space-y-3">
               {examTips.map((tip, ti) => (
-                <div key={ti} className="rounded-xl p-4 border" style={{ borderColor: "#189aa140", background: "#f0fbfc" }}>
+                <div key={ti} className="rounded-xl p-4 border" style={{ borderColor: (TIP_COLORS[tip.category] || "#189aa1") + "40", background: "#f0fbfc" }}>
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-bold uppercase tracking-wider text-[#189aa1]">{tip.category}</span>
+                    <span className="text-xs font-bold uppercase tracking-wider" style={{ color: TIP_COLORS[tip.category] || "#189aa1" }}>{tip.category}</span>
                   </div>
                   <p className="text-sm text-gray-700">{tip.text}</p>
                 </div>

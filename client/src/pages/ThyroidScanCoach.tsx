@@ -1,6 +1,7 @@
 /*
   UltrasoundAssist™ — Small Parts Thyroid Ultrasound ScanCoach
   Based on: AIUM Practice Parameter for the Performance of a Thyroid and Parathyroid Ultrasound Examination (2019)
+  ACR TI-RADS (2017) — Tessler et al.
   Brand: Teal #189aa1, Aqua #4ad9e0
   Fonts: Merriweather headings, Open Sans body
 */
@@ -8,100 +9,108 @@ import { useState } from "react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
-import { Scan, ChevronDown, ChevronUp, Lightbulb, Info, ExternalLink } from "lucide-react";
+import { Scan, ChevronDown, ChevronUp, Lightbulb, Info } from "lucide-react";
 import { PremiumGate } from "@/components/PremiumGate";
-import { BlurredOverlay } from "@/components/BlurredOverlay";
 import { usePremium } from "@/hooks/usePremium";
 
 const views = [
   {
-    view: "Transverse Right Lobe",
-    probe: "Superior, Mid, and Inferior Right Lobe",
+    view: "Transverse Survey — Right Lobe",
+    probe: "Linear 12–18 MHz",
     tips: [
-      { category: "Patient Positioning", text: "Supine with the neck hyperextended, with a pad or pillow under the shoulders. Upright positioning may be used if the patient cannot tolerate hyperexte" },
-      { category: "Transducer Positioning", text: "Superior, Mid, and Inferior Right Lobe" },
-      { category: "What to Assess", text: "Thyroid parenchyma, nodules, and surrounding structures." },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Patient Positioning\', \'tip_content\': \"Ensure the patient\'s neck is adequately hyperex" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Transducer Selection\', \'tip_content\': \'Use a high-frequency linear transducer for opt" }
+      { category: "Patient Positioning", text: "Supine with the neck hyperextended — place a pillow or rolled towel under the shoulders to extend the neck and bring the thyroid gland anteriorly. If the patient cannot tolerate full hyperextension (e.g., cervical arthritis), a semi-reclined position is acceptable." },
+      { category: "Transducer Positioning", text: "Begin at the superior pole of the right lobe and sweep inferiorly in the transverse plane through the superior, mid, and inferior thirds. The right lobe lies lateral to the trachea and anterior to the right carotid artery and internal jugular vein." },
+      { category: "What to Assess", text: "Lobe dimensions (AP × transverse at widest point); echogenicity (normal = homogeneous, isoechoic to adjacent strap muscle); any focal nodules (location, size, composition, echogenicity, margins, calcifications, vascularity); surrounding structures (carotid, IJV, strap muscles, trachea)." },
+      { category: "Scanning Tip", text: "Measure the right lobe AP and transverse dimensions in the transverse plane at its widest point. Normal thyroid lobe: 4–6 cm long, 1.5–2 cm AP, 1.5–2 cm transverse. Volume = 0.479 × length × width × depth (each lobe). Normal total volume: men <25 mL, women <18 mL." },
+      { category: "Pearl", text: "The right lobe is typically slightly larger than the left. The right inferior thyroid artery enters the posterior aspect of the right lobe and can be used to confirm the inferior pole. Always document the inferior pole — it may extend retrosternally." },
+      { category: "Pitfall", text: "The esophagus lies posterior-medial to the left lobe (occasionally posterior to the right). On transverse views, it appears as a round structure with a hyperechoic center (air). Do not mistake it for a parathyroid adenoma or lymph node — have the patient swallow to confirm." },
     ],
   },
   {
-    view: "Longitudinal Right Lobe",
-    probe: "Medial, Mid, and Lateral Right Lobe",
+    view: "Longitudinal Survey — Right Lobe",
+    probe: "Linear 12–18 MHz",
     tips: [
-      { category: "Patient Positioning", text: "Supine with the neck hyperextended, with a pad or pillow under the shoulders. Upright positioning may be used if the patient cannot tolerate hyperexte" },
-      { category: "Transducer Positioning", text: "Medial, Mid, and Lateral Right Lobe" },
-      { category: "What to Assess", text: "Thyroid parenchyma, nodules, and surrounding structures." },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Patient Positioning\', \'tip_content\': \"Ensure the patient\'s neck is adequately hyperex" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Transducer Selection\', \'tip_content\': \'Use a high-frequency linear transducer for opt" }
+      { category: "Patient Positioning", text: "Supine with neck hyperextended. Rotate the transducer 90° from the transverse plane. Scan from the medial to lateral aspect of the right lobe in three sweeps: medial (near trachea), mid, and lateral." },
+      { category: "Transducer Positioning", text: "Longitudinal plane, parallel to the long axis of the right lobe. The lobe appears as an oval/elongated structure with pointed superior and inferior poles. Measure the craniocaudal length in this plane." },
+      { category: "What to Assess", text: "Craniocaudal length of the right lobe (normal 4–6 cm); superior and inferior pole definition; any nodules (measure in three planes in the view where the nodule is largest); pyramidal lobe (midline, superior to isthmus — present in ~50% of patients)." },
+      { category: "Scanning Tip", text: "Always measure the craniocaudal length in the longitudinal plane — this is the most accurate dimension for volume calculation. Ensure both poles are visible in the same image. If the inferior pole extends below the clavicle, document substernal extension and note the depth." },
+      { category: "Pearl", text: "The pyramidal lobe is a remnant of the thyroglossal duct and extends superiorly from the isthmus (usually to the left of midline). It is present in ~50% of patients and may be enlarged in Graves' disease. Do not mistake it for a midline neck mass." },
     ],
   },
   {
-    view: "Transverse Left Lobe",
-    probe: "Superior, Mid, and Inferior Left Lobe",
+    view: "Transverse Survey — Left Lobe",
+    probe: "Linear 12–18 MHz",
     tips: [
-      { category: "Patient Positioning", text: "Supine with the neck hyperextended, with a pad or pillow under the shoulders. Upright positioning may be used if the patient cannot tolerate hyperexte" },
-      { category: "Transducer Positioning", text: "Superior, Mid, and Inferior Left Lobe" },
-      { category: "What to Assess", text: "Thyroid parenchyma, nodules, and surrounding structures." },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Patient Positioning\', \'tip_content\': \"Ensure the patient\'s neck is adequately hyperex" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Transducer Selection\', \'tip_content\': \'Use a high-frequency linear transducer for opt" }
+      { category: "Patient Positioning", text: "Supine with neck hyperextended. Mirror the right lobe technique. The left lobe lies lateral to the trachea and anterior to the left carotid artery and IJV. The esophagus is typically posterior-medial to the left lobe." },
+      { category: "Transducer Positioning", text: "Transverse plane, sweeping from superior to inferior through the left lobe. Identify the left carotid artery and IJV as landmarks. The esophagus is posterior-medial to the left lobe." },
+      { category: "What to Assess", text: "Same as right lobe: dimensions, echogenicity, nodules, vascularity. Compare symmetry with right lobe. Assess the posterior aspect carefully for parathyroid adenomas (oval, hypoechoic structures posterior to the lobe, <1 cm normally)." },
+      { category: "Scanning Tip", text: "The left recurrent laryngeal nerve runs in the tracheoesophageal groove — a critical surgical landmark. Nodules in the posterior medial aspect of the left lobe are at higher risk for RLN involvement. Document the relationship of any posterior nodule to the tracheoesophageal groove." },
+      { category: "Pitfall", text: "The esophagus posterior to the left lobe can be mistaken for a parathyroid adenoma or lymph node. Have the patient swallow — the esophagus will move and show peristalsis, confirming its identity. A true parathyroid adenoma will not move with swallowing." },
     ],
   },
   {
-    view: "Longitudinal Left Lobe",
-    probe: "Medial, Mid, and Lateral Left Lobe",
+    view: "Longitudinal Survey — Left Lobe",
+    probe: "Linear 12–18 MHz",
     tips: [
-      { category: "Patient Positioning", text: "Supine with the neck hyperextended, with a pad or pillow under the shoulders. Upright positioning may be used if the patient cannot tolerate hyperexte" },
-      { category: "Transducer Positioning", text: "Medial, Mid, and Lateral Left Lobe" },
-      { category: "What to Assess", text: "Thyroid parenchyma, nodules, and surrounding structures." },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Patient Positioning\', \'tip_content\': \"Ensure the patient\'s neck is adequately hyperex" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Transducer Selection\', \'tip_content\': \'Use a high-frequency linear transducer for opt" }
+      { category: "Patient Positioning", text: "Supine with neck hyperextended. Longitudinal plane through the left lobe, medial to lateral sweeps. Measure craniocaudal length at the longest dimension." },
+      { category: "Transducer Positioning", text: "Longitudinal plane, parallel to the long axis of the left lobe. Three sweeps: medial (near trachea/esophagus), mid, and lateral. Identify the left carotid artery in the lateral sweep as a landmark." },
+      { category: "What to Assess", text: "Craniocaudal length; superior and inferior pole definition; any nodules (measure in three planes); pyramidal lobe (if present, arises from the isthmus and extends superiorly, typically to the left of midline)." },
+      { category: "Scanning Tip", text: "For any nodule identified, document: location (lobe, pole, isthmus), size in three planes, ACR TI-RADS category (composition, echogenicity, shape, margin, echogenic foci), and vascularity on color Doppler. Standardized reporting facilitates consistent follow-up recommendations." },
     ],
   },
   {
-    view: "Transverse Isthmus",
-    probe: "Midline, between the right and left lobes",
+    view: "Isthmus",
+    probe: "Linear 12–18 MHz",
     tips: [
-      { category: "Patient Positioning", text: "Supine with the neck hyperextended, with a pad or pillow under the shoulders. Upright positioning may be used if the patient cannot tolerate hyperexte" },
-      { category: "Transducer Positioning", text: "Midline, between the right and left lobes" },
-      { category: "What to Assess", text: "Isthmus parenchyma and thickness." },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Patient Positioning\', \'tip_content\': \"Ensure the patient\'s neck is adequately hyperex" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Transducer Selection\', \'tip_content\': \'Use a high-frequency linear transducer for opt" }
+      { category: "Patient Positioning", text: "Supine with neck hyperextended. The isthmus is the bridge of thyroid tissue connecting the right and left lobes, lying anterior to the trachea at the level of the 2nd–4th tracheal rings." },
+      { category: "Transducer Positioning", text: "Transverse plane at the midline, anterior to the trachea. Measure the AP thickness of the isthmus. Normal isthmus thickness: <3 mm. Scan in longitudinal plane to assess for pyramidal lobe extending superiorly." },
+      { category: "What to Assess", text: "Isthmus thickness (AP dimension in transverse plane); any focal nodules; pyramidal lobe (extends superiorly from isthmus, present in ~50%); Delphian lymph node (prelaryngeal node — if enlarged, may indicate papillary thyroid cancer or Hashimoto's thyroiditis)." },
+      { category: "Pearl", text: "Isthmus thickness >3 mm is considered enlarged. Diffuse isthmus enlargement is seen in Hashimoto's thyroiditis and Graves' disease. A focal isthmus nodule should be characterized with the same TI-RADS criteria as lobe nodules. Isthmus nodules may be more palpable than lobe nodules." },
+    ],
+  },
+  {
+    view: "Nodule Characterization (ACR TI-RADS)",
+    probe: "Linear 12–18 MHz; standoff pad for very superficial nodules",
+    tips: [
+      { category: "Patient Positioning", text: "Supine with neck hyperextended. Center the nodule in the field of view. Measure in three orthogonal planes in the view where the nodule appears largest." },
+      { category: "Transducer Positioning", text: "Center the nodule. Scan in transverse and longitudinal planes. Use color/power Doppler to assess vascularity (perinodular vs. intranodular). Use elastography if available." },
+      { category: "What to Assess", text: "ACR TI-RADS scoring — (1) Composition: cystic/almost completely cystic (0 pts), spongiform (0 pts), mixed cystic/solid (1 pt), solid/almost completely solid (2 pts); (2) Echogenicity: anechoic (0), hyperechoic/isoechoic (1), hypoechoic (2), very hypoechoic (3); (3) Shape: wider-than-tall (0), taller-than-wide (3); (4) Margin: smooth/ill-defined (0), lobulated/irregular (2), extrathyroidal extension (3); (5) Echogenic foci: none/large comet-tail (0), macrocalcifications (1), peripheral calcifications (2), punctate echogenic foci (3)." },
+      { category: "Scanning Tip", text: "ACR TI-RADS categories: TR1 (0 pts) = benign; TR2 (2 pts) = not suspicious; TR3 (3 pts) = mildly suspicious — FNA if ≥2.5 cm, follow if ≥1.5 cm; TR4 (4–6 pts) = moderately suspicious — FNA if ≥1.5 cm, follow if ≥1 cm; TR5 (≥7 pts) = highly suspicious — FNA if ≥1 cm, follow if ≥0.5 cm." },
+      { category: "Pearl", text: "Punctate echogenic foci (PEF) within a solid nodule are the most suspicious TI-RADS feature — they represent psammomatous calcifications strongly associated with papillary thyroid carcinoma. However, PEF in a cystic component (comet-tail artifact) are benign colloid crystals and score 0 points." },
+      { category: "Pitfall", text: "Taller-than-wide shape (AP > transverse in the transverse plane) is the single highest-scoring TI-RADS feature (3 points). Always measure in the transverse plane to determine shape. A nodule that appears taller-than-wide only in the longitudinal plane does not score 3 points — shape is assessed in the transverse plane only." },
     ],
   },
   {
     view: "Cervical Lymph Nodes",
-    probe: "Levels I-VI of the neck",
+    probe: "Linear 12–18 MHz",
     tips: [
-      { category: "Patient Positioning", text: "Supine with the neck hyperextended, with a pad or pillow under the shoulders. Upright positioning may be used if the patient cannot tolerate hyperexte" },
-      { category: "Transducer Positioning", text: "Levels I-VI of the neck" },
-      { category: "What to Assess", text: "Size, shape, echogenicity, and vascularity of lymph nodes." },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Patient Positioning\', \'tip_content\': \"Ensure the patient\'s neck is adequately hyperex" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Transducer Selection\', \'tip_content\': \'Use a high-frequency linear transducer for opt" }
+      { category: "Patient Positioning", text: "Supine with neck hyperextended. Systematically evaluate cervical lymph node levels I–VI. Levels II, III, IV, and VI (central compartment) are most relevant for thyroid cancer staging." },
+      { category: "Transducer Positioning", text: "Scan along the carotid sheath (levels II–IV), the posterior triangle (level V), the submental/submandibular region (levels I–II), and the central compartment (level VI — between the carotid arteries, from hyoid to sternal notch)." },
+      { category: "What to Assess", text: "Suspicious features: round shape (L/S ratio <2), loss of fatty hilum, heterogeneous echogenicity, cystic change (strongly suspicious for papillary thyroid cancer metastasis), calcifications, peripheral vascularity, size >1 cm short axis. Normal nodes: oval, echogenic hilum, hilar vascularity, short axis <1 cm." },
+      { category: "Scanning Tip", text: "Cystic change in a cervical lymph node is highly suspicious for papillary thyroid cancer metastasis — it represents cystic degeneration of metastatic papillary carcinoma. This finding alone warrants FNA even if the node is small. Thyroglobulin washout from FNA can confirm thyroid origin." },
+      { category: "Pearl", text: "Level VI (central compartment) nodes are the most common site of regional metastasis from papillary thyroid cancer. They are located between the carotid arteries, from the hyoid bone to the sternal notch. These nodes are often small and difficult to visualize — use high-frequency transducer and scan systematically." },
     ],
   },
   {
     view: "Parathyroid Glands",
-    probe: "Posterior to the thyroid lobes",
+    probe: "Linear 12–18 MHz",
     tips: [
-      { category: "Patient Positioning", text: "Supine with the neck hyperextended, with a pad or pillow under the shoulders. Upright positioning may be used if the patient cannot tolerate hyperexte" },
-      { category: "Transducer Positioning", text: "Posterior to the thyroid lobes" },
-      { category: "What to Assess", text: "Size, shape, and echogenicity of parathyroid glands." },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Patient Positioning\', \'tip_content\': \"Ensure the patient\'s neck is adequately hyperex" },
-      { category: "Scanning Tip", text: "{\'tip_title\': \'Transducer Selection\', \'tip_content\': \'Use a high-frequency linear transducer for opt" }
+      { category: "Patient Positioning", text: "Supine with neck hyperextended. Normal parathyroid glands are typically not visible on ultrasound (<5 mm). Ultrasound is used to localize parathyroid adenomas in patients with primary hyperparathyroidism prior to surgery." },
+      { category: "Transducer Positioning", text: "Scan the posterior aspect of each thyroid lobe in both transverse and longitudinal planes. The superior parathyroids are at the posterior aspect of the upper thyroid lobe; the inferior parathyroids are at the posterior aspect of the lower pole (more variable location)." },
+      { category: "What to Assess", text: "Parathyroid adenoma: oval, hypoechoic (darker than thyroid), homogeneous, well-defined, posterior to thyroid lobe, typically 1–3 cm. Vascularity: peripheral 'arc' or 'polar' vessel on color Doppler (feeding vessel entering the polar end). Ectopic locations: retroesophageal, mediastinal, intrathyroidal." },
+      { category: "Scanning Tip", text: "The 'polar vessel sign' (a feeding artery entering the polar end of the adenoma) is highly specific for parathyroid adenoma. Use color Doppler at low PRF (3–5 cm/s) to detect the polar vessel. This sign helps distinguish parathyroid adenoma from a posterior thyroid nodule or lymph node." },
+      { category: "Pearl", text: "Parathyroid adenomas are typically solitary (85% of cases). Multigland disease (hyperplasia) accounts for ~15% and is associated with MEN1, MEN2A, and familial hyperparathyroidism. Ultrasound sensitivity for parathyroid adenoma is 70–80%; combine with sestamibi scan for preoperative localization." },
+      { category: "Pitfall", text: "Posterior thyroid nodules, lymph nodes, and the esophagus can all mimic parathyroid adenomas. Key differentiators: parathyroid adenomas are hypoechoic relative to thyroid (posterior nodules are part of the thyroid and isoechoic); the esophagus moves with swallowing; lymph nodes have a fatty hilum." },
     ],
-  }
+  },
 ];
 
 const examTips = [
-  { category: "Scanning Tip", text: "{\'tip_title\': \'Patient Positioning\', \'tip_content\': \"Ensure the patient\'s neck is adequately hyperextended to bring the thyroid gland into a more supe" },
-  { category: "Scanning Tip", text: "{\'tip_title\': \'Transducer Selection\', \'tip_content\': \'Use a high-frequency linear transducer for optimal resolution of the superficial thyroid gland a" },
-  { category: "Scanning Tip", text: "{\'tip_title\': \'Complete Gland Survey\', \'tip_content\': \"Systematically scan through the entire gland in both transverse and longitudinal planes, from t" },
-  { category: "Scanning Tip", text: "{\'tip_title\': \'Nodule Characterization\', \'tip_content\': \'When a nodule is identified, carefully assess its sonographic features, including composition" },
-  { category: "Scanning Tip", text: "{\'tip_title\': \'Lymph Node Evaluation\', \'tip_content\': \'Systematically evaluate the cervical lymph node chains, paying close attention to levels II, II" },
-  { category: "Scanning Tip", text: "{\'tip_title\': \'Optimize Doppler Settings\', \'tip_content\': \'When using color Doppler, adjust the scale, gain, and filter settings to be sensitive to th" },
-  { category: "Scanning Tip", text: "{\'tip_title\': \'Look for the Parathyroids\', \'tip_content\': \'The parathyroid glands are typically located posterior to the thyroid lobes. Look for small" },
-  { category: "Scanning Tip", text: "{\'tip_title\': \'Document Substernal Extension\', \'tip_content\': \'If the lower poles of the thyroid gland extend into the superior mediastinum, document " }
+  { category: "Preparation", text: "No patient preparation is required for thyroid ultrasound. The patient should be supine with the neck hyperextended — a pillow under the shoulders helps. If the patient cannot tolerate hyperextension, a semi-reclined position is acceptable. Remove any neck jewelry before scanning." },
+  { category: "Equipment", text: "Use a high-frequency linear transducer (12–18 MHz) for most thyroid examinations. Higher frequency (15–18 MHz) improves resolution for small nodules and superficial structures. Use tissue harmonic imaging to reduce artifact. Spatial compound imaging improves margin definition." },
+  { category: "Scanning Tip", text: "Systematically scan the entire gland in both transverse and longitudinal planes before focusing on any specific finding. Start with a survey of the right lobe, then isthmus, then left lobe. Measure each lobe in three dimensions and calculate volume. Document the overall echogenicity relative to adjacent strap muscle." },
+  { category: "Pearl", text: "Diffuse thyroid disease (Hashimoto's thyroiditis, Graves' disease) is characterized by heterogeneous echogenicity, increased vascularity on color Doppler (Graves'), and decreased echogenicity relative to strap muscle. Hashimoto's shows a 'micronodular' or 'pseudolobular' pattern with fibrous septae." },
+  { category: "Pitfall", text: "Substernal extension of the thyroid (inferior poles below the clavicle) limits ultrasound assessment. Document the depth of the inferior pole below the clavicle. CT or MRI is required for complete evaluation of substernal goiter. Always assess the trachea for deviation or compression." },
 ];
 
 const TIP_COLORS: Record<string, string> = {
@@ -113,13 +122,14 @@ const TIP_COLORS: Record<string, string> = {
   "Optimization": "#0e4a50",
   "Pitfall": "#d97706",
   "Pearl": "#059669",
+  "Preparation": "#0e4a50",
+  "Equipment": "#189aa1",
 };
 
 export default function ThyroidScanCoach() {
   const { isPremium } = usePremium();
   const [selectedView, setSelectedView] = useState(0);
-  const [expandedTip, setExpandedTip] = useState<number | null>(null);
-  const [showExamTips, setShowGeneral] = useState(false);
+  const [showExamTips, setShowExamTips] = useState(false);
 
   const currentView = views[selectedView];
 
@@ -148,7 +158,7 @@ export default function ThyroidScanCoach() {
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">View-by-View Acquisition Guidance</p>
               <p className="text-white/70 text-xs mt-1 max-w-xl">
-                Probe: High-frequency linear array transducer (10-14 MHz or higher)
+                Probe: Linear 12–18 MHz · ACR TI-RADS 2017 · AIUM 2019 Guidelines
               </p>
               <div className="mt-3">
                 <Link href="/thyroid-navigator">
@@ -211,33 +221,35 @@ export default function ThyroidScanCoach() {
 
             {/* Tips */}
             <div className="p-5 space-y-3">
-              {currentView.tips.map((tip, ti) => (
-                <div
-                  key={ti}
-                  className="rounded-xl p-4 border"
-                  style={{
-                    borderColor: (TIP_COLORS[tip.category] || "#189aa1") + "30",
-                    background: (TIP_COLORS[tip.category] || "#189aa1") + "08",
-                  }}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <Lightbulb className="w-3.5 h-3.5 flex-shrink-0" style={{ color: TIP_COLORS[tip.category] || "#189aa1" }} />
-                    <span className="text-xs font-bold uppercase tracking-wider" style={{ color: TIP_COLORS[tip.category] || "#189aa1" }}>
-                      {tip.category}
-                    </span>
+              <PremiumGate>
+                {currentView.tips.map((tip, ti) => (
+                  <div
+                    key={ti}
+                    className="rounded-xl p-4 border"
+                    style={{
+                      borderColor: (TIP_COLORS[tip.category] || "#189aa1") + "30",
+                      background: (TIP_COLORS[tip.category] || "#189aa1") + "08",
+                    }}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <Lightbulb className="w-3.5 h-3.5 flex-shrink-0" style={{ color: TIP_COLORS[tip.category] || "#189aa1" }} />
+                      <span className="text-xs font-bold uppercase tracking-wider" style={{ color: TIP_COLORS[tip.category] || "#189aa1" }}>
+                        {tip.category}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-700 leading-relaxed">{tip.text}</p>
                   </div>
-                  <p className="text-sm text-gray-700 leading-relaxed">{tip.text}</p>
-                </div>
-              ))}
+                ))}
+              </PremiumGate>
             </div>
           </div>
         )}
 
-        {/* General tips section */}
+        {/* Exam Tips section */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-5">
           <button
             className="w-full flex items-center gap-3 px-5 py-3 hover:bg-[#f0fbfc] transition-all"
-            onClick={() => setShowGeneral(!showExamTips)}
+            onClick={() => setShowExamTips(!showExamTips)}
           >
             <Lightbulb className="w-4 h-4 text-[#189aa1] flex-shrink-0" />
             <span className="font-bold text-sm text-gray-700 flex-1 text-left" style={{ fontFamily: "Merriweather, serif" }}>
@@ -248,9 +260,9 @@ export default function ThyroidScanCoach() {
           {showExamTips && (
             <div className="border-t border-gray-100 p-5 space-y-3">
               {examTips.map((tip, ti) => (
-                <div key={ti} className="rounded-xl p-4 border" style={{ borderColor: "#189aa140", background: "#f0fbfc" }}>
+                <div key={ti} className="rounded-xl p-4 border" style={{ borderColor: (TIP_COLORS[tip.category] || "#189aa1") + "40", background: "#f0fbfc" }}>
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-bold uppercase tracking-wider text-[#189aa1]">{tip.category}</span>
+                    <span className="text-xs font-bold uppercase tracking-wider" style={{ color: TIP_COLORS[tip.category] || "#189aa1" }}>{tip.category}</span>
                   </div>
                   <p className="text-sm text-gray-700">{tip.text}</p>
                 </div>
@@ -261,7 +273,7 @@ export default function ThyroidScanCoach() {
 
         {/* Reference */}
         <div className="text-xs text-gray-400 px-1 mt-4">
-          Based on: <a href="https://www.aium.org/resources/practice-parameters" target="_blank" rel="noopener noreferrer" className="underline hover:text-[#189aa1]">AIUM Practice Parameter for the Performance of a Thyroid and Parathyroid Ultrasound Examination (2019)</a>
+          Based on: <a href="https://www.aium.org/resources/practice-parameters" target="_blank" rel="noopener noreferrer" className="underline hover:text-[#189aa1]">AIUM Practice Parameter for Thyroid and Parathyroid Ultrasound (2019)</a> · <a href="https://www.acr.org/Clinical-Resources/Reporting-and-Data-Systems/TI-RADS" target="_blank" rel="noopener noreferrer" className="underline hover:text-[#189aa1]">ACR TI-RADS (2017)</a>
         </div>
       </div>
     </Layout>

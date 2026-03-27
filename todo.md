@@ -793,3 +793,16 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] AbdominalVascularNavigator: split into 3 tabs — Liver Duplex, Mesenteric Duplex, Renal Artery Duplex (Aorta stays standalone)
 - [x] AbdominalVascularScanCoach: split into 3 tabs with view-specific tips, protocols, and exam criteria
 - [x] Remove duplicate TCD card from UltrasoundAssist hub page (keep second one, remove first)
+
+## Remaining ScanCoach/Navigator Rewrites (Mar 26)
+- [x] BreastScanCoach: replace raw JSON tips with full clinical content
+- [x] TCDScanCoach: replace raw JSON tips with full clinical content (4 adult windows + neonatal fontanelle)
+- [x] ThyroidScanCoach: replace raw JSON tips with full clinical content (8 views, ACR TI-RADS)
+- [x] ScrotumScanCoach: replace raw JSON tips with full clinical content
+- [x] PelvicGynScanCoach: add TA/TVS tabs, replace raw JSON tips (TA: 3 views, TVS: 4 views)
+- [x] OB1ScanCoach: replace raw JSON tips with full clinical content (6 views)
+- [x] OB23ScanCoach: replace raw JSON tips with full clinical content (11 views)
+- [x] MSKScanCoach: replace raw JSON tips with full clinical content (7 views + 7 Exam Tips)
+- [x] TCDNavigator: replace thin single-item checklists with full protocol items (5 windows, 25 items)
+- [ ] Verify POCUS ScanCoaches (eFAST, Lung, RUSH, Cardiac) — confirm no raw JSON
+- [x] All other Navigators audited — content is complete and well-structured
