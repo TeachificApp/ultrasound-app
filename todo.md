@@ -806,3 +806,26 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] TCDNavigator: replace thin single-item checklists with full protocol items (5 windows, 25 items)
 - [ ] Verify POCUS ScanCoaches (eFAST, Lung, RUSH, Cardiac) — confirm no raw JSON
 - [x] All other Navigators audited — content is complete and well-structured
+
+## ScanCoach Editor Pre-Population (Mar 26)
+- [ ] Seed DB with all static ScanCoach content so Editor pre-populates for every module/view
+- [ ] Editor should show current static tips as editable default content for all 19 modules
+
+## Navigator Editor & ScanCoach Pre-Population (Mar 26)
+- [ ] Add navigatorOverrides table to DB schema (module, viewId, items JSON, referenceValues JSON, examTips JSON)
+- [ ] Build navigatorAdminRouter.ts with listOverrides, upsertOverride, deleteOverride procedures
+- [ ] Seed DB with all static ScanCoach content for all 19 modules (so Editor pre-populates)
+- [ ] Build NavigatorEditor.tsx admin page with module selector, view accordion, checklist item CRUD
+- [ ] Add reference value editing to NavigatorEditor (per-category tables)
+- [ ] Wire all Navigator pages to use DB overrides when present, falling back to static content
+- [ ] Add NavigatorEditor link to PlatformAdmin panel
+- [x] MSKNavigator + MSKScanCoach: remove "Musculoskeletal 2023" verbiage from both pages
+
+## Navigator Editor (Mar 26)
+- [x] navigatorOverrides DB table created (module, sectionName, probe, items JSON, sortOrder)
+- [x] navigatorAdminRouter: listSections, upsertSection, deleteSection, reorderSections, listModules
+- [x] NavigatorEditor.tsx: module selector, section accordion, inline edit/delete/add/reorder per item
+- [x] Static seed data for all 19 modules embedded — shows current content pre-loaded without DB
+- [x] "Seed to Database" button to persist all static content to DB in one click
+- [x] Route /admin/navigator registered in App.tsx with admin guard
+- [x] Navigator Editor link added to PlatformAdmin admin tools grid

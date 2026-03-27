@@ -2515,3 +2515,27 @@ export const appSettings = mysqlTable("appSettings", {
 });
 export type AppSetting = typeof appSettings.$inferSelect;
 export type InsertAppSetting = typeof appSettings.$inferInsert;
+
+// ─── Navigator Overrides ──────────────────────────────────────────────────────
+// Stores admin-editable checklist items, reference values, and exam tips
+// for each Navigator module/section. When a row exists for a module, the
+// Navigator page uses the DB data instead of the static code defaults.
+export const navigatorOverrides = mysqlTable("navigatorOverrides", {
+  id: int("id").primaryKey().autoincrement(),
+  // Navigator module key (e.g. "abdominal", "venous", "carotid", "msk")
+  module: varchar("module", { length: 64 }).notNull(),
+  // Section/view name within the module (e.g. "Liver", "Shoulder")
+  sectionName: varchar("sectionName", { length: 128 }).notNull(),
+  // Probe/approach description for this section
+  probe: text("probe"),
+  // JSON array of checklist items: { id, label, detail, critical, sortOrder }
+  items: text("items"),
+  // Sort order of this section within the module (0 = first)
+  sortOrder: int("sortOrder").default(0),
+  // Metadata
+  updatedByUserId: int("updatedByUserId"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type NavigatorOverride = typeof navigatorOverrides.$inferSelect;
+export type InsertNavigatorOverride = typeof navigatorOverrides.$inferInsert;

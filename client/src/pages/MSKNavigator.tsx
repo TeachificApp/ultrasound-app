@@ -1,6 +1,5 @@
 /*
-  UltrasoundAssist™ — MSK Ultrasound (Musculoskeletal 2023) Navigator
-  Based on: AIUM Practice Parameter for the Performance of a Musculoskeletal Ultrasound Examination (2023)
+  UltrasoundAssist™ — MSK Ultrasound Navigator
   Brand: Teal #189aa1, Aqua #4ad9e0
   Fonts: Merriweather headings, Open Sans body
 */
@@ -152,7 +151,7 @@ export default function MSKNavigator() {
                 <span className="text-sm text-white/80 font-medium">MSK · Protocol Navigator</span>
               </div>
               <h1 className="text-2xl md:text-3xl font-black text-white leading-tight" style={{ fontFamily: "Merriweather, serif" }}>
-                MSK Ultrasound (Musculoskeletal 2023) Navigator
+                MSK Ultrasound Navigator
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">Protocol Checklist &amp; Reference Values</p>
               <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">

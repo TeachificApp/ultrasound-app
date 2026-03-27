@@ -20,6 +20,7 @@ import { educatorRouter } from "./routers/educatorRouter";
 import { sonoQuizRouter } from "./routers/sonoQuizRouter";
 import { emailCampaignRouter } from "./routers/emailCampaignRouter";
 import { menuLinksRouter } from "./routers/menuLinksRouter";
+import { navigatorAdminRouter } from "./routers/navigatorAdminRouter";
 import {
   getUserById,
   getUsersByIds,
@@ -1756,6 +1757,7 @@ export const appRouter = router({
 
   // ─── ScanCoach WYSIWYG Admin ──────────────────────────────────────────────────
   scanCoachAdmin: scanCoachAdminRouter,
+  navigatorAdmin: navigatorAdminRouter,
 
   // ─── DIY Accreditation ─────────────────────────────────────────────────────────────
   diy: diyRouter,

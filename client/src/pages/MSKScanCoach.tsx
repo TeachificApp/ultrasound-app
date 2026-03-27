@@ -1,6 +1,5 @@
 /*
-  UltrasoundAssist™ — MSK Ultrasound (Musculoskeletal 2023) ScanCoach
-  Based on: AIUM Practice Parameter for the Performance of a Musculoskeletal Ultrasound Examination (2023)
+  UltrasoundAssist™ — MSK Ultrasound ScanCoach
   Brand: Teal #189aa1, Aqua #4ad9e0
   Fonts: Merriweather headings, Open Sans body
 */
@@ -159,7 +158,7 @@ export default function MSKScanCoach() {
                 <span className="text-sm text-white/80 font-medium">MSK · ScanCoach™</span>
               </div>
               <h1 className="text-2xl md:text-3xl font-black text-white leading-tight" style={{ fontFamily: "Merriweather, serif" }}>
-                MSK Ultrasound (Musculoskeletal 2023) ScanCoach™
+                MSK Ultrasound ScanCoach™
               </h1>
               <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">View-by-View Acquisition Guidance</p>
               <p className="text-white/70 text-xs mt-1 max-w-xl">
@@ -276,7 +275,7 @@ export default function MSKScanCoach() {
 
         {/* Reference */}
         <div className="text-xs text-gray-400 px-1 mt-4">
-          Based on: <a href="https://www.aium.org/resources/practice-parameters" target="_blank" rel="noopener noreferrer" className="underline hover:text-[#189aa1]">AIUM Practice Parameter for the Performance of a Musculoskeletal Ultrasound Examination (2023)</a>
+          
         </div>
       </div>
     </Layout>

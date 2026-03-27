@@ -1030,6 +1030,13 @@ export default function PlatformAdmin() {
                 color: "#0d9488",
               },
               {
+                href: "/admin/navigator",
+                icon: ClipboardList,
+                label: "Navigator Editor",
+                description: "Edit protocol checklists, probe descriptions, and reference items for all Navigator modules",
+                color: "#0891b2",
+              },
+              {
                 href: "/admin/thinkific-webhook",
                 icon: Webhook,
                 label: "Thinkific Webhook",
