@@ -66,7 +66,59 @@ const specialties = [
     navigatorFree: true,
     scanCoachFree: false,
   },
-  // ── VASCULAR — Carotid always first ──────────────────────────────────────
+  // ── SMALL PARTS ───────────────────────────────────────────────────────────
+  {
+    path: "/thyroid-navigator",
+    scanCoachPath: "/thyroid-scan-coach",
+    icon: Activity,
+    title: "Thyroid & Small Parts",
+    description: "Thyroid lobes, isthmus, nodule characterization (ACR TI-RADS), cervical lymph nodes, and ultrasound-guided FNA/core biopsy — per ACR TI-RADS 2017 guidelines.",
+    badge: "Thyroid",
+    navigatorFree: true,
+    scanCoachFree: false,
+  },
+  {
+    path: "/scrotum-navigator",
+    scanCoachPath: "/scrotum-scan-coach",
+    icon: Circle,
+    title: "Scrotum Ultrasound",
+    description: "Testes, epididymis, and extratesticular structures — scrotal ultrasound protocol with torsion assessment and color Doppler per AIUM guidelines.",
+    badge: "Scrotum",
+    navigatorFree: true,
+    scanCoachFree: false,
+  },
+  {
+    path: "/breast-navigator",
+    scanCoachPath: "/breast-scan-coach",
+    icon: Circle,
+    title: "Breast Ultrasound",
+    description: "Systematic breast survey, lesion characterization (ACR BI-RADS), ultrasound-guided biopsy (core/FNA/VAB), and pre-surgical lumpectomy localisation.",
+    badge: "Breast",
+    navigatorFree: false,
+    scanCoachFree: false,
+  },
+  // ── PROCEDURAL ────────────────────────────────────────────────────────────
+  {
+    path: "/appendix-navigator",
+    scanCoachPath: "/appendix-scan-coach",
+    icon: Search,
+    title: "Appendix Ultrasound",
+    description: "Graded compression technique for appendicitis — RLQ survey, appendix identification, periappendiceal assessment, and alternative RLQ diagnoses per ACR 2022 guidelines.",
+    badge: "Appendix",
+    navigatorFree: false,
+    scanCoachFree: false,
+  },
+  {
+    path: "/invasive-procedures-navigator",
+    scanCoachPath: "/invasive-procedures-scan-coach",
+    icon: Syringe,
+    title: "Invasive Procedures",
+    description: "Ultrasound-guided paracentesis and thoracentesis — site selection, real-time needle guidance, and post-procedure assessment per ACCP/ATS/SHM/SCCM 2020 consensus.",
+    badge: "Procedures",
+    navigatorFree: false,
+    scanCoachFree: false,
+  },
+  // ── VASCULAR — all 6, Carotid first, immediately before MSK ──────────────
   {
     path: "/carotid-navigator",
     scanCoachPath: "/carotid-scan-coach",
@@ -124,58 +176,6 @@ const specialties = [
     title: "Vascular — Intracranial Duplex/TCD",
     description: "Transcranial Doppler and duplex — MCA, ACA, PCA, basilar, and vertebral arteries via temporal, orbital, and suboccipital windows per AIUM guidelines.",
     badge: "TCD",
-    navigatorFree: false,
-    scanCoachFree: false,
-  },
-  // ── SMALL PARTS ───────────────────────────────────────────────────────────
-  {
-    path: "/thyroid-navigator",
-    scanCoachPath: "/thyroid-scan-coach",
-    icon: Activity,
-    title: "Thyroid & Small Parts",
-    description: "Thyroid lobes, isthmus, nodule characterization (ACR TI-RADS), cervical lymph nodes, and ultrasound-guided FNA/core biopsy — per ACR TI-RADS 2017 guidelines.",
-    badge: "Thyroid",
-    navigatorFree: true,
-    scanCoachFree: false,
-  },
-  {
-    path: "/scrotum-navigator",
-    scanCoachPath: "/scrotum-scan-coach",
-    icon: Circle,
-    title: "Scrotum Ultrasound",
-    description: "Testes, epididymis, and extratesticular structures — scrotal ultrasound protocol with torsion assessment and color Doppler per AIUM guidelines.",
-    badge: "Scrotum",
-    navigatorFree: true,
-    scanCoachFree: false,
-  },
-  {
-    path: "/breast-navigator",
-    scanCoachPath: "/breast-scan-coach",
-    icon: Circle,
-    title: "Breast Ultrasound",
-    description: "Systematic breast survey, lesion characterization (ACR BI-RADS), ultrasound-guided biopsy (core/FNA/VAB), and pre-surgical lumpectomy localisation.",
-    badge: "Breast",
-    navigatorFree: false,
-    scanCoachFree: false,
-  },
-  // ── PROCEDURAL ────────────────────────────────────────────────────────────
-  {
-    path: "/appendix-navigator",
-    scanCoachPath: "/appendix-scan-coach",
-    icon: Search,
-    title: "Appendix Ultrasound",
-    description: "Graded compression technique for appendicitis — RLQ survey, appendix identification, periappendiceal assessment, and alternative RLQ diagnoses per ACR 2022 guidelines.",
-    badge: "Appendix",
-    navigatorFree: false,
-    scanCoachFree: false,
-  },
-  {
-    path: "/invasive-procedures-navigator",
-    scanCoachPath: "/invasive-procedures-scan-coach",
-    icon: Syringe,
-    title: "Invasive Procedures",
-    description: "Ultrasound-guided paracentesis and thoracentesis — site selection, real-time needle guidance, and post-procedure assessment per ACCP/ATS/SHM/SCCM 2020 consensus.",
-    badge: "Procedures",
     navigatorFree: false,
     scanCoachFree: false,
   },
@@ -368,26 +368,26 @@ export default function UltrasoundAssistHub() {
         </div>
       </div>
 
-      {/* iHeartEcho EchoAssist CTA */}
+      {/* iHeartEcho EchoAssist CTA — brand teal/navy */}
       <div className="container pb-10">
         <div
-          className="relative overflow-hidden rounded-2xl p-6 md:p-8"
-          style={{ background: "linear-gradient(135deg, #0e1e2e 0%, #1a1040 60%, #2d1b69 100%)" }}
+          className="relative overflow-hidden rounded-2xl p-6 md:p-8 border border-[#189aa1]/20"
+          style={{ background: "linear-gradient(135deg, #0e1e2e 0%, #0a3040 50%, #0e4a50 100%)" }}
         >
           <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
             <div
               className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
-              style={{ background: "rgba(255,255,255,0.1)" }}
+              style={{ background: "rgba(24,154,161,0.2)", border: "1px solid rgba(74,217,224,0.3)" }}
             >
               <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 21C12 21 3 15 3 9C3 6.23858 5.23858 4 8 4C9.65685 4 11.1217 4.7835 12 6C12.8783 4.7835 14.3431 4 16 4C18.7614 4 21 6.23858 21 9C21 15 12 21 12 21Z" fill="#e879f9" stroke="#e879f9" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M12 21C12 21 3 15 3 9C3 6.23858 5.23858 4 8 4C9.65685 4 11.1217 4.7835 12 6C12.8783 4.7835 14.3431 4 16 4C18.7614 4 21 6.23858 21 9C21 15 12 21 12 21Z" fill="#4ad9e0" stroke="#4ad9e0" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
                 <span
-                  className="text-xs font-bold px-2 py-0.5 rounded-full text-white"
-                  style={{ background: "rgba(232,121,249,0.25)", border: "1px solid rgba(232,121,249,0.4)" }}
+                  className="text-xs font-bold px-2 py-0.5 rounded-full"
+                  style={{ background: "rgba(74,217,224,0.15)", border: "1px solid rgba(74,217,224,0.35)", color: "#4ad9e0" }}
                 >
                   Echo-Focused
                 </span>
@@ -410,7 +410,7 @@ export default function UltrasoundAssistHub() {
             >
               <button
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 hover:scale-105"
-                style={{ background: "linear-gradient(135deg, #a855f7, #e879f9)" }}
+                style={{ background: "linear-gradient(135deg, #189aa1, #4ad9e0)" }}
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M12 21C12 21 3 15 3 9C3 6.23858 5.23858 4 8 4C9.65685 4 11.1217 4.7835 12 6C12.8783 4.7835 14.3431 4 16 4C18.7614 4 21 6.23858 21 9C21 15 12 21 12 21Z" fill="white" stroke="white" strokeWidth="1.5"/>
