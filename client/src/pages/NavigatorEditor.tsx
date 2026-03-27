@@ -98,9 +98,10 @@ function SortableItemRow({
   };
 
   return (
-    <div
+      <div
       ref={setNodeRef}
       style={style}
+      draggable={false}
       className={`border-b border-gray-50 last:border-0 ${item.critical ? "bg-amber-50/30" : ""}`}
     >
       <div className="flex items-start gap-2 px-4 py-2.5">
@@ -537,11 +538,13 @@ export default function NavigatorEditor() {
               <div
                 key={si}
                 className={`bg-white rounded-xl border shadow-sm overflow-hidden ${section.isDirty ? "border-amber-300" : "border-gray-100"}`}
-                onDragOver={e => handleSectionDragOver(e, si)}
-                onDrop={e => { e.preventDefault(); }}
               >
                 {/* Section header */}
-                <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border-b border-gray-100">
+                <div
+                  className="flex items-center gap-2 px-4 py-3 bg-gray-50 border-b border-gray-100"
+                  onDragOver={e => handleSectionDragOver(e, si)}
+                  onDrop={e => { e.preventDefault(); }}
+                >
                   <span
                     draggable
                     onDragStart={e => handleSectionDragStart(e, si)}
