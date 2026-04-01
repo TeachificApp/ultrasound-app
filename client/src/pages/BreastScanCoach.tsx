@@ -4,7 +4,7 @@
   Brand: Teal #189aa1, Aqua #4ad9e0
   Fonts: Merriweather headings, Open Sans body
 */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
@@ -13,9 +13,11 @@ import { PremiumGate } from "@/components/PremiumGate";
 import { BlurredOverlay } from "@/components/BlurredOverlay";
 import { usePremium } from "@/hooks/usePremium";
 import { breastBilling } from "@/lib/scanCoachBillingCodes";
+import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 
 const views = [
   {
+    id: "lesion",
     view: "Whole-Breast Survey (Bilateral)",
     probe: "Linear 12–18 MHz",
     tips: [
@@ -28,6 +30,7 @@ const views = [
     ],
   },
   {
+    id: "lesion",
     view: "Breast Lesion Characterization",
     probe: "Linear 12–18 MHz (standoff pad for superficial lesions)",
     tips: [
@@ -40,6 +43,7 @@ const views = [
     ],
   },
   {
+    id: "lesion",
     view: "Cyst Assessment",
     probe: "Linear 12–18 MHz",
     tips: [
@@ -52,6 +56,7 @@ const views = [
     ],
   },
   {
+    id: "axillary_ln",
     view: "Axillary Lymph Node Assessment",
     probe: "Linear 12–18 MHz",
     tips: [
@@ -64,6 +69,7 @@ const views = [
     ],
   },
   {
+    id: "lesion",
     view: "Doppler Assessment of Breast Lesions",
     probe: "Linear 12–18 MHz",
     tips: [
@@ -76,6 +82,7 @@ const views = [
     ],
   },
   {
+    id: "lesion",
     view: "Ultrasound-Guided Biopsy (Core / FNA / VAB)",
     probe: "Linear 12–18 MHz",
     tips: [
@@ -88,6 +95,7 @@ const views = [
     ],
   },
   {
+    id: "lesion",
     view: "Pre-Surgical Lumpectomy Localisation",
     probe: "Linear 12–18 MHz",
     tips: [
@@ -128,7 +136,17 @@ export default function BreastScanCoach() {
   const [showBilling, setShowBilling] = useState(false);
   const [showSWE, setShowSWE] = useState(false);
 
-  const currentView = views[selectedView];
+  const { mergeView } = useScanCoachOverrides("breast");
+  const currentView = useMemo(() => {
+    const v = views[selectedView];
+    if (!v) return v;
+    const merged = mergeView({ ...v, id: v.id });
+    const rawTips = merged.tips as unknown;
+    if (Array.isArray(rawTips) && rawTips.length > 0 && typeof rawTips[0] === "string") {
+      return { ...merged, tips: (rawTips as string[]).map(t => ({ category: "Scanning Tip", text: t })) };
+    }
+    return merged;
+  }, [selectedView, mergeView]);
 
   return (
     <Layout>

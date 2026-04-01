@@ -5,7 +5,7 @@
   Brand: Teal #189aa1, Aqua #4ad9e0
   Fonts: Merriweather headings, Open Sans body
 */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
@@ -14,10 +14,12 @@ import { PremiumGate } from "@/components/PremiumGate";
 import { BlurredOverlay } from "@/components/BlurredOverlay";
 import { usePremium } from "@/hooks/usePremium";
 import { carotidBilling } from "@/lib/scanCoachBillingCodes";
+import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 
 // ─── Views Data ────────────────────────────────────────────────────────────────
 const views = [
   {
+    id: "cca",
     view: "Common Carotid Artery (CCA)",
     probe: "High-frequency linear (7–15 MHz) · Longitudinal & transverse from clavicle to bifurcation",
     tips: [
@@ -52,6 +54,7 @@ const views = [
     ],
   },
   {
+    id: "bifurcation",
     view: "Carotid Bifurcation",
     probe: "High-frequency linear (7–15 MHz) · Longitudinal & transverse at the bifurcation",
     tips: [
@@ -86,6 +89,7 @@ const views = [
     ],
   },
   {
+    id: "ica",
     view: "Internal Carotid Artery (ICA)",
     probe: "High-frequency linear (7–15 MHz) · Longitudinal & transverse from origin as far distally as possible",
     tips: [
@@ -120,6 +124,7 @@ const views = [
     ],
   },
   {
+    id: "eca",
     view: "External Carotid Artery (ECA)",
     probe: "High-frequency linear (7–15 MHz) · Longitudinal plane, identify at least one branch",
     tips: [
@@ -154,6 +159,7 @@ const views = [
     ],
   },
   {
+    id: "vertebral",
     view: "Vertebral Artery",
     probe: "High-frequency linear (7–15 MHz) · Longitudinal plane between transverse processes or at origin",
     tips: [
@@ -188,6 +194,7 @@ const views = [
     ],
   },
   {
+    id: "vertebral",
     view: "Subclavian Artery",
     probe: "High-frequency linear (7–15 MHz) or curved array (5–2 MHz) for deep vessels · Supraclavicular approach",
     tips: [
@@ -536,7 +543,17 @@ export default function CarotidScanCoach() {
   const [showExamTips, setShowExamTips] = useState(false);
   const [showBilling, setShowBilling] = useState(false);
 
-  const currentView = views[selectedView];
+  const { mergeView } = useScanCoachOverrides("carotid");
+  const currentView = useMemo(() => {
+    const v = views[selectedView];
+    if (!v) return v;
+    const merged = mergeView({ ...v, id: v.id });
+    const rawTips = merged.tips as unknown;
+    if (Array.isArray(rawTips) && rawTips.length > 0 && typeof rawTips[0] === "string") {
+      return { ...merged, tips: (rawTips as string[]).map(t => ({ category: "Scanning Tip", text: t })) };
+    }
+    return merged;
+  }, [selectedView, mergeView]);
 
   return (
     <Layout>

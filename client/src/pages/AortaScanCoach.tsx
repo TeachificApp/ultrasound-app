@@ -4,7 +4,7 @@
   Brand: Teal #189aa1, Aqua #4ad9e0
   Fonts: Merriweather headings, Open Sans body
 */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
@@ -13,6 +13,7 @@ import { PremiumGate } from "@/components/PremiumGate";
 import { BlurredOverlay } from "@/components/BlurredOverlay";
 import { usePremium } from "@/hooks/usePremium";
 import { aortaBilling } from "@/lib/scanCoachBillingCodes";
+import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 
 const AORTA_SCANNING_TIPS = [
   { category: "Scanning Tip", text: "Optimizing Aortic Visualization: Use graded compression with the transducer to displace overlying bowel gas. Having the patient fast for 4–6 hours before the exam significantly reduces bowel gas. A left lateral decubitus position can help shift gas away from the midline." },
@@ -21,6 +22,7 @@ const AORTA_SCANNING_TIPS = [
 
 const views = [
   {
+    id: "prox_long",
     view: "Proximal Aorta - Long",
     probe: "Subxiphoid, sagittal plane",
     tips: [
@@ -31,6 +33,7 @@ const views = [
     ],
   },
   {
+    id: "prox_trans",
     view: "Proximal Aorta - Trans",
     probe: "Subxiphoid, transverse plane",
     tips: [
@@ -41,6 +44,7 @@ const views = [
     ],
   },
   {
+    id: "mid_long",
     view: "Mid Aorta - Long",
     probe: "Mid-abdomen, sagittal plane",
     tips: [
@@ -51,6 +55,7 @@ const views = [
     ],
   },
   {
+    id: "mid_trans",
     view: "Mid Aorta - Trans",
     probe: "Mid-abdomen, transverse plane",
     tips: [
@@ -61,6 +66,7 @@ const views = [
     ],
   },
   {
+    id: "dist_long",
     view: "Distal Aorta - Long",
     probe: "Lower abdomen, sagittal plane",
     tips: [
@@ -71,6 +77,7 @@ const views = [
     ],
   },
   {
+    id: "dist_trans",
     view: "Distal Aorta - Trans",
     probe: "Lower abdomen, transverse plane",
     tips: [
@@ -81,6 +88,7 @@ const views = [
     ],
   },
   {
+    id: "iliac_long",
     view: "Common Iliac Arteries - Long",
     probe: "Just inferior to the aortic bifurcation, sagittal oblique plane for each iliac artery",
     tips: [
@@ -91,6 +99,7 @@ const views = [
     ],
   },
   {
+    id: "iliac_trans",
     view: "Common Iliac Arteries - Trans",
     probe: "Just inferior to the aortic bifurcation, transverse plane",
     tips: [
@@ -127,7 +136,17 @@ export default function AortaScanCoach() {
   const [showExamTips, setShowGeneral] = useState(false);
   const [showBilling, setShowBilling] = useState(false);
 
-  const currentView = views[selectedView];
+  const { mergeView } = useScanCoachOverrides("aorta");
+  const currentView = useMemo(() => {
+    const v = views[selectedView];
+    if (!v) return v;
+    const merged = mergeView({ ...v, id: v.id });
+    const rawTips = merged.tips as unknown;
+    if (Array.isArray(rawTips) && rawTips.length > 0 && typeof rawTips[0] === "string") {
+      return { ...merged, tips: (rawTips as string[]).map(t => ({ category: "Scanning Tip", text: t })) };
+    }
+    return merged;
+  }, [selectedView, mergeView]);
 
   return (
     <Layout>

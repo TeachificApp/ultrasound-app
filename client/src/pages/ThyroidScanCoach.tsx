@@ -5,7 +5,7 @@
   Brand: Teal #189aa1, Aqua #4ad9e0
   Fonts: Merriweather headings, Open Sans body
 */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
@@ -13,9 +13,11 @@ import { Scan, ChevronDown, ChevronUp, Lightbulb, Info, Receipt} from "lucide-re
 import { PremiumGate } from "@/components/PremiumGate";
 import { usePremium } from "@/hooks/usePremium";
 import { thyroidBilling } from "@/lib/scanCoachBillingCodes";
+import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 
 const views = [
   {
+    id: "trans_right",
     view: "Transverse Survey — Right Lobe",
     probe: "Linear 12–18 MHz",
     tips: [
@@ -28,6 +30,7 @@ const views = [
     ],
   },
   {
+    id: "long_right",
     view: "Longitudinal Survey — Right Lobe",
     probe: "Linear 12–18 MHz",
     tips: [
@@ -39,6 +42,7 @@ const views = [
     ],
   },
   {
+    id: "trans_left",
     view: "Transverse Survey — Left Lobe",
     probe: "Linear 12–18 MHz",
     tips: [
@@ -50,6 +54,7 @@ const views = [
     ],
   },
   {
+    id: "long_left",
     view: "Longitudinal Survey — Left Lobe",
     probe: "Linear 12–18 MHz",
     tips: [
@@ -60,6 +65,7 @@ const views = [
     ],
   },
   {
+    id: "isthmus",
     view: "Isthmus",
     probe: "Linear 12–18 MHz",
     tips: [
@@ -70,6 +76,7 @@ const views = [
     ],
   },
   {
+    id: "lymph_nodes",
     view: "Nodule Characterization (ACR TI-RADS)",
     probe: "Linear 12–18 MHz; standoff pad for very superficial nodules",
     tips: [
@@ -82,6 +89,7 @@ const views = [
     ],
   },
   {
+    id: "lymph_nodes",
     view: "Cervical Lymph Nodes",
     probe: "Linear 12–18 MHz",
     tips: [
@@ -93,6 +101,7 @@ const views = [
     ],
   },
   {
+    id: "parathyroid",
     view: "Parathyroid Glands",
     probe: "Linear 12–18 MHz",
     tips: [
@@ -105,6 +114,7 @@ const views = [
     ],
   },
   {
+    id: "parathyroid",
     view: "Ultrasound-Guided FNA / Core Biopsy",
     probe: "Linear 12–18 MHz",
     tips: [
@@ -145,7 +155,17 @@ export default function ThyroidScanCoach() {
   const [showExamTips, setShowExamTips] = useState(false);
   const [showBilling, setShowBilling] = useState(false);
 
-  const currentView = views[selectedView];
+  const { mergeView } = useScanCoachOverrides("thyroid");
+  const currentView = useMemo(() => {
+    const v = views[selectedView];
+    if (!v) return v;
+    const merged = mergeView({ ...v, id: v.id });
+    const rawTips = merged.tips as unknown;
+    if (Array.isArray(rawTips) && rawTips.length > 0 && typeof rawTips[0] === "string") {
+      return { ...merged, tips: (rawTips as string[]).map(t => ({ category: "Scanning Tip", text: t })) };
+    }
+    return merged;
+  }, [selectedView, mergeView]);
 
   return (
     <Layout>

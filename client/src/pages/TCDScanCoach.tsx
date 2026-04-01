@@ -4,7 +4,7 @@
   Brand: Teal #189aa1, Aqua #4ad9e0
   Fonts: Merriweather headings, Open Sans body
 */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
@@ -13,9 +13,11 @@ import { PremiumGate } from "@/components/PremiumGate";
 import { BlurredOverlay } from "@/components/BlurredOverlay";
 import { usePremium } from "@/hooks/usePremium";
 import { tcdBilling } from "@/lib/scanCoachBillingCodes";
+import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 
 const views = [
   {
+    id: "transtemporal",
     view: "Transtemporal Window — MCA/ACA/PCA",
     probe: "Phased array 2 MHz (adults); 2–3 MHz sector probe",
     tips: [
@@ -28,6 +30,7 @@ const views = [
     ],
   },
   {
+    id: "transtemporal",
     view: "Transorbital Window — Ophthalmic Artery / ICA Siphon",
     probe: "Phased array 2 MHz — REDUCE POWER to MI <0.23 for orbital use",
     tips: [
@@ -39,6 +42,7 @@ const views = [
     ],
   },
   {
+    id: "post_circ",
     view: "Suboccipital Window — Vertebral/Basilar Arteries",
     probe: "Phased array 2 MHz",
     tips: [
@@ -50,6 +54,7 @@ const views = [
     ],
   },
   {
+    id: "transtemporal",
     view: "Submandibular Window — Distal ICA (Lindegaard Ratio)",
     probe: "Phased array 2 MHz",
     tips: [
@@ -61,6 +66,7 @@ const views = [
     ],
   },
   {
+    id: "ant_fontanelle",
     view: "Anterior Fontanelle — Neonates/Infants",
     probe: "Phased array or sector 5–7.5 MHz (neonates); 3–5 MHz (older infants)",
     tips: [
@@ -101,7 +107,17 @@ export default function TCDScanCoach() {
   const [showExamTips, setShowExamTips] = useState(false);
   const [showBilling, setShowBilling] = useState(false);
 
-  const currentView = views[selectedView];
+  const { mergeView } = useScanCoachOverrides("tcd");
+  const currentView = useMemo(() => {
+    const v = views[selectedView];
+    if (!v) return v;
+    const merged = mergeView({ ...v, id: v.id });
+    const rawTips = merged.tips as unknown;
+    if (Array.isArray(rawTips) && rawTips.length > 0 && typeof rawTips[0] === "string") {
+      return { ...merged, tips: (rawTips as string[]).map(t => ({ category: "Scanning Tip", text: t })) };
+    }
+    return merged;
+  }, [selectedView, mergeView]);
 
   return (
     <Layout>

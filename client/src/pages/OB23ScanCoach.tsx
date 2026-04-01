@@ -4,7 +4,7 @@
   Brand: Teal #189aa1, Aqua #4ad9e0
   Fonts: Merriweather headings, Open Sans body
 */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
@@ -13,9 +13,11 @@ import { PremiumGate } from "@/components/PremiumGate";
 import { BlurredOverlay } from "@/components/BlurredOverlay";
 import { usePremium } from "@/hooks/usePremium";
 import { ob23Billing } from "@/lib/scanCoachBillingCodes";
+import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 
 const views = [
   {
+    id: "head_neck",
     view: "Head & Brain",
     probe: "TA 3.5–5 MHz curved array; axial planes",
     tips: [
@@ -28,6 +30,7 @@ const views = [
     ],
   },
   {
+    id: "face",
     view: "Face",
     probe: "TA 3.5–5 MHz; coronal and sagittal planes",
     tips: [
@@ -39,6 +42,7 @@ const views = [
     ],
   },
   {
+    id: "chest",
     view: "Chest & Heart",
     probe: "TA 3.5–5 MHz; axial planes through the fetal chest",
     tips: [
@@ -51,6 +55,7 @@ const views = [
     ],
   },
   {
+    id: "abdomen",
     view: "Abdomen",
     probe: "TA 3.5–5 MHz; axial and sagittal planes",
     tips: [
@@ -63,6 +68,7 @@ const views = [
     ],
   },
   {
+    id: "spine",
     view: "Spine",
     probe: "TA 3.5–5 MHz; sagittal, coronal, and axial planes",
     tips: [
@@ -74,6 +80,7 @@ const views = [
     ],
   },
   {
+    id: "extremities",
     view: "Extremities",
     probe: "TA 3.5–5 MHz; long-axis and axial planes",
     tips: [
@@ -85,6 +92,7 @@ const views = [
     ],
   },
   {
+    id: "genitalia",
     view: "Genitalia",
     probe: "TA 3.5–5 MHz; axial and sagittal planes",
     tips: [
@@ -96,6 +104,7 @@ const views = [
     ],
   },
   {
+    id: "placenta",
     view: "Placenta",
     probe: "TA 3.5–5 MHz; TVS for low-lying placenta",
     tips: [
@@ -108,6 +117,7 @@ const views = [
     ],
   },
   {
+    id: "amniotic_fluid",
     view: "Amniotic Fluid",
     probe: "TA 3.5–5 MHz; four-quadrant survey",
     tips: [
@@ -119,6 +129,7 @@ const views = [
     ],
   },
   {
+    id: "biometry",
     view: "Biometry",
     probe: "TA 3.5–5 MHz; standard measurement planes",
     tips: [
@@ -130,6 +141,7 @@ const views = [
     ],
   },
   {
+    id: "maternal",
     view: "Maternal Anatomy",
     probe: "TA 3.5–5 MHz; TVS for cervix",
     tips: [
@@ -171,7 +183,17 @@ export default function OB23ScanCoach() {
   const [showExamTips, setShowGeneral] = useState(false);
   const [showBilling, setShowBilling] = useState(false);
 
-  const currentView = views[selectedView];
+  const { mergeView } = useScanCoachOverrides("ob23");
+  const currentView = useMemo(() => {
+    const v = views[selectedView];
+    if (!v) return v;
+    const merged = mergeView({ ...v, id: v.id });
+    const rawTips = merged.tips as unknown;
+    if (Array.isArray(rawTips) && rawTips.length > 0 && typeof rawTips[0] === "string") {
+      return { ...merged, tips: (rawTips as string[]).map(t => ({ category: "Scanning Tip", text: t })) };
+    }
+    return merged;
+  }, [selectedView, mergeView]);
 
   return (
     <Layout>

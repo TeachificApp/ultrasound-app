@@ -4,16 +4,18 @@
   Brand: Teal #189aa1, Aqua #4ad9e0
   Fonts: Merriweather headings, Open Sans body
 */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { Scan, ChevronDown, ChevronUp, Lightbulb, Info, Receipt } from "lucide-react";
 import { usePremium } from "@/hooks/usePremium";
 import { abdominalBilling } from "@/lib/scanCoachBillingCodes";
+import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 
 const views = [
   {
+    id: "pancreas",
     view: "Pancreas",
     probe: "Transverse epigastric approach",
     tips: [
@@ -25,6 +27,7 @@ const views = [
     ],
   },
   {
+    id: "aorta",
     view: "Aorta",
     probe: "Midline transverse and longitudinal approaches",
     tips: [
@@ -36,6 +39,7 @@ const views = [
     ],
   },
   {
+    id: "ivc",
     view: "Inferior Vena Cava (IVC)",
     probe: "Subcostal and parasagittal approaches",
     tips: [
@@ -47,6 +51,7 @@ const views = [
     ],
   },
   {
+    id: "liver",
     view: "Liver",
     probe: "Subcostal and intercostal approaches",
     hasSWE: true,
@@ -60,6 +65,7 @@ const views = [
     ],
   },
   {
+    id: "gallbladder",
     view: "Gallbladder and Biliary Tract",
     probe: "Subcostal and intercostal approaches",
     tips: [
@@ -71,6 +77,7 @@ const views = [
     ],
   },
   {
+    id: "kidneys",
     view: "Kidneys",
     probe: "Flank (coronal) and transverse approaches",
     tips: [
@@ -82,6 +89,7 @@ const views = [
     ],
   },
   {
+    id: "spleen",
     view: "Spleen",
     probe: "Left intercostal and coronal approaches",
     tips: [
@@ -121,7 +129,18 @@ export default function AbdominalScanCoach() {
   const [showBilling, setShowBilling] = useState(false);
   const [showSWE, setShowSWE] = useState(false);
 
-  const currentView = views[selectedView];
+  const { mergeView } = useScanCoachOverrides("abdominal");
+  const currentView = useMemo(() => {
+    const v = views[selectedView];
+    if (!v) return v;
+    const merged = mergeView({ ...v, id: v.id });
+    // If override tips is a string array, convert to {category,text} format for rendering
+    const rawTips = merged.tips as unknown;
+    if (Array.isArray(rawTips) && rawTips.length > 0 && typeof rawTips[0] === "string") {
+      return { ...merged, tips: (rawTips as string[]).map(t => ({ category: "Scanning Tip", text: t })) };
+    }
+    return merged;
+  }, [selectedView, mergeView]);
 
   return (
     <Layout>

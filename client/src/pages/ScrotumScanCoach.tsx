@@ -3,7 +3,7 @@
   Based on: AIUM Practice Parameter for the Performance of a Scrotal Ultrasound Examination (2015)
   Brand: Teal #189aa1, Aqua #4ad9e0
 */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
@@ -11,9 +11,11 @@ import { Scan, ChevronDown, ChevronUp, Lightbulb, Info, Receipt} from "lucide-re
 import { PremiumGate } from "@/components/PremiumGate";
 import { usePremium } from "@/hooks/usePremium";
 import { scrotumBilling } from "@/lib/scanCoachBillingCodes";
+import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 
 const views = [
   {
+    id: "global",
     view: "Survey — Both Testes",
     probe: "Linear 12–18 MHz (5–9 MHz for large scrota)",
     tips: [
@@ -25,6 +27,7 @@ const views = [
     ],
   },
   {
+    id: "testis",
     view: "Right Testis — Transverse",
     probe: "Linear 12–18 MHz",
     tips: [
@@ -37,6 +40,7 @@ const views = [
     ],
   },
   {
+    id: "testis",
     view: "Right Testis — Longitudinal",
     probe: "Linear 12–18 MHz",
     tips: [
@@ -47,6 +51,7 @@ const views = [
     ],
   },
   {
+    id: "testis",
     view: "Left Testis — Transverse & Longitudinal",
     probe: "Linear 12–18 MHz",
     tips: [
@@ -57,6 +62,7 @@ const views = [
     ],
   },
   {
+    id: "epididymis",
     view: "Epididymis",
     probe: "Linear 12–18 MHz",
     tips: [
@@ -68,6 +74,7 @@ const views = [
     ],
   },
   {
+    id: "spermatic_cord",
     view: "Spermatic Cord & Varicocele",
     probe: "Linear 12–18 MHz; scan upright with Valsalva for varicocele",
     tips: [
@@ -79,6 +86,7 @@ const views = [
     ],
   },
   {
+    id: "scrotal_wall",
     view: "Scrotal Wall & Hydrocele",
     probe: "Linear 12–18 MHz",
     tips: [
@@ -118,7 +126,17 @@ export default function ScrotumScanCoach() {
   const [showExamTips, setShowExamTips] = useState(false);
   const [showBilling, setShowBilling] = useState(false);
 
-  const currentView = views[selectedView];
+  const { mergeView } = useScanCoachOverrides("scrotum");
+  const currentView = useMemo(() => {
+    const v = views[selectedView];
+    if (!v) return v;
+    const merged = mergeView({ ...v, id: v.id });
+    const rawTips = merged.tips as unknown;
+    if (Array.isArray(rawTips) && rawTips.length > 0 && typeof rawTips[0] === "string") {
+      return { ...merged, tips: (rawTips as string[]).map(t => ({ category: "Scanning Tip", text: t })) };
+    }
+    return merged;
+  }, [selectedView, mergeView]);
 
   return (
     <Layout>

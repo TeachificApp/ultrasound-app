@@ -4,13 +4,14 @@
   Brand: Teal #189aa1, Aqua #4ad9e0
   Fonts: Merriweather headings, Open Sans body
 */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { Scan, ChevronDown, ChevronUp, Lightbulb, Info, Receipt} from "lucide-react";
 import { usePremium } from "@/hooks/usePremium";
 import { venousBilling } from "@/lib/scanCoachBillingCodes";
+import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 
 const PATIENT_POSITIONING = "The patient is typically positioned in a reverse Trendelenburg position (head elevated 15–30°) to facilitate venous filling in the lower extremities. For popliteal and calf vein assessment, the patient may be seated with the legs dependent or placed prone with the knee slightly flexed.";
 
@@ -21,6 +22,7 @@ const VENOUS_SCANNING_TIPS = [
 
 const views = [
   {
+    id: "cfv",
     view: "Common Femoral Vein (CFV)",
     probe: "Transverse, inguinal ligament",
     tips: [
@@ -31,6 +33,7 @@ const views = [
     ],
   },
   {
+    id: "fv",
     view: "Femoral Vein (FV)",
     probe: "Transverse, from CFV down the thigh",
     tips: [
@@ -41,6 +44,7 @@ const views = [
     ],
   },
   {
+    id: "dfv",
     view: "Deep Femoral Vein (DFV)",
     probe: "Transverse, at the confluence with the FV",
     tips: [
@@ -51,6 +55,7 @@ const views = [
     ],
   },
   {
+    id: "gsv",
     view: "Great Saphenous Vein (GSV)",
     probe: "Transverse, at the saphenofemoral junction",
     tips: [
@@ -61,6 +66,7 @@ const views = [
     ],
   },
   {
+    id: "popliteal",
     view: "Popliteal Vein",
     probe: "Transverse, popliteal fossa",
     tips: [
@@ -71,6 +77,7 @@ const views = [
     ],
   },
   {
+    id: "ptv",
     view: "Posterior Tibial Veins (PTV)",
     probe: "Transverse, medial calf",
     tips: [
@@ -81,6 +88,7 @@ const views = [
     ],
   },
   {
+    id: "peroneal",
     view: "Peroneal Veins",
     probe: "Transverse, lateral/posterior calf",
     tips: [
@@ -91,6 +99,7 @@ const views = [
     ],
   },
   {
+    id: "gastro_soleal",
     view: "Gastrocnemius and Soleal Veins",
     probe: "Transverse, posterior calf",
     tips: [
@@ -127,7 +136,17 @@ export default function VenousScanCoach() {
   const [showExamTips, setShowGeneral] = useState(false);
   const [showBilling, setShowBilling] = useState(false);
 
-  const currentView = views[selectedView];
+  const { mergeView } = useScanCoachOverrides("venous");
+  const currentView = useMemo(() => {
+    const v = views[selectedView];
+    if (!v) return v;
+    const merged = mergeView({ ...v, id: v.id });
+    const rawTips = merged.tips as unknown;
+    if (Array.isArray(rawTips) && rawTips.length > 0 && typeof rawTips[0] === "string") {
+      return { ...merged, tips: (rawTips as string[]).map(t => ({ category: "Scanning Tip", text: t })) };
+    }
+    return merged;
+  }, [selectedView, mergeView]);
 
   return (
     <Layout>

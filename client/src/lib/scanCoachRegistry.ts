@@ -38,7 +38,10 @@ export type ScanCoachModule =
   | "pocus_efast"
   | "pocus_rush"
   | "pocus_cardiac"
-  | "pocus_lung";
+  | "pocus_lung"
+  // Procedures
+  | "appendix"
+  | "invasive_procedures";
 
 export interface ScanCoachViewMeta {
   id: string;

@@ -4,7 +4,7 @@
   Brand: Teal #189aa1, Aqua #4ad9e0
   Fonts: Merriweather headings, Open Sans body
 */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
@@ -13,9 +13,11 @@ import { PremiumGate } from "@/components/PremiumGate";
 import { BlurredOverlay } from "@/components/BlurredOverlay";
 import { usePremium } from "@/hooks/usePremium";
 import { ob1Billing } from "@/lib/scanCoachBillingCodes";
+import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 
 const views = [
   {
+    id: "gest_sac",
     view: "Gestational Sac",
     probe: "TVS preferred <7 weeks; TA with full bladder if TVS unavailable",
     tips: [
@@ -28,6 +30,7 @@ const views = [
     ],
   },
   {
+    id: "gest_sac",
     view: "Yolk Sac",
     probe: "TVS preferred; 5–9 MHz",
     tips: [
@@ -39,6 +42,7 @@ const views = [
     ],
   },
   {
+    id: "embryo",
     view: "Embryo / CRL Measurement",
     probe: "TVS preferred; TA if TVS unavailable",
     tips: [
@@ -51,6 +55,7 @@ const views = [
     ],
   },
   {
+    id: "nt",
     view: "Nuchal Translucency (NT)",
     probe: "TVS or TA; midsagittal plane; CRL 45–84 mm (11+0 to 13+6 weeks)",
     tips: [
@@ -63,6 +68,7 @@ const views = [
     ],
   },
   {
+    id: "uterus_sag",
     view: "Uterus, Cervix & Adnexa",
     probe: "TVS preferred; TA for overall survey",
     tips: [
@@ -74,6 +80,7 @@ const views = [
     ],
   },
   {
+    id: "fetal_head",
     view: "Early Anatomy Survey (11–14 weeks)",
     probe: "TVS or TA; 11+0 to 13+6 weeks",
     tips: [
@@ -114,7 +121,17 @@ export default function OB1ScanCoach() {
   const [showExamTips, setShowGeneral] = useState(false);
   const [showBilling, setShowBilling] = useState(false);
 
-  const currentView = views[selectedView];
+  const { mergeView } = useScanCoachOverrides("ob1");
+  const currentView = useMemo(() => {
+    const v = views[selectedView];
+    if (!v) return v;
+    const merged = mergeView({ ...v, id: v.id });
+    const rawTips = merged.tips as unknown;
+    if (Array.isArray(rawTips) && rawTips.length > 0 && typeof rawTips[0] === "string") {
+      return { ...merged, tips: (rawTips as string[]).map(t => ({ category: "Scanning Tip", text: t })) };
+    }
+    return merged;
+  }, [selectedView, mergeView]);
 
   return (
     <Layout>

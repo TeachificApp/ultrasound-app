@@ -4,7 +4,7 @@
   Based on: ACCP/ATS/SHM/SCCM Consensus Statement on Ultrasound-Guided Procedures (2020)
   Brand: Teal #189aa1, Aqua #4ad9e0
 */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
@@ -12,9 +12,11 @@ import { Scan, ChevronDown, ChevronUp, Lightbulb, Info, Receipt } from "lucide-r
 import { PremiumGate } from "@/components/PremiumGate";
 import { usePremium } from "@/hooks/usePremium";
 import { invasiveProceduresBilling } from "@/lib/scanCoachBillingCodes";
+import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 
 const views = [
   {
+    id: "thoracentesis_site",
     view: "Thoracentesis — Site Selection",
     probe: "Curvilinear 3–5 MHz (site selection); Linear 9–12 MHz (real-time guidance)",
     tips: [
@@ -27,6 +29,7 @@ const views = [
     ],
   },
   {
+    id: "thoracentesis_guidance",
     view: "Thoracentesis — Real-Time Needle Guidance",
     probe: "Linear 9–12 MHz (real-time guidance)",
     tips: [
@@ -39,6 +42,7 @@ const views = [
     ],
   },
   {
+    id: "paracentesis_site",
     view: "Paracentesis — Site Selection",
     probe: "Curvilinear 3–5 MHz (site selection); Linear 9–12 MHz (real-time guidance)",
     tips: [
@@ -51,6 +55,7 @@ const views = [
     ],
   },
   {
+    id: "paracentesis_guidance",
     view: "Paracentesis — Real-Time Needle Guidance",
     probe: "Linear 9–12 MHz (real-time guidance)",
     tips: [
@@ -87,7 +92,17 @@ export default function InvasiveProceduresScanCoach() {
   const [showExamTips, setShowExamTips] = useState(false);
   const [showBilling, setShowBilling] = useState(false);
 
-  const currentView = views[selectedView];
+  const { mergeView } = useScanCoachOverrides("invasive_procedures");
+  const currentView = useMemo(() => {
+    const v = views[selectedView];
+    if (!v) return v;
+    const merged = mergeView({ ...v, id: v.id });
+    const rawTips = merged.tips as unknown;
+    if (Array.isArray(rawTips) && rawTips.length > 0 && typeof rawTips[0] === "string") {
+      return { ...merged, tips: (rawTips as string[]).map(t => ({ category: "Scanning Tip", text: t })) };
+    }
+    return merged;
+  }, [selectedView, mergeView]);
 
   return (
     <Layout>

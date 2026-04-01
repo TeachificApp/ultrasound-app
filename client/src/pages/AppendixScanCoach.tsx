@@ -4,7 +4,7 @@
   ACR Appropriateness Criteria — Right Lower Quadrant Pain (2022)
   Brand: Teal #189aa1, Aqua #4ad9e0
 */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
@@ -12,9 +12,11 @@ import { Scan, ChevronDown, ChevronUp, Lightbulb, Info, Receipt } from "lucide-r
 import { PremiumGate } from "@/components/PremiumGate";
 import { usePremium } from "@/hooks/usePremium";
 import { appendixBilling } from "@/lib/scanCoachBillingCodes";
+import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 
 const views = [
   {
+    id: "rlq_survey",
     view: "RLQ Survey — Graded Compression Technique",
     probe: "Linear 9–15 MHz (curvilinear 3–5 MHz for deep/obese patients)",
     tips: [
@@ -27,6 +29,7 @@ const views = [
     ],
   },
   {
+    id: "appendix_id",
     view: "Appendix Identification and Measurement",
     probe: "Linear 9–15 MHz",
     tips: [
@@ -39,6 +42,7 @@ const views = [
     ],
   },
   {
+    id: "periappendiceal",
     view: "Periappendiceal Assessment (Inflammation / Perforation)",
     probe: "Linear 9–15 MHz",
     tips: [
@@ -51,6 +55,7 @@ const views = [
     ],
   },
   {
+    id: "alt_diagnoses",
     view: "Alternative RLQ Diagnoses",
     probe: "Linear 9–15 MHz; curvilinear 3–5 MHz for pelvic structures",
     tips: [
@@ -88,7 +93,17 @@ export default function AppendixScanCoach() {
   const [showExamTips, setShowExamTips] = useState(false);
   const [showBilling, setShowBilling] = useState(false);
 
-  const currentView = views[selectedView];
+  const { mergeView } = useScanCoachOverrides("appendix");
+  const currentView = useMemo(() => {
+    const v = views[selectedView];
+    if (!v) return v;
+    const merged = mergeView({ ...v, id: v.id });
+    const rawTips = merged.tips as unknown;
+    if (Array.isArray(rawTips) && rawTips.length > 0 && typeof rawTips[0] === "string") {
+      return { ...merged, tips: (rawTips as string[]).map(t => ({ category: "Scanning Tip", text: t })) };
+    }
+    return merged;
+  }, [selectedView, mergeView]);
 
   return (
     <Layout>

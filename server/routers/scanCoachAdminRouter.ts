@@ -59,6 +59,8 @@ const MODULE_VALUES = [
   "fetal",
   // POCUS-Assist™
   "pocus_efast", "pocus_rush", "pocus_cardiac", "pocus_lung",
+  // Procedures
+  "appendix", "invasive_procedures",
 ] as const;
 
 const upsertSchema = z.object({

@@ -4,7 +4,7 @@
   Brand: Teal #189aa1, Aqua #4ad9e0
   Fonts: Merriweather headings, Open Sans body
 */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
@@ -12,11 +12,13 @@ import { Scan, ChevronDown, ChevronUp, Lightbulb, Info, Receipt} from "lucide-re
 import { PremiumGate } from "@/components/PremiumGate";
 import { usePremium } from "@/hooks/usePremium";
 import { pelvicGynBilling } from "@/lib/scanCoachBillingCodes";
+import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 
 type Approach = "TA" | "TVS";
 
 const taViews = [
   {
+    id: "uterus_sag",
     view: "Uterus",
     probe: "TA: 3.5–5 MHz curved array; full bladder",
     tips: [
@@ -29,6 +31,7 @@ const taViews = [
     ],
   },
   {
+    id: "adnexa",
     view: "Adnexa / Ovaries",
     probe: "TA: 3.5–5 MHz curved array; full bladder",
     tips: [
@@ -41,6 +44,7 @@ const taViews = [
     ],
   },
   {
+    id: "cul_de_sac",
     view: "Cul-de-Sac",
     probe: "TA: 3.5–5 MHz curved array; full bladder",
     tips: [
@@ -79,6 +83,7 @@ const tvsViews = [
     ],
   },
   {
+    id: "uterus_sag",
     view: "Endometrium",
     probe: "TVS: 5–9 MHz endocavitary transducer; empty bladder",
     tips: [
@@ -132,7 +137,17 @@ export default function PelvicGynScanCoach() {
   const [showBilling, setShowBilling] = useState(false);
 
   const views = approach === "TA" ? taViews : tvsViews;
-  const currentView = views[Math.min(selectedView, views.length - 1)];
+  const { mergeView } = useScanCoachOverrides("pelvic_gyn");
+  const currentView = useMemo(() => {
+    const v = views[Math.min(selectedView, views.length - 1)];
+    if (!v) return v;
+    const merged = mergeView({ ...v, id: (v as any).id ?? "uterus_sag" });
+    const rawTips = merged.tips as unknown;
+    if (Array.isArray(rawTips) && rawTips.length > 0 && typeof rawTips[0] === "string") {
+      return { ...merged, tips: (rawTips as string[]).map(t => ({ category: "Scanning Tip", text: t })) };
+    }
+    return merged;
+  }, [selectedView, approach, mergeView]);
 
   return (
     <Layout>

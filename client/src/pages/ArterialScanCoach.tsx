@@ -4,7 +4,7 @@
   Brand: Teal #189aa1, Aqua #4ad9e0
   Fonts: Merriweather headings, Open Sans body
 */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
@@ -13,6 +13,7 @@ import { PremiumGate } from "@/components/PremiumGate";
 import { BlurredOverlay } from "@/components/BlurredOverlay";
 import { usePremium } from "@/hooks/usePremium";
 import { arterialBilling } from "@/lib/scanCoachBillingCodes";
+import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 
 const ARTERIAL_SCANNING_TIPS = [
   { category: "Scanning Tip", text: "Patient Preparation: Perform the examination in a warm room to minimize peripheral vasoconstriction. The patient should be recumbent and ideally acclimatized for at least 10–15 minutes before testing. Cold extremities cause vasoconstriction that artificially lowers segmental pressures and waveform amplitudes." },
@@ -21,6 +22,7 @@ const ARTERIAL_SCANNING_TIPS = [
 
 const views = [
   {
+    id: "segmental",
     view: "Segmental Limb Pressures and Waveforms",
     probe: "Upper thigh, lower thigh, calf, ankle, metatarsals (lower extremity); Upper arm, upper forearm, above the wrist (upper extremity); Digits (toes and fingers)",
     tips: [
@@ -31,6 +33,7 @@ const views = [
     ],
   },
   {
+    id: "cw_doppler",
     view: "CW Doppler Waveforms",
     probe: "Common femoral, superficial femoral, popliteal, posterior tibial, dorsalis pedis (lower extremity); Subclavian, axillary, brachial, radial, ulnar (upper extremity)",
     tips: [
@@ -41,6 +44,7 @@ const views = [
     ],
   },
   {
+    id: "pvr",
     view: "Pulse Volume Recordings (PVRs)",
     probe: "Upper thigh, lower thigh, calf, ankle, metatarsals (lower extremity); Upper arm, upper forearm, above the wrist (upper extremity); Toes and digits",
     tips: [
@@ -51,6 +55,7 @@ const views = [
     ],
   },
   {
+    id: "tcpo2",
     view: "Transcutaneous Oxygen Tension (tcPO2) Measurements",
     probe: "Foot, ankle, calf (lower extremities), with a reference point on the chest",
     tips: [
@@ -61,6 +66,7 @@ const views = [
     ],
   },
   {
+    id: "ppg",
     view: "Photoplethysmography (PPG)",
     probe: "Digits (toes and fingers)",
     tips: [
@@ -98,7 +104,17 @@ export default function ArterialScanCoach() {
   const [showExamTips, setShowGeneral] = useState(false);
   const [showBilling, setShowBilling] = useState(false);
 
-  const currentView = views[selectedView];
+  const { mergeView } = useScanCoachOverrides("arterial");
+  const currentView = useMemo(() => {
+    const v = views[selectedView];
+    if (!v) return v;
+    const merged = mergeView({ ...v, id: v.id });
+    const rawTips = merged.tips as unknown;
+    if (Array.isArray(rawTips) && rawTips.length > 0 && typeof rawTips[0] === "string") {
+      return { ...merged, tips: (rawTips as string[]).map(t => ({ category: "Scanning Tip", text: t })) };
+    }
+    return merged;
+  }, [selectedView, mergeView]);
 
   return (
     <Layout>

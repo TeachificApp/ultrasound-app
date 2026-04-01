@@ -3,7 +3,7 @@
   Brand: Teal #189aa1, Aqua #4ad9e0
   Fonts: Merriweather headings, Open Sans body
 */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
@@ -12,9 +12,11 @@ import { PremiumGate } from "@/components/PremiumGate";
 import { BlurredOverlay } from "@/components/BlurredOverlay";
 import { usePremium } from "@/hooks/usePremium";
 import { mskBilling } from "@/lib/scanCoachBillingCodes";
+import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 
 const views = [
   {
+    id: "shoulder",
     view: "Shoulder",
     probe: "Linear 10–15 MHz; curved 5–9 MHz for deep structures or large patients",
     tips: [
@@ -28,6 +30,7 @@ const views = [
     ],
   },
   {
+    id: "elbow",
     view: "Elbow",
     probe: "Linear 10–15 MHz",
     tips: [
@@ -40,6 +43,7 @@ const views = [
     ],
   },
   {
+    id: "wrist",
     view: "Wrist",
     probe: "Linear 12–18 MHz",
     tips: [
@@ -52,6 +56,7 @@ const views = [
     ],
   },
   {
+    id: "hand",
     view: "Hand",
     probe: "Linear 12–18 MHz; standoff pad for very superficial structures",
     tips: [
@@ -63,6 +68,7 @@ const views = [
     ],
   },
   {
+    id: "hip",
     view: "Hip",
     probe: "Curved 5–9 MHz (deep structures); linear 10–15 MHz (superficial structures)",
     tips: [
@@ -74,6 +80,7 @@ const views = [
     ],
   },
   {
+    id: "knee",
     view: "Knee",
     probe: "Linear 10–15 MHz; curved 5–9 MHz for deep structures",
     tips: [
@@ -85,6 +92,7 @@ const views = [
     ],
   },
   {
+    id: "ankle",
     view: "Ankle",
     probe: "Linear 10–15 MHz",
     tips: [
@@ -96,6 +104,7 @@ const views = [
     ],
   },
   {
+    id: "foot",
     view: "Foot",
     probe: "Linear 12–18 MHz; standoff pad for plantar fascia",
     tips: [
@@ -137,7 +146,17 @@ export default function MSKScanCoach() {
   const [showExamTips, setShowGeneral] = useState(false);
   const [showBilling, setShowBilling] = useState(false);
 
-  const currentView = views[selectedView];
+  const { mergeView } = useScanCoachOverrides("msk");
+  const currentView = useMemo(() => {
+    const v = views[selectedView];
+    if (!v) return v;
+    const merged = mergeView({ ...v, id: v.id });
+    const rawTips = merged.tips as unknown;
+    if (Array.isArray(rawTips) && rawTips.length > 0 && typeof rawTips[0] === "string") {
+      return { ...merged, tips: (rawTips as string[]).map(t => ({ category: "Scanning Tip", text: t })) };
+    }
+    return merged;
+  }, [selectedView, mergeView]);
 
   return (
     <Layout>
