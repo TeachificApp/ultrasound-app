@@ -18,7 +18,7 @@ import {
 const BRAND = "#189aa1";
 const GROUP_COLOR = "#189aa1";
 
-const EFAST_VIEWS = [
+export const EFAST_VIEWS = [
   {
     id: "ruq",
     group: "Abdominal Windows",

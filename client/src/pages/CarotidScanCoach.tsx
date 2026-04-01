@@ -17,7 +17,7 @@ import { carotidBilling } from "@/lib/scanCoachBillingCodes";
 import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 
 // ─── Views Data ────────────────────────────────────────────────────────────────
-const views = [
+export const views = [
   {
     id: "cca",
     view: "Common Carotid Artery (CCA)",

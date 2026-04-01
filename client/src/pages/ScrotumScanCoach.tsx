@@ -13,7 +13,7 @@ import { usePremium } from "@/hooks/usePremium";
 import { scrotumBilling } from "@/lib/scanCoachBillingCodes";
 import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 
-const views = [
+export const views = [
   {
     id: "global",
     view: "Survey — Both Testes",

@@ -17,7 +17,7 @@ import {
 
 const BRAND = "#189aa1";
 
-const FETAL_VIEWS = [
+export const FETAL_VIEWS = [
   {
     id: "situs",
     group: "Fetal Protocol",

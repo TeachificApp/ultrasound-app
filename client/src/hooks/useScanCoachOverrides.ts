@@ -31,12 +31,18 @@ type OverrideRow = {
   criticalFindings: string | null;
 };
 
-/** Parse a JSON-array field back to string[] (or return the original if already an array) */
-function parseJsonArray(value: string | null): string[] | null {
+/** Parse a JSON-array field back to string[] or {category,text}[] (structured tips) */
+function parseJsonArray(value: string | null): string[] | Array<{category: string; text: string}> | null {
   if (!value) return null;
   try {
     const parsed = JSON.parse(value);
-    if (Array.isArray(parsed)) return parsed as string[];
+    if (Array.isArray(parsed)) {
+      // Structured tips: [{category, text}, ...]
+      if (parsed.length > 0 && typeof parsed[0] === "object" && parsed[0] !== null && "category" in parsed[0]) {
+        return parsed as Array<{category: string; text: string}>;
+      }
+      return parsed as string[];
+    }
   } catch {
     // plain text — split by newline
     return value.split("\n").map((l) => l.trim()).filter(Boolean);

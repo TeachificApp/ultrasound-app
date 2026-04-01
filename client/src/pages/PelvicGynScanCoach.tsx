@@ -16,7 +16,7 @@ import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 
 type Approach = "TA" | "TVS";
 
-const taViews = [
+export const taViews = [
   {
     id: "uterus_sag",
     view: "Uterus",
@@ -57,7 +57,7 @@ const taViews = [
   },
 ];
 
-const tvsViews = [
+export const tvsViews = [
   {
     view: "Uterus",
     probe: "TVS: 5–9 MHz endocavitary transducer; empty bladder",

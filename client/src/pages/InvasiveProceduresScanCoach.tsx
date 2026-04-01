@@ -14,7 +14,7 @@ import { usePremium } from "@/hooks/usePremium";
 import { invasiveProceduresBilling } from "@/lib/scanCoachBillingCodes";
 import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 
-const views = [
+export const views = [
   {
     id: "thoracentesis_site",
     view: "Thoracentesis — Site Selection",

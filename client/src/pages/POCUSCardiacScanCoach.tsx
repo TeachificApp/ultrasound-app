@@ -18,7 +18,7 @@ import {
 const BRAND = "#189aa1";
 const GROUP_COLOR = "#189aa1";
 
-const CARDIAC_VIEWS = [
+export const CARDIAC_VIEWS = [
   {
     id: "plax",
     group: "Standard Cardiac Views",

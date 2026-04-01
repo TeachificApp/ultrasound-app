@@ -15,7 +15,7 @@ import { usePremium } from "@/hooks/usePremium";
 import { breastBilling } from "@/lib/scanCoachBillingCodes";
 import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 
-const views = [
+export const views = [
   {
     id: "lesion",
     view: "Whole-Breast Survey (Bilateral)",

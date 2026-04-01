@@ -14,7 +14,7 @@ import { usePremium } from "@/hooks/usePremium";
 import { appendixBilling } from "@/lib/scanCoachBillingCodes";
 import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 
-const views = [
+export const views = [
   {
     id: "rlq_survey",
     view: "RLQ Survey — Graded Compression Technique",

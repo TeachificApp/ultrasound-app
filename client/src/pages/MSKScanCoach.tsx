@@ -14,7 +14,7 @@ import { usePremium } from "@/hooks/usePremium";
 import { mskBilling } from "@/lib/scanCoachBillingCodes";
 import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 
-const views = [
+export const views = [
   {
     id: "shoulder",
     view: "Shoulder",

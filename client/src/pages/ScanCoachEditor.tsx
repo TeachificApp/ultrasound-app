@@ -26,13 +26,16 @@ import {
   type ImageSlotKey,
 } from "@/lib/scanCoachRegistry";
 import { getStaticContent } from "@/lib/scanCoachStaticContent";
+import { getViewsForModule, isStructuredTips, TIP_COLOR_MAP, TIP_CATEGORIES, type StructuredTip } from "@/lib/scanCoachViewData";
 import {
   Upload, Trash2, Save, ChevronLeft, ChevronRight,
   Image as ImageIcon, Edit3, Eye, Loader2, CheckCircle2,
   AlertCircle, ExternalLink, Layers, AlertTriangle,
   Stethoscope, Ruler, Lightbulb, Activity, Heart, Baby,
   Zap, Scan, Wind, Microscope, Users, Shield,
+  Plus, Pencil, X, Check, MoveUp, MoveDown,
 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // Icon map for each ScanCoach module
 const MODULE_ICONS: Record<string, React.ReactNode> = {
@@ -79,12 +82,42 @@ type Override = {
 type DraftState = {
   description: string;
   howToGet: string;
-  tips: string;
+  tips: string; // kept for non-structured modules (plain text)
   pitfalls: string;
   structures: string;
   measurements: string;
   criticalFindings: string;
 };
+
+/** Modules that use {category, text}[] structured tips */
+const STRUCTURED_TIP_MODULES = new Set([
+  "abdominal", "pelvic_gyn", "ob1", "ob23", "thyroid", "scrotum",
+  "venous", "arterial", "abdominal_vascular", "aorta", "carotid", "tcd",
+  "msk", "breast", "appendix", "invasive_procedures",
+]);
+
+/** Parse tips from DB override JSON or static view data into StructuredTip[] */
+function parseTipsDraft(tipsJson: string | null | undefined, staticTips: unknown[]): StructuredTip[] {
+  // Try DB override first
+  if (tipsJson) {
+    try {
+      const parsed = JSON.parse(tipsJson);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        if (typeof parsed[0] === "object" && parsed[0] !== null && "category" in parsed[0]) {
+          return parsed as StructuredTip[];
+        }
+        // Plain string array from old format — convert to structured
+        return (parsed as string[]).map((t) => ({ category: "Scanning Tip", text: t }));
+      }
+    } catch { /* fall through */ }
+  }
+  // Fall back to static view data
+  if (Array.isArray(staticTips) && staticTips.length > 0) {
+    if (isStructuredTips(staticTips)) return staticTips;
+    return (staticTips as string[]).map((t) => ({ category: "Scanning Tip", text: t }));
+  }
+  return [];
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -656,6 +689,12 @@ export default function ScanCoachEditor() {
   const [selectedModule, setSelectedModule] = useState<ScanCoachModule>("fetal");
   const [selectedViewId, setSelectedViewId] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftState | null>(null);
+  // Structured tips state (for modules using {category, text}[] format)
+  const [tipsDraft, setTipsDraft] = useState<StructuredTip[]>([]);
+  const [editingTipIdx, setEditingTipIdx] = useState<number | null>(null);
+  const [editingTip, setEditingTip] = useState<StructuredTip>({ category: "Scanning Tip", text: "" });
+  const [addingTip, setAddingTip] = useState(false);
+  const [newTip, setNewTip] = useState<StructuredTip>({ category: "Scanning Tip", text: "" });
   const [uploadingSlot, setUploadingSlot] = useState<ImageSlotKey | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [previewMode, setPreviewMode] = useState(false);
@@ -713,9 +752,10 @@ export default function ScanCoachEditor() {
 
   const handleSelectView = (viewId: string) => {
     setSelectedViewId(viewId);
-    setPreviewMode(false); // reset to edit mode on new view selection
+    setPreviewMode(false);
+    setEditingTipIdx(null);
+    setAddingTip(false);
     const ov = overrides.find((o: Override) => o.viewId === viewId);
-    // Fall back to static content when no DB override exists so admins can see current content
     const staticContent = getStaticContent(selectedModule, viewId);
     setDraft({
       description: ov?.description ?? staticContent.description,
@@ -726,18 +766,29 @@ export default function ScanCoachEditor() {
       measurements: parseArrayField(ov?.measurements ?? null),
       criticalFindings: parseArrayField(ov?.criticalFindings ?? null),
     });
+    // For structured modules, populate tipsDraft from static view data or DB override
+    if (STRUCTURED_TIP_MODULES.has(selectedModule)) {
+      const moduleViews = getViewsForModule(selectedModule);
+      const staticView = moduleViews.find((v) => v.id === viewId);
+      const staticTips = staticView?.tips ?? [];
+      setTipsDraft(parseTipsDraft(ov?.tips ?? null, staticTips));
+    }
   };
 
   const handleSaveText = () => {
     if (!selectedViewId || !draft) return;
     const viewMeta = moduleMeta.views.find((v) => v.id === selectedViewId);
+    const isStructured = STRUCTURED_TIP_MODULES.has(selectedModule);
     upsertMutation.mutate({
       module: selectedModule,
       viewId: selectedViewId,
       viewName: viewMeta?.name,
       description: draft.description || null,
       howToGet: draft.howToGet ? toJsonArray(draft.howToGet) : null,
-      tips: draft.tips ? toJsonArray(draft.tips) : null,
+      // For structured modules, serialize tipsDraft as [{category, text}] JSON
+      tips: isStructured
+        ? (tipsDraft.length > 0 ? JSON.stringify(tipsDraft) : null)
+        : (draft.tips ? toJsonArray(draft.tips) : null),
       pitfalls: draft.pitfalls ? toJsonArray(draft.pitfalls) : null,
       structures: draft.structures ? toJsonArray(draft.structures) : null,
       measurements: draft.measurements ? toJsonArray(draft.measurements) : null,
@@ -843,6 +894,9 @@ export default function ScanCoachEditor() {
                     setSelectedModule(mod.key);
                     setSelectedViewId(null);
                     setDraft(null);
+                    setTipsDraft([]);
+                    setEditingTipIdx(null);
+                    setAddingTip(false);
                     setPreviewMode(false);
                   }}
                   className={`relative flex flex-col items-center gap-2 px-3 py-4 rounded-xl border-2 text-center transition-all font-semibold ${
@@ -1051,93 +1105,363 @@ export default function ScanCoachEditor() {
                       </div>
                     </div>
 
-                    {/* Text content editor */}
+                    {/* WYSIWYG Content Editor */}
                     {draft && (
-                      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center gap-2">
+                      <div className="space-y-4">
+                        {/* Description field (all modules) */}
+                        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+                          <div className="flex items-center gap-2 mb-3">
                             <Edit3 className="w-4 h-4" style={{ color: BRAND }} />
-                            <h3 className="font-bold text-sm text-gray-700" style={{ fontFamily: "Merriweather, serif" }}>
-                              Text Content
-                            </h3>
+                            <h3 className="font-bold text-sm text-gray-700" style={{ fontFamily: "Merriweather, serif" }}>Description</h3>
+                            <span className="text-xs text-gray-400">Shown at the top of the view card</span>
                           </div>
-                          <Button
-                            size="sm"
-                            onClick={handleSaveText}
-                            disabled={upsertMutation.isPending}
-                            style={{ background: BRAND }}
-                            className="text-white hover:opacity-90"
-                          >
-                            {upsertMutation.isPending ? (
-                              <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Saving…</>
-                            ) : (
-                              <><Save className="w-3 h-3 mr-1" /> Save Changes</>
-                            )}
-                          </Button>
+                          <Textarea
+                            value={draft.description}
+                            onChange={(e) => setDraft((d) => d ? { ...d, description: e.target.value } : d)}
+                            placeholder="Enter a description for this view…"
+                            rows={3}
+                            className="text-sm resize-y"
+                          />
                         </div>
 
-                        <div className="space-y-5">
-                          {TEXT_FIELDS.map((field) => {
-                            const value = draft[field.key as keyof DraftState];
-                            return (
-                              <div key={field.key}>
-                                <div className="flex items-center justify-between mb-1.5">
-                                  <label className="text-xs font-semibold text-gray-600">{field.label}</label>
-                                  {field.isArray && (
-                                    <span className="text-[10px] text-gray-400">One item per line</span>
+                        {/* WYSIWYG Tips Editor — structured modules */}
+                        {STRUCTURED_TIP_MODULES.has(selectedModule) ? (
+                          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                            {/* View card header — mirrors the live UI dark header */}
+                            <div
+                              className="px-5 py-4"
+                              style={{ background: "linear-gradient(135deg, #0e1e2e 0%, #0e4a50 60%, #189aa1 100%)" }}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-[10px] font-bold text-[#4ad9e0] uppercase tracking-wider mb-0.5">Tips — as seen by users</p>
+                                  <h4 className="text-base font-black text-white" style={{ fontFamily: "Merriweather, serif" }}>
+                                    {selectedViewName}
+                                  </h4>
+                                  {(() => {
+                                    const moduleViews = getViewsForModule(selectedModule);
+                                    const sv = moduleViews.find((v) => v.id === selectedViewId);
+                                    return sv?.probe ? (
+                                      <p className="text-xs text-white/60 mt-0.5">{sv.probe as string}</p>
+                                    ) : null;
+                                  })()}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-white/50">{tipsDraft.length} tip{tipsDraft.length !== 1 ? "s" : ""}</span>
+                                  {currentOverride?.tips && (
+                                    <Badge className="text-xs text-white" style={{ background: "rgba(255,255,255,0.2)" }}>Overridden</Badge>
                                   )}
                                 </div>
-                                <Textarea
-                                  value={value}
-                                  onChange={(e) =>
-                                    setDraft((d) => d ? { ...d, [field.key]: e.target.value } : d)
-                                  }
-                                  placeholder={
-                                    field.isArray
-                                      ? `Enter each ${field.label.toLowerCase()} item on a new line…`
-                                      : `Enter ${field.label.toLowerCase()}…`
-                                  }
-                                  rows={field.isArray ? 4 : 3}
-                                  className="text-sm font-mono resize-y"
-                                />
                               </div>
-                            );
-                          })}
-                        </div>
+                            </div>
 
-                        <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
-                          <p className="text-xs text-gray-400">
-                            Leave a field blank to use the static default from the component.
-                            {currentOverride && (
-                              <span className="ml-1">
-                                Last updated: {new Date(currentOverride.updatedAt).toLocaleString()}
-                              </span>
-                            )}
-                          </p>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setPreviewMode(true)}
-                              className="text-amber-600 border-amber-200 hover:bg-amber-50 text-xs"
-                            >
-                              <Eye className="w-3 h-3 mr-1" /> Preview
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={handleSaveText}
-                              disabled={upsertMutation.isPending}
-                              style={{ background: BRAND }}
-                              className="text-white hover:opacity-90"
-                            >
-                              {upsertMutation.isPending ? (
-                                <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Saving…</>
-                              ) : (
-                                <><Save className="w-3 h-3 mr-1" /> Save Changes</>
+                            {/* Tip cards — exactly as shown in live UI */}
+                            <div className="p-4 space-y-2">
+                              {tipsDraft.length === 0 && (
+                                <div className="text-center py-8 text-gray-400">
+                                  <p className="text-sm">No tips yet. Add a tip below.</p>
+                                </div>
                               )}
-                            </Button>
+                              {tipsDraft.map((tip, idx) => {
+                                const color = TIP_COLOR_MAP[tip.category] ?? BRAND;
+                                const isEditing = editingTipIdx === idx;
+                                return (
+                                  <div
+                                    key={idx}
+                                    className="rounded-lg border overflow-hidden"
+                                    style={{ borderColor: color + "40" }}
+                                  >
+                                    {isEditing ? (
+                                      /* Inline edit form */
+                                      <div className="p-3 space-y-2" style={{ background: color + "08" }}>
+                                        <div className="flex items-center gap-2">
+                                          <Select
+                                            value={editingTip.category}
+                                            onValueChange={(val) => setEditingTip((t) => ({ ...t, category: val }))}
+                                          >
+                                            <SelectTrigger className="h-7 text-xs w-52">
+                                              <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              {TIP_CATEGORIES.map((c) => (
+                                                <SelectItem key={c.label} value={c.label} className="text-xs">
+                                                  <span className="flex items-center gap-2">
+                                                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: c.color }} />
+                                                    {c.label}
+                                                  </span>
+                                                </SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
+                                          <div className="flex items-center gap-1 ml-auto">
+                                            <Button
+                                              size="sm"
+                                              className="h-7 px-2 text-xs text-white"
+                                              style={{ background: color }}
+                                              onClick={() => {
+                                                setTipsDraft((prev) => prev.map((t, i) => i === idx ? editingTip : t));
+                                                setEditingTipIdx(null);
+                                              }}
+                                            >
+                                              <Check className="w-3 h-3 mr-1" /> Save
+                                            </Button>
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              className="h-7 px-2 text-xs"
+                                              onClick={() => setEditingTipIdx(null)}
+                                            >
+                                              <X className="w-3 h-3" />
+                                            </Button>
+                                          </div>
+                                        </div>
+                                        <Textarea
+                                          value={editingTip.text}
+                                          onChange={(e) => setEditingTip((t) => ({ ...t, text: e.target.value }))}
+                                          rows={3}
+                                          className="text-sm resize-y"
+                                          placeholder="Tip text…"
+                                          autoFocus
+                                        />
+                                      </div>
+                                    ) : (
+                                      /* Display mode — mirrors live UI */
+                                      <div className="flex items-start gap-0">
+                                        <div
+                                          className="flex-shrink-0 w-1.5 self-stretch rounded-l-lg"
+                                          style={{ background: color }}
+                                        />
+                                        <div className="flex-1 px-3 py-2.5">
+                                          <p
+                                            className="text-[10px] font-bold uppercase tracking-wider mb-1"
+                                            style={{ color }}
+                                          >
+                                            {tip.category}
+                                          </p>
+                                          <p className="text-sm text-gray-700 leading-relaxed">{tip.text}</p>
+                                        </div>
+                                        {/* Edit controls */}
+                                        <div className="flex flex-col gap-1 p-2 flex-shrink-0">
+                                          <button
+                                            className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600"
+                                            title="Edit tip"
+                                            onClick={() => {
+                                              setEditingTipIdx(idx);
+                                              setEditingTip({ ...tip });
+                                            }}
+                                          >
+                                            <Pencil className="w-3.5 h-3.5" />
+                                          </button>
+                                          <button
+                                            className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-red-500"
+                                            title="Move up"
+                                            disabled={idx === 0}
+                                            onClick={() => {
+                                              if (idx === 0) return;
+                                              setTipsDraft((prev) => {
+                                                const next = [...prev];
+                                                [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+                                                return next;
+                                              });
+                                            }}
+                                          >
+                                            <MoveUp className="w-3.5 h-3.5" />
+                                          </button>
+                                          <button
+                                            className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-red-500"
+                                            title="Move down"
+                                            disabled={idx === tipsDraft.length - 1}
+                                            onClick={() => {
+                                              if (idx === tipsDraft.length - 1) return;
+                                              setTipsDraft((prev) => {
+                                                const next = [...prev];
+                                                [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+                                                return next;
+                                              });
+                                            }}
+                                          >
+                                            <MoveDown className="w-3.5 h-3.5" />
+                                          </button>
+                                          <button
+                                            className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500"
+                                            title="Delete tip"
+                                            onClick={() => setTipsDraft((prev) => prev.filter((_, i) => i !== idx))}
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+
+                              {/* Add tip form */}
+                              {addingTip ? (
+                                <div className="rounded-lg border border-dashed border-[#189aa1]/40 p-3 space-y-2 bg-[#189aa1]/5">
+                                  <div className="flex items-center gap-2">
+                                    <Select
+                                      value={newTip.category}
+                                      onValueChange={(val) => setNewTip((t) => ({ ...t, category: val }))}
+                                    >
+                                      <SelectTrigger className="h-7 text-xs w-52">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {TIP_CATEGORIES.map((c) => (
+                                          <SelectItem key={c.label} value={c.label} className="text-xs">
+                                            <span className="flex items-center gap-2">
+                                              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: c.color }} />
+                                              {c.label}
+                                            </span>
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <div className="flex items-center gap-1 ml-auto">
+                                      <Button
+                                        size="sm"
+                                        className="h-7 px-2 text-xs text-white"
+                                        style={{ background: BRAND }}
+                                        onClick={() => {
+                                          if (!newTip.text.trim()) return;
+                                          setTipsDraft((prev) => [...prev, { ...newTip }]);
+                                          setNewTip({ category: "Scanning Tip", text: "" });
+                                          setAddingTip(false);
+                                        }}
+                                      >
+                                        <Check className="w-3 h-3 mr-1" /> Add
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-7 px-2 text-xs"
+                                        onClick={() => { setAddingTip(false); setNewTip({ category: "Scanning Tip", text: "" }); }}
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                  <Textarea
+                                    value={newTip.text}
+                                    onChange={(e) => setNewTip((t) => ({ ...t, text: e.target.value }))}
+                                    rows={3}
+                                    className="text-sm resize-y"
+                                    placeholder="Enter tip text…"
+                                    autoFocus
+                                  />
+                                </div>
+                              ) : (
+                                <button
+                                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-dashed border-[#189aa1]/30 text-xs text-[#189aa1] hover:bg-[#189aa1]/5 transition-colors"
+                                  onClick={() => setAddingTip(true)}
+                                >
+                                  <Plus className="w-3.5 h-3.5" /> Add Tip
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Save bar */}
+                            <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between bg-gray-50">
+                              <p className="text-xs text-gray-400">
+                                Tips are saved exactly as shown above.
+                                {currentOverride?.tips && (
+                                  <span className="ml-1 text-[#189aa1] font-medium">Override active.</span>
+                                )}
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setPreviewMode(true)}
+                                  className="text-amber-600 border-amber-200 hover:bg-amber-50 text-xs"
+                                >
+                                  <Eye className="w-3 h-3 mr-1" /> Preview
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  onClick={handleSaveText}
+                                  disabled={upsertMutation.isPending}
+                                  style={{ background: BRAND }}
+                                  className="text-white hover:opacity-90"
+                                >
+                                  {upsertMutation.isPending ? (
+                                    <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Saving…</>
+                                  ) : (
+                                    <><Save className="w-3 h-3 mr-1" /> Save Changes</>
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
                           </div>
-                        </div>
+                        ) : (
+                          /* Non-structured modules: keep existing textarea editing */
+                          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+                            <div className="flex items-center gap-2 mb-4">
+                              <Edit3 className="w-4 h-4" style={{ color: BRAND }} />
+                              <h3 className="font-bold text-sm text-gray-700" style={{ fontFamily: "Merriweather, serif" }}>Tips &amp; Content</h3>
+                            </div>
+                            <div className="space-y-5">
+                              {TEXT_FIELDS.filter((f) => f.key !== "description").map((field) => {
+                                const value = draft[field.key as keyof DraftState];
+                                return (
+                                  <div key={field.key}>
+                                    <div className="flex items-center justify-between mb-1.5">
+                                      <label className="text-xs font-semibold text-gray-600">{field.label}</label>
+                                      {field.isArray && (
+                                        <span className="text-[10px] text-gray-400">One item per line</span>
+                                      )}
+                                    </div>
+                                    <Textarea
+                                      value={value}
+                                      onChange={(e) =>
+                                        setDraft((d) => d ? { ...d, [field.key]: e.target.value } : d)
+                                      }
+                                      placeholder={
+                                        field.isArray
+                                          ? `Enter each ${field.label.toLowerCase()} item on a new line…`
+                                          : `Enter ${field.label.toLowerCase()}…`
+                                      }
+                                      rows={field.isArray ? 4 : 3}
+                                      className="text-sm font-mono resize-y"
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
+                              <p className="text-xs text-gray-400">
+                                Leave a field blank to use the static default.
+                                {currentOverride && (
+                                  <span className="ml-1">Last updated: {new Date(currentOverride.updatedAt).toLocaleString()}</span>
+                                )}
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setPreviewMode(true)}
+                                  className="text-amber-600 border-amber-200 hover:bg-amber-50 text-xs"
+                                >
+                                  <Eye className="w-3 h-3 mr-1" /> Preview
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  onClick={handleSaveText}
+                                  disabled={upsertMutation.isPending}
+                                  style={{ background: BRAND }}
+                                  className="text-white hover:opacity-90"
+                                >
+                                  {upsertMutation.isPending ? (
+                                    <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Saving…</>
+                                  ) : (
+                                    <><Save className="w-3 h-3 mr-1" /> Save Changes</>
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
 

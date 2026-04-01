@@ -15,7 +15,7 @@ import { usePremium } from "@/hooks/usePremium";
 import { ob23Billing } from "@/lib/scanCoachBillingCodes";
 import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 
-const views = [
+export const views = [
   {
     id: "head_neck",
     view: "Head & Brain",

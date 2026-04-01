@@ -15,7 +15,7 @@ import { usePremium } from "@/hooks/usePremium";
 import { tcdBilling } from "@/lib/scanCoachBillingCodes";
 import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 
-const views = [
+export const views = [
   {
     id: "transtemporal",
     view: "Transtemporal Window — MCA/ACA/PCA",

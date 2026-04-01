@@ -20,7 +20,7 @@ const ARTERIAL_SCANNING_TIPS = [
   { category: "Scanning Tip", text: "Exercise Testing for Claudication: For claudication assessment when resting ABI is normal or higher than anticipated, perform post-exercise ABI testing. Have the patient walk on a treadmill (3.5 km/h, 12% grade) for up to 5 minutes or until symptoms occur. A post-exercise ABI drop of ≥20% is diagnostic of significant PAD." },
 ];
 
-const views = [
+export const views = [
   {
     id: "segmental",
     view: "Segmental Limb Pressures and Waveforms",

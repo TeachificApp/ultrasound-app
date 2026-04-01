@@ -20,7 +20,7 @@ const AORTA_SCANNING_TIPS = [
   { category: "Scanning Tip", text: "Accurate Aortic Measurements: Ensure measurements are taken perpendicular to the long axis of the aorta and from outer wall to outer wall in both longitudinal and transverse planes. Oblique measurements overestimate diameter. Always document the largest diameter obtained." },
 ];
 
-const views = [
+export const views = [
   {
     id: "prox_long",
     view: "Proximal Aorta - Long",

@@ -13,7 +13,7 @@ import { usePremium } from "@/hooks/usePremium";
 import { abdominalBilling } from "@/lib/scanCoachBillingCodes";
 import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 
-const views = [
+export const views = [
   {
     id: "pancreas",
     view: "Pancreas",

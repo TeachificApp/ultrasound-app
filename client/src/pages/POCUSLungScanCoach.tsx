@@ -18,7 +18,7 @@ import {
 const BRAND = "#189aa1";
 const GROUP_COLOR = "#189aa1";
 
-const LUNG_VIEWS = [
+export const LUNG_VIEWS = [
   {
     id: "anterior_ptx",
     group: "Anterior Zones — Pneumothorax",

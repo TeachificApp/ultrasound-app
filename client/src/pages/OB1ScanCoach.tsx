@@ -15,7 +15,7 @@ import { usePremium } from "@/hooks/usePremium";
 import { ob1Billing } from "@/lib/scanCoachBillingCodes";
 import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 
-const views = [
+export const views = [
   {
     id: "gest_sac",
     view: "Gestational Sac",

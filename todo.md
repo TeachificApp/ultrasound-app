@@ -894,3 +894,5 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 
 ## Bug Fixes
 - [x] Fix: Magic link login does not persist session — user is prompted to log in again when navigating to ScanCoach pages after signing in via email link
+- [x] ScanCoach Editor WYSIWYG Redesign: show exact view names, tip categories, and content matching live UI with inline editing
+- [ ] Module selector should show the same module names as the hub

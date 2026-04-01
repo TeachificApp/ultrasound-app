@@ -17,7 +17,7 @@ import { abdominalVascularBillingByTab, type ScanCoachBillingData } from "@/lib/
 type ExamTab = "liver" | "tips" | "mesenteric" | "renal";
 
 // ── LIVER DUPLEX VIEWS ────────────────────────────────────────────────────────
-const liverViews = [
+export const liverViews = [
   {
     view: "Portal Vein — Main",
     probe: "Curvilinear 2–5 MHz",
@@ -75,7 +75,7 @@ const liverExamTips = [
 ];
 
 // ── MESENTERIC DUPLEX VIEWS ───────────────────────────────────────────────────
-const mesentericViews = [
+export const mesentericViews = [
   {
     view: "Superior Mesenteric Artery (SMA) — Fasting",
     probe: "Curvilinear 2–5 MHz",
@@ -131,7 +131,7 @@ const mesentericExamTips = [
 ];
 
 // ── TIPS SURVEILLANCE VIEWS ────────────────────────────────────────────────────────────
-const tipsViews = [
+export const tipsViews = [
   {
     view: "TIPS Stent — B-mode Survey",
     probe: "Curvilinear 2–5 MHz",
@@ -218,7 +218,7 @@ const tipsExamTips = [
 ];
 
 // ── RENAL ARTERY DUPLEX VIEWS ─────────────────────────────────────────────────
-const renalViews = [
+export const renalViews = [
   {
     view: "Kidneys — B-mode Survey",
     probe: "Curvilinear 2–5 MHz",

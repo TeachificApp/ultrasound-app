@@ -20,7 +20,7 @@ const VENOUS_SCANNING_TIPS = [
   { category: "Scanning Tip", text: "Systematic Compression: Apply venous compression every 2 cm or less in the transverse plane throughout the entire examination. A normal vein collapses completely with gentle transducer pressure. Incomplete compressibility is the primary diagnostic criterion for DVT. Never rely on colour Doppler alone to exclude DVT." },
 ];
 
-const views = [
+export const views = [
   {
     id: "cfv",
     view: "Common Femoral Vein (CFV)",
