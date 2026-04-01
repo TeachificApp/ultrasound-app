@@ -25,6 +25,7 @@ import {
   type ScanCoachModule,
   type ImageSlotKey,
 } from "@/lib/scanCoachRegistry";
+import { getStaticContent } from "@/lib/scanCoachStaticContent";
 import {
   Upload, Trash2, Save, ChevronLeft, ChevronRight,
   Image as ImageIcon, Edit3, Eye, Loader2, CheckCircle2,
@@ -714,11 +715,13 @@ export default function ScanCoachEditor() {
     setSelectedViewId(viewId);
     setPreviewMode(false); // reset to edit mode on new view selection
     const ov = overrides.find((o: Override) => o.viewId === viewId);
+    // Fall back to static content when no DB override exists so admins can see current content
+    const staticContent = getStaticContent(selectedModule, viewId);
     setDraft({
-      description: ov?.description ?? "",
-      howToGet: parseArrayField(ov?.howToGet ?? null),
-      tips: parseArrayField(ov?.tips ?? null),
-      pitfalls: parseArrayField(ov?.pitfalls ?? null),
+      description: ov?.description ?? staticContent.description,
+      howToGet: parseArrayField(ov?.howToGet ?? null) || staticContent.howToGet,
+      tips: parseArrayField(ov?.tips ?? null) || staticContent.tips,
+      pitfalls: parseArrayField(ov?.pitfalls ?? null) || staticContent.pitfalls,
       structures: parseArrayField(ov?.structures ?? null),
       measurements: parseArrayField(ov?.measurements ?? null),
       criticalFindings: parseArrayField(ov?.criticalFindings ?? null),
