@@ -1,0 +1,38 @@
+{
+  "query": "SELECT module, COUNT(*) as section_count FROM navigatorOverrides GROUP BY module ORDER BY module;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT module, COUNT(*) as section_count FROM navigatorOverrides GROUP BY module ORDER BY module;",
+  "rows": [
+    {
+      "module": "abdominal",
+      "section_count": "8"
+    },
+    {
+      "module": "abdominal_vascular",
+      "section_count": "15"
+    },
+    {
+      "module": "appendix",
+      "section_count": "4"
+    },
+    {
+      "module": "breast",
+      "section_count": "5"
+    },
+    {
+      "module": "invasive_procedures",
+      "section_count": "4"
+    },
+    {
+      "module": "thyroid",
+      "section_count": "5"
+    },
+    {
+      "module": "venous",
+      "section_count": "6"
+    }
+  ],
+  "messages": [],
+  "stdout": "module\tsection_count\nabdominal\t8\nabdominal_vascular\t15\nappendix\t4\nbreast\t5\ninvasive_procedures\t4\nthyroid\t5\nvenous\t6\n",
+  "stderr": "",
+  "execution_time_ms": 385
+}

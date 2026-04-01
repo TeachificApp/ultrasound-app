@@ -1,0 +1,105 @@
+{
+  "query": "SELECT id, sectionName, sortOrder FROM navigatorOverrides WHERE module = 'abdominal_vascular' ORDER BY sortOrder, id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT id, sectionName, sortOrder FROM navigatorOverrides WHERE module = 'abdominal_vascular' ORDER BY sortOrder, id;",
+  "rows": [
+    {
+      "id": "33",
+      "sectionName": "liver:Liver Parenchyma and Morphology",
+      "sortOrder": "0"
+    },
+    {
+      "id": "34",
+      "sectionName": "liver:Portal Vein — Main",
+      "sortOrder": "1"
+    },
+    {
+      "id": "35",
+      "sectionName": "liver:Portal Vein — Right and Left Branches",
+      "sortOrder": "2"
+    },
+    {
+      "id": "36",
+      "sectionName": "liver:Hepatic Veins (Right, Middle, Left)",
+      "sortOrder": "3"
+    },
+    {
+      "id": "37",
+      "sectionName": "liver:Hepatic Artery",
+      "sortOrder": "4"
+    },
+    {
+      "id": "48",
+      "sectionName": "tips:TIPS Stent — B-mode and Color Doppler Survey",
+      "sortOrder": "5"
+    },
+    {
+      "id": "49",
+      "sectionName": "tips:TIPS Stent — Spectral Doppler (Three-Point Sampling)",
+      "sortOrder": "6"
+    },
+    {
+      "id": "50",
+      "sectionName": "tips:Main Portal Vein — Post-TIPS Assessment",
+      "sortOrder": "7"
+    },
+    {
+      "id": "51",
+      "sectionName": "tips:Hepatic Veins — Post-TIPS Assessment",
+      "sortOrder": "8"
+    },
+    {
+      "id": "38",
+      "sectionName": "mesenteric:Superior Mesenteric Artery (SMA) — Fasting",
+      "sortOrder": "9"
+    },
+    {
+      "id": "39",
+      "sectionName": "mesenteric:Superior Mesenteric Artery (SMA) — Post-prandial (if indicated)",
+      "sortOrder": "10"
+    },
+    {
+      "id": "40",
+      "sectionName": "mesenteric:Celiac Axis (CA)",
+      "sortOrder": "11"
+    },
+    {
+      "id": "41",
+      "sectionName": "mesenteric:Inferior Mesenteric Artery (IMA) — if indicated",
+      "sortOrder": "12"
+    },
+    {
+      "id": "42",
+      "sectionName": "mesenteric:Splenic Artery",
+      "sortOrder": "13"
+    },
+    {
+      "id": "43",
+      "sectionName": "renal:Kidneys — B-mode Survey",
+      "sortOrder": "14"
+    },
+    {
+      "id": "44",
+      "sectionName": "renal:Aorta at Renal Artery Level",
+      "sortOrder": "15"
+    },
+    {
+      "id": "45",
+      "sectionName": "renal:Main Renal Artery — Origin, Proximal, Mid and Distal Segments",
+      "sortOrder": "16"
+    },
+    {
+      "id": "46",
+      "sectionName": "renal:Intrarenal Arteries — Spectral Doppler",
+      "sortOrder": "17"
+    },
+    {
+      "id": "47",
+      "sectionName": "renal:Renal Veins",
+      "sortOrder": "18"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tsectionName\tsortOrder\n33\tliver:Liver Parenchyma and Morphology\t0\n34\tliver:Portal Vein — Main\t1\n35\tliver:Portal Vein — Right and Left Branches\t2\n36\tliver:Hepatic Veins (Right, Middle, Left)\t3\n37\tliver:Hepatic Artery\t4\n48\ttips:TIPS Stent — B-mode and Color Doppler Survey\t5\n49\ttips:TIPS Stent — Spectral Doppler (Three-Point Sampling)\t6\n50\ttips:Main Portal Vein — Post-TIPS Assessment\t7\n51\ttips:Hepatic Veins — Post-TIPS Assessment\t8\n38\tmesenteric:Superior Mesenteric Artery (SMA) — Fasting\t9\n39\tmesenteric:Superior Mesenteric Artery (SMA) — Post-prandial (if indicated)\t10\n40\tmesenteric:Celiac Axis (CA)\t11\n41\tmesenteric:Inferior Mesenteric Artery (IMA) — if indicated\t12\n42\tmesenteric:Splenic Artery\t13\n43\trenal:Kidneys — B-mode Survey\t14\n44\trenal:Aorta at Renal Artery Level\t15\n45\trenal:Main Renal Artery — Origin, Proximal, Mid and Distal Segments\t16\n46\trenal:Intrarenal Arteries — Spectral Doppler\t17\n47\trenal:Renal Veins\t18\n",
+  "stderr": "",
+  "execution_time_ms": 353
+}

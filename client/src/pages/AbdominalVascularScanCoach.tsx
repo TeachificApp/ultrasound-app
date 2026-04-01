@@ -8,10 +8,11 @@ import { useState, useEffect } from "react";
 import { Link, useSearch } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
-import { Scan, ChevronDown, ChevronUp, Lightbulb } from "lucide-react";
+import { Scan, ChevronDown, ChevronUp, Lightbulb, Receipt } from "lucide-react";
 import { PremiumGate } from "@/components/PremiumGate";
 import { BlurredOverlay } from "@/components/BlurredOverlay";
 import { usePremium } from "@/hooks/usePremium";
+import { abdominalVascularBillingByTab, type ScanCoachBillingData } from "@/lib/scanCoachBillingCodes";
 
 type ExamTab = "liver" | "tips" | "mesenteric" | "renal";
 
@@ -308,11 +309,13 @@ export default function AbdominalVascularScanCoach() {
   const [selectedView, setSelectedView] = useState(0);
   const [expandedTip, setExpandedTip] = useState<number | null>(null);
   const [showExamTips, setShowExamTips] = useState(false);
+  const [showBilling, setShowBilling] = useState(false);
 
   useEffect(() => {
     setSelectedView(0);
     setExpandedTip(null);
     setShowExamTips(false);
+    setShowBilling(false);
   }, [examTab]);
 
   const views = examTab === "liver" ? liverViews : examTab === "tips" ? tipsViews : examTab === "mesenteric" ? mesentericViews : renalViews;
@@ -483,6 +486,40 @@ export default function AbdominalVascularScanCoach() {
               </div>
             </div>
           </div>
+        </div>
+        {/* Billing Codes */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-5">
+          <button
+            className="w-full flex items-center gap-3 px-5 py-3 hover:bg-[#f0fbfc] transition-all"
+            onClick={() => setShowBilling(!showBilling)}
+          >
+            <Receipt className="w-4 h-4 text-[#189aa1] flex-shrink-0" />
+            <span className="font-bold text-sm text-gray-700 flex-1 text-left" style={{ fontFamily: "Merriweather, serif" }}>Billing Codes (CPT)</span>
+            {showBilling ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+          </button>
+          {showBilling && (
+            <div className="border-t border-gray-100 p-5 space-y-5">
+              <p className="text-xs text-gray-400 italic">For reference only — verify with current payer policies and local coverage determinations.</p>
+              {(abdominalVascularBillingByTab[examTab] ?? abdominalVascularBillingByTab.liver as ScanCoachBillingData).map((section: ScanCoachBillingData[0], si: number) => (
+                <div key={si}>
+                  <div className="text-xs font-bold uppercase tracking-wider text-[#189aa1] mb-2">{section.heading}</div>
+                  <div className="space-y-2">
+                    {section.codes.map((c, ci) => (
+                      <div key={ci} className="rounded-lg border p-3" style={{ borderColor: "#189aa140", background: "#f0fbfc" }}>
+                        <div className="flex items-start gap-2">
+                          <span className="font-mono font-bold text-sm text-[#189aa1] flex-shrink-0">{c.code}</span>
+                          <div>
+                            <div className="text-sm font-medium text-gray-800">{c.description}</div>
+                            {c.note && <div className="text-xs text-gray-500 mt-0.5 leading-relaxed">{c.note}</div>}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </PremiumGate>
     </Layout>

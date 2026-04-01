@@ -1,0 +1,100 @@
+{
+  "query": "SELECT id, module, sectionName, sortOrder FROM navigatorOverrides WHERE module = 'abdominal_vascular' ORDER BY sortOrder, id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT id, module, sectionName, sortOrder FROM navigatorOverrides WHERE module = 'abdominal_vascular' ORDER BY sortOrder, id;",
+  "rows": [
+    {
+      "id": "33",
+      "module": "abdominal_vascular",
+      "sectionName": "liver:Liver Parenchyma and Morphology",
+      "sortOrder": "0"
+    },
+    {
+      "id": "34",
+      "module": "abdominal_vascular",
+      "sectionName": "liver:Portal Vein — Main",
+      "sortOrder": "1"
+    },
+    {
+      "id": "35",
+      "module": "abdominal_vascular",
+      "sectionName": "liver:Portal Vein — Right and Left Branches",
+      "sortOrder": "2"
+    },
+    {
+      "id": "36",
+      "module": "abdominal_vascular",
+      "sectionName": "liver:Hepatic Veins (Right, Middle, Left)",
+      "sortOrder": "3"
+    },
+    {
+      "id": "37",
+      "module": "abdominal_vascular",
+      "sectionName": "liver:Hepatic Artery",
+      "sortOrder": "4"
+    },
+    {
+      "id": "38",
+      "module": "abdominal_vascular",
+      "sectionName": "mesenteric:Superior Mesenteric Artery (SMA) — Fasting",
+      "sortOrder": "5"
+    },
+    {
+      "id": "39",
+      "module": "abdominal_vascular",
+      "sectionName": "mesenteric:Superior Mesenteric Artery (SMA) — Post-prandial (if indicated)",
+      "sortOrder": "6"
+    },
+    {
+      "id": "40",
+      "module": "abdominal_vascular",
+      "sectionName": "mesenteric:Celiac Axis (CA)",
+      "sortOrder": "7"
+    },
+    {
+      "id": "41",
+      "module": "abdominal_vascular",
+      "sectionName": "mesenteric:Inferior Mesenteric Artery (IMA) — if indicated",
+      "sortOrder": "8"
+    },
+    {
+      "id": "42",
+      "module": "abdominal_vascular",
+      "sectionName": "mesenteric:Splenic Artery",
+      "sortOrder": "9"
+    },
+    {
+      "id": "43",
+      "module": "abdominal_vascular",
+      "sectionName": "renal:Kidneys — B-mode Survey",
+      "sortOrder": "10"
+    },
+    {
+      "id": "44",
+      "module": "abdominal_vascular",
+      "sectionName": "renal:Aorta at Renal Artery Level",
+      "sortOrder": "11"
+    },
+    {
+      "id": "45",
+      "module": "abdominal_vascular",
+      "sectionName": "renal:Main Renal Artery — Origin, Proximal, Mid and Distal Segments",
+      "sortOrder": "12"
+    },
+    {
+      "id": "46",
+      "module": "abdominal_vascular",
+      "sectionName": "renal:Intrarenal Arteries — Spectral Doppler",
+      "sortOrder": "13"
+    },
+    {
+      "id": "47",
+      "module": "abdominal_vascular",
+      "sectionName": "renal:Renal Veins",
+      "sortOrder": "14"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tmodule\tsectionName\tsortOrder\n33\tabdominal_vascular\tliver:Liver Parenchyma and Morphology\t0\n34\tabdominal_vascular\tliver:Portal Vein — Main\t1\n35\tabdominal_vascular\tliver:Portal Vein — Right and Left Branches\t2\n36\tabdominal_vascular\tliver:Hepatic Veins (Right, Middle, Left)\t3\n37\tabdominal_vascular\tliver:Hepatic Artery\t4\n38\tabdominal_vascular\tmesenteric:Superior Mesenteric Artery (SMA) — Fasting\t5\n39\tabdominal_vascular\tmesenteric:Superior Mesenteric Artery (SMA) — Post-prandial (if indicated)\t6\n40\tabdominal_vascular\tmesenteric:Celiac Axis (CA)\t7\n41\tabdominal_vascular\tmesenteric:Inferior Mesenteric Artery (IMA) — if indicated\t8\n42\tabdominal_vascular\tmesenteric:Splenic Artery\t9\n43\tabdominal_vascular\trenal:Kidneys — B-mode Survey\t10\n44\tabdominal_vascular\trenal:Aorta at Renal Artery Level\t11\n45\tabdominal_vascular\trenal:Main Renal Artery — Origin, Proximal, Mid and Distal Segments\t12\n46\tabdominal_vascular\trenal:Intrarenal Arteries — Spectral Doppler\t13\n47\tabdominal_vascular\trenal:Renal Veins\t14\n",
+  "stderr": "",
+  "execution_time_ms": 359
+}
