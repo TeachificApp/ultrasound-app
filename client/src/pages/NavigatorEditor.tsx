@@ -93,80 +93,90 @@ function SortableItemRow({
     <div
       ref={setNodeRef}
       style={style}
-      className={`border-b border-gray-50 last:border-0 ${item.critical ? "bg-amber-50/30" : "bg-white"}`}
+      className={`flex items-start gap-3 px-5 py-3 border-b border-gray-50 last:border-0 group ${item.critical ? "bg-amber-50/40" : "bg-white"} hover:bg-[#f0fbfc] transition-all`}
     >
-      <div className="flex items-start gap-2 px-4 py-2.5">
-        <button
-          type="button"
-          {...attributes}
-          {...listeners}
-          className="cursor-grab active:cursor-grabbing flex-shrink-0 mt-1 touch-none p-0.5 rounded hover:bg-gray-100"
-          title="Drag to reorder item"
-        >
-          <GripVertical className="w-4 h-4 text-gray-400" />
-        </button>
+      {/* Drag handle */}
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing flex-shrink-0 mt-0.5 touch-none p-0.5 rounded hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-opacity"
+        title="Drag to reorder item"
+      >
+        <GripVertical className="w-3.5 h-3.5 text-gray-400" />
+      </button>
 
-        <div className="flex-1 min-w-0">
-          {isEditing ? (
-            <div className="space-y-1.5">
-              <Input
-                className="text-sm h-8"
-                value={item.label}
-                onChange={e => onUpdate("label", e.target.value)}
-                placeholder="Checklist item label"
-                autoFocus
+      {/* Circle icon — mirrors live Navigator */}
+      <div className="flex-shrink-0 mt-0.5">
+        {item.critical
+          ? <AlertTriangle className="w-5 h-5 text-amber-400" />
+          : <div className="w-5 h-5 rounded-full border-2 border-gray-300" />}
+      </div>
+
+      {/* Item content */}
+      <div className="flex-1 min-w-0">
+        {isEditing ? (
+          <div className="space-y-1.5">
+            <Input
+              className="text-sm h-8"
+              value={item.label}
+              onChange={e => onUpdate("label", e.target.value)}
+              placeholder="Checklist item label"
+              autoFocus
+            />
+            <Textarea
+              className="text-xs min-h-[60px] resize-none"
+              value={item.detail}
+              onChange={e => onUpdate("detail", e.target.value)}
+              placeholder="Detail / explanation (optional)"
+            />
+            <label className="flex items-center gap-2 text-xs text-amber-600 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={item.critical}
+                onChange={e => onUpdate("critical", e.target.checked)}
+                className="accent-amber-500"
               />
-              <Textarea
-                className="text-xs min-h-[60px] resize-none"
-                value={item.detail}
-                onChange={e => onUpdate("detail", e.target.value)}
-                placeholder="Detail / explanation (optional)"
-              />
-              <label className="flex items-center gap-2 text-xs text-amber-600 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={item.critical}
-                  onChange={e => onUpdate("critical", e.target.checked)}
-                  className="accent-amber-500"
-                />
-                <AlertTriangle className="w-3 h-3" />
-                Mark as critical item
-              </label>
-            </div>
-          ) : (
-            <div>
-              <div className="flex items-center gap-1.5">
-                {item.critical && <AlertTriangle className="w-3 h-3 text-amber-500 flex-shrink-0" />}
-                <span className={`text-sm font-medium ${item.label ? "text-gray-700" : "text-gray-300 italic"}`}>
-                  {item.label || "Empty label — click edit"}
-                </span>
-              </div>
-              {item.detail && (
-                <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{item.detail}</p>
+              <AlertTriangle className="w-3 h-3" />
+              Mark as critical item
+            </label>
+          </div>
+        ) : (
+          <div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className={`text-sm font-medium ${item.label ? "text-gray-700" : "text-gray-300 italic"}`}>
+                {item.label || "Empty label — click edit"}
+              </span>
+              {item.critical && (
+                <span className="text-xs font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Critical</span>
               )}
             </div>
-          )}
-        </div>
+            {item.detail && (
+              <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{item.detail}</p>
+            )}
+          </div>
+        )}
+      </div>
 
-        <div className="flex items-center gap-0.5 flex-shrink-0">
-          <button type="button" onClick={() => onMove("up")} disabled={itemIdx === 0} className="p-1 rounded hover:bg-gray-100 disabled:opacity-30">
-            <ArrowUp className="w-3 h-3 text-gray-400" />
-          </button>
-          <button type="button" onClick={() => onMove("down")} disabled={itemIdx === totalItems - 1} className="p-1 rounded hover:bg-gray-100 disabled:opacity-30">
-            <ArrowDown className="w-3 h-3 text-gray-400" />
-          </button>
-          <button
-            type="button"
-            onClick={isEditing ? onDoneEdit : onEdit}
-            className="p-1.5 rounded hover:bg-blue-100 text-blue-500"
-            title={isEditing ? "Done editing" : "Edit item"}
-          >
-            {isEditing ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Edit3 className="w-3.5 h-3.5" />}
-          </button>
-          <button type="button" onClick={onDelete} className="p-1.5 rounded hover:bg-red-100 text-red-400" title="Delete item">
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
+      {/* Edit controls */}
+      <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button type="button" onClick={() => onMove("up")} disabled={itemIdx === 0} className="p-1 rounded hover:bg-gray-100 disabled:opacity-30" title="Move up">
+          <ArrowUp className="w-3 h-3 text-gray-400" />
+        </button>
+        <button type="button" onClick={() => onMove("down")} disabled={itemIdx === totalItems - 1} className="p-1 rounded hover:bg-gray-100 disabled:opacity-30" title="Move down">
+          <ArrowDown className="w-3 h-3 text-gray-400" />
+        </button>
+        <button
+          type="button"
+          onClick={isEditing ? onDoneEdit : onEdit}
+          className="p-1.5 rounded hover:bg-blue-100 text-blue-500"
+          title={isEditing ? "Done editing" : "Edit item"}
+        >
+          {isEditing ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Edit3 className="w-3.5 h-3.5" />}
+        </button>
+        <button type="button" onClick={onDelete} className="p-1.5 rounded hover:bg-red-100 text-red-400" title="Delete item">
+          <X className="w-3.5 h-3.5" />
+        </button>
       </div>
     </div>
   );
@@ -216,9 +226,9 @@ function SortableSectionCard({
   return (
     <div ref={setNodeRef} style={style}>
       <div className={`bg-white rounded-xl border shadow-sm overflow-hidden ${section.isDirty ? "border-amber-300" : "border-gray-100"}`}>
-        {/* Section header */}
-        <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border-b border-gray-100">
-          {/* Section drag handle */}
+        {/* Section header — mirrors live Navigator section card */}
+        <div className="flex items-center gap-3 px-4 py-3.5 hover:bg-[#f0fbfc] transition-colors border-b border-gray-100">
+          {/* Drag handle */}
           <button
             type="button"
             {...attributes}
@@ -226,9 +236,18 @@ function SortableSectionCard({
             className="cursor-grab active:cursor-grabbing flex-shrink-0 touch-none p-0.5 rounded hover:bg-gray-200"
             title="Drag to reorder section"
           >
-            <GripVertical className="w-4 h-4 text-gray-400" />
+            <GripVertical className="w-4 h-4 text-gray-300" />
           </button>
 
+          {/* Teal numbered circle — exactly as in live Navigator */}
+          <div
+            className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-white text-xs font-bold"
+            style={{ background: section.isDirty ? "#f59e0b" : "#189aa1" }}
+          >
+            {si + 1}
+          </div>
+
+          {/* Section name + probe — editable inline */}
           <div className="flex-1 min-w-0">
             <input
               className="font-bold text-sm text-gray-800 bg-transparent border-none outline-none w-full"
@@ -236,25 +255,28 @@ function SortableSectionCard({
               value={section.sectionName}
               onChange={e => onUpdateSectionField("sectionName", e.target.value)}
               placeholder="Section name"
+              onClick={e => e.stopPropagation()}
             />
             <input
               className="text-xs text-gray-400 bg-transparent border-none outline-none w-full mt-0.5"
               value={section.probe}
               onChange={e => onUpdateSectionField("probe", e.target.value)}
-              placeholder="Probe / approach description"
+              placeholder="Probe / approach"
+              onClick={e => e.stopPropagation()}
             />
           </div>
 
-          <div className="flex items-center gap-1 flex-shrink-0">
+          {/* Controls */}
+          <div className="flex items-center gap-0.5 flex-shrink-0">
             {section.isDirty && (
-              <Badge variant="outline" className="text-amber-600 border-amber-300 text-xs">unsaved</Badge>
+              <Badge variant="outline" className="text-amber-600 border-amber-300 text-xs mr-1">unsaved</Badge>
             )}
-            <span className="text-xs text-gray-400 mr-1">{section.items.length} items</span>
-            <button type="button" onClick={() => onMoveSection("up")} disabled={si === 0} className="p-1 rounded hover:bg-gray-200 disabled:opacity-30">
-              <ArrowUp className="w-3 h-3 text-gray-500" />
+            <span className="text-xs text-gray-400 mr-1">{section.items.length}/{section.items.length}</span>
+            <button type="button" onClick={() => onMoveSection("up")} disabled={si === 0} className="p-1 rounded hover:bg-gray-100 disabled:opacity-30" title="Move up">
+              <ArrowUp className="w-3 h-3 text-gray-400" />
             </button>
-            <button type="button" onClick={() => onMoveSection("down")} disabled={si === totalSections - 1} className="p-1 rounded hover:bg-gray-200 disabled:opacity-30">
-              <ArrowDown className="w-3 h-3 text-gray-500" />
+            <button type="button" onClick={() => onMoveSection("down")} disabled={si === totalSections - 1} className="p-1 rounded hover:bg-gray-100 disabled:opacity-30" title="Move down">
+              <ArrowDown className="w-3 h-3 text-gray-400" />
             </button>
             <button
               type="button"
@@ -274,8 +296,8 @@ function SortableSectionCard({
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
-            <button type="button" onClick={onToggleExpand} className="p-1.5 rounded hover:bg-gray-200">
-              {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
+            <button type="button" onClick={onToggleExpand} className="p-1.5 rounded hover:bg-gray-100" title={isExpanded ? "Collapse" : "Expand"}>
+              {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
             </button>
           </div>
         </div>

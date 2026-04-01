@@ -896,3 +896,12 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix: Magic link login does not persist session — user is prompted to log in again when navigating to ScanCoach pages after signing in via email link
 - [x] ScanCoach Editor WYSIWYG Redesign: show exact view names, tip categories, and content matching live UI with inline editing
 - [ ] Module selector should show the same module names as the hub
+
+## WYSIWYG Editor Extension
+- [ ] Extend ScanCoach Editor WYSIWYG to POCUS and Fetal modules (currently use legacy textarea)
+- [ ] Build WYSIWYG Navigator Editor: show exact section structure matching live Navigator UI with inline editing
+
+## WYSIWYG Editor Extension (Apr 2026)
+- [x] Extend WYSIWYG to POCUS/Fetal ScanCoach modules (accordion sections: How to Get This View, Structures to Identify, Scanning Tips, Pitfalls, Key Measurements, Critical Findings)
+- [x] Update Navigator Editor SortableSectionCard to mirror live Navigator styling (teal numbered circle, Merriweather section name, probe text, amber circle when unsaved)
+- [x] Update Navigator Editor SortableItemRow to mirror live Navigator item styling (circle icon, critical badge, detail text, hover-reveal edit controls)

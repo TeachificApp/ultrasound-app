@@ -28,7 +28,7 @@ import {
 import { getStaticContent } from "@/lib/scanCoachStaticContent";
 import { getViewsForModule, isStructuredTips, TIP_COLOR_MAP, TIP_CATEGORIES, type StructuredTip } from "@/lib/scanCoachViewData";
 import {
-  Upload, Trash2, Save, ChevronLeft, ChevronRight,
+  Upload, Trash2, Save, ChevronLeft, ChevronRight, ChevronUp, ChevronDown,
   Image as ImageIcon, Edit3, Eye, Loader2, CheckCircle2,
   AlertCircle, ExternalLink, Layers, AlertTriangle,
   Stethoscope, Ruler, Lightbulb, Activity, Heart, Baby,
@@ -88,6 +88,9 @@ type DraftState = {
   measurements: string;
   criticalFindings: string;
 };
+
+/** Modules that use the legacy multi-section format (howToGet, structures, tips, pitfalls, measurements, criticalFindings as string[]) */
+const LEGACY_MODULES = new Set(["fetal", "pocus_efast", "pocus_rush", "pocus_cardiac", "pocus_lung"]);
 
 /** Modules that use {category, text}[] structured tips */
 const STRUCTURED_TIP_MODULES = new Set([
@@ -691,6 +694,12 @@ export default function ScanCoachEditor() {
   const [draft, setDraft] = useState<DraftState | null>(null);
   // Structured tips state (for modules using {category, text}[] format)
   const [tipsDraft, setTipsDraft] = useState<StructuredTip[]>([]);
+  // Legacy multi-section draft (for POCUS/Fetal modules)
+  type LegacyDraft = { howToGet: string[]; structures: string[]; tips: string[]; pitfalls: string[]; measurements: string[]; criticalFindings: string[] };
+  const [legacyDraft, setLegacyDraft] = useState<LegacyDraft | null>(null);
+  const [legacyEditState, setLegacyEditState] = useState<{ section: keyof LegacyDraft; idx: number; text: string } | null>(null);
+  const [legacyAddState, setLegacyAddState] = useState<{ section: keyof LegacyDraft; text: string } | null>(null);
+  const [legacyOpenSections, setLegacyOpenSections] = useState<Record<string, boolean>>({ howToGet: true, structures: true, tips: true, pitfalls: true, measurements: true, criticalFindings: true });
   const [editingTipIdx, setEditingTipIdx] = useState<number | null>(null);
   const [editingTip, setEditingTip] = useState<StructuredTip>({ category: "Scanning Tip", text: "" });
   const [addingTip, setAddingTip] = useState(false);
@@ -773,26 +782,59 @@ export default function ScanCoachEditor() {
       const staticTips = staticView?.tips ?? [];
       setTipsDraft(parseTipsDraft(ov?.tips ?? null, staticTips));
     }
+    // For legacy modules (POCUS/Fetal), populate legacyDraft from static view data or DB override
+    if (LEGACY_MODULES.has(selectedModule)) {
+      const moduleViews = getViewsForModule(selectedModule);
+      const sv = moduleViews.find((v) => v.id === viewId);
+      const getArr = (dbVal: string | null | undefined, staticVal: unknown): string[] => {
+        if (dbVal) return parseToStringArray(dbVal);
+        if (Array.isArray(staticVal)) return staticVal as string[];
+        return [];
+      };
+      setLegacyDraft({
+        howToGet:         getArr(ov?.howToGet,         sv?.howToGet),
+        structures:       getArr(ov?.structures,       sv?.structures),
+        tips:             getArr(ov?.tips,             sv?.tips),
+        pitfalls:         getArr(ov?.pitfalls,         sv?.pitfalls),
+        measurements:     getArr(ov?.measurements,     sv?.measurements),
+        criticalFindings: getArr(ov?.criticalFindings, sv?.criticalFindings),
+      });
+      setLegacyEditState(null);
+      setLegacyAddState(null);
+    }
   };
 
   const handleSaveText = () => {
     if (!selectedViewId || !draft) return;
     const viewMeta = moduleMeta.views.find((v) => v.id === selectedViewId);
     const isStructured = STRUCTURED_TIP_MODULES.has(selectedModule);
+    const isLegacy = LEGACY_MODULES.has(selectedModule);
+    const arrToJson = (arr: string[]) => arr.length > 0 ? JSON.stringify(arr) : null;
     upsertMutation.mutate({
       module: selectedModule,
       viewId: selectedViewId,
       viewName: viewMeta?.name,
       description: draft.description || null,
-      howToGet: draft.howToGet ? toJsonArray(draft.howToGet) : null,
-      // For structured modules, serialize tipsDraft as [{category, text}] JSON
+      howToGet: isLegacy
+        ? arrToJson(legacyDraft?.howToGet ?? [])
+        : (draft.howToGet ? toJsonArray(draft.howToGet) : null),
       tips: isStructured
         ? (tipsDraft.length > 0 ? JSON.stringify(tipsDraft) : null)
-        : (draft.tips ? toJsonArray(draft.tips) : null),
-      pitfalls: draft.pitfalls ? toJsonArray(draft.pitfalls) : null,
-      structures: draft.structures ? toJsonArray(draft.structures) : null,
-      measurements: draft.measurements ? toJsonArray(draft.measurements) : null,
-      criticalFindings: draft.criticalFindings ? toJsonArray(draft.criticalFindings) : null,
+        : isLegacy
+          ? arrToJson(legacyDraft?.tips ?? [])
+          : (draft.tips ? toJsonArray(draft.tips) : null),
+      pitfalls: isLegacy
+        ? arrToJson(legacyDraft?.pitfalls ?? [])
+        : (draft.pitfalls ? toJsonArray(draft.pitfalls) : null),
+      structures: isLegacy
+        ? arrToJson(legacyDraft?.structures ?? [])
+        : (draft.structures ? toJsonArray(draft.structures) : null),
+      measurements: isLegacy
+        ? arrToJson(legacyDraft?.measurements ?? [])
+        : (draft.measurements ? toJsonArray(draft.measurements) : null),
+      criticalFindings: isLegacy
+        ? arrToJson(legacyDraft?.criticalFindings ?? [])
+        : (draft.criticalFindings ? toJsonArray(draft.criticalFindings) : null),
     });
   };
 
@@ -1395,72 +1437,188 @@ export default function ScanCoachEditor() {
                             </div>
                           </div>
                         ) : (
-                          /* Non-structured modules: keep existing textarea editing */
-                          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-                            <div className="flex items-center gap-2 mb-4">
-                              <Edit3 className="w-4 h-4" style={{ color: BRAND }} />
-                              <h3 className="font-bold text-sm text-gray-700" style={{ fontFamily: "Merriweather, serif" }}>Tips &amp; Content</h3>
-                            </div>
-                            <div className="space-y-5">
-                              {TEXT_FIELDS.filter((f) => f.key !== "description").map((field) => {
-                                const value = draft[field.key as keyof DraftState];
-                                return (
-                                  <div key={field.key}>
-                                    <div className="flex items-center justify-between mb-1.5">
-                                      <label className="text-xs font-semibold text-gray-600">{field.label}</label>
-                                      {field.isArray && (
-                                        <span className="text-[10px] text-gray-400">One item per line</span>
+                          /* Legacy modules (POCUS/Fetal): WYSIWYG accordion section editor */
+                          legacyDraft && (() => {
+                            type LDKey = keyof typeof legacyDraft;
+                            const SECTIONS: { key: LDKey; label: string; icon: React.ReactNode; color: string; emptyLabel: string; numbered?: boolean }[] = [
+                              { key: "howToGet",         label: "How to Get This View",  icon: <Lightbulb className="w-4 h-4" />,      color: "#189aa1", emptyLabel: "step",           numbered: true },
+                              { key: "structures",       label: "Structures to Identify", icon: <Layers className="w-4 h-4" />,         color: "#6366f1", emptyLabel: "structure" },
+                              { key: "tips",             label: "Scanning Tips",          icon: <Lightbulb className="w-4 h-4" />,      color: "#22c55e", emptyLabel: "tip" },
+                              { key: "pitfalls",         label: "Pitfalls",               icon: <AlertTriangle className="w-4 h-4" />,  color: "#f59e0b", emptyLabel: "pitfall" },
+                              { key: "measurements",     label: "Key Measurements",       icon: <Ruler className="w-4 h-4" />,          color: "#8b5cf6", emptyLabel: "measurement" },
+                              { key: "criticalFindings", label: "Critical Findings",      icon: <AlertCircle className="w-4 h-4" />,    color: "#ef4444", emptyLabel: "finding" },
+                            ];
+                            return (
+                              <div className="space-y-3">
+                                {SECTIONS.map((sec) => {
+                                  const items = legacyDraft[sec.key];
+                                  const isOpen = legacyOpenSections[sec.key] !== false;
+                                  const isAdding = legacyAddState?.section === sec.key;
+                                  return (
+                                    <div key={sec.key} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                                      {/* Section header — mirrors live UI accordion */}
+                                      <button
+                                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left"
+                                        onClick={() => setLegacyOpenSections((s) => ({ ...s, [sec.key]: !isOpen }))}
+                                      >
+                                        <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-white" style={{ background: sec.color }}>
+                                          {sec.icon}
+                                        </div>
+                                        <div className="flex-1">
+                                          <span className="font-bold text-sm text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>{sec.label}</span>
+                                          {currentOverride?.[sec.key as keyof Override] && (
+                                            <Badge className="ml-2 text-[10px] text-white" style={{ background: sec.color }}>Overridden</Badge>
+                                          )}
+                                        </div>
+                                        <span className="text-xs text-gray-400 mr-1">{items.length} item{items.length !== 1 ? "s" : ""}</span>
+                                        {isOpen ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                                      </button>
+                                      {isOpen && (
+                                        <div className="border-t border-gray-100">
+                                          {items.length === 0 && !isAdding && (
+                                            <p className="text-xs text-gray-400 px-4 py-3 italic">No {sec.emptyLabel}s yet.</p>
+                                          )}
+                                          {items.map((item, idx) => {
+                                            const isEditing = legacyEditState?.section === sec.key && legacyEditState.idx === idx;
+                                            return (
+                                              <div key={idx} className="flex items-start gap-2 px-4 py-2.5 border-b border-gray-50 last:border-0 group">
+                                                {/* Item number/bullet */}
+                                                <div className="flex-shrink-0 mt-0.5">
+                                                  {sec.numbered
+                                                    ? <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white" style={{ background: sec.color }}>{idx + 1}</span>
+                                                    : <span className="w-1.5 h-1.5 rounded-full mt-1.5 block" style={{ background: sec.color }} />}
+                                                </div>
+                                                {/* Item content */}
+                                                <div className="flex-1 min-w-0">
+                                                  {isEditing ? (
+                                                    <div className="space-y-1.5">
+                                                      <Textarea
+                                                        value={legacyEditState.text}
+                                                        onChange={(e) => setLegacyEditState((s) => s ? { ...s, text: e.target.value } : s)}
+                                                        rows={3}
+                                                        className="text-sm resize-y"
+                                                        autoFocus
+                                                      />
+                                                      <div className="flex gap-1">
+                                                        <Button size="sm" className="h-6 px-2 text-xs text-white" style={{ background: sec.color }}
+                                                          onClick={() => {
+                                                            if (!legacyEditState.text.trim()) return;
+                                                            setLegacyDraft((d) => {
+                                                              if (!d) return d;
+                                                              const arr = [...d[sec.key]];
+                                                              arr[idx] = legacyEditState.text.trim();
+                                                              return { ...d, [sec.key]: arr };
+                                                            });
+                                                            setLegacyEditState(null);
+                                                          }}
+                                                        ><Check className="w-3 h-3 mr-1" /> Save</Button>
+                                                        <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => setLegacyEditState(null)}><X className="w-3 h-3" /></Button>
+                                                      </div>
+                                                    </div>
+                                                  ) : (
+                                                    <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{item}</p>
+                                                  )}
+                                                </div>
+                                                {/* Edit controls */}
+                                                {!isEditing && (
+                                                  <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600" title="Edit"
+                                                      onClick={() => setLegacyEditState({ section: sec.key, idx, text: item })}>
+                                                      <Pencil className="w-3 h-3" />
+                                                    </button>
+                                                    <button className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600" title="Move up" disabled={idx === 0}
+                                                      onClick={() => {
+                                                        if (idx === 0) return;
+                                                        setLegacyDraft((d) => {
+                                                          if (!d) return d;
+                                                          const arr = [...d[sec.key]];
+                                                          [arr[idx - 1], arr[idx]] = [arr[idx], arr[idx - 1]];
+                                                          return { ...d, [sec.key]: arr };
+                                                        });
+                                                      }}>
+                                                      <MoveUp className="w-3 h-3" />
+                                                    </button>
+                                                    <button className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600" title="Move down" disabled={idx === items.length - 1}
+                                                      onClick={() => {
+                                                        if (idx === items.length - 1) return;
+                                                        setLegacyDraft((d) => {
+                                                          if (!d) return d;
+                                                          const arr = [...d[sec.key]];
+                                                          [arr[idx], arr[idx + 1]] = [arr[idx + 1], arr[idx]];
+                                                          return { ...d, [sec.key]: arr };
+                                                        });
+                                                      }}>
+                                                      <MoveDown className="w-3 h-3" />
+                                                    </button>
+                                                    <button className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500" title="Delete"
+                                                      onClick={() => setLegacyDraft((d) => {
+                                                        if (!d) return d;
+                                                        return { ...d, [sec.key]: d[sec.key].filter((_, i) => i !== idx) };
+                                                      })}>
+                                                      <Trash2 className="w-3 h-3" />
+                                                    </button>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            );
+                                          })}
+                                          {/* Add item */}
+                                          {isAdding ? (
+                                            <div className="px-4 py-3 space-y-1.5 border-t border-dashed" style={{ borderColor: sec.color + "40", background: sec.color + "08" }}>
+                                              <Textarea
+                                                value={legacyAddState?.text ?? ""}
+                                                onChange={(e) => setLegacyAddState((s) => s ? { ...s, text: e.target.value } : s)}
+                                                rows={3}
+                                                className="text-sm resize-y"
+                                                placeholder={`Enter ${sec.emptyLabel} text…`}
+                                                autoFocus
+                                              />
+                                              <div className="flex gap-1">
+                                                <Button size="sm" className="h-6 px-2 text-xs text-white" style={{ background: sec.color }}
+                                                  onClick={() => {
+                                                    if (!legacyAddState?.text.trim()) return;
+                                                    setLegacyDraft((d) => {
+                                                      if (!d) return d;
+                                                      return { ...d, [sec.key]: [...d[sec.key], legacyAddState.text.trim()] };
+                                                    });
+                                                    setLegacyAddState(null);
+                                                  }}
+                                                ><Check className="w-3 h-3 mr-1" /> Add</Button>
+                                                <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => setLegacyAddState(null)}><X className="w-3 h-3" /></Button>
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <button
+                                              className="w-full flex items-center justify-center gap-1.5 py-2 text-xs transition-colors"
+                                              style={{ color: sec.color }}
+                                              onClick={() => setLegacyAddState({ section: sec.key, text: "" })}
+                                            >
+                                              <Plus className="w-3.5 h-3.5" /> Add {sec.emptyLabel}
+                                            </button>
+                                          )}
+                                        </div>
                                       )}
                                     </div>
-                                    <Textarea
-                                      value={value}
-                                      onChange={(e) =>
-                                        setDraft((d) => d ? { ...d, [field.key]: e.target.value } : d)
-                                      }
-                                      placeholder={
-                                        field.isArray
-                                          ? `Enter each ${field.label.toLowerCase()} item on a new line…`
-                                          : `Enter ${field.label.toLowerCase()}…`
-                                      }
-                                      rows={field.isArray ? 4 : 3}
-                                      className="text-sm font-mono resize-y"
-                                    />
+                                  );
+                                })}
+                                {/* Save bar */}
+                                <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3 flex items-center justify-between">
+                                  <p className="text-xs text-gray-400">
+                                    Content shown exactly as users see it.
+                                    {currentOverride && <span className="ml-1 text-[#189aa1] font-medium">Override active.</span>}
+                                  </p>
+                                  <div className="flex items-center gap-2">
+                                    <Button size="sm" variant="outline" onClick={() => setPreviewMode(true)} className="text-amber-600 border-amber-200 hover:bg-amber-50 text-xs">
+                                      <Eye className="w-3 h-3 mr-1" /> Preview
+                                    </Button>
+                                    <Button size="sm" onClick={handleSaveText} disabled={upsertMutation.isPending} style={{ background: BRAND }} className="text-white hover:opacity-90">
+                                      {upsertMutation.isPending ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Saving…</> : <><Save className="w-3 h-3 mr-1" /> Save Changes</>}
+                                    </Button>
                                   </div>
-                                );
-                              })}
-                            </div>
-                            <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
-                              <p className="text-xs text-gray-400">
-                                Leave a field blank to use the static default.
-                                {currentOverride && (
-                                  <span className="ml-1">Last updated: {new Date(currentOverride.updatedAt).toLocaleString()}</span>
-                                )}
-                              </p>
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => setPreviewMode(true)}
-                                  className="text-amber-600 border-amber-200 hover:bg-amber-50 text-xs"
-                                >
-                                  <Eye className="w-3 h-3 mr-1" /> Preview
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  onClick={handleSaveText}
-                                  disabled={upsertMutation.isPending}
-                                  style={{ background: BRAND }}
-                                  className="text-white hover:opacity-90"
-                                >
-                                  {upsertMutation.isPending ? (
-                                    <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Saving…</>
-                                  ) : (
-                                    <><Save className="w-3 h-3 mr-1" /> Save Changes</>
-                                  )}
-                                </Button>
+                                </div>
                               </div>
-                            </div>
-                          </div>
+                            );
+                          })()
                         )}
                       </div>
                     )}
