@@ -328,6 +328,31 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
       { id: "diaphragm",       name: "Diaphragm — M-mode Assessment",     group: "Diaphragm" },
     ],
   },
+  // ── Procedures ──────────────────────────────────────────────────────────────
+  {
+    key: "appendix",
+    label: "Appendix ScanCoach",
+    path: "/appendix-scan-coach",
+    category: "Procedures",
+    views: [
+      { id: "rlq_survey",       name: "RLQ Survey — Graded Compression Technique",            group: "Appendix" },
+      { id: "appendix_id",      name: "Appendix Identification and Measurement",               group: "Appendix" },
+      { id: "periappendiceal",  name: "Periappendiceal Assessment (Inflammation / Perforation)", group: "Appendix" },
+      { id: "alt_diagnoses",    name: "Alternative RLQ Diagnoses",                            group: "Appendix" },
+    ],
+  },
+  {
+    key: "invasive_procedures",
+    label: "Invasive Procedures ScanCoach",
+    path: "/invasive-procedures-scan-coach",
+    category: "Procedures",
+    views: [
+      { id: "thoracentesis_site",      name: "Thoracentesis — Site Selection",           group: "Thoracentesis" },
+      { id: "thoracentesis_guidance",  name: "Thoracentesis — Real-Time Needle Guidance", group: "Thoracentesis" },
+      { id: "paracentesis_site",       name: "Paracentesis — Site Selection",            group: "Paracentesis" },
+      { id: "paracentesis_guidance",   name: "Paracentesis — Real-Time Needle Guidance",  group: "Paracentesis" },
+    ],
+  },
 ];
 
 /** Lookup a module by key */
