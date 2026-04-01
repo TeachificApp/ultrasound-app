@@ -141,6 +141,8 @@ export const appRouter = router({
   auth: router({
     me: publicProcedure.query(async opts => {
       if (!opts.ctx.user) return null;
+      // Backfill the base "user" role for any existing user who may be missing it
+      await ensureUserRole(opts.ctx.user.id);
       const roles = await getUserRoles(opts.ctx.user.id);
       // Fetch full user row to expose pendingEmail and isPremium for the profile UI
       const fullUser = await getUserById(opts.ctx.user.id);

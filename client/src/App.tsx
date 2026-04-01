@@ -174,15 +174,15 @@ function Router() {
 
         {/* ── Abdominal ─────────────────────────────────────────────────── */}
         <Route path="/abdominal-navigator" component={AbdominalNavigator} />
-        <Route path="/abdominal-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><AbdominalScanCoach /></RoleGuard>}</Route>
+        <Route path="/abdominal-scan-coach">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><AbdominalScanCoach /></RoleGuard>}</Route>
 
         {/* ── Pelvic/Gyn ────────────────────────────────────────────────── */}
         <Route path="/pelvic-gyn-navigator" component={PelvicGynNavigator} />
-        <Route path="/pelvic-gyn-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><PelvicGynScanCoach /></RoleGuard>}</Route>
+        <Route path="/pelvic-gyn-scan-coach">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><PelvicGynScanCoach /></RoleGuard>}</Route>
 
         {/* ── OB 1st Trimester ──────────────────────────────────────────── */}
         <Route path="/ob1-navigator" component={OB1Navigator} />
-        <Route path="/ob1-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><OB1ScanCoach /></RoleGuard>}</Route>
+        <Route path="/ob1-scan-coach">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><OB1ScanCoach /></RoleGuard>}</Route>
 
         {/* ── OB 2nd/3rd Trimester ──────────────────────────────────────── */}
         <Route path="/ob23-navigator" component={OB23Navigator} />

@@ -21,7 +21,7 @@
 
 import type { Express, Request, Response } from "express";
 import * as bcrypt from "bcryptjs";
-import { getDb } from "../db";
+import { getDb, ensureUserRole } from "../db";
 import { users } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { getSessionCookieOptions } from "../_core/cookies";
@@ -75,6 +75,9 @@ export function registerAuthLoginRoute(app: Express) {
 
       // Update last signed in
       await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.id, user.id));
+
+      // Ensure the user has the base "user" role (idempotent)
+      await ensureUserRole(user.id);
 
       // Issue session cookie
       const openId = user.openId ?? emailOpenId(normalizedEmail);
@@ -134,6 +137,9 @@ export function registerAuthLoginRoute(app: Express) {
         .update(users)
         .set({ magicLinkToken: null, magicLinkExpiry: null, emailVerified: true })
         .where(eq(users.id, user.id));
+
+      // Ensure the user has the base "user" role (idempotent)
+      await ensureUserRole(user.id);
 
       // Issue session cookie
       const openId = user.openId ?? emailOpenId(user.email ?? "");
