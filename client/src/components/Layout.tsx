@@ -61,6 +61,8 @@ const BASE_NAV_GROUPS = [
     items: [
       { path: "/ultrasound-assist", label: "UltrasoundAssist™", icon: Stethoscope },
       { path: "/calculators", label: "UltrasoundAssist™ Calculators", icon: Calculator },
+      { path: "/pediatric-navigator", label: "PediatricAssist™", icon: Stethoscope },
+      { path: "/pediatric-calculators", label: "PediatricAssist™ Calculators", icon: Calculator },
       { path: "/clinical-intelligence", label: "Clinical Intelligence", icon: Brain },
     ],
   },
@@ -165,6 +167,9 @@ const hiddenNavItems = [
   { path: "/msk-scan-coach", label: "MSK ScanCoach™" },
   { path: "/pocus-navigator", label: "POCUS Navigator" },
   { path: "/pocus-scan-coach", label: "POCUS ScanCoach™" },
+  { path: "/pediatric-navigator", label: "PediatricAssist™ Navigator" },
+  { path: "/pediatric-scan-coach", label: "PediatricAssist™ ScanCoach™" },
+  { path: "/pediatric-calculators", label: "PediatricAssist™ Calculators" },
   { path: "/soundbytes", label: "SoundBytes™" },
   { path: "/educator-assist", label: "EducatorAssist™" },
 ];

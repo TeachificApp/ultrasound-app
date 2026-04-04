@@ -96,7 +96,7 @@ const LEGACY_MODULES = new Set(["fetal", "pocus_efast", "pocus_rush", "pocus_car
 const STRUCTURED_TIP_MODULES = new Set([
   "abdominal", "pelvic_gyn", "ob1", "ob23", "thyroid", "scrotum",
   "venous", "arterial", "abdominal_vascular", "aorta", "carotid", "tcd",
-  "msk", "breast", "appendix", "invasive_procedures",
+  "msk", "breast", "appendix", "invasive_procedures", "pediatric",
 ]);
 
 /** Parse tips from DB override JSON or static view data into StructuredTip[] */

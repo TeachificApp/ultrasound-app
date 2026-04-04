@@ -9,7 +9,7 @@ import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import {
   Activity, Baby, Scan, TrendingUp, BookOpen, Crown, Lock,
-  Stethoscope, Brain, Bone, Circle, Zap, Search, Syringe
+  Stethoscope, Brain, Bone, Circle, Zap, Search, Syringe, Calculator
 } from "lucide-react";
 import { usePremium } from "@/hooks/usePremium";
 
@@ -117,6 +117,18 @@ const specialties = [
     badge: "Procedures",
     navigatorFree: false,
     scanCoachFree: false,
+  },
+  // ── PEDIATRIC ────────────────────────────────────────────────────────────
+  {
+    path: "/pediatric-navigator",
+    scanCoachPath: "/pediatric-scan-coach",
+    calculatorPath: "/pediatric-calculators",
+    icon: Baby,
+    title: "PediatricAssist™",
+    description: "Pediatric ultrasound — Appendix, Intussusception, Pyloric Stenosis, Kidneys, Spine, Hips (Graf DDH), and Neonatal Neuro with age-based nomograms and clinical decision support.",
+    badge: "Pediatric",
+    navigatorFree: true,
+    scanCoachFree: true,
   },
   // ── VASCULAR — all 6, Carotid first, immediately before MSK ──────────────
   {
@@ -334,6 +346,20 @@ export default function UltrasoundAssistHub() {
                           >
                             <BookOpen className="w-3 h-3" />
                             Navigator
+                          </button>
+                        </Link>
+                      )}
+
+                      {/* Calculators button — only for specialties with calculatorPath */}
+                      {(spec as any).calculatorPath && (
+                        <Link href={(spec as any).calculatorPath}>
+                          <button
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs border bg-white transition-all hover:bg-[#f0fbfc]"
+                            style={{ borderColor: "#189aa150", color: "#189aa1" }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Calculator className="w-3 h-3" />
+                            Calculators
                           </button>
                         </Link>
                       )}

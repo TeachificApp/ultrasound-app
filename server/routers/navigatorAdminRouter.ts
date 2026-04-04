@@ -43,6 +43,7 @@ export const NAVIGATOR_MODULES = [
   "venous",
   "appendix",
   "invasive_procedures",
+  "pediatric",
 ] as const;
 
 export type NavigatorModule = (typeof NAVIGATOR_MODULES)[number];
@@ -208,6 +209,7 @@ export const navigatorAdminRouter = router({
       { key: "venous",            label: "Peripheral Venous" },
       { key: "appendix",           label: "Appendix Ultrasound" },
       { key: "invasive_procedures", label: "Invasive Procedures (Paracentesis / Thoracentesis)" },
+      { key: "pediatric",           label: "PediatricAssist™" },
     ];
   }),
 });

@@ -41,7 +41,9 @@ export type ScanCoachModule =
   | "pocus_lung"
   // Procedures
   | "appendix"
-  | "invasive_procedures";
+  | "invasive_procedures"
+  // Pediatric
+  | "pediatric";
 
 export interface ScanCoachViewMeta {
   id: string;
@@ -351,6 +353,32 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
       { id: "thoracentesis_guidance",  name: "Thoracentesis — Real-Time Needle Guidance", group: "Thoracentesis" },
       { id: "paracentesis_site",       name: "Paracentesis — Site Selection",            group: "Paracentesis" },
       { id: "paracentesis_guidance",   name: "Paracentesis — Real-Time Needle Guidance",  group: "Paracentesis" },
+    ],
+  },
+  // ── Pediatric ─────────────────────────────────────────────────────────────────
+  {
+    key: "pediatric",
+    label: "PediatricAssist™ ScanCoach",
+    path: "/pediatric-scan-coach",
+    category: "Pediatric",
+    views: [
+      { id: "ped_app_graded",         name: "Appendix — Graded Compression Survey",        group: "Appendix" },
+      { id: "ped_app_identification",  name: "Appendix — Identification & Measurement",     group: "Appendix" },
+      { id: "ped_app_periappendiceal", name: "Appendix — Periappendiceal Assessment",      group: "Appendix" },
+      { id: "ped_int_survey",          name: "Intussusception — Abdominal Survey",          group: "Intussusception" },
+      { id: "ped_int_assessment",      name: "Intussusception — Assessment & Doppler",      group: "Intussusception" },
+      { id: "ped_pyl_standard",        name: "Pyloric Stenosis — Standard Measurement",     group: "Pyloric" },
+      { id: "ped_pyl_dynamic",         name: "Pyloric Stenosis — Dynamic Assessment",       group: "Pyloric" },
+      { id: "ped_kid_bilateral",       name: "Kidneys — Bilateral Renal Survey",            group: "Kidneys" },
+      { id: "ped_kid_hydronephrosis",  name: "Kidneys — Hydronephrosis Assessment",         group: "Kidneys" },
+      { id: "ped_kid_bladder",         name: "Kidneys — Bladder & Distal Ureters",          group: "Kidneys" },
+      { id: "ped_spi_longitudinal",    name: "Spine — Longitudinal Survey",                group: "Spine" },
+      { id: "ped_spi_transverse",      name: "Spine — Transverse Survey",                  group: "Spine" },
+      { id: "ped_hip_coronal",         name: "Hips — Standard Coronal View (Graf)",         group: "Hips" },
+      { id: "ped_hip_dynamic",         name: "Hips — Dynamic Stress Assessment",            group: "Hips" },
+      { id: "ped_neu_coronal",         name: "Neuro — Coronal Planes",                     group: "Neuro" },
+      { id: "ped_neu_sagittal",        name: "Neuro — Sagittal Planes",                    group: "Neuro" },
+      { id: "ped_neu_doppler",         name: "Neuro — Doppler Assessment",                 group: "Neuro" },
     ],
   },
 ];

@@ -905,3 +905,25 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Extend WYSIWYG to POCUS/Fetal ScanCoach modules (accordion sections: How to Get This View, Structures to Identify, Scanning Tips, Pitfalls, Key Measurements, Critical Findings)
 - [x] Update Navigator Editor SortableSectionCard to mirror live Navigator styling (teal numbered circle, Merriweather section name, probe text, amber circle when unsaved)
 - [x] Update Navigator Editor SortableItemRow to mirror live Navigator item styling (circle icon, critical badge, detail text, hover-reveal edit controls)
+
+## PediatricAssist Module (Apr 2026)
+- [ ] PediatricAssist Navigator page with 7 tabs: Appendix, Intussusception, Pyloric, Kidneys, Spine, Hips, Neuro
+- [ ] PediatricAssist ScanCoach page with 7 tabs: Appendix, Intussusception, Pyloric, Kidneys, Spine, Hips, Neuro
+- [ ] PediatricAssist Calculators page with relevant pediatric ultrasound measurements
+- [ ] Wire /pediatric-navigator and /pediatric-scan-coach routes in App.tsx
+- [ ] Add PediatricAssist card to UltrasoundAssist Hub
+- [ ] Add PediatricAssist to sidebar navigation
+- [ ] Register pediatric module in scanCoachRegistry and navigatorStaticData
+- [ ] Export pediatric views from ScanCoach page for WYSIWYG editor support
+
+## PediatricAssist Module
+- [x] PediatricAssist Navigator with 7 anatomy tabs (Appendix, Intussusception, Pyloric Stenosis, Kidneys, Spine, Hips, Neuro)
+- [x] PediatricAssist ScanCoach with 7 anatomy tabs (structured tip cards: Patient Positioning, Transducer Positioning, What to Assess, Scanning Tip, Pearl, Pitfall)
+- [x] PediatricAssist Calculators with all relevant pediatric measurements (Appendix, Intussusception, Pyloric Stenosis, Kidneys, Spine, Hips/Graf, Neuro)
+- [x] Routes wired in App.tsx (/pediatric-navigator, /pediatric-scan-coach, /pediatric-calculators)
+- [x] Hub card with Navigator, Calculators, and ScanCoach buttons
+- [x] Sidebar navigation entries (PediatricAssist™, PediatricAssist™ Calculators)
+- [x] ScanCoach Editor WYSIWYG support for pediatric module (STRUCTURED_TIP_MODULES)
+- [x] Navigator Editor support for pediatric module (NAVIGATOR_MODULES)
+- [x] Hub Calculators button added for all specialties with calculatorPath
+- [x] All 771 tests passing after PediatricAssist addition

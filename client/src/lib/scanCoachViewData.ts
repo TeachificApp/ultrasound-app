@@ -43,8 +43,10 @@ import { LUNG_VIEWS as _pocusLungViews } from "@/pages/POCUSLungScanCoach";
 import { views as _appendixViews } from "@/pages/AppendixScanCoach";
 import { views as _invasiveProceduresViews } from "@/pages/InvasiveProceduresScanCoach";
 
-// ── Fetal Echo ───────────────────────────────────────────────────────────────
+// ── Fetal Echo ────────────────────────────────────────────────────────────
 import { FETAL_VIEWS as _fetalViews } from "@/pages/FetalScanCoach";
+// ── Pediatric ────────────────────────────────────────────────────────────
+import { VIEWS as _pediatricViews, EXAM_TIPS as _pediatricExamTips } from "@/pages/PediatricScanCoach";
 
 // Re-export for direct use
 export const abdominalViews = _abdominalViews;
@@ -72,6 +74,8 @@ export const pocusLungViews = _pocusLungViews;
 export const appendixViews = _appendixViews;
 export const invasiveProceduresViews = _invasiveProceduresViews;
 export const fetalViews = _fetalViews;
+export const pediatricViews = _pediatricViews;
+export const pediatricExamTips = _pediatricExamTips;
 
 // ── Tip type ─────────────────────────────────────────────────────────────────
 export type StructuredTip = { category: string; text: string };
@@ -118,6 +122,18 @@ export function getViewsForModule(moduleKey: string): ScanCoachView[] {
     case "appendix":           return _appendixViews as unknown as ScanCoachView[];
     case "invasive_procedures":return _invasiveProceduresViews as unknown as ScanCoachView[];
     case "fetal":              return _fetalViews as unknown as ScanCoachView[];
+    case "pediatric":          {
+      // Flatten all tab views and merge EXAM_TIPS into each view's tips
+      const allViews: ScanCoachView[] = [];
+      for (const [tabKey, tabViews] of Object.entries(_pediatricViews)) {
+        const examTips = (_pediatricExamTips[tabKey] ?? []) as StructuredTip[];
+        for (const v of tabViews) {
+          const existingTips = Array.isArray((v as unknown as ScanCoachView).tips) ? (v as unknown as ScanCoachView).tips : [];
+          allViews.push({ ...v, tips: [...existingTips, ...examTips] } as unknown as ScanCoachView);
+        }
+      }
+      return allViews;
+    }
     default:                   return [];
   }
 }

@@ -108,6 +108,10 @@ import AppendixNavigator from "./pages/AppendixNavigator";
 import AppendixScanCoach from "./pages/AppendixScanCoach";
 import InvasiveProceduresNavigator from "./pages/InvasiveProceduresNavigator";
 import InvasiveProceduresScanCoach from "./pages/InvasiveProceduresScanCoach";
+// ── PediatricAssist™ ──────────────────────────────────────────────────────────
+import PediatricNavigator from "./pages/PediatricNavigator";
+import PediatricScanCoach from "./pages/PediatricScanCoach";
+import PediatricCalculators from "./pages/PediatricCalculators";
 
 // ── LMS Engines ───────────────────────────────────────────────────────────────
 import QuickFire from "./pages/QuickFire";
@@ -207,6 +211,10 @@ function Router() {
         {/* Invasive Procedures */}
         <Route path="/invasive-procedures-navigator" component={InvasiveProceduresNavigator} />
         <Route path="/invasive-procedures-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><InvasiveProceduresScanCoach /></RoleGuard>}</Route>
+        {/* ── PediatricAssist™ ──────────────────────────────────────────── */}
+        <Route path="/pediatric-navigator" component={PediatricNavigator} />
+        <Route path="/pediatric-scan-coach">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><PediatricScanCoach /></RoleGuard>}</Route>
+        <Route path="/pediatric-calculators" component={PediatricCalculators} />
 
         {/* ── Vascular — Venous ─────────────────────────────────────────── */}
         <Route path="/venous-navigator" component={VenousNavigator} />
