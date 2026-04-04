@@ -212,8 +212,8 @@ function Router() {
         <Route path="/invasive-procedures-navigator" component={InvasiveProceduresNavigator} />
         <Route path="/invasive-procedures-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><InvasiveProceduresScanCoach /></RoleGuard>}</Route>
         {/* ── PediatricAssist™ ──────────────────────────────────────────── */}
-        <Route path="/pediatric-navigator" component={PediatricNavigator} />
-        <Route path="/pediatric-scan-coach">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><PediatricScanCoach /></RoleGuard>}</Route>
+        <Route path="/pediatric-navigator">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><PediatricNavigator /></RoleGuard>}</Route>
+        <Route path="/pediatric-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><PediatricScanCoach /></RoleGuard>}</Route>
         <Route path="/pediatric-calculators" component={PediatricCalculators} />
 
         {/* ── Vascular — Venous ─────────────────────────────────────────── */}

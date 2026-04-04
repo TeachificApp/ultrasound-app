@@ -128,7 +128,7 @@ const specialties = [
     description: "Pediatric ultrasound — Appendix, Intussusception, Pyloric Stenosis, Kidneys, Spine, Hips (Graf DDH), and Neonatal Neuro with age-based nomograms and clinical decision support.",
     badge: "Pediatric",
     navigatorFree: true,
-    scanCoachFree: true,
+    scanCoachFree: false,
   },
   // ── VASCULAR — all 6, Carotid first, immediately before MSK ──────────────
   {

@@ -927,3 +927,8 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Navigator Editor support for pediatric module (NAVIGATOR_MODULES)
 - [x] Hub Calculators button added for all specialties with calculatorPath
 - [x] All 771 tests passing after PediatricAssist addition
+
+## PediatricAssist Gating
+- [x] PediatricAssist Navigator: free (requires login only — any registered user)
+- [x] PediatricAssist ScanCoach: premium (requires premium_user, diy_user, or diy_admin role)
+- [x] Update hub card: navigatorFree: true, scanCoachFree: false
