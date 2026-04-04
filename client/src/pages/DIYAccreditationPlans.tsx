@@ -421,7 +421,7 @@ export default function DIYAccreditationPlans() {
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Button style={{ background: BRAND, color: "white" }} asChild>
-              <Link href="/diy-lab-admin">Open Lab Admin Portal</Link>
+              <Link href="/lab-admin">Open Lab Admin Portal</Link>
             </Button>
             <Button variant="outline" className="border-white/30 text-white hover:bg-white/10" asChild>
               <Link href="/diy-member">Member Portal</Link>

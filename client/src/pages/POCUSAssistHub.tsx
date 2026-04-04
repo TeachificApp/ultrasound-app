@@ -29,7 +29,7 @@ type Specialty = {
 const specialties: Specialty[] = [
   // ── Free ──────────────────────────────────────────────────────────────────
   {
-    path: "/pocus-efast",
+    path: "/pocus-efast-navigator",
     scanCoachPath: "/pocus-efast-scan-coach",
     icon: Shield,
     title: "eFAST",
@@ -38,7 +38,7 @@ const specialties: Specialty[] = [
     free: true,
   },
   {
-    path: "/pocus-cardiac",
+    path: "/pocus-cardiac-navigator",
     scanCoachPath: "/pocus-cardiac-scan-coach",
     icon: Heart,
     title: "Cardiac POCUS",
@@ -48,7 +48,7 @@ const specialties: Specialty[] = [
   },
   // ── Premium ───────────────────────────────────────────────────────────────
   {
-    path: "/pocus-rush",
+    path: "/pocus-rush-navigator",
     scanCoachPath: "/pocus-rush-scan-coach",
     icon: Zap,
     title: "RUSH Protocol",
@@ -57,7 +57,7 @@ const specialties: Specialty[] = [
     free: false,
   },
   {
-    path: "/pocus-lung",
+    path: "/pocus-lung-navigator",
     scanCoachPath: "/pocus-lung-scan-coach",
     icon: Wind,
     title: "Lung POCUS",

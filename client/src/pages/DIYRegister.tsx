@@ -378,7 +378,7 @@ export default function DIYRegister() {
               Complete Payment →
             </Button>
           </a>
-          <Link href="/diy-lab-admin">
+          <Link href="/lab-admin">
             <Button variant="outline" className="w-full sm:w-auto">
               Go to Lab Admin Portal
             </Button>
@@ -469,7 +469,7 @@ export default function DIYRegister() {
           {step !== 3 && (
             <p className="text-center text-xs text-gray-400 mt-4">
               Already have an organization?{" "}
-              <Link href="/diy-lab-admin" className="underline" style={{ color: BRAND }}>Go to Lab Admin Portal</Link>
+              <Link href="/lab-admin" className="underline" style={{ color: BRAND }}>Go to Lab Admin Portal</Link>
               {" · "}
               <Link href="/diy-accreditation-plans" className="underline" style={{ color: BRAND }}>View all plans</Link>
             </p>

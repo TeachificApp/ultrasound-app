@@ -410,7 +410,7 @@ export default function POCUSLungScanCoach() {
             ← POCUS-Assist™ Hub
           </span>
         </Link>
-        <Link href="/pocus-lung">
+        <Link href="/pocus-lung-navigator">
           <span className="inline-flex items-center gap-1.5 text-xs font-semibold cursor-pointer hover:opacity-75 transition-opacity" style={{ color: "#4ad9e0" }}>
             Go to Lung Navigator <ArrowRight className="w-3.5 h-3.5" />
           </span>

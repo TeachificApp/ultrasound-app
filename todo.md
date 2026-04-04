@@ -932,3 +932,12 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] PediatricAssist Navigator: free (requires login only — any registered user)
 - [x] PediatricAssist ScanCoach: premium (requires premium_user, diy_user, or diy_admin role)
 - [x] Update hub card: navigatorFree: true, scanCoachFree: false
+
+## 404 Audit & Fix
+- [x] Audit all routes in App.tsx vs navigation links in hub/sidebar for 404s
+- [x] Fix all broken routes
+- [x] Added missing routes: /cme (CMEHub), /accreditation, /lab-admin, /accreditation-manager, /scan-coach-hub
+- [x] Fixed POCUS ScanCoach back-links to use -navigator suffix
+- [x] Fixed diy-lab-admin links to point to /lab-admin
+- [x] Created CMEHub.tsx page for /cme route (Thinkific CME catalog)
+- [x] All 771 tests still passing after route fixes

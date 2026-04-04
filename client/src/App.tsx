@@ -128,6 +128,7 @@ import QuickFireAdmin from "./pages/QuickFireAdmin";
 import ChallengeCardGenerator from "./pages/ChallengeCardGenerator";
 import ScanCoachEditor from "./pages/ScanCoachEditor";
 import NavigatorEditor from "./pages/NavigatorEditor";
+import ScanCoachHub from "./pages/ScanCoachHub";
 import ThinkificWebhookAdmin from "./pages/ThinkificWebhookAdmin";
 import FormBuilderAdmin from "./pages/FormBuilderAdmin";
 import EmailAdmin from "./pages/EmailAdmin";
@@ -143,9 +144,14 @@ import DIYMemberPortal from "./pages/DIYMemberPortal";
 import DIYAccreditationPlans from "./pages/DIYAccreditationPlans";
 import DIYRegister from "./pages/DIYRegister";
 import AccreditationNavigator from "./pages/AccreditationNavigator";
+import AccreditationTool from "./pages/AccreditationTool";
+import AccreditationManager from "./pages/AccreditationManager";
 
-// ── Learn Fetal Echo ──────────────────────────────────────────────────────────
+// ── Learn Fetal Echo ────────────────────────────────────────────
 import LearnFetalEcho from "./pages/LearnFetalEcho";
+
+// ── CME Hub ─────────────────────────────────────────────────────────────────────────
+import CMEHub from "./pages/CMEHub";
 
 // ── Physician Over-Read (public, token-based) ─────────────────────────────────
 import PhysicianOverReadForm from "./pages/PhysicianOverReadForm";
@@ -171,8 +177,9 @@ function Router() {
         <Route path="/premium" component={Premium} />
         <Route path="/profile" component={Profile} />
 
-        {/* ── UltrasoundAssist™ Hub ─────────────────────────────────────── */}
+        {/* ── UltrasoundAssist™ Hub ───────────────────────────────────── */}
         <Route path="/ultrasound-assist" component={UltrasoundAssistHub} />
+        <Route path="/scan-coach-hub" component={ScanCoachHub} />
         <Route path="/calculators" component={ObGynCalculators} />
         <Route path="/clinical-intelligence" component={ClinicalInterpretationEngine} />
 
@@ -269,6 +276,7 @@ function Router() {
         <Route path="/flashcards" component={FlashcardDeck} />
         <Route path="/case-library" component={CaseLibrary} />
         <Route path="/registry-review" component={RegistryReviewHub} />
+        <Route path="/cme" component={CMEHub} />
         <Route path="/case-library/submit" component={SubmitCase} />
         <Route path="/case-library/edit/:id" component={SubmitCase} />
         <Route path="/case-library/:id" component={CaseDetail} />
@@ -297,6 +305,9 @@ function Router() {
         <Route path="/diy-register" component={DIYRegister} />
         <Route path="/diy-member">{() => <RoleGuard roles={["diy_user", "diy_admin"]} allowAdmin={false}><DIYMemberPortal /></RoleGuard>}</Route>
         <Route path="/accreditation-navigator" component={AccreditationNavigator} />
+        <Route path="/accreditation">{() => <RoleGuard roles={["diy_user", "diy_admin"]} allowAdmin={false}><AccreditationTool /></RoleGuard>}</Route>
+        <Route path="/lab-admin">{() => <RoleGuard roles={["diy_user", "diy_admin"]} allowAdmin={false}><AccreditationTool /></RoleGuard>}</Route>
+        <Route path="/accreditation-manager">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AccreditationManager /></RoleGuard>}</Route>
 
         {/* ── Physician Over-Read (public, token-based) ─────────────────── */}
         <Route path="/physician-review/:token" component={PhysicianOverReadForm} />
