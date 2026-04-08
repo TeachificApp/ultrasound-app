@@ -21,7 +21,7 @@ import { Loader2, ShieldAlert, ArrowLeft, CheckCircle2, Send, Crown } from "luci
 import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { BlurredOverlay } from "@/components/BlurredOverlay";
+import { PremiumPearlGate } from "@/components/PremiumPearlGate";
 
 type AppRole = "user" | "premium_user" | "diy_admin" | "diy_user" | "platform_admin" | "accreditation_manager";
 
@@ -89,9 +89,9 @@ export function RoleGuard({ roles, allowAdmin = true, children }: RoleGuardProps
     const hasPremiumRole = roles.includes("premium_user");
     const isDiyOnlyGate = !hasPremiumRole && roles.some(r => ["diy_admin", "diy_user"].includes(r));
     return (
-      <BlurredOverlay type={isDiyOnlyGate ? "diy" : "login"}>
+      <PremiumPearlGate type={isDiyOnlyGate ? "diy" : "login"}>
         {children}
-      </BlurredOverlay>
+      </PremiumPearlGate>
     );
   }
 
@@ -109,9 +109,9 @@ export function RoleGuard({ roles, allowAdmin = true, children }: RoleGuardProps
   const isPremiumGate = roles.includes("premium_user");
   if (isPremiumGate) {
     return (
-      <BlurredOverlay type="premium">
+      <PremiumPearlGate type="premium">
         {children}
-      </BlurredOverlay>
+      </PremiumPearlGate>
     );
   }
   // DEAD CODE BELOW — kept for reference only, never reached for premium gate
@@ -167,9 +167,9 @@ export function RoleGuard({ roles, allowAdmin = true, children }: RoleGuardProps
   const isDiyGate2 = roles.some(r => ["diy_admin", "diy_user"].includes(r));
   if (isDiyGate2) {
     return (
-      <BlurredOverlay type="diy">
+      <PremiumPearlGate type="diy">
         {children}
-      </BlurredOverlay>
+      </PremiumPearlGate>
     );
   }
 

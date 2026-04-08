@@ -9,8 +9,7 @@ import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { Scan, ChevronDown, ChevronUp, Lightbulb, Info, ExternalLink, Receipt} from "lucide-react";
-import { PremiumGate } from "@/components/PremiumGate";
-import { BlurredOverlay } from "@/components/BlurredOverlay";
+import { PremiumPearlGate } from "@/components/PremiumPearlGate";
 import { usePremium } from "@/hooks/usePremium";
 import { ob23Billing } from "@/lib/scanCoachBillingCodes";
 import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
@@ -237,7 +236,7 @@ export default function OB23ScanCoach() {
         </div>
       </div>
 
-      <PremiumGate featureName="OB 2nd/3rd Trimester ScanCoach™">
+      <PremiumPearlGate featureName="OB 2nd/3rd Trimester ScanCoach™">
       <div className="container py-6">
         {/* View selector */}
         <div className="flex gap-2 flex-wrap mb-5">
@@ -371,7 +370,7 @@ export default function OB23ScanCoach() {
           Based on: <a href="https://www.aium.org/resources/practice-parameters" target="_blank" rel="noopener noreferrer" className="underline hover:text-[#189aa1]">AIUM Practice Parameter for the Performance of Obstetric Ultrasound Examinations (2018)</a>
         </div>
       </div>
-      </PremiumGate>
+      </PremiumPearlGate>
     </Layout>
   );
 }

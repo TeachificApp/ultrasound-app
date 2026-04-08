@@ -7,7 +7,7 @@
 import { useState, useMemo } from "react";
 import { Link, useSearch } from "wouter";
 import Layout from "@/components/Layout";
-import { BlurredOverlay } from "@/components/BlurredOverlay";
+import { PremiumPearlGate } from "@/components/PremiumPearlGate";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 import {
@@ -482,7 +482,7 @@ export default function POCUSCardiacScanCoach() {
         </div>
       </div>
 
-      <BlurredOverlay type="login" featureName="Cardiac POCUS ScanCoach™" disabled={loading || isAuthenticated}>
+      <PremiumPearlGate type="login" featureName="Cardiac POCUS ScanCoach™">
       <div className="container py-6">
         <div className="flex flex-col md:flex-row gap-5">
           <div className="w-56 flex-shrink-0 hidden md:block">
@@ -518,7 +518,7 @@ export default function POCUSCardiacScanCoach() {
           </div>
         </div>
       </div>
-      </BlurredOverlay>
+      </PremiumPearlGate>
     </Layout>
   );
 }

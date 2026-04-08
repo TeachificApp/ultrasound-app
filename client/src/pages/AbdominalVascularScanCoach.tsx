@@ -9,8 +9,7 @@ import { Link, useSearch } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { Scan, ChevronDown, ChevronUp, Lightbulb, Receipt } from "lucide-react";
-import { PremiumGate } from "@/components/PremiumGate";
-import { BlurredOverlay } from "@/components/BlurredOverlay";
+import { PremiumPearlGate } from "@/components/PremiumPearlGate";
 import { usePremium } from "@/hooks/usePremium";
 import { abdominalVascularBillingByTab, type ScanCoachBillingData } from "@/lib/scanCoachBillingCodes";
 
@@ -391,7 +390,7 @@ export default function AbdominalVascularScanCoach() {
         </div>
       </div>
 
-      <PremiumGate featureName="Abdominal Vascular ScanCoach™">
+      <PremiumPearlGate featureName="Abdominal Vascular ScanCoach™">
         <div className="container py-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             {/* View Selector */}
@@ -521,7 +520,7 @@ export default function AbdominalVascularScanCoach() {
             </div>
           )}
         </div>
-      </PremiumGate>
+      </PremiumPearlGate>
     </Layout>
   );
 }

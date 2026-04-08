@@ -9,7 +9,7 @@ import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { Scan, ChevronDown, ChevronUp, Lightbulb, Info, Receipt } from "lucide-react";
-import { PremiumGate } from "@/components/PremiumGate";
+import { PremiumPearlGate } from "@/components/PremiumPearlGate";
 import { usePremium } from "@/hooks/usePremium";
 import { invasiveProceduresBilling } from "@/lib/scanCoachBillingCodes";
 import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
@@ -147,7 +147,7 @@ export default function InvasiveProceduresScanCoach() {
         </div>
       </div>
 
-      <PremiumGate featureName="Invasive Procedures ScanCoach™">
+      <PremiumPearlGate featureName="Invasive Procedures ScanCoach™">
         <div className="container py-6">
           {/* View selector */}
           <div className="flex flex-wrap gap-2 mb-6">
@@ -257,7 +257,7 @@ export default function InvasiveProceduresScanCoach() {
             </div>
           )}
         </div>
-      </PremiumGate>
+      </PremiumPearlGate>
     </Layout>
   );
 }

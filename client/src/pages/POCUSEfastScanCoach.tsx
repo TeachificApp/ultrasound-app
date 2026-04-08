@@ -7,7 +7,7 @@
 import { useState, useMemo } from "react";
 import { Link, useSearch } from "wouter";
 import Layout from "@/components/Layout";
-import { BlurredOverlay } from "@/components/BlurredOverlay";
+import { PremiumPearlGate } from "@/components/PremiumPearlGate";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 import {
@@ -499,7 +499,7 @@ export default function POCUSEfastScanCoach() {
         </div>
       </div>
 
-      <BlurredOverlay type="login" featureName="eFAST ScanCoach™" disabled={loading || isAuthenticated}>
+      <PremiumPearlGate type="login" featureName="eFAST ScanCoach™">
       {/* Main Layout */}
       <div className="container py-6">
         <div className="flex flex-col md:flex-row gap-5">
@@ -539,7 +539,7 @@ export default function POCUSEfastScanCoach() {
           </div>
         </div>
       </div>
-      </BlurredOverlay>
+      </PremiumPearlGate>
     </Layout>
   );
 }

@@ -8,7 +8,7 @@ import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { CheckCircle2, Circle, ChevronDown, ChevronUp, Info, Scan, ExternalLink } from "lucide-react";
-import { PremiumGate } from "@/components/PremiumGate";
+import { PremiumPearlGate } from "@/components/PremiumPearlGate";
 import ProtocolProgressBar from "../components/ProtocolProgressBar";
 import { useNavigatorSections } from "@/hooks/useNavigatorSections";
 

@@ -941,3 +941,27 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fixed diy-lab-admin links to point to /lab-admin
 - [x] Created CMEHub.tsx page for /cme route (Thinkific CME catalog)
 - [x] All 771 tests still passing after route fixes
+
+## Attribution Masking
+- [ ] Replace owner username with "All About Ultrasound" in all contributor/attribution displays (cases, soundbytes, flashcards, challenges, etc.)
+- [ ] Apply masking in CaseLibrary.tsx (By larawilliams0501 → By All About Ultrasound)
+- [ ] Apply masking in CaseDetail.tsx
+- [ ] Apply masking in any other pages that show contributor names
+
+## PremiumPearlGate
+- [x] Build PremiumPearlGate component — teaser preview + fade + upgrade card (premium/login/diy types)
+- [x] Replace BlurredOverlay in RoleGuard (all 4 gate paths)
+- [x] Replace PremiumGate in all ScanCoach pages (14 pages)
+- [x] Replace PremiumLockOverlay and PremiumOverlay in Navigator pages
+- [x] Replace BlurredOverlay in CaseDetail, CaseLibrary, ClinicalInterpretationEngine, DailyChallenge, QuickFire, POCUS ScanCoach pages
+- [x] Fix mismatched JSX tags in ScrotumScanCoach, TCDScanCoach, ThyroidScanCoach, FetalNavigator, POCUSLungNavigator, POCUSRushNavigator
+- [x] Zero TypeScript errors, 771 tests passing
+
+## PremiumPearlGate
+- [x] Build PremiumPearlGate component — teaser preview + fade + upgrade card (premium/login/diy types)
+- [x] Replace BlurredOverlay in RoleGuard (all 4 gate paths)
+- [x] Replace PremiumGate in all ScanCoach pages (14 pages)
+- [x] Replace PremiumLockOverlay and PremiumOverlay in Navigator pages
+- [x] Replace BlurredOverlay in CaseDetail, CaseLibrary, ClinicalInterpretationEngine, DailyChallenge, QuickFire, POCUS ScanCoach pages
+- [x] Fix mismatched JSX tags in ScrotumScanCoach, TCDScanCoach, ThyroidScanCoach, FetalNavigator, POCUSLungNavigator, POCUSRushNavigator
+- [x] Zero TypeScript errors, 771 tests passing

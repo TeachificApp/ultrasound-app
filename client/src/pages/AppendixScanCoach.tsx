@@ -9,7 +9,7 @@ import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { Scan, ChevronDown, ChevronUp, Lightbulb, Info, Receipt } from "lucide-react";
-import { PremiumGate } from "@/components/PremiumGate";
+import { PremiumPearlGate } from "@/components/PremiumPearlGate";
 import { usePremium } from "@/hooks/usePremium";
 import { appendixBilling } from "@/lib/scanCoachBillingCodes";
 import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
@@ -148,7 +148,7 @@ export default function AppendixScanCoach() {
         </div>
       </div>
 
-      <PremiumGate featureName="Appendix ScanCoach™">
+      <PremiumPearlGate featureName="Appendix ScanCoach™">
         <div className="container py-6">
           {/* View selector */}
           <div className="flex flex-wrap gap-2 mb-6">
@@ -258,7 +258,7 @@ export default function AppendixScanCoach() {
             </div>
           )}
         </div>
-      </PremiumGate>
+      </PremiumPearlGate>
     </Layout>
   );
 }

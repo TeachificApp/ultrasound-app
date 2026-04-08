@@ -7,7 +7,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
-import { PremiumGate } from "@/components/PremiumGate";
+import { PremiumPearlGate } from "@/components/PremiumPearlGate";
 import ProtocolProgressBar from "../components/ProtocolProgressBar";
 import { useNavigatorSections } from "@/hooks/useNavigatorSections";
 import {
@@ -197,7 +197,7 @@ export default function POCUSLungNavigator() {
         </Link>
       </div>
 
-      <PremiumGate featureName="Lung POCUS Navigator">
+      <PremiumPearlGate featureName="Lung POCUS Navigator">
         {/* Hero */}
         <div className="relative overflow-hidden" style={{ background: "linear-gradient(135deg, #0e1e2e 0%, #0a3a40 60%, #189aa1 100%)" }}>
           <div className="container py-8 md:py-10">
@@ -294,7 +294,7 @@ export default function POCUSLungNavigator() {
             </button>
           </div>
         </div>
-      </PremiumGate>
+      </PremiumPearlGate>
     </Layout>
   );
 }

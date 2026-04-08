@@ -727,16 +727,20 @@ getUserStats: protectedProcedure.query(async ({ ctx }) => {
     const userIds = results.map((r) => r.userId);
     // NOTE: Do NOT early-return when userIds is empty — virtual entries must still be shown
     const userList = userIds.length > 0 ? await db
-      .select({ id: users.id, displayName: users.displayName, name: users.name, avatarUrl: users.avatarUrl })
+      .select({ id: users.id, displayName: users.displayName, name: users.name, avatarUrl: users.avatarUrl, openId: users.openId })
       .from(users)
       .where(inArray(users.id, userIds)) : [];
     const currentUserId = ctx.user.id;
     const allEntries = results.map((r, i) => {
       const u = userList.find((u) => u.id === r.userId);
+      const rawName = u?.displayName || u?.name || "Anonymous";
+      const maskedName = (u?.openId && ENV.ownerOpenId && u.openId === ENV.ownerOpenId)
+        ? "All About Ultrasound"
+        : rawName;
       return {
         rank: i + 1,
         userId: r.userId,
-        displayName: u?.displayName || u?.name || "Anonymous",
+        displayName: maskedName,
         avatarUrl: u?.avatarUrl ?? null,
         correct: Number(r.correct),
         total: Number(r.total),

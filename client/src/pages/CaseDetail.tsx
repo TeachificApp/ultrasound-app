@@ -9,7 +9,7 @@ import { useState, useMemo } from "react";
 import { useParams, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { BlurredOverlay } from "@/components/BlurredOverlay";
+import { PremiumPearlGate } from "@/components/PremiumPearlGate";
 import Layout from "@/components/Layout";
 import { RichTextDisplay } from "@/components/RichTextEditor";
 import { Button } from "@/components/ui/button";
@@ -193,7 +193,7 @@ export default function CaseDetail() {
   if (!authLoading && !isAuthenticated) {
     return (
       <Layout>
-        <BlurredOverlay type="login" featureName="Echo Case Library">
+        <PremiumPearlGate type="login" featureName="Echo Case Library">
           <div className="container py-8">
             <div className="max-w-4xl mx-auto">
               <div className="h-8 bg-gray-200 rounded w-3/4 mb-4" />
@@ -206,7 +206,7 @@ export default function CaseDetail() {
               </div>
             </div>
           </div>
-        </BlurredOverlay>
+        </PremiumPearlGate>
       </Layout>
     );
   }

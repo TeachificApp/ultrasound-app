@@ -10,7 +10,7 @@
 
 import { useState } from "react";
 import Layout from "@/components/Layout";
-import { BlurredOverlay } from "@/components/BlurredOverlay";
+import { PremiumPearlGate } from "@/components/PremiumPearlGate";
 import { usePremium } from "@/hooks/usePremium";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1531,7 +1531,7 @@ export default function ClinicalInterpretationEngine() {
               </div>
             )}
 
-            {/* Tool form — BlurredOverlay only wraps the data-entry form, not the header */}
+            {/* Tool form — PremiumPearlGate only wraps the data-entry form, not the header */}
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
               <div className="mb-5">
                 <h2 className="text-lg font-bold text-gray-900" style={{ fontFamily: "Merriweather, serif" }}>
@@ -1539,13 +1539,13 @@ export default function ClinicalInterpretationEngine() {
                 </h2>
                 <p className="text-sm text-gray-500 mt-0.5">{currentToolDef.subtitle}</p>
               </div>
-              <BlurredOverlay
+              <PremiumPearlGate
                 type={toolOverlayType}
                 featureName={currentCat.label}
-                disabled={!toolFormLocked}
+                bypass={!toolFormLocked}
               >
                 <ToolComponent />
-              </BlurredOverlay>
+              </PremiumPearlGate>
             </div>
           </div>
         </div>

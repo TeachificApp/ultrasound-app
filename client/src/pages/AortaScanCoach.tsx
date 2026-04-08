@@ -9,8 +9,7 @@ import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { Scan, ChevronDown, ChevronUp, Lightbulb, Info, Receipt} from "lucide-react";
-import { PremiumGate } from "@/components/PremiumGate";
-import { BlurredOverlay } from "@/components/BlurredOverlay";
+import { PremiumPearlGate } from "@/components/PremiumPearlGate";
 import { usePremium } from "@/hooks/usePremium";
 import { aortaBilling } from "@/lib/scanCoachBillingCodes";
 import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
@@ -236,7 +235,7 @@ export default function AortaScanCoach() {
 
             {/* Tips */}
             <div className="p-5 space-y-3">
-              <PremiumGate featureName="Scan Coach Tips">
+              <PremiumPearlGate featureName="Scan Coach Tips">
                 {currentView.tips.map((tip, ti) => (
                   <div
                     key={ti}
@@ -255,7 +254,7 @@ export default function AortaScanCoach() {
                     <p className="text-sm text-gray-700 leading-relaxed">{tip.text}</p>
                   </div>
                 ))}
-              </PremiumGate>
+              </PremiumPearlGate>
             </div>
           </div>
         )}

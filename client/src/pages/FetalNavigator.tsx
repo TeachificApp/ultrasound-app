@@ -7,7 +7,7 @@ import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { Baby, AlertCircle, CheckCircle2, HelpCircle, Scan, ClipboardList, ChevronDown, ChevronUp, Calculator, Crown } from "lucide-react";
-import { PremiumGate } from "@/components/PremiumGate";
+import { PremiumPearlGate } from "@/components/PremiumPearlGate";
 import ProtocolProgressBar from "../components/ProtocolProgressBar";
 import { useNavigatorSections } from "@/hooks/useNavigatorSections";
 
@@ -421,7 +421,7 @@ export default function FetalNavigator() {
         </div>
 
         {view === "fetalassist" ? (
-          <PremiumGate featureName="Ultrasound-Assist Calculators">
+          <PremiumPearlGate featureName="Ultrasound-Assist Calculators">
             <div className="bg-white rounded-xl border border-[#0369a1]/20 shadow-sm overflow-hidden">
               <div className="px-5 py-4 flex items-center gap-3" style={{ background: "linear-gradient(135deg, #0e1e2e, #0369a1)" }}>
                 <Calculator className="w-5 h-5 text-[#4ad9e0]" />
@@ -450,7 +450,7 @@ export default function FetalNavigator() {
                 </Link>
               </div>
             </div>
-          </PremiumGate>
+          </PremiumPearlGate>
         ) : view === "protocol" ? (
           <FetalProtocolChecklist />
         ) : view === "zscore" ? (

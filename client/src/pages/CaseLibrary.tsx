@@ -12,7 +12,7 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import Layout from "@/components/Layout";
-import { BlurredOverlay } from "@/components/BlurredOverlay";
+import { PremiumPearlGate } from "@/components/PremiumPearlGate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -250,7 +250,7 @@ export default function CaseLibrary() {
 
         {/* ── Browse Tab ─────────────────────────────────────────────────────── */}
         {activeTab === "browse" && (
-          <BlurredOverlay type="login" featureName="Ultrasound Case Library" disabled={authLoading || isAuthenticated}>
+          <PremiumPearlGate type="login" featureName="Ultrasound Case Library">
             {/* Filters */}
             <div className="flex flex-col sm:flex-row gap-3 mb-6">
               <div className="relative flex-1">
@@ -425,7 +425,7 @@ export default function CaseLibrary() {
                 </Button>
               </div>
              )}
-          </BlurredOverlay>
+          </PremiumPearlGate>
         )}
         {/* ── My Submissions Tab ─────────────────────────────────────────────── */}
         {activeTab === "mySubmissions" && (

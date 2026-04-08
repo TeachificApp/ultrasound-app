@@ -13,7 +13,7 @@ import { isVideoUrl } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import Layout from "@/components/Layout";
-import { BlurredOverlay } from "@/components/BlurredOverlay";
+import { PremiumPearlGate } from "@/components/PremiumPearlGate";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -2085,7 +2085,7 @@ export default function QuickFire() {
           <>
             {/* Free users: show blurred preview with premium gate overlay */}
             {!isPremium && (
-              <BlurredOverlay type="premium" featureName="Challenge Archive">
+              <PremiumPearlGate type="premium" featureName="Challenge Archive">
                 {/* Blurred preview — a static mock of the archive list */}
                 <div className="space-y-3 pointer-events-none">
                   <div className="flex items-center justify-between mb-4">
@@ -2107,7 +2107,7 @@ export default function QuickFire() {
                     </div>
                   ))}
                 </div>
-              </BlurredOverlay>
+              </PremiumPearlGate>
             )}
 
             {/* Premium users: show full archive */}
@@ -2706,7 +2706,7 @@ export default function QuickFire() {
           <>
             {/* Free users: premium gate */}
             {!isPremium && (
-              <BlurredOverlay type="premium" featureName="Leaderboard">
+              <PremiumPearlGate type="premium" featureName="Leaderboard">
                 <div className="space-y-3 pointer-events-none">
                   <div className="flex items-center justify-between mb-4">
                     <div>
@@ -2727,7 +2727,7 @@ export default function QuickFire() {
                     </div>
                   ))}
                 </div>
-              </BlurredOverlay>
+              </PremiumPearlGate>
             )}
             {isPremium && <>
             <div className="flex items-center justify-between mb-5 flex-wrap gap-3">

@@ -24,6 +24,7 @@
 
 import { z } from "zod";
 import { router, publicProcedure, protectedProcedure } from "../_core/trpc";
+import { ENV } from "../_core/env";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
 import {
@@ -50,6 +51,15 @@ const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   }
   return next({ ctx });
 });
+
+// ─── Owner attribution masking ────────────────────────────────────────────────
+// When the app owner (larawilliams0501) submits or creates content, display
+// "All About Ultrasound" instead of their personal username.
+const OWNER_DISPLAY_NAME = "All About Ultrasound";
+function maskOwnerName(openId: string | null | undefined, rawName: string): string {
+  if (openId && ENV.ownerOpenId && openId === ENV.ownerOpenId) return OWNER_DISPLAY_NAME;
+  return rawName;
+}
 
 // ─── Input schemas ────────────────────────────────────────────────────────────
 const caseInputSchema = z.object({
@@ -316,7 +326,7 @@ export const caseLibraryRouter = router({
 
       // Fetch submitter display name
       const [submitter] = await db
-        .select({ displayName: users.displayName, name: users.name })
+        .select({ displayName: users.displayName, name: users.name, openId: users.openId })
         .from(users)
         .where(eq(users.id, caseRow.submittedByUserId))
         .limit(1);
@@ -346,7 +356,7 @@ export const caseLibraryRouter = router({
           ...q,
           options: JSON.parse(q.options),
         })),
-        submitterName: submitter?.displayName || submitter?.name || "Anonymous",
+        submitterName: maskOwnerName(submitter?.openId, submitter?.displayName || submitter?.name || "Anonymous"),
         userAttempt: userAttempt
           ? {
               answers: userAttempt.answers ? JSON.parse(userAttempt.answers) : {},
@@ -731,26 +741,24 @@ export const caseLibraryRouter = router({
       .where(eq(echoLibraryCases.status, "pending"))
       .orderBy(echoLibraryCases.submittedAt);
 
-    // Fetch submitter names
+      // Fetch submitter names
     const userIds = Array.from(new Set(cases.map((c) => c.submittedByUserId)));
     let submitterMap: Record<number, string> = {};
     if (userIds.length > 0) {
       const userList = await db
-        .select({ id: users.id, displayName: users.displayName, name: users.name })
+        .select({ id: users.id, displayName: users.displayName, name: users.name, openId: users.openId })
         .from(users)
         .where(sql`${users.id} IN (${userIds.join(",")})`);
       for (const u of userList) {
-        submitterMap[u.id] = u.displayName || u.name || "Unknown";
+        submitterMap[u.id] = maskOwnerName(u.openId, u.displayName || u.name || "Unknown");
       }
     }
-
     return cases.map((c) => ({
       ...c,
       tags: c.tags ? JSON.parse(c.tags) : [],
       submitterName: submitterMap[c.submittedByUserId] ?? "Unknown",
     }));
   }),
-
   approveCase: adminProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
@@ -1034,17 +1042,16 @@ export const caseLibraryRouter = router({
 
       // Fetch submitter names
       const userIds = Array.from(new Set(cases.map((c) => c.submittedByUserId)));
-      let submitterMap: Record<number, string> = {};
+       let submitterMap: Record<number, string> = {};
       if (userIds.length > 0) {
         const userList = await db
-          .select({ id: users.id, displayName: users.displayName, name: users.name })
+          .select({ id: users.id, displayName: users.displayName, name: users.name, openId: users.openId })
           .from(users)
           .where(sql`${users.id} IN (${userIds.join(",")})`);
         for (const u of userList) {
-          submitterMap[u.id] = u.displayName || u.name || "Unknown";
+          submitterMap[u.id] = maskOwnerName(u.openId, u.displayName || u.name || "Unknown");
         }
       }
-
       return {
         cases: cases.map((c) => ({
           ...c,

@@ -9,7 +9,7 @@ import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { Scan, ChevronDown, ChevronUp, Lightbulb, Info, Receipt} from "lucide-react";
-import { PremiumGate } from "@/components/PremiumGate";
+import { PremiumPearlGate } from "@/components/PremiumPearlGate";
 import { usePremium } from "@/hooks/usePremium";
 import { pelvicGynBilling } from "@/lib/scanCoachBillingCodes";
 import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
@@ -189,7 +189,7 @@ export default function PelvicGynScanCoach() {
         </div>
       </div>
 
-      <PremiumGate featureName="Pelvic/Gyn ScanCoach™">
+      <PremiumPearlGate featureName="Pelvic/Gyn ScanCoach™">
       <div className="container py-6">
         {/* Approach tabs */}
         <div className="flex gap-2 mb-5">
@@ -348,7 +348,7 @@ export default function PelvicGynScanCoach() {
           Based on: <a href="https://www.aium.org/resources/practice-parameters" target="_blank" rel="noopener noreferrer" className="underline hover:text-[#189aa1]">AIUM Practice Parameter for the Performance of Pelvic Ultrasound Examinations (2020)</a>
         </div>
       </div>
-      </PremiumGate>
+      </PremiumPearlGate>
     </Layout>
   );
 }
