@@ -325,6 +325,12 @@ export default function CaseDetail() {
                     </>
                   )}
                 </div>
+                {/* Image counter overlay */}
+                {allMedia.length > 1 && (
+                  <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-0.5 rounded-full">
+                    {mediaIndex + 1} / {allMedia.length}
+                  </div>
+                )}
                 {/* Thumbnails */}
                 {allMedia.length > 1 && (
                   <div className="flex gap-2 p-3 bg-gray-50 overflow-x-auto">
@@ -332,24 +338,37 @@ export default function CaseDetail() {
                       <button
                         key={m.id}
                         onClick={() => setMediaIndex(i)}
-                        className={`w-14 h-14 rounded flex-shrink-0 overflow-hidden border-2 transition ${i === mediaIndex ? "border-[#189aa1]" : "border-transparent"}`}
+                        title={m.caption || undefined}
+                        className={`flex-shrink-0 overflow-hidden rounded-lg border-2 transition ${i === mediaIndex ? "border-[#189aa1]" : "border-transparent hover:border-gray-300"}`}
+                        style={{ width: 56, height: 56 }}
                       >
                         {m.type === "video" ? (
                           <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-                            <PlayCircle className="w-6 h-6 text-gray-500" />
+                            <PlayCircle className="w-5 h-5 text-gray-500" />
                           </div>
                         ) : (
-                          <img src={m.url} alt="" className="w-full h-full object-cover" />
+                          <img src={m.url} alt={m.caption || ""} className="w-full h-full object-cover" />
                         )}
                       </button>
                     ))}
                   </div>
                 )}
-                {currentMedia?.caption && (
-                  <div className="px-4 py-2 text-xs text-gray-500 bg-gray-50 border-t">
-                    {currentMedia.caption}
+                {/* Image title / caption */}
+                {currentMedia?.caption ? (
+                  <div className="px-4 py-2.5 bg-gray-50 border-t flex items-center gap-2">
+                    <span className="text-xs font-semibold text-[#189aa1]">
+                      {currentMedia.type === "video" ? "🎬" : "🖼️"}
+                    </span>
+                    <span className="text-xs font-medium text-gray-700">{currentMedia.caption}</span>
+                    {allMedia.length > 1 && (
+                      <span className="ml-auto text-xs text-gray-400">{mediaIndex + 1} of {allMedia.length}</span>
+                    )}
                   </div>
-                )}
+                ) : allMedia.length > 1 ? (
+                  <div className="px-4 py-2 bg-gray-50 border-t text-xs text-gray-400">
+                    Image {mediaIndex + 1} of {allMedia.length}
+                  </div>
+                ) : null}
               </Card>
             )}
 

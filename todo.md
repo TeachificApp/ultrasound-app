@@ -965,3 +965,13 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Replace BlurredOverlay in CaseDetail, CaseLibrary, ClinicalInterpretationEngine, DailyChallenge, QuickFire, POCUS ScanCoach pages
 - [x] Fix mismatched JSX tags in ScrotumScanCoach, TCDScanCoach, ThyroidScanCoach, FetalNavigator, POCUSLungNavigator, POCUSRushNavigator
 - [x] Zero TypeScript errors, 771 tests passing
+
+## Multi-Image Case Upload
+- [x] Audit current single-image upload in case submission and admin case management
+- [x] DB schema already supports multiple images via echoLibraryCaseMedia table (caption field = title)
+- [x] Server router already supports multiple images with captions
+- [x] S3 upload endpoint already handles multiple files
+- [x] Updated case submission form UI: per-image title field with contextual placeholder, larger thumbnail, upload status
+- [x] Updated admin case editor UI: title display with icon and counter
+- [x] Updated case detail display: image title bar with icon, counter overlay, improved thumbnail strip
+- [x] Zero TypeScript errors, 771 tests passing

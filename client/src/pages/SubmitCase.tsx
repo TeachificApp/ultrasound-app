@@ -960,25 +960,48 @@ export default function SubmitCase() {
 
               {/* Media list */}
               {media.length > 0 && (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {media.map((m, i) => (
-                    <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
-                      <div className="w-14 h-14 rounded overflow-hidden flex-shrink-0 bg-gray-200">
-                        {m.type === "video" ? (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <PlayCircle className="w-6 h-6 text-gray-400" />
+                    <div key={i} className="p-3 bg-gray-50 rounded-xl border border-gray-100 space-y-2">
+                      <div className="flex items-center gap-3">
+                        {/* Thumbnail */}
+                        <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-200 border border-gray-200">
+                          {m.type === "video" ? (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <PlayCircle className="w-6 h-6 text-gray-400" />
+                            </div>
+                          ) : (
+                            <img src={m.localPreview || m.url} alt="" className="w-full h-full object-cover" />
+                          )}
+                        </div>
+                        {/* File info + remove */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-medium text-gray-500">
+                              {m.type === "video" ? "🎬 Video" : "🖼️ Image"} {i + 1} of {media.length}
+                            </span>
+                            <button
+                              onClick={() => removeMedia(i)}
+                              className="text-gray-400 hover:text-red-500 transition-colors"
+                              title="Remove"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
                           </div>
-                        ) : (
-                          <img src={m.localPreview || m.url} alt="" className="w-full h-full object-cover" />
-                        )}
+                          {m.uploading && (
+                            <div className="flex items-center gap-2 text-xs text-[#189aa1] mt-1">
+                              <div className="w-3 h-3 rounded-full border-2 border-[#189aa1] border-t-transparent animate-spin" />
+                              Uploading…
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        {m.uploading ? (
-                          <div className="flex items-center gap-2 text-xs text-gray-400">
-                            <div className="w-3 h-3 rounded-full border-2 border-[#189aa1] border-t-transparent animate-spin" />
-                            Uploading…
-                          </div>
-                        ) : (
+                      {/* Title field — shown after upload completes */}
+                      {!m.uploading && (
+                        <div>
+                          <label className="text-xs font-semibold text-gray-500 mb-1 block">
+                            Image title <span className="font-normal text-gray-400">(optional)</span>
+                          </label>
                           <Input
                             value={m.caption}
                             onChange={(e) =>
@@ -986,18 +1009,12 @@ export default function SubmitCase() {
                                 prev.map((item, j) => (j === i ? { ...item, caption: e.target.value } : item))
                               )
                             }
-                            placeholder="Caption (optional)"
+                            placeholder={m.type === "video" ? "e.g. Doppler waveform — hepatic vein" : "e.g. Transverse view — right upper quadrant"}
                             className="text-xs h-8"
                             maxLength={300}
                           />
-                        )}
-                      </div>
-                      <button
-                        onClick={() => removeMedia(i)}
-                        className="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

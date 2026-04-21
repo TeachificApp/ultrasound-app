@@ -258,9 +258,17 @@ function CasePreviewModal({
                       ))}
                     </div>
                   )}
-                  {media[mediaIdx]?.caption && (
-                    <p className="text-xs text-gray-500 mt-1 italic">{media[mediaIdx].caption}</p>
-                  )}
+                  {media[mediaIdx]?.caption ? (
+                    <div className="flex items-center gap-1.5 mt-1.5 px-1">
+                      <span className="text-xs text-[#189aa1]">{media[mediaIdx].type === "video" ? "🎬" : "🖼️"}</span>
+                      <p className="text-xs font-medium text-gray-700">{media[mediaIdx].caption}</p>
+                      {media.length > 1 && (
+                        <span className="ml-auto text-xs text-gray-400">{mediaIdx + 1}/{media.length}</span>
+                      )}
+                    </div>
+                  ) : media.length > 1 ? (
+                    <p className="text-xs text-gray-400 mt-1 px-1">{mediaIdx + 1} of {media.length}</p>
+                  ) : null}
                 </div>
               )}
 
