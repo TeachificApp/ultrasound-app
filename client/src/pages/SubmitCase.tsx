@@ -13,6 +13,23 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useLocation, useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -56,6 +73,7 @@ import {
   RefreshCw,
   UserCheck,
   Link2,
+  GripVertical,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -64,6 +82,7 @@ const DIFFICULTIES = ["beginner", "intermediate", "advanced"] as const;
 const DRAFT_KEY = "ihe_submit_case_draft";
 
 type MediaItem = {
+  id: string; // stable key for dnd-kit
   type: "image" | "video";
   url: string;
   fileKey: string;
@@ -72,6 +91,101 @@ type MediaItem = {
   localPreview?: string;
   uploading?: boolean;
 };
+
+/** Sortable media row used inside the DndContext */
+function SortableMediaItem({
+  item,
+  index,
+  total,
+  onCaptionChange,
+  onRemove,
+}: {
+  item: MediaItem;
+  index: number;
+  total: number;
+  onCaptionChange: (id: string, value: string) => void;
+  onRemove: (id: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: item.id });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="p-3 bg-gray-50 rounded-xl border border-gray-100 space-y-2"
+    >
+      <div className="flex items-center gap-3">
+        {/* Drag handle */}
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          className="text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing flex-shrink-0 touch-none"
+          title="Drag to reorder"
+        >
+          <GripVertical className="w-4 h-4" />
+        </button>
+        {/* Thumbnail */}
+        <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-gray-200 border border-gray-200">
+          {item.type === "video" ? (
+            <div className="w-full h-full flex items-center justify-center">
+              <PlayCircle className="w-5 h-5 text-gray-400" />
+            </div>
+          ) : (
+            <img src={item.localPreview || item.url} alt="" className="w-full h-full object-cover" />
+          )}
+        </div>
+        {/* File info + remove */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-medium text-gray-500">
+              {item.type === "video" ? "🎬 Video" : "🖼️ Image"} {index + 1} of {total}
+            </span>
+            <button
+              type="button"
+              onClick={() => onRemove(item.id)}
+              className="text-gray-400 hover:text-red-500 transition-colors"
+              title="Remove"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          {item.uploading && (
+            <div className="flex items-center gap-2 text-xs text-[#189aa1] mt-1">
+              <div className="w-3 h-3 rounded-full border-2 border-[#189aa1] border-t-transparent animate-spin" />
+              Uploading…
+            </div>
+          )}
+        </div>
+      </div>
+      {/* Title field — shown after upload completes */}
+      {!item.uploading && (
+        <div>
+          <label className="text-xs font-semibold text-gray-500 mb-1 block">
+            Image title <span className="font-normal text-gray-400">(optional)</span>
+          </label>
+          <Input
+            value={item.caption}
+            onChange={(e) => onCaptionChange(item.id, e.target.value)}
+            placeholder={
+              item.type === "video"
+                ? "e.g. Doppler waveform — hepatic vein"
+                : "e.g. Transverse view — right upper quadrant"
+            }
+            className="text-xs h-8"
+            maxLength={300}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
 
 type QuestionItem = {
   question: string;
@@ -164,7 +278,8 @@ export default function SubmitCase() {
     setTeachingPointsInput(tp.join("\n"));
     // Pre-populate media from S3 URLs (no re-upload needed for existing files)
     setMedia(
-      (existingCase.media ?? []).map((m: any) => ({
+      (existingCase.media ?? []).map((m: any, i: number) => ({
+        id: `media-existing-${m.id ?? i}`,
         type: m.type as "image" | "video",
         url: m.url,
         fileKey: m.fileKey,
@@ -391,7 +506,9 @@ export default function SubmitCase() {
         continue;
       }
       const localPreview = URL.createObjectURL(file);
+      const itemId = `media-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const placeholder: MediaItem = {
+        id: itemId,
         type: isVideo ? "video" : "image",
         url: "",
         fileKey: "",
@@ -414,21 +531,32 @@ export default function SubmitCase() {
         const { url, fileKey } = await res.json();
         setMedia((prev) =>
           prev.map((m) =>
-            m.localPreview === localPreview
+            m.id === itemId
               ? { ...m, url, fileKey, uploading: false }
               : m
           )
         );
       } catch {
         toast.error(`Failed to upload ${file.name}.`);
-        setMedia((prev) => prev.filter((m) => m.localPreview !== localPreview));
+        setMedia((prev) => prev.filter((m) => m.id !== itemId));
       }
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const removeMedia = (idx: number) => {
-    setMedia((prev) => prev.filter((_, i) => i !== idx));
+  const removeMedia = (id: string) => {
+    setMedia((prev) => prev.filter((m) => m.id !== id));
+  };
+
+  const handleMediaDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setMedia((prev) => {
+      const oldIndex = prev.findIndex((m) => m.id === active.id);
+      const newIndex = prev.findIndex((m) => m.id === over.id);
+      if (oldIndex === -1 || newIndex === -1) return prev;
+      return arrayMove(prev, oldIndex, newIndex).map((m, i) => ({ ...m, sortOrder: i }));
+    });
   };
 
   const addQuestion = () => {
@@ -958,66 +1086,42 @@ export default function SubmitCase() {
                 </button>
               )}
 
-              {/* Media list */}
+              {/* Media list — drag to reorder */}
               {media.length > 0 && (
-                <div className="space-y-3">
-                  {media.map((m, i) => (
-                    <div key={i} className="p-3 bg-gray-50 rounded-xl border border-gray-100 space-y-2">
-                      <div className="flex items-center gap-3">
-                        {/* Thumbnail */}
-                        <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-200 border border-gray-200">
-                          {m.type === "video" ? (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <PlayCircle className="w-6 h-6 text-gray-400" />
-                            </div>
-                          ) : (
-                            <img src={m.localPreview || m.url} alt="" className="w-full h-full object-cover" />
-                          )}
-                        </div>
-                        {/* File info + remove */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs font-medium text-gray-500">
-                              {m.type === "video" ? "🎬 Video" : "🖼️ Image"} {i + 1} of {media.length}
-                            </span>
-                            <button
-                              onClick={() => removeMedia(i)}
-                              className="text-gray-400 hover:text-red-500 transition-colors"
-                              title="Remove"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                          {m.uploading && (
-                            <div className="flex items-center gap-2 text-xs text-[#189aa1] mt-1">
-                              <div className="w-3 h-3 rounded-full border-2 border-[#189aa1] border-t-transparent animate-spin" />
-                              Uploading…
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      {/* Title field — shown after upload completes */}
-                      {!m.uploading && (
-                        <div>
-                          <label className="text-xs font-semibold text-gray-500 mb-1 block">
-                            Image title <span className="font-normal text-gray-400">(optional)</span>
-                          </label>
-                          <Input
-                            value={m.caption}
-                            onChange={(e) =>
+                <>
+                  {media.length > 1 && (
+                    <p className="text-xs text-gray-400 flex items-center gap-1">
+                      <GripVertical className="w-3 h-3" /> Drag to reorder images
+                    </p>
+                  )}
+                  <DndContext
+                    sensors={useSensors(
+                      useSensor(PointerSensor),
+                      useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+                    )}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleMediaDragEnd}
+                  >
+                    <SortableContext items={media.map((m) => m.id)} strategy={verticalListSortingStrategy}>
+                      <div className="space-y-3">
+                        {media.map((m, i) => (
+                          <SortableMediaItem
+                            key={m.id}
+                            item={m}
+                            index={i}
+                            total={media.length}
+                            onCaptionChange={(id, val) =>
                               setMedia((prev) =>
-                                prev.map((item, j) => (j === i ? { ...item, caption: e.target.value } : item))
+                                prev.map((item) => (item.id === id ? { ...item, caption: val } : item))
                               )
                             }
-                            placeholder={m.type === "video" ? "e.g. Doppler waveform — hepatic vein" : "e.g. Transverse view — right upper quadrant"}
-                            className="text-xs h-8"
-                            maxLength={300}
+                            onRemove={removeMedia}
                           />
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                        ))}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
+                </>
               )}
             </CardContent>
           </Card>

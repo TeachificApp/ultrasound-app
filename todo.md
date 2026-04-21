@@ -975,3 +975,8 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Updated admin case editor UI: title display with icon and counter
 - [x] Updated case detail display: image title bar with icon, counter overlay, improved thumbnail strip
 - [x] Zero TypeScript errors, 771 tests passing
+
+## Vite HMR / Attribution / Drag-Reorder
+- [x] Suppress Vite HMR WebSocket console error (set overlay: false in vite.config.ts)
+- [x] Attribution masking already fully wired: maskOwnerName applied in all 3 submitter query locations in caseLibraryRouter + quickfireRouter leaderboard
+- [x] Added drag-to-reorder images in SubmitCase: dnd-kit SortableMediaItem with grip handle, arrayMove on drag end, stable id per item

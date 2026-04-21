@@ -178,6 +178,9 @@ export default defineConfig({
       // Do NOT set host here — the client must use window.location.hostname.
       clientPort: 443,
       protocol: "wss",
+      // Suppress the WebSocket connection error overlay in the browser console
+      // when the dev server is accessed through the Manus sandbox proxy.
+      overlay: false,
     },
     fs: {
       strict: true,
