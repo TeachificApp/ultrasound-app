@@ -11,6 +11,7 @@ import { registerSendGridWebhook } from "../webhooks/sendgrid";
 import { registerUploadCaseMediaRoute } from "../routes/uploadCaseMedia";
 import { registerUploadQuestionImageRoute } from "../routes/uploadQuestionImage";
 import { registerUploadQuestionMediaRoute } from "../routes/uploadQuestionMedia";
+import { registerUploadNavigatorImageRoute } from "../routes/uploadNavigatorImage";
 import { registerUnsubscribeRoute } from "../routes/unsubscribe";
 import { registerAuthLoginRoute } from "../routes/authLogin";
 import { appRouter } from "../routers";
@@ -60,6 +61,8 @@ async function startServer() {
   registerSendGridWebhook(app);
   // Case media upload endpoint (multipart/form-data)
   registerUploadCaseMediaRoute(app);
+  // Navigator section image upload endpoint (admin only)
+  registerUploadNavigatorImageRoute(app);
   // Question image upload endpoint (admin only)
   registerUploadQuestionImageRoute(app);
   // Question media upload endpoint (images + videos, admin only)

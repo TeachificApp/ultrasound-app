@@ -2,14 +2,15 @@
  * NavigatorEditor — Admin page for editing Navigator protocol checklists.
  * Both section-level and item-level drag-and-drop use @dnd-kit/sortable.
  */
-import { useState, useEffect, useCallback, useId } from "react";
+import { useState, useEffect, useCallback, useId, useRef } from "react";
 import { useLocation } from "wouter";
 import Layout from "@/components/Layout";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import {
   ChevronDown, ChevronUp, Plus, Trash2, Save, GripVertical,
-  AlertTriangle, CheckCircle2, ArrowUp, ArrowDown, Edit3, X, RefreshCw
+  AlertTriangle, CheckCircle2, ArrowUp, ArrowDown, Edit3, X, RefreshCw,
+  Image as ImageIcon, Upload, Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +45,15 @@ interface ChecklistItem {
   sortOrder: number;
 }
 
+interface NavigatorImage {
+  id: string; // client-side stable id
+  url: string;
+  fileKey: string;
+  caption: string;
+  sortOrder: number;
+  uploading?: boolean;
+}
+
 interface SectionData {
   /** Stable client-side key for dnd-kit (never changes for the lifetime of this section in state) */
   dndKey: string;
@@ -51,6 +61,7 @@ interface SectionData {
   sectionName: string;
   probe: string;
   items: ChecklistItem[];
+  images: NavigatorImage[];
   sortOrder: number;
   isDirty: boolean;
 }
@@ -184,6 +195,10 @@ function SortableItemRow({
 
 // ─── Sortable Section Card ────────────────────────────────────────────────────
 interface SortableSectionCardProps {
+  onAddImage: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onRemoveImage: (imgId: string) => void;
+  onUpdateImageCaption: (imgId: string, caption: string) => void;
+  uploadingImages: Set<string>;
   section: SectionData;
   si: number;
   totalSections: number;
@@ -212,7 +227,9 @@ function SortableSectionCard({
   onToggleExpand, onMoveSection, onSaveSection, onDeleteSection,
   onUpdateSectionField, onAddItem, onItemDragEnd,
   onUpdateItem, onDeleteItem, onMoveItem, onEditItem, onDoneEditItem,
+  onAddImage, onRemoveImage, onUpdateImageCaption, uploadingImages,
 }: SortableSectionCardProps) {
+  const imgInputRef = useRef<HTMLInputElement>(null);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: section.dndKey });
 
@@ -331,6 +348,63 @@ function SortableSectionCard({
               </SortableContext>
             </DndContext>
 
+            {/* ── Clinical Images ─────────────────────────────────────────── */}
+            <div className="px-4 pt-3 pb-2 border-t border-gray-100 bg-[#f8fffe]">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-gray-600 flex items-center gap-1.5">
+                  <ImageIcon className="w-3.5 h-3.5 text-[#189aa1]" />
+                  Clinical Images
+                  <span className="text-gray-400 font-normal">({section.images.length})</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => imgInputRef.current?.click()}
+                  className="flex items-center gap-1 text-xs font-semibold text-[#189aa1] hover:text-[#0e7a80] transition-colors"
+                >
+                  <Upload className="w-3 h-3" /> Add Image
+                </button>
+                <input
+                  ref={imgInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={onAddImage as any}
+                />
+              </div>
+              {section.images.length > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-2">
+                  {section.images.map((img) => (
+                    <div key={img.id} className="relative group rounded-lg overflow-hidden border border-gray-200 bg-gray-100">
+                      {img.uploading ? (
+                        <div className="w-full h-24 flex items-center justify-center">
+                          <Loader2 className="w-5 h-5 text-[#189aa1] animate-spin" />
+                        </div>
+                      ) : (
+                        <img src={img.url} alt={img.caption || "Clinical image"} className="w-full h-24 object-cover" />
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => onRemoveImage(img.id)}
+                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Remove image"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                      <input
+                        type="text"
+                        value={img.caption}
+                        onChange={(e) => onUpdateImageCaption(img.id, e.target.value)}
+                        placeholder="Image title (optional)"
+                        className="w-full text-xs px-2 py-1 border-t border-gray-200 bg-white outline-none focus:bg-[#f0fbfc]"
+                        maxLength={200}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="px-4 py-2.5 bg-gray-50/50">
               <button
                 type="button"
@@ -360,6 +434,7 @@ export default function NavigatorEditor() {
   const [deletingSection, setDeletingSection] = useState<number | null>(null);
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [uploadingImages, setUploadingImages] = useState<Set<string>>(new Set());
 
   // Shared sensors for both section and item dnd-kit contexts
   const sensors = useSensors(
@@ -392,6 +467,13 @@ export default function NavigatorEditor() {
           sectionName: s.sectionName,
           probe: s.probe,
           items: s.items.map((item, i) => ({ ...item, sortOrder: item.sortOrder ?? i })),
+          images: ((s as any).images ?? []).map((img: any, i: number) => ({
+            id: uniqueKey("img"),
+            url: img.url,
+            fileKey: img.fileKey ?? "",
+            caption: img.caption ?? "",
+            sortOrder: img.sortOrder ?? i,
+          })),
           sortOrder: s.sortOrder,
           isDirty: false,
         }))
@@ -403,6 +485,7 @@ export default function NavigatorEditor() {
           sectionName: s.sectionName,
           probe: s.probe,
           items: s.items.map((item, i) => ({ ...item, sortOrder: i })),
+          images: [],
           sortOrder: idx,
           isDirty: false,
         }))
@@ -446,6 +529,7 @@ export default function NavigatorEditor() {
         sectionName: section.sectionName,
         probe: section.probe,
         items: section.items,
+        images: section.images.map(({ id: _id, uploading: _u, ...img }) => img),
         sortOrder: section.sortOrder,
       });
       setSections(prev => prev.map((s, i) => i === sectionIdx ? { ...s, isDirty: false } : s));
@@ -453,6 +537,58 @@ export default function NavigatorEditor() {
     } finally {
       setSavingSection(null);
     }
+  };
+
+  // ── Image upload handler ────────────────────────────────────────────────────
+  const handleAddImages = async (sectionIdx: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
+    e.target.value = "";
+    for (const file of files) {
+      const tempId = uniqueKey("img");
+      // Add placeholder with uploading state
+      setSections(prev => prev.map((s, i) => i !== sectionIdx ? s : {
+        ...s,
+        images: [...s.images, { id: tempId, url: "", fileKey: "", caption: "", sortOrder: s.images.length, uploading: true }],
+        isDirty: true,
+      }));
+      setUploadingImages(prev => new Set(prev).add(tempId));
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await fetch("/api/upload-navigator-image", { method: "POST", body: formData });
+        if (!res.ok) throw new Error("Upload failed");
+        const { url, fileKey } = await res.json() as { url: string; fileKey: string };
+        setSections(prev => prev.map((s, i) => i !== sectionIdx ? s : {
+          ...s,
+          images: s.images.map(img => img.id === tempId ? { ...img, url, fileKey, uploading: false } : img),
+        }));
+      } catch {
+        // Remove failed placeholder
+        setSections(prev => prev.map((s, i) => i !== sectionIdx ? s : {
+          ...s,
+          images: s.images.filter(img => img.id !== tempId),
+        }));
+      } finally {
+        setUploadingImages(prev => { const n = new Set(prev); n.delete(tempId); return n; });
+      }
+    }
+  };
+
+  const handleRemoveImage = (sectionIdx: number, imgId: string) => {
+    setSections(prev => prev.map((s, i) => i !== sectionIdx ? s : {
+      ...s,
+      images: s.images.filter(img => img.id !== imgId).map((img, idx) => ({ ...img, sortOrder: idx })),
+      isDirty: true,
+    }));
+  };
+
+  const handleUpdateImageCaption = (sectionIdx: number, imgId: string, caption: string) => {
+    setSections(prev => prev.map((s, i) => i !== sectionIdx ? s : {
+      ...s,
+      images: s.images.map(img => img.id === imgId ? { ...img, caption } : img),
+      isDirty: true,
+    }));
   };
 
   const handleSaveAll = async () => {
@@ -483,6 +619,7 @@ export default function NavigatorEditor() {
       sectionName: "New Section",
       probe: "",
       items: [],
+      images: [],
       sortOrder: sections.length,
       isDirty: true,
     };
@@ -571,6 +708,7 @@ export default function NavigatorEditor() {
           sectionName: sections[i].sectionName,
           probe: sections[i].probe,
           items: sections[i].items,
+          images: sections[i].images.map(({ id: _id, uploading: _u, ...img }) => img),
           sortOrder: i,
         });
       }
@@ -676,6 +814,10 @@ export default function NavigatorEditor() {
                   onMoveItem={(itemIdx, dir) => handleMoveItem(si, itemIdx, dir)}
                   onEditItem={(itemId) => setEditingItem(itemId)}
                   onDoneEditItem={() => setEditingItem(null)}
+                  onAddImage={(e: React.ChangeEvent<HTMLInputElement>) => { handleAddImages(si, e); }}
+                  onRemoveImage={(imgId) => handleRemoveImage(si, imgId)}
+                  onUpdateImageCaption={(imgId, caption) => handleUpdateImageCaption(si, imgId, caption)}
+                  uploadingImages={uploadingImages}
                 />
               ))}
             </div>

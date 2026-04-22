@@ -2530,6 +2530,8 @@ export const navigatorOverrides = mysqlTable("navigatorOverrides", {
   probe: text("probe"),
   // JSON array of checklist items: { id, label, detail, critical, sortOrder }
   items: text("items"),
+  // JSON array of clinical images: { url, fileKey, caption, sortOrder }
+  images: text("images"),
   // Sort order of this section within the module (0 = first)
   sortOrder: int("sortOrder").default(0),
   // Metadata

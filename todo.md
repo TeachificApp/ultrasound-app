@@ -980,3 +980,20 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Suppress Vite HMR WebSocket console error (set overlay: false in vite.config.ts)
 - [x] Attribution masking already fully wired: maskOwnerName applied in all 3 submitter query locations in caseLibraryRouter + quickfireRouter leaderboard
 - [x] Added drag-to-reorder images in SubmitCase: dnd-kit SortableMediaItem with grip handle, arrayMove on drag end, stable id per item
+
+## Multi-Image Per Structure (Navigator/ScanCoach)
+- [ ] Audit: find where single clinical image URL is stored per structure in DB schema and editor
+- [ ] Update DB schema: change single imageUrl column to images JSON array (url + caption) per structure
+- [ ] Update server router: accept and return images array per structure
+- [ ] Update editor UI: add/remove multiple images per structure with captions, no longer replace-on-upload
+- [ ] Update viewer/display: show image gallery (thumbnails + lightbox) per structure
+- [ ] Run tests and save checkpoint
+
+## Multi-Image Per Structure (Navigator Sections)
+- [x] Added `images` JSON column to `navigatorOverrides` table (DB migration applied)
+- [x] Updated `navigatorAdminRouter.ts` to accept and return `images` array in upsertSection/listSections
+- [x] Created `/api/upload-navigator-image` endpoint (admin-only, images only, S3 storage)
+- [x] Updated NavigatorEditor.tsx: multi-image upload with per-image title, spinner placeholder, remove button, drag-to-reorder (dnd-kit)
+- [x] Updated `useNavigatorSections` hook to pass `images` array through to all Navigator pages
+- [x] Added clinical image gallery to 16 Navigator pages (horizontal scrollable strip, click to open full size)
+- [x] Zero TypeScript errors, 771 tests passing

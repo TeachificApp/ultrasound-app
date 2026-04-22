@@ -57,6 +57,13 @@ const ChecklistItemSchema = z.object({
   sortOrder: z.number().int().optional().default(0),
 });
 
+const NavigatorImageSchema = z.object({
+  url: z.string().url(),
+  fileKey: z.string().optional().default(""),
+  caption: z.string().optional().default(""),
+  sortOrder: z.number().int().optional().default(0),
+});
+
 export const navigatorAdminRouter = router({
   /**
    * List all section overrides for a given navigator module.
@@ -78,6 +85,7 @@ export const navigatorAdminRouter = router({
         sectionName: r.sectionName,
         probe: r.probe ?? "",
         items: r.items ? (JSON.parse(r.items) as z.infer<typeof ChecklistItemSchema>[]) : [],
+        images: r.images ? (JSON.parse(r.images) as z.infer<typeof NavigatorImageSchema>[]) : [],
         sortOrder: r.sortOrder ?? 0,
         updatedAt: r.updatedAt,
       }));
@@ -94,6 +102,7 @@ export const navigatorAdminRouter = router({
         sectionName: z.string().min(1).max(128),
         probe: z.string().optional().default(""),
         items: z.array(ChecklistItemSchema),
+        images: z.array(NavigatorImageSchema).optional().default([]),
         sortOrder: z.number().int().optional().default(0),
       })
     )
@@ -104,6 +113,9 @@ export const navigatorAdminRouter = router({
 
       const itemsJson = JSON.stringify(
         input.items.map((item, idx) => ({ ...item, sortOrder: item.sortOrder ?? idx }))
+      );
+      const imagesJson = JSON.stringify(
+        input.images.map((img, idx) => ({ ...img, sortOrder: img.sortOrder ?? idx }))
       );
 
       const existing = await db
@@ -123,6 +135,7 @@ export const navigatorAdminRouter = router({
           .set({
             probe: input.probe,
             items: itemsJson,
+            images: imagesJson,
             sortOrder: input.sortOrder,
             updatedByUserId: ctx.user.id,
           })
@@ -134,6 +147,7 @@ export const navigatorAdminRouter = router({
           sectionName: input.sectionName,
           probe: input.probe,
           items: itemsJson,
+          images: imagesJson,
           sortOrder: input.sortOrder,
           updatedByUserId: ctx.user.id,
         });

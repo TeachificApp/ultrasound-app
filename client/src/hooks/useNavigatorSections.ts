@@ -17,8 +17,19 @@ import { trpc } from "@/lib/trpc";
 import { STATIC_NAVIGATOR_DATA } from "@/lib/navigatorStaticData";
 import type { NavigatorSection } from "@/lib/navigatorStaticData";
 
+/** A clinical image attached to a navigator section */
+export interface NavigatorSectionImage {
+  url: string;
+  fileKey: string;
+  caption: string;
+  sortOrder: number;
+}
+
 /** NavigatorSection with a `view` alias for sectionName — used by legacy navigator pages */
-export type NavigatorSectionWithView = NavigatorSection & { view: string };
+export type NavigatorSectionWithView = NavigatorSection & {
+  view: string;
+  images: NavigatorSectionImage[];
+};
 
 export function useNavigatorSections(moduleKey: string): {
   sections: NavigatorSectionWithView[];
@@ -45,6 +56,12 @@ export function useNavigatorSections(moduleKey: string): {
           detail: item.detail ?? "",
           critical: item.critical ?? false,
         })),
+        images: ((row as any).images ?? []).map((img: any, i: number) => ({
+          url: img.url ?? "",
+          fileKey: img.fileKey ?? "",
+          caption: img.caption ?? "",
+          sortOrder: img.sortOrder ?? i,
+        })) as NavigatorSectionImage[],
       }));
     }
     // Otherwise fall back to embedded static data
@@ -52,7 +69,7 @@ export function useNavigatorSections(moduleKey: string): {
   }, [dbSections, moduleKey]);
 
   const sectionsWithView = useMemo<NavigatorSectionWithView[]>(
-    () => sections.map((s) => ({ ...s, view: s.sectionName })),
+    () => sections.map((s) => ({ ...s, view: s.sectionName, images: (s as any).images ?? [] })),
     [sections]
   );
 

@@ -159,6 +159,27 @@ export default function InvasiveProceduresNavigator() {
                   </button>
                   {isExpanded && (
                     <div className="border-t border-gray-100">
+                      {/* Clinical image gallery */}
+                      {section.images && section.images.length > 0 && (
+                        <div className="px-4 py-3 bg-gray-50/60 border-b border-gray-100">
+                          <p className="text-[10px] font-semibold text-[#189aa1] uppercase tracking-wide mb-2">Clinical Images</p>
+                          <div className="flex gap-2 overflow-x-auto pb-1">
+                            {section.images.map((img, imgIdx) => (
+                              <div key={imgIdx} className="flex-shrink-0 w-36">
+                                <img
+                                  src={img.url}
+                                  alt={img.caption || `Image ${imgIdx + 1}`}
+                                  className="w-36 h-24 object-cover rounded-lg border border-gray-200 shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
+                                  onClick={() => window.open(img.url, "_blank")}
+                                />
+                                {img.caption && (
+                                  <p className="text-[10px] text-gray-500 mt-1 text-center leading-tight">{img.caption}</p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       {section.items.map((item) => (
                         <div
                           key={item.id}
