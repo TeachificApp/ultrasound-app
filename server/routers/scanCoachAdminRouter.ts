@@ -456,6 +456,44 @@ export const scanCoachAdminRouter = router({
     }),
 
   /**
+   * Rename a view by updating only the viewName field on its override row.
+   * Creates the override row if it does not yet exist.
+   */
+  renameView: protectedProcedure
+    .input(z.object({
+      module: z.enum(MODULE_VALUES),
+      viewId: z.string().min(1).max(64),
+      viewName: z.string().min(1).max(128),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const existing = await db
+        .select({ id: scanCoachOverrides.id })
+        .from(scanCoachOverrides)
+        .where(and(eq(scanCoachOverrides.module, input.module), eq(scanCoachOverrides.viewId, input.viewId)))
+        .limit(1);
+
+      if (existing.length > 0) {
+        await db
+          .update(scanCoachOverrides)
+          .set({ viewName: input.viewName, updatedByUserId: ctx.user.id })
+          .where(eq(scanCoachOverrides.id, existing[0].id));
+        return { id: existing[0].id, created: false };
+      } else {
+        const [result] = await db.insert(scanCoachOverrides).values({
+          module: input.module,
+          viewId: input.viewId,
+          viewName: input.viewName,
+          updatedByUserId: ctx.user.id,
+        });
+        return { id: (result as any).insertId as number, created: true };
+      }
+    }),
+
+  /**
    * Update the caption/label for a specific clinical echo image by its fileKey.
    */
   updateEchoImageCaption: protectedProcedure

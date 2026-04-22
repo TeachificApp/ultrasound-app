@@ -82,7 +82,7 @@ export const SCANCOACH_MODULES: ScanCoachModuleMeta[] = [
     path: "/pelvic-gyn-scan-coach",
     category: "General",
     views: [
-      { id: "uterus_sag", name: "Uterus - Sagittal",                       group: "Pelvic" },
+      { id: "uterus_sag", name: "Uterus",                                    group: "Pelvic" },
       { id: "adnexa",     name: "Adnexa (Ovaries and Fallopian Tubes)",     group: "Pelvic" },
       { id: "cul_de_sac", name: "Cul-de-Sac",                              group: "Pelvic" },
     ],

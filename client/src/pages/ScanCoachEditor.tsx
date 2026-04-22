@@ -866,6 +866,9 @@ export default function ScanCoachEditor() {
   const [uploadingEchoImage, setUploadingEchoImage] = useState(false);
   // Inline label editing state: maps fileKey → draft caption string
   const [editingCaptions, setEditingCaptions] = useState<Record<string, string>>({});
+  // View name inline editing
+  const [editingViewName, setEditingViewName] = useState(false);
+  const [viewNameDraft, setViewNameDraft] = useState("");
 
   const updateEchoImageCaptionMutation = trpc.scanCoachAdmin.updateEchoImageCaption.useMutation({
     onSuccess: () => {
@@ -921,11 +924,30 @@ export default function ScanCoachEditor() {
     (o: Override) => o.viewId === selectedViewId
   );
 
+  const renameViewMutation = trpc.scanCoachAdmin.renameView.useMutation({
+    onSuccess: () => {
+      utils.scanCoachAdmin.listOverrides.invalidate();
+      setEditingViewName(false);
+      toast.success("View name updated");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const handleSaveViewName = () => {
+    if (!selectedViewId || !viewNameDraft.trim()) { setEditingViewName(false); return; }
+    renameViewMutation.mutate({
+      module: selectedModule,
+      viewId: selectedViewId,
+      viewName: viewNameDraft.trim(),
+    });
+  };
+
   const handleSelectView = (viewId: string) => {
     setSelectedViewId(viewId);
     setPreviewMode(false);
     setEditingTipIdx(null);
     setAddingTip(false);
+    setEditingViewName(false);
     const ov = overrides.find((o: Override) => o.viewId === viewId);
     const staticContent = getStaticContent(selectedModule, viewId);
     setDraft({
@@ -1218,7 +1240,9 @@ export default function ScanCoachEditor() {
                               : "text-gray-600 hover:bg-gray-50"
                           }`}
                         >
-                          <span className="truncate">{view.name}</span>
+                          <span className="truncate">
+                            {overrides.find((o: Override) => o.viewId === view.id)?.viewName ?? view.name}
+                          </span>
                           {hasOverride && (
                             <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: BRAND }} />
                           )}
@@ -1261,9 +1285,39 @@ export default function ScanCoachEditor() {
                           </Badge>
                         )}
                       </div>
-                      <h2 className="text-lg font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>
-                        {selectedViewName}
-                      </h2>
+                      {editingViewName ? (
+                        <div className="flex items-center gap-2 mt-1">
+                          <Input
+                            autoFocus
+                            value={viewNameDraft}
+                            onChange={(e) => setViewNameDraft(e.target.value)}
+                            className="h-8 text-base font-bold w-72"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") { e.preventDefault(); handleSaveViewName(); }
+                              if (e.key === "Escape") { setEditingViewName(false); }
+                            }}
+                          />
+                          <Button size="sm" className="h-8 px-3 text-xs text-white" style={{ background: BRAND }} onClick={handleSaveViewName} disabled={renameViewMutation.isPending}>
+                            {renameViewMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-8 px-3 text-xs" onClick={() => setEditingViewName(false)}>
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 group">
+                          <h2 className="text-lg font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>
+                            {currentOverride?.viewName ?? selectedViewName}
+                          </h2>
+                          <button
+                            onClick={() => { setViewNameDraft(currentOverride?.viewName ?? selectedViewName ?? ""); setEditingViewName(true); }}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-[#189aa1] p-1 rounded"
+                            title="Rename this view"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
                       <p className="text-xs text-gray-400 mt-0.5">View ID: <code className="font-mono">{selectedViewId}</code></p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
