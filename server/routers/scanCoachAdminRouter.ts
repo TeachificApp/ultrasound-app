@@ -366,6 +366,96 @@ export const scanCoachAdminRouter = router({
     }),
 
   /**
+   * Upload a clinical echo image and APPEND it to the echoImages JSON array.
+   * Does NOT replace — each call adds a new entry.
+   */
+  uploadEchoImage: protectedProcedure
+    .input(z.object({
+      module: z.enum(MODULE_VALUES),
+      viewId: z.string().min(1).max(64),
+      base64Data: z.string(),
+      mimeType: z.string().regex(/^(image\/(jpeg|png|gif|webp|svg\+xml)|video\/(mp4|webm|ogg|quicktime|x-ms-wmv|x-msvideo|avi))$/),
+      fileName: z.string().max(128),
+      caption: z.string().max(255).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const buffer = Buffer.from(input.base64Data, "base64");
+      const mimeToExt: Record<string, string> = {
+        "image/jpeg": "jpg", "image/png": "png", "image/gif": "gif",
+        "image/webp": "webp", "image/svg+xml": "svg",
+        "video/mp4": "mp4", "video/webm": "webm", "video/ogg": "ogv", "video/quicktime": "mov",
+        "video/x-ms-wmv": "wmv", "video/x-msvideo": "avi", "video/avi": "avi",
+      };
+      const ext = mimeToExt[input.mimeType] ?? input.mimeType.split("/")[1];
+      const randomSuffix = Math.random().toString(36).slice(2, 10);
+      const safeFileName = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const key = `scancoach/${input.module}/${input.viewId}/echo-${safeFileName}-${randomSuffix}.${ext}`;
+      const { url } = await storagePut(key, buffer, input.mimeType);
+
+      const rowId = await getOrCreateOverride(db, input.module, input.viewId, ctx.user.id);
+
+      const [row] = await db
+        .select({ echoImages: scanCoachOverrides.echoImages })
+        .from(scanCoachOverrides)
+        .where(eq(scanCoachOverrides.id, rowId))
+        .limit(1);
+
+      const existing: Array<{ url: string; fileKey: string; caption: string | null; sortOrder: number }> =
+        row?.echoImages ? JSON.parse(row.echoImages as string) : [];
+
+      const newItem = { url, fileKey: key, caption: input.caption ?? null, sortOrder: existing.length };
+      const updated = [...existing, newItem];
+
+      await db
+        .update(scanCoachOverrides)
+        .set({ echoImages: JSON.stringify(updated), updatedByUserId: ctx.user.id })
+        .where(eq(scanCoachOverrides.id, rowId));
+
+      return { url, key, sortOrder: newItem.sortOrder };
+    }),
+
+  /**
+   * Remove a specific clinical echo image from the echoImages array by its S3 fileKey.
+   */
+  removeEchoImage: protectedProcedure
+    .input(z.object({
+      id: z.number().int().positive(),
+      fileKey: z.string().min(1),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const [row] = await db
+        .select({ echoImages: scanCoachOverrides.echoImages })
+        .from(scanCoachOverrides)
+        .where(eq(scanCoachOverrides.id, input.id))
+        .limit(1);
+
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Override row not found" });
+
+      const existing: Array<{ fileKey: string }> = row.echoImages
+        ? JSON.parse(row.echoImages as string)
+        : [];
+
+      const updated = existing
+        .filter((img) => img.fileKey !== input.fileKey)
+        .map((img, idx) => ({ ...img, sortOrder: idx }));
+
+      await db
+        .update(scanCoachOverrides)
+        .set({ echoImages: JSON.stringify(updated), updatedByUserId: ctx.user.id })
+        .where(eq(scanCoachOverrides.id, input.id));
+
+      return { deleted: true };
+    }),
+
+  /**
    * Add a custom (admin-defined) view not in the static registry.
    * Sets isCustomView = 1 on the override row.
    */

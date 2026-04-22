@@ -1002,3 +1002,17 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix NavigatorEditor: uploading a new image replaces existing instead of appending to list
   - Root cause: useEffect re-initialised all sections from DB on every refetch after save, wiping unsaved images
   - Fix: added initialisedModuleRef to skip re-init when module hasn't changed; reset ref on module switch
+
+## ScanCoach Multi-Image Clinical Slot
+- [ ] Update ScanCoach Editor: Clinical Ultrasound Image slot supports multiple images (add/append, not replace)
+- [ ] Update DB schema/router: store array of clinical images per ScanCoach view
+- [ ] Update ScanCoach viewer: show image gallery for clinical images
+
+## ScanCoach Multi-Image Clinical Images
+- [x] Added echoImages JSON column to scanCoachOverrides schema and migrated DB
+- [x] Updated scanCoachAdminRouter: uploadEchoImage (appends to array), removeEchoImage, echoImages returned in getOverride
+- [x] Updated ScanCoachEditor UI: replaced single replace-only slot with multi-image gallery (add/remove per image with title)
+- [x] Updated useScanCoachOverrides hook to include echoImages in merged view
+- [x] Updated all ScanCoach viewer pages with gallery display (single=full-width, multiple=horizontal scroll strip)
+- [x] Added useScanCoachOverrides to AbdominalVascularScanCoach (was missing)
+- [x] Zero TypeScript errors, 771 tests passing

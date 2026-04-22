@@ -12,6 +12,7 @@ import { Scan, ChevronDown, ChevronUp, Lightbulb, Receipt } from "lucide-react";
 import { PremiumPearlGate } from "@/components/PremiumPearlGate";
 import { usePremium } from "@/hooks/usePremium";
 import { abdominalVascularBillingByTab, type ScanCoachBillingData } from "@/lib/scanCoachBillingCodes";
+import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 
 type ExamTab = "liver" | "tips" | "mesenteric" | "renal";
 
@@ -319,7 +320,8 @@ export default function AbdominalVascularScanCoach() {
 
   const views = examTab === "liver" ? liverViews : examTab === "tips" ? tipsViews : examTab === "mesenteric" ? mesentericViews : renalViews;
   const examTips = examTab === "liver" ? liverExamTips : examTab === "tips" ? tipsExamTips : examTab === "mesenteric" ? mesentericExamTips : renalExamTips;
-  const currentView = views[selectedView];
+  const { mergeView } = useScanCoachOverrides("abdominal_vascular");
+  const currentView = mergeView({ ...views[selectedView], id: views[selectedView].view });
 
   const EXAM_TABS: { key: ExamTab; label: string; short: string }[] = [
     { key: "liver", label: "Liver Duplex", short: "Liver" },
@@ -427,6 +429,41 @@ export default function AbdominalVascularScanCoach() {
                   <h2 className="font-black text-white text-base" style={{ fontFamily: "Merriweather, serif" }}>{currentView.view}</h2>
                   <p className="text-[#4ad9e0] text-xs mt-0.5">{currentView.probe}</p>
                 </div>
+                {/* Clinical images gallery */}
+                {(() => {
+                  const imgs = (currentView as any).echoImages as Array<{url: string; caption: string | null}> | undefined;
+                  const legacyUrl = (currentView as any).echoImageUrl as string | undefined;
+                  const gallery = imgs && imgs.length > 0 ? imgs : legacyUrl ? [{ url: legacyUrl, caption: null }] : [];
+                  if (gallery.length === 0) return null;
+                  return (
+                    <div className="mx-5 mt-4">
+                      {gallery.length === 1 ? (
+                        <div className="rounded-xl overflow-hidden border border-[#189aa130] bg-gray-950 relative">
+                          <img src={gallery[0].url} alt={gallery[0].caption ?? "Clinical image"} className="w-full max-h-64 object-contain" />
+                          {gallery[0].caption && (
+                            <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-3 py-1.5">
+                              <p className="text-xs text-white">{gallery[0].caption}</p>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex gap-2 overflow-x-auto pb-1">
+                          {gallery.map((img, idx) => (
+                            <div key={idx} className="relative flex-shrink-0 rounded-xl overflow-hidden border border-[#189aa130] bg-gray-950" style={{ width: 160, height: 120 }}>
+                              <img src={img.url} alt={img.caption ?? `Image ${idx + 1}`} className="w-full h-full object-cover" />
+                              {img.caption && (
+                                <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1.5 py-0.5">
+                                  <p className="text-[9px] text-white truncate">{img.caption}</p>
+                                </div>
+                              )}
+                              <span className="absolute top-1 left-1 bg-black/60 text-white text-[9px] px-1 rounded">{idx + 1}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
                 <div className="divide-y divide-gray-50">
                   {currentView.tips.map((tip, ti) => {
                     const color = TIP_COLORS[tip.category] || "#189aa1";

@@ -17,9 +17,12 @@ import { useMemo, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import type { ScanCoachModule } from "@/lib/scanCoachRegistry";
 
+type EchoImage = { url: string; fileKey: string; caption: string | null; sortOrder: number };
+
 type OverrideRow = {
   viewId: string;
   echoImageUrl: string | null;
+  echoImages: string | null;  // JSON array of EchoImage
   anatomyImageUrl: string | null;
   transducerImageUrl: string | null;
   description: string | null;
@@ -57,7 +60,19 @@ function applyOverride<T extends Record<string, unknown>>(view: T, override: Ove
   const merged: Record<string, unknown> = { ...view };
 
   // Image URL overrides — only replace if the override has a non-empty value
-  if (override.echoImageUrl)       merged.echoImageUrl       = override.echoImageUrl;
+  // echoImages: prefer the new multi-image array; fall back to legacy single URL
+  if (override.echoImages) {
+    try {
+      const imgs: EchoImage[] = JSON.parse(override.echoImages);
+      if (Array.isArray(imgs) && imgs.length > 0) {
+        merged.echoImages = imgs;
+        merged.echoImageUrl = imgs[0].url;  // keep legacy field pointing at first image
+      }
+    } catch { /* ignore */ }
+  } else if (override.echoImageUrl) {
+    merged.echoImageUrl = override.echoImageUrl;
+    merged.echoImages = [{ url: override.echoImageUrl, fileKey: override.echoImageUrl, caption: null, sortOrder: 0 }];
+  }
   if (override.anatomyImageUrl)    merged.anatomyImageUrl    = override.anatomyImageUrl;
   if (override.transducerImageUrl) merged.transducerImageUrl = override.transducerImageUrl;
 

@@ -61,12 +61,15 @@ const BRAND = "#189aa1";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+type EchoImage = { url: string; fileKey: string; caption: string | null; sortOrder: number };
+
 type Override = {
   id: number;
   module: string;
   viewId: string;
   viewName: string | null;
   echoImageUrl: string | null;
+  echoImages: string | null;  // JSON array of EchoImage objects
   anatomyImageUrl: string | null;
   transducerImageUrl: string | null;
   description: string | null;
@@ -558,7 +561,7 @@ function ImageUploadZone({
   isUploading,
   setIsUploading,
 }: {
-  slot: typeof IMAGE_SLOTS[number];
+  slot: { key: string; label: string; hint: string };
   currentUrl: string | null | undefined;
   onUploaded: (url: string) => void;
   onCleared: () => void;
@@ -737,6 +740,28 @@ export default function ScanCoachEditor() {
     },
   });
 
+  const [uploadingEchoImage, setUploadingEchoImage] = useState(false);
+
+  const uploadEchoImageMutation = trpc.scanCoachAdmin.uploadEchoImage.useMutation({
+    onSuccess: () => {
+      utils.scanCoachAdmin.listOverrides.invalidate();
+      setUploadingEchoImage(false);
+      toast.success("Image added to gallery");
+    },
+    onError: (e) => {
+      setUploadingEchoImage(false);
+      toast.error(e.message);
+    },
+  });
+
+  const removeEchoImageMutation = trpc.scanCoachAdmin.removeEchoImage.useMutation({
+    onSuccess: () => {
+      utils.scanCoachAdmin.listOverrides.invalidate();
+      toast.success("Image removed from gallery");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   const clearImageMutation = trpc.scanCoachAdmin.clearImageField.useMutation({
     onSuccess: () => {
       utils.scanCoachAdmin.listOverrides.invalidate();
@@ -836,6 +861,24 @@ export default function ScanCoachEditor() {
         ? arrToJson(legacyDraft?.criticalFindings ?? [])
         : (draft.criticalFindings ? toJsonArray(draft.criticalFindings) : null),
     });
+  };
+
+  const handleAddEchoImage = (rawData: string) => {
+    if (!selectedViewId) return;
+    const [base64Data, mimeType, fileName] = rawData.split("|");
+    setUploadingEchoImage(true);
+    uploadEchoImageMutation.mutate({
+      module: selectedModule,
+      viewId: selectedViewId,
+      base64Data,
+      mimeType,
+      fileName,
+    });
+  };
+
+  const handleRemoveEchoImage = (fileKey: string) => {
+    if (!currentOverride) return;
+    removeEchoImageMutation.mutate({ id: currentOverride.id, fileKey });
   };
 
   const handleImageUploaded = (slot: ImageSlotKey, rawData: string) => {
@@ -1132,12 +1175,88 @@ export default function ScanCoachEditor() {
                         </h3>
                         <span className="text-xs text-gray-400">Upload images to override the static defaults</span>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {IMAGE_SLOTS.map((slot) => (
+
+                      {/* ── Clinical Ultrasound Images (multi-image gallery) ── */}
+                      <div className="mb-6">
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <span className="text-xs font-semibold text-gray-600">Clinical Ultrasound Images</span>
+                            <p className="text-xs text-gray-400">Multiple views shown as a gallery — each upload adds a new image</p>
+                          </div>
+                          {(() => {
+                            const imgs: EchoImage[] = currentOverride?.echoImages
+                              ? (() => { try { return JSON.parse(currentOverride.echoImages); } catch { return []; } })()
+                              : currentOverride?.echoImageUrl
+                                ? [{ url: currentOverride.echoImageUrl, fileKey: "", caption: null, sortOrder: 0 }]
+                                : [];
+                            return imgs.length > 0 ? (
+                              <span className="text-xs text-[#189aa1] font-semibold">{imgs.length} image{imgs.length !== 1 ? "s" : ""}</span>
+                            ) : null;
+                          })()}
+                        </div>
+
+                        {/* Existing images list */}
+                        {(() => {
+                          const imgs: EchoImage[] = currentOverride?.echoImages
+                            ? (() => { try { return JSON.parse(currentOverride.echoImages); } catch { return []; } })()
+                            : currentOverride?.echoImageUrl
+                              ? [{ url: currentOverride.echoImageUrl, fileKey: currentOverride.echoImageUrl, caption: null, sortOrder: 0 }]
+                              : [];
+                          if (imgs.length === 0) return null;
+                          return (
+                            <div className="flex flex-wrap gap-3 mb-3">
+                              {imgs.map((img, idx) => (
+                                <div key={img.fileKey || idx} className="relative group rounded-lg overflow-hidden border border-gray-200 bg-gray-950" style={{ width: 120, height: 90 }}>
+                                  {/\.(mp4|webm|ogv|mov)$/i.test(img.url) ? (
+                                    <video src={img.url} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <img src={img.url} alt={img.caption ?? `Image ${idx + 1}`} className="w-full h-full object-cover" />
+                                  )}
+                                  {img.caption && (
+                                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1.5 py-0.5">
+                                      <p className="text-[9px] text-white truncate">{img.caption}</p>
+                                    </div>
+                                  )}
+                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100">
+                                    <a href={img.url} target="_blank" rel="noopener noreferrer"
+                                      className="bg-white/90 rounded p-1 text-gray-700 hover:bg-white"
+                                    >
+                                      <ExternalLink className="w-3 h-3" />
+                                    </a>
+                                    {img.fileKey && currentOverride && (
+                                      <button
+                                        onClick={() => handleRemoveEchoImage(img.fileKey)}
+                                        className="bg-red-500/90 rounded p-1 text-white hover:bg-red-600"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </button>
+                                    )}
+                                  </div>
+                                  <span className="absolute top-1 left-1 bg-black/60 text-white text-[9px] px-1 rounded">{idx + 1}</span>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+
+                        {/* Add image drop zone */}
+                        <ImageUploadZone
+                          slot={{ key: "echoImageUrl", label: "Add Clinical Image", hint: "Uploads are added to the gallery (not replaced)" }}
+                          currentUrl={null}
+                          isUploading={uploadingEchoImage}
+                          setIsUploading={(v) => setUploadingEchoImage(v)}
+                          onUploaded={handleAddEchoImage}
+                          onCleared={() => {}}
+                        />
+                      </div>
+
+                      {/* ── Anatomy + Transducer slots (single-image, unchanged) ── */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {IMAGE_SLOTS.filter((s) => s.key !== "echoImageUrl").map((slot) => (
                           <ImageUploadZone
                             key={slot.key}
                             slot={slot}
-                            currentUrl={currentOverride?.[slot.key]}
+                            currentUrl={currentOverride?.[slot.key as "anatomyImageUrl" | "transducerImageUrl"]}
                             isUploading={uploadingSlot === slot.key}
                             setIsUploading={(v) => setIsUploading(v ? slot.key : null)}
                             onUploaded={(rawData) => handleImageUploaded(slot.key, rawData)}

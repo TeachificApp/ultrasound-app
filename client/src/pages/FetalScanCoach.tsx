@@ -502,12 +502,33 @@ export default function FetalScanCoach() {
           {((view as any).echoImageUrl || (view as any).anatomyImageUrl || (view as any).transducerImageUrl) && (
             <div className="px-5 py-4 border-b border-gray-100">
               <div className={`grid gap-3 ${[(view as any).echoImageUrl, (view as any).anatomyImageUrl, (view as any).transducerImageUrl].filter(Boolean).length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
-                {(view as any).echoImageUrl && (
-                  <div className="rounded-lg overflow-hidden bg-black/10">
-                    <img src={(view as any).echoImageUrl} alt="Clinical Ultrasound Image" className="max-h-64 object-contain rounded-lg w-full" />
-                    <p className="text-[10px] text-gray-500 text-center py-1">Clinical Ultrasound Image</p>
-                  </div>
-                )}
+                {/* Clinical images gallery */}
+            {(() => {
+              const imgs = (view as any).echoImages as Array<{url: string; caption: string | null}> | undefined;
+              const legacyUrl = (view as any).echoImageUrl as string | undefined;
+              const gallery = imgs && imgs.length > 0 ? imgs : legacyUrl ? [{ url: legacyUrl, caption: null }] : [];
+              if (gallery.length === 0) return null;
+              return gallery.length === 1 ? (
+                <div className="rounded-lg overflow-hidden bg-black/20 relative">
+                  <img src={gallery[0].url} alt={gallery[0].caption ?? "Ultrasound Image"} className="max-h-64 object-contain rounded-lg w-full" />
+                  <p className="text-[10px] text-white/60 text-center py-1">{gallery[0].caption ?? "Ultrasound Image"}</p>
+                </div>
+              ) : (
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {gallery.map((img, idx) => (
+                    <div key={idx} className="relative flex-shrink-0 rounded-lg overflow-hidden bg-black/20" style={{ width: 150, height: 110 }}>
+                      <img src={img.url} alt={img.caption ?? `Image ${idx + 1}`} className="w-full h-full object-cover" />
+                      {img.caption && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1.5 py-0.5">
+                          <p className="text-[9px] text-white truncate">{img.caption}</p>
+                        </div>
+                      )}
+                      <span className="absolute top-1 left-1 bg-black/60 text-white text-[9px] px-1 rounded">{idx + 1}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
                 {(view as any).anatomyImageUrl && (
                   <div className="rounded-lg overflow-hidden bg-black/10">
                     <img src={(view as any).anatomyImageUrl} alt="Anatomy Diagram" className="max-h-64 object-contain rounded-lg w-full" />

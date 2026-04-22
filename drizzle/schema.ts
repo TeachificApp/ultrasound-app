@@ -1157,6 +1157,10 @@ export const scanCoachOverrides = mysqlTable("scanCoachOverrides", {
   anatomyLabel: varchar("anatomyLabel", { length: 128 }),
   // Custom label for the transducer image section (default: "Transducer Position")
   transducerLabel: varchar("transducerLabel", { length: 128 }),
+  // ── Multiple clinical echo images ───────────────────────────────────────────
+  // JSON array of {url, fileKey, caption, sortOrder} objects.
+  // When present, overrides the single echoImageUrl field for the gallery display.
+  echoImages: text("echoImages"),
   // ── Additional educational media ─────────────────────────────────────────────
   // JSON array of AdditionalMedia objects: {id, url, fileKey, caption, mediaType, section, sortOrder}
   // section values: "echo" | "anatomy" | "transducer" | "tips" | "structures" | "measurements" | "howToGet" | "criticalFindings" | "general"
