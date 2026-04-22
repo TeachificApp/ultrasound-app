@@ -435,6 +435,9 @@ export default function NavigatorEditor() {
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
   const [uploadingImages, setUploadingImages] = useState<Set<string>>(new Set());
+  // Track which module has already been loaded into local state to avoid
+  // wiping unsaved changes (e.g. newly uploaded images) on every refetch.
+  const initialisedModuleRef = useRef<string | null>(null);
 
   // Shared sensors for both section and item dnd-kit contexts
   const sensors = useSensors(
@@ -456,8 +459,19 @@ export default function NavigatorEditor() {
   const deleteSection = trpc.navigatorAdmin.deleteSection.useMutation();
   const reorderSections = trpc.navigatorAdmin.reorderSections.useMutation();
 
+  // When the module selector changes, clear the initialised flag so the
+  // next dbSections load triggers a full reset.
+  useEffect(() => {
+    initialisedModuleRef.current = null;
+  }, [selectedModule]);
+
   useEffect(() => {
     if (!dbSections) return;
+    // Only do a full reset when the module actually changes (not on every refetch
+    // after save — that would wipe unsaved images/changes in other sections).
+    if (initialisedModuleRef.current === selectedModule) return;
+    initialisedModuleRef.current = selectedModule;
+
     const staticData = STATIC_NAVIGATOR_DATA[selectedModule] ?? [];
     if (dbSections.length > 0) {
       setSections(

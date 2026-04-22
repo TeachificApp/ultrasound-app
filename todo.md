@@ -997,3 +997,8 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Updated `useNavigatorSections` hook to pass `images` array through to all Navigator pages
 - [x] Added clinical image gallery to 16 Navigator pages (horizontal scrollable strip, click to open full size)
 - [x] Zero TypeScript errors, 771 tests passing
+
+## Bug Fix: Navigator Image Upload Replace vs Append
+- [x] Fix NavigatorEditor: uploading a new image replaces existing instead of appending to list
+  - Root cause: useEffect re-initialised all sections from DB on every refetch after save, wiping unsaved images
+  - Fix: added initialisedModuleRef to skip re-init when module hasn't changed; reset ref on module switch
