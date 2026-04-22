@@ -1016,3 +1016,9 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Updated all ScanCoach viewer pages with gallery display (single=full-width, multiple=horizontal scroll strip)
 - [x] Added useScanCoachOverrides to AbdominalVascularScanCoach (was missing)
 - [x] Zero TypeScript errors, 771 tests passing
+
+## ScanCoach Editor — Image Label & Reorder
+- [x] Add updateEchoImageCaption procedure to scanCoachAdminRouter (update caption for one image by fileKey)
+- [x] Add reorderEchoImages procedure to scanCoachAdminRouter (accept new ordered array of fileKeys)
+- [x] Rebuild ScanCoach Editor echoImages gallery: vertical list with drag-to-reorder (dnd-kit), inline label editing, and save buttons
+- [x] Update viewer pages to display image captions/labels below each gallery image

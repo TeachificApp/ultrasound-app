@@ -456,6 +456,85 @@ export const scanCoachAdminRouter = router({
     }),
 
   /**
+   * Update the caption/label for a specific clinical echo image by its fileKey.
+   */
+  updateEchoImageCaption: protectedProcedure
+    .input(z.object({
+      id: z.number().int().positive(),
+      fileKey: z.string().min(1),
+      caption: z.string().max(255).nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const [row] = await db
+        .select({ echoImages: scanCoachOverrides.echoImages })
+        .from(scanCoachOverrides)
+        .where(eq(scanCoachOverrides.id, input.id))
+        .limit(1);
+
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Override row not found" });
+
+      const existing: Array<{ url: string; fileKey: string; caption: string | null; sortOrder: number }> =
+        row.echoImages ? JSON.parse(row.echoImages as string) : [];
+
+      const updated = existing.map((img) =>
+        img.fileKey === input.fileKey ? { ...img, caption: input.caption } : img
+      );
+
+      await db
+        .update(scanCoachOverrides)
+        .set({ echoImages: JSON.stringify(updated), updatedByUserId: ctx.user.id })
+        .where(eq(scanCoachOverrides.id, input.id));
+
+      return { updated: true };
+    }),
+
+  /**
+   * Reorder clinical echo images by providing the new ordered array of fileKeys.
+   * The images are re-sorted to match the provided order.
+   */
+  reorderEchoImages: protectedProcedure
+    .input(z.object({
+      id: z.number().int().positive(),
+      orderedFileKeys: z.array(z.string()),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const [row] = await db
+        .select({ echoImages: scanCoachOverrides.echoImages })
+        .from(scanCoachOverrides)
+        .where(eq(scanCoachOverrides.id, input.id))
+        .limit(1);
+
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Override row not found" });
+
+      const existing: Array<{ url: string; fileKey: string; caption: string | null; sortOrder: number }> =
+        row.echoImages ? JSON.parse(row.echoImages as string) : [];
+
+      // Build a map for O(1) lookup
+      const imgMap = new Map(existing.map((img) => [img.fileKey, img]));
+
+      // Reorder according to provided keys, then re-assign sortOrder
+      const reordered = input.orderedFileKeys
+        .map((key) => imgMap.get(key))
+        .filter((img): img is NonNullable<typeof img> => img !== undefined)
+        .map((img, idx) => ({ ...img, sortOrder: idx }));
+
+      await db
+        .update(scanCoachOverrides)
+        .set({ echoImages: JSON.stringify(reordered), updatedByUserId: ctx.user.id })
+        .where(eq(scanCoachOverrides.id, input.id));
+
+      return { reordered: true };
+    }),
+
+  /**
    * Add a custom (admin-defined) view not in the static registry.
    * Sets isCustomView = 1 on the override row.
    */

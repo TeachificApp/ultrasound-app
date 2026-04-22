@@ -318,10 +318,10 @@ function ViewDetail({ view }: { view: typeof CARDIAC_VIEWS[0] }) {
                       <img src={img.url} alt={img.caption ?? `Image ${idx + 1}`} className="w-full h-full object-cover" />
                       {img.caption && (
                         <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1.5 py-0.5">
-                          <p className="text-[9px] text-white truncate">{img.caption}</p>
+                          <p className="text-xs text-white truncate">{img.caption}</p>
                         </div>
                       )}
-                      <span className="absolute top-1 left-1 bg-black/60 text-white text-[9px] px-1 rounded">{idx + 1}</span>
+                      <span className="absolute top-1 left-1 bg-black/60 text-white text-xs font-bold px-1.5 py-0.5 rounded">{idx + 1}</span>
                     </div>
                   ))}
                 </div>

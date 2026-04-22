@@ -243,9 +243,9 @@ export default function BreastScanCoach() {
                   {gallery.length === 1 ? (
                     <div className="rounded-xl overflow-hidden border border-[#189aa130] bg-gray-950 relative">
                       {/\.(mp4|webm|ogv|mov)$/i.test(gallery[0].url) ? (
-                        <video src={gallery[0].url} controls className="w-full max-h-64 object-contain" />
+                        <video src={gallery[0].url} controls className="w-full max-h-96 object-contain" />
                       ) : (
-                        <img src={gallery[0].url} alt={gallery[0].caption ?? "Clinical image"} className="w-full max-h-64 object-contain" />
+                        <img src={gallery[0].url} alt={gallery[0].caption ?? "Clinical image"} className="w-full max-h-96 object-contain" />
                       )}
                       {gallery[0].caption && (
                         <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-3 py-1.5">
@@ -256,7 +256,7 @@ export default function BreastScanCoach() {
                   ) : (
                     <div className="flex gap-2 overflow-x-auto pb-1">
                       {gallery.map((img, idx) => (
-                        <div key={idx} className="relative flex-shrink-0 rounded-xl overflow-hidden border border-[#189aa130] bg-gray-950" style={{ width: 160, height: 120 }}>
+                        <div key={idx} className="relative flex-shrink-0 rounded-xl overflow-hidden border border-[#189aa130] bg-gray-950" style={{ width: 280, height: 210 }}>
                           {/\.(mp4|webm|ogv|mov)$/i.test(img.url) ? (
                             <video src={img.url} className="w-full h-full object-cover" />
                           ) : (
@@ -264,10 +264,10 @@ export default function BreastScanCoach() {
                           )}
                           {img.caption && (
                             <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1.5 py-0.5">
-                              <p className="text-[9px] text-white truncate">{img.caption}</p>
+                              <p className="text-xs text-white truncate">{img.caption}</p>
                             </div>
                           )}
-                          <span className="absolute top-1 left-1 bg-black/60 text-white text-[9px] px-1 rounded">{idx + 1}</span>
+                          <span className="absolute top-1 left-1 bg-black/60 text-white text-xs font-bold px-1.5 py-0.5 rounded">{idx + 1}</span>
                         </div>
                       ))}
                     </div>

@@ -10,6 +10,23 @@
   Access: platform_admin or owner role only.
 */
 import React, { useState, useRef, useCallback } from "react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import { trpc } from "@/lib/trpc";
@@ -33,8 +50,9 @@ import {
   AlertCircle, ExternalLink, Layers, AlertTriangle,
   Stethoscope, Ruler, Lightbulb, Activity, Heart, Baby,
   Zap, Scan, Wind, Microscope, Users, Shield,
-  Plus, Pencil, X, Check, MoveUp, MoveDown,
+  Plus, Pencil, X, Check, MoveUp, MoveDown, GripVertical,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // Icon map for each ScanCoach module
@@ -551,6 +569,106 @@ function _legacyStaticPreviewContent({
   );
 }
 
+// ─── Sortable Echo Image Row ─────────────────────────────────────────────────
+
+function SortableEchoImageRow({
+  img,
+  idx,
+  captionDraft,
+  onCaptionChange,
+  onSaveCaption,
+  onRemove,
+  isSavingCaption,
+}: {
+  img: EchoImage;
+  idx: number;
+  captionDraft: string;
+  onCaptionChange: (val: string) => void;
+  onSaveCaption: () => void;
+  onRemove: () => void;
+  isSavingCaption: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: img.fileKey,
+  });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : undefined,
+  };
+
+  const isVideo = /\.(mp4|webm|ogv|mov)$/i.test(img.url);
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex gap-3 items-start bg-white border border-gray-200 rounded-xl p-3 shadow-sm"
+    >
+      {/* Drag handle */}
+      <button
+        {...attributes}
+        {...listeners}
+        className="flex-shrink-0 mt-1 text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing touch-none"
+        title="Drag to reorder"
+      >
+        <GripVertical className="w-5 h-5" />
+      </button>
+
+      {/* Thumbnail */}
+      <div className="flex-shrink-0 relative rounded-lg overflow-hidden bg-gray-950 border border-gray-200" style={{ width: 120, height: 90 }}>
+        {isVideo ? (
+          <video src={img.url} className="w-full h-full object-cover" />
+        ) : (
+          <img src={img.url} alt={captionDraft || `Image ${idx + 1}`} className="w-full h-full object-cover" />
+        )}
+        <span className="absolute top-1 left-1 bg-black/60 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">{idx + 1}</span>
+      </div>
+
+      {/* Label + actions */}
+      <div className="flex-1 min-w-0 space-y-2">
+        <div className="flex items-center gap-2">
+          <Input
+            value={captionDraft}
+            onChange={(e) => onCaptionChange(e.target.value)}
+            placeholder="Add a label (e.g. RUQ Longitudinal, Liver Dome)"
+            className="h-8 text-sm flex-1"
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onSaveCaption(); } }}
+          />
+          <Button
+            size="sm"
+            className="h-8 px-3 text-xs text-white flex-shrink-0"
+            style={{ background: BRAND }}
+            onClick={onSaveCaption}
+            disabled={isSavingCaption}
+            title="Save label"
+          >
+            {isSavingCaption ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+          </Button>
+        </div>
+        <div className="flex items-center gap-2">
+          <a
+            href={img.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-[#189aa1] hover:underline flex items-center gap-1"
+          >
+            <ExternalLink className="w-3 h-3" /> View full size
+          </a>
+          <button
+            onClick={onRemove}
+            className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 ml-auto"
+          >
+            <Trash2 className="w-3 h-3" /> Remove
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Image Upload Zone ────────────────────────────────────────────────────────
 
 function ImageUploadZone({
@@ -713,6 +831,11 @@ export default function ScanCoachEditor() {
 
   const utils = trpc.useUtils();
 
+  const dndSensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
   const { data: overrides = [], isLoading: loadingOverrides } = trpc.scanCoachAdmin.listOverrides.useQuery(
     { module: selectedModule },
     { staleTime: 0 }
@@ -741,6 +864,20 @@ export default function ScanCoachEditor() {
   });
 
   const [uploadingEchoImage, setUploadingEchoImage] = useState(false);
+  // Inline label editing state: maps fileKey → draft caption string
+  const [editingCaptions, setEditingCaptions] = useState<Record<string, string>>({});
+
+  const updateEchoImageCaptionMutation = trpc.scanCoachAdmin.updateEchoImageCaption.useMutation({
+    onSuccess: () => {
+      utils.scanCoachAdmin.listOverrides.invalidate();
+      toast.success("Label saved");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const reorderEchoImagesMutation = trpc.scanCoachAdmin.reorderEchoImages.useMutation({
+    onError: (e) => toast.error(e.message),
+  });
 
   const uploadEchoImageMutation = trpc.scanCoachAdmin.uploadEchoImage.useMutation({
     onSuccess: () => {
@@ -879,6 +1016,31 @@ export default function ScanCoachEditor() {
   const handleRemoveEchoImage = (fileKey: string) => {
     if (!currentOverride) return;
     removeEchoImageMutation.mutate({ id: currentOverride.id, fileKey });
+  };
+
+  const handleSaveCaption = (fileKey: string) => {
+    if (!currentOverride) return;
+    const caption = editingCaptions[fileKey] ?? null;
+    updateEchoImageCaptionMutation.mutate({
+      id: currentOverride.id,
+      fileKey,
+      caption: caption || null,
+    });
+  };
+
+  const handleEchoImageDragEnd = (event: DragEndEvent, imgs: EchoImage[]) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id || !currentOverride) return;
+    const oldIndex = imgs.findIndex((img) => img.fileKey === active.id);
+    const newIndex = imgs.findIndex((img) => img.fileKey === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reordered = arrayMove(imgs, oldIndex, newIndex);
+    reorderEchoImagesMutation.mutate({
+      id: currentOverride.id,
+      orderedFileKeys: reordered.map((img) => img.fileKey),
+    });
+    // Optimistically invalidate so the list refreshes
+    utils.scanCoachAdmin.listOverrides.invalidate();
   };
 
   const handleImageUploaded = (slot: ImageSlotKey, rawData: string) => {
@@ -1176,79 +1338,68 @@ export default function ScanCoachEditor() {
                         <span className="text-xs text-gray-400">Upload images to override the static defaults</span>
                       </div>
 
-                      {/* ── Clinical Ultrasound Images (multi-image gallery) ── */}
-                      <div className="mb-6">
-                        <div className="flex items-center justify-between mb-2">
-                          <div>
-                            <span className="text-xs font-semibold text-gray-600">Clinical Ultrasound Images</span>
-                            <p className="text-xs text-gray-400">Multiple views shown as a gallery — each upload adds a new image</p>
-                          </div>
-                          {(() => {
-                            const imgs: EchoImage[] = currentOverride?.echoImages
-                              ? (() => { try { return JSON.parse(currentOverride.echoImages); } catch { return []; } })()
-                              : currentOverride?.echoImageUrl
-                                ? [{ url: currentOverride.echoImageUrl, fileKey: "", caption: null, sortOrder: 0 }]
-                                : [];
-                            return imgs.length > 0 ? (
-                              <span className="text-xs text-[#189aa1] font-semibold">{imgs.length} image{imgs.length !== 1 ? "s" : ""}</span>
-                            ) : null;
-                          })()}
-                        </div>
-
-                        {/* Existing images list */}
-                        {(() => {
-                          const imgs: EchoImage[] = currentOverride?.echoImages
-                            ? (() => { try { return JSON.parse(currentOverride.echoImages); } catch { return []; } })()
-                            : currentOverride?.echoImageUrl
-                              ? [{ url: currentOverride.echoImageUrl, fileKey: currentOverride.echoImageUrl, caption: null, sortOrder: 0 }]
-                              : [];
-                          if (imgs.length === 0) return null;
-                          return (
-                            <div className="flex flex-wrap gap-3 mb-3">
-                              {imgs.map((img, idx) => (
-                                <div key={img.fileKey || idx} className="relative group rounded-lg overflow-hidden border border-gray-200 bg-gray-950" style={{ width: 120, height: 90 }}>
-                                  {/\.(mp4|webm|ogv|mov)$/i.test(img.url) ? (
-                                    <video src={img.url} className="w-full h-full object-cover" />
-                                  ) : (
-                                    <img src={img.url} alt={img.caption ?? `Image ${idx + 1}`} className="w-full h-full object-cover" />
-                                  )}
-                                  {img.caption && (
-                                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1.5 py-0.5">
-                                      <p className="text-[9px] text-white truncate">{img.caption}</p>
-                                    </div>
-                                  )}
-                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100">
-                                    <a href={img.url} target="_blank" rel="noopener noreferrer"
-                                      className="bg-white/90 rounded p-1 text-gray-700 hover:bg-white"
-                                    >
-                                      <ExternalLink className="w-3 h-3" />
-                                    </a>
-                                    {img.fileKey && currentOverride && (
-                                      <button
-                                        onClick={() => handleRemoveEchoImage(img.fileKey)}
-                                        className="bg-red-500/90 rounded p-1 text-white hover:bg-red-600"
-                                      >
-                                        <Trash2 className="w-3 h-3" />
-                                      </button>
-                                    )}
-                                  </div>
-                                  <span className="absolute top-1 left-1 bg-black/60 text-white text-[9px] px-1 rounded">{idx + 1}</span>
-                                </div>
-                              ))}
+                      {/* ── Clinical Ultrasound Images (multi-image gallery with reorder + labels) ── */}
+                      {(() => {
+                        const imgs: EchoImage[] = currentOverride?.echoImages
+                          ? (() => { try { return JSON.parse(currentOverride.echoImages); } catch { return []; } })()
+                          : currentOverride?.echoImageUrl
+                            ? [{ url: currentOverride.echoImageUrl, fileKey: currentOverride.echoImageUrl, caption: null, sortOrder: 0 }]
+                            : [];
+                        return (
+                          <div className="mb-6">
+                            <div className="flex items-center justify-between mb-3">
+                              <div>
+                                <span className="text-xs font-semibold text-gray-600">Clinical Ultrasound Images</span>
+                                <p className="text-xs text-gray-400">Drag to reorder · click label to edit · each upload appends a new image</p>
+                              </div>
+                              {imgs.length > 0 && (
+                                <span className="text-xs text-[#189aa1] font-semibold">{imgs.length} image{imgs.length !== 1 ? "s" : ""}</span>
+                              )}
                             </div>
-                          );
-                        })()}
 
-                        {/* Add image drop zone */}
-                        <ImageUploadZone
-                          slot={{ key: "echoImageUrl", label: "Add Clinical Image", hint: "Uploads are added to the gallery (not replaced)" }}
-                          currentUrl={null}
-                          isUploading={uploadingEchoImage}
-                          setIsUploading={(v) => setUploadingEchoImage(v)}
-                          onUploaded={handleAddEchoImage}
-                          onCleared={() => {}}
-                        />
-                      </div>
+                            {/* Sortable image list */}
+                            {imgs.length > 0 && (
+                              <DndContext
+                                sensors={dndSensors}
+                                collisionDetection={closestCenter}
+                                onDragEnd={(e) => handleEchoImageDragEnd(e, imgs)}
+                              >
+                                <SortableContext
+                                  items={imgs.map((img) => img.fileKey)}
+                                  strategy={verticalListSortingStrategy}
+                                >
+                                  <div className="space-y-2 mb-3">
+                                    {imgs.map((img, idx) => (
+                                      <SortableEchoImageRow
+                                        key={img.fileKey || idx}
+                                        img={img}
+                                        idx={idx}
+                                        captionDraft={editingCaptions[img.fileKey] ?? (img.caption ?? "")}
+                                        onCaptionChange={(val) =>
+                                          setEditingCaptions((prev) => ({ ...prev, [img.fileKey]: val }))
+                                        }
+                                        onSaveCaption={() => handleSaveCaption(img.fileKey)}
+                                        onRemove={() => handleRemoveEchoImage(img.fileKey)}
+                                        isSavingCaption={updateEchoImageCaptionMutation.isPending}
+                                      />
+                                    ))}
+                                  </div>
+                                </SortableContext>
+                              </DndContext>
+                            )}
+
+                            {/* Add image drop zone */}
+                            <ImageUploadZone
+                              slot={{ key: "echoImageUrl", label: "Add Clinical Image", hint: "Uploads are added to the gallery (not replaced)" }}
+                              currentUrl={null}
+                              isUploading={uploadingEchoImage}
+                              setIsUploading={(v) => setUploadingEchoImage(v)}
+                              onUploaded={handleAddEchoImage}
+                              onCleared={() => {}}
+                            />
+                          </div>
+                        );
+                      })()}
 
                       {/* ── Anatomy + Transducer slots (single-image, unchanged) ── */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
