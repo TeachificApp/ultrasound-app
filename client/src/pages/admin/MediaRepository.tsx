@@ -1243,7 +1243,7 @@ export default function MediaRepository() {
             <div>
               {/* Back to Platform Admin */}
               <a
-                href="/admin"
+                href="/platform-admin"
                 className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors mb-1"
               >
                 <ArrowLeft className="w-3 h-3" />

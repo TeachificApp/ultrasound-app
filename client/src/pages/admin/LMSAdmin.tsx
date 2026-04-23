@@ -25,7 +25,7 @@ import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import RichTextEditor from "@/components/RichTextEditor";
 import {
-  BookOpen, ChevronRight, Download, Edit2, HelpCircle, Plus, Trash2,
+  BookOpen, ChevronLeft, ChevronRight, Download, Edit2, HelpCircle, Plus, Trash2,
   Users, DollarSign, BarChart2, GripVertical, CheckCircle, AlertCircle,
   Link as LinkIcon, UserCheck, ArrowLeft,
 } from "lucide-react";
@@ -1380,6 +1380,11 @@ export default function LMSAdmin() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-5">
+      <div className="mb-1">
+        <Link href="/platform-admin" className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700 transition-colors">
+          <ChevronLeft className="w-3 h-3" /> Platform Admin
+        </Link>
+      </div>
       <div className="flex items-center gap-3">
         <BookOpen className="w-6 h-6 text-teal-600" />
         <h1 className="text-xl font-bold text-gray-900">Education Library — Admin</h1>

@@ -60,6 +60,7 @@ import {
   FlaskConical,
   Image,
   HardDrive,
+  GraduationCap,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import BulkCsvUploadPanel, { type BulkResult } from "@/components/BulkCsvUploadPanel";
@@ -1071,6 +1072,13 @@ export default function PlatformAdmin() {
                 label: "Media Repository",
                 description: "Upload and manage media files with version history, access control, and embed links",
                 color: "#0f766e",
+              },
+              {
+                href: "/admin/lms",
+                icon: GraduationCap,
+                label: "Education Library",
+                description: "Course creator, quiz builder, enrollments, group seats, instructors, and affiliate management",
+                color: "#0d9488",
               },
             ].map(({ href, icon: Icon, label, description, color }) => (
               <Link key={href} href={href}>
