@@ -20,6 +20,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { startChallengeCron } from "../jobs/challengeCron";
+import { startMediaPurgeCron } from "../jobs/mediaPurgeCron";
 import { startEmailCampaignScheduler } from "../routers/emailCampaignRouter";
 import { startThinkificMemberSync } from "../jobs/thinkificMemberSync";
 import { initSonoQuizHub } from "../sonoQuizHub";
@@ -49,8 +50,9 @@ async function startServer() {
   app.set("trust proxy", 1);
   const server = createServer(app);
   // Configure body parser with larger size limit for file uploads
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  // No body-parser limit for chunked media uploads — multer handles streaming directly
+  app.use(express.json({ limit: "100mb" }));
+  app.use(express.urlencoded({ limit: "100mb", extended: true }));
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // Chat API with streaming and tool calling
@@ -110,6 +112,8 @@ async function startServer() {
     startEmailCampaignScheduler();
     // Start the Thinkific member sync job (imports new members every 6 hours, no emails sent)
     startThinkificMemberSync();
+    // Start the Media Repository purge cron (hard-deletes assets soft-deleted > 30 days ago)
+    startMediaPurgeCron();
   });
 }
 

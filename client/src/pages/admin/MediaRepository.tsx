@@ -196,6 +196,8 @@ function UploadDialog({ open, onClose, onSuccess, existingAssetId, existingTitle
     if (f) handleFile(f);
   }, [title, isReupload]);
 
+  const CHUNK_SIZE = 10 * 1024 * 1024; // 10 MB per chunk
+
   const handleUpload = async () => {
     if (!file) { toast.error("Please select a file"); return; }
     if (!isReupload && !title.trim()) { toast.error("Title is required"); return; }
@@ -203,34 +205,69 @@ function UploadDialog({ open, onClose, onSuccess, existingAssetId, existingTitle
     setProgress(0);
 
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      if (!isReupload) {
-        formData.append("title", title.trim());
-        formData.append("description", description);
-        formData.append("tags", tags);
-        formData.append("access", access);
-        if (folderSlug && folderSlug !== "none") formData.append("folder", folderSlug);
-      }
-      formData.append("notes", notes);
-      if (existingAssetId) formData.append("assetId", String(existingAssetId));
-
-      const xhr = new XMLHttpRequest();
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100));
-      };
-
-      await new Promise<void>((resolve, reject) => {
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) resolve();
-          else reject(new Error(JSON.parse(xhr.responseText)?.error ?? "Upload failed"));
-        };
-        xhr.onerror = () => reject(new Error("Network error"));
-        xhr.open("POST", "/api/upload-media-repo");
-        xhr.withCredentials = true;
-        xhr.send(formData);
+      // Step 1: initialise the upload session
+      const initRes = await fetch("/api/upload-media-repo/init", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assetId: existingAssetId ?? undefined }),
       });
+      if (!initRes.ok) {
+        const e = await initRes.json().catch(() => ({}));
+        throw new Error(e.error ?? "Failed to initialise upload");
+      }
+      const { uploadId } = await initRes.json();
 
+      // Step 2: send chunks sequentially
+      const totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
+
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, file.size);
+        const chunk = file.slice(start, end);
+
+        const fd = new FormData();
+        fd.append("chunk", chunk, file.name);
+        fd.append("uploadId", uploadId);
+        fd.append("chunkIndex", String(i));
+        fd.append("totalChunks", String(totalChunks));
+        fd.append("fileName", file.name);
+        fd.append("mimeType", file.type || "application/octet-stream");
+        fd.append("fileSize", String(file.size));
+        fd.append("notes", notes);
+        if (existingAssetId) fd.append("assetId", String(existingAssetId));
+        if (!isReupload) {
+          fd.append("title", title.trim());
+          fd.append("description", description);
+          fd.append("tags", tags);
+          fd.append("access", access);
+          if (folderSlug && folderSlug !== "none") fd.append("folder", folderSlug);
+        }
+
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+              const chunkProgress = e.loaded / e.total;
+              const overall = Math.round(((i + chunkProgress) / totalChunks) * 100);
+              setProgress(overall);
+            }
+          };
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) resolve();
+            else {
+              try { reject(new Error(JSON.parse(xhr.responseText)?.error ?? "Chunk upload failed")); }
+              catch { reject(new Error("Chunk upload failed")); }
+            }
+          };
+          xhr.onerror = () => reject(new Error("Network error on chunk " + i));
+          xhr.open("POST", "/api/upload-media-repo/chunk");
+          xhr.withCredentials = true;
+          xhr.send(fd);
+        });
+      }
+
+      setProgress(100);
       toast.success(isReupload ? "New version uploaded" : "File uploaded successfully");
       onSuccess();
       onClose();
@@ -260,7 +297,7 @@ function UploadDialog({ open, onClose, onSuccess, existingAssetId, existingTitle
           {file ? (
             <p className="text-sm font-medium">{file.name} <span className="text-muted-foreground">({formatBytes(file.size)})</span></p>
           ) : (
-            <p className="text-sm text-muted-foreground">Drag & drop any file, or click to browse<br /><span className="text-xs">Images, video, audio, PDF, HTML, SCORM, ZIP, LMS — up to 500 MB</span></p>
+            <p className="text-sm text-muted-foreground">Drag & drop any file, or click to browse<br /><span className="text-xs">Images, video, audio, PDF, HTML, SCORM, ZIP, LMS — no size limit</span></p>
           )}
           <input ref={fileRef} type="file" className="hidden" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
         </div>
@@ -614,9 +651,10 @@ function AssetDetailDialog({ assetId, onClose, onRefresh }: AssetDetailDialogPro
               <Button
                 size="sm"
                 variant="destructive"
-                onClick={() => { if (confirm("Delete this asset? This cannot be undone.")) deleteMutation.mutate({ id: asset.id }); }}
+                onClick={() => { if (confirm("Move this asset to Trash? It will be permanently deleted after 30 days. You can recover it from the Trash view.")) deleteMutation.mutate({ id: asset.id }); }}
+                disabled={deleteMutation.isPending}
               >
-                <Trash2 className="w-3 h-3" />
+                <Trash2 className="w-3 h-3 mr-1" />{deleteMutation.isPending ? "Deleting…" : "Delete"}
               </Button>
             </div>
           </div>
@@ -920,6 +958,17 @@ export default function MediaRepository() {
   const folders = foldersData ?? [];
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showTrash, setShowTrash] = useState(false);
+
+  const { data: trashedData, refetch: refetchTrashed } = trpc.mediaRepo.listTrashed.useQuery(
+    undefined,
+    { enabled: showTrash }
+  );
+
+  const restoreAssetMutation = trpc.mediaRepo.restoreAsset.useMutation({
+    onSuccess: () => { toast.success("Asset recovered from trash"); refetchTrashed(); handleRefresh(); },
+    onError: (e) => toast.error(e.message),
+  });
 
   return (
     <div className="flex h-full min-h-screen relative">
@@ -1094,9 +1143,18 @@ export default function MediaRepository() {
               </p>
             </div>
           </div>
-          <Button onClick={() => setUploadOpen(true)} size="sm">
-            <Upload className="w-4 h-4 mr-1 sm:mr-2" /><span className="hidden sm:inline">Upload File</span><span className="sm:hidden">Upload</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={showTrash ? "destructive" : "outline"}
+              size="sm"
+              onClick={() => setShowTrash(v => !v)}
+            >
+              <Trash2 className="w-4 h-4 mr-1" /><span className="hidden sm:inline">{showTrash ? "Hide Trash" : "Trash"}</span>
+            </Button>
+            <Button onClick={() => setUploadOpen(true)} size="sm">
+              <Upload className="w-4 h-4 mr-1 sm:mr-2" /><span className="hidden sm:inline">Upload File</span><span className="sm:hidden">Upload</span>
+            </Button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -1180,6 +1238,56 @@ export default function MediaRepository() {
           )}
         </div>
       </div>
+
+      {/* Trash panel */}
+      {showTrash && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+          <div className="bg-background border border-border rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+              <div>
+                <h2 className="font-bold text-lg flex items-center gap-2"><Trash2 className="w-5 h-5 text-destructive" />Trash</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">Deleted files are permanently removed after 30 days.</p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setShowTrash(false)}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </Button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {!trashedData || trashedData.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Trash2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <p className="font-semibold">Trash is empty</p>
+                  <p className="text-sm mt-1">Deleted files will appear here for 30 days before permanent removal.</p>
+                </div>
+              ) : (
+                trashedData.map((asset: any) => {
+                  const deletedAt = new Date(asset.deletedAt);
+                  const daysLeft = Math.max(0, 30 - Math.floor((Date.now() - deletedAt.getTime()) / (1000 * 60 * 60 * 24)));
+                  return (
+                    <div key={asset.id} className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/50">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{asset.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Deleted {deletedAt.toLocaleDateString()} ·
+                          <span className={daysLeft <= 3 ? " text-destructive font-semibold" : ""}> {daysLeft} day{daysLeft !== 1 ? 's' : ''} until permanent deletion</span>
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => restoreAssetMutation.mutate({ id: asset.id })}
+                        disabled={restoreAssetMutation.isPending}
+                      >
+                        <RotateCcw className="w-3 h-3 mr-1" />Recover
+                      </Button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Upload dialog */}
       {uploadOpen && (

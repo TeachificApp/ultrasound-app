@@ -24,7 +24,7 @@ import { and, desc, eq, gte, isNull, like, or, sql } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { storagePut } from "../storage";
+import { storagePut, storageDelete } from "../storage";
 import { sendEmail } from "../_core/email";
 import {
   mediaAssets,
@@ -284,7 +284,7 @@ export const mediaRepoRouter = router({
     }),
 
   /**
-   * Soft-delete an asset.
+   * Soft-delete an asset (moves to trash). Permanently purged after 30 days.
    */
   deleteAsset: protectedProcedure
     .input(z.object({ id: z.number().int().positive() }))
@@ -292,12 +292,133 @@ export const mediaRepoRouter = router({
       await assertPlatformAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-
       await db
         .update(mediaAssets)
         .set({ deletedAt: new Date() })
-        .where(eq(mediaAssets.id, input.id));
+        .where(and(eq(mediaAssets.id, input.id), isNull(mediaAssets.deletedAt)));
       return { deleted: true };
+    }),
+
+  /**
+   * Restore a soft-deleted asset from trash.
+   */
+  restoreAsset: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      await db
+        .update(mediaAssets)
+        .set({ deletedAt: null })
+        .where(eq(mediaAssets.id, input.id));
+      return { restored: true };
+    }),
+
+  /**
+   * List all soft-deleted assets (trash view).
+   */
+  listTrashed: protectedProcedure
+    .query(async ({ ctx }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const rows = await db
+        .select()
+        .from(mediaAssets)
+        .where(sql`${mediaAssets.deletedAt} IS NOT NULL`)
+        .orderBy(desc(mediaAssets.deletedAt));
+      return rows;
+    }),
+
+  /**
+   * Permanently purge assets deleted more than 30 days ago.
+   * Deletes S3 files and all related DB rows.
+   */
+  purgeExpiredAssets: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const expired = await db
+        .select({ id: mediaAssets.id })
+        .from(mediaAssets)
+        .where(and(
+          sql`${mediaAssets.deletedAt} IS NOT NULL`,
+          sql`${mediaAssets.deletedAt} < ${cutoff.toISOString()}`
+        ));
+
+      let purged = 0;
+      for (const { id } of expired) {
+        const versions = await db
+          .select({ s3Key: mediaVersions.s3Key })
+          .from(mediaVersions)
+          .where(eq(mediaVersions.assetId, id));
+        await Promise.allSettled(versions.map((v) => storageDelete(v.s3Key)));
+        await db.delete(mediaAccessGrants).where(eq(mediaAccessGrants.assetId, id));
+        await db.delete(mediaViewEvents).where(eq(mediaViewEvents.assetId, id));
+        await db.delete(mediaVersions).where(eq(mediaVersions.assetId, id));
+        await db.delete(mediaAssets).where(eq(mediaAssets.id, id));
+        purged++;
+      }
+      return { purged };
+    }),
+
+  /**
+   * Revert to a specific version: makes that version the "current" one by
+   * inserting a new version row that is a copy of the target, preserving history.
+   */
+  revertToVersion: protectedProcedure
+    .input(z.object({
+      assetId: z.number().int().positive(),
+      versionId: z.number().int().positive(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      // Fetch the target version
+      const [target] = await db
+        .select()
+        .from(mediaVersions)
+        .where(and(
+          eq(mediaVersions.id, input.versionId),
+          eq(mediaVersions.assetId, input.assetId)
+        ))
+        .limit(1);
+      if (!target) throw new TRPCError({ code: "NOT_FOUND", message: "Version not found" });
+
+      // Get the current max version number
+      const [maxRow] = await db
+        .select({ max: sql<number>`MAX(${mediaVersions.versionNumber})` })
+        .from(mediaVersions)
+        .where(eq(mediaVersions.assetId, input.assetId));
+      const nextVersion = (maxRow?.max ?? 0) + 1;
+
+      // Insert a new version row copying the target's S3 key/url/size/mime
+      await db.insert(mediaVersions).values({
+        assetId: input.assetId,
+        versionNumber: nextVersion,
+        s3Key: target.s3Key,
+        s3Url: target.s3Url,
+        fileName: target.fileName,
+        fileSize: target.fileSize,
+        mimeType: target.mimeType,
+        notes: `Reverted to v${target.versionNumber}`,
+        uploadedByUserId: ctx.user.id,
+        createdAt: new Date(),
+      });
+
+      // Update asset's updatedAt so the grid reflects the change
+      await db
+        .update(mediaAssets)
+        .set({ updatedAt: new Date() })
+        .where(eq(mediaAssets.id, input.assetId));
+
+      return { reverted: true, newVersionNumber: nextVersion };
     }),
 
   /**
