@@ -129,18 +129,21 @@ function AssetThumbnail({ asset }: { asset: any }) {
       />
     );
   }
-  const icons: Record<string, React.ReactNode> = {
-    image: <FileImage className="w-6 h-6" />,
-    video: <FileVideo className="w-6 h-6" />,
-    audio: <FileAudio className="w-6 h-6" />,
-    document: <FileText className="w-6 h-6" />,
-    html: <Code className="w-6 h-6" />,
-    scorm: <Monitor className="w-6 h-6" />,
-    lms: <Monitor className="w-6 h-6" />,
+  const iconMap: Record<string, { icon: React.ReactNode; bg: string; color: string }> = {
+    image:    { icon: <FileImage className="w-10 h-10" />,  bg: "bg-blue-50 dark:bg-blue-950/30",   color: "text-blue-500" },
+    video:    { icon: <FileVideo className="w-10 h-10" />,  bg: "bg-purple-50 dark:bg-purple-950/30", color: "text-purple-500" },
+    audio:    { icon: <FileAudio className="w-10 h-10" />,  bg: "bg-pink-50 dark:bg-pink-950/30",   color: "text-pink-500" },
+    document: { icon: <FileText className="w-10 h-10" />,   bg: "bg-orange-50 dark:bg-orange-950/30", color: "text-orange-500" },
+    html:     { icon: <Code className="w-10 h-10" />,       bg: "bg-green-50 dark:bg-green-950/30",  color: "text-green-500" },
+    scorm:    { icon: <Monitor className="w-10 h-10" />,    bg: "bg-teal-50 dark:bg-teal-950/30",   color: "text-teal-500" },
+    lms:      { icon: <Monitor className="w-10 h-10" />,    bg: "bg-teal-50 dark:bg-teal-950/30",   color: "text-teal-500" },
+    zip:      { icon: <File className="w-10 h-10" />,       bg: "bg-yellow-50 dark:bg-yellow-950/30", color: "text-yellow-600" },
+    other:    { icon: <File className="w-10 h-10" />,       bg: "bg-muted",                          color: "text-muted-foreground" },
   };
+  const entry = iconMap[asset.mediaType] ?? iconMap.other;
   return (
-    <div className="w-full h-full flex items-center justify-center bg-muted/50 text-muted-foreground">
-      {icons[asset.mediaType] ?? <File className="w-6 h-6" />}
+    <div className={`w-full h-full flex items-center justify-center ${entry.bg} ${entry.color}`}>
+      {entry.icon}
     </div>
   );
 }
@@ -341,28 +344,43 @@ function AssetCard({ asset, onClick }: AssetCardProps) {
 
   return (
     <div
-      className="border border-border rounded-lg overflow-hidden hover:border-primary/50 hover:shadow-sm cursor-pointer transition-all group bg-card"
+      className="border border-border rounded-xl overflow-hidden hover:border-primary/60 hover:shadow-md cursor-pointer transition-all group bg-card"
       onClick={onClick}
     >
-      {/* Thumbnail */}
-      <div className="aspect-video bg-muted overflow-hidden relative">
+      {/* Thumbnail — taller for better preview */}
+      <div className="h-40 bg-muted overflow-hidden relative">
         <AssetThumbnail asset={asset} />
-        <div className="absolute top-1.5 right-1.5">
-          <Badge variant={isPublic ? "default" : "secondary"} className="text-xs py-0 px-1.5">
-            {isPublic ? <Globe className="w-2.5 h-2.5" /> : <Lock className="w-2.5 h-2.5" />}
+        {/* Access badge */}
+        <div className="absolute top-2 right-2">
+          <Badge
+            variant={isPublic ? "default" : "secondary"}
+            className="text-xs gap-1 shadow-sm"
+          >
+            {isPublic ? <><Globe className="w-3 h-3" />Public</> : <><Lock className="w-3 h-3" />Private</>}
+          </Badge>
+        </div>
+        {/* Type badge bottom-left */}
+        <div className="absolute bottom-2 left-2">
+          <Badge variant="outline" className="text-xs bg-background/80 backdrop-blur-sm gap-1">
+            {MEDIA_TYPE_ICONS[mediaType]}
+            {MEDIA_TYPE_LABELS[mediaType]}
           </Badge>
         </div>
       </div>
       {/* Info */}
-      <div className="p-2.5">
-        <p className="font-medium text-xs truncate mb-1">{asset.title}</p>
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <span>{MEDIA_TYPE_ICONS[mediaType]}</span>
-          <span>{MEDIA_TYPE_LABELS[mediaType]}</span>
-          {asset.folder && (
-            <span className="ml-auto truncate max-w-[80px] flex items-center gap-0.5">
-              <Folder className="w-2.5 h-2.5 shrink-0" />{asset.folder.split("/").pop()}
+      <div className="p-3">
+        <p className="font-semibold text-sm leading-snug line-clamp-2 mb-1.5 group-hover:text-primary transition-colors">{asset.title}</p>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          {asset.folder ? (
+            <span className="flex items-center gap-1 truncate">
+              <Folder className="w-3 h-3 shrink-0" />
+              <span className="truncate">{asset.folder.split("/").pop()}</span>
             </span>
+          ) : (
+            <span className="text-muted-foreground/50">No folder</span>
+          )}
+          {asset.currentVersion?.fileSize && (
+            <span className="ml-auto shrink-0">{formatBytes(asset.currentVersion.fileSize)}</span>
           )}
         </div>
       </div>
@@ -568,45 +586,57 @@ function AssetDetailDialog({ assetId, onClose, onRefresh }: AssetDetailDialogPro
   return (
     <>
       <Dialog open={!!assetId} onOpenChange={(v) => !v && onClose()}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <div className="flex items-start justify-between gap-2">
-              <DialogTitle className="text-lg">{asset.title}</DialogTitle>
-              <div className="flex gap-2 shrink-0">
-                <Button
-                  size="sm"
-                  variant={isPublic ? "outline" : "default"}
-                  onClick={() => setAccessMutation.mutate({ id: asset.id, access: isPublic ? "private" : "public" })}
-                >
-                  {isPublic ? <><Lock className="w-3 h-3 mr-1" />Make Private</> : <><Globe className="w-3 h-3 mr-1" />Make Public</>}
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => setReuploadOpen(true)}>
-                  <RefreshCw className="w-3 h-3 mr-1" />Re-upload
-                </Button>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={() => { if (confirm("Delete this asset? This cannot be undone.")) deleteMutation.mutate({ id: asset.id }); }}
-                >
-                  <Trash2 className="w-3 h-3" />
-                </Button>
+        <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto p-0">
+          {/* ── Header bar ── */}
+          <div className="flex items-center justify-between gap-3 px-6 pt-5 pb-4 border-b border-border">
+            <div className="min-w-0">
+              <DialogTitle className="text-xl font-bold truncate">{asset.title}</DialogTitle>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <Badge variant={isPublic ? "default" : "secondary"} className="gap-1">
+                  {isPublic ? <><Globe className="w-3 h-3" />Public</> : <><Lock className="w-3 h-3" />Private</>}
+                </Badge>
+                <Badge variant="outline">{MEDIA_TYPE_LABELS[asset.mediaType as MediaType]}</Badge>
+                {asset.mimeType && <Badge variant="outline" className="font-mono text-xs">{asset.mimeType}</Badge>}
+                {currentVersion && <span className="text-xs text-muted-foreground">v{currentVersion.versionNumber} · {formatBytes(currentVersion.fileSize)}</span>}
               </div>
             </div>
-            <div className="flex gap-2 flex-wrap mt-1 items-center">
-              <Badge variant={isPublic ? "default" : "secondary"}>
-                {isPublic ? <><Globe className="w-3 h-3 mr-1" />Public</> : <><Lock className="w-3 h-3 mr-1" />Private</>}
-              </Badge>
-              <Badge variant="outline">{MEDIA_TYPE_LABELS[asset.mediaType as MediaType]}</Badge>
-              {asset.mimeType && <Badge variant="outline" className="font-mono text-xs">{asset.mimeType}</Badge>}
-              {currentVersion && <span className="text-xs text-muted-foreground self-center">v{currentVersion.versionNumber} · {formatBytes(currentVersion.fileSize)}</span>}
-              {/* Folder assignment */}
-              <div className="flex items-center gap-1.5 ml-auto">
+            <div className="flex gap-2 shrink-0">
+              <Button
+                size="sm"
+                variant={isPublic ? "outline" : "default"}
+                onClick={() => setAccessMutation.mutate({ id: asset.id, access: isPublic ? "private" : "public" })}
+              >
+                {isPublic ? <><Lock className="w-3 h-3 mr-1" />Make Private</> : <><Globe className="w-3 h-3 mr-1" />Make Public</>}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setReuploadOpen(true)}>
+                <Upload className="w-3 h-3 mr-1" />New Version
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => { if (confirm("Delete this asset? This cannot be undone.")) deleteMutation.mutate({ id: asset.id }); }}
+              >
+                <Trash2 className="w-3 h-3" />
+              </Button>
+            </div>
+          </div>
+
+          {/* ── Preview + meta row ── */}
+          <div className="flex gap-4 px-6 py-4 border-b border-border">
+            {/* Preview thumbnail */}
+            <div className="w-32 h-24 rounded-lg overflow-hidden shrink-0 border border-border">
+              <AssetThumbnail asset={asset} />
+            </div>
+            {/* Meta */}
+            <div className="flex-1 min-w-0 space-y-2">
+              <div className="flex items-center gap-2">
                 <Folder className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                <span className="text-xs text-muted-foreground">Folder:</span>
                 <Select
                   value={asset.folder ?? "none"}
                   onValueChange={(v) => moveToFolderMutation.mutate({ assetId: asset.id, folderSlug: v === "none" ? null : v })}
                 >
-                  <SelectTrigger className="h-7 text-xs w-40">
+                  <SelectTrigger className="h-7 text-xs w-44">
                     <SelectValue placeholder="No folder" />
                   </SelectTrigger>
                   <SelectContent>
@@ -617,9 +647,20 @@ function AssetDetailDialog({ assetId, onClose, onRefresh }: AssetDetailDialogPro
                   </SelectContent>
                 </Select>
               </div>
+              {asset.description && (
+                <p className="text-sm text-muted-foreground line-clamp-2">{asset.description}</p>
+              )}
+              {asset.tags && (
+                <div className="flex gap-1 flex-wrap">
+                  {asset.tags.split(",").map((t: string) => t.trim()).filter(Boolean).map((t: string) => (
+                    <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>
+                  ))}
+                </div>
+              )}
             </div>
-          </DialogHeader>
+          </div>
 
+          <div className="px-6 pb-6">
           <Tabs defaultValue="embed">
             <TabsList className="w-full">
               <TabsTrigger value="embed" className="flex-1"><Link className="w-3 h-3 mr-1" />Links & Embed</TabsTrigger>
@@ -811,6 +852,7 @@ function AssetDetailDialog({ assetId, onClose, onRefresh }: AssetDetailDialogPro
               <AnalyticsPanel assetId={asset.id} />
             </TabsContent>
           </Tabs>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -1096,19 +1138,24 @@ export default function MediaRepository() {
           )}
 
           {isLoading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-              {Array.from({ length: 12 }).map((_, i) => (
-                <div key={i} className="aspect-video rounded-lg bg-muted animate-pulse" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="rounded-xl bg-muted animate-pulse h-48" />
               ))}
             </div>
           ) : data?.assets.length === 0 ? (
-            <div className="text-center py-16 text-muted-foreground">
-              <File className="w-12 h-12 mx-auto mb-3 opacity-30" />
-              <p className="font-medium">No files found</p>
+            <div className="text-center py-20 text-muted-foreground">
+              <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+                <File className="w-8 h-8 opacity-40" />
+              </div>
+              <p className="font-semibold text-base">No files found</p>
               <p className="text-sm mt-1">Upload your first file to get started.</p>
+              <Button className="mt-4" onClick={() => setUploadOpen(true)}>
+                <Upload className="w-4 h-4 mr-2" />Upload File
+              </Button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {data?.assets.map((asset) => (
                 <AssetCard
                   key={asset.id}
