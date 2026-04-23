@@ -70,6 +70,7 @@ import {
   Monitor,
   LayoutGrid,
   LayoutList,
+  ArrowLeft,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -1190,6 +1191,14 @@ export default function MediaRepository() {
               <FolderOpen className="w-4 h-4" />
             </Button>
             <div>
+              {/* Back to Platform Admin */}
+              <a
+                href="/admin"
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors mb-1"
+              >
+                <ArrowLeft className="w-3 h-3" />
+                Platform Admin
+              </a>
               <h1 className="text-lg sm:text-xl font-bold">Media Repository</h1>
               <p className="text-muted-foreground text-xs mt-0.5">
                 {selectedFolder ? `Folder: ${selectedFolder}` : "All files"}
