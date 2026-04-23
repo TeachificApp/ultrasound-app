@@ -228,7 +228,53 @@ router.get("/media/:slug", async (req: Request, res: Response) => {
   );
 });
 
-// ─── GET /media/:slug/info — JSON metadata ────────────────────────────────────
+// ─── GET /media/:slug/download — force file download (Content-Disposition: attachment) ───
+
+router.get("/media/:slug/download", async (req: Request, res: Response) => {
+  setCorsHeaders(res);
+  const token = (req.query.token as string) || undefined;
+  const result = await resolveMedia(req.params.slug, token);
+
+  if (!result) {
+    res.status(404).send(errorPage("Media not found."));
+    return;
+  }
+  if (!result.allowed) {
+    res.status(403).send(errorPage("Access denied. A valid token is required."));
+    return;
+  }
+  if (!result.version) {
+    res.status(404).send(errorPage("No file version available."));
+    return;
+  }
+
+  const { asset, version } = result;
+  const mimeType = version.mimeType ?? asset.mimeType ?? "application/octet-stream";
+  const fileName = version.fileName ?? asset.title;
+  const safeFileName = encodeURIComponent(fileName);
+
+  // Record view event (fire-and-forget)
+  recordView(asset.id, "direct", req);
+
+  // Proxy through our server with Content-Disposition: attachment to force download
+  res.setHeader("Content-Disposition", `attachment; filename="${safeFileName}"`);
+  res.setHeader("Content-Type", mimeType);
+  res.setHeader("Cache-Control", "public, max-age=3600");
+
+  const protocol = version.s3Url.startsWith("https") ? https : http;
+  protocol
+    .get(version.s3Url, (upstream) => {
+      const cl = upstream.headers["content-length"];
+      if (cl) res.setHeader("Content-Length", cl);
+      res.status(upstream.statusCode ?? 200);
+      upstream.pipe(res);
+    })
+    .on("error", () => {
+      if (!res.headersSent) res.status(502).send("Failed to fetch media file.");
+    });
+});
+
+// ─── GET /media/:slug/info — JSON metadata ────────────────────────────────────────────
 
 router.get("/media/:slug/info", async (req: Request, res: Response) => {
   setCorsHeaders(res);

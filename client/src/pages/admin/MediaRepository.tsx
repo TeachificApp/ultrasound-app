@@ -359,7 +359,8 @@ function AssetCard({ asset, onClick }: AssetCardProps) {
 function EmbedPanel({ asset, token }: { asset: any; token?: string }) {
   const origin = getOrigin();
   const tokenParam = token ? `?token=${encodeURIComponent(token)}` : "";
-  const directUrl = `${origin}/media/${asset.slug}${tokenParam}`;
+  const displayUrl = `${origin}/media/${asset.slug}${tokenParam}`;
+  const downloadUrl = `${origin}/media/${asset.slug}/download${tokenParam}`;
   const embedUrl = `${origin}/media/${asset.slug}/embed${tokenParam}`;
   const iframeCode = `<iframe src="${embedUrl}" width="100%" height="480" frameborder="0" allowfullscreen loading="lazy" title="${asset.title.replace(/"/g, "&quot;")}"></iframe>`;
 
@@ -370,21 +371,37 @@ function EmbedPanel({ asset, token }: { asset: any; token?: string }) {
   return (
     <div className="space-y-4">
       <div>
-        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Direct Link</Label>
-        <div className="flex gap-2 mt-1">
-          <Input value={directUrl} readOnly className="text-xs font-mono" />
-          <Button size="icon" variant="outline" onClick={() => copy(directUrl, "Direct link")}>
+        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Display Link</Label>
+        <p className="text-xs text-muted-foreground mb-1">Opens and renders the file inline in the browser.</p>
+        <div className="flex gap-2">
+          <Input value={displayUrl} readOnly className="text-xs font-mono" />
+          <Button size="icon" variant="outline" onClick={() => copy(displayUrl, "Display link")}>
             <Copy className="w-4 h-4" />
           </Button>
           <Button size="icon" variant="outline" asChild>
-            <a href={directUrl} target="_blank" rel="noopener noreferrer"><ExternalLink className="w-4 h-4" /></a>
+            <a href={displayUrl} target="_blank" rel="noopener noreferrer"><ExternalLink className="w-4 h-4" /></a>
+          </Button>
+        </div>
+      </div>
+
+      <div>
+        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Download Link</Label>
+        <p className="text-xs text-muted-foreground mb-1">Forces the file to download to the user's device.</p>
+        <div className="flex gap-2">
+          <Input value={downloadUrl} readOnly className="text-xs font-mono" />
+          <Button size="icon" variant="outline" onClick={() => copy(downloadUrl, "Download link")}>
+            <Copy className="w-4 h-4" />
+          </Button>
+          <Button size="icon" variant="outline" asChild>
+            <a href={downloadUrl} target="_blank" rel="noopener noreferrer"><ExternalLink className="w-4 h-4" /></a>
           </Button>
         </div>
       </div>
 
       <div>
         <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Embed URL</Label>
-        <div className="flex gap-2 mt-1">
+        <p className="text-xs text-muted-foreground mb-1">Use in an iframe — renders inline, no cookies required.</p>
+        <div className="flex gap-2">
           <Input value={embedUrl} readOnly className="text-xs font-mono" />
           <Button size="icon" variant="outline" onClick={() => copy(embedUrl, "Embed URL")}>
             <Copy className="w-4 h-4" />
