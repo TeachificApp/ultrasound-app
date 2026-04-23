@@ -173,9 +173,12 @@ function UploadDialog({ open, onClose, onSuccess, existingAssetId, existingTitle
   const [description, setDescription] = useState("");
   const [tags, setTags] = useState("");
   const [access, setAccess] = useState<"public" | "private">("private");
+  const [folderSlug, setFolderSlug] = useState<string>("none");
   const [notes, setNotes] = useState("");
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+
+  const { data: foldersData } = trpc.mediaRepo.listFoldersFull.useQuery();
 
   const isReupload = !!existingAssetId;
 
@@ -204,6 +207,7 @@ function UploadDialog({ open, onClose, onSuccess, existingAssetId, existingTitle
         formData.append("description", description);
         formData.append("tags", tags);
         formData.append("access", access);
+        if (folderSlug && folderSlug !== "none") formData.append("folder", folderSlug);
       }
       formData.append("notes", notes);
       if (existingAssetId) formData.append("assetId", String(existingAssetId));
@@ -283,6 +287,18 @@ function UploadDialog({ open, onClose, onSuccess, existingAssetId, existingTitle
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div>
+              <Label>Folder</Label>
+              <Select value={folderSlug} onValueChange={setFolderSlug}>
+                <SelectTrigger><SelectValue placeholder="No folder" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No folder (uncategorized)</SelectItem>
+                  {(foldersData ?? []).map((f: any) => (
+                    <SelectItem key={f.id} value={f.slug}>{f.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         )}
@@ -512,6 +528,11 @@ function AssetDetailDialog({ assetId, onClose, onRefresh }: AssetDetailDialogPro
     { id: assetId! },
     { enabled: !!assetId }
   );
+  const { data: foldersData } = trpc.mediaRepo.listFoldersFull.useQuery();
+  const moveToFolderMutation = trpc.mediaRepo.moveAssetToFolder.useMutation({
+    onSuccess: () => { toast.success("Folder updated"); refetch(); onRefresh(); },
+    onError: (e) => toast.error(e.message),
+  });
 
   const setAccessMutation = trpc.mediaRepo.setAccess.useMutation({
     onSuccess: () => { toast.success("Access updated"); refetch(); onRefresh(); },
@@ -571,13 +592,31 @@ function AssetDetailDialog({ assetId, onClose, onRefresh }: AssetDetailDialogPro
                 </Button>
               </div>
             </div>
-            <div className="flex gap-2 flex-wrap mt-1">
+            <div className="flex gap-2 flex-wrap mt-1 items-center">
               <Badge variant={isPublic ? "default" : "secondary"}>
                 {isPublic ? <><Globe className="w-3 h-3 mr-1" />Public</> : <><Lock className="w-3 h-3 mr-1" />Private</>}
               </Badge>
               <Badge variant="outline">{MEDIA_TYPE_LABELS[asset.mediaType as MediaType]}</Badge>
               {asset.mimeType && <Badge variant="outline" className="font-mono text-xs">{asset.mimeType}</Badge>}
               {currentVersion && <span className="text-xs text-muted-foreground self-center">v{currentVersion.versionNumber} · {formatBytes(currentVersion.fileSize)}</span>}
+              {/* Folder assignment */}
+              <div className="flex items-center gap-1.5 ml-auto">
+                <Folder className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                <Select
+                  value={asset.folder ?? "none"}
+                  onValueChange={(v) => moveToFolderMutation.mutate({ assetId: asset.id, folderSlug: v === "none" ? null : v })}
+                >
+                  <SelectTrigger className="h-7 text-xs w-40">
+                    <SelectValue placeholder="No folder" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No folder</SelectItem>
+                    {(foldersData ?? []).map((f: any) => (
+                      <SelectItem key={f.id} value={f.slug}>{f.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </DialogHeader>
 
@@ -800,6 +839,25 @@ export default function MediaRepository() {
   } as any;
 
   const { data, isLoading, refetch } = trpc.mediaRepo.listAssets.useQuery(queryInput);
+  const { data: foldersData, refetch: refetchFolders } = trpc.mediaRepo.listFoldersFull.useQuery();
+
+  const [newFolderName, setNewFolderName] = useState("");
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [editingFolder, setEditingFolder] = useState<{ id: number; name: string } | null>(null);
+  const [editFolderName, setEditFolderName] = useState("");
+
+  const createFolderMutation = trpc.mediaRepo.createFolder.useMutation({
+    onSuccess: () => { refetchFolders(); setNewFolderName(""); setCreatingFolder(false); toast.success("Folder created"); },
+    onError: (e) => toast.error(e.message),
+  });
+  const renameFolderMutation = trpc.mediaRepo.renameFolder.useMutation({
+    onSuccess: () => { refetchFolders(); refetch(); setEditingFolder(null); toast.success("Folder renamed"); },
+    onError: (e) => toast.error(e.message),
+  });
+  const deleteFolderMutation = trpc.mediaRepo.deleteFolder.useMutation({
+    onSuccess: () => { refetchFolders(); refetch(); if (selectedFolder) setSelectedFolder(null); toast.success("Folder deleted — assets moved to uncategorized"); },
+    onError: (e) => toast.error(e.message),
+  });
 
   const handleRefresh = () => {
     refetch();
@@ -807,41 +865,130 @@ export default function MediaRepository() {
   };
 
   const totalPages = data ? Math.ceil(data.total / 24) : 1;
-  const folders: string[] = (data as any)?.folders ?? [];
+  const folders = foldersData ?? [];
 
   return (
     <div className="flex h-full min-h-screen">
       {/* Folder Sidebar */}
-      <aside className="w-52 shrink-0 border-r border-border bg-card/50 flex flex-col">
-        <div className="p-3 border-b border-border">
+      <aside className="w-56 shrink-0 border-r border-border bg-card/50 flex flex-col">
+        <div className="p-3 border-b border-border flex items-center justify-between">
           <p className="font-semibold text-sm flex items-center gap-2">
             <FolderOpen className="w-4 h-4 text-primary" /> Folders
           </p>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="w-6 h-6"
+            title="New folder"
+            onClick={() => setCreatingFolder(true)}
+          >
+            <span className="text-lg leading-none">+</span>
+          </Button>
         </div>
+
+        {/* New folder input */}
+        {creatingFolder && (
+          <div className="p-2 border-b border-border flex gap-1">
+            <Input
+              autoFocus
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              placeholder="Folder name"
+              className="h-7 text-xs"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newFolderName.trim()) createFolderMutation.mutate({ name: newFolderName.trim() });
+                if (e.key === "Escape") { setCreatingFolder(false); setNewFolderName(""); }
+              }}
+            />
+            <Button
+              size="icon"
+              className="h-7 w-7 shrink-0"
+              disabled={!newFolderName.trim() || createFolderMutation.isPending}
+              onClick={() => newFolderName.trim() && createFolderMutation.mutate({ name: newFolderName.trim() })}
+            >
+              <span className="text-xs">✓</span>
+            </Button>
+            <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={() => { setCreatingFolder(false); setNewFolderName(""); }}>
+              <X className="w-3 h-3" />
+            </Button>
+          </div>
+        )}
+
         <nav className="flex-1 overflow-y-auto p-2 space-y-0.5">
+          {/* All Assets */}
           <button
             onClick={() => { setSelectedFolder(null); setPage(1); }}
             className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center gap-2 transition-colors ${
               selectedFolder === null ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted text-muted-foreground"
             }`}
           >
-            <Folder className="w-4 h-4" /> All Assets
-            <span className="ml-auto text-xs">{data?.total ?? 0}</span>
+            <Folder className="w-4 h-4" />
+            <span className="flex-1">All Assets</span>
           </button>
-          {folders.map((f) => (
-            <button
-              key={f}
-              onClick={() => { setSelectedFolder(f); setPage(1); }}
-              className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center gap-2 transition-colors ${
-                selectedFolder === f ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted text-muted-foreground"
-              }`}
-            >
-              <Folder className="w-4 h-4 shrink-0" />
-              <span className="truncate">{f}</span>
-            </button>
+
+          {/* Folder list */}
+          {folders.map((f: any) => (
+            <div key={f.id} className="group relative">
+              {editingFolder?.id === f.id ? (
+                <div className="flex gap-1 px-1">
+                  <Input
+                    autoFocus
+                    value={editFolderName}
+                    onChange={(e) => setEditFolderName(e.target.value)}
+                    className="h-7 text-xs"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && editFolderName.trim()) renameFolderMutation.mutate({ id: f.id, name: editFolderName.trim() });
+                      if (e.key === "Escape") setEditingFolder(null);
+                    }}
+                  />
+                  <Button size="icon" className="h-7 w-7 shrink-0" disabled={!editFolderName.trim()} onClick={() => editFolderName.trim() && renameFolderMutation.mutate({ id: f.id, name: editFolderName.trim() })}>
+                    <span className="text-xs">✓</span>
+                  </Button>
+                  <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={() => setEditingFolder(null)}>
+                    <X className="w-3 h-3" />
+                  </Button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => { setSelectedFolder(f.slug); setPage(1); }}
+                  className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center gap-2 transition-colors ${
+                    selectedFolder === f.slug ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted text-muted-foreground"
+                  }`}
+                >
+                  <Folder className="w-4 h-4 shrink-0" />
+                  <span className="flex-1 truncate">{f.name}</span>
+                  <span className="text-xs opacity-60">{f.assetCount}</span>
+                  {/* Edit / Delete buttons — visible on hover */}
+                  <span className="hidden group-hover:flex items-center gap-0.5 ml-1">
+                    <span
+                      role="button"
+                      className="p-0.5 rounded hover:bg-muted-foreground/20"
+                      title="Rename"
+                      onClick={(e) => { e.stopPropagation(); setEditingFolder({ id: f.id, name: f.name }); setEditFolderName(f.name); }}
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 2.828L11.828 15.828a2 2 0 01-1.414.586H7v-3.414a2 2 0 01.586-1.414z" /></svg>
+                    </span>
+                    <span
+                      role="button"
+                      className="p-0.5 rounded hover:bg-destructive/20 text-destructive"
+                      title="Delete folder"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(`Delete folder "${f.name}"? Assets will be moved to uncategorized.`)) {
+                          deleteFolderMutation.mutate({ id: f.id });
+                        }
+                      }}
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </span>
+                  </span>
+                </button>
+              )}
+            </div>
           ))}
-          {folders.length === 0 && (
-            <p className="text-xs text-muted-foreground px-3 py-2">No folders yet. Assign a folder when uploading or in the asset detail.</p>
+
+          {folders.length === 0 && !creatingFolder && (
+            <p className="text-xs text-muted-foreground px-3 py-4 text-center">No folders yet.<br />Click + to create one.</p>
           )}
         </nav>
       </aside>

@@ -31,6 +31,7 @@ import {
   mediaVersions,
   mediaAccessGrants,
   mediaViewEvents,
+  mediaFolders,
 } from "../../drizzle/schema";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -703,4 +704,138 @@ export const mediaRepoRouter = router({
 
       return { allowed: true, asset, version: version ?? null };
     }),
+
+  // ─── Folder CRUD ──────────────────────────────────────────────────────────────
+
+  /**
+   * List all folders with asset counts.
+   */
+  listFoldersFull: protectedProcedure.query(async ({ ctx }) => {
+    await assertPlatformAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    const folders = await db
+      .select()
+      .from(mediaFolders)
+      .orderBy(mediaFolders.sortOrder, mediaFolders.name);
+    const counts = await db
+      .select({ folder: mediaAssets.folder, count: sql<number>`count(*)` })
+      .from(mediaAssets)
+      .where(isNull(mediaAssets.deletedAt))
+      .groupBy(mediaAssets.folder);
+    const countMap = new Map(counts.map(c => [c.folder ?? "", Number(c.count)]));
+    return folders.map(f => ({ ...f, assetCount: countMap.get(f.slug) ?? 0 }));
+  }),
+
+  /**
+   * Create a new folder.
+   */
+  createFolder: protectedProcedure
+    .input(z.object({
+      name: z.string().min(1).max(255),
+      description: z.string().max(1000).optional(),
+      parentId: z.number().int().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const now = Date.now();
+      const baseSlug = input.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      let slug = baseSlug;
+      let attempt = 0;
+      while (true) {
+        const [existing] = await db.select({ id: mediaFolders.id }).from(mediaFolders).where(eq(mediaFolders.slug, slug)).limit(1);
+        if (!existing) break;
+        attempt++;
+        slug = `${baseSlug}-${attempt}`;
+      }
+      const [result] = await db.insert(mediaFolders).values({
+        name: input.name,
+        slug,
+        description: input.description ?? null,
+        parentId: input.parentId ?? null,
+        sortOrder: 0,
+        createdAt: now,
+        updatedAt: now,
+      });
+      return { id: (result as any).insertId, slug };
+    }),
+
+  /**
+   * Rename / update a folder.
+   */
+  renameFolder: protectedProcedure
+    .input(z.object({
+      id: z.number().int(),
+      name: z.string().min(1).max(255),
+      description: z.string().max(1000).nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      await db.update(mediaFolders)
+        .set({ name: input.name, description: input.description ?? null, updatedAt: Date.now() })
+        .where(eq(mediaFolders.id, input.id));
+      return { ok: true };
+    }),
+
+  /**
+   * Delete a folder. Assets in the folder are moved to uncategorized (null).
+   */
+  deleteFolder: protectedProcedure
+    .input(z.object({ id: z.number().int() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const [folder] = await db.select().from(mediaFolders).where(eq(mediaFolders.id, input.id)).limit(1);
+      if (!folder) throw new TRPCError({ code: "NOT_FOUND", message: "Folder not found" });
+      await db.update(mediaAssets).set({ folder: null }).where(eq(mediaAssets.folder, folder.slug));
+      const children = await db.select().from(mediaFolders).where(eq(mediaFolders.parentId, input.id));
+      for (const child of children) {
+        await db.update(mediaAssets).set({ folder: null }).where(eq(mediaAssets.folder, child.slug));
+        await db.delete(mediaFolders).where(eq(mediaFolders.id, child.id));
+      }
+      await db.delete(mediaFolders).where(eq(mediaFolders.id, input.id));
+      return { ok: true };
+    }),
+
+  /**
+   * Move an asset to a folder by slug (or null for uncategorized).
+   */
+  moveAssetToFolder: protectedProcedure
+    .input(z.object({
+      assetId: z.number().int(),
+      folderSlug: z.string().nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      await db.update(mediaAssets)
+        .set({ folder: input.folderSlug })
+        .where(eq(mediaAssets.id, input.assetId));
+      return { ok: true };
+    }),
+
+  /**
+   * Bulk move assets to a folder.
+   */
+  bulkMoveToFolder: protectedProcedure
+    .input(z.object({
+      assetIds: z.array(z.number().int()),
+      folderSlug: z.string().nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      for (const id of input.assetIds) {
+        await db.update(mediaAssets).set({ folder: input.folderSlug }).where(eq(mediaAssets.id, id));
+      }
+      return { ok: true };
+    }),
+
 });

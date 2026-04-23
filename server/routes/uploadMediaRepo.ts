@@ -102,6 +102,7 @@ router.post(
       const notes = (req.body.notes as string) || null;
       const existingAssetId = req.body.assetId ? parseInt(req.body.assetId, 10) : null;
       const mediaType = (req.body.mediaType as string) || detectMediaType(mimetype);
+      const folderSlug = (req.body.folder as string) || null;
 
       if (existingAssetId) {
         // ── Re-upload: add a new version to an existing asset ──────────────────
@@ -157,6 +158,7 @@ router.post(
           mimeType: mimetype,
           access: access as any,
           tags,
+          folder: folderSlug,
           createdByUserId: user.id,
         });
         const assetId = (assetResult as any).insertId as number;

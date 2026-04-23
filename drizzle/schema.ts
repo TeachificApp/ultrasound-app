@@ -2651,3 +2651,15 @@ export const mediaViewEvents = mysqlTable("mediaViewEvents", {
 });
 export type MediaViewEvent = typeof mediaViewEvents.$inferSelect;
 export type InsertMediaViewEvent = typeof mediaViewEvents.$inferInsert;
+
+// ─── Media Folders ────────────────────────────────────────────────────────────
+export const mediaFolders = mysqlTable("media_folders", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 255 }).notNull().unique(),
+  description: text("description"),
+  parentId: int("parent_id"),
+  sortOrder: int("sort_order").default(0),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+});
