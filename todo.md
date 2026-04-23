@@ -1059,3 +1059,93 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Server-side listAssets filters by title and tags using LIKE
 - [x] queryInput memoized with useMemo to prevent infinite re-fetch
 - [x] Search works in both list view and grid view
+
+## LMS — Education Library (All About Ultrasound™)
+
+### DB Schema
+- [ ] lms_courses table (id, slug, title, subtitle, description, coverImageUrl, status: draft/public/hidden/private, type: course/quiz/download, price, isFree, brand: aaus/iheartecho, createdAt, updatedAt)
+- [ ] lms_sections table (id, courseId, title, position, isPreview)
+- [ ] lms_lessons table (id, sectionId, title, type: video/text/quiz/download, content, mediaAssetId, position, isPreview, dripDays)
+- [ ] lms_quizzes table (id, lessonId, title, passingScore)
+- [ ] lms_quiz_questions table (id, quizId, question, type: mcq/truefalse, options JSON, correctAnswer, explanation, position)
+- [ ] lms_enrollments table (id, userId, courseId, enrolledAt, completedAt, progress JSON, groupId, affiliateCode)
+- [ ] lms_lesson_progress table (id, enrollmentId, lessonId, completedAt, quizScore)
+- [ ] lms_groups table (id, courseId, name, seats, managerId, createdAt)
+- [ ] lms_group_seats table (id, groupId, email, assignedAt, enrollmentId)
+- [ ] lms_instructors table (id, userId, bio, avatarUrl, title, website, isActive)
+- [ ] lms_course_instructors table (courseId, instructorId, revenueSharePct)
+- [ ] lms_affiliates table (id, userId, code, commissionPct, isActive)
+- [ ] lms_affiliate_conversions table (id, affiliateId, enrollmentId, amount, paidAt)
+- [ ] lms_landing_pages table (id, courseId, heroTitle, heroSubtitle, heroImageUrl, bodyContent, ctaText, isCustom)
+- [ ] lms_orders table (id, userId, courseId, amount, stripePaymentIntentId, status, affiliateId, createdAt)
+
+### Server Routers
+- [ ] lmsPublicRouter: listCourses, getCourse, getLandingPage, getInstructor
+- [ ] lmsLearnerRouter: getEnrollment, getLessonProgress, markLessonComplete, submitQuiz, getMyCourses
+- [ ] lmsAdminRouter: createCourse, updateCourse, deleteCourse, publishCourse, listCourses (all statuses), manageSections, manageLessons, manageQuizzes, manageEnrollments, manageGroups, manageInstructors, manageAffiliates, updateLandingPage, getAnalytics
+- [ ] lmsGroupRouter: getMyGroup, assignSeat, revokeSeat (group manager role)
+
+### Stripe Integration
+- [ ] Set up Stripe via webdev_add_feature
+- [ ] Course checkout: create PaymentIntent, confirm, create enrollment on success
+- [ ] Group seat purchase: quantity-based checkout
+- [ ] Webhook: payment_intent.succeeded → create enrollment + affiliate conversion
+- [ ] Affiliate commission tracking on purchase
+
+### Public-Facing Education Library
+- [ ] /learn route — public education library (course catalog grid)
+- [ ] Course cards: cover image, title, instructor, price, rating, status badge
+- [ ] Filter by brand (AAUS / iHeartEcho), type (course/quiz/download), price (free/paid)
+- [ ] /learn/:slug — auto-generated course landing page (hero, curriculum, instructor, pricing, CTA)
+- [ ] /learn/:slug/enroll — Stripe checkout or free enrollment
+- [ ] Instructor public profile pages at /instructors/:id
+
+### Course Player
+- [ ] /learn/:slug/player — course player layout (sidebar lesson list + main content area)
+- [ ] Video lesson: embed from Media Repository (inline player)
+- [ ] Text/rich content lesson: rendered HTML
+- [ ] Quiz lesson: MCQ/true-false runner with score and pass/fail
+- [ ] Download lesson: download button linked to Media Repository asset
+- [ ] Progress tracking: mark lesson complete, overall % progress
+- [ ] Certificate of completion (auto-generated on 100% progress)
+
+### Platform Admin LMS Panel
+- [ ] /admin/lms — LMS admin dashboard (course list, enrollment stats, revenue)
+- [ ] Course builder: create/edit course, add/reorder sections and lessons
+- [ ] Rich text editor for lesson content (reuse existing rich text approach)
+- [ ] Media Repository picker in lesson builder (pull in video/audio/PDF/SCORM)
+- [ ] Quiz builder: add/edit/reorder questions, set passing score
+- [ ] Landing page editor: edit hero, body, CTA per course
+- [ ] Enrollment management: view/add/remove enrollments per course
+- [ ] Group management: create groups, set seats, assign group manager
+- [ ] Instructor management: add/edit instructors, set revenue share per course
+- [ ] Affiliate management: create affiliate codes, view conversions, mark paid
+- [ ] Course status control: draft → public / hidden / private
+
+### Group Enrollment
+- [ ] Group manager dashboard at /my-group
+- [ ] Group manager can assign/revoke seats by email
+- [ ] Email notification to assigned user with enrollment link
+- [ ] Seat usage display (X of Y seats used)
+
+### Instructor Profiles
+- [ ] Instructor profile page at /instructors/:id
+- [ ] Bio, avatar, title, courses taught, website link
+- [ ] Admin can create/edit instructor profiles and link to user accounts
+
+## LMS — Education Library (Completed Apr 23 2026)
+- [x] DB schema: 15 LMS tables (courses, sections, lessons, quizzes, quiz_questions, enrollments, lesson_progress, groups, group_seats, instructors, course_instructors, affiliates, affiliate_conversions, landing_pages, orders)
+- [x] tRPC routers: lms (public), lmsLearner (protected), lmsAdmin (admin-only)
+- [x] Stripe checkout session creation for paid courses
+- [x] Stripe webhook: checkout.session.completed → auto-enroll learner
+- [x] Public Education Library page (/education-library) with filter by type/status
+- [x] Course landing page with enroll/checkout CTA (/learn/:slug)
+- [x] Course player: sidebar nav, lesson viewer, quiz runner, progress tracking (/learn/:slug/player)
+- [x] Admin LMS panel (/admin/lms): course builder, section/lesson/quiz builder, enrollment management, group management, instructor management, affiliate management
+- [x] Course status: draft, published, hidden, private (invite-only)
+- [x] Group enrollments: seat count, group manager role, seat assignment by email
+- [x] Instructor profiles with bio, avatar, and revenue share %
+- [x] Affiliate tracking: code generation, commission %, conversion logging
+- [x] Revenue sharing config per course instructor
+- [x] LMS vitest tests: 16 tests passing (slugify, enrollment, commission, seats, visibility)
+- [x] Routes registered in App.tsx (no sidebar link added per user preference)

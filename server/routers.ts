@@ -22,6 +22,7 @@ import { sonoQuizRouter } from "./routers/sonoQuizRouter";
 import { emailCampaignRouter } from "./routers/emailCampaignRouter";
 import { menuLinksRouter } from "./routers/menuLinksRouter";
 import { navigatorAdminRouter } from "./routers/navigatorAdminRouter";
+import { lmsPublicRouter, lmsLearnerRouter, lmsAdminRouter, lmsGroupRouter } from "./routers/lmsRouter";
 import {
   getUserById,
   getUsersByIds,
@@ -1771,6 +1772,12 @@ export const appRouter = router({
   accreditationManager: accreditationManagerRouter,
   emailCampaign: emailCampaignRouter,
   menuLinks: menuLinksRouter,
+
+  // ─── LMS Education Library ────────────────────────────────────────────────────
+  lms: lmsPublicRouter,
+  lmsLearner: lmsLearnerRouter,
+  lmsAdmin: lmsAdminRouter,
+  lmsGroup: lmsGroupRouter,
 
   // ─── Physician Over-Read Workflow (Step 1 & Step 2) ──────────────────────────
   physicianOverRead: router({

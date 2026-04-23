@@ -2663,3 +2663,211 @@ export const mediaFolders = mysqlTable("media_folders", {
   createdAt: bigint("created_at", { mode: "number" }).notNull(),
   updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
 });
+
+
+// ─── LMS — Education Library ──────────────────────────────────────────────────
+
+export const lmsCourses = mysqlTable("lms_courses", {
+  id: int("id").autoincrement().primaryKey(),
+  slug: varchar("slug", { length: 255 }).notNull().unique(),
+  title: varchar("title", { length: 255 }).notNull(),
+  subtitle: varchar("subtitle", { length: 500 }),
+  description: longtext("description"),
+  coverImageUrl: text("cover_image_url"),
+  status: mysqlEnum("status", ["draft", "public", "hidden", "private"]).default("draft").notNull(),
+  type: mysqlEnum("type", ["course", "quiz", "download"]).default("course").notNull(),
+  brand: mysqlEnum("brand", ["aaus", "iheartecho"]).default("aaus").notNull(),
+  price: int("price").default(0).notNull(), // cents
+  isFree: boolean("is_free").default(false).notNull(),
+  currency: varchar("currency", { length: 8 }).default("usd").notNull(),
+  // SEO / landing page
+  metaTitle: varchar("meta_title", { length: 255 }),
+  metaDescription: text("meta_description"),
+  // Completion certificate
+  hasCertificate: boolean("has_certificate").default(false).notNull(),
+  // Drip: unlock all immediately (false) or by schedule (true)
+  isDrip: boolean("is_drip").default(false).notNull(),
+  createdByUserId: int("created_by_user_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type LmsCourse = typeof lmsCourses.$inferSelect;
+export type InsertLmsCourse = typeof lmsCourses.$inferInsert;
+
+export const lmsSections = mysqlTable("lms_sections", {
+  id: int("id").autoincrement().primaryKey(),
+  courseId: int("course_id").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  position: int("position").default(0).notNull(),
+  isPreview: boolean("is_preview").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type LmsSection = typeof lmsSections.$inferSelect;
+
+export const lmsLessons = mysqlTable("lms_lessons", {
+  id: int("id").autoincrement().primaryKey(),
+  sectionId: int("section_id").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  type: mysqlEnum("type", ["video", "text", "quiz", "download"]).default("text").notNull(),
+  content: longtext("content"), // rich text HTML or markdown
+  mediaAssetId: int("media_asset_id"), // FK to mediaAssets
+  position: int("position").default(0).notNull(),
+  isPreview: boolean("is_preview").default(false).notNull(), // visible without enrollment
+  dripDays: int("drip_days").default(0).notNull(), // days after enrollment to unlock
+  durationMinutes: int("duration_minutes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type LmsLesson = typeof lmsLessons.$inferSelect;
+
+export const lmsQuizzes = mysqlTable("lms_quizzes", {
+  id: int("id").autoincrement().primaryKey(),
+  lessonId: int("lesson_id").notNull().unique(),
+  title: varchar("title", { length: 255 }).notNull(),
+  passingScore: int("passing_score").default(70).notNull(), // percentage
+  allowRetakes: boolean("allow_retakes").default(true).notNull(),
+  showCorrectAnswers: boolean("show_correct_answers").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type LmsQuiz = typeof lmsQuizzes.$inferSelect;
+
+export const lmsQuizQuestions = mysqlTable("lms_quiz_questions", {
+  id: int("id").autoincrement().primaryKey(),
+  quizId: int("quiz_id").notNull(),
+  question: text("question").notNull(),
+  type: mysqlEnum("type", ["mcq", "truefalse"]).default("mcq").notNull(),
+  options: text("options"), // JSON array of strings
+  correctAnswer: varchar("correct_answer", { length: 255 }).notNull(),
+  explanation: text("explanation"),
+  position: int("position").default(0).notNull(),
+});
+export type LmsQuizQuestion = typeof lmsQuizQuestions.$inferSelect;
+
+export const lmsEnrollments = mysqlTable("lms_enrollments", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  courseId: int("course_id").notNull(),
+  enrolledAt: timestamp("enrolled_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+  progressPct: int("progress_pct").default(0).notNull(),
+  groupId: int("group_id"),
+  affiliateCode: varchar("affiliate_code", { length: 64 }),
+  orderId: int("order_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type LmsEnrollment = typeof lmsEnrollments.$inferSelect;
+
+export const lmsLessonProgress = mysqlTable("lms_lesson_progress", {
+  id: int("id").autoincrement().primaryKey(),
+  enrollmentId: int("enrollment_id").notNull(),
+  lessonId: int("lesson_id").notNull(),
+  completedAt: timestamp("completed_at"),
+  quizScore: int("quiz_score"), // percentage if quiz lesson
+  quizPassed: boolean("quiz_passed"),
+  attempts: int("attempts").default(0).notNull(),
+});
+export type LmsLessonProgress = typeof lmsLessonProgress.$inferSelect;
+
+export const lmsGroups = mysqlTable("lms_groups", {
+  id: int("id").autoincrement().primaryKey(),
+  courseId: int("course_id").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  seats: int("seats").default(1).notNull(),
+  managerId: int("manager_id"), // FK to users — the group manager
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type LmsGroup = typeof lmsGroups.$inferSelect;
+
+export const lmsGroupSeats = mysqlTable("lms_group_seats", {
+  id: int("id").autoincrement().primaryKey(),
+  groupId: int("group_id").notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  assignedAt: timestamp("assigned_at").defaultNow().notNull(),
+  enrollmentId: int("enrollment_id"), // set when user accepts and enrolls
+  inviteToken: varchar("invite_token", { length: 128 }),
+  acceptedAt: timestamp("accepted_at"),
+});
+export type LmsGroupSeat = typeof lmsGroupSeats.$inferSelect;
+
+export const lmsInstructors = mysqlTable("lms_instructors", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id"), // optional link to app user account
+  name: varchar("name", { length: 255 }).notNull(),
+  title: varchar("title", { length: 255 }),
+  bio: longtext("bio"),
+  avatarUrl: text("avatar_url"),
+  website: varchar("website", { length: 255 }),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type LmsInstructor = typeof lmsInstructors.$inferSelect;
+
+export const lmsCourseInstructors = mysqlTable("lms_course_instructors", {
+  id: int("id").autoincrement().primaryKey(),
+  courseId: int("course_id").notNull(),
+  instructorId: int("instructor_id").notNull(),
+  revenueSharePct: int("revenue_share_pct").default(0).notNull(), // 0-100
+  isPrimary: boolean("is_primary").default(false).notNull(),
+});
+export type LmsCourseInstructor = typeof lmsCourseInstructors.$inferSelect;
+
+export const lmsAffiliates = mysqlTable("lms_affiliates", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id"), // optional link to app user
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 320 }),
+  code: varchar("code", { length: 64 }).notNull().unique(),
+  commissionPct: int("commission_pct").default(10).notNull(), // percentage
+  isActive: boolean("is_active").default(true).notNull(),
+  totalEarned: int("total_earned").default(0).notNull(), // cents
+  totalPaid: int("total_paid").default(0).notNull(), // cents
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type LmsAffiliate = typeof lmsAffiliates.$inferSelect;
+
+export const lmsAffiliateConversions = mysqlTable("lms_affiliate_conversions", {
+  id: int("id").autoincrement().primaryKey(),
+  affiliateId: int("affiliate_id").notNull(),
+  enrollmentId: int("enrollment_id").notNull(),
+  orderId: int("order_id").notNull(),
+  saleAmount: int("sale_amount").notNull(), // cents
+  commissionAmount: int("commission_amount").notNull(), // cents
+  paidAt: timestamp("paid_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type LmsAffiliateConversion = typeof lmsAffiliateConversions.$inferSelect;
+
+export const lmsLandingPages = mysqlTable("lms_landing_pages", {
+  id: int("id").autoincrement().primaryKey(),
+  courseId: int("course_id").notNull().unique(),
+  heroTitle: varchar("hero_title", { length: 255 }),
+  heroSubtitle: text("hero_subtitle"),
+  heroImageUrl: text("hero_image_url"),
+  bodyContent: longtext("body_content"), // rich text HTML
+  ctaText: varchar("cta_text", { length: 128 }).default("Enroll Now"),
+  whatYouLearn: longtext("what_you_learn"), // rich text
+  requirements: longtext("requirements"), // rich text
+  isCustom: boolean("is_custom").default(false).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type LmsLandingPage = typeof lmsLandingPages.$inferSelect;
+
+export const lmsOrders = mysqlTable("lms_orders", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  courseId: int("course_id").notNull(),
+  amount: int("amount").notNull(), // cents
+  currency: varchar("currency", { length: 8 }).default("usd").notNull(),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
+  stripeSessionId: varchar("stripe_session_id", { length: 255 }),
+  status: mysqlEnum("status", ["pending", "paid", "failed", "refunded"]).default("pending").notNull(),
+  affiliateId: int("affiliate_id"),
+  groupId: int("group_id"),
+  seats: int("seats").default(1).notNull(), // for group purchases
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type LmsOrder = typeof lmsOrders.$inferSelect;

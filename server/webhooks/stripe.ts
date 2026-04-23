@@ -16,8 +16,8 @@
  */
 import type { Express, Request, Response } from "express";
 import { getDb, getUserByEmail } from "../db";
-import { diySubscriptions, diyOrganizations, webhookEvents } from "../../drizzle/schema";
-import { eq } from "drizzle-orm";
+import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions } from "../../drizzle/schema";
+import { and, eq } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 
 // Stripe webhook secret — optional but strongly recommended in production
@@ -114,6 +114,55 @@ async function handleCheckoutSessionCompleted(session: Record<string, unknown>) 
   });
 }
 
+async function handleLmsCheckoutCompleted(session: Record<string, unknown>) {
+  const meta = (session.metadata as Record<string, string>) ?? {};
+  const orderId = meta.order_id ? parseInt(meta.order_id) : null;
+  const userId = meta.user_id ? parseInt(meta.user_id) : null;
+  const courseId = meta.course_id ? parseInt(meta.course_id) : null;
+  const seats = meta.seats ? parseInt(meta.seats) : 1;
+  const affiliateCode = meta.affiliate_code ?? null;
+  const sessionId = session.id as string;
+
+  if (!orderId || !userId || !courseId) return; // Not an LMS order
+
+  const db = await getDb();
+  if (!db) return;
+
+  // Mark order as paid
+  await db.update(lmsOrders).set({ status: "paid", stripeSessionId: sessionId }).where(eq(lmsOrders.id, orderId));
+
+  // Enroll user (and extra seats if group purchase)
+  const [existingEnrollment] = await db.select().from(lmsEnrollments)
+    .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, courseId))).limit(1);
+  if (!existingEnrollment) {
+    await db.insert(lmsEnrollments).values({ userId, courseId, orderId, affiliateCode });
+  }
+
+  // Track affiliate conversion
+  if (affiliateCode) {
+    const [affiliate] = await db.select().from(lmsAffiliates).where(eq(lmsAffiliates.code, affiliateCode)).limit(1);
+    if (affiliate) {
+      const amountTotal = (session.amount_total as number) ?? 0;
+      const commission = Math.round(amountTotal * (affiliate.commissionPct / 100));
+      const [enrollment] = await db.select().from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, courseId))).limit(1);
+      if (enrollment) {
+        await db.insert(lmsAffiliateConversions).values({
+          affiliateId: affiliate.id, enrollmentId: enrollment.id, orderId,
+          saleAmount: amountTotal, commissionAmount: commission,
+        });
+        await db.update(lmsAffiliates).set({ totalEarned: affiliate.totalEarned + commission }).where(eq(lmsAffiliates.id, affiliate.id));
+      }
+    }
+  }
+
+  await notifyOwner({
+    title: "🎓 New LMS Course Purchase",
+    content: `User ID ${userId} purchased course ID ${courseId} (${seats} seat${seats > 1 ? 's' : ''}). Order #${orderId}. Amount: $${((session.amount_total as number ?? 0) / 100).toFixed(2)}.`,
+  });
+  console.log(`[Stripe] LMS order ${orderId} fulfilled for user ${userId}, course ${courseId}`);
+}
+
 export function registerStripeWebhook(app: Express) {
   // Raw body needed for Stripe signature verification
   app.post(
@@ -190,10 +239,10 @@ export function registerStripeWebhook(app: Express) {
 
       // Handle events
       try {
+        const sessionObj = (event.data as { object: Record<string, unknown> }).object;
         if (eventType === "checkout.session.completed") {
-          await handleCheckoutSessionCompleted(event.data as Record<string, unknown> & { object: Record<string, unknown> }).catch
-            ? await handleCheckoutSessionCompleted((event.data as { object: Record<string, unknown> }).object)
-            : null;
+          await handleCheckoutSessionCompleted(sessionObj);
+          await handleLmsCheckoutCompleted(sessionObj);
         } else {
           console.log(`[Stripe] Unhandled event type: ${eventType}`);
         }

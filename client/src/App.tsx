@@ -28,6 +28,12 @@ import Unsubscribe from "./pages/Unsubscribe";
 import UpgradeSuccess from "./pages/UpgradeSuccess";
 import Premium from "./pages/Premium";
 
+// ── LMS — Education Library ─────────────────────────────────────────────────
+import EducationLibrary from "./pages/EducationLibrary";
+import CourseLanding from "./pages/CourseLanding";
+import CoursePlayer from "./pages/CoursePlayer";
+import LMSAdmin from "./pages/admin/LMSAdmin";
+
 // ── UltrasoundAssist™ Hub ────────────────────────────────────────────────────
 import UltrasoundAssistHub from "./pages/UltrasoundAssistHub";
 import ObGynCalculators from "./pages/ObGynCalculators";
@@ -283,7 +289,13 @@ function Router() {
         <Route path="/case-library/:id" component={CaseDetail} />
         <Route path="/soundbytes" component={SoundBytes} />
 
-        {/* ── Admin ─────────────────────────────────────────────────────── */}
+        {/* ── LMS — Education Library ──────────────────────────────────────────────────── */}
+        <Route path="/education-library" component={EducationLibrary} />
+        <Route path="/learn/:slug/player" component={CoursePlayer} />
+        <Route path="/learn/:slug" component={CourseLanding} />
+        <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
+
+        {/* ── Admin ───────────────────────────────────────────────────────────── */}
         <Route path="/admin/cases">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminCaseManagement /></RoleGuard>}</Route>
         <Route path="/admin/quickfire">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuickFireAdmin /></RoleGuard>}</Route>
         <Route path="/admin/challenge-cards">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ChallengeCardGenerator /></RoleGuard>}</Route>
