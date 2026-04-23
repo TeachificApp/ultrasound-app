@@ -2545,3 +2545,83 @@ export const navigatorOverrides = mysqlTable("navigatorOverrides", {
 });
 export type NavigatorOverride = typeof navigatorOverrides.$inferSelect;
 export type InsertNavigatorOverride = typeof navigatorOverrides.$inferInsert;
+
+// ─── Media Repository ─────────────────────────────────────────────────────────
+
+/**
+ * media_assets — one row per logical media file.
+ * The "current" version is determined by the highest versionNumber in media_versions.
+ * The slug is stable and used in all public/embed URLs.
+ */
+export const mediaAssets = mysqlTable("mediaAssets", {
+  id: int("id").primaryKey().autoincrement(),
+  // URL-safe unique identifier — used in /media/:slug and embed URLs
+  slug: varchar("slug", { length: 128 }).notNull().unique(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  // Broad media category for UI filtering
+  mediaType: mysqlEnum("mediaType", [
+    "image", "video", "audio", "document", "html", "scorm", "zip", "lms", "other"
+  ]).notNull().default("other"),
+  // MIME type of the current version (e.g. "video/mp4", "application/zip")
+  mimeType: varchar("mimeType", { length: 128 }),
+  // "public" — anyone with the link; "private" — email invite only
+  access: mysqlEnum("access", ["public", "private"]).notNull().default("private"),
+  // Optional comma-separated tags for search/filter
+  tags: text("tags"),
+  // Soft-delete
+  deletedAt: timestamp("deletedAt"),
+  createdByUserId: int("createdByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type MediaAsset = typeof mediaAssets.$inferSelect;
+export type InsertMediaAsset = typeof mediaAssets.$inferInsert;
+
+/**
+ * media_versions — immutable upload history for each asset.
+ * Re-uploading creates a new row; the highest versionNumber is "current".
+ */
+export const mediaVersions = mysqlTable("mediaVersions", {
+  id: int("id").primaryKey().autoincrement(),
+  assetId: int("assetId").notNull(),
+  versionNumber: int("versionNumber").notNull().default(1),
+  // S3 object key (used for deletion / presigned access)
+  s3Key: text("s3Key").notNull(),
+  // Public or presigned CDN URL
+  s3Url: text("s3Url").notNull(),
+  // Original file name as uploaded
+  fileName: varchar("fileName", { length: 255 }),
+  // File size in bytes
+  fileSize: bigint("fileSize", { mode: "number" }),
+  mimeType: varchar("mimeType", { length: 128 }),
+  // Optional admin note about this version
+  notes: text("notes"),
+  uploadedByUserId: int("uploadedByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type MediaVersion = typeof mediaVersions.$inferSelect;
+export type InsertMediaVersion = typeof mediaVersions.$inferInsert;
+
+/**
+ * media_access_grants — per-email invite tokens for private assets.
+ * A valid (non-expired, non-revoked) grant allows the holder to view/embed the asset.
+ */
+export const mediaAccessGrants = mysqlTable("mediaAccessGrants", {
+  id: int("id").primaryKey().autoincrement(),
+  assetId: int("assetId").notNull(),
+  // Email address the invite was sent to
+  email: varchar("email", { length: 320 }).notNull(),
+  // Opaque token embedded in the access URL
+  token: varchar("token", { length: 128 }).notNull().unique(),
+  // NULL = never expires
+  expiresAt: timestamp("expiresAt"),
+  // Timestamp of first use (for audit)
+  firstUsedAt: timestamp("firstUsedAt"),
+  // Admin can revoke by setting this
+  revokedAt: timestamp("revokedAt"),
+  createdByUserId: int("createdByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type MediaAccessGrant = typeof mediaAccessGrants.$inferSelect;
+export type InsertMediaAccessGrant = typeof mediaAccessGrants.$inferInsert;

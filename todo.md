@@ -1022,3 +1022,20 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add reorderEchoImages procedure to scanCoachAdminRouter (accept new ordered array of fileKeys)
 - [x] Rebuild ScanCoach Editor echoImages gallery: vertical list with drag-to-reorder (dnd-kit), inline label editing, and save buttons
 - [x] Update viewer pages to display image captions/labels below each gallery image
+
+## Media Repository (Admin-only)
+- [ ] DB schema: media_assets table (id, slug, title, description, mimeType, mediaType, access, createdByUserId, createdAt, updatedAt)
+- [ ] DB schema: media_versions table (id, assetId, versionNumber, s3Key, s3Url, fileSize, fileName, uploadedByUserId, createdAt)
+- [ ] DB schema: media_access_grants table (id, assetId, email, token, expiresAt, usedAt, createdAt)
+- [ ] tRPC mediaRepo router: uploadAsset, listAssets, getAsset, deleteAsset
+- [ ] tRPC mediaRepo router: reuploadVersion, listVersions, restoreVersion
+- [ ] tRPC mediaRepo router: setAccess (public/private), inviteByEmail, revokeGrant, listGrants
+- [ ] Public serve endpoint: GET /media/:slug — validates token/session, proxies from S3
+- [ ] Public embed page: GET /media/:slug/embed — responsive HTML embed viewer
+- [ ] Admin UI: /admin/media-repository page (platform admin only)
+- [ ] Admin UI: Upload modal (drag-drop, any file type, title/description/tags)
+- [ ] Admin UI: Asset browser (grid/list view, filter by media type, search)
+- [ ] Admin UI: Asset detail panel (version history, re-upload, access control, embed code)
+- [ ] Admin UI: Access control panel (public toggle, email invite list, revoke grants)
+- [ ] Admin UI: Embed code snippets (direct link, iframe, video/audio/image/SCORM tag)
+- [ ] Register /admin/media-repository route in App.tsx and sidebar nav

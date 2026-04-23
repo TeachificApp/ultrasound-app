@@ -12,6 +12,7 @@ import { quickfireRouter } from "./routers/quickfireRouter";
 import { caseLibraryRouter } from "./routers/caseLibraryRouter";
 import { premiumRouter } from "./routers/premiumRouter";
 import { scanCoachAdminRouter } from "./routers/scanCoachAdminRouter";
+import { mediaRepoRouter } from "./routers/mediaRepoRouter";
 import { diyRouter } from "./routers/diyRouter";
 import { meetingRouter } from "./routers/meetingRouter";
 import { formBuilderRouter } from "./routers/formBuilderRouter";
@@ -1759,6 +1760,7 @@ export const appRouter = router({
 
   // ─── ScanCoach WYSIWYG Admin ──────────────────────────────────────────────────
   scanCoachAdmin: scanCoachAdminRouter,
+  mediaRepo: mediaRepoRouter,
   navigatorAdmin: navigatorAdminRouter,
 
   // ─── DIY Accreditation ─────────────────────────────────────────────────────────────

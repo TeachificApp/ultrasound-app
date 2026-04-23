@@ -128,6 +128,7 @@ import QuickFireAdmin from "./pages/QuickFireAdmin";
 import ChallengeCardGenerator from "./pages/ChallengeCardGenerator";
 import ScanCoachEditor from "./pages/ScanCoachEditor";
 import NavigatorEditor from "./pages/NavigatorEditor";
+import MediaRepository from "./pages/admin/MediaRepository";
 import ScanCoachHub from "./pages/ScanCoachHub";
 import ThinkificWebhookAdmin from "./pages/ThinkificWebhookAdmin";
 import FormBuilderAdmin from "./pages/FormBuilderAdmin";
@@ -288,6 +289,7 @@ function Router() {
         <Route path="/admin/challenge-cards">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ChallengeCardGenerator /></RoleGuard>}</Route>
         <Route path="/admin/scancoach">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ScanCoachEditor /></RoleGuard>}</Route>
         <Route path="/admin/navigator">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><NavigatorEditor /></RoleGuard>}</Route>
+        <Route path="/admin/media-repository">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MediaRepository /></RoleGuard>}</Route>
         <Route path="/admin/thinkific-webhook">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ThinkificWebhookAdmin /></RoleGuard>}</Route>
         <Route path="/admin/form-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
         <Route path="/admin/form-builder/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>

@@ -1,0 +1,575 @@
+/**
+ * mediaRepoRouter.ts
+ * Platform-admin-only media repository.
+ *
+ * Procedures:
+ *   uploadAsset       — create a new asset + first version (multipart base64)
+ *   listAssets        — paginated list with search/type filter
+ *   getAsset          — full asset detail + current version + version history
+ *   updateAsset       — edit title/description/tags/access
+ *   deleteAsset       — soft-delete
+ *   reuploadVersion   — add a new version without changing the slug/links
+ *   listVersions      — all versions for an asset
+ *   restoreVersion    — make an older version the "current" one
+ *   setAccess         — toggle public/private
+ *   inviteByEmail     — create a signed access grant and send invite email
+ *   listGrants        — list access grants for an asset
+ *   revokeGrant       — revoke a specific grant
+ *   validateToken     — public: check if a token is valid for an asset slug
+ */
+
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
+import { and, desc, eq, isNull, like, or, sql } from "drizzle-orm";
+import { randomBytes } from "crypto";
+import { protectedProcedure, router } from "../_core/trpc";
+import { getDb } from "../db";
+import { storagePut } from "../storage";
+import { sendEmail } from "../_core/email";
+import {
+  mediaAssets,
+  mediaVersions,
+  mediaAccessGrants,
+} from "../../drizzle/schema";
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+async function assertPlatformAdmin(ctx: { user: { id: number; role: string } }) {
+  const ownerId = process.env.OWNER_OPEN_ID;
+  const db = await getDb();
+  if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+  const [user] = await db
+    .select({ role: (await import("../../drizzle/schema")).users.role, openId: (await import("../../drizzle/schema")).users.openId })
+    .from((await import("../../drizzle/schema")).users)
+    .where(eq((await import("../../drizzle/schema")).users.id, ctx.user.id))
+    .limit(1);
+  if (!user || (user.role !== "admin" && user.openId !== ownerId)) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Platform admin access required" });
+  }
+}
+
+function generateSlug(title: string): string {
+  const base = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+  const suffix = randomBytes(4).toString("hex");
+  return `${base}-${suffix}`;
+}
+
+function generateToken(): string {
+  return randomBytes(32).toString("hex");
+}
+
+function detectMediaType(mimeType: string): string {
+  if (mimeType.startsWith("image/")) return "image";
+  if (mimeType.startsWith("video/")) return "video";
+  if (mimeType.startsWith("audio/")) return "audio";
+  if (mimeType === "text/html") return "html";
+  if (mimeType === "application/pdf" || mimeType.includes("word") || mimeType.includes("presentation")) return "document";
+  if (mimeType === "application/zip" || mimeType === "application/x-zip-compressed") return "zip";
+  return "other";
+}
+
+// ─── Schemas ──────────────────────────────────────────────────────────────────
+
+const MEDIA_TYPES = ["image", "video", "audio", "document", "html", "scorm", "zip", "lms", "other"] as const;
+
+const uploadFileSchema = z.object({
+  title: z.string().min(1).max(255),
+  description: z.string().max(2000).optional(),
+  tags: z.string().max(500).optional(),
+  access: z.enum(["public", "private"]).default("private"),
+  mediaType: z.enum(MEDIA_TYPES).optional(),
+  // Base64-encoded file data
+  fileData: z.string().min(1),
+  fileName: z.string().min(1).max(255),
+  mimeType: z.string().min(1).max(128),
+  fileSize: z.number().int().positive(),
+  notes: z.string().max(500).optional(),
+});
+
+// ─── Router ───────────────────────────────────────────────────────────────────
+
+export const mediaRepoRouter = router({
+  /**
+   * Upload a new asset (creates asset row + version 1).
+   * File data is base64-encoded to avoid multipart complexity.
+   */
+  uploadAsset: protectedProcedure
+    .input(uploadFileSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const slug = generateSlug(input.title);
+      const mediaType = (input.mediaType ?? detectMediaType(input.mimeType)) as typeof MEDIA_TYPES[number];
+
+      // Upload to S3
+      const buffer = Buffer.from(input.fileData, "base64");
+      const s3Key = `media-repo/${slug}/v1-${input.fileName}`;
+      const { url: s3Url } = await storagePut(s3Key, buffer, input.mimeType);
+
+      // Insert asset
+      const [assetResult] = await db.insert(mediaAssets).values({
+        slug,
+        title: input.title,
+        description: input.description ?? null,
+        mediaType,
+        mimeType: input.mimeType,
+        access: input.access,
+        tags: input.tags ?? null,
+        createdByUserId: ctx.user.id,
+      });
+      const assetId = (assetResult as any).insertId as number;
+
+      // Insert version 1
+      await db.insert(mediaVersions).values({
+        assetId,
+        versionNumber: 1,
+        s3Key,
+        s3Url,
+        fileName: input.fileName,
+        fileSize: input.fileSize,
+        mimeType: input.mimeType,
+        notes: input.notes ?? null,
+        uploadedByUserId: ctx.user.id,
+      });
+
+      return { id: assetId, slug, s3Url };
+    }),
+
+  /**
+   * List all assets (non-deleted) with optional search and type filter.
+   */
+  listAssets: protectedProcedure
+    .input(z.object({
+      search: z.string().optional(),
+      mediaType: z.enum(MEDIA_TYPES).optional(),
+      access: z.enum(["public", "private"]).optional(),
+      page: z.number().int().min(1).default(1),
+      pageSize: z.number().int().min(1).max(100).default(24),
+    }))
+    .query(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const offset = (input.page - 1) * input.pageSize;
+
+      const conditions = [isNull(mediaAssets.deletedAt)];
+      if (input.mediaType) conditions.push(eq(mediaAssets.mediaType, input.mediaType));
+      if (input.access) conditions.push(eq(mediaAssets.access, input.access));
+      if (input.search) {
+        conditions.push(
+          or(
+            like(mediaAssets.title, `%${input.search}%`),
+            like(mediaAssets.tags, `%${input.search}%`)
+          )!
+        );
+      }
+
+      const where = and(...conditions);
+
+      const assets = await db
+        .select()
+        .from(mediaAssets)
+        .where(where)
+        .orderBy(desc(mediaAssets.createdAt))
+        .limit(input.pageSize)
+        .offset(offset);
+
+      // Get current version URL for each asset
+      const enriched = await Promise.all(
+        assets.map(async (asset) => {
+          const [currentVersion] = await db
+            .select({ s3Url: mediaVersions.s3Url, versionNumber: mediaVersions.versionNumber, fileName: mediaVersions.fileName, fileSize: mediaVersions.fileSize })
+            .from(mediaVersions)
+            .where(eq(mediaVersions.assetId, asset.id))
+            .orderBy(desc(mediaVersions.versionNumber))
+            .limit(1);
+          return { ...asset, currentVersion: currentVersion ?? null };
+        })
+      );
+
+      const [{ count }] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(mediaAssets)
+        .where(where);
+
+      return { assets: enriched, total: count, page: input.page, pageSize: input.pageSize };
+    }),
+
+  /**
+   * Get full asset detail including all versions and access grants.
+   */
+  getAsset: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const [asset] = await db
+        .select()
+        .from(mediaAssets)
+        .where(and(eq(mediaAssets.id, input.id), isNull(mediaAssets.deletedAt)))
+        .limit(1);
+      if (!asset) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const versions = await db
+        .select()
+        .from(mediaVersions)
+        .where(eq(mediaVersions.assetId, input.id))
+        .orderBy(desc(mediaVersions.versionNumber));
+
+      const grants = await db
+        .select()
+        .from(mediaAccessGrants)
+        .where(eq(mediaAccessGrants.assetId, input.id))
+        .orderBy(desc(mediaAccessGrants.createdAt));
+
+      return { asset, versions, grants };
+    }),
+
+  /**
+   * Update asset metadata (title, description, tags, access).
+   */
+  updateAsset: protectedProcedure
+    .input(z.object({
+      id: z.number().int().positive(),
+      title: z.string().min(1).max(255).optional(),
+      description: z.string().max(2000).nullable().optional(),
+      tags: z.string().max(500).nullable().optional(),
+      access: z.enum(["public", "private"]).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const updates: Record<string, unknown> = {};
+      if (input.title !== undefined) updates.title = input.title;
+      if (input.description !== undefined) updates.description = input.description;
+      if (input.tags !== undefined) updates.tags = input.tags;
+      if (input.access !== undefined) updates.access = input.access;
+
+      if (Object.keys(updates).length === 0) return { updated: false };
+
+      await db.update(mediaAssets).set(updates).where(eq(mediaAssets.id, input.id));
+      return { updated: true };
+    }),
+
+  /**
+   * Soft-delete an asset.
+   */
+  deleteAsset: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      await db
+        .update(mediaAssets)
+        .set({ deletedAt: new Date() })
+        .where(eq(mediaAssets.id, input.id));
+      return { deleted: true };
+    }),
+
+  /**
+   * Re-upload a new version of an existing asset.
+   * The slug and all existing links remain unchanged.
+   */
+  reuploadVersion: protectedProcedure
+    .input(z.object({
+      assetId: z.number().int().positive(),
+      fileData: z.string().min(1),
+      fileName: z.string().min(1).max(255),
+      mimeType: z.string().min(1).max(128),
+      fileSize: z.number().int().positive(),
+      notes: z.string().max(500).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const [asset] = await db
+        .select({ slug: mediaAssets.slug })
+        .from(mediaAssets)
+        .where(and(eq(mediaAssets.id, input.assetId), isNull(mediaAssets.deletedAt)))
+        .limit(1);
+      if (!asset) throw new TRPCError({ code: "NOT_FOUND" });
+
+      // Determine next version number
+      const [{ maxVer }] = await db
+        .select({ maxVer: sql<number>`MAX(versionNumber)` })
+        .from(mediaVersions)
+        .where(eq(mediaVersions.assetId, input.assetId));
+      const nextVersion = (maxVer ?? 0) + 1;
+
+      // Upload to S3
+      const buffer = Buffer.from(input.fileData, "base64");
+      const s3Key = `media-repo/${asset.slug}/v${nextVersion}-${input.fileName}`;
+      const { url: s3Url } = await storagePut(s3Key, buffer, input.mimeType);
+
+      await db.insert(mediaVersions).values({
+        assetId: input.assetId,
+        versionNumber: nextVersion,
+        s3Key,
+        s3Url,
+        fileName: input.fileName,
+        fileSize: input.fileSize,
+        mimeType: input.mimeType,
+        notes: input.notes ?? null,
+        uploadedByUserId: ctx.user.id,
+      });
+
+      // Update asset mimeType to reflect new version
+      await db
+        .update(mediaAssets)
+        .set({ mimeType: input.mimeType, mediaType: detectMediaType(input.mimeType) as any })
+        .where(eq(mediaAssets.id, input.assetId));
+
+      return { versionNumber: nextVersion, s3Url };
+    }),
+
+  /**
+   * List all versions for an asset.
+   */
+  listVersions: protectedProcedure
+    .input(z.object({ assetId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      return db
+        .select()
+        .from(mediaVersions)
+        .where(eq(mediaVersions.assetId, input.assetId))
+        .orderBy(desc(mediaVersions.versionNumber));
+    }),
+
+  /**
+   * Restore an older version as the "current" one by duplicating it as a new version.
+   */
+  restoreVersion: protectedProcedure
+    .input(z.object({
+      assetId: z.number().int().positive(),
+      versionId: z.number().int().positive(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const [version] = await db
+        .select()
+        .from(mediaVersions)
+        .where(and(eq(mediaVersions.id, input.versionId), eq(mediaVersions.assetId, input.assetId)))
+        .limit(1);
+      if (!version) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const [{ maxVer }] = await db
+        .select({ maxVer: sql<number>`MAX(versionNumber)` })
+        .from(mediaVersions)
+        .where(eq(mediaVersions.assetId, input.assetId));
+      const nextVersion = (maxVer ?? 0) + 1;
+
+      await db.insert(mediaVersions).values({
+        assetId: input.assetId,
+        versionNumber: nextVersion,
+        s3Key: version.s3Key,
+        s3Url: version.s3Url,
+        fileName: version.fileName,
+        fileSize: version.fileSize,
+        mimeType: version.mimeType,
+        notes: `Restored from v${version.versionNumber}`,
+        uploadedByUserId: ctx.user.id,
+      });
+
+      return { restored: true, newVersionNumber: nextVersion };
+    }),
+
+  /**
+   * Set access mode for an asset.
+   */
+  setAccess: protectedProcedure
+    .input(z.object({
+      id: z.number().int().positive(),
+      access: z.enum(["public", "private"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      await db.update(mediaAssets).set({ access: input.access }).where(eq(mediaAssets.id, input.id));
+      return { access: input.access };
+    }),
+
+  /**
+   * Create an email-based access grant and send an invite email.
+   */
+  inviteByEmail: protectedProcedure
+    .input(z.object({
+      assetId: z.number().int().positive(),
+      email: z.string().email(),
+      expiresInDays: z.number().int().min(1).max(365).optional(),
+      message: z.string().max(500).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const [asset] = await db
+        .select({ slug: mediaAssets.slug, title: mediaAssets.title })
+        .from(mediaAssets)
+        .where(and(eq(mediaAssets.id, input.assetId), isNull(mediaAssets.deletedAt)))
+        .limit(1);
+      if (!asset) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const token = generateToken();
+      const expiresAt = input.expiresInDays
+        ? new Date(Date.now() + input.expiresInDays * 86400_000)
+        : null;
+
+      await db.insert(mediaAccessGrants).values({
+        assetId: input.assetId,
+        email: input.email,
+        token,
+        expiresAt,
+        createdByUserId: ctx.user.id,
+      });
+
+      // Build access URL (uses the app's origin from env)
+      const origin = process.env.VITE_OAUTH_PORTAL_URL
+        ? process.env.VITE_OAUTH_PORTAL_URL.replace("portal.", "app.")
+        : "https://app.allaboutultrasound.com";
+      const accessUrl = `${origin}/media/${asset.slug}?token=${token}`;
+
+      await sendEmail({
+        to: { name: input.email.split("@")[0], email: input.email },
+        subject: `You've been granted access to "${asset.title}"`,
+        htmlBody: `
+          <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;">
+            <h2 style="color:#189aa1;margin-bottom:8px;">Media Access Granted</h2>
+            <p style="color:#374151;">You have been granted access to the following media file:</p>
+            <p style="font-weight:bold;color:#111827;">${asset.title}</p>
+            ${input.message ? `<p style="color:#374151;font-style:italic;">"${input.message}"</p>` : ""}
+            <a href="${accessUrl}" style="display:inline-block;margin-top:16px;padding:12px 24px;background:#189aa1;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">
+              View / Embed Media
+            </a>
+            ${expiresAt ? `<p style="color:#6b7280;font-size:13px;margin-top:16px;">This link expires on ${expiresAt.toLocaleDateString()}.</p>` : ""}
+            <p style="color:#9ca3af;font-size:12px;margin-top:24px;">All About Ultrasound™ — Clinical Intelligence Platform</p>
+          </div>
+        `,
+      });
+
+      return { token, accessUrl, expiresAt };
+    }),
+
+  /**
+   * List all access grants for an asset.
+   */
+  listGrants: protectedProcedure
+    .input(z.object({ assetId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      return db
+        .select()
+        .from(mediaAccessGrants)
+        .where(eq(mediaAccessGrants.assetId, input.assetId))
+        .orderBy(desc(mediaAccessGrants.createdAt));
+    }),
+
+  /**
+   * Revoke a specific access grant.
+   */
+  revokeGrant: protectedProcedure
+    .input(z.object({ grantId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      await db
+        .update(mediaAccessGrants)
+        .set({ revokedAt: new Date() })
+        .where(eq(mediaAccessGrants.id, input.grantId));
+      return { revoked: true };
+    }),
+
+  /**
+   * Public: validate a token for a given asset slug.
+   * Returns the current version URL if valid.
+   */
+  validateToken: protectedProcedure
+    .input(z.object({
+      slug: z.string().min(1),
+      token: z.string().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const [asset] = await db
+        .select()
+        .from(mediaAssets)
+        .where(and(eq(mediaAssets.slug, input.slug), isNull(mediaAssets.deletedAt)))
+        .limit(1);
+      if (!asset) throw new TRPCError({ code: "NOT_FOUND" });
+
+      // Public assets: anyone can access
+      if (asset.access === "public") {
+        const [version] = await db
+          .select()
+          .from(mediaVersions)
+          .where(eq(mediaVersions.assetId, asset.id))
+          .orderBy(desc(mediaVersions.versionNumber))
+          .limit(1);
+        return { allowed: true, asset, version: version ?? null };
+      }
+
+      // Private: check token
+      if (!input.token) return { allowed: false, asset, version: null };
+
+      const [grant] = await db
+        .select()
+        .from(mediaAccessGrants)
+        .where(and(
+          eq(mediaAccessGrants.assetId, asset.id),
+          eq(mediaAccessGrants.token, input.token),
+          isNull(mediaAccessGrants.revokedAt)
+        ))
+        .limit(1);
+
+      if (!grant) return { allowed: false, asset, version: null };
+      if (grant.expiresAt && grant.expiresAt < new Date()) return { allowed: false, asset, version: null };
+
+      // Mark first use
+      if (!grant.firstUsedAt) {
+        await db
+          .update(mediaAccessGrants)
+          .set({ firstUsedAt: new Date() })
+          .where(eq(mediaAccessGrants.id, grant.id));
+      }
+
+      const [version] = await db
+        .select()
+        .from(mediaVersions)
+        .where(eq(mediaVersions.assetId, asset.id))
+        .orderBy(desc(mediaVersions.versionNumber))
+        .limit(1);
+
+      return { allowed: true, asset, version: version ?? null };
+    }),
+});

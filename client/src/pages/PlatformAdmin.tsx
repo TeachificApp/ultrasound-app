@@ -59,6 +59,7 @@ import {
   Webhook,
   FlaskConical,
   Image,
+  HardDrive,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import BulkCsvUploadPanel, { type BulkResult } from "@/components/BulkCsvUploadPanel";
@@ -1063,6 +1064,13 @@ export default function PlatformAdmin() {
                 label: "Challenge Card Generator",
                 description: "Generate social media cards for Daily Challenge questions",
                 color: "#189aa1",
+              },
+              {
+                href: "/admin/media-repository",
+                icon: HardDrive,
+                label: "Media Repository",
+                description: "Upload and manage media files with version history, access control, and embed links",
+                color: "#0f766e",
               },
             ].map(({ href, icon: Icon, label, description, color }) => (
               <Link key={href} href={href}>

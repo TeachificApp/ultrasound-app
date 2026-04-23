@@ -14,6 +14,8 @@ import { registerUploadQuestionMediaRoute } from "../routes/uploadQuestionMedia"
 import { registerUploadNavigatorImageRoute } from "../routes/uploadNavigatorImage";
 import { registerUnsubscribeRoute } from "../routes/unsubscribe";
 import { registerAuthLoginRoute } from "../routes/authLogin";
+import { registerMediaServeRoutes } from "../routes/mediaServe";
+import { registerUploadMediaRepoRoute } from "../routes/uploadMediaRepo";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -71,6 +73,10 @@ async function startServer() {
   registerUnsubscribeRoute(app);
   // Server-side login/magic-verify routes (bypasses Cloudflare fetch-response cookie stripping)
   registerAuthLoginRoute(app);
+  // Media repository public serve/embed routes (cookieless, token-based access)
+  registerMediaServeRoutes(app);
+  // Media repository multipart upload endpoint (admin only)
+  registerUploadMediaRepoRoute(app);
   // tRPC API
   app.use(
     "/api/trpc",
