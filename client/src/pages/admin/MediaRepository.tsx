@@ -676,21 +676,24 @@ function AssetDetailDialog({ assetId, onClose, onRefresh }: AssetDetailDialogPro
   return (
     <>
       <Dialog open={!!assetId} onOpenChange={(v) => !v && onClose()}>
-        <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto p-0">
+        <DialogContent className="max-w-4xl w-[95vw] h-[92vh] flex flex-col p-0 overflow-hidden">
           {/* ── Header bar ── */}
-          <div className="flex items-center justify-between gap-3 px-6 pt-5 pb-4 border-b border-border">
-            <div className="min-w-0">
-              <DialogTitle className="text-xl font-bold truncate">{asset.title}</DialogTitle>
-              <div className="flex items-center gap-2 mt-1 flex-wrap">
-                <Badge variant={isPublic ? "default" : "secondary"} className="gap-1">
-                  {isPublic ? <><Globe className="w-3 h-3" />Public</> : <><Lock className="w-3 h-3" />Private</>}
-                </Badge>
-                <Badge variant="outline">{MEDIA_TYPE_LABELS[asset.mediaType as MediaType]}</Badge>
-                {asset.mimeType && <Badge variant="outline" className="font-mono text-xs">{asset.mimeType}</Badge>}
-                {currentVersion && <span className="text-xs text-muted-foreground">v{currentVersion.versionNumber} · {formatBytes(currentVersion.fileSize)}</span>}
+          <div className="shrink-0 px-5 pt-5 pb-4 border-b border-border">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <DialogTitle className="text-xl font-bold break-words leading-snug">{asset.title}</DialogTitle>
+                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                  <Badge variant={isPublic ? "default" : "secondary"} className="gap-1">
+                    {isPublic ? <><Globe className="w-3 h-3" />Public</> : <><Lock className="w-3 h-3" />Private</>}
+                  </Badge>
+                  <Badge variant="outline">{MEDIA_TYPE_LABELS[asset.mediaType as MediaType]}</Badge>
+                  {asset.mimeType && <Badge variant="outline" className="font-mono text-xs">{asset.mimeType}</Badge>}
+                  {currentVersion && <span className="text-xs text-muted-foreground">v{currentVersion.versionNumber} · {formatBytes(currentVersion.fileSize)}</span>}
+                </div>
               </div>
             </div>
-            <div className="flex gap-2 shrink-0">
+            {/* Action buttons row */}
+            <div className="flex gap-2 mt-3 flex-wrap">
               <Button
                 size="sm"
                 variant={isPublic ? "outline" : "default"}
@@ -699,7 +702,7 @@ function AssetDetailDialog({ assetId, onClose, onRefresh }: AssetDetailDialogPro
                 {isPublic ? <><Lock className="w-3 h-3 mr-1" />Make Private</> : <><Globe className="w-3 h-3 mr-1" />Make Public</>}
               </Button>
               <Button size="sm" variant="outline" onClick={() => setReuploadOpen(true)}>
-                <Upload className="w-3 h-3 mr-1" />New Version
+                <Upload className="w-3 h-3 mr-1" />Upload New Version
               </Button>
               <Button
                 size="sm"
@@ -712,52 +715,54 @@ function AssetDetailDialog({ assetId, onClose, onRefresh }: AssetDetailDialogPro
             </div>
           </div>
 
-          {/* ── Preview + meta row ── */}
-          <div className="flex gap-4 px-6 py-4 border-b border-border">
-            {/* Preview thumbnail */}
-            <div className="w-32 h-24 rounded-lg overflow-hidden shrink-0 border border-border">
-              <AssetThumbnail asset={asset} />
-            </div>
-            {/* Meta */}
-            <div className="flex-1 min-w-0 space-y-2">
-              <div className="flex items-center gap-2">
-                <Folder className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                <span className="text-xs text-muted-foreground">Folder:</span>
-                <Select
-                  value={asset.folder ?? "none"}
-                  onValueChange={(v) => moveToFolderMutation.mutate({ assetId: asset.id, folderSlug: v === "none" ? null : v })}
-                >
-                  <SelectTrigger className="h-7 text-xs w-44">
-                    <SelectValue placeholder="No folder" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No folder</SelectItem>
-                    {(foldersData ?? []).map((f: any) => (
-                      <SelectItem key={f.id} value={f.slug}>{f.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+          {/* ── Scrollable body ── */}
+          <div className="flex-1 overflow-y-auto">
+            {/* Preview + meta row */}
+            <div className="flex gap-4 px-5 py-4 border-b border-border">
+              {/* Preview thumbnail */}
+              <div className="w-28 h-20 rounded-lg overflow-hidden shrink-0 border border-border">
+                <AssetThumbnail asset={asset} />
               </div>
-              {asset.description && (
-                <p className="text-sm text-muted-foreground line-clamp-2">{asset.description}</p>
-              )}
-              {asset.tags && (
-                <div className="flex gap-1 flex-wrap">
-                  {asset.tags.split(",").map((t: string) => t.trim()).filter(Boolean).map((t: string) => (
-                    <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>
-                  ))}
+              {/* Meta */}
+              <div className="flex-1 min-w-0 space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Folder className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  <span className="text-xs text-muted-foreground">Folder:</span>
+                  <Select
+                    value={asset.folder ?? "none"}
+                    onValueChange={(v) => moveToFolderMutation.mutate({ assetId: asset.id, folderSlug: v === "none" ? null : v })}
+                  >
+                    <SelectTrigger className="h-7 text-xs w-44">
+                      <SelectValue placeholder="No folder" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No folder</SelectItem>
+                      {(foldersData ?? []).map((f: any) => (
+                        <SelectItem key={f.id} value={f.slug}>{f.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              )}
+                {asset.description && (
+                  <p className="text-sm text-muted-foreground">{asset.description}</p>
+                )}
+                {asset.tags && (
+                  <div className="flex gap-1 flex-wrap">
+                    {asset.tags.split(",").map((t: string) => t.trim()).filter(Boolean).map((t: string) => (
+                      <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
 
-          <div className="px-6 pb-6">
+          <div className="px-5 pb-6 pt-2">
           <Tabs defaultValue="embed">
-            <TabsList className="w-full">
-              <TabsTrigger value="embed" className="flex-1"><Link className="w-3 h-3 mr-1" />Links & Embed</TabsTrigger>
-              <TabsTrigger value="versions" className="flex-1"><History className="w-3 h-3 mr-1" />Versions ({versions.length})</TabsTrigger>
-              <TabsTrigger value="access" className="flex-1"><Shield className="w-3 h-3 mr-1" />Access Control</TabsTrigger>
-              <TabsTrigger value="analytics" className="flex-1"><BarChart2 className="w-3 h-3 mr-1" />Analytics</TabsTrigger>
+            <TabsList className="w-full grid grid-cols-4">
+              <TabsTrigger value="embed" className="text-xs sm:text-sm"><Link className="w-3 h-3 mr-1 hidden sm:inline" />Links</TabsTrigger>
+              <TabsTrigger value="versions" className="text-xs sm:text-sm"><History className="w-3 h-3 mr-1 hidden sm:inline" />Versions ({versions.length})</TabsTrigger>
+              <TabsTrigger value="access" className="text-xs sm:text-sm"><Shield className="w-3 h-3 mr-1 hidden sm:inline" />Access</TabsTrigger>
+              <TabsTrigger value="analytics" className="text-xs sm:text-sm"><BarChart2 className="w-3 h-3 mr-1 hidden sm:inline" />Analytics</TabsTrigger>
             </TabsList>
 
             {/* Links & Embed */}
@@ -943,6 +948,7 @@ function AssetDetailDialog({ assetId, onClose, onRefresh }: AssetDetailDialogPro
               <AnalyticsPanel assetId={asset.id} />
             </TabsContent>
           </Tabs>
+          </div>
           </div>
         </DialogContent>
       </Dialog>

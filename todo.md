@@ -1035,7 +1035,7 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Admin UI: /admin/media-repository page (platform admin only)
 - [ ] Admin UI: Upload modal (drag-drop, any file type, title/description/tags)
 - [ ] Admin UI: Asset browser (grid/list view, filter by media type, search)
-- [ ] Admin UI: Asset detail panel (version history, re-upload, access control, embed code)
+- [x] Admin UI: Asset detail panel (version history, re-upload, access control, embed code)
 - [ ] Admin UI: Access control panel (public toggle, email invite list, revoke grants)
 - [ ] Admin UI: Embed code snippets (direct link, iframe, video/audio/image/SCORM tag)
 - [ ] Register /admin/media-repository route in App.tsx and sidebar nav
