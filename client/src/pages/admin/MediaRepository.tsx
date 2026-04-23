@@ -662,6 +662,16 @@ function AssetDetailDialog({ assetId, onClose, onRefresh }: AssetDetailDialogPro
 
             {/* Version History */}
             <TabsContent value="versions" className="mt-4">
+              {/* Upload new version CTA */}
+              <div className="flex items-center justify-between mb-3 pb-3 border-b border-border">
+                <div>
+                  <p className="text-sm font-semibold">Version History</p>
+                  <p className="text-xs text-muted-foreground">{versions.length} version{versions.length !== 1 ? 's' : ''} · links always point to the current version</p>
+                </div>
+                <Button size="sm" onClick={() => setReuploadOpen(true)}>
+                  <Upload className="w-3 h-3 mr-1.5" />Upload New Version
+                </Button>
+              </div>
               <div className="space-y-2">
                 {versions.map((v, i) => (
                   <div key={v.id} className={`flex items-center gap-3 p-3 rounded-lg border ${i === 0 ? "border-primary/40 bg-primary/5" : "border-border"}`}>
