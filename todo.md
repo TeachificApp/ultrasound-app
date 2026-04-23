@@ -1039,3 +1039,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Admin UI: Access control panel (public toggle, email invite list, revoke grants)
 - [ ] Admin UI: Embed code snippets (direct link, iframe, video/audio/image/SCORM tag)
 - [ ] Register /admin/media-repository route in App.tsx and sidebar nav
+
+## Media Repository Enhancements
+- [ ] Thumbnail previews for images and video in asset grid
+- [ ] Folder/category column on media_assets; folder sidebar in admin UI
+- [ ] media_view_events table to track embed/link views
+- [ ] Embed endpoint records view events (assetId, grantId, IP, referer)
+- [ ] Analytics panel in asset detail dialog (total views, unique viewers, daily chart)

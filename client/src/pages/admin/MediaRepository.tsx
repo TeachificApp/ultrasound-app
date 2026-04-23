@@ -63,6 +63,11 @@ import {
   Shield,
   ShieldOff,
   ExternalLink,
+  Folder,
+  FolderOpen,
+  BarChart2,
+  Users,
+  Monitor,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -85,6 +90,60 @@ const MEDIA_TYPE_ICONS: Record<MediaType, React.ReactNode> = {
   lms: <File className="w-4 h-4" />,
   other: <File className="w-4 h-4" />,
 };
+
+// ─── Thumbnail Preview ───────────────────────────────────────────────────────
+
+function AssetThumbnail({ asset }: { asset: any }) {
+  const url = asset.currentVersion?.s3Url;
+  const isImage = asset.mediaType === "image" || asset.mimeType?.startsWith("image/");
+  const isVideo = asset.mediaType === "video" || asset.mimeType?.startsWith("video/");
+
+  if (asset.thumbnailUrl) {
+    return (
+      <img
+        src={asset.thumbnailUrl}
+        alt={asset.title}
+        className="w-full h-full object-cover"
+        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+      />
+    );
+  }
+  if (isImage && url) {
+    return (
+      <img
+        src={url}
+        alt={asset.title}
+        className="w-full h-full object-cover"
+        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+      />
+    );
+  }
+  if (isVideo && url) {
+    return (
+      <video
+        src={url}
+        className="w-full h-full object-cover"
+        muted
+        preload="metadata"
+        onLoadedMetadata={(e) => { const v = e.target as HTMLVideoElement; v.currentTime = 1; }}
+      />
+    );
+  }
+  const icons: Record<string, React.ReactNode> = {
+    image: <FileImage className="w-6 h-6" />,
+    video: <FileVideo className="w-6 h-6" />,
+    audio: <FileAudio className="w-6 h-6" />,
+    document: <FileText className="w-6 h-6" />,
+    html: <Code className="w-6 h-6" />,
+    scorm: <Monitor className="w-6 h-6" />,
+    lms: <Monitor className="w-6 h-6" />,
+  };
+  return (
+    <div className="w-full h-full flex items-center justify-center bg-muted/50 text-muted-foreground">
+      {icons[asset.mediaType] ?? <File className="w-6 h-6" />}
+    </div>
+  );
+}
 
 function formatBytes(bytes: number | null | undefined): string {
   if (!bytes) return "—";
@@ -253,9 +312,7 @@ function UploadDialog({ open, onClose, onSuccess, existingAssetId, existingTitle
       </DialogContent>
     </Dialog>
   );
-}
-
-// ─── Asset Card ───────────────────────────────────────────────────────────────
+}// ─── Asset Card ───────────────────────────────────────────────────────────────
 
 interface AssetCardProps {
   asset: any;
@@ -268,33 +325,31 @@ function AssetCard({ asset, onClick }: AssetCardProps) {
 
   return (
     <div
-      className="border border-border rounded-lg p-4 hover:border-primary/50 hover:shadow-sm cursor-pointer transition-all group bg-card"
+      className="border border-border rounded-lg overflow-hidden hover:border-primary/50 hover:shadow-sm cursor-pointer transition-all group bg-card"
       onClick={onClick}
     >
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-muted-foreground shrink-0">{MEDIA_TYPE_ICONS[mediaType]}</span>
-          <span className="font-medium text-sm truncate">{asset.title}</span>
+      {/* Thumbnail */}
+      <div className="aspect-video bg-muted overflow-hidden relative">
+        <AssetThumbnail asset={asset} />
+        <div className="absolute top-1.5 right-1.5">
+          <Badge variant={isPublic ? "default" : "secondary"} className="text-xs py-0 px-1.5">
+            {isPublic ? <Globe className="w-2.5 h-2.5" /> : <Lock className="w-2.5 h-2.5" />}
+          </Badge>
         </div>
-        <Badge variant={isPublic ? "default" : "secondary"} className="shrink-0 text-xs">
-          {isPublic ? <><Globe className="w-3 h-3 mr-1" />Public</> : <><Lock className="w-3 h-3 mr-1" />Private</>}
-        </Badge>
       </div>
-
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Badge variant="outline" className="text-xs">{MEDIA_TYPE_LABELS[mediaType]}</Badge>
-        {asset.currentVersion && (
-          <span>v{asset.currentVersion.versionNumber} · {formatBytes(asset.currentVersion.fileSize)}</span>
-        )}
+      {/* Info */}
+      <div className="p-2.5">
+        <p className="font-medium text-xs truncate mb-1">{asset.title}</p>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span>{MEDIA_TYPE_ICONS[mediaType]}</span>
+          <span>{MEDIA_TYPE_LABELS[mediaType]}</span>
+          {asset.folder && (
+            <span className="ml-auto truncate max-w-[80px] flex items-center gap-0.5">
+              <Folder className="w-2.5 h-2.5 shrink-0" />{asset.folder.split("/").pop()}
+            </span>
+          )}
+        </div>
       </div>
-
-      {asset.tags && (
-        <p className="text-xs text-muted-foreground mt-1 truncate">{asset.tags}</p>
-      )}
-
-      <p className="text-xs text-muted-foreground mt-1">
-        {new Date(asset.createdAt).toLocaleDateString()}
-      </p>
     </div>
   );
 }
@@ -349,6 +404,74 @@ function EmbedPanel({ asset, token }: { asset: any; token?: string }) {
           Works cross-origin without third-party cookies. Token is embedded in the URL — no session required.
         </p>
       </div>
+    </div>
+  );
+}
+
+// ─── Analytics Panel ─────────────────────────────────────────────────────────
+
+function AnalyticsPanel({ assetId }: { assetId: number }) {
+  const { data, isLoading } = trpc.mediaRepo.getAnalytics.useQuery({ assetId });
+
+  if (isLoading) return <div className="text-sm text-muted-foreground py-8 text-center">Loading analytics…</div>;
+  if (!data) return <div className="text-sm text-muted-foreground py-8 text-center">No data.</div>;
+
+  const maxViews = Math.max(...(data.daily.map((d: any) => Number(d.views))), 1);
+
+  return (
+    <div className="space-y-5 mt-4">
+      <div className="grid grid-cols-2 gap-3">
+        {[
+          { label: "Total Views", value: data.totalViews, icon: <Eye className="w-4 h-4" /> },
+          { label: "Unique Viewers", value: data.uniqueViewers, icon: <Users className="w-4 h-4" /> },
+          { label: "Embed Views", value: data.embedViews, icon: <Code className="w-4 h-4" /> },
+          { label: "Direct Views", value: data.directViews, icon: <ExternalLink className="w-4 h-4" /> },
+        ].map(({ label, value, icon }) => (
+          <div key={label} className="bg-muted/50 rounded-lg p-3 flex items-center gap-3">
+            <div className="text-primary">{icon}</div>
+            <div>
+              <p className="text-xl font-bold">{value}</p>
+              <p className="text-xs text-muted-foreground">{label}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {data.daily.length > 0 ? (
+        <div>
+          <p className="text-xs font-medium text-muted-foreground mb-2">Daily Views — last 30 days</p>
+          <div className="flex items-end gap-px h-20 bg-muted/30 rounded p-1">
+            {data.daily.map((d: any) => (
+              <div
+                key={d.date}
+                className="flex-1 bg-primary/70 rounded-sm"
+                style={{ height: `${(Number(d.views) / maxViews) * 100}%`, minHeight: "2px" }}
+                title={`${d.date}: ${d.views} views`}
+              />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground text-center py-4">No views in the last 30 days.</p>
+      )}
+
+      {data.topReferers.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-muted-foreground mb-2">Top Referrers</p>
+          <div className="space-y-1">
+            {data.topReferers.slice(0, 5).map((r: any, i: number) => (
+              <div key={i} className="flex items-center justify-between text-xs">
+                <span className="truncate max-w-[220px] text-muted-foreground">{r.referer ?? "Direct"}</span>
+                <Badge variant="secondary" className="ml-2 shrink-0">{r.views}</Badge>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {Number(data.totalViews) === 0 && (
+        <p className="text-xs text-muted-foreground text-center">Views are tracked when the embed or direct link is accessed.</p>
+      )}
     </div>
   );
 }
@@ -446,6 +569,7 @@ function AssetDetailDialog({ assetId, onClose, onRefresh }: AssetDetailDialogPro
               <TabsTrigger value="embed" className="flex-1"><Link className="w-3 h-3 mr-1" />Links & Embed</TabsTrigger>
               <TabsTrigger value="versions" className="flex-1"><History className="w-3 h-3 mr-1" />Versions ({versions.length})</TabsTrigger>
               <TabsTrigger value="access" className="flex-1"><Shield className="w-3 h-3 mr-1" />Access Control</TabsTrigger>
+              <TabsTrigger value="analytics" className="flex-1"><BarChart2 className="w-3 h-3 mr-1" />Analytics</TabsTrigger>
             </TabsList>
 
             {/* Links & Embed */}
@@ -616,6 +740,10 @@ function AssetDetailDialog({ assetId, onClose, onRefresh }: AssetDetailDialogPro
                 </>
               )}
             </TabsContent>
+            {/* Analytics */}
+            <TabsContent value="analytics">
+              <AnalyticsPanel assetId={asset.id} />
+            </TabsContent>
           </Tabs>
         </DialogContent>
       </Dialog>
@@ -639,18 +767,22 @@ export default function MediaRepository() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [accessFilter, setAccessFilter] = useState<string>("all");
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [selectedAssetId, setSelectedAssetId] = useState<number | null>(null);
   const utils = trpc.useUtils();
 
-  const { data, isLoading, refetch } = trpc.mediaRepo.listAssets.useQuery({
+  const queryInput = {
     search: search || undefined,
     mediaType: typeFilter !== "all" ? (typeFilter as MediaType) : undefined,
     access: accessFilter !== "all" ? (accessFilter as "public" | "private") : undefined,
+    folder: selectedFolder !== null ? selectedFolder : undefined,
     page,
     pageSize: 24,
-  });
+  } as any;
+
+  const { data, isLoading, refetch } = trpc.mediaRepo.listAssets.useQuery(queryInput);
 
   const handleRefresh = () => {
     refetch();
@@ -658,96 +790,136 @@ export default function MediaRepository() {
   };
 
   const totalPages = data ? Math.ceil(data.total / 24) : 1;
+  const folders: string[] = (data as any)?.folders ?? [];
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">Media Repository</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Upload and manage media files with version history, access control, and embed links.
+    <div className="flex h-full min-h-screen">
+      {/* Folder Sidebar */}
+      <aside className="w-52 shrink-0 border-r border-border bg-card/50 flex flex-col">
+        <div className="p-3 border-b border-border">
+          <p className="font-semibold text-sm flex items-center gap-2">
+            <FolderOpen className="w-4 h-4 text-primary" /> Folders
           </p>
         </div>
-        <Button onClick={() => setUploadOpen(true)}>
-          <Upload className="w-4 h-4 mr-2" />Upload File
-        </Button>
-      </div>
-
-      {/* Filters */}
-      <div className="flex gap-3 mb-6 flex-wrap">
-        <div className="relative flex-1 min-w-48">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            placeholder="Search by title or tag…"
-            className="pl-9"
-          />
-        </div>
-        <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v); setPage(1); }}>
-          <SelectTrigger className="w-40"><SelectValue placeholder="All types" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All types</SelectItem>
-            {Object.entries(MEDIA_TYPE_LABELS).map(([k, v]) => (
-              <SelectItem key={k} value={k}>{v}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={accessFilter} onValueChange={(v) => { setAccessFilter(v); setPage(1); }}>
-          <SelectTrigger className="w-36"><SelectValue placeholder="All access" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All access</SelectItem>
-            <SelectItem value="public">Public</SelectItem>
-            <SelectItem value="private">Private</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Stats bar */}
-      {data && (
-        <p className="text-sm text-muted-foreground mb-4">
-          {data.total} file{data.total !== 1 ? "s" : ""} {search || typeFilter !== "all" || accessFilter !== "all" ? "matching filters" : "total"}
-        </p>
-      )}
-
-      {/* Grid */}
-      {isLoading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-          {Array.from({ length: 12 }).map((_, i) => (
-            <div key={i} className="h-32 rounded-lg bg-muted animate-pulse" />
+        <nav className="flex-1 overflow-y-auto p-2 space-y-0.5">
+          <button
+            onClick={() => { setSelectedFolder(null); setPage(1); }}
+            className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center gap-2 transition-colors ${
+              selectedFolder === null ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted text-muted-foreground"
+            }`}
+          >
+            <Folder className="w-4 h-4" /> All Assets
+            <span className="ml-auto text-xs">{data?.total ?? 0}</span>
+          </button>
+          {folders.map((f) => (
+            <button
+              key={f}
+              onClick={() => { setSelectedFolder(f); setPage(1); }}
+              className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center gap-2 transition-colors ${
+                selectedFolder === f ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted text-muted-foreground"
+              }`}
+            >
+              <Folder className="w-4 h-4 shrink-0" />
+              <span className="truncate">{f}</span>
+            </button>
           ))}
+          {folders.length === 0 && (
+            <p className="text-xs text-muted-foreground px-3 py-2">No folders yet. Assign a folder when uploading or in the asset detail.</p>
+          )}
+        </nav>
+      </aside>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="p-4 border-b border-border flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h1 className="text-xl font-bold">Media Repository</h1>
+            <p className="text-muted-foreground text-xs mt-0.5">
+              {selectedFolder ? `Folder: ${selectedFolder}` : "All files"}
+            </p>
+          </div>
+          <Button onClick={() => setUploadOpen(true)} size="sm">
+            <Upload className="w-4 h-4 mr-2" />Upload File
+          </Button>
         </div>
-      ) : data?.assets.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground">
-          <File className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p className="font-medium">No files found</p>
-          <p className="text-sm mt-1">Upload your first file to get started.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-          {data?.assets.map((asset) => (
-            <AssetCard
-              key={asset.id}
-              asset={asset}
-              onClick={() => setSelectedAssetId(asset.id)}
+
+        {/* Filters */}
+        <div className="flex gap-3 p-4 border-b border-border flex-wrap">
+          <div className="relative flex-1 min-w-48">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              placeholder="Search by title or tag…"
+              className="pl-9"
             />
-          ))}
+          </div>
+          <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v); setPage(1); }}>
+            <SelectTrigger className="w-36"><SelectValue placeholder="All types" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All types</SelectItem>
+              {Object.entries(MEDIA_TYPE_LABELS).map(([k, v]) => (
+                <SelectItem key={k} value={k}>{v}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={accessFilter} onValueChange={(v) => { setAccessFilter(v); setPage(1); }}>
+            <SelectTrigger className="w-32"><SelectValue placeholder="All access" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All access</SelectItem>
+              <SelectItem value="public">Public</SelectItem>
+              <SelectItem value="private">Private</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-      )}
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-3 mt-8">
-          <Button variant="outline" size="sm" onClick={() => setPage(p => p - 1)} disabled={page === 1}>
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <span className="text-sm text-muted-foreground">Page {page} of {totalPages}</span>
-          <Button variant="outline" size="sm" onClick={() => setPage(p => p + 1)} disabled={page === totalPages}>
-            <ChevronRight className="w-4 h-4" />
-          </Button>
+        {/* Grid */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {data && (
+            <p className="text-xs text-muted-foreground mb-3">
+              {data.total} file{data.total !== 1 ? "s" : ""} {search || typeFilter !== "all" || accessFilter !== "all" || selectedFolder ? "matching filters" : "total"}
+            </p>
+          )}
+
+          {isLoading ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+              {Array.from({ length: 12 }).map((_, i) => (
+                <div key={i} className="aspect-video rounded-lg bg-muted animate-pulse" />
+              ))}
+            </div>
+          ) : data?.assets.length === 0 ? (
+            <div className="text-center py-16 text-muted-foreground">
+              <File className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p className="font-medium">No files found</p>
+              <p className="text-sm mt-1">Upload your first file to get started.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+              {data?.assets.map((asset) => (
+                <AssetCard
+                  key={asset.id}
+                  asset={asset}
+                  onClick={() => setSelectedAssetId(asset.id)}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-3 mt-8">
+              <Button variant="outline" size="sm" onClick={() => setPage(p => p - 1)} disabled={page === 1}>
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <span className="text-sm text-muted-foreground">Page {page} of {totalPages}</span>
+              <Button variant="outline" size="sm" onClick={() => setPage(p => p + 1)} disabled={page === totalPages}>
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Upload dialog */}
       {uploadOpen && (
@@ -767,3 +939,4 @@ export default function MediaRepository() {
     </div>
   );
 }
+

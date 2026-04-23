@@ -18,15 +18,46 @@
 import { Router, Request, Response } from "express";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { getDb } from "../db";
+import { createHash } from "crypto";
 import {
   mediaAssets,
   mediaVersions,
   mediaAccessGrants,
+  mediaViewEvents,
 } from "../../drizzle/schema";
 
 const router = Router();
 
 // ─── Shared access check ──────────────────────────────────────────────────────
+
+function hashIp(ip: string): string {
+  return createHash("sha256").update(ip + "media-repo-salt").digest("hex").slice(0, 16);
+}
+
+async function recordView(
+  assetId: number,
+  viewType: "embed" | "direct",
+  req: Request,
+  grantId?: number,
+  viewerEmail?: string
+) {
+  try {
+    const db = await getDb();
+    if (!db) return;
+    const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ?? req.socket.remoteAddress ?? "";
+    const referer = (req.headers["referer"] as string) || null;
+    await db.insert(mediaViewEvents).values({
+      assetId,
+      grantId: grantId ?? null,
+      viewerEmail: viewerEmail ?? null,
+      referer,
+      ipHash: hashIp(ip),
+      viewType,
+    });
+  } catch {
+    // fire-and-forget, never block the response
+  }
+}
 
 async function resolveMedia(slug: string, token?: string) {
   const db = await getDb();
@@ -114,6 +145,9 @@ router.get("/media/:slug", async (req: Request, res: Response) => {
     return;
   }
 
+  // Record view event (fire-and-forget)
+  recordView(result.asset.id, "direct", req);
+
   // Redirect to the S3 URL (the bucket is public so no presigning needed)
   res.redirect(302, result.version.s3Url);
 });
@@ -157,6 +191,9 @@ router.get("/media/:slug/embed", async (req: Request, res: Response) => {
   const mimeType = version.mimeType ?? asset.mimeType ?? "application/octet-stream";
   const mediaType = asset.mediaType;
   const tokenParam = token ? `?token=${encodeURIComponent(token)}` : "";
+
+  // Record view event (fire-and-forget)
+  recordView(asset.id, "embed", req);
 
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.send(buildEmbedPage({ asset, version, fileUrl, mimeType, mediaType, tokenParam }));

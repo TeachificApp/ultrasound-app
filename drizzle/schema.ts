@@ -2569,6 +2569,10 @@ export const mediaAssets = mysqlTable("mediaAssets", {
   access: mysqlEnum("access", ["public", "private"]).notNull().default("private"),
   // Optional comma-separated tags for search/filter
   tags: text("tags"),
+  // Optional folder/category path (e.g. "Courses/Abdominal", "Marketing")
+  folder: varchar("folder", { length: 255 }),
+  // Thumbnail URL (auto-generated for images; manually set for video/other)
+  thumbnailUrl: text("thumbnailUrl"),
   // Soft-delete
   deletedAt: timestamp("deletedAt"),
   createdByUserId: int("createdByUserId").notNull(),
@@ -2625,3 +2629,25 @@ export const mediaAccessGrants = mysqlTable("mediaAccessGrants", {
 });
 export type MediaAccessGrant = typeof mediaAccessGrants.$inferSelect;
 export type InsertMediaAccessGrant = typeof mediaAccessGrants.$inferInsert;
+
+/**
+ * media_view_events — one row per view/play of a media asset.
+ * Recorded by the embed/serve endpoint on every request.
+ */
+export const mediaViewEvents = mysqlTable("mediaViewEvents", {
+  id: int("id").primaryKey().autoincrement(),
+  assetId: int("assetId").notNull(),
+  // Grant used for this view (NULL for public assets)
+  grantId: int("grantId"),
+  // Viewer email (from grant, if available)
+  viewerEmail: varchar("viewerEmail", { length: 320 }),
+  // Referrer URL (where the embed was hosted)
+  referer: text("referer"),
+  // Viewer IP (hashed for privacy)
+  ipHash: varchar("ipHash", { length: 64 }),
+  // "embed" | "direct"
+  viewType: mysqlEnum("viewType", ["embed", "direct"]).notNull().default("direct"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type MediaViewEvent = typeof mediaViewEvents.$inferSelect;
+export type InsertMediaViewEvent = typeof mediaViewEvents.$inferInsert;

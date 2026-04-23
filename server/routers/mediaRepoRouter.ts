@@ -20,7 +20,7 @@
 
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { and, desc, eq, isNull, like, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, like, or, sql } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
@@ -30,6 +30,7 @@ import {
   mediaAssets,
   mediaVersions,
   mediaAccessGrants,
+  mediaViewEvents,
 } from "../../drizzle/schema";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -170,6 +171,14 @@ export const mediaRepoRouter = router({
           )!
         );
       }
+      if ((input as any).folder !== undefined) {
+        const folderVal = (input as any).folder;
+        if (folderVal === null || folderVal === "") {
+          conditions.push(isNull(mediaAssets.folder));
+        } else {
+          conditions.push(eq(mediaAssets.folder, folderVal));
+        }
+      }
 
       const where = and(...conditions);
 
@@ -199,7 +208,18 @@ export const mediaRepoRouter = router({
         .from(mediaAssets)
         .where(where);
 
-      return { assets: enriched, total: count, page: input.page, pageSize: input.pageSize };
+      // Get all distinct folders for sidebar
+      const folderRows = await db
+        .selectDistinct({ folder: mediaAssets.folder })
+        .from(mediaAssets)
+        .where(isNull(mediaAssets.deletedAt))
+        .orderBy(mediaAssets.folder);
+      const folders = folderRows
+        .map(r => r.folder)
+        .filter((f): f is string => !!f)
+        .sort();
+
+      return { assets: enriched, total: count, page: input.page, pageSize: input.pageSize, folders };
     }),
 
   /**
@@ -506,6 +526,117 @@ export const mediaRepoRouter = router({
         .set({ revokedAt: new Date() })
         .where(eq(mediaAccessGrants.id, input.grantId));
       return { revoked: true };
+    }),
+
+  /**
+   * Update folder for an asset.
+   */
+  setFolder: protectedProcedure
+    .input(z.object({
+      id: z.number().int().positive(),
+      folder: z.string().max(255).nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      await db.update(mediaAssets).set({ folder: input.folder }).where(eq(mediaAssets.id, input.id));
+      return { updated: true };
+    }),
+
+  /**
+   * Set thumbnail URL for an asset.
+   */
+  setThumbnail: protectedProcedure
+    .input(z.object({
+      id: z.number().int().positive(),
+      thumbnailUrl: z.string().url().nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      await db.update(mediaAssets).set({ thumbnailUrl: input.thumbnailUrl }).where(eq(mediaAssets.id, input.id));
+      return { updated: true };
+    }),
+
+  /**
+   * Get distinct folder list.
+   */
+  listFolders: protectedProcedure
+    .query(async ({ ctx }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const rows = await db
+        .selectDistinct({ folder: mediaAssets.folder })
+        .from(mediaAssets)
+        .where(isNull(mediaAssets.deletedAt))
+        .orderBy(mediaAssets.folder);
+      return rows.map(r => r.folder).filter((f): f is string => !!f).sort();
+    }),
+
+  /**
+   * Get analytics for an asset: total views, unique viewer IPs, daily breakdown (last 30 days).
+   */
+  getAnalytics: protectedProcedure
+    .input(z.object({ assetId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 86400_000);
+
+      const [{ totalViews }] = await db
+        .select({ totalViews: sql<number>`count(*)` })
+        .from(mediaViewEvents)
+        .where(eq(mediaViewEvents.assetId, input.assetId));
+
+      const [{ uniqueViewers }] = await db
+        .select({ uniqueViewers: sql<number>`count(distinct ipHash)` })
+        .from(mediaViewEvents)
+        .where(eq(mediaViewEvents.assetId, input.assetId));
+
+      const [{ embedViews }] = await db
+        .select({ embedViews: sql<number>`count(*)` })
+        .from(mediaViewEvents)
+        .where(and(eq(mediaViewEvents.assetId, input.assetId), eq(mediaViewEvents.viewType, "embed")));
+
+      const [{ directViews }] = await db
+        .select({ directViews: sql<number>`count(*)` })
+        .from(mediaViewEvents)
+        .where(and(eq(mediaViewEvents.assetId, input.assetId), eq(mediaViewEvents.viewType, "direct")));
+
+      // Daily breakdown for last 30 days
+      const daily = await db
+        .select({
+          date: sql<string>`DATE(createdAt)`,
+          views: sql<number>`count(*)`,
+        })
+        .from(mediaViewEvents)
+        .where(and(
+          eq(mediaViewEvents.assetId, input.assetId),
+          gte(mediaViewEvents.createdAt, thirtyDaysAgo)
+        ))
+        .groupBy(sql`DATE(createdAt)`)
+        .orderBy(sql`DATE(createdAt)`);
+
+      // Top referers
+      const topReferers = await db
+        .select({
+          referer: mediaViewEvents.referer,
+          views: sql<number>`count(*)`,
+        })
+        .from(mediaViewEvents)
+        .where(and(
+          eq(mediaViewEvents.assetId, input.assetId),
+          sql`referer IS NOT NULL`
+        ))
+        .groupBy(mediaViewEvents.referer)
+        .orderBy(desc(sql`count(*)`));
+
+      return { totalViews, uniqueViewers, embedViews, directViews, daily, topReferers };
     }),
 
   /**
