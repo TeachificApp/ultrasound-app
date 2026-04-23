@@ -19,6 +19,8 @@ import { Router, Request, Response } from "express";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { getDb } from "../db";
 import { createHash } from "crypto";
+import https from "https";
+import http from "http";
 import {
   mediaAssets,
   mediaVersions,
@@ -125,7 +127,53 @@ function setCorsHeaders(res: Response) {
   res.setHeader("Content-Security-Policy", "frame-ancestors *");
 }
 
-// ─── GET /media/:slug — redirect to current S3 URL ───────────────────────────
+// ─── GET /media/:slug — serve content inline (no forced download) ────────────
+
+/**
+ * Determine whether a media type should be served via the embed viewer page
+ * (HTML wrapper with sandboxed iframe) rather than proxied directly.
+ * This covers HTML, SCORM, LMS, and ZIP packages.
+ */
+function needsViewerPage(mediaType: string, mimeType: string): boolean {
+  return (
+    mediaType === "html" ||
+    mediaType === "scorm" ||
+    mediaType === "lms" ||
+    mediaType === "zip" ||
+    mimeType === "text/html" ||
+    mimeType === "application/zip" ||
+    mimeType === "application/x-zip-compressed"
+  );
+}
+
+/**
+ * Proxy a remote URL through our server so we can set Content-Disposition: inline
+ * and the correct Content-Type, preventing the browser from forcing a download.
+ */
+function proxyInline(
+  fileUrl: string,
+  mimeType: string,
+  fileName: string,
+  res: Response
+): void {
+  const safeFileName = encodeURIComponent(fileName);
+  res.setHeader("Content-Disposition", `inline; filename="${safeFileName}"`);
+  res.setHeader("Content-Type", mimeType);
+  res.setHeader("Cache-Control", "public, max-age=3600");
+
+  const protocol = fileUrl.startsWith("https") ? https : http;
+  protocol
+    .get(fileUrl, (upstream) => {
+      // Forward content-length if available so the browser shows progress
+      const cl = upstream.headers["content-length"];
+      if (cl) res.setHeader("Content-Length", cl);
+      res.status(upstream.statusCode ?? 200);
+      upstream.pipe(res);
+    })
+    .on("error", () => {
+      if (!res.headersSent) res.status(502).send("Failed to fetch media file.");
+    });
+}
 
 router.get("/media/:slug", async (req: Request, res: Response) => {
   setCorsHeaders(res);
@@ -133,23 +181,51 @@ router.get("/media/:slug", async (req: Request, res: Response) => {
   const result = await resolveMedia(req.params.slug, token);
 
   if (!result) {
-    res.status(404).send("Media not found.");
+    res.status(404).send(errorPage("Media not found."));
     return;
   }
   if (!result.allowed) {
-    res.status(403).send("Access denied. A valid token is required.");
+    res.status(403).send(errorPage("Access denied. A valid token is required."));
     return;
   }
   if (!result.version) {
-    res.status(404).send("No file version available.");
+    res.status(404).send(errorPage("No file version available."));
     return;
   }
 
-  // Record view event (fire-and-forget)
-  recordView(result.asset.id, "direct", req);
+  const { asset, version } = result;
+  const mimeType = version.mimeType ?? asset.mimeType ?? "application/octet-stream";
+  const mediaType = asset.mediaType;
+  const tokenParam = token ? `?token=${encodeURIComponent(token)}` : "";
 
-  // Redirect to the S3 URL (the bucket is public so no presigning needed)
-  res.redirect(302, result.version.s3Url);
+  // Record view event (fire-and-forget)
+  recordView(asset.id, "direct", req);
+
+  // For HTML, SCORM, LMS, and ZIP: render the full embed viewer page so the
+  // content displays in a sandboxed iframe rather than downloading.
+  if (needsViewerPage(mediaType, mimeType)) {
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(
+      buildEmbedPage({
+        asset,
+        version,
+        fileUrl: version.s3Url,
+        mimeType,
+        mediaType,
+        tokenParam,
+      })
+    );
+    return;
+  }
+
+  // For all other types: proxy through our server with Content-Disposition: inline
+  // so the browser renders the content (video, audio, image, PDF) instead of downloading.
+  proxyInline(
+    version.s3Url,
+    mimeType,
+    version.fileName ?? asset.title,
+    res
+  );
 });
 
 // ─── GET /media/:slug/info — JSON metadata ────────────────────────────────────
@@ -272,22 +348,67 @@ function buildEmbedPage(opts: EmbedPageOptions): string {
               sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
               title="${escHtml(asset.title)}"></iframe>`;
   } else if (mediaType === "scorm" || mediaType === "lms") {
-    // SCORM/LMS: serve in iframe with scripts allowed
+    // SCORM/LMS ZIP package: show a launch page with an open-in-new-tab button
+    // and a download option. The ZIP itself cannot be iframed directly — the LMS
+    // host must extract and serve it. We provide the download link so the admin
+    // can deploy it to their LMS, and an "Open" button for direct inspection.
     contentHtml = `
-      <iframe src="${escHtml(fileUrl)}" style="width:100%;height:100%;border:none;"
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
-              allow="fullscreen"
-              title="${escHtml(asset.title)}"></iframe>`;
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:20px;padding:40px;background:#f0fdf4;">
+        <div style="font-size:56px;">🎓</div>
+        <div style="text-align:center;">
+          <p style="font-size:18px;font-weight:700;color:#111827;margin:0 0 6px;">${escHtml(asset.title)}</p>
+          <p style="font-size:13px;color:#6b7280;margin:0;">SCORM / LMS Package</p>
+        </div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">
+          <a href="${escHtml(fileUrl)}" target="_blank" rel="noopener"
+             style="padding:10px 22px;background:#189aa1;color:#fff;text-decoration:none;border-radius:8px;font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:6px;">
+            &#x1F517; Open Package
+          </a>
+          <a href="${escHtml(fileUrl)}" download
+             style="padding:10px 22px;background:#fff;color:#374151;text-decoration:none;border-radius:8px;font-size:14px;font-weight:600;border:1px solid #d1d5db;display:inline-flex;align-items:center;gap:6px;">
+            &#x2B07; Download ZIP
+          </a>
+        </div>
+        <p style="font-size:12px;color:#9ca3af;text-align:center;max-width:400px;margin:0;">
+          To run this SCORM package in your LMS, download the ZIP and upload it to your learning management system.
+        </p>
+      </div>`;
+  } else if (mediaType === "zip") {
+    // Generic ZIP: show a viewer page with open and download options
+    contentHtml = `
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:20px;padding:40px;background:#fafafa;">
+        <div style="font-size:56px;">🗜️</div>
+        <div style="text-align:center;">
+          <p style="font-size:18px;font-weight:700;color:#111827;margin:0 0 6px;">${escHtml(asset.title)}</p>
+          <p style="font-size:13px;color:#6b7280;margin:0;">ZIP Archive</p>
+        </div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">
+          <a href="${escHtml(fileUrl)}" target="_blank" rel="noopener"
+             style="padding:10px 22px;background:#189aa1;color:#fff;text-decoration:none;border-radius:8px;font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:6px;">
+            &#x1F517; Open File
+          </a>
+          <a href="${escHtml(fileUrl)}" download
+             style="padding:10px 22px;background:#fff;color:#374151;text-decoration:none;border-radius:8px;font-size:14px;font-weight:600;border:1px solid #d1d5db;display:inline-flex;align-items:center;gap:6px;">
+            &#x2B07; Download
+          </a>
+        </div>
+      </div>`;
   } else {
-    // Generic: show download link for unsupported types
+    // Generic fallback: open-in-new-tab + download
     contentHtml = `
-      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:16px;padding:32px;">
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:16px;padding:32px;background:#f9fafb;">
         <div style="font-size:48px;">📄</div>
         <p style="font-size:16px;font-weight:600;color:#111827;margin:0;">${escHtml(asset.title)}</p>
-        <a href="${escHtml(fileUrl)}" download
-           style="padding:10px 20px;background:#189aa1;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;">
-          Download File
-        </a>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+          <a href="${escHtml(fileUrl)}" target="_blank" rel="noopener"
+             style="padding:10px 20px;background:#189aa1;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;">
+            Open File
+          </a>
+          <a href="${escHtml(fileUrl)}" download
+             style="padding:10px 20px;background:#fff;color:#374151;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;border:1px solid #d1d5db;">
+            Download
+          </a>
+        </div>
       </div>`;
   }
 
