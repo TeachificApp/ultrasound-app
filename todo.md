@@ -1046,3 +1046,16 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] media_view_events table to track embed/link views
 - [ ] Embed endpoint records view events (assetId, grantId, IP, referer)
 - [ ] Analytics panel in asset detail dialog (total views, unique viewers, daily chart)
+
+## Media Repository — List View Column Sorting
+- [x] Add sortKey + sortDir state (default: name asc)
+- [x] Render clickable column headers (Name, Type, Folder, Size, Access) with sort arrow indicators
+- [x] Client-side sort logic for all five columns
+- [x] Sort arrows: up = asc, down = desc, neutral = unsorted
+
+## Media Repository — Search Function
+- [x] Debounce search input (300ms) so query fires only after user stops typing
+- [x] Reset page to 1 on new search term
+- [x] Server-side listAssets filters by title and tags using LIKE
+- [x] queryInput memoized with useMemo to prevent infinite re-fetch
+- [x] Search works in both list view and grid view

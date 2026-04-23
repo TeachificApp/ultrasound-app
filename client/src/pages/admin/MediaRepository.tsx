@@ -10,7 +10,7 @@
  * - Copy direct link, embed code (iframe), and embed URL
  */
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,6 +71,9 @@ import {
   LayoutGrid,
   LayoutList,
   ArrowLeft,
+  ChevronsUpDown,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -970,6 +973,7 @@ function AssetDetailDialog({ assetId, onClose, onRefresh }: AssetDetailDialogPro
 
 export default function MediaRepository() {
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [accessFilter, setAccessFilter] = useState<string>("all");
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
@@ -978,14 +982,24 @@ export default function MediaRepository() {
   const [selectedAssetId, setSelectedAssetId] = useState<number | null>(null);
   const utils = trpc.useUtils();
 
-  const queryInput = {
-    search: search || undefined,
+  // Debounce search input — fire query 300ms after user stops typing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const queryInput = useMemo(() => ({
+    search: debouncedSearch || undefined,
     mediaType: typeFilter !== "all" ? (typeFilter as MediaType) : undefined,
     access: accessFilter !== "all" ? (accessFilter as "public" | "private") : undefined,
     folder: selectedFolder !== null ? selectedFolder : undefined,
     page,
     pageSize: 24,
-  } as any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  }) as any, [debouncedSearch, typeFilter, accessFilter, selectedFolder, page]);
 
   const { data, isLoading, refetch } = trpc.mediaRepo.listAssets.useQuery(queryInput);
   const { data: foldersData, refetch: refetchFolders } = trpc.mediaRepo.listFoldersFull.useQuery();
@@ -1019,6 +1033,36 @@ export default function MediaRepository() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showTrash, setShowTrash] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
+  type SortKey = "name" | "type" | "folder" | "size" | "access";
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  function handleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir(d => d === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
+
+  const sortedAssets = [...(data?.assets ?? [])].sort((a, b) => {
+    let cmp = 0;
+    if (sortKey === "name") {
+      cmp = (a.title ?? "").localeCompare(b.title ?? "");
+    } else if (sortKey === "type") {
+      cmp = (a.mediaType ?? "").localeCompare(b.mediaType ?? "");
+    } else if (sortKey === "folder") {
+      cmp = (a.folder ?? "").localeCompare(b.folder ?? "");
+    } else if (sortKey === "size") {
+      const sa = a.currentVersion?.fileSize ?? 0;
+      const sb = b.currentVersion?.fileSize ?? 0;
+      cmp = sa - sb;
+    } else if (sortKey === "access") {
+      cmp = (a.access ?? "").localeCompare(b.access ?? "");
+    }
+    return sortDir === "asc" ? cmp : -cmp;
+  });
 
   const { data: trashedData, refetch: refetchTrashed } = trpc.mediaRepo.listTrashed.useQuery(
     undefined,
@@ -1327,15 +1371,70 @@ export default function MediaRepository() {
               {/* Column headers */}
               <div className="flex items-center gap-3 px-3 py-2 bg-muted/50 border-b border-border text-xs font-semibold text-muted-foreground select-none">
                 <div className="w-8 shrink-0" />
-                <span className="flex-1">Name</span>
-                <span className="hidden sm:block w-20 shrink-0">Type</span>
-                <span className="hidden md:block w-28 shrink-0">Folder</span>
-                <span className="hidden lg:block w-16 shrink-0 text-right">Size</span>
-                <span className="hidden sm:block w-16 shrink-0 text-right">Access</span>
+                {/* Name */}
+                <button
+                  className="flex-1 flex items-center gap-1 hover:text-foreground transition-colors text-left"
+                  onClick={() => handleSort("name")}
+                >
+                  Name
+                  {sortKey === "name" ? (
+                    sortDir === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+                  ) : (
+                    <ChevronsUpDown className="w-3 h-3 opacity-40" />
+                  )}
+                </button>
+                {/* Type */}
+                <button
+                  className="hidden sm:flex items-center gap-1 w-20 shrink-0 hover:text-foreground transition-colors"
+                  onClick={() => handleSort("type")}
+                >
+                  Type
+                  {sortKey === "type" ? (
+                    sortDir === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+                  ) : (
+                    <ChevronsUpDown className="w-3 h-3 opacity-40" />
+                  )}
+                </button>
+                {/* Folder */}
+                <button
+                  className="hidden md:flex items-center gap-1 w-28 shrink-0 hover:text-foreground transition-colors"
+                  onClick={() => handleSort("folder")}
+                >
+                  Folder
+                  {sortKey === "folder" ? (
+                    sortDir === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+                  ) : (
+                    <ChevronsUpDown className="w-3 h-3 opacity-40" />
+                  )}
+                </button>
+                {/* Size */}
+                <button
+                  className="hidden lg:flex items-center justify-end gap-1 w-16 shrink-0 hover:text-foreground transition-colors"
+                  onClick={() => handleSort("size")}
+                >
+                  Size
+                  {sortKey === "size" ? (
+                    sortDir === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+                  ) : (
+                    <ChevronsUpDown className="w-3 h-3 opacity-40" />
+                  )}
+                </button>
+                {/* Access */}
+                <button
+                  className="hidden sm:flex items-center justify-end gap-1 w-16 shrink-0 hover:text-foreground transition-colors"
+                  onClick={() => handleSort("access")}
+                >
+                  Access
+                  {sortKey === "access" ? (
+                    sortDir === "asc" ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+                  ) : (
+                    <ChevronsUpDown className="w-3 h-3 opacity-40" />
+                  )}
+                </button>
               </div>
               {/* Rows */}
               <div className="divide-y divide-border">
-                {data?.assets.map((asset) => (
+                {sortedAssets.map((asset) => (
                   <AssetListRow
                     key={asset.id}
                     asset={asset}
