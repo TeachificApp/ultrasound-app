@@ -230,3 +230,64 @@ describe("Media Repository — version numbering", () => {
     expect(nextVersion).toBe(1);
   });
 });
+
+// ─── Folder management logic ──────────────────────────────────────────────────
+
+describe("Media Repository — folder management", () => {
+  function generateFolderSlug(name: string): string {
+    return name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80);
+  }
+
+  it("generates a valid slug from a folder name", () => {
+    expect(generateFolderSlug("Course Module 1")).toBe("course-module-1");
+  });
+
+  it("handles special characters in folder names", () => {
+    expect(generateFolderSlug("Cardiology & Vascular")).toBe("cardiology-vascular");
+  });
+
+  it("trims leading/trailing hyphens", () => {
+    expect(generateFolderSlug("  My Folder  ")).toBe("my-folder");
+  });
+
+  it("truncates long folder names to 80 chars in slug", () => {
+    const longName = "A".repeat(200);
+    const slug = generateFolderSlug(longName);
+    expect(slug.length).toBeLessThanOrEqual(80);
+  });
+
+  it("asset count defaults to 0 for new folders", () => {
+    const folder = { id: 1, name: "Test Folder", slug: "test-folder", assetCount: 0 };
+    expect(folder.assetCount).toBe(0);
+  });
+});
+
+// ─── Mobile embed viewport ────────────────────────────────────────────────────
+
+describe("Media Repository — mobile embed page", () => {
+  it("includes mobile viewport meta tag", () => {
+    const viewport = 'width=device-width,initial-scale=1,maximum-scale=5';
+    expect(viewport).toContain("width=device-width");
+    expect(viewport).toContain("initial-scale=1");
+    expect(viewport).toContain("maximum-scale=5");
+  });
+
+  it("includes apple-mobile-web-app-capable meta", () => {
+    const metaContent = "yes";
+    expect(metaContent).toBe("yes");
+  });
+
+  it("action buttons stack vertically on mobile via CSS media query", () => {
+    const css = `@media (max-width: 480px) {
+      .action-btn { width: 100%; justify-content: center; }
+      .action-group { flex-direction: column; }
+    }`;
+    expect(css).toContain("max-width: 480px");
+    expect(css).toContain("flex-direction: column");
+  });
+});

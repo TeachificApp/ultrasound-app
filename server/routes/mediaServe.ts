@@ -399,19 +399,17 @@ function buildEmbedPage(opts: EmbedPageOptions): string {
     // host must extract and serve it. We provide the download link so the admin
     // can deploy it to their LMS, and an "Open" button for direct inspection.
     contentHtml = `
-      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:20px;padding:40px;background:#f0fdf4;">
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:16px;padding:clamp(20px,5vw,40px);background:#f0fdf4;">
         <div style="font-size:56px;">🎓</div>
         <div style="text-align:center;">
           <p style="font-size:18px;font-weight:700;color:#111827;margin:0 0 6px;">${escHtml(asset.title)}</p>
           <p style="font-size:13px;color:#6b7280;margin:0;">SCORM / LMS Package</p>
         </div>
-        <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">
-          <a href="${escHtml(fileUrl)}" target="_blank" rel="noopener"
-             style="padding:10px 22px;background:#189aa1;color:#fff;text-decoration:none;border-radius:8px;font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:6px;">
+        <div class="action-group">
+          <a href="${escHtml(fileUrl)}" target="_blank" rel="noopener" class="action-btn action-btn-primary">
             &#x1F517; Open Package
           </a>
-          <a href="${escHtml(fileUrl)}" download
-             style="padding:10px 22px;background:#fff;color:#374151;text-decoration:none;border-radius:8px;font-size:14px;font-weight:600;border:1px solid #d1d5db;display:inline-flex;align-items:center;gap:6px;">
+          <a href="${escHtml(fileUrl)}" download class="action-btn action-btn-secondary">
             &#x2B07; Download ZIP
           </a>
         </div>
@@ -422,19 +420,17 @@ function buildEmbedPage(opts: EmbedPageOptions): string {
   } else if (mediaType === "zip") {
     // Generic ZIP: show a viewer page with open and download options
     contentHtml = `
-      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:20px;padding:40px;background:#fafafa;">
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:16px;padding:clamp(20px,5vw,40px);background:#fafafa;">
         <div style="font-size:56px;">🗜️</div>
         <div style="text-align:center;">
           <p style="font-size:18px;font-weight:700;color:#111827;margin:0 0 6px;">${escHtml(asset.title)}</p>
           <p style="font-size:13px;color:#6b7280;margin:0;">ZIP Archive</p>
         </div>
-        <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">
-          <a href="${escHtml(fileUrl)}" target="_blank" rel="noopener"
-             style="padding:10px 22px;background:#189aa1;color:#fff;text-decoration:none;border-radius:8px;font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:6px;">
+        <div class="action-group">
+          <a href="${escHtml(fileUrl)}" target="_blank" rel="noopener" class="action-btn action-btn-primary">
             &#x1F517; Open File
           </a>
-          <a href="${escHtml(fileUrl)}" download
-             style="padding:10px 22px;background:#fff;color:#374151;text-decoration:none;border-radius:8px;font-size:14px;font-weight:600;border:1px solid #d1d5db;display:inline-flex;align-items:center;gap:6px;">
+          <a href="${escHtml(fileUrl)}" download class="action-btn action-btn-secondary">
             &#x2B07; Download
           </a>
         </div>
@@ -445,13 +441,11 @@ function buildEmbedPage(opts: EmbedPageOptions): string {
       <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:16px;padding:32px;background:#f9fafb;">
         <div style="font-size:48px;">📄</div>
         <p style="font-size:16px;font-weight:600;color:#111827;margin:0;">${escHtml(asset.title)}</p>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
-          <a href="${escHtml(fileUrl)}" target="_blank" rel="noopener"
-             style="padding:10px 20px;background:#189aa1;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;">
+        <div class="action-group">
+          <a href="${escHtml(fileUrl)}" target="_blank" rel="noopener" class="action-btn action-btn-primary">
             Open File
           </a>
-          <a href="${escHtml(fileUrl)}" download
-             style="padding:10px 20px;background:#fff;color:#374151;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;border:1px solid #d1d5db;">
+          <a href="${escHtml(fileUrl)}" download class="action-btn action-btn-secondary">
             Download
           </a>
         </div>
@@ -462,12 +456,15 @@ function buildEmbedPage(opts: EmbedPageOptions): string {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <title>${escHtml(asset.title)}</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
-                 font-family: system-ui, -apple-system, sans-serif; background: #000; }
+                 font-family: system-ui, -apple-system, sans-serif; background: #000;
+                 -webkit-text-size-adjust: 100%; }
     .embed-wrapper { width: 100%; height: 100%; display: flex; flex-direction: column; }
     .embed-content { flex: 1; overflow: hidden; position: relative; }
     .embed-content > * { position: absolute; inset: 0; }
@@ -476,6 +473,28 @@ function buildEmbedPage(opts: EmbedPageOptions): string {
     .embed-content.image-bg { background: #111; }
     .embed-content.doc-bg { background: #fff; }
     .embed-content.download-bg { background: #f9fafb; }
+    /* Mobile-friendly touch targets */
+    a, button { min-height: 44px; min-width: 44px; }
+    /* Responsive action buttons */
+    .action-btn {
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .action-btn-primary { background: #189aa1; color: #fff; border: none; }
+    .action-btn-secondary { background: #fff; color: #374151; border: 1px solid #d1d5db; }
+    .action-group { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+    @media (max-width: 480px) {
+      .action-btn { width: 100%; justify-content: center; font-size: 14px; }
+      .action-group { flex-direction: column; align-items: stretch; width: 100%; max-width: 320px; }
+    }
   </style>
 </head>
 <body>

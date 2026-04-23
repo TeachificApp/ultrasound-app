@@ -867,23 +867,51 @@ export default function MediaRepository() {
   const totalPages = data ? Math.ceil(data.total / 24) : 1;
   const folders = foldersData ?? [];
 
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   return (
-    <div className="flex h-full min-h-screen">
+    <div className="flex h-full min-h-screen relative">
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-20 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Folder Sidebar */}
-      <aside className="w-56 shrink-0 border-r border-border bg-card/50 flex flex-col">
+      <aside className={`
+        fixed md:relative z-30 md:z-auto
+        top-0 left-0 h-full md:h-auto
+        w-64 md:w-56 shrink-0
+        border-r border-border bg-card
+        flex flex-col
+        transition-transform duration-200
+        ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
+      `}>
         <div className="p-3 border-b border-border flex items-center justify-between">
           <p className="font-semibold text-sm flex items-center gap-2">
             <FolderOpen className="w-4 h-4 text-primary" /> Folders
           </p>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="w-6 h-6"
-            title="New folder"
-            onClick={() => setCreatingFolder(true)}
-          >
-            <span className="text-lg leading-none">+</span>
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="w-6 h-6"
+              title="New folder"
+              onClick={() => setCreatingFolder(true)}
+            >
+              <span className="text-lg leading-none">+</span>
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="w-6 h-6 md:hidden"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
 
         {/* New folder input */}
@@ -994,23 +1022,34 @@ export default function MediaRepository() {
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Header */}
-        <div className="p-4 border-b border-border flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <h1 className="text-xl font-bold">Media Repository</h1>
-            <p className="text-muted-foreground text-xs mt-0.5">
-              {selectedFolder ? `Folder: ${selectedFolder}` : "All files"}
-            </p>
+        <div className="p-3 sm:p-4 border-b border-border flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            {/* Mobile hamburger to open folder sidebar */}
+            <Button
+              size="icon"
+              variant="ghost"
+              className="md:hidden w-8 h-8 shrink-0"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <FolderOpen className="w-4 h-4" />
+            </Button>
+            <div>
+              <h1 className="text-lg sm:text-xl font-bold">Media Repository</h1>
+              <p className="text-muted-foreground text-xs mt-0.5">
+                {selectedFolder ? `Folder: ${selectedFolder}` : "All files"}
+              </p>
+            </div>
           </div>
           <Button onClick={() => setUploadOpen(true)} size="sm">
-            <Upload className="w-4 h-4 mr-2" />Upload File
+            <Upload className="w-4 h-4 mr-1 sm:mr-2" /><span className="hidden sm:inline">Upload File</span><span className="sm:hidden">Upload</span>
           </Button>
         </div>
 
         {/* Filters */}
-        <div className="flex gap-3 p-4 border-b border-border flex-wrap">
-          <div className="relative flex-1 min-w-48">
+        <div className="flex gap-2 sm:gap-3 p-3 sm:p-4 border-b border-border flex-wrap">
+          <div className="relative flex-1 min-w-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               value={search}
@@ -1020,7 +1059,7 @@ export default function MediaRepository() {
             />
           </div>
           <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v); setPage(1); }}>
-            <SelectTrigger className="w-36"><SelectValue placeholder="All types" /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-36"><SelectValue placeholder="All types" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All types</SelectItem>
               {Object.entries(MEDIA_TYPE_LABELS).map(([k, v]) => (
@@ -1029,7 +1068,7 @@ export default function MediaRepository() {
             </SelectContent>
           </Select>
           <Select value={accessFilter} onValueChange={(v) => { setAccessFilter(v); setPage(1); }}>
-            <SelectTrigger className="w-32"><SelectValue placeholder="All access" /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-32"><SelectValue placeholder="All access" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All access</SelectItem>
               <SelectItem value="public">Public</SelectItem>
