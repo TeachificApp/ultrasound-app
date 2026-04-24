@@ -2677,9 +2677,19 @@ export const lmsCourses = mysqlTable("lms_courses", {
   status: mysqlEnum("status", ["draft", "public", "hidden", "private"]).default("draft").notNull(),
   type: mysqlEnum("type", ["course", "quiz", "download"]).default("course").notNull(),
   brand: mysqlEnum("brand", ["aaus", "iheartecho"]).default("aaus").notNull(),
-  price: int("price").default(0).notNull(), // cents
+  price: int("price").default(0).notNull(), // cents — used for one_time and payment_plan total
   isFree: boolean("is_free").default(false).notNull(),
   currency: varchar("currency", { length: 8 }).default("usd").notNull(),
+  // Extended pricing model
+  pricingType: mysqlEnum("pricing_type", ["free", "one_time", "subscription", "payment_plan"]).default("one_time").notNull(),
+  subscriptionInterval: mysqlEnum("subscription_interval", ["monthly", "quarterly", "annual"]),
+  // Payment plan: down payment (cents) + N installments of installmentAmount (cents)
+  downPayment: int("down_payment").default(0), // cents
+  installmentCount: int("installment_count").default(0),
+  installmentAmount: int("installment_amount").default(0), // cents per installment
+  installmentIntervalDays: int("installment_interval_days").default(30), // days between installments
+  // Stripe IDs for subscription/payment-plan products (created on first checkout)
+  stripePriceId: varchar("stripe_price_id", { length: 255 }),
   // SEO / landing page
   metaTitle: varchar("meta_title", { length: 255 }),
   metaDescription: text("meta_description"),

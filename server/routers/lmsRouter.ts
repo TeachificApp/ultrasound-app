@@ -377,43 +377,137 @@ export const lmsLearnerRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
-      if (course.isFree) throw new TRPCError({ code: "BAD_REQUEST", message: "Use enrollFree for free courses" });
+      const pricingType = course.pricingType ?? (course.isFree ? "free" : "one_time");
+      if (pricingType === "free") throw new TRPCError({ code: "BAD_REQUEST", message: "Use enrollFree for free courses" });
 
       const Stripe = (await import("stripe")).default;
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2026-03-25.dahlia" });
 
       // Create order record
+      const orderAmount = pricingType === "payment_plan"
+        ? (course.downPayment ?? 0)
+        : course.price * input.seats;
       const [orderResult] = await db.insert(lmsOrders).values({
         userId: ctx.user.id, courseId: course.id,
-        amount: course.price * input.seats,
+        amount: orderAmount,
         affiliateId: null, seats: input.seats, status: "pending",
       }).$returningId();
 
-      const session = await stripe.checkout.sessions.create({
-        mode: "payment",
-        customer_email: ctx.user.email ?? undefined,
-        allow_promotion_codes: true,
-        line_items: [{
-          price_data: {
-            currency: course.currency,
-            product_data: { name: course.title, description: course.subtitle ?? undefined },
-            unit_amount: course.price,
-          },
-          quantity: input.seats,
-        }],
-        success_url: `${input.origin}/learn/${course.slug}/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${input.origin}/learn/${course.slug}`,
-        client_reference_id: ctx.user.id.toString(),
-        metadata: {
-          user_id: ctx.user.id.toString(),
-          course_id: course.id.toString(),
-          order_id: orderResult.id.toString(),
-          affiliate_code: input.affiliateCode ?? "",
-          seats: input.seats.toString(),
-        },
-      });
+      const commonMeta = {
+        user_id: ctx.user.id.toString(),
+        course_id: course.id.toString(),
+        order_id: orderResult.id.toString(),
+        affiliate_code: input.affiliateCode ?? "",
+        seats: input.seats.toString(),
+        pricing_type: pricingType,
+      };
+      const successUrl = `${input.origin}/learn/${course.slug}/success?session_id={CHECKOUT_SESSION_ID}`;
+      const cancelUrl = `${input.origin}/learn/${course.slug}`;
 
-      // Update order with session id
+      let session: any;
+
+      if (pricingType === "one_time") {
+        session = await stripe.checkout.sessions.create({
+          mode: "payment",
+          customer_email: ctx.user.email ?? undefined,
+          allow_promotion_codes: true,
+          line_items: [{
+            price_data: {
+              currency: course.currency,
+              product_data: { name: course.title, description: course.subtitle ?? undefined },
+              unit_amount: course.price,
+            },
+            quantity: input.seats,
+          }],
+          success_url: successUrl, cancel_url: cancelUrl,
+          client_reference_id: ctx.user.id.toString(),
+          metadata: commonMeta,
+        });
+
+      } else if (pricingType === "subscription") {
+        // Create or reuse a Stripe Price for this course subscription
+        let stripePriceId = course.stripePriceId;
+        if (!stripePriceId) {
+          const intervalMap: Record<string, "month" | "year"> = { monthly: "month", quarterly: "month", annual: "year" };
+          const intervalCountMap: Record<string, number> = { monthly: 1, quarterly: 3, annual: 1 };
+          const interval = course.subscriptionInterval ?? "monthly";
+          const stripeProduct = await stripe.products.create({
+            name: course.title,
+            description: course.subtitle ?? undefined,
+            metadata: { course_id: course.id.toString() },
+          });
+          const stripePrice = await stripe.prices.create({
+            product: stripeProduct.id,
+            unit_amount: course.price,
+            currency: course.currency,
+            recurring: { interval: intervalMap[interval], interval_count: intervalCountMap[interval] },
+          });
+          stripePriceId = stripePrice.id;
+          await db.update(lmsCourses).set({ stripePriceId }).where(eq(lmsCourses.id, course.id));
+        }
+        session = await stripe.checkout.sessions.create({
+          mode: "subscription",
+          customer_email: ctx.user.email ?? undefined,
+          allow_promotion_codes: true,
+          line_items: [{ price: stripePriceId, quantity: 1 }],
+          success_url: successUrl, cancel_url: cancelUrl,
+          client_reference_id: ctx.user.id.toString(),
+          metadata: commonMeta,
+        });
+
+      } else if (pricingType === "payment_plan") {
+        // Charge down payment now; installments handled via subscription
+        const downPayment = course.downPayment ?? 0;
+        const installmentAmount = course.installmentAmount ?? 0;
+        const installmentCount = course.installmentCount ?? 0;
+        const intervalDays = course.installmentIntervalDays ?? 30;
+        const lineItems: any[] = [];
+        if (downPayment > 0) {
+          lineItems.push({
+            price_data: {
+              currency: course.currency,
+              product_data: { name: `${course.title} — Down Payment` },
+              unit_amount: downPayment,
+            },
+            quantity: 1,
+          });
+        }
+        if (installmentAmount > 0 && installmentCount > 0) {
+          // Add installments as additional line items (Stripe doesn't natively support deferred installments
+          // in a single checkout; we model them as a subscription with a fixed billing cycle count)
+          let stripePriceId = course.stripePriceId;
+          if (!stripePriceId) {
+            const stripeProduct = await stripe.products.create({
+              name: `${course.title} — Installment`,
+              metadata: { course_id: course.id.toString() },
+            });
+            const intervalMonths = Math.round(intervalDays / 30) || 1;
+            const stripePrice = await stripe.prices.create({
+              product: stripeProduct.id,
+              unit_amount: installmentAmount,
+              currency: course.currency,
+              recurring: { interval: "month", interval_count: intervalMonths },
+            });
+            stripePriceId = stripePrice.id;
+            await db.update(lmsCourses).set({ stripePriceId }).where(eq(lmsCourses.id, course.id));
+          }
+          lineItems.push({ price: stripePriceId, quantity: 1 });
+        }
+        // Use payment mode for down-payment-only, subscription mode when installments exist
+        const hasInstallments = installmentAmount > 0 && installmentCount > 0;
+        session = await stripe.checkout.sessions.create({
+          mode: hasInstallments ? "subscription" : "payment",
+          customer_email: ctx.user.email ?? undefined,
+          allow_promotion_codes: true,
+          line_items: lineItems,
+          success_url: successUrl, cancel_url: cancelUrl,
+          client_reference_id: ctx.user.id.toString(),
+          metadata: { ...commonMeta, installment_count: installmentCount.toString() },
+        });
+      } else {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Unknown pricing type" });
+      }
+
       await db.update(lmsOrders).set({ stripeSessionId: session.id }).where(eq(lmsOrders.id, orderResult.id));
       return { checkoutUrl: session.url };
     }),
@@ -483,8 +577,14 @@ export const lmsAdminRouter = router({
       subtitle: z.string().max(500).optional(),
       type: z.enum(["course", "quiz", "download"]).default("course"),
       brand: z.enum(["aaus", "iheartecho"]).default("aaus"),
+      pricingType: z.enum(["free", "one_time", "subscription", "payment_plan"]).default("one_time"),
       price: z.number().int().min(0).default(0),
       isFree: z.boolean().default(false),
+      subscriptionInterval: z.enum(["monthly", "quarterly", "annual"]).optional(),
+      downPayment: z.number().int().min(0).optional(),
+      installmentCount: z.number().int().min(0).optional(),
+      installmentAmount: z.number().int().min(0).optional(),
+      installmentIntervalDays: z.number().int().min(1).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -492,10 +592,17 @@ export const lmsAdminRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const base = generateSlug(input.title);
       const slug = await uniqueSlug(db, base);
+      const isFree = input.pricingType === "free" || input.isFree;
       const [result] = await db.insert(lmsCourses).values({
         slug, title: input.title, subtitle: input.subtitle ?? null,
         type: input.type, brand: input.brand, price: input.price,
-        isFree: input.isFree, createdByUserId: ctx.user.id,
+        isFree, pricingType: input.pricingType,
+        subscriptionInterval: input.subscriptionInterval ?? null,
+        downPayment: input.downPayment ?? null,
+        installmentCount: input.installmentCount ?? null,
+        installmentAmount: input.installmentAmount ?? null,
+        installmentIntervalDays: input.installmentIntervalDays ?? null,
+        createdByUserId: ctx.user.id,
       }).$returningId();
       // Auto-create landing page stub
       await db.insert(lmsLandingPages).values({ courseId: result.id, heroTitle: input.title, ctaText: "Enroll Now" });
@@ -514,6 +621,12 @@ export const lmsAdminRouter = router({
       brand: z.enum(["aaus", "iheartecho"]).optional(),
       price: z.number().int().min(0).optional(),
       isFree: z.boolean().optional(),
+      pricingType: z.enum(["free", "one_time", "subscription", "payment_plan"]).optional(),
+      subscriptionInterval: z.enum(["monthly", "quarterly", "annual"]).nullable().optional(),
+      downPayment: z.number().int().min(0).nullable().optional(),
+      installmentCount: z.number().int().min(0).nullable().optional(),
+      installmentAmount: z.number().int().min(0).nullable().optional(),
+      installmentIntervalDays: z.number().int().min(1).nullable().optional(),
       hasCertificate: z.boolean().optional(),
       isDrip: z.boolean().optional(),
       metaTitle: z.string().optional(),
@@ -523,8 +636,14 @@ export const lmsAdminRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const { id, ...updates } = input;
-      const filtered = Object.fromEntries(Object.entries(updates).filter(([, v]) => v !== undefined));
+      const { id, pricingType, ...updates } = input;
+      // Sync isFree with pricingType
+      const extra: Record<string, any> = {};
+      if (pricingType !== undefined) {
+        extra.pricingType = pricingType;
+        extra.isFree = pricingType === "free";
+      }
+      const filtered = { ...Object.fromEntries(Object.entries(updates).filter(([, v]) => v !== undefined)), ...extra };
       if (Object.keys(filtered).length > 0) {
         await db.update(lmsCourses).set(filtered).where(eq(lmsCourses.id, id));
       }

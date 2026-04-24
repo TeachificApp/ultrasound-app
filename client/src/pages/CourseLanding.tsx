@@ -52,7 +52,8 @@ export default function CourseLanding() {
     if (enrollment) { navigate(`/learn/${slug}/player`); return; }
     setEnrolling(true);
     try {
-      if (course?.isFree) {
+      const pt = course?.pricingType ?? (course?.isFree ? "free" : "one_time");
+      if (pt === "free") {
         await enrollFree.mutateAsync({ courseSlug: slug! });
       } else {
         await createCheckout.mutateAsync({ courseSlug: slug!, seats: 1, origin: window.location.origin });
@@ -60,6 +61,24 @@ export default function CourseLanding() {
     } finally {
       setEnrolling(false);
     }
+  };
+
+  const formatPrice = (c: any) => {
+    const pt = c?.pricingType ?? (c?.isFree ? "free" : "one_time");
+    if (pt === "free") return "Free";
+    if (pt === "one_time") return `$${(c.price / 100).toFixed(0)}`;
+    if (pt === "subscription") {
+      const intervalLabel: Record<string, string> = { monthly: "/mo", quarterly: "/qtr", annual: "/yr" };
+      return `$${(c.price / 100).toFixed(0)}${intervalLabel[c.subscriptionInterval ?? "monthly"] ?? "/mo"}`;
+    }
+    if (pt === "payment_plan") {
+      const dp = c.downPayment ? `$${(c.downPayment / 100).toFixed(0)} down` : "";
+      const inst = c.installmentCount && c.installmentAmount
+        ? ` + ${c.installmentCount}×$${(c.installmentAmount / 100).toFixed(0)}`
+        : "";
+      return dp + inst || `$${(c.price / 100).toFixed(0)}`;
+    }
+    return `$${(c.price / 100).toFixed(0)}`;
   };
 
   if (isLoading) {
@@ -84,7 +103,8 @@ export default function CourseLanding() {
   }
 
   const lp = course.landingPage;
-  const price = course.isFree ? "Free" : `$${(course.price / 100).toFixed(0)}`;
+  const price = formatPrice(course);
+  const pricingType = course.pricingType ?? (course.isFree ? "free" : "one_time");
   const ctaText = enrollment ? "Continue Learning" : (lp?.ctaText ?? "Enroll Now");
   const totalLessons = course.sections.reduce((sum: number, s: any) => sum + s.lessons.length, 0);
   const totalDuration = course.sections.reduce((sum: number, s: any) =>
@@ -148,7 +168,23 @@ export default function CourseLanding() {
             {course.coverImageUrl && (
               <img src={course.coverImageUrl} alt={course.title} className="w-full h-36 object-cover rounded-lg" />
             )}
-            <div className="text-3xl font-bold text-teal-700">{price}</div>
+            <div className="space-y-1">
+              <div className="text-3xl font-bold text-teal-700">{price}</div>
+              {pricingType === "subscription" && (
+                <p className="text-xs text-gray-500">Billed {course.subscriptionInterval ?? "monthly"} — cancel anytime</p>
+              )}
+              {pricingType === "payment_plan" && course.downPayment && (
+                <p className="text-xs text-gray-500">
+                  ${(course.downPayment / 100).toFixed(0)} due today
+                  {course.installmentCount && course.installmentAmount
+                    ? `, then ${course.installmentCount}×$${(course.installmentAmount / 100).toFixed(0)} every ${course.installmentIntervalDays ?? 30} days`
+                    : ""}
+                </p>
+              )}
+              {pricingType === "free" && (
+                <p className="text-xs text-gray-500">No payment required</p>
+              )}
+            </div>
             <Button
               className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold"
               size="lg"

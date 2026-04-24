@@ -143,8 +143,13 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
   const [subtitle, setSubtitle] = useState("");
   const [type, setType] = useState<"course" | "quiz" | "download">(defaultType);
   const [brand, setBrand] = useState<"aaus" | "iheartecho">("aaus");
+  const [pricingType, setPricingType] = useState<"free"|"one_time"|"subscription"|"payment_plan">("one_time");
   const [price, setPrice] = useState("");
-  const [isFree, setIsFree] = useState(false);
+  const [subscriptionInterval, setSubscriptionInterval] = useState<"monthly"|"quarterly"|"annual">("monthly");
+  const [downPayment, setDownPayment] = useState("");
+  const [installmentCount, setInstallmentCount] = useState("");
+  const [installmentAmount, setInstallmentAmount] = useState("");
+  const [installmentIntervalDays, setInstallmentIntervalDays] = useState("30");
 
   const create = trpc.lmsAdmin.createCourse.useMutation({
     onSuccess: (data) => {
@@ -190,16 +195,83 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
               </Select>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <Switch checked={isFree} onCheckedChange={setIsFree} id="is-free" />
-            <Label htmlFor="is-free" className="text-sm">Free course</Label>
+          <div>
+            <Label className="text-sm">Pricing Type</Label>
+            <Select value={pricingType} onValueChange={v => setPricingType(v as any)}>
+              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="free">Free</SelectItem>
+                <SelectItem value="one_time">One-Time Purchase</SelectItem>
+                <SelectItem value="subscription">Subscription</SelectItem>
+                <SelectItem value="payment_plan">Payment Plan</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          {!isFree && (
+          {pricingType === "one_time" && (
             <div>
               <Label className="text-sm">Price (USD)</Label>
               <div className="relative mt-1">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
                 <Input value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" className="pl-7" type="number" min="0" step="0.01" />
+              </div>
+            </div>
+          )}
+          {pricingType === "subscription" && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-sm">Price per Period (USD)</Label>
+                <div className="relative mt-1">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
+                  <Input value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" className="pl-7" type="number" min="0" step="0.01" />
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm">Billing Interval</Label>
+                <Select value={subscriptionInterval} onValueChange={v => setSubscriptionInterval(v as any)}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                    <SelectItem value="quarterly">Quarterly</SelectItem>
+                    <SelectItem value="annual">Annual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          {pricingType === "payment_plan" && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-sm">Down Payment (USD)</Label>
+                  <div className="relative mt-1">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
+                    <Input value={downPayment} onChange={e => setDownPayment(e.target.value)} placeholder="0.00" className="pl-7" type="number" min="0" step="0.01" />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm">Total Price (USD)</Label>
+                  <div className="relative mt-1">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
+                    <Input value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" className="pl-7" type="number" min="0" step="0.01" />
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <Label className="text-sm"># Installments</Label>
+                  <Input value={installmentCount} onChange={e => setInstallmentCount(e.target.value)} placeholder="3" className="mt-1" type="number" min="1" />
+                </div>
+                <div>
+                  <Label className="text-sm">Amount Each (USD)</Label>
+                  <div className="relative mt-1">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
+                    <Input value={installmentAmount} onChange={e => setInstallmentAmount(e.target.value)} placeholder="0.00" className="pl-7" type="number" min="0" step="0.01" />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm">Every (days)</Label>
+                  <Input value={installmentIntervalDays} onChange={e => setInstallmentIntervalDays(e.target.value)} placeholder="30" className="mt-1" type="number" min="1" />
+                </div>
               </div>
             </div>
           )}
@@ -211,8 +283,15 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
             disabled={!title.trim() || create.isPending}
             onClick={() => create.mutate({
               title: title.trim(), subtitle: subtitle.trim() || undefined,
-              type, brand, isFree,
-              price: isFree ? 0 : Math.round(parseFloat(price || "0") * 100),
+              type, brand,
+              pricingType,
+              isFree: pricingType === "free",
+              price: pricingType === "free" ? 0 : Math.round(parseFloat(price || "0") * 100),
+              subscriptionInterval: pricingType === "subscription" ? subscriptionInterval : undefined,
+              downPayment: pricingType === "payment_plan" ? Math.round(parseFloat(downPayment || "0") * 100) : undefined,
+              installmentCount: pricingType === "payment_plan" ? parseInt(installmentCount || "0") : undefined,
+              installmentAmount: pricingType === "payment_plan" ? Math.round(parseFloat(installmentAmount || "0") * 100) : undefined,
+              installmentIntervalDays: pricingType === "payment_plan" ? parseInt(installmentIntervalDays || "30") : undefined,
             })}
           >
             {create.isPending ? "Creating..." : `Create ${type === "quiz" ? "Quiz" : type === "download" ? "Download" : "Course"}`}
@@ -371,8 +450,13 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
   const [description, setDescription] = useState(course.description ?? "");
   const [status, setStatus] = useState(course.status);
   const [brand, setBrand] = useState(course.brand);
+  const [pricingType, setPricingType] = useState<"free"|"one_time"|"subscription"|"payment_plan">(course.pricingType ?? (course.isFree ? "free" : "one_time"));
   const [price, setPrice] = useState(String((course.price / 100).toFixed(2)));
-  const [isFree, setIsFree] = useState(course.isFree);
+  const [subscriptionInterval, setSubscriptionInterval] = useState<"monthly"|"quarterly"|"annual">(course.subscriptionInterval ?? "monthly");
+  const [downPayment, setDownPayment] = useState(String(((course.downPayment ?? 0) / 100).toFixed(2)));
+  const [installmentCount, setInstallmentCount] = useState(String(course.installmentCount ?? ""));
+  const [installmentAmount, setInstallmentAmount] = useState(String(((course.installmentAmount ?? 0) / 100).toFixed(2)));
+  const [installmentIntervalDays, setInstallmentIntervalDays] = useState(String(course.installmentIntervalDays ?? 30));
   const [hasCertificate, setHasCertificate] = useState(course.hasCertificate);
   const [coverImageUrl, setCoverImageUrl] = useState(course.coverImageUrl ?? "");
 
@@ -416,26 +500,95 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
         <Input value={coverImageUrl} onChange={e => setCoverImageUrl(e.target.value)} placeholder="https://..." className="mt-1" />
       </div>
 
-      <div className="flex items-center gap-6">
-        <div className="flex items-center gap-2">
-          <Switch checked={isFree} onCheckedChange={setIsFree} id="free-switch" />
-          <Label htmlFor="free-switch" className="text-sm">Free course</Label>
+      {/* Pricing */}
+      <div className="border border-gray-200 rounded-lg p-4 space-y-4">
+        <h3 className="text-sm font-semibold text-gray-700">Pricing</h3>
+        <div>
+          <Label className="text-sm">Pricing Type</Label>
+          <Select value={pricingType} onValueChange={v => setPricingType(v as any)}>
+            <SelectTrigger className="mt-1 w-56"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="free">Free</SelectItem>
+              <SelectItem value="one_time">One-Time Purchase</SelectItem>
+              <SelectItem value="subscription">Subscription</SelectItem>
+              <SelectItem value="payment_plan">Payment Plan</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <div className="flex items-center gap-2">
-          <Switch checked={hasCertificate} onCheckedChange={setHasCertificate} id="cert-switch" />
-          <Label htmlFor="cert-switch" className="text-sm">Certificate of completion</Label>
-        </div>
+        {pricingType === "one_time" && (
+          <div className="w-40">
+            <Label className="text-sm">Price (USD)</Label>
+            <div className="relative mt-1">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
+              <Input value={price} onChange={e => setPrice(e.target.value)} className="pl-7" type="number" min="0" step="0.01" />
+            </div>
+          </div>
+        )}
+        {pricingType === "subscription" && (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="text-sm">Price per Period (USD)</Label>
+              <div className="relative mt-1">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
+                <Input value={price} onChange={e => setPrice(e.target.value)} className="pl-7" type="number" min="0" step="0.01" />
+              </div>
+            </div>
+            <div>
+              <Label className="text-sm">Billing Interval</Label>
+              <Select value={subscriptionInterval} onValueChange={v => setSubscriptionInterval(v as any)}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                  <SelectItem value="quarterly">Quarterly</SelectItem>
+                  <SelectItem value="annual">Annual</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
+        {pricingType === "payment_plan" && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm">Down Payment (USD)</Label>
+                <div className="relative mt-1">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
+                  <Input value={downPayment} onChange={e => setDownPayment(e.target.value)} className="pl-7" type="number" min="0" step="0.01" />
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm">Total Price (USD)</Label>
+                <div className="relative mt-1">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
+                  <Input value={price} onChange={e => setPrice(e.target.value)} className="pl-7" type="number" min="0" step="0.01" />
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <Label className="text-sm"># Installments</Label>
+                <Input value={installmentCount} onChange={e => setInstallmentCount(e.target.value)} placeholder="3" className="mt-1" type="number" min="1" />
+              </div>
+              <div>
+                <Label className="text-sm">Amount Each (USD)</Label>
+                <div className="relative mt-1">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
+                  <Input value={installmentAmount} onChange={e => setInstallmentAmount(e.target.value)} className="pl-7" type="number" min="0" step="0.01" />
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm">Every (days)</Label>
+                <Input value={installmentIntervalDays} onChange={e => setInstallmentIntervalDays(e.target.value)} placeholder="30" className="mt-1" type="number" min="1" />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {!isFree && (
-        <div className="w-40">
-          <Label className="text-sm">Price (USD)</Label>
-          <div className="relative mt-1">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
-            <Input value={price} onChange={e => setPrice(e.target.value)} className="pl-7" type="number" min="0" step="0.01" />
-          </div>
-        </div>
-      )}
+      <div className="flex items-center gap-2">
+        <Switch checked={hasCertificate} onCheckedChange={setHasCertificate} id="cert-switch" />
+        <Label htmlFor="cert-switch" className="text-sm">Certificate of completion</Label>
+      </div>
 
       <div>
         <Label className="text-sm">Description (rich text)</Label>
@@ -450,8 +603,15 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
         onClick={() => onSave({
           title: title.trim(), subtitle: subtitle.trim() || undefined,
           description: description || undefined, status, brand,
-          isFree, hasCertificate,
-          price: isFree ? 0 : Math.round(parseFloat(price || "0") * 100),
+          pricingType,
+          isFree: pricingType === "free",
+          hasCertificate,
+          price: pricingType === "free" ? 0 : Math.round(parseFloat(price || "0") * 100),
+          subscriptionInterval: pricingType === "subscription" ? subscriptionInterval : null,
+          downPayment: pricingType === "payment_plan" ? Math.round(parseFloat(downPayment || "0") * 100) : null,
+          installmentCount: pricingType === "payment_plan" ? parseInt(installmentCount || "0") : null,
+          installmentAmount: pricingType === "payment_plan" ? Math.round(parseFloat(installmentAmount || "0") * 100) : null,
+          installmentIntervalDays: pricingType === "payment_plan" ? parseInt(installmentIntervalDays || "30") : null,
           coverImageUrl: coverImageUrl.trim() || undefined,
         })}
       >

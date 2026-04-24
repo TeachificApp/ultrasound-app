@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE lms_courses\n  ADD COLUMN pricing_type ENUM('free','one_time','subscription','payment_plan') NOT NULL DEFAULT 'one_time',\n  ADD COLUMN subscription_interval ENUM('monthly','quarterly','annual') NULL,\n  ADD COLUMN down_payment INT NULL DEFAULT 0,\n  ADD COLUMN installment_count INT NULL DEFAULT 0,\n  ADD COLUMN installment_amount INT NULL DEFAULT 0,\n  ADD COLUMN installment_interval_days INT NULL DEFAULT 30,\n  ADD COLUMN stripe_price_id VARCHAR(255) NULL;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute ALTER TABLE lms_courses\n  ADD COLUMN pricing_type ENUM('free','one_time','subscription','payment_plan') NOT NULL DEFAULT 'one_time',\n  ADD COLUMN subscription_interval ENUM('monthly','quarterly','annual') NULL,\n  ADD COLUMN down_payment INT NULL DEFAULT 0,\n  ADD COLUMN installment_count INT NULL DEFAULT 0,\n  ADD COLUMN installment_amount INT NULL DEFAULT 0,\n  ADD COLUMN installment_interval_days INT NULL DEFAULT 30,\n  ADD COLUMN stripe_price_id VARCHAR(255) NULL;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 3854
+}

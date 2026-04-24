@@ -1175,3 +1175,12 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] EditLessonDialog — "Pick from Media Repository" button for video/download lessons
 - [x] Education Library — type-aware count label, search placeholder, empty state icon, and CTA button
 - [x] 817 tests passing, 0 TypeScript errors
+
+## LMS — Extended Pricing Models (Apr 23 2026)
+
+- [ ] DB migration: add pricingType enum (free/one_time/subscription/payment_plan), subscriptionInterval (monthly/annual/quarterly), installmentCount, installmentAmount, downPayment columns to lms_courses
+- [ ] Server: update createCourse/updateCourse input to accept new pricing fields
+- [ ] Server: Stripe checkout — one_time uses payment_mode, subscription uses subscription_mode with Price, payment_plan creates subscription with initial invoice for down payment
+- [ ] Admin UI: replace simple price/isFree with full pricing section (type selector + conditional fields)
+- [ ] Public CourseLanding: display correct pricing badge and CTA per pricing type
+- [ ] 0 TypeScript errors, tests passing
