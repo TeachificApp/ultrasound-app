@@ -1189,3 +1189,12 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Route uploadCourseCoverImage through Media Repository (creates a media asset record)
 - [x] Add landing page hero image upload field (also stored via Media Repository)
 - [x] Both uploads accessible and manageable from the Media Repository admin
+
+## LMS — SCORM/HTML Import & AI Generate
+- [ ] Server: importFromMediaLibrary mutation — accepts mediaAssetId, creates a lesson (type=scorm or html) linked to the asset URL
+- [ ] Server: aiGenerateCourse mutation — accepts topic + type (course/quiz), calls LLM to produce sections/lessons or quiz questions, inserts them into the DB
+- [ ] Admin UI: "Import from Media Library" button in course/quiz curriculum tab — opens asset picker filtered to scorm/html/zip, creates lesson on select
+- [ ] Admin UI: "AI Generate" button in course/quiz builder header — opens dialog with topic input, type selector, generates and previews content before inserting
+- [ ] AI Generate: streaming progress indicator while LLM generates content
+- [ ] AI Generate: editable preview of generated outline before committing to DB
+- [ ] AI Generate standalone quiz: topic input → LLM generates quiz questions + landing page, preview, commit

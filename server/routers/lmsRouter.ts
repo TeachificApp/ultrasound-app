@@ -17,6 +17,7 @@ import { randomBytes } from "crypto";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
 import { getDb } from "../db";
+import { invokeLLM } from "../_core/llm";
 import {
   lmsCourses,
   lmsSections,
@@ -1238,6 +1239,232 @@ export const lmsAdminRouter = router({
       }));
       const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(lmsOrders);
       return { orders: enriched, total: Number(count) };
+    }),
+
+  // ── AI Generate ──
+  aiGenerateCourse: protectedProcedure
+    .input(z.object({
+      topics: z.string().min(3).max(2000),
+      productType: z.enum(["course", "quiz"]).default("course"),
+      targetAudience: z.string().max(500).optional(),
+      difficultyLevel: z.enum(["beginner", "intermediate", "advanced"]).optional(),
+      estimatedDurationMinutes: z.number().int().min(5).max(600).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+
+      const systemPrompt = `You are an expert medical education curriculum designer specializing in ultrasound and echocardiography for All About Ultrasound™ and iHeartEcho™.
+You create structured, clinically accurate, and pedagogically sound course content.
+Always use United States English spelling.
+Return ONLY valid JSON — no markdown, no code fences, no extra text.`;
+
+      const isQuiz = input.productType === "quiz";
+
+      const userPrompt = isQuiz
+        ? `Create a standalone quiz on the following ultrasound/echocardiography topics:
+"${input.topics}"
+${input.targetAudience ? `Target audience: ${input.targetAudience}` : ""}
+${input.difficultyLevel ? `Difficulty: ${input.difficultyLevel}` : ""}
+
+Return a JSON object with this exact structure:
+{
+  "title": "Quiz title (concise, clinical)",
+  "subtitle": "One-line subtitle",
+  "questions": [
+    {
+      "question": "Question text",
+      "type": "mcq",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctAnswer": "Option A",
+      "explanation": "Brief clinical explanation of the correct answer"
+    }
+  ],
+  "landingPage": {
+    "heroTitle": "Engaging hero headline",
+    "heroSubtitle": "One sentence description",
+    "ctaText": "Start Quiz",
+    "whatYouLearn": "<ul><li>Key topic 1</li><li>Key topic 2</li><li>Key topic 3</li></ul>",
+    "bodyContent": "<p>2-3 paragraph HTML description of the quiz</p>",
+    "requirements": "<p>Who this quiz is for and any prerequisites</p>"
+  }
+}
+Generate 10-20 high-quality MCQ questions. Each question must have exactly 4 options.`
+        : `Create a comprehensive course on the following ultrasound/echocardiography topics:
+"${input.topics}"
+${input.targetAudience ? `Target audience: ${input.targetAudience}` : ""}
+${input.difficultyLevel ? `Difficulty: ${input.difficultyLevel}` : ""}
+${input.estimatedDurationMinutes ? `Estimated duration: ${input.estimatedDurationMinutes} minutes` : ""}
+
+Return a JSON object with this exact structure:
+{
+  "title": "Course title (concise, clinical)",
+  "subtitle": "One-line subtitle",
+  "sections": [
+    {
+      "title": "Section title",
+      "lessons": [
+        {
+          "title": "Lesson title",
+          "type": "text",
+          "durationMinutes": 10,
+          "content": "<p>Detailed lesson content in HTML. Include clinical context, key concepts, and practical tips. Minimum 150 words per lesson.</p>"
+        }
+      ]
+    }
+  ],
+  "landingPage": {
+    "heroTitle": "Engaging hero headline",
+    "heroSubtitle": "One sentence description",
+    "ctaText": "Enroll Now",
+    "whatYouLearn": "<ul><li>Learning outcome 1</li><li>Learning outcome 2</li><li>Learning outcome 3</li><li>Learning outcome 4</li><li>Learning outcome 5</li></ul>",
+    "bodyContent": "<p>2-3 paragraph HTML description of the course</p>",
+    "requirements": "<p>Prerequisites and who this course is designed for</p>"
+  }
+}
+Generate 3-6 sections with 2-5 lessons each. Lesson types can be: text, video (for placeholder), quiz.`;
+
+      const response = await invokeLLM({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        response_format: { type: "json_object" },
+      });
+
+      const raw = response?.choices?.[0]?.message?.content ?? "{}";
+      let parsed: any;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "AI returned invalid JSON. Please try again." });
+      }
+
+      return { generated: parsed, productType: input.productType };
+    }),
+
+  aiCommitCourse: protectedProcedure
+    .input(z.object({
+      courseId: z.number(),
+      productType: z.enum(["course", "quiz"]),
+      generated: z.any(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const { courseId, generated, productType } = input;
+
+      // Upsert landing page
+      if (generated.landingPage) {
+        const lp = generated.landingPage;
+        const [existing] = await db.select({ id: lmsLandingPages.id }).from(lmsLandingPages).where(eq(lmsLandingPages.courseId, courseId)).limit(1);
+        const lpData = {
+          heroTitle: lp.heroTitle ?? null,
+          heroSubtitle: lp.heroSubtitle ?? null,
+          ctaText: lp.ctaText ?? "Enroll Now",
+          whatYouLearn: lp.whatYouLearn ?? null,
+          bodyContent: lp.bodyContent ?? null,
+          requirements: lp.requirements ?? null,
+          isCustom: true,
+        };
+        if (existing) {
+          await db.update(lmsLandingPages).set(lpData).where(eq(lmsLandingPages.courseId, courseId));
+        } else {
+          await db.insert(lmsLandingPages).values({ courseId, ...lpData });
+        }
+        // Also update course title/subtitle if provided
+        if (generated.title) {
+          await db.update(lmsCourses).set({ title: generated.title, subtitle: generated.subtitle ?? null }).where(eq(lmsCourses.id, courseId));
+        }
+      }
+
+      if (productType === "course" && Array.isArray(generated.sections)) {
+        // Insert sections and lessons
+        for (let si = 0; si < generated.sections.length; si++) {
+          const sec = generated.sections[si];
+          const [secResult] = await db.insert(lmsSections).values({ courseId, title: sec.title, position: si }).$returningId();
+          const sectionId = secResult.id;
+          if (Array.isArray(sec.lessons)) {
+            for (let li = 0; li < sec.lessons.length; li++) {
+              const les = sec.lessons[li];
+              const lesType = ["video", "text", "quiz", "download"].includes(les.type) ? les.type : "text";
+              const [lesResult] = await db.insert(lmsLessons).values({
+                sectionId,
+                title: les.title,
+                type: lesType,
+                position: li,
+                content: les.content ?? null,
+                durationMinutes: les.durationMinutes ?? null,
+                mediaAssetId: null,
+              }).$returningId();
+              if (lesType === "quiz") {
+                await db.insert(lmsQuizzes).values({ lessonId: lesResult.id, title: les.title });
+              }
+            }
+          }
+        }
+      } else if (productType === "quiz" && Array.isArray(generated.questions)) {
+        // For standalone quiz: create a single section + quiz lesson + questions
+        const [secResult] = await db.insert(lmsSections).values({ courseId, title: "Quiz Questions", position: 0 }).$returningId();
+        const [lesResult] = await db.insert(lmsLessons).values({
+          sectionId: secResult.id, title: generated.title ?? "Quiz",
+          type: "quiz", position: 0, content: null, mediaAssetId: null,
+        }).$returningId();
+        const [quizResult] = await db.insert(lmsQuizzes).values({ lessonId: lesResult.id, title: generated.title ?? "Quiz" }).$returningId();
+        for (let qi = 0; qi < generated.questions.length; qi++) {
+          const q = generated.questions[qi];
+          await db.insert(lmsQuizQuestions).values({
+            quizId: quizResult.id,
+            question: q.question,
+            type: q.type === "truefalse" ? "truefalse" : "mcq",
+            options: Array.isArray(q.options) ? JSON.stringify(q.options) : null,
+            correctAnswer: q.correctAnswer,
+            explanation: q.explanation ?? null,
+            position: qi,
+          });
+        }
+      }
+
+      return { success: true };
+    }),
+
+  // ── Import from Media Library ──
+  importMediaAssetAsLesson: protectedProcedure
+    .input(z.object({
+      courseId: z.number(),
+      sectionId: z.number(),
+      mediaAssetId: z.number(),
+      title: z.string().min(1).max(255),
+      position: z.number().int().default(0),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Fetch the asset to determine lesson type
+      const [asset] = await db.select({ mediaType: mediaAssets.mediaType, mimeType: mediaAssets.mimeType })
+        .from(mediaAssets).where(eq(mediaAssets.id, input.mediaAssetId)).limit(1);
+      if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Media asset not found" });
+
+      // Map media type to lesson type
+      let lessonType: "video" | "text" | "quiz" | "download" = "text";
+      if (asset.mediaType === "video") lessonType = "video";
+      else if (["document", "zip", "scorm", "html"].includes(asset.mediaType ?? "")) lessonType = "download";
+      else if (asset.mediaType === "audio") lessonType = "video"; // treat audio as video player
+
+      const [result] = await db.insert(lmsLessons).values({
+        sectionId: input.sectionId,
+        title: input.title,
+        type: lessonType,
+        position: input.position,
+        content: null,
+        mediaAssetId: input.mediaAssetId,
+        durationMinutes: null,
+      }).$returningId();
+
+      return { id: result.id, lessonType };
     }),
 });
 

@@ -28,6 +28,7 @@ import {
   BookOpen, ChevronLeft, ChevronRight, Download, Edit2, HelpCircle, Plus, Trash2,
   Users, DollarSign, BarChart2, GripVertical, CheckCircle, AlertCircle,
   Link as LinkIcon, UserCheck, ArrowLeft, Upload, ImageIcon,
+  Sparkles, Loader2, Eye, FolderOpen,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -138,7 +139,7 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
 // ─── Create Course Dialog ─────────────────────────────────────────────────────
 
 function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }: { open: boolean; onClose: () => void; onCreated: (id: number) => void; defaultType?: "course" | "quiz" | "download" }) {
-  
+  const [mode, setMode] = useState<"manual" | "ai">("manual");
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [type, setType] = useState<"course" | "quiz" | "download">(defaultType);
@@ -151,151 +152,360 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
   const [installmentAmount, setInstallmentAmount] = useState("");
   const [installmentIntervalDays, setInstallmentIntervalDays] = useState("30");
 
+  // AI Generate state
+  const [aiTopics, setAiTopics] = useState("");
+  const [aiAudience, setAiAudience] = useState("");
+  const [aiDifficulty, setAiDifficulty] = useState<"beginner"|"intermediate"|"advanced">("intermediate");
+  const [aiDuration, setAiDuration] = useState("");
+  const [aiPreview, setAiPreview] = useState<any>(null);
+  const [aiStep, setAiStep] = useState<"input"|"preview">("input");
+
   const create = trpc.lmsAdmin.createCourse.useMutation({
-    onSuccess: (data) => {
-      toast.success("Course created!");
-      onCreated(data.id);
-    },
+    onSuccess: (data) => { toast.success("Course created!"); onCreated(data.id); },
     onError: e => toast.error(`Error: ${e.message}`),
   });
 
+  const aiGenerate = trpc.lmsAdmin.aiGenerateCourse.useMutation({
+    onSuccess: (data) => { setAiPreview(data.generated); setAiStep("preview"); },
+    onError: e => toast.error(`AI generation failed: ${e.message}`),
+  });
+
+  const aiCommit = trpc.lmsAdmin.aiCommitCourse.useMutation({
+    onSuccess: () => toast.success("Content applied!"),
+    onError: e => toast.error(`Error: ${e.message}`),
+  });
+
+  const handleAiCreate = async () => {
+    // Step 1: create the course shell
+    const courseTitle = aiPreview?.title || `New ${type === "quiz" ? "Quiz" : "Course"}`;
+    create.mutate({
+      title: courseTitle,
+      subtitle: aiPreview?.subtitle || undefined,
+      type: type === "download" ? "course" : type,
+      brand,
+      pricingType: "draft" as any,
+      isFree: true,
+      price: 0,
+    }, {
+      onSuccess: async (data) => {
+        // Step 2: commit AI content
+        await aiCommit.mutateAsync({ courseId: data.id, productType: type === "quiz" ? "quiz" : "course", generated: aiPreview });
+        toast.success(`${type === "quiz" ? "Quiz" : "Course"} created with AI content!`);
+        onCreated(data.id);
+      },
+    });
+  };
+
+  const productLabel = type === "quiz" ? "Quiz" : type === "download" ? "Download" : "Course";
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Create New {type === "quiz" ? "Quiz" : type === "download" ? "Download" : "Course"}</DialogTitle></DialogHeader>
-        <div className="space-y-4 py-2">
-          <div>
-            <Label className="text-sm">Title *</Label>
-            <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Course title" className="mt-1" />
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>Create New {productLabel}</DialogTitle>
+          <div className="flex gap-2 mt-3">
+            <Button size="sm" variant={mode === "manual" ? "default" : "outline"} onClick={() => setMode("manual")} className={mode === "manual" ? "bg-teal-600 hover:bg-teal-700 text-white" : ""}>
+              Manual
+            </Button>
+            <Button size="sm" variant={mode === "ai" ? "default" : "outline"} onClick={() => setMode("ai")} className={mode === "ai" ? "bg-purple-600 hover:bg-purple-700 text-white" : ""}>
+              <Sparkles className="w-4 h-4 mr-1" /> AI Generate
+            </Button>
           </div>
-          <div>
-            <Label className="text-sm">Subtitle</Label>
-            <Input value={subtitle} onChange={e => setSubtitle(e.target.value)} placeholder="Short description" className="mt-1" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-sm">Type</Label>
-              <Select value={type} onValueChange={v => setType(v as any)}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="course">Course</SelectItem>
-                  <SelectItem value="quiz">Quiz</SelectItem>
-                  <SelectItem value="download">Download</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-sm">Brand</Label>
-              <Select value={brand} onValueChange={v => setBrand(v as any)}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="aaus">All About Ultrasound</SelectItem>
-                  <SelectItem value="iheartecho">iHeartEcho</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div>
-            <Label className="text-sm">Pricing Type</Label>
-            <Select value={pricingType} onValueChange={v => setPricingType(v as any)}>
-              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="free">Free</SelectItem>
-                <SelectItem value="one_time">One-Time Purchase</SelectItem>
-                <SelectItem value="subscription">Subscription</SelectItem>
-                <SelectItem value="payment_plan">Payment Plan</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {pricingType === "one_time" && (
-            <div>
-              <Label className="text-sm">Price (USD)</Label>
-              <div className="relative mt-1">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
-                <Input value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" className="pl-7" type="number" min="0" step="0.01" />
-              </div>
-            </div>
-          )}
-          {pricingType === "subscription" && (
-            <div className="grid grid-cols-2 gap-3">
+        </DialogHeader>
+
+        <div className="flex-1 overflow-y-auto">
+          {mode === "manual" ? (
+            <div className="space-y-4 py-2">
               <div>
-                <Label className="text-sm">Price per Period (USD)</Label>
-                <div className="relative mt-1">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
-                  <Input value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" className="pl-7" type="number" min="0" step="0.01" />
+                <Label className="text-sm">Title *</Label>
+                <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Course title" className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-sm">Subtitle</Label>
+                <Input value={subtitle} onChange={e => setSubtitle(e.target.value)} placeholder="Short description" className="mt-1" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-sm">Type</Label>
+                  <Select value={type} onValueChange={v => setType(v as any)}>
+                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="course">Course</SelectItem>
+                      <SelectItem value="quiz">Quiz</SelectItem>
+                      <SelectItem value="download">Download</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-sm">Brand</Label>
+                  <Select value={brand} onValueChange={v => setBrand(v as any)}>
+                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="aaus">All About Ultrasound</SelectItem>
+                      <SelectItem value="iheartecho">iHeartEcho</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <div>
-                <Label className="text-sm">Billing Interval</Label>
-                <Select value={subscriptionInterval} onValueChange={v => setSubscriptionInterval(v as any)}>
+                <Label className="text-sm">Pricing Type</Label>
+                <Select value={pricingType} onValueChange={v => setPricingType(v as any)}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="monthly">Monthly</SelectItem>
-                    <SelectItem value="quarterly">Quarterly</SelectItem>
-                    <SelectItem value="annual">Annual</SelectItem>
+                    <SelectItem value="free">Free</SelectItem>
+                    <SelectItem value="one_time">One-Time Purchase</SelectItem>
+                    <SelectItem value="subscription">Subscription</SelectItem>
+                    <SelectItem value="payment_plan">Payment Plan</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-          )}
-          {pricingType === "payment_plan" && (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              {pricingType === "one_time" && (
                 <div>
-                  <Label className="text-sm">Down Payment (USD)</Label>
-                  <div className="relative mt-1">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
-                    <Input value={downPayment} onChange={e => setDownPayment(e.target.value)} placeholder="0.00" className="pl-7" type="number" min="0" step="0.01" />
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-sm">Total Price (USD)</Label>
+                  <Label className="text-sm">Price (USD)</Label>
                   <div className="relative mt-1">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
                     <Input value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" className="pl-7" type="number" min="0" step="0.01" />
                   </div>
                 </div>
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <Label className="text-sm"># Installments</Label>
-                  <Input value={installmentCount} onChange={e => setInstallmentCount(e.target.value)} placeholder="3" className="mt-1" type="number" min="1" />
-                </div>
-                <div>
-                  <Label className="text-sm">Amount Each (USD)</Label>
-                  <div className="relative mt-1">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
-                    <Input value={installmentAmount} onChange={e => setInstallmentAmount(e.target.value)} placeholder="0.00" className="pl-7" type="number" min="0" step="0.01" />
+              )}
+              {pricingType === "subscription" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-sm">Price per Period (USD)</Label>
+                    <div className="relative mt-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
+                      <Input value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" className="pl-7" type="number" min="0" step="0.01" />
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm">Billing Interval</Label>
+                    <Select value={subscriptionInterval} onValueChange={v => setSubscriptionInterval(v as any)}>
+                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                        <SelectItem value="quarterly">Quarterly</SelectItem>
+                        <SelectItem value="annual">Annual</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
-                <div>
-                  <Label className="text-sm">Every (days)</Label>
-                  <Input value={installmentIntervalDays} onChange={e => setInstallmentIntervalDays(e.target.value)} placeholder="30" className="mt-1" type="number" min="1" />
+              )}
+              {pricingType === "payment_plan" && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-sm">Down Payment (USD)</Label>
+                      <div className="relative mt-1">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
+                        <Input value={downPayment} onChange={e => setDownPayment(e.target.value)} placeholder="0.00" className="pl-7" type="number" min="0" step="0.01" />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-sm">Total Price (USD)</Label>
+                      <div className="relative mt-1">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
+                        <Input value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" className="pl-7" type="number" min="0" step="0.01" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <Label className="text-sm"># Installments</Label>
+                      <Input value={installmentCount} onChange={e => setInstallmentCount(e.target.value)} placeholder="3" className="mt-1" type="number" min="1" />
+                    </div>
+                    <div>
+                      <Label className="text-sm">Amount Each (USD)</Label>
+                      <div className="relative mt-1">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
+                        <Input value={installmentAmount} onChange={e => setInstallmentAmount(e.target.value)} placeholder="0.00" className="pl-7" type="number" min="0" step="0.01" />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-sm">Every (days)</Label>
+                      <Input value={installmentIntervalDays} onChange={e => setInstallmentIntervalDays(e.target.value)} placeholder="30" className="mt-1" type="number" min="1" />
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
+            </div>
+          ) : (
+            // AI Generate mode
+            <div className="py-2">
+              {aiStep === "input" ? (
+                <div className="space-y-4">
+                  <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-lg p-3">
+                    <p className="text-sm text-purple-700 dark:text-purple-300 flex items-center gap-2">
+                      <Sparkles className="w-4 h-4" />
+                      AI will generate a complete {type === "quiz" ? "quiz with questions" : "course curriculum with sections and lessons"} plus a full landing page based on your topics.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-sm">Product Type</Label>
+                      <Select value={type === "download" ? "course" : type} onValueChange={v => setType(v as any)}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="course">Course</SelectItem>
+                          <SelectItem value="quiz">Quiz</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-sm">Brand</Label>
+                      <Select value={brand} onValueChange={v => setBrand(v as any)}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="aaus">All About Ultrasound</SelectItem>
+                          <SelectItem value="iheartecho">iHeartEcho</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm">Topics / Subject Matter *</Label>
+                    <textarea
+                      value={aiTopics}
+                      onChange={e => setAiTopics(e.target.value)}
+                      placeholder={type === "quiz" ? "e.g. Mitral valve anatomy, regurgitation grading, Doppler assessment, PISA method" : "e.g. Left ventricular systolic function assessment, EF calculation methods, wall motion abnormalities, clinical interpretation"}
+                      className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring min-h-[100px] resize-none"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Be specific — include clinical concepts, procedures, or anatomy you want covered.</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-sm">Target Audience (optional)</Label>
+                      <Input value={aiAudience} onChange={e => setAiAudience(e.target.value)} placeholder="e.g. Sonography students" className="mt-1" />
+                    </div>
+                    <div>
+                      <Label className="text-sm">Difficulty</Label>
+                      <Select value={aiDifficulty} onValueChange={v => setAiDifficulty(v as any)}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="beginner">Beginner</SelectItem>
+                          <SelectItem value="intermediate">Intermediate</SelectItem>
+                          <SelectItem value="advanced">Advanced</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  {type !== "quiz" && (
+                    <div>
+                      <Label className="text-sm">Estimated Duration (minutes, optional)</Label>
+                      <Input value={aiDuration} onChange={e => setAiDuration(e.target.value)} placeholder="e.g. 120" className="mt-1" type="number" min="5" />
+                    </div>
+                  )}
+                </div>
+              ) : (
+                // Preview step
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-sm flex items-center gap-2"><Eye className="w-4 h-4" /> Preview Generated Content</h3>
+                    <Button size="sm" variant="outline" onClick={() => setAiStep("input")}>← Back to Edit</Button>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 space-y-3 text-sm max-h-[50vh] overflow-y-auto">
+                    <div>
+                      <span className="font-semibold text-teal-700 dark:text-teal-400">Title:</span>
+                      <Input value={aiPreview?.title ?? ""} onChange={e => setAiPreview((p: any) => ({ ...p, title: e.target.value }))} className="mt-1" />
+                    </div>
+                    <div>
+                      <span className="font-semibold text-teal-700 dark:text-teal-400">Subtitle:</span>
+                      <Input value={aiPreview?.subtitle ?? ""} onChange={e => setAiPreview((p: any) => ({ ...p, subtitle: e.target.value }))} className="mt-1" />
+                    </div>
+                    {type !== "quiz" && Array.isArray(aiPreview?.sections) && (
+                      <div>
+                        <span className="font-semibold text-teal-700 dark:text-teal-400">Curriculum ({aiPreview.sections.length} sections):</span>
+                        <div className="mt-2 space-y-2">
+                          {aiPreview.sections.map((sec: any, si: number) => (
+                            <div key={si} className="border rounded p-2">
+                              <div className="font-medium text-xs text-gray-700 dark:text-gray-300">{si + 1}. {sec.title}</div>
+                              <div className="mt-1 pl-3 space-y-1">
+                                {sec.lessons?.map((les: any, li: number) => (
+                                  <div key={li} className="text-xs text-gray-500 flex items-center gap-1">
+                                    <span className="text-gray-400">{li + 1}.</span> {les.title}
+                                    <span className="ml-auto text-gray-400">{les.type} {les.durationMinutes ? `· ${les.durationMinutes}m` : ""}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {type === "quiz" && Array.isArray(aiPreview?.questions) && (
+                      <div>
+                        <span className="font-semibold text-teal-700 dark:text-teal-400">Questions ({aiPreview.questions.length}):</span>
+                        <div className="mt-2 space-y-2">
+                          {aiPreview.questions.slice(0, 5).map((q: any, qi: number) => (
+                            <div key={qi} className="border rounded p-2 text-xs">
+                              <div className="font-medium">{qi + 1}. {q.question}</div>
+                              <div className="mt-1 text-gray-500">{q.options?.join(" · ")}</div>
+                              <div className="text-teal-600 mt-1">✓ {q.correctAnswer}</div>
+                            </div>
+                          ))}
+                          {aiPreview.questions.length > 5 && <div className="text-xs text-gray-400">+ {aiPreview.questions.length - 5} more questions…</div>}
+                        </div>
+                      </div>
+                    )}
+                    {aiPreview?.landingPage && (
+                      <div>
+                        <span className="font-semibold text-teal-700 dark:text-teal-400">Landing Page:</span>
+                        <div className="mt-1 text-xs text-gray-600 dark:text-gray-400 space-y-1">
+                          <div><strong>Hero:</strong> {aiPreview.landingPage.heroTitle}</div>
+                          <div><strong>Subtitle:</strong> {aiPreview.landingPage.heroSubtitle}</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500">You can edit all content after creation in the course editor. Click "Create with AI Content" to proceed.</p>
+                </div>
+              )}
             </div>
           )}
         </div>
-        <DialogFooter>
+
+        <DialogFooter className="pt-4 border-t">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button
-            className="bg-teal-600 hover:bg-teal-700 text-white"
-            disabled={!title.trim() || create.isPending}
-            onClick={() => create.mutate({
-              title: title.trim(), subtitle: subtitle.trim() || undefined,
-              type, brand,
-              pricingType,
-              isFree: pricingType === "free",
-              price: pricingType === "free" ? 0 : Math.round(parseFloat(price || "0") * 100),
-              subscriptionInterval: pricingType === "subscription" ? subscriptionInterval : undefined,
-              downPayment: pricingType === "payment_plan" ? Math.round(parseFloat(downPayment || "0") * 100) : undefined,
-              installmentCount: pricingType === "payment_plan" ? parseInt(installmentCount || "0") : undefined,
-              installmentAmount: pricingType === "payment_plan" ? Math.round(parseFloat(installmentAmount || "0") * 100) : undefined,
-              installmentIntervalDays: pricingType === "payment_plan" ? parseInt(installmentIntervalDays || "30") : undefined,
-            })}
-          >
-            {create.isPending ? "Creating..." : `Create ${type === "quiz" ? "Quiz" : type === "download" ? "Download" : "Course"}`}
-          </Button>
+          {mode === "manual" ? (
+            <Button
+              className="bg-teal-600 hover:bg-teal-700 text-white"
+              disabled={!title.trim() || create.isPending}
+              onClick={() => create.mutate({
+                title: title.trim(), subtitle: subtitle.trim() || undefined,
+                type, brand, pricingType,
+                isFree: pricingType === "free",
+                price: pricingType === "free" ? 0 : Math.round(parseFloat(price || "0") * 100),
+                subscriptionInterval: pricingType === "subscription" ? subscriptionInterval : undefined,
+                downPayment: pricingType === "payment_plan" ? Math.round(parseFloat(downPayment || "0") * 100) : undefined,
+                installmentCount: pricingType === "payment_plan" ? parseInt(installmentCount || "0") : undefined,
+                installmentAmount: pricingType === "payment_plan" ? Math.round(parseFloat(installmentAmount || "0") * 100) : undefined,
+                installmentIntervalDays: pricingType === "payment_plan" ? parseInt(installmentIntervalDays || "30") : undefined,
+              })}
+            >
+              {create.isPending ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Creating...</> : `Create ${productLabel}`}
+            </Button>
+          ) : aiStep === "input" ? (
+            <Button
+              className="bg-purple-600 hover:bg-purple-700 text-white"
+              disabled={!aiTopics.trim() || aiGenerate.isPending}
+              onClick={() => aiGenerate.mutate({
+                topics: aiTopics.trim(),
+                productType: type === "quiz" ? "quiz" : "course",
+                targetAudience: aiAudience.trim() || undefined,
+                difficultyLevel: aiDifficulty,
+                estimatedDurationMinutes: aiDuration ? parseInt(aiDuration) : undefined,
+              })}
+            >
+              {aiGenerate.isPending ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Generating...</> : <><Sparkles className="w-4 h-4 mr-1" /> Generate Preview</>}
+            </Button>
+          ) : (
+            <Button
+              className="bg-purple-600 hover:bg-purple-700 text-white"
+              disabled={create.isPending || aiCommit.isPending}
+              onClick={handleAiCreate}
+            >
+              {(create.isPending || aiCommit.isPending) ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Creating...</> : <><Sparkles className="w-4 h-4 mr-1" /> Create with AI Content</>}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -313,6 +523,7 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
   const [addLessonSection, setAddLessonSection] = useState<number | null>(null);
   const [editLesson, setEditLesson] = useState<any>(null);
   const [quizLesson, setQuizLesson] = useState<any>(null);
+  const [importMediaSection, setImportMediaSection] = useState<number | null>(null);
 
   const updateCourse = trpc.lmsAdmin.updateCourse.useMutation({
     onSuccess: () => { toast.success("Saved"); refetch(); },
@@ -379,6 +590,9 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
                   <Button size="sm" variant="ghost" className="h-7 text-xs text-teal-600" onClick={() => setAddLessonSection(section.id)}>
                     <Plus className="w-3 h-3 mr-1" /> Add Lesson
                   </Button>
+                  <Button size="sm" variant="ghost" className="h-7 text-xs text-blue-600 hover:bg-blue-50" onClick={() => setImportMediaSection(section.id)}>
+                    <FolderOpen className="w-3 h-3 mr-1" /> Import Media
+                  </Button>
                   <Button size="sm" variant="ghost" className="h-7 text-red-400 hover:bg-red-50" onClick={() => {
                     if (confirm(`Delete section "${section.title}" and all its lessons?`)) deleteSection.mutate({ id: section.id });
                   }}>
@@ -434,6 +648,9 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
       <AddSectionDialog open={addSectionOpen} courseId={courseId} onClose={() => setAddSectionOpen(false)} onCreated={() => { setAddSectionOpen(false); refetch(); }} />
       {addLessonSection && (
         <AddLessonDialog sectionId={addLessonSection} onClose={() => setAddLessonSection(null)} onCreated={() => { setAddLessonSection(null); refetch(); }} />
+      )}
+      {importMediaSection && (
+        <ImportMediaAsLessonDialog sectionId={importMediaSection} onClose={() => setImportMediaSection(null)} onCreated={() => { setImportMediaSection(null); refetch(); }} />
       )}
       {editLesson && (
         <EditLessonDialog lesson={editLesson} onClose={() => setEditLesson(null)} onSaved={() => { setEditLesson(null); refetch(); }} />
@@ -828,6 +1045,100 @@ function CourseInstructorsEditor({ courseId, courseInstructors, onSaved }: { cou
         </Button>
       </div>
     </div>
+  );
+}
+
+// ─── Import Media As Lesson Dialog ──────────────────────────────────────────
+
+function ImportMediaAsLessonDialog({ sectionId, onClose, onCreated }: { sectionId: number; onClose: () => void; onCreated: () => void }) {
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState<"all" | "video" | "document" | "scorm" | "html">("all");
+  const [selectedAsset, setSelectedAsset] = useState<any>(null);
+
+  const { data: assets, isLoading } = trpc.mediaRepo.listAssets.useQuery({
+    page: 1, pageSize: 30,
+    search: search || undefined,
+    mediaType: typeFilter === "all" ? undefined : typeFilter,
+  });
+
+  const importLesson = trpc.lmsAdmin.importMediaAssetAsLesson.useMutation({
+    onSuccess: () => { toast.success("Lesson imported from Media Library!"); onCreated(); },
+    onError: e => toast.error(`Import failed: ${e.message}`),
+  });
+
+  const lessonTypeForAsset = (asset: any) => {
+    if (asset.mediaType === "video") return "video";
+    if (asset.mediaType === "scorm") return "scorm";
+    if (asset.mediaType === "html") return "html";
+    return "download";
+  };
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><FolderOpen className="w-5 h-5 text-blue-600" /> Import from Media Library</DialogTitle>
+        </DialogHeader>
+        <div className="flex gap-2">
+          <Input placeholder="Search assets..." value={search} onChange={e => setSearch(e.target.value)} className="flex-1" />
+          <Select value={typeFilter} onValueChange={v => setTypeFilter(v as any)}>
+            <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="video">Video</SelectItem>
+              <SelectItem value="document">Document</SelectItem>
+              <SelectItem value="scorm">SCORM</SelectItem>
+              <SelectItem value="html">HTML</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
+          {isLoading ? (
+            Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)
+          ) : assets?.assets?.length === 0 ? (
+            <div className="text-center py-8 text-gray-400 text-sm">No assets found. Upload files to the Media Library first.</div>
+          ) : (
+            assets?.assets?.map((asset: any) => (
+              <div
+                key={asset.id}
+                onClick={() => setSelectedAsset(asset)}
+                className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                  selectedAsset?.id === asset.id
+                    ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30"
+                    : "border-gray-200 hover:border-blue-300 hover:bg-gray-50"
+                }`}
+              >
+                <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
+                  {asset.mediaType === "video" ? "🎬" : asset.mediaType === "scorm" ? "📦" : asset.mediaType === "html" ? "🌐" : "📄"}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-gray-800 truncate">{asset.title}</div>
+                  <div className="text-xs text-gray-500 flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs capitalize">{asset.mediaType}</Badge>
+                    {asset.folder && <span>{asset.folder.name}</span>}
+                  </div>
+                </div>
+                {selectedAsset?.id === asset.id && <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0" />}
+              </div>
+            ))
+          )}
+        </div>
+        <DialogFooter className="pt-3 border-t">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+            disabled={!selectedAsset || importLesson.isPending}
+            onClick={() => importLesson.mutate({
+              sectionId,
+              assetId: selectedAsset.id,
+              lessonType: lessonTypeForAsset(selectedAsset),
+            })}
+          >
+            {importLesson.isPending ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Importing...</> : <><FolderOpen className="w-4 h-4 mr-1" /> Import as Lesson</>}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
