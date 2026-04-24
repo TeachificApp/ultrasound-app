@@ -676,10 +676,31 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
 function LandingPageEditor({ courseId, landingPage, courseType, onSave, saving }: { courseId: number; landingPage: any; courseType?: string; onSave: (data: any) => void; saving: boolean }) {
   const [heroTitle, setHeroTitle] = useState(landingPage?.heroTitle ?? "");
   const [heroSubtitle, setHeroSubtitle] = useState(landingPage?.heroSubtitle ?? "");
+  const [heroImageUrl, setHeroImageUrl] = useState(landingPage?.heroImageUrl ?? "");
   const [ctaText, setCtaText] = useState(landingPage?.ctaText ?? "Enroll Now");
   const [whatYouLearn, setWhatYouLearn] = useState(landingPage?.whatYouLearn ?? "");
   const [requirements, setRequirements] = useState(landingPage?.requirements ?? "");
   const [bodyContent, setBodyContent] = useState(landingPage?.bodyContent ?? "");
+  const [uploadingHero, setUploadingHero] = useState(false);
+
+  const uploadHeroImage = trpc.lmsAdmin.uploadLandingPageHeroImage.useMutation({
+    onSuccess: (data) => { setHeroImageUrl(data.url); toast.success("Hero image uploaded and saved to Media Library"); },
+    onError: e => toast.error(`Upload failed: ${e.message}`),
+    onSettled: () => setUploadingHero(false),
+  });
+
+  const handleHeroFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 8_000_000) { toast.error("Image must be under 8 MB"); return; }
+    setUploadingHero(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      uploadHeroImage.mutate({ courseId, dataUri: reader.result as string, mimeType: file.type as any });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
@@ -715,7 +736,36 @@ function LandingPageEditor({ courseId, landingPage, courseType, onSave, saving }
         </Label>
         <div className="mt-1"><RichTextEditor value={requirements} onChange={setRequirements} /></div>
       </div>
-      <Button className="bg-teal-600 hover:bg-teal-700 text-white" disabled={saving} onClick={() => onSave({ heroTitle, heroSubtitle, ctaText, whatYouLearn, bodyContent, requirements })}>
+      {/* Hero Image */}
+      <div>
+        <Label className="text-sm">Hero Banner Image</Label>
+        <p className="text-xs text-gray-400 mt-0.5">Displayed at the top of the public landing page. Recommended: 1600×600 px. Stored in the Media Library.</p>
+        <div className="mt-2 flex items-start gap-4">
+          <div className="w-48 h-20 rounded-lg border-2 border-dashed border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center flex-shrink-0">
+            {heroImageUrl ? (
+              <img src={heroImageUrl} alt="Hero" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-xs text-gray-400 text-center px-2">No banner</span>
+            )}
+          </div>
+          <div className="flex-1 space-y-2">
+            <label className="cursor-pointer">
+              <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={handleHeroFileChange} disabled={uploadingHero} />
+              <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors ${
+                uploadingHero
+                  ? "border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed"
+                  : "border-teal-300 text-teal-600 bg-white hover:bg-teal-50 cursor-pointer"
+              }`}>
+                <Upload className="w-3 h-3" />
+                {uploadingHero ? "Uploading..." : "Upload Banner"}
+              </span>
+            </label>
+            <Input value={heroImageUrl} onChange={e => setHeroImageUrl(e.target.value)} placeholder="Or paste image URL..." className="text-xs h-8" />
+          </div>
+        </div>
+      </div>
+
+      <Button className="bg-teal-600 hover:bg-teal-700 text-white" disabled={saving} onClick={() => onSave({ heroTitle, heroSubtitle, heroImageUrl, ctaText, whatYouLearn, bodyContent, requirements })}>
         {saving ? "Saving..." : "Save Landing Page"}
       </Button>
     </div>

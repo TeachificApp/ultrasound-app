@@ -1184,3 +1184,8 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Admin UI: replace simple price/isFree with full pricing section (type selector + conditional fields)
 - [ ] Public CourseLanding: display correct pricing badge and CTA per pricing type
 - [ ] 0 TypeScript errors, tests passing
+
+## LMS — Cover Image via Media Library
+- [x] Route uploadCourseCoverImage through Media Repository (creates a media asset record)
+- [x] Add landing page hero image upload field (also stored via Media Repository)
+- [x] Both uploads accessible and manageable from the Media Repository admin

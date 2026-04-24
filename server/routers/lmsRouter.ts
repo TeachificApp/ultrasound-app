@@ -34,6 +34,8 @@ import {
   lmsLandingPages,
   lmsOrders,
   users,
+  mediaAssets,
+  mediaVersions,
 } from "../../drizzle/schema";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -671,14 +673,114 @@ export const lmsAdminRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Fetch the course title for the media asset name
+      const [course] = await db.select({ title: lmsCourses.title }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+
       const base64Data = input.dataUri.replace(/^data:[^;]+;base64,/, "");
       const buffer = Buffer.from(base64Data, "base64");
       const ext = input.mimeType.split("/")[1];
       const suffix = randomBytes(4).toString("hex");
-      const fileKey = `lms-covers/${input.courseId}-${suffix}.${ext}`;
+      const slug = `lms-cover-${input.courseId}-${suffix}`;
+      const fileName = `cover-${suffix}.${ext}`;
+      const fileKey = `media-repo/${slug}/${fileName}`;
+
+      // Upload to S3
       const { url } = await storagePut(fileKey, buffer, input.mimeType);
+
+      // Create Media Repository asset record
+      const [assetResult] = await db.insert(mediaAssets).values({
+        slug,
+        title: `${course.title} — Cover Image`,
+        description: `Course card cover image for "${course.title}"`,
+        mediaType: "image",
+        mimeType: input.mimeType,
+        access: "public",
+        tags: "lms,cover,course",
+        folder: "Course Covers",
+        thumbnailUrl: url,
+        createdByUserId: ctx.user.id,
+      });
+      const assetId = (assetResult as any).insertId as number;
+
+      // Create version record
+      await db.insert(mediaVersions).values({
+        assetId,
+        versionNumber: 1,
+        s3Key: fileKey,
+        s3Url: url,
+        fileName,
+        fileSize: buffer.byteLength,
+        mimeType: input.mimeType,
+        notes: "Auto-uploaded from LMS course settings",
+        uploadedByUserId: ctx.user.id,
+      });
+
+      // Update the course coverImageUrl
       await db.update(lmsCourses).set({ coverImageUrl: url }).where(eq(lmsCourses.id, input.courseId));
-      return { url };
+      return { url, assetId };
+    }),
+
+  uploadLandingPageHeroImage: protectedProcedure
+    .input(z.object({
+      courseId: z.number(),
+      dataUri: z.string().min(1).max(10_000_000),
+      mimeType: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const [course] = await db.select({ title: lmsCourses.title }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const base64Data = input.dataUri.replace(/^data:[^;]+;base64,/, "");
+      const buffer = Buffer.from(base64Data, "base64");
+      const ext = input.mimeType.split("/")[1];
+      const suffix = randomBytes(4).toString("hex");
+      const slug = `lms-hero-${input.courseId}-${suffix}`;
+      const fileName = `hero-${suffix}.${ext}`;
+      const fileKey = `media-repo/${slug}/${fileName}`;
+
+      const { url } = await storagePut(fileKey, buffer, input.mimeType);
+
+      // Create Media Repository asset record
+      const [assetResult] = await db.insert(mediaAssets).values({
+        slug,
+        title: `${course.title} — Hero Banner`,
+        description: `Landing page hero banner for "${course.title}"`,
+        mediaType: "image",
+        mimeType: input.mimeType,
+        access: "public",
+        tags: "lms,hero,landing-page",
+        folder: "Course Covers",
+        thumbnailUrl: url,
+        createdByUserId: ctx.user.id,
+      });
+      const assetId = (assetResult as any).insertId as number;
+
+      await db.insert(mediaVersions).values({
+        assetId,
+        versionNumber: 1,
+        s3Key: fileKey,
+        s3Url: url,
+        fileName,
+        fileSize: buffer.byteLength,
+        mimeType: input.mimeType,
+        notes: "Auto-uploaded from LMS landing page editor",
+        uploadedByUserId: ctx.user.id,
+      });
+
+      // Upsert the landing page heroImageUrl
+      const [existing] = await db.select({ id: lmsLandingPages.id }).from(lmsLandingPages).where(eq(lmsLandingPages.courseId, input.courseId)).limit(1);
+      if (existing) {
+        await db.update(lmsLandingPages).set({ heroImageUrl: url }).where(eq(lmsLandingPages.courseId, input.courseId));
+      } else {
+        await db.insert(lmsLandingPages).values({ courseId: input.courseId, heroImageUrl: url, isCustom: true });
+      }
+      return { url, assetId };
     }),
 
   getCourse: protectedProcedure
