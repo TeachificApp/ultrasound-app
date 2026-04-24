@@ -460,6 +460,7 @@ export const lmsAdminRouter = router({
   listCourses: protectedProcedure
     .input(z.object({
       status: z.enum(["draft", "public", "hidden", "private", "all"]).default("all"),
+      type: z.enum(["course", "quiz", "download", "all"]).default("all"),
       page: z.number().int().min(1).default(1),
       pageSize: z.number().int().min(1).max(100).default(20),
     }))
@@ -467,7 +468,9 @@ export const lmsAdminRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const conditions = input.status !== "all" ? [eq(lmsCourses.status, input.status as "draft" | "public" | "hidden" | "private")] : [];
+      const conditions: any[] = [];
+      if (input.status !== "all") conditions.push(eq(lmsCourses.status, input.status as "draft" | "public" | "hidden" | "private"));
+      if (input.type !== "all") conditions.push(eq(lmsCourses.type, input.type as "course" | "quiz" | "download"));
       const offset = (input.page - 1) * input.pageSize;
       const courses = await db.select().from(lmsCourses).where(conditions.length ? and(...conditions) : undefined).orderBy(desc(lmsCourses.updatedAt)).limit(input.pageSize).offset(offset);
       const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(lmsCourses).where(conditions.length ? and(...conditions) : undefined);

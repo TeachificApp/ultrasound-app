@@ -46,15 +46,18 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
   download: <Download className="w-4 h-4" />,
 };
 
-// ─── Course List Tab ──────────────────────────────────────────────────────────
+// ─── Course / Quiz / Download List Tab ──────────────────────────────────────
 
-function CoursesTab({ onEdit }: { onEdit: (id: number) => void }) {
+function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) => void; typeFilter?: "course" | "quiz" | "download" }) {
   
   const [createOpen, setCreateOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
 
-  const { data, isLoading, refetch } = trpc.lmsAdmin.listCourses.useQuery({ status: statusFilter as any, page, pageSize: 20 });
+  const typeLabel = typeFilter === "quiz" ? "Quiz" : typeFilter === "download" ? "Download" : "Course";
+  const typeLabelPlural = typeFilter === "quiz" ? "quizzes" : typeFilter === "download" ? "downloads" : "courses";
+
+  const { data, isLoading, refetch } = trpc.lmsAdmin.listCourses.useQuery({ status: statusFilter as any, type: typeFilter, page, pageSize: 20 });
 
   const deleteCourse = trpc.lmsAdmin.deleteCourse.useMutation({
     onSuccess: () => { toast.success("Course deleted"); refetch(); },
@@ -77,10 +80,10 @@ function CoursesTab({ onEdit }: { onEdit: (id: number) => void }) {
               <SelectItem value="private">Private</SelectItem>
             </SelectContent>
           </Select>
-          {data && <span className="text-sm text-gray-500">{data.total} course{data.total !== 1 ? "s" : ""}</span>}
+          {data && <span className="text-sm text-gray-500">{data.total} {data.total !== 1 ? typeLabelPlural : typeLabel.toLowerCase()}</span>}
         </div>
         <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white h-8" onClick={() => setCreateOpen(true)}>
-          <Plus className="w-4 h-4 mr-1" /> New Course
+          <Plus className="w-4 h-4 mr-1" /> New {typeLabel}
         </Button>
       </div>
 
@@ -114,7 +117,7 @@ function CoursesTab({ onEdit }: { onEdit: (id: number) => void }) {
           {data?.courses.length === 0 && (
             <div className="text-center py-12 text-gray-400">
               <BookOpen className="w-10 h-10 mx-auto mb-2 opacity-30" />
-              <p>No courses yet. Create your first course.</p>
+              <p>No {typeLabelPlural} yet. Create your first {typeLabel.toLowerCase()}.</p>
             </div>
           )}
         </div>
@@ -127,18 +130,18 @@ function CoursesTab({ onEdit }: { onEdit: (id: number) => void }) {
         </div>
       )}
 
-      <CreateCourseDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={id => { setCreateOpen(false); onEdit(id); refetch(); }} />
+      <CreateCourseDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={id => { setCreateOpen(false); onEdit(id); refetch(); }} defaultType={typeFilter} />
     </div>
   );
 }
 
 // ─── Create Course Dialog ─────────────────────────────────────────────────────
 
-function CreateCourseDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (id: number) => void }) {
+function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }: { open: boolean; onClose: () => void; onCreated: (id: number) => void; defaultType?: "course" | "quiz" | "download" }) {
   
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
-  const [type, setType] = useState<"course" | "quiz" | "download">("course");
+  const [type, setType] = useState<"course" | "quiz" | "download">(defaultType);
   const [brand, setBrand] = useState<"aaus" | "iheartecho">("aaus");
   const [price, setPrice] = useState("");
   const [isFree, setIsFree] = useState(false);
@@ -154,7 +157,7 @@ function CreateCourseDialog({ open, onClose, onCreated }: { open: boolean; onClo
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Create New Course</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Create New {type === "quiz" ? "Quiz" : type === "download" ? "Download" : "Course"}</DialogTitle></DialogHeader>
         <div className="space-y-4 py-2">
           <div>
             <Label className="text-sm">Title *</Label>
@@ -212,7 +215,7 @@ function CreateCourseDialog({ open, onClose, onCreated }: { open: boolean; onClo
               price: isFree ? 0 : Math.round(parseFloat(price || "0") * 100),
             })}
           >
-            {create.isPending ? "Creating..." : "Create Course"}
+            {create.isPending ? "Creating..." : `Create ${type === "quiz" ? "Quiz" : type === "download" ? "Download" : "Course"}`}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -589,6 +592,70 @@ function AddSectionDialog({ open, courseId, onClose, onCreated }: { open: boolea
 
 // ─── Add Lesson Dialog ────────────────────────────────────────────────────────
 
+// ─── Media Repository Picker Dialog ──────────────────────────────────────────
+
+function MediaPickerDialog({ open, onClose, onSelect }: { open: boolean; onClose: () => void; onSelect: (asset: { id: number; title: string; s3Url: string; mediaType: string }) => void }) {
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [mediaType, setMediaType] = useState<string>("all");
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const { data, isLoading } = trpc.mediaRepo.listAssets.useQuery(
+    { search: debouncedSearch || undefined, mediaType: mediaType !== "all" ? mediaType as any : undefined, page, pageSize: 20 },
+    { enabled: open }
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+        <DialogHeader><DialogTitle>Pick from Media Repository</DialogTitle></DialogHeader>
+        <div className="flex gap-2 mb-3">
+          <Input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="Search assets..." className="flex-1 h-8 text-sm" />
+          <Select value={mediaType} onValueChange={v => { setMediaType(v); setPage(1); }}>
+            <SelectTrigger className="w-36 h-8 text-sm"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="video">Video</SelectItem>
+              <SelectItem value="pdf">PDF</SelectItem>
+              <SelectItem value="image">Image</SelectItem>
+              <SelectItem value="audio">Audio</SelectItem>
+              <SelectItem value="document">Document</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex-1 overflow-y-auto space-y-1 min-h-0">
+          {isLoading ? (
+            Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded" />)
+          ) : (
+            (data?.assets ?? []).map((a: any) => (
+              <button key={a.id} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border border-gray-200 hover:border-teal-400 hover:bg-teal-50 transition-colors text-left"
+                onClick={() => { onSelect({ id: a.id, title: a.title, s3Url: a.s3Url, mediaType: a.mediaType }); onClose(); }}>
+                <span className="text-xs font-mono bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded uppercase">{a.mediaType}</span>
+                <span className="text-sm text-gray-800 flex-1 truncate">{a.title}</span>
+                {a.folder && <span className="text-xs text-gray-400 truncate max-w-[120px]">{a.folder}</span>}
+              </button>
+            ))
+          )}
+          {!isLoading && data?.assets?.length === 0 && (
+            <p className="text-center py-8 text-gray-400 text-sm">No assets found.</p>
+          )}
+        </div>
+        {(data?.total ?? 0) > 20 && (
+          <div className="flex justify-center gap-2 pt-3 border-t border-gray-100">
+            <Button size="sm" variant="outline" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Previous</Button>
+            <Button size="sm" variant="outline" disabled={page * 20 >= (data?.total ?? 0)} onClick={() => setPage(p => p + 1)}>Next</Button>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function AddLessonDialog({ sectionId, onClose, onCreated }: { sectionId: number; onClose: () => void; onCreated: () => void }) {
   
   const [title, setTitle] = useState("");
@@ -596,13 +663,22 @@ function AddLessonDialog({ sectionId, onClose, onCreated }: { sectionId: number;
   const [isPreview, setIsPreview] = useState(false);
   const [content, setContent] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("");
+  const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
+  const [selectedAsset, setSelectedAsset] = useState<{ id: number; title: string; s3Url: string; mediaType: string } | null>(null);
 
   const create = trpc.lmsAdmin.createLesson.useMutation({
     onSuccess: () => { toast.success("Lesson added"); onCreated(); },
     onError: e => toast.error(`Error: ${e.message}`),
   });
 
+  const handleSelectAsset = (asset: { id: number; title: string; s3Url: string; mediaType: string }) => {
+    setSelectedAsset(asset);
+    setContent(asset.s3Url);
+    if (!title.trim()) setTitle(asset.title);
+  };
+
   return (
+    <>
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="max-w-lg">
         <DialogHeader><DialogTitle>Add Lesson</DialogTitle></DialogHeader>
@@ -614,7 +690,7 @@ function AddLessonDialog({ sectionId, onClose, onCreated }: { sectionId: number;
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-sm">Type</Label>
-              <Select value={type} onValueChange={v => setType(v as any)}>
+              <Select value={type} onValueChange={v => { setType(v as any); setSelectedAsset(null); setContent(""); }}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="text">Text</SelectItem>
@@ -635,7 +711,21 @@ function AddLessonDialog({ sectionId, onClose, onCreated }: { sectionId: number;
           </div>
           {type !== "quiz" && (
             <div>
-              <Label className="text-sm">{type === "video" ? "Video URL" : type === "download" ? "Download URL" : "Content (rich text)"}</Label>
+              <div className="flex items-center justify-between mb-1">
+                <Label className="text-sm">{type === "video" ? "Video URL" : type === "download" ? "Download URL" : "Content (rich text)"}</Label>
+                {(type === "video" || type === "download") && (
+                  <Button size="sm" variant="outline" className="h-6 text-xs text-teal-600 border-teal-300 hover:bg-teal-50" onClick={() => setMediaPickerOpen(true)}>
+                    Pick from Media Repository
+                  </Button>
+                )}
+              </div>
+              {selectedAsset && (
+                <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-teal-50 border border-teal-200 rounded-lg text-xs text-teal-700">
+                  <span className="font-mono bg-teal-100 px-1 rounded uppercase">{selectedAsset.mediaType}</span>
+                  <span className="flex-1 truncate">{selectedAsset.title}</span>
+                  <button className="text-teal-400 hover:text-teal-600" onClick={() => { setSelectedAsset(null); setContent(""); }}>×</button>
+                </div>
+              )}
               {type === "text" ? (
                 <div className="mt-1"><RichTextEditor value={content} onChange={setContent} /></div>
               ) : (
@@ -652,6 +742,7 @@ function AddLessonDialog({ sectionId, onClose, onCreated }: { sectionId: number;
             onClick={() => create.mutate({
               sectionId, title: title.trim(), type, isPreview,
               content: content || undefined,
+              mediaAssetId: selectedAsset?.id ?? undefined,
               durationMinutes: durationMinutes ? parseInt(durationMinutes) : undefined,
             })}
           >
@@ -660,6 +751,8 @@ function AddLessonDialog({ sectionId, onClose, onCreated }: { sectionId: number;
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    <MediaPickerDialog open={mediaPickerOpen} onClose={() => setMediaPickerOpen(false)} onSelect={handleSelectAsset} />
+    </>
   );
 }
 
@@ -671,6 +764,8 @@ function EditLessonDialog({ lesson, onClose, onSaved }: { lesson: any; onClose: 
   const [content, setContent] = useState(lesson.content ?? "");
   const [isPreview, setIsPreview] = useState(lesson.isPreview);
   const [durationMinutes, setDurationMinutes] = useState(String(lesson.durationMinutes ?? ""));
+  const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
+  const [selectedAsset, setSelectedAsset] = useState<{ id: number; title: string; s3Url: string; mediaType: string } | null>(null);
 
   const update = trpc.lmsAdmin.updateLesson.useMutation({
     onSuccess: () => { toast.success("Lesson saved"); onSaved(); },
@@ -678,6 +773,7 @@ function EditLessonDialog({ lesson, onClose, onSaved }: { lesson: any; onClose: 
   });
 
   return (
+    <>
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="max-w-lg">
         <DialogHeader><DialogTitle>Edit Lesson</DialogTitle></DialogHeader>
@@ -696,7 +792,21 @@ function EditLessonDialog({ lesson, onClose, onSaved }: { lesson: any; onClose: 
           </div>
           {lesson.type !== "quiz" && (
             <div>
-              <Label className="text-sm">{lesson.type === "video" ? "Video URL" : lesson.type === "download" ? "Download URL" : "Content (rich text)"}</Label>
+              <div className="flex items-center justify-between mb-1">
+                <Label className="text-sm">{lesson.type === "video" ? "Video URL" : lesson.type === "download" ? "Download URL" : "Content (rich text)"}</Label>
+                {(lesson.type === "video" || lesson.type === "download") && (
+                  <Button size="sm" variant="outline" className="h-6 text-xs text-teal-600 border-teal-300 hover:bg-teal-50" onClick={() => setMediaPickerOpen(true)}>
+                    Pick from Media Repository
+                  </Button>
+                )}
+              </div>
+              {selectedAsset && (
+                <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-teal-50 border border-teal-200 rounded-lg text-xs text-teal-700">
+                  <span className="font-mono bg-teal-100 px-1 rounded uppercase">{selectedAsset.mediaType}</span>
+                  <span className="flex-1 truncate">{selectedAsset.title}</span>
+                  <button className="text-teal-400 hover:text-teal-600" onClick={() => { setSelectedAsset(null); setContent(lesson.content ?? ""); }}>×</button>
+                </div>
+              )}
               {lesson.type === "text" ? (
                 <div className="mt-1"><RichTextEditor value={content} onChange={setContent} /></div>
               ) : (
@@ -713,6 +823,7 @@ function EditLessonDialog({ lesson, onClose, onSaved }: { lesson: any; onClose: 
             onClick={() => update.mutate({
               id: lesson.id, title: title.trim(), isPreview,
               content: content || undefined,
+              mediaAssetId: selectedAsset?.id ?? undefined,
               durationMinutes: durationMinutes ? parseInt(durationMinutes) : null,
             })}
           >
@@ -721,6 +832,8 @@ function EditLessonDialog({ lesson, onClose, onSaved }: { lesson: any; onClose: 
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    <MediaPickerDialog open={mediaPickerOpen} onClose={() => setMediaPickerOpen(false)} onSelect={asset => { setSelectedAsset(asset); setContent(asset.s3Url); }} />
+    </>
   );
 }
 
@@ -1399,15 +1512,19 @@ export default function LMSAdmin() {
         <CourseEditor courseId={editingCourseId} onBack={() => setEditingCourseId(null)} />
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="bg-gray-100">
+          <TabsList className="bg-gray-100 flex-wrap h-auto gap-0.5">
             <TabsTrigger value="courses" className="text-xs">Courses</TabsTrigger>
+            <TabsTrigger value="quizzes" className="text-xs">Quizzes</TabsTrigger>
+            <TabsTrigger value="downloads" className="text-xs">Downloads</TabsTrigger>
             <TabsTrigger value="enrollments" className="text-xs">Enrollments</TabsTrigger>
             <TabsTrigger value="groups" className="text-xs">Groups</TabsTrigger>
             <TabsTrigger value="instructors" className="text-xs">Instructors</TabsTrigger>
             <TabsTrigger value="affiliates" className="text-xs">Affiliates</TabsTrigger>
             <TabsTrigger value="analytics" className="text-xs">Analytics</TabsTrigger>
           </TabsList>
-          <TabsContent value="courses" className="mt-4"><CoursesTab onEdit={setEditingCourseId} /></TabsContent>
+          <TabsContent value="courses" className="mt-4"><CoursesTab onEdit={setEditingCourseId} typeFilter="course" /></TabsContent>
+          <TabsContent value="quizzes" className="mt-4"><CoursesTab onEdit={setEditingCourseId} typeFilter="quiz" /></TabsContent>
+          <TabsContent value="downloads" className="mt-4"><CoursesTab onEdit={setEditingCourseId} typeFilter="download" /></TabsContent>
           <TabsContent value="enrollments" className="mt-4"><EnrollmentsTab /></TabsContent>
           <TabsContent value="groups" className="mt-4"><GroupsTab /></TabsContent>
           <TabsContent value="instructors" className="mt-4"><InstructorsTab /></TabsContent>

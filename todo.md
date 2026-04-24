@@ -1149,3 +1149,29 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Revenue sharing config per course instructor
 - [x] LMS vitest tests: 16 tests passing (slugify, enrollment, commission, seats, visibility)
 - [x] Routes registered in App.tsx (no sidebar link added per user preference)
+
+## LMS — Quizzes, Downloads & Media Picker (Apr 23 2026)
+- [ ] DB: lms_standalone_quizzes table (title, slug, description, price, status, passingScore, questions JSON)
+- [ ] DB: lms_downloads table (title, slug, description, price, status, fileUrl, fileKey, mimeType, fileSize)
+- [ ] Server: lmsAdmin procedures for standalone quiz CRUD and download CRUD
+- [ ] Server: lmsLearner procedures for standalone quiz purchase/attempt and download purchase/access
+- [ ] Admin LMS panel: Quizzes tab (create/edit standalone quizzes with question builder)
+- [ ] Admin LMS panel: Downloads tab (create/edit digital downloads, upload file or pick from Media Repository)
+- [ ] Course lesson builder: "Insert from Media Repository" picker (browse and select video/PDF/image)
+- [ ] Course lesson builder: "Attach Standalone Quiz" picker (link a standalone quiz as a lesson)
+- [ ] Course lesson builder: "Attach Download" picker (link a download as a lesson resource)
+- [ ] Public Education Library: show Quizzes and Downloads cards alongside Courses
+- [ ] Course landing page: show attached downloads and quizzes in the curriculum outline
+
+## LMS — Quizzes, Downloads & Media Picker (Apr 23 2026)
+
+- [x] Add type filter to lmsAdmin.listCourses server procedure
+- [x] Add Quizzes tab to LMS Admin panel (pre-filtered by type=quiz)
+- [x] Add Downloads tab to LMS Admin panel (pre-filtered by type=download)
+- [x] CoursesTab accepts typeFilter prop — labels and empty states are type-aware
+- [x] CreateCourseDialog defaultType prop — dialog title and button say "New Quiz" / "New Download" contextually
+- [x] MediaPickerDialog component — search, type filter, paginated asset list from Media Repository
+- [x] AddLessonDialog — "Pick from Media Repository" button for video/download lessons
+- [x] EditLessonDialog — "Pick from Media Repository" button for video/download lessons
+- [x] Education Library — type-aware count label, search placeholder, empty state icon, and CTA button
+- [x] 817 tests passing, 0 TypeScript errors

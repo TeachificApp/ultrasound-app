@@ -79,7 +79,7 @@ function CourseCard({ course }: { course: any }) {
           <div className="flex items-center justify-between pt-3 border-t border-gray-100 mt-auto">
             <span className="text-sm font-bold text-teal-700">{price}</span>
             <Button size="sm" variant="outline" className="text-xs h-7 border-teal-300 text-teal-700 hover:bg-teal-50">
-              View Course
+              {course.type === "quiz" ? "Take Quiz" : course.type === "download" ? "Get Download" : "View Course"}
             </Button>
           </div>
         </div>
@@ -142,7 +142,7 @@ export default function EducationLibrary() {
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <Input
-              placeholder="Search courses..."
+              placeholder="Search courses, quizzes, downloads..."
               value={search}
               onChange={e => { setSearch(e.target.value); setPage(1); }}
               className="pl-9 h-9 text-sm"
@@ -180,7 +180,9 @@ export default function EducationLibrary() {
             </SelectContent>
           </Select>
           {total > 0 && (
-            <span className="text-sm text-gray-500 ml-auto">{total} course{total !== 1 ? "s" : ""}</span>
+            <span className="text-sm text-gray-500 ml-auto">
+              {total} {type === "quiz" ? (total !== 1 ? "quizzes" : "quiz") : type === "download" ? (total !== 1 ? "downloads" : "download") : (total !== 1 ? "items" : "item")}
+            </span>
           )}
         </div>
 
@@ -191,8 +193,8 @@ export default function EducationLibrary() {
           </div>
         ) : courses.length === 0 ? (
           <div className="text-center py-20 text-gray-400">
-            <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p className="text-lg font-medium">No courses found</p>
+            {type === "quiz" ? <HelpCircle className="w-12 h-12 mx-auto mb-3 opacity-30" /> : type === "download" ? <Download className="w-12 h-12 mx-auto mb-3 opacity-30" /> : <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />}
+            <p className="text-lg font-medium">No {type === "quiz" ? "quizzes" : type === "download" ? "downloads" : "courses"} found</p>
             <p className="text-sm mt-1">Try adjusting your filters</p>
           </div>
         ) : (
