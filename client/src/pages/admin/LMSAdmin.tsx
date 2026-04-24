@@ -1704,6 +1704,14 @@ function QuizBuilderDialog({ lesson, onClose }: { lesson: any; onClose: () => vo
   const [addingQuestion, setAddingQuestion] = useState(false);
   const [newQ, setNewQ] = useState({ question: "", type: "mcq" as "mcq" | "truefalse", options: ["", "", "", ""], correctAnswer: "", explanation: "" });
 
+  // AI Generate state
+  const [showAIDialog, setShowAIDialog] = useState(false);
+  const [aiTopic, setAITopic] = useState("");
+  const [aiCount, setAICount] = useState(10);
+  const [aiDifficulty, setAIDifficulty] = useState<"beginner" | "intermediate" | "advanced">("intermediate");
+  const [aiQType, setAIQType] = useState<"mcq" | "truefalse" | "mixed">("mcq");
+  const [aiPreview, setAIPreview] = useState<Array<{ question: string; type: string; options: string[]; correctAnswer: string; explanation: string; selected: boolean }> | null>(null);
+
   const updateQuiz = trpc.lmsAdmin.updateQuiz.useMutation({ onSuccess: () => { toast.success("Quiz settings saved"); refetch(); } });
   const addQuestion = trpc.lmsAdmin.addQuestion.useMutation({
     onSuccess: () => { toast.success("Question added"); setAddingQuestion(false); setNewQ({ question: "", type: "mcq", options: ["", "", "", ""], correctAnswer: "", explanation: "" }); refetch(); },
@@ -1711,10 +1719,36 @@ function QuizBuilderDialog({ lesson, onClose }: { lesson: any; onClose: () => vo
   });
   const deleteQuestion = trpc.lmsAdmin.deleteQuestion.useMutation({ onSuccess: () => refetch() });
 
+  const aiGenerate = trpc.lmsAdmin.aiGenerateQuizQuestions.useMutation({
+    onSuccess: (data) => {
+      setAIPreview(data.questions.map(q => ({ ...q, selected: true })));
+    },
+    onError: e => toast.error(`AI error: ${e.message}`),
+  });
+
+  const bulkInsert = trpc.lmsAdmin.bulkInsertQuizQuestions.useMutation({
+    onSuccess: (data) => {
+      toast.success(`${data.inserted} question${data.inserted === 1 ? "" : "s"} added`);
+      setShowAIDialog(false);
+      setAIPreview(null);
+      setAITopic("");
+      refetch();
+    },
+    onError: e => toast.error(`Error: ${e.message}`),
+  });
+
   return (
+    <>
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Quiz Builder — {lesson.title}</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <div className="flex items-center justify-between">
+            <DialogTitle>Quiz Builder — {lesson.title}</DialogTitle>
+            <Button size="sm" variant="outline" className="border-teal-300 text-teal-700 hover:bg-teal-50 gap-1.5" onClick={() => { setAIPreview(null); setShowAIDialog(true); }}>
+              <Sparkles className="w-3.5 h-3.5" /> AI Generate
+            </Button>
+          </div>
+        </DialogHeader>
 
         {quiz && (
           <div className="space-y-5">
@@ -1828,6 +1862,145 @@ function QuizBuilderDialog({ lesson, onClose }: { lesson: any; onClose: () => vo
         )}
       </DialogContent>
     </Dialog>
+
+    {/* AI Generate Dialog */}
+    {showAIDialog && quiz && (
+      <Dialog open={true} onOpenChange={() => { setShowAIDialog(false); setAIPreview(null); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-teal-600" /> AI Generate Questions
+            </DialogTitle>
+          </DialogHeader>
+
+          {!aiPreview ? (
+            <div className="space-y-4">
+              <div>
+                <Label className="text-sm font-medium">Topic *</Label>
+                <Input
+                  value={aiTopic}
+                  onChange={e => setAITopic(e.target.value)}
+                  placeholder="e.g. Doppler physics in vascular ultrasound, Normal fetal echo anatomy, DVT diagnosis criteria"
+                  className="mt-1"
+                />
+                <p className="text-xs text-gray-400 mt-1">Be specific — the AI will generate clinically accurate questions tailored to your topic.</p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <Label className="text-sm font-medium">Number of Questions</Label>
+                  <Select value={String(aiCount)} onValueChange={v => setAICount(Number(v))}>
+                    <SelectTrigger className="mt-1 h-9 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {[5, 10, 15, 20, 25, 30, 40, 50].map(n => (
+                        <SelectItem key={n} value={String(n)}>{n} questions</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Difficulty</Label>
+                  <Select value={aiDifficulty} onValueChange={v => setAIDifficulty(v as any)}>
+                    <SelectTrigger className="mt-1 h-9 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="beginner">Beginner</SelectItem>
+                      <SelectItem value="intermediate">Intermediate</SelectItem>
+                      <SelectItem value="advanced">Advanced</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Question Type</Label>
+                  <Select value={aiQType} onValueChange={v => setAIQType(v as any)}>
+                    <SelectTrigger className="mt-1 h-9 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="mcq">Multiple Choice</SelectItem>
+                      <SelectItem value="truefalse">True / False</SelectItem>
+                      <SelectItem value="mixed">Mixed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button variant="outline" onClick={() => setShowAIDialog(false)}>Cancel</Button>
+                <Button
+                  className="bg-teal-600 hover:bg-teal-700 text-white gap-2"
+                  disabled={!aiTopic.trim() || aiGenerate.isPending}
+                  onClick={() => aiGenerate.mutate({ quizId: quiz.id, topic: aiTopic.trim(), count: aiCount, difficulty: aiDifficulty, questionType: aiQType })}
+                >
+                  {aiGenerate.isPending ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</> : <><Sparkles className="w-4 h-4" /> Generate {aiCount} Questions</>}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-gray-600">{aiPreview.filter(q => q.selected).length} of {aiPreview.length} questions selected</p>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="ghost" className="text-xs h-7" onClick={() => setAIPreview(p => p!.map(q => ({ ...q, selected: true })))}>Select All</Button>
+                  <Button size="sm" variant="ghost" className="text-xs h-7" onClick={() => setAIPreview(p => p!.map(q => ({ ...q, selected: false })))}>Deselect All</Button>
+                  <Button size="sm" variant="ghost" className="text-xs h-7 text-teal-600" onClick={() => setAIPreview(null)}>← Back</Button>
+                </div>
+              </div>
+
+              <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+                {aiPreview.map((q, qi) => {
+                  const opts = q.options ?? [];
+                  return (
+                    <div
+                      key={qi}
+                      className={`border rounded-lg p-3 cursor-pointer transition-colors ${
+                        q.selected ? "border-teal-400 bg-teal-50" : "border-gray-200 bg-white opacity-60"
+                      }`}
+                      onClick={() => setAIPreview(p => p!.map((item, i) => i === qi ? { ...item, selected: !item.selected } : item))}
+                    >
+                      <div className="flex items-start gap-2">
+                        <div className={`mt-0.5 w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center text-xs ${
+                          q.selected ? "bg-teal-600 border-teal-600 text-white" : "border-gray-300"
+                        }`}>{q.selected ? "✓" : ""}</div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800">{qi + 1}. {q.question}</p>
+                          <div className="mt-1.5 space-y-0.5">
+                            {opts.map((opt: string) => (
+                              <p key={opt} className={`text-xs px-2 py-0.5 rounded ${
+                                opt === q.correctAnswer ? "bg-green-100 text-green-700 font-medium" : "text-gray-500"
+                              }`}>{opt === q.correctAnswer ? "✓ " : "○ "}{opt}</p>
+                            ))}
+                          </div>
+                          {q.explanation && <p className="text-xs text-gray-400 mt-1 italic">{q.explanation}</p>}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => { setShowAIDialog(false); setAIPreview(null); }}>Cancel</Button>
+                <Button
+                  className="bg-teal-600 hover:bg-teal-700 text-white gap-2"
+                  disabled={aiPreview.filter(q => q.selected).length === 0 || bulkInsert.isPending}
+                  onClick={() => bulkInsert.mutate({
+                    quizId: quiz.id,
+                    questions: aiPreview.filter(q => q.selected).map(({ selected: _s, ...q }) => ({
+                      question: q.question,
+                      type: q.type as "mcq" | "truefalse",
+                      options: q.options,
+                      correctAnswer: q.correctAnswer,
+                      explanation: q.explanation,
+                    })),
+                  })}
+                >
+                  {bulkInsert.isPending ? <><Loader2 className="w-4 h-4 animate-spin" /> Inserting...</> : <>Add {aiPreview.filter(q => q.selected).length} Questions to Quiz</>}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    )}
+    </>
   );
 }
 

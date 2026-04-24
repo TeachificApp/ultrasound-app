@@ -1032,6 +1032,139 @@ export const lmsAdminRouter = router({
       return { success: true };
     }),
 
+  aiGenerateQuizQuestions: protectedProcedure
+    .input(z.object({
+      quizId: z.number(),
+      topic: z.string().min(1).max(500),
+      count: z.number().int().min(1).max(50).default(10),
+      difficulty: z.enum(["beginner", "intermediate", "advanced"]).default("intermediate"),
+      questionType: z.enum(["mcq", "truefalse", "mixed"]).default("mcq"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const typeInstruction =
+        input.questionType === "mcq"
+          ? "All questions must be multiple-choice with exactly 4 options."
+          : input.questionType === "truefalse"
+          ? 'All questions must be true/false. Options must be exactly ["True", "False"].'
+          : 'Mix of multiple-choice (4 options each) and true/false questions (["True", "False"] options).';
+
+      const systemPrompt = `You are a medical education expert specializing in ultrasound and sonography. Generate high-quality quiz questions for healthcare professionals and students. Always use United States English spelling. Return ONLY valid JSON — no markdown, no code fences, no extra text.`;
+
+      const userPrompt = `Generate exactly ${input.count} quiz questions about: "${input.topic}".
+Difficulty: ${input.difficulty}.
+${typeInstruction}
+
+Return a JSON array of objects with this exact shape:
+[
+  {
+    "question": "string — the question text",
+    "type": "mcq" | "truefalse",
+    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "correctAnswer": "string — must exactly match one of the options",
+    "explanation": "string — brief explanation of why the answer is correct (1-2 sentences)"
+  }
+]
+
+Rules:
+- Questions must be clinically accurate and relevant to ultrasound/sonography practice
+- Each question must be distinct and test a different concept
+- correctAnswer must exactly match one of the options (case-sensitive)
+- For truefalse, options must be exactly ["True", "False"]
+- For mcq, provide exactly 4 options
+- Explanations should cite relevant anatomy, physics, or clinical guidelines where appropriate`;
+
+      const response = await invokeLLM({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "quiz_questions",
+            strict: true,
+            schema: {
+              type: "object",
+              properties: {
+                questions: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      question: { type: "string" },
+                      type: { type: "string", enum: ["mcq", "truefalse"] },
+                      options: { type: "array", items: { type: "string" } },
+                      correctAnswer: { type: "string" },
+                      explanation: { type: "string" },
+                    },
+                    required: ["question", "type", "options", "correctAnswer", "explanation"],
+                    additionalProperties: false,
+                  },
+                },
+              },
+              required: ["questions"],
+              additionalProperties: false,
+            },
+          },
+        },
+      });
+
+      let questions: Array<{ question: string; type: string; options: string[]; correctAnswer: string; explanation: string }>;
+      try {
+        const raw = response.choices[0].message.content as string;
+        const parsed = JSON.parse(raw);
+        questions = Array.isArray(parsed) ? parsed : parsed.questions;
+        if (!Array.isArray(questions)) throw new Error("Not an array");
+      } catch {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "AI returned invalid JSON. Please try again." });
+      }
+
+      return { questions };
+    }),
+
+  bulkInsertQuizQuestions: protectedProcedure
+    .input(z.object({
+      quizId: z.number(),
+      questions: z.array(z.object({
+        question: z.string().min(1),
+        type: z.enum(["mcq", "truefalse"]),
+        options: z.array(z.string()),
+        correctAnswer: z.string().min(1),
+        explanation: z.string().optional(),
+      })),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Get current max position
+      const existing = await db.select({ pos: lmsQuizQuestions.position })
+        .from(lmsQuizQuestions)
+        .where(eq(lmsQuizQuestions.quizId, input.quizId))
+        .orderBy(desc(lmsQuizQuestions.position))
+        .limit(1);
+      let nextPos = existing.length > 0 ? (existing[0].pos ?? 0) + 1 : 0;
+
+      for (const q of input.questions) {
+        await db.insert(lmsQuizQuestions).values({
+          quizId: input.quizId,
+          question: q.question,
+          type: q.type as "mcq" | "truefalse",
+          options: JSON.stringify(q.options),
+          correctAnswer: q.correctAnswer,
+          explanation: q.explanation ?? null,
+          position: nextPos++,
+        });
+      }
+
+      return { inserted: input.questions.length };
+    }),
+
   // ── Landing Pages ──
   updateLandingPage: protectedProcedure
     .input(z.object({

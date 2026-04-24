@@ -1239,3 +1239,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] CourseLanding.tsx: render blocks-based layout with #179ca3 default
 - [x] CourseLanding.tsx: access duration label (e.g. "30-day access")
 - [x] CourseLanding.tsx: trial pricing label (e.g. "7 days free, then $X/mo")
+
+## Quiz Builder AI Generate (Apr 24 2026)
+- [x] Add aiGenerateQuizQuestions tRPC procedure (topic, count, difficulty → LLM → questions JSON)
+- [x] Add AI Generate button + dialog to quiz builder in LMSAdmin
+- [x] Dialog: topic input, question count selector (5/10/15/20/custom), difficulty (beginner/intermediate/advanced), question type (MCQ/true-false/mixed)
+- [x] Preview generated questions before inserting (accept all / edit individual / remove)
+- [x] Insert accepted questions into the quiz question list
