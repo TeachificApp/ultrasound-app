@@ -344,6 +344,7 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
           <ArrowLeft className="w-4 h-4 mr-1" /> Back
         </Button>
         <h2 className="font-semibold text-gray-900 text-lg truncate flex-1">{course.title}</h2>
+        <Badge className="text-xs bg-gray-100 text-gray-600 border border-gray-200 capitalize">{course.type}</Badge>
         <Badge className={`text-xs ${STATUS_COLORS[course.status]}`}>{course.status}</Badge>
         <Link href={`/learn/${course.slug}`} target="_blank">
           <Button size="sm" variant="outline" className="h-8 text-xs text-teal-600 border-teal-300">
@@ -355,7 +356,9 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="bg-gray-100">
           <TabsTrigger value="settings" className="text-xs">Settings</TabsTrigger>
-          <TabsTrigger value="curriculum" className="text-xs">Curriculum</TabsTrigger>
+          <TabsTrigger value="curriculum" className="text-xs">
+            {course.type === "quiz" ? "Questions" : course.type === "download" ? "Files" : "Curriculum"}
+          </TabsTrigger>
           <TabsTrigger value="landing" className="text-xs">Landing Page</TabsTrigger>
           <TabsTrigger value="instructors" className="text-xs">Instructors</TabsTrigger>
         </TabsList>
@@ -418,7 +421,7 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
 
         {/* Landing Page Tab */}
         <TabsContent value="landing" className="mt-4">
-          <LandingPageEditor courseId={courseId} landingPage={course.landingPage} onSave={data => updateLandingPage.mutate({ courseId, ...data })} saving={updateLandingPage.isPending} />
+          <LandingPageEditor courseId={courseId} landingPage={course.landingPage} courseType={course.type} onSave={data => updateLandingPage.mutate({ courseId, ...data })} saving={updateLandingPage.isPending} />
         </TabsContent>
 
         {/* Instructors Tab */}
@@ -623,7 +626,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
 
 // ─── Landing Page Editor ──────────────────────────────────────────────────────
 
-function LandingPageEditor({ courseId, landingPage, onSave, saving }: { courseId: number; landingPage: any; onSave: (data: any) => void; saving: boolean }) {
+function LandingPageEditor({ courseId, landingPage, courseType, onSave, saving }: { courseId: number; landingPage: any; courseType?: string; onSave: (data: any) => void; saving: boolean }) {
   const [heroTitle, setHeroTitle] = useState(landingPage?.heroTitle ?? "");
   const [heroSubtitle, setHeroSubtitle] = useState(landingPage?.heroSubtitle ?? "");
   const [ctaText, setCtaText] = useState(landingPage?.ctaText ?? "Enroll Now");
@@ -648,15 +651,21 @@ function LandingPageEditor({ courseId, landingPage, onSave, saving }: { courseId
         <Input value={heroSubtitle} onChange={e => setHeroSubtitle(e.target.value)} className="mt-1" />
       </div>
       <div>
-        <Label className="text-sm">What You'll Learn (rich text)</Label>
+        <Label className="text-sm">
+          {courseType === "download" ? "What's Included" : courseType === "quiz" ? "What You'll Practice" : "What You'll Learn"}
+        </Label>
         <div className="mt-1"><RichTextEditor value={whatYouLearn} onChange={setWhatYouLearn} /></div>
       </div>
       <div>
-        <Label className="text-sm">Course Description / Body Content (rich text)</Label>
+        <Label className="text-sm">
+          {courseType === "download" ? "About This Download" : courseType === "quiz" ? "About This Quiz" : "Course Description / Body Content"}
+        </Label>
         <div className="mt-1"><RichTextEditor value={bodyContent} onChange={setBodyContent} /></div>
       </div>
       <div>
-        <Label className="text-sm">Requirements (rich text)</Label>
+        <Label className="text-sm">
+          {courseType === "download" ? "Who This Is For" : courseType === "quiz" ? "Prerequisites" : "Requirements"}
+        </Label>
         <div className="mt-1"><RichTextEditor value={requirements} onChange={setRequirements} /></div>
       </div>
       <Button className="bg-teal-600 hover:bg-teal-700 text-white" disabled={saving} onClick={() => onSave({ heroTitle, heroSubtitle, ctaText, whatYouLearn, bodyContent, requirements })}>
