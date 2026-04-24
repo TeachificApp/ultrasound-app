@@ -1,414 +1,259 @@
 /*
   UltrasoundAssist™ — Fetal Echo ScanCoach
-  View-by-view acquisition guide for Fetal Echocardiography
-  Based on: AIUM Practice Guideline for the Performance of Fetal Echocardiography (2020)
+  13-view sweep sequence — data sourced from iHeartEcho™ / All About Ultrasound, Inc.
   Brand: Teal #189aa1, Aqua #4ad9e0
   Fonts: Merriweather headings, Open Sans body
 */
 import { useState, useMemo } from "react";
-import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
 import { useScanCoachOverrides } from "@/hooks/useScanCoachOverrides";
 import { fetalBilling } from "@/lib/scanCoachBillingCodes";
 import {
   Baby, ChevronDown, ChevronUp, Info, AlertTriangle,
-  CheckCircle, Target, BookOpen, Lightbulb, Receipt} from "lucide-react";
+  CheckCircle, Target, Receipt,
+  ChevronLeft, ChevronRight,
+} from "lucide-react";
 
 const BRAND = "#189aa1";
 
+// ─── CDN Image URLs (© All About Ultrasound, Inc. / iHeartEcho™) ─────────────
+const CDN = {
+  sweep: "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/pwtXDnxySsEwDrgH.png?Expires=1804217678&Signature=RjLvt9Fs6sbCplyJuBgyeMa3moRHLqXSn5sgXkxbmEMk4zq8JyWJ3uhIlW4xlIMySe1iUKmIoWUsxw9p9gF96ayg9wsQylH0Nf9uugH4tvoyJl4HQcDNZU~eh1UNmWKF2MXx7bp9FDJAKsHla8WuCu6j7rQv50qEaNFCJOqs3cRpoGZNyQhABCzpMPopJJR-V7rzIrebcwNPvB8Zg8J5g2gIr3FW1OVQhuO8G4zOKG2u69c~yiQEdqnxcUd5JeBGdxlMIR5wvaKUn384nUBMhSO1rhEq6WN2eHyFtVZNVnWb0ZPPPP-zYaA5Y8tzPs70r~IuAvDl8uPMxmtIWx8elw__&Key-Pair-Id=K2HSFNDJXOU9YS",
+  abdominalSitusDiagram: "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/ZMTandoYWqCfTVQG.png?Expires=1804219541&Signature=FFw3aLQMd681Ktzg35mIlyajenWZXm5SUyNpFH4Jy~AHqYVioMYaUNqtxZ410Uq9GoNPRcBd6W~zQ5~ddPDzfo7jHB6sc7B~DlmsQcWFSYre6CLyWRhxYC~CBrJk2bq0oh84jf5WLgoc95f70H3wOc~JamfxXXSOE70VM~~2jd~2rQOm5vkLA6QzLMvZANC2XAPlaAoKhGk-Hkfjv4Y7WTlcudoywE2Wmkk-5zHslwi~DDh9UJjeS6HE6wNVfb0Gu9uytxKRAS3r65i8TeH4zNq7kZStckHZmpiPOCgEFg3nKq7UZFIfnyanhi37z9~E3sS5MSbrQX89pvWMEfaHnQ__&Key-Pair-Id=K2HSFNDJXOU9YS",
+  echoAbdominalSitus: "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/oJAqycRWgaGIHUKy.png?Expires=1804219546&Signature=r2K1V3-P-GnIhbORET95gATIoTUFWXd4AxZeqCiDXB1yXQJUXk6rojvOLenXmx~VmkqxROoBJmxj6onaUz62nTTQY4QDKKW1zhZvxCH9yANnYkXZPy-nsmnEeqQCAq~CutfguKZSfj5wub~YDQ7voe2y38IZQqC6TcG-rk7ZElwB~GRqAXhFwJ5p3zlfzhCWZXt8SyXk0rCtfdGVuz1JYqz9QMZ3mGBkz-Zbe4ETNy~Rc0f1OmWAL0M9NDGp~xKExY9cpKO581Z6MbeV9aJ3IbdNMwy~7xsBtXbuJPGxt880EuruzfcVom0mlQj7I9uGX-Fa-1QlQ9Rp9FCxJB9njw__&Key-Pair-Id=K2HSFNDJXOU9YS",
+  fourChamber: "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/CLtSxqdZHBcCumkP.png?Expires=1804217683&Signature=VOxwYTn3wPLwSAG0YLL5zwY5flGx68Jw1pRhxySaq219-kolUuyAnCsaARBvuiZ0EdFnpZjTg-9ikyzFAcXWaog7l~T17sj9zDG5p7bVmBDBQckRWNOCxJW4emBzz-qlyvSMpyXcBBLAPXas~OB5TV2R7GJwN86IbGuYujQnAlR5WsY2lnCC9DTrIjsqdXZS1C-EOjS8X3Gzj5gim6FQYDTRr4U-B28fH0~gbJxskTbEZpuXG20W9U-J9jtvnUHhK2GG-amhyQ13s4M82UX7Le~~JrGHXMjrdhM73ZLNyxJVgiYETzpPyj9GiTwu~Q2sr6mWZA5HjnRWKLfCnX1mww__&Key-Pair-Id=K2HSFNDJXOU9YS",
+  echoFourChamber: "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/FsCsjnyeqmklIFoo.gif?Expires=1804233214&Signature=Jo-rvA0xYhTpV7FpI0syHloTxxRoJiBlV0rJI1~IGZecYYEx3f4yNshsAc8ax0QpKf~B53bd8QD2kiBTZe~ervKNZTE2ZpCDbVck9siO8HP-RafW3dUV7LyxpcfKqbjpXCQf5yWWIuJnFBm45zPPA3ungtCqppNxY~4h2cw0r0a0MKWvuSh8fUe0Aht54BF4NZ1vQWqs7kl6hQO2XVtQR8vRvAzKCjj8XzWbg78n8heVnyN-1hI9PTD9aQTEsKaHX2e7wGlgkeFiJiNQMXUtkZi9PuGWsrAVC7zmXyDs0UTCjwdMeVFmWWX43Eb6uSDB6-gjrisk3YVxrk5VgRBJgw__&Key-Pair-Id=K2HSFNDJXOU9YS",
+  lvot: "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/HGAQPXIReqfTNBKy.png?Expires=1804217687&Signature=T-bR51dg0rI8c71vd~9W491Gd2a5cjZQ17GFS-RQW7zqc58OE4pAQbhUnMQl7Q0D8qj9gzdYl3BbkQX34XEYBGw~Ha7uD5j62v8cJ7Wk-wMPFdD1p-DhmCyMBhQBw-Hv3uOutyxhKZjOflH4MWJkkuuNdRGATanGjZGDdbu3lZWjLRJFoY3Y8nwQiUFNppYJZejwUgT~0nBkIEo5Kr0-igVQzPrDcmk7z0xhHhluDBgGknAbnW2LnrtLnusr0AK2~TyHUa9JzQ9RXX4VS3nKLpq4bopk1cLFz7YIM-AvsIgfFIIW2TFFFMEIOPRr9focbem9CDh7~TlzNFtqYh~FDg__&Key-Pair-Id=K2HSFNDJXOU9YS",
+  echoLvot: "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/yKTaXDyqcalQLhSz.gif?Expires=1804233215&Signature=g4HbckpFIDhN6fx3cSxgsyvYDzMyWlpOkTxc97yWNiiKiPd6lAf5E2uJ-YSOLEFe8tdyvqjhXDPV4u1oZNL8AJ7JrT4OHaJksXCOW4OzI0QBoE2GPUWgquV616lITbBm2L96i9s0Da5~~Y9UJITA0lZEZWb78XnvO-lFo0iWEhjcqRQvfvzuhHkstx637ZQxyhW48GQ1ma5I9RFW60ImcpVLyt68Ce6Ja8K~2eE-qOS6~-9hUlPN31WoF653il1zAueq8W11fopkD14LiQu2YYKWJirqbb0s0NVGJhcR9dzHTw4jjywnHOt5e4P1SCZkKkw666ocYWVQH3eq~7KBbg__&Key-Pair-Id=K2HSFNDJXOU9YS",
+  rvot: "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/zkMTTtxmdDbJFPnT.png?Expires=1804217677&Signature=V4cp7hA2Vxz5atyyJ8Yf0xJ3P8ZqagZR95YqE-M1oK5TqjCU4LF4Qhp2MduyF4N0qoHaWeyClQ5zMlUd29ACTMXbrFxP~6bNQIDqAz7jTtLxwykK3s9BHsyqhmHpomzoFJo~3JsDFUtaJU0EAe18sFHpWjRVZFWaP7jt9SyJwet2KLQMo-1Bv0QZXAmzG7R7QnaMgarZXI-EHqMexKk1Jet8iQRYBF3FkF3PQ9IiEvI4FggvcECes7ISyqrSprlFiNbP1iy5qrZzpAkSyc3p5hh8-Lh4FhUTk-vysmW4iHMkNm8KV0ylswYQCkpYAC3QHa0G8If-RroFHveEo8L8-A__&Key-Pair-Id=K2HSFNDJXOU9YS",
+  echoRvot: "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/mfSQNxAuERDAcTEN.gif?Expires=1804233215&Signature=KMndkGZCsadxq8BfXsFHLTQWw3BUy3JdWA8kxttgOr2q2LRCiqYvDrRrza5fnvQa1jjxaWzXVlVQY5N9pJSQzm99yqlUt44jcD4dPN4scbRgjiVGOS2CE7yC7x4k5YoZkacVrUw1MSLlRUXdaZdSEDhyiF3IhGYim2wdRHlL7mV~20bP7dRQP2q9nV6KqjLc-645Zqa0N3WFX1fK04ZTka26BTDi8P6n6gjqo5MXEGmz3FEKIh8oD4tk6QTcMBo~YdAanw8fO1p399X2o8YHJCks7ft97X2TO00wTEtugZkcNsVQgYlLDrx1Wx6ulw0mLAyBZ9Ho49~0LARfOT1XlA__&Key-Pair-Id=K2HSFNDJXOU9YS",
+  rvotBifurcation: "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/GJOvhZIPNnIgAQHJ.png?Expires=1804217677&Signature=DE1TDX9Xf4hMNW5e-clWZiIE978WXpn3gem83T5ZCyWak6ow~kp1aOal6LNqjRpC7fJ-UDQUS4carcg5RUNMWTNDQ~8Wb11MYxn0FfoujGIER3e0Iw56cOrJp2cEBCM5~DfQEtjtu3ELZW-wKLAtTuDfyYCeEquCqrE32eI4da1yy~2kpfdBHUR2Jl9ts3O4kwHwLmOoVnLhDiZGmF8EPHFeQgSLSwbDXGfk4QJ8z0WZwOT2B81YakA0VgAQbstTmR2~pZrT7OhHD1dg3-Pr3tYH0bC3yhRVd7ZhgnmK39sjd3ihjJ0fUf2fUCyhBOwGnviqKjs05pjM6a3Fnai6OA__&Key-Pair-Id=K2HSFNDJXOU9YS",
+  echoRvotBifurcation: "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/kjNujbopvYeXuXRd.png?Expires=1804219531&Signature=EtSFpEBvcFTPWEa5CBlr89rmS8MMPCHN4QwtQ1TGHb202PKKEEeYq5MadcYUTWLq7miAnnnwXls7ViZu~-349O4ki3lmeRRjGlIog7m4KazgEoJmQX6jzm2kgtCZS6-SjbTUlEK4tiGbkJofCe~hq7E-q9xULBwy2pyF1tYn6mFrIYOOzBJgSohf0KSoxWFkSjpY7UTDMGtIUmJb4A0i~RO7Wb~~oIvqZfQOzLZMeOfINzdG5r6SoJoXaCLWiUmNOnN4SDvIMj7kbPQbM9e4~wyAdH5HOrYENIfBMZ2-8L1aZQpnX6xXo3~ksdUxKMJsahORgJYa0sa362bD9TSUBw__&Key-Pair-Id=K2HSFNDJXOU9YS",
+  threeVVDuctal: "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/tqIbdiftEiCjCtBg.png?Expires=1804217678&Signature=C6FTzFhtUc5TnxTwnvOO8K-~5y7vUwR9ZY-ndHTL~W6Y1~DU6JRY-CVCxtXqiM4npoJtq7BrgNNWQ7l8AdysUP2gB9g~I89JzVd0Xbxgrw6Cj2CLI5wAVpMTjDMBXxhHZyJtxNHHM8at81J2-aqsbxllARyMKMuq3yViQHLhZ7IiP~R14zDpFDn8KfXcpRTQbrYlJXu2G76L4Kuvn4G3rJVhpI4bEzAUKo4SNEeNJkHsH9YQpuqyzNQ93uPzpDxzwk09wR9CoyUMW-ZGBm~JKB6KNBnYSWXWY~Qrbp5OBuPk3doqj5n7vFqZO3kmQ1IS89rWDrDwxGilXuYqb8o6hA__&Key-Pair-Id=K2HSFNDJXOU9YS",
+  echoThreeVVDuctal: "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/tqrBgqVGzZDYoeXM.png?Expires=1804219557&Signature=CDFJzl4ikVN-wm7kjYAzoizilDf9Iv6EBn~R71yWirmTgSC53Poukur~PZNKd26ndivYsur2qwZk3Ek7XE9oFNED3UhQVk0IHnBm4t8wm6lHZsjRH7dUTuGGKLYVC2BiPm6rHxBTTn94UtcOvAmlsYyazQgGiaKp5BkNcOQYYZaeLS-yQ0hkJmBVbGreICidn6NmxWkgP-ies5kHeJg6IO72epeSJFV0QfgxLVwLUp0jZ1D5j0cL17GwVsk1RtDbJ09Q6VN~IORZGWznv7EGAw3t0317AJ~2i5p6ZyZdKKMoDQOlCQcKP8ITqsOe~99Sc6AVkmxFzFxaYfmjZdQE~A__&Key-Pair-Id=K2HSFNDJXOU9YS",
+  threeVT: "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/wXdhYtXSmjdILGLY.png?Expires=1804217678&Signature=AbYSjgEbF67spokqJE6r0QiY-amruwTq9ND5JdHR0VAnHM2LUJJcqwwVKI6xkXbbXFXthhMfWWVhNPrQYoWhfuKiejlnwBD84A2MRxS~PHqlkobnY1mshHUA8Mk1a1gvxk0b9rmy7TPiO6PDNBr2yeP0d4HHB5qveWfZV6Ef6N8ujxuxsWUGDGy4H~FvgwksZGIaPRCznwi1G5WEp3Bx-8jlj6FkvQTlJsRo-mhb5REPXlqDXDKtgzQW-t6Hrl3lmxYUgFA~3Mp4uM4WMbf--Oq0CSi3nMlNIIDWuCRZ22CSG8C9C9-cl6K0BquXgBoKRxJ8Xn0fRzWaErym-y3-Pg__&Key-Pair-Id=K2HSFNDJXOU9YS",
+  echoThreeVT: "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/ViQyJlALqrvWVEph.gif?Expires=1804233216&Signature=hR0jVOZM3YaZV9QOcE1TuzhklM6UJz9fNcOsNODCk~PU2mXsB7AaeMvsvV8d0CiOD7~TgcW8ql2MaPbLQiuzkX4FvSZ~JC1Tszv-qASoqsp4NMiwL3Vb7IPGQZlbxPGK21RhU412Q3emtUqPQ32bDeB9C-bdtPEkQTmNoIOfPukOIEiJOFRlTo8ZQGygYTBEofmhnT6X55FIV7r314~IHXYHvGQUe53TdqbYWnkrAKy6dkNIOAqyOXvvn41YOzZsbetKy1U1kXMIKNvbYTKcgxh6w2oSOlYeVkMeWqy1mMCEJVnItNbweHg4hsGT3lsc5N3w8o5zBaPa6h9XMdyAkg__&Key-Pair-Id=K2HSFNDJXOU9YS",
+  bcv: "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/vRqqlQSitiQuZxSJ.png?Expires=1804217678&Signature=XacRQ2a0loWf3gCJH2fWU~KTUNBawZUALgm6ZeTq5bTLjnycjlI15ykab6dSXGO82fiuyczm9ePOC1vwpJ76ZyYkS7f2ZHO~BAGREmsYOxdmb-jDbaZP3e9MfC9F~5JNFeQPcFXXEEKKAkFbhtYfF8nOub3tZHkcuonV~JW3Yr5rDSOAn6KKAHRttn2zy895eBqOzLozU2eHtWwSN3Pcfan1y7fZBeyrz-26R0wj~nWDcWSC6tPEg90g5ycjMx74E5LAC2UzXJiBVVVoRvf~IZsdnKk7WWqOEWDLW9rMRYPIA2PkapLOs7BM88PV0q0McPe0N8kZZiW4p5AGi-fsDg__&Key-Pair-Id=K2HSFNDJXOU9YS",
+  echoLbvc: "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/VizJommhsipdzIeA.png?Expires=1804219531&Signature=XYTjAWg9IqlCByRfuqWLeJXN-QsTAi-KPfu5csTu50s41cV9Q1DlYx6bwvbg69-Aakl0Uft0rMPQcD96hppPaDU-QuNYZOgu8x0-66yMpIqD5mcny7cTMaQIN-lIfqUCGfo5uHVHDSjZcDcACv1PogJLqYu7RTUCbvRVx4GZNp7JW5xTY09cznC6YJFT60gIUvx9nso6rHc~JlsCMjJ1GXiv~7hIab~PEghsjLIam2Pxpyv8~qIiPfByRfYeJz0Y9dl3l4NQ5ND5Y9XREXmqm6slDL10~YEiItHVi6FeHczsEcTd8MZj1A~2D3-il5DWnvdSYVfc~k4F0Sx1GU3QUQ__&Key-Pair-Id=K2HSFNDJXOU9YS",
+  echoLvShortAxis: "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/vQTOAothgRTPuaXI.gif?Expires=1804233216&Signature=pXA93W5yVReHPuxvtUUDsys-TV7UlEN1k37XkiZZViCxzfCfQDnET0hMKIg0URmyfPXm-dTha7qRP0LZSDMETBzIQrdIKCsjrosMXdYgHG7niz7dYe6GZBJj2-av8vddtG3p5Rk3XDZ-GdLBsHQLfoiY--ICtRwsCJqCxvSQo~zt2WI8OQh5iSyGMMKr-ANTFib8a8hXWeshGuLB8ObDkjltkxUxHVJ0z7pryZXRLa5AxFWp4hS4Bs70Tcl~rWKzPb7D0TJqnD0tvhBXh3fDN3NhBlfNCv7gBTxBe0sRDXDHgmQpYQqXsow35-ntBFSfNB8iXcI1K2unUHtI2uy21A__&Key-Pair-Id=K2HSFNDJXOU9YS",
+  fetalRvotSaxAnatomy: "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/eAzSlcLjWuskBlIM.png?Expires=1804233087&Signature=sDbjIEusdQS3ymQSQy61DT5drOjwCubFVtpxsRn9KIz85ry2cstjOtQhGRgqiT2nFZuV3cCUGfmOV8TM7yZuB8JidA0Ut3lioFv6VrsCyR1dFl7nnUEX9o3zZRJOuf2~t~zPNym8Ru5GqiOHTkjEehT6Sw~QWi9~XVaJ9mWRPBaSdltkacu09bZii-Z~lz3Rb8XjcIONdtW4-HrRbTA4-dSoFcTk3g9Tz4G7D1XNODaUKSyIYopNAtly-nexHYUVrXFTyzS3xn9myjCf5zcLqAlU9xk1vfcBOUC7EBPQo6EITrr3r4MLmDbN~5G8spe9JwccHkYJZI-yL~aufeHudg__&Key-Pair-Id=K2HSFNDJXOU9YS",
+  echoRvotShortAxis: "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/DIECWLBAWgIaNYNW.gif?Expires=1804233215&Signature=Wxc0ufcYwvkFut37XoiZY7FaEFyGBx0xEUPRmtaua79GJpC3NRKEK27TmiwHX-IuuWFK65JgRGP3fYPqGoeKg9ztup5tHl3OsBZe5W4weWO-aKAj63y3EkesP9JhJ6gN3RHX4CnO3Ca3IzVH~AqsM7Skw~o~sSQ3vlIGGJDvDLpezG364WNprJXTBU-AgC9K~is9lKg~5gOeohZSLxdVHJDM026zJl~o8Gzt-m1fGGpBC27F9rQrgLORnT9EQlbNTfQUjOa7AXzblZHK2u7Xyp5Lk3lOHlc9WiTVKoZEZgJFQAcy03Nmg2fmbBQ__&Key-Pair-Id=K2HSFNDJXOU9YS",
+  bicaval: "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/BFlsjzXHQURCTgXJ.png?Expires=1804217678&Signature=Rf32-AAr~a1IBc1WxrGdLCuI4XZPy9ov4CEuKdg68bE~b71p8o52rAKqCbi5UfU6SAhkJI6fGPcWLli5B90y24re5WX2Q9wOIXBefLgEzPLnHY9a~EniZUij48wwPA6De0eQ7UPgVSMAgswXcmOYcNMM~lsO3PVp-3F1gVyj0Y0RD4UACDSyxMXgZAYzaTfxzLTIjHI4zbXhxZMFnDL8w3zr5FUTZefcqrV95fYKwZQm2d3mrx3Lw~8XTIWcEQZ1uOx~2GJnLopHAvOPtJqhVjLOLvr9~7X~1JuTGs3YTz3R6g4JJjmaX17xJDvFo3b2M6twyqGU~H0DqZwCL1t0fw__&Key-Pair-Id=K2HSFNDJXOU9YS",
+  echoBicaval: "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/XLCPDDlQZLNxHWxC.gif?Expires=1804233216&Signature=CcVMmOffRsFpxh4KAiCQwUbbH~IomT3QLkOiniMUD3i6i2MFPH~WjX62H1Em8QYz~KcIiwyUaqSeRfburxSkMe1vm3nAgYtsPtXBjz2INHrbq2gO4MCDn4nzGHko0iaVIZMK3PxfoukVX6H6jw5i5OIgs7pi-eZOqS7NEybsaC4PPmKqRDkYYKAY52fF4EHHBgpjI36whW-7bxz-JAI7cJTaPuj0wDPVss7m~oY3ngaEJsP1zswt7WseSQMM2CoEhbyRWPd2eU1JhnbHDQ1OdK58Dioq9lhROpD9vBLbfQr~6ywjat7oGs1eeXMFeQF7hfXKCDalAhW-fJE8gC6nbA__&Key-Pair-Id=K2HSFNDJXOU9YS",
+  aorticArch: "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/TKlJMYtocuCBKwbl.png?Expires=1804217678&Signature=eojPUlijwGlowVGglOvcT3zQY-LR8gK11wJQnfC2qZlnkawEQfTx~e1s8wviyiQcQsp7dMfGrw5NN8m98ofDYz7OYUjLTd7jzv56cr6X5m12PJRJndtZOiNvSBd3QNgHNZ3gZaV3QaiM-ozMrtEQMZWL11l0LhmLcTGnc9wULnDMyqTm1RvcBrbZMZLagDQkuAO~fQOtDHZSDVh2DVXfQtC7teCqYSUwVGBM0NpG6T0~ocdAs2~Kn00TrPLtjo32iPwq8U3ndb9c0lRT75MMwUAZG4M5KPed--PbAYiS2UK465P-5-~DCboWpSXbbsCqzHi74BAd8kNv15-1K67dug__&Key-Pair-Id=K2HSFNDJXOU9YS",
+  echoAorticArch: "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/UBqhGFAUZIxSaYgz.gif?Expires=1804233217&Signature=pBsnwYkwIrnLqcz-Og27cM9NUMx6Fji0JZbDzVO~SournpTlFFOYr2TRjC0Eeo6Cvt7SroEIm3nE2hCmLBCKfr8vamp8Sk-I0r~XeMfb8jc5OOcr286gVyWIVBVNpnsYsftXuaUviZ39h~nNj-HI5lpO6SNrudOfBPPjKSs7AyRXcahyvrBS4zujQ6bbJgLdmcLgU93PlXKx6~Mo1Ox73J97ZliDqtJM-686nDaMY9LONoxDHK5FvIT7Zlz-ece3NNtmYcg1RNeMURm3u6AwVgsMEPR1YpmWrLSD1SeKDP7RciW-g9CzImYEO4jJeYDFVsOYdhqEZloqE2IDB1T8Yw__&Key-Pair-Id=K2HSFNDJXOU9YS",
+  ductalArch: "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/bvrodzhIwNApIBbC.png?Expires=1804217678&Signature=oZ4LyOOcoHxUHXmU-o~9dtNQd1~0O9GQRuEVBx9Bbg0NKvsBOtAhAeIBbWJJe2AJ-AlfN3N66m7sNGnvKorUkixgyqosSbhG7bnpmZoY~aFIPjDMn0Vtd0t3QrIrzmRe3JIY8frK0xo8dBhQeHI1HjKsHdHebttaz5vjkha34mBXEtFVUMPAbK-lQMeobbcZkpipsuJ1aYnIAslKeZLJwr8-d7D4LrB4oYf70rKffMyeZZ3XCLKPm19tUAktTgomn0UfIy9jCHQgjPWHMP-tNob~MMtURGRM0uzX1Vq1rsojj2pwsUYpz6haOGG1KBt1f8OU2IRLyK4oJT6aoMHsxg__&Key-Pair-Id=K2HSFNDJXOU9YS",
+  echoDuctalArch: "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/niftMrorwLRVixtq.gif?Expires=1804233217&Signature=Ei2xvaGjnBEglQVKoM1GOyE5s5U-lWFu~e70vn8IbqgC398vxNhqx0TPGmBqpOT6oage7x3dNlHUw8jvDMWuSPT6ZWflKPjQqAVnGoEWKtSCtMO1bbal9ZzOaUzl3KhL1o-EJmKnZWIpId1ao5C7ClccGMjlY2u2jJXXSt~8NZd3TktyLwrnQXWDdw6N5-qTuwoHSOtw0cXPX7siTFJbJHP1YJGSjG4pH-OvboqaMezD7nNwZ6TmJG39zUzxd84arcosAEGHHlxTsU5eiIZKMqjCIPbipoaoG1ThuUBE9q5vdUa-La68F2vT5ntMZIALMIxz4Q~eUkkBkmUsel-YbA__&Key-Pair-Id=K2HSFNDJXOU9YS",
+};
+
+// ─── 13-View Fetal Echo Dataset (© All About Ultrasound, Inc. / iHeartEcho™) ──
 export const FETAL_VIEWS = [
   {
-    id: "situs",
-    group: "Fetal Protocol",
-    groupColor: BRAND,
-    name: "Situs / Abdominal",
-    probe: "Curvilinear 3–5 MHz (or higher frequency in early 3rd trimester)",
-    depth: "8–12 cm depending on maternal habitus",
-    markerDirection: "Transverse plane, marker to patient's right",
-    patientPosition: "Supine or semi-recumbent. Determine fetal lie before starting — identify fetal spine position to orient left/right.",
-    description: "The first view obtained in every fetal echo. Establishes cardiac and visceral situs. Situs solitus (normal) requires stomach on the left, liver on the right, cardiac apex pointing left, IVC to the right of the spine, and aorta to the left. Any deviation suggests situs inversus or heterotaxy (situs ambiguus).",
-    howToGet: [
-      "Identify fetal spine position first — this orients fetal left and right",
-      "Obtain a transverse view at the level of the upper abdomen",
-      "Identify the stomach bubble — should be on the fetal left",
-      "Identify the liver — should be on the fetal right",
-      "Identify the IVC (anterior, right of spine) and aorta (posterior, left of spine)",
-      "Confirm cardiac apex points to the left anterior chest wall",
-    ],
-    structures: [
-      "Stomach (fetal left)",
-      "Liver (fetal right)",
-      "Inferior vena cava (IVC) — anterior, right of spine",
-      "Descending aorta — posterior, left of spine",
-      "Cardiac apex direction",
-    ],
-    tips: [
-      "Identify the spine first — everything else is oriented relative to the spine",
-      "IVC is more anterior and to the right; aorta is more posterior and to the left",
-      "Stomach and cardiac apex should be on the same side (both left in situs solitus)",
-      "Color Doppler helps distinguish IVC (hepatopetal flow) from aorta",
-    ],
-    pitfalls: [
-      "Fetal position confusion: always reconfirm spine position before labeling left/right",
-      "Situs ambiguus (heterotaxy): midline stomach, bilateral right or left isomerism — associated with complex CHD",
-      "Absent stomach bubble: consider esophageal atresia, oligohydramnios, or fetal swallowing disorder",
-    ],
-    measurements: ["Cardiac axis (normal 45° ± 20°)", "Cardiac position (levocardia, dextrocardia, mesocardia)"],
-    criticalFindings: [
-      "Dextrocardia with situs solitus = isolated dextrocardia (high CHD risk)",
-      "Situs ambiguus = heterotaxy — associated with complex structural CHD in >50%",
-      "Cardiac axis >75° or <25° = associated with CHD or extracardiac anomaly",
-    ],
+    id: "abdominal-situs", step: 1, groupColor: BRAND,
+    name: "Abdominal Situs View", abbr: "Situs",
+    description: "The first step in fetal cardiac evaluation. Confirms normal situs solitus — stomach on left, liver on right, aorta left of spine, IVC right of spine. Situs abnormalities are strongly associated with complex congenital heart disease.",
+    imageUrl: CDN.abdominalSitusDiagram,
+    echoImageUrl: CDN.echoAbdominalSitus,
+    structures: ["Stomach (left)", "Liver (right)", "Descending aorta (left of spine)", "IVC (right of spine)", "Umbilical vein", "Spine (posterior)"],
+    normalFindings: ["Stomach bubble on LEFT side of fetus", "Aorta to LEFT of spine, IVC to RIGHT", "Liver on right, stomach on left", "Umbilical vein entering liver anteriorly"],
+    technique: "Transverse view of fetal abdomen at level of stomach. Identify spine posteriorly. Confirm stomach on left and aorta/IVC positions relative to spine.",
+    doppler: "Color Doppler to confirm aorta (pulsatile) vs. IVC (venous) positions relative to spine.",
+    pitfalls: ["Fetal position may make left/right orientation confusing — always reference spine first", "Absent stomach may indicate esophageal atresia or diaphragmatic hernia"],
+    redFlags: ["Stomach on RIGHT (situs inversus or heterotaxy)", "Stomach absent (esophageal atresia, CDH)", "Aorta and IVC on same side (asplenia/polysplenia)", "Midline stomach (heterotaxy)"],
+    patientPosition: "Mother supine or left lateral tilt; obtain true transverse cardiac cut perpendicular to fetal spine",
   },
   {
-    id: "4cv",
-    group: "Fetal Protocol",
-    groupColor: BRAND,
-    name: "4-Chamber View (4CV)",
-    probe: "Curvilinear 3–5 MHz",
-    depth: "8–12 cm",
-    markerDirection: "Transverse plane at level of 4 chambers, apex toward transducer",
-    patientPosition: "Supine or semi-recumbent. Obtain transverse plane slightly above the stomach bubble. Rotate probe to bring apex toward transducer.",
-    description: "The most important screening view in fetal echocardiography. Detects approximately 40–60% of significant CHD. Four chambers should be roughly equal in size. The crux of the heart (where AV valves and septa meet) should be intact. The foramen ovale flap should be visible in the left atrium. The moderator band identifies the right ventricle.",
-    howToGet: [
-      "Start from the situs view and slide the probe slightly cephalad",
-      "Obtain a transverse plane at the level of all 4 cardiac chambers",
-      "Rotate the probe so the cardiac apex points toward the transducer (apex-up view)",
-      "Identify the crux of the heart — AV valves should be at the same level",
-      "Confirm the foramen ovale flap in the left atrium (flap opens toward LA)",
-      "Identify the moderator band in the right ventricle (apical trabeculation)",
-    ],
-    structures: [
-      "Right ventricle (anterior, trabeculated, moderator band)",
-      "Left ventricle (posterior, smooth walls)",
-      "Right atrium",
-      "Left atrium (foramen ovale flap visible)",
-      "Tricuspid valve (more apical)",
-      "Mitral valve (more basal)",
-      "Interventricular septum (IVS)",
-      "Interatrial septum (IAS) with foramen ovale",
-      "Crux of the heart",
-    ],
-    tips: [
-      "The tricuspid valve inserts more apically than the mitral valve — this offset identifies the RV",
-      "LA is slightly larger than RA — this is normal due to pulmonary venous return",
-      "Foramen ovale flap should bow into the LA — if it bows into RA, consider elevated LA pressure",
-      "Cardiac axis: the IVS should make a 45° (±20°) angle with the midline",
-    ],
-    pitfalls: [
-      "Ventricular disproportion: R>L suggests CoA or HLHS; L>R suggests pulmonary atresia or critical PS",
-      "Loss of AV valve offset (both valves at same level) = AVSD",
-      "Cardiac axis >60° suggests CHD or extracardiac anomaly (e.g., diaphragmatic hernia)",
-      "Pericardial effusion: small rim is normal — large effusion suggests hydrops or infection",
-    ],
-    measurements: [
-      "RV/LV ratio (normal ~1:1)",
-      "Cardiac circumference/chest circumference ratio (normal <0.5)",
-      "Cardiac axis (normal 45° ± 20°)",
-    ],
-    criticalFindings: [
-      "Ventricular disproportion (R>>L): CoA, HLHS, aortic stenosis",
-      "Absent crux / AV valve offset: AVSD",
-      "Hypoplastic left heart: small LV, mitral atresia, aortic atresia",
-      "Large VSD visible in 4CV: AVSD, malalignment VSD",
-    ],
+    id: "4cv", step: 2, groupColor: "#1ba8b0",
+    name: "Four Chamber View", abbr: "4CV",
+    description: "The most important screening view in fetal echo. Obtained from a transverse cross-section of the fetal thorax at the level of the AV valves. The heart should occupy approximately 1/3 of the thoracic area.",
+    imageUrl: CDN.fourChamber,
+    echoImageUrl: CDN.echoFourChamber,
+    structures: ["LV (left, posterior)", "RV (right, anterior)", "LA (posterior left)", "RA (posterior right)", "Mitral valve", "Tricuspid valve", "IVS", "IAS with foramen ovale flap", "Descending aorta (posterior to spine)"],
+    normalFindings: ["LV and RV roughly equal in size (RV slightly larger in fetus)", "Foramen ovale flap opens toward LA", "Apex points toward left anterior chest wall (levocardia)", "Descending aorta posterior-left to spine", "Pulmonary veins entering LA (2 on each side)"],
+    technique: "Transverse sweep from abdomen (situs view) cranially until 4 chambers are visible. Maintain transverse plane — do not oblique.",
+    doppler: "Color Doppler across AV valves for regurgitation. PW at MV and TV tips for E/A ratio.",
+    pitfalls: ["Dextrocardia vs dextroposition — check situs first", "Foramen ovale flap mistaken for ASD — flap should bow toward LA", "Oblique cut may make chambers appear unequal"],
+    redFlags: ["Cardiomegaly (>1/3 thorax)", "Unequal chamber sizes", "Absent or abnormal foramen ovale flap", "Pericardial effusion", "Echogenic focus (EIF)", "Cardiac axis >60°"],
+    patientPosition: "Mother supine or left lateral tilt; obtain true transverse cardiac cut perpendicular to fetal spine",
   },
   {
-    id: "lvot",
-    group: "Fetal Protocol",
-    groupColor: BRAND,
-    name: "LVOT / 5-Chamber View",
-    probe: "Curvilinear 3–5 MHz",
-    depth: "8–12 cm",
-    markerDirection: "Slight anterior tilt from 4CV to bring aortic root into view",
-    patientPosition: "Supine or semi-recumbent. From the 4CV, tilt the probe slightly anteriorly (toward the fetal anterior chest wall) to bring the aortic root into the image.",
-    description: "The LVOT / 5-chamber view confirms aortic-ventricular continuity. The aorta should arise centrally from the left ventricle. The anterior aortic wall is continuous with the interventricular septum, and the posterior aortic wall is continuous with the anterior mitral valve leaflet. This view screens for VSD with aortic override (TOF, DORV) and aortic stenosis.",
-    howToGet: [
-      "Start from the 4-chamber view",
-      "Tilt the probe slightly anteriorly (toward the fetal anterior chest wall)",
-      "The aortic root will come into view between the two ventricles",
-      "Confirm the aorta arises from the left ventricle",
-      "Trace the anterior aortic wall — it should be continuous with the IVS",
-      "Apply color Doppler to assess LVOT flow and screen for VSD",
-    ],
-    structures: [
-      "Aortic root (arising from LV)",
-      "Aortic-mitral continuity",
-      "Anterior aortic wall (continuous with IVS)",
-      "Posterior aortic wall (continuous with anterior MV leaflet)",
-      "LVOT",
-    ],
-    tips: [
-      "Aortic-mitral continuity is the key feature — confirms the aorta arises from the LV",
-      "Color Doppler: laminar flow in LVOT = normal; turbulence = LVOT obstruction",
-      "Overriding aorta (>50% over IVS) suggests TOF or DORV",
-      "Malalignment VSD may be subtle on 2D — always use color Doppler",
-    ],
-    pitfalls: [
-      "Overriding aorta: measure % override — <50% = TOF; >50% = DORV",
-      "Malalignment VSD: anterior malalignment (TOF) vs posterior malalignment (interrupted arch)",
-      "Subaortic stenosis: discrete membrane or tunnel — color Doppler shows turbulence",
-    ],
-    measurements: [
-      "Aortic root diameter (Z-score for gestational age)",
-      "% aortic override (if applicable)",
-    ],
-    criticalFindings: [
-      "Aortic override >50% with VSD = DORV or TOF",
-      "Absent aortic-mitral continuity = double outlet RV",
-      "Turbulent LVOT flow = aortic stenosis or LVOT obstruction",
-    ],
+    id: "lvot", step: 3, groupColor: "#1db6bf",
+    name: "LVOT View", abbr: "LVOT",
+    description: "Obtained by rotating the transducer slightly from the 4CV to bring the LVOT into view. Confirms the aorta arises from the LV (ventriculo-arterial concordance) and crosses the RVOT.",
+    imageUrl: CDN.lvot,
+    echoImageUrl: CDN.echoLvot,
+    structures: ["LV", "RV", "LA", "Ascending aorta (ASC AO)", "LVOT", "Pulmonary veins (entering LA)", "Descending aorta (DESC AO)"],
+    normalFindings: ["Aorta arises from LV — continuity between IVS and anterior aortic wall", "Aorta crosses rightward over the RVOT", "Ascending aorta smaller than MPA in fetus", "Pulmonary veins visible entering LA posteriorly"],
+    technique: "From 4CV, rotate transducer slightly clockwise (or tilt anteriorly) until the aortic root comes into view arising from the LV. The LVOT should be parallel to the ultrasound beam.",
+    doppler: "PW Doppler in LVOT for velocity. Color Doppler to confirm antegrade flow from LV to aorta.",
+    pitfalls: ["Overangulation brings in RVOT instead of LVOT", "Aorta appears to arise from RV in TGA — confirm with RVOT view"],
+    redFlags: ["Aorta arising from RV (TGA)", "Overriding aorta (TOF)", "Aortic stenosis — turbulent LVOT flow", "Small ascending aorta (HLHS)"],
+    patientPosition: "Mother supine; tilt transducer slightly cephalad from 4CV to bring LVOT into view",
   },
   {
-    id: "rvot",
-    group: "Fetal Protocol",
-    groupColor: "#d97706",
-    name: "RVOT / 3-Vessel View (3VV)",
-    probe: "Curvilinear 3–5 MHz",
-    depth: "8–12 cm",
-    markerDirection: "Slight further anterior tilt from LVOT — 3 vessels appear in a row",
-    patientPosition: "Supine or semi-recumbent. From the LVOT view, continue tilting the probe anteriorly until 3 vessels appear in a row: PA (largest, leftmost), Ao (middle), SVC (smallest, rightmost).",
-    description: "The 3-vessel view (3VV) screens for outflow tract and great vessel anomalies. Three vessels appear in a row: pulmonary artery (largest, leftmost), aorta (middle), and superior vena cava (smallest, rightmost). The PA should be slightly larger than the Ao. The ductus arteriosus connects the PA to the descending aorta, forming a V-shape with the aortic arch.",
-    howToGet: [
-      "From the LVOT view, continue tilting the probe anteriorly",
-      "Three vessels will appear in a row: PA (left), Ao (middle), SVC (right)",
-      "The PA should be slightly larger than the Ao",
-      "Confirm the ductus arteriosus connecting PA to descending aorta",
-      "Apply color Doppler to confirm antegrade flow in both PA and Ao",
-      "Assess the V-shape formed by the ductus and aortic arch",
-    ],
-    structures: [
-      "Pulmonary artery (PA) — largest, leftmost",
-      "Aorta (Ao) — middle",
-      "Superior vena cava (SVC) — smallest, rightmost",
-      "Ductus arteriosus (connecting PA to descending Ao)",
-      "Trachea (posterior to vessels)",
-    ],
-    tips: [
-      "PA > Ao > SVC in size — any reversal of this relationship is abnormal",
-      "Right-sided aortic arch: Ao is to the right of the trachea (U-shape instead of V-shape)",
-      "4 vessels in the 3VV: suspect persistent left SVC or TAPVR vertical vein",
-      "Color Doppler: both PA and Ao should show antegrade (left-to-right) flow",
-    ],
-    pitfalls: [
-      "Absent ductus: associated with TOF, pulmonary atresia, or absent pulmonary valve syndrome",
-      "Dilated PA: pulmonary stenosis (post-stenotic dilation) or absent pulmonary valve syndrome",
-      "Small PA: pulmonary atresia, critical PS, or TOF with severe PS",
-      "Right-sided arch: associated with CHD (TOF, truncus) or vascular ring",
-    ],
-    measurements: [
-      "PA diameter (Z-score for GA)",
-      "Ao diameter (Z-score for GA)",
-      "PA/Ao ratio (normal ~1.1–1.2:1)",
-    ],
-    criticalFindings: [
-      "Absent PA or very small PA = pulmonary atresia",
-      "Single great vessel = truncus arteriosus or transposition",
-      "Reversed PA/Ao size ratio (Ao > PA) = TGA or CoA",
-      "Right-sided arch + aberrant left subclavian = vascular ring",
-    ],
+    id: "rvot", step: 4, groupColor: "#20c4ce",
+    name: "RVOT View", abbr: "RVOT",
+    description: "Confirms the pulmonary artery arises from the RV. The MPA is normally larger than the ascending aorta in the fetus. The PA bifurcates into LPA and RPA.",
+    imageUrl: CDN.rvot,
+    echoImageUrl: CDN.echoRvot,
+    structures: ["RV", "Main pulmonary artery (MPA/PA)", "Ascending aorta (ASC AO)", "Superior vena cava (SVC)", "Descending aorta (DESC AO)"],
+    normalFindings: ["PA arises from RV — larger than ascending aorta in fetus", "PA bifurcates into LPA and RPA", "ASC AO and SVC visible as smaller circles to the right of PA", "DESC AO visible as small circle in lower left"],
+    technique: "From LVOT view, continue rotating/tilting anteriorly until PA comes into view arising from RV. The PA should be seen bifurcating.",
+    doppler: "PW Doppler in MPA for velocity. Color Doppler to confirm antegrade flow from RV to PA.",
+    pitfalls: ["PA arising from LV in TGA — confirm with LVOT view", "Pulmonary stenosis — turbulent flow in MPA"],
+    redFlags: ["PA arising from LV (TGA)", "Small PA (pulmonary atresia/stenosis)", "PA = Ao size (abnormal)", "Absent PA bifurcation"],
+    patientPosition: "Mother supine; tilt transducer further cephalad from LVOT view to visualize RVOT crossing over aorta",
   },
   {
-    id: "aortic_arch",
-    group: "Fetal Protocol",
-    groupColor: "#059669",
-    name: "Aortic Arch View",
-    probe: "Curvilinear 3–5 MHz",
-    depth: "8–12 cm",
-    markerDirection: "Sagittal/oblique plane — follow aorta from LV through arch to descending aorta",
-    patientPosition: "Supine or semi-recumbent. Rotate probe 90° from transverse to sagittal plane, then angle to follow the aortic arch from the LV to the descending aorta.",
-    description: "The aortic arch view confirms arch sidedness, size, and the presence of coarctation. The normal left aortic arch has a hockey-stick shape, with head and neck vessels arising from the superior aspect. The isthmus (between the left common carotid artery and the ductus arteriosus) is the narrowest segment and the most common site for coarctation.",
-    howToGet: [
-      "Rotate probe 90° from the transverse plane to a sagittal/oblique plane",
-      "Angle the probe to follow the aorta from the LV through the arch",
-      "Identify the hockey-stick shape of the left aortic arch",
-      "Identify head and neck vessels arising from the superior arch",
-      "Measure the aortic isthmus (between LCCA and ductus)",
-      "Apply color Doppler to confirm antegrade flow throughout the arch",
-    ],
-    structures: [
-      "Ascending aorta",
-      "Aortic arch (hockey-stick shape)",
-      "Head and neck vessels (brachiocephalic, LCCA, LSCA)",
-      "Aortic isthmus (narrowest segment)",
-      "Descending aorta",
-    ],
-    tips: [
-      "Left arch curves to the left of the trachea; right arch curves to the right",
-      "Isthmus is the most common site for CoA — measure carefully and calculate Z-score",
-      "Retrograde flow in the isthmus on color Doppler = severe CoA or interrupted arch",
-      "Compare aortic arch size to ductal arch — they should be similar",
-    ],
-    pitfalls: [
-      "Isthmus is easily underestimated — use color Doppler to confirm flow direction",
-      "Interrupted aortic arch: complete discontinuity — no flow beyond the interruption",
-      "Right aortic arch: curves to the right of trachea — associated with CHD and vascular ring",
-    ],
-    measurements: [
-      "Aortic isthmus diameter (Z-score for GA)",
-      "Ascending aorta diameter (Z-score for GA)",
-    ],
-    criticalFindings: [
-      "Retrograde isthmus flow = severe coarctation or interrupted aortic arch",
-      "Absent arch continuity = interrupted aortic arch (Type A, B, or C)",
-      "Right aortic arch + aberrant left subclavian = vascular ring",
-    ],
+    id: "rvot-bifurcation", step: 5, groupColor: "#24d2d8",
+    name: "RVOT with MPA Bifurcation", abbr: "MPA Bifurc",
+    description: "A slightly superior view from the RVOT showing the main pulmonary artery bifurcating into the right and left pulmonary arteries. Confirms pulmonary artery anatomy and rules out pulmonary atresia.",
+    imageUrl: CDN.rvotBifurcation,
+    echoImageUrl: CDN.echoRvotBifurcation,
+    structures: ["RV", "Main PA (MPA)", "Right PA (RPA)", "Left PA (LPA)", "Ascending aorta", "SVC"],
+    normalFindings: ["MPA bifurcates into RPA and LPA", "RPA and LPA roughly equal in size", "PA bifurcation visible in same plane"],
+    technique: "Slight superior tilt from RVOT view. The PA bifurcation confirms pulmonary artery anatomy and rules out pulmonary atresia.",
+    doppler: "Color Doppler at bifurcation; assess RPA and LPA flow.",
+    pitfalls: ["Absent bifurcation may indicate pulmonary atresia with intact IVS", "Markedly asymmetric branch PAs suggest peripheral PS or absent PA"],
+    redFlags: ["Absent bifurcation (pulmonary atresia with intact IVS)", "Markedly asymmetric branch PAs", "Confluent PAs absent (severe TOF with absent PA)"],
+    patientPosition: "Mother supine; slight additional cephalad tilt from RVOT view to visualize PA bifurcation into RPA and LPA",
   },
   {
-    id: "ductal_arch",
-    group: "Fetal Protocol",
-    groupColor: "#db2777",
-    name: "Ductal Arch View",
-    probe: "Curvilinear 3–5 MHz",
-    depth: "8–12 cm",
-    markerDirection: "Sagittal plane — follow PA through ductus to descending aorta",
-    patientPosition: "Supine or semi-recumbent. From the aortic arch view, rotate slightly to bring the ductal arch into view — it is wider and more acute-angled than the aortic arch.",
-    description: "The ductal arch view confirms ductal patency and direction of flow. The ductus arteriosus connects the pulmonary artery to the descending aorta. The ductal arch is wider and more acute-angled than the aortic arch (like a hockey stick vs. a candy cane). Both arches should be similar in size. Left-to-right flow (PA to descending Ao) is normal in the fetus.",
-    howToGet: [
-      "From the aortic arch view, rotate the probe slightly to bring the PA into view",
-      "Follow the PA as it connects to the descending aorta via the ductus",
-      "The ductal arch is wider and more acute-angled than the aortic arch",
-      "Confirm both arches are similar in size",
-      "Apply color Doppler to confirm L→R flow (PA to descending Ao)",
-      "PW Doppler at the ductus: normal = low-velocity, continuous flow",
-    ],
-    structures: [
-      "Main pulmonary artery",
-      "Ductus arteriosus",
-      "Descending aorta",
-      "Ductal arch (wider, more acute angle than aortic arch)",
-    ],
-    tips: [
-      "Ductal arch is wider and more acute than aortic arch — key distinguishing feature",
-      "Both arches should be similar in size — ductal > aortic suggests pulmonary hypertension",
-      "Color Doppler: L→R flow is normal; R→L flow suggests elevated PA pressure or CHD",
-      "Constricted ductus: high-velocity, turbulent flow — check for maternal NSAID use",
-    ],
-    pitfalls: [
-      "Absent ductus: associated with TOF, pulmonary atresia, absent pulmonary valve syndrome",
-      "Constricted ductus: may cause RV dilation and TR — ask about maternal NSAID/indomethacin use",
-      "Premature ductal closure: may cause hydrops and RV failure",
-    ],
-    measurements: [
-      "Ductal diameter (Z-score for GA)",
-      "PW Doppler: ductal velocity (normal <1.4 m/s)",
-      "Pulsatility index (PI) at ductus",
-    ],
-    criticalFindings: [
-      "Absent ductus = pulmonary atresia or TOF with absent pulmonary valve",
-      "Reversed ductal flow (R→L) = elevated PA pressure, CHD",
-      "High-velocity turbulent ductal flow = ductal constriction (check NSAIDs)",
-    ],
+    id: "3vv-ductal", step: 6, groupColor: "#28dce0",
+    name: "3-Vessel View (3VV) — Ductal", abbr: "3VV",
+    description: "A transverse view at the level of the great vessels showing three vessels in a line from left to right: MPA (largest), ascending aorta (medium), and SVC (smallest). The MPA bifurcates in this view.",
+    imageUrl: CDN.threeVVDuctal,
+    echoImageUrl: CDN.echoThreeVVDuctal,
+    structures: ["MPA/Ductus Arteriosus (DA)", "Ascending aorta (ASC AO)", "SVC", "Descending aorta (DESC AO)"],
+    normalFindings: ["Three vessels in a line: PA > Ao > SVC (left to right)", "PA is the largest vessel — normally larger than Ao in fetus", "Vessels align in a straight line (abnormal if offset)", "DESC AO in lower left quadrant"],
+    technique: "From RVOT view, slide the transducer slightly cranially. The three vessels should appear in a transverse plane. Maintain transverse orientation.",
+    doppler: "Color Doppler across all three vessels to confirm antegrade flow. PW in MPA for velocity.",
+    pitfalls: ["Only 2 vessels visible — may be at wrong level", "PA and Ao equal in size — abnormal", "Vessels not in a line — offset suggests abnormality"],
+    redFlags: ["PA < Ao (pulmonary stenosis/atresia)", "Absent SVC", "Vessels not in a line", "Reversed flow in PA (pulmonary atresia)"],
+    patientPosition: "Mother supine; transverse upper mediastinal view — three vessels must appear in a straight line",
   },
   {
-    id: "pulm_veins",
-    group: "Fetal Protocol",
-    groupColor: "#0e7490",
-    name: "Pulmonary Veins",
-    probe: "Curvilinear 3–5 MHz (color Doppler essential)",
-    depth: "8–12 cm",
-    markerDirection: "Transverse or oblique plane — posterior to LA, looking for crab-claw pattern",
-    patientPosition: "Supine or semi-recumbent. From the 4-chamber view, increase color Doppler gain and look posterior to the LA for the pulmonary vein connections.",
-    description: "All four pulmonary veins (right upper, right lower, left upper, left lower) must drain directly into the left atrium. Color Doppler is essential — 2D alone is insufficient to confirm pulmonary venous return. The normal pattern shows a 'crab-claw' appearance of 4 veins entering the LA. Any vertical vein above the LA suggests total anomalous pulmonary venous return (TAPVR).",
-    howToGet: [
-      "Start from the 4-chamber view",
-      "Increase color Doppler gain and sensitivity",
-      "Look posterior to the left atrium for pulmonary vein connections",
-      "Identify the 'crab-claw' pattern of 4 veins entering the LA",
-      "Confirm all 4 veins drain directly into the LA",
-      "Look for any vertical vein above the LA (TAPVR)",
-    ],
-    structures: [
-      "Right upper pulmonary vein (RUPV)",
-      "Right lower pulmonary vein (RLPV)",
-      "Left upper pulmonary vein (LUPV)",
-      "Left lower pulmonary vein (LLPV)",
-      "Left atrium",
-      "Vertical vein (if present — abnormal)",
-    ],
-    tips: [
-      "Color Doppler is essential — 2D alone cannot confirm pulmonary venous return",
-      "The 'crab-claw' pattern on color Doppler = all 4 veins entering the LA",
-      "Vertical vein above the LA = TAPVR supracardiac type (drains to innominate vein)",
-      "Dilated LA with no visible PV connections: suspect obstructed TAPVR",
-    ],
-    pitfalls: [
-      "TAPVR is easily missed without color Doppler — always use color Doppler for this view",
-      "Obstructed TAPVR: may appear as small LA with normal-looking 4CV — color Doppler reveals absent PV connections",
-      "Partial TAPVR (PAPVR): one or more veins drain anomalously — may be subtle",
-    ],
-    measurements: [
-      "LA size (compared to RA — LA should be equal or slightly larger)",
-      "PW Doppler in pulmonary veins (if accessible): normal = phasic biphasic flow",
-    ],
-    criticalFindings: [
-      "Absent pulmonary vein connections to LA = TAPVR",
-      "Vertical vein above LA = TAPVR supracardiac type",
-      "Small LA with absent PV connections = obstructed TAPVR (neonatal emergency)",
-    ],
-  },
-];
-
-const examTips = [
-  {
-    title: "Gestational Age & Timing",
-    text: "Standard fetal echocardiography is performed between 18–22 weeks gestation. Early fetal echo (nuchal translucency-guided) can be performed at 13–16 weeks using a high-frequency transducer or transvaginal approach. Repeat echo at 20–22 weeks is recommended if early echo is performed.",
+    id: "3vt", step: 7, groupColor: "#30e0e4",
+    name: "3-Vessel Trachea View (3VT)", abbr: "3VT",
+    description: "A transverse view at the level of the superior mediastinum showing the relationship of the three vessels to the trachea. Critical for detecting vascular rings and abnormal vessel arrangements.",
+    imageUrl: CDN.threeVT,
+    echoImageUrl: CDN.echoThreeVT,
+    structures: ["MPA / ductal arch", "Transverse aortic arch", "SVC", "Trachea (echogenic ring)", "Descending aorta"],
+    normalFindings: ["Aortic arch curves to the left of the trachea (left aortic arch)", "Three vessels form a 'V' shape pointing to the right", "Trachea is a small echogenic ring to the right of the aortic arch", "SVC is the rightmost vessel"],
+    technique: "Slide cranially from 3VV until the trachea becomes visible as an echogenic ring. The aortic arch should be seen curving to the left.",
+    doppler: "Color Doppler to confirm flow direction in all vessels.",
+    pitfalls: ["Right aortic arch: arch curves to the right of trachea — abnormal", "Double aortic arch: vessels on both sides of trachea", "Trachea not identified — may be at wrong level"],
+    redFlags: ["Right aortic arch (curves right of trachea)", "Double aortic arch", "Aberrant subclavian artery", "Vascular ring encircling trachea"],
+    patientPosition: "Mother supine; transverse upper mediastinal view slightly cephalad to 3VV — trachea ring must be visible to the right of the aortic arch",
   },
   {
-    title: "Transducer Selection",
-    text: "Use a curvilinear 3–5 MHz transducer for most fetal echos. Higher frequency (5–8 MHz) improves resolution in early pregnancy or thin patients. Transvaginal approach (5–8 MHz) is used for early fetal echo (<16 weeks). Harmonic imaging improves endocardial definition.",
+    id: "lbvc", step: 8, groupColor: "#38e4e8",
+    name: "LBVC View", abbr: "LBVC",
+    description: "A superior transverse sweep above the 3VT level showing the left brachiocephalic vein (LBVC) crossing from left to right to join the SVC. The thymus is visible anteriorly.",
+    imageUrl: CDN.bcv,
+    echoImageUrl: CDN.echoLbvc,
+    structures: ["Left brachiocephalic vein (LBVC)", "SVC", "Thymus", "Brachiocephalic arteries", "Trachea (T)"],
+    normalFindings: ["LBVC crosses midline from left to right to join SVC", "Thymus visible as gray structure anterior to vessels", "3 brachiocephalic arteries visible below LBVC", "Trachea to right side"],
+    technique: "Superior transverse sweep above 3VT level. The LBVC appears as a horizontal vessel crossing from left to right, anterior to the aortic arch vessels.",
+    doppler: "Color Doppler to confirm LBVC flow direction (left to right into SVC); assess thymic size.",
+    pitfalls: ["Absent LBVC may drain anomalously — TAPVR, heterotaxy", "Dilated LBVC suggests increased flow — PAPVR, AVM"],
+    redFlags: ["Absent LBVC (may drain anomalously — TAPVR, heterotaxy)", "Dilated LBVC (increased flow — PAPVR, AVM)", "Absent thymus (22q11 DiGeorge)", "Persistent LSVC (LBVC absent, vertical vein present instead)"],
+    patientPosition: "Mother supine; transverse upper chest view just above 3VT — LBVC crosses horizontally anterior to the great vessels",
   },
   {
-    title: "Fetal Position & Orientation",
-    text: "Always determine fetal lie (cephalic, breech, transverse) and spine position before starting. Fetal left/right is determined relative to the fetal spine — not the maternal orientation. Label images clearly with fetal position. Optimal cardiac windows are obtained when the fetal spine is posterior or lateral.",
+    id: "lv-short-axis", step: 9, groupColor: "#3de8e8",
+    name: "LV Short Axis View", abbr: "LV SAX",
+    description: "A transverse view at the mid-ventricular level showing the left ventricle in short axis. The LV appears circular with the RV wrapping around it anteriorly. Used to assess ventricular size, wall thickness, and systolic function.",
+    imageUrl: CDN.echoLvShortAxis,
+    echoImageUrl: CDN.echoLvShortAxis,
+    structures: ["LV (circular)", "RV (crescent-shaped, anterior)", "Interventricular septum (IVS)", "Posterior wall", "Papillary muscles (at mid level)"],
+    normalFindings: ["LV appears circular in cross-section", "RV wraps around anterior LV", "Symmetric wall thickness", "Normal papillary muscle position at mid level", "Concentric contraction on M-mode"],
+    technique: "Transverse plane at mid-ventricular level. Tilt caudally from 4CV until LV appears circular with papillary muscles visible. Avoid oblique cuts that make LV appear oval.",
+    doppler: "Not typically used; M-mode through LV at papillary muscle level for fractional shortening.",
+    pitfalls: ["Oblique cut makes LV appear oval — foreshortens measurements", "Papillary muscles may be confused for VSD or mass", "Difficult to obtain in late gestation due to fetal position"],
+    redFlags: ["Asymmetric wall thickness (hypertrophic cardiomyopathy)", "Dilated LV (cardiomyopathy, severe AR/MR)", "Echogenic foci in LV (normal variant vs. cardiac rhabdomyoma)", "Hypoplastic LV (HLHS)"],
+    patientPosition: "Mother supine; transverse cardiac view at papillary muscle level — tilt inferiorly from 4CV",
   },
   {
-    title: "Color Doppler Settings",
-    text: "Reduce color Doppler scale (PRF) to 30–50 cm/s for fetal cardiac imaging — fetal cardiac velocities are lower than adult. Increase color gain until just below noise threshold. Color Doppler is essential for pulmonary veins, ductus arteriosus, and screening for VSD/ASD flow.",
+    id: "rvot-short-axis", step: 10, groupColor: "#42e8e4",
+    name: "RVOT Short Axis View", abbr: "RVOT SAX",
+    description: "A transverse view at the base of the heart showing the RVOT, pulmonary valve, and main pulmonary artery with its bifurcation into RPA and LPA. Also shows the aortic root in cross-section and the ductus arteriosus.",
+    imageUrl: CDN.fetalRvotSaxAnatomy,
+    echoImageUrl: CDN.echoRvotShortAxis,
+    structures: ["RV and RVOT", "Pulmonary valve", "MPA", "RPA and LPA", "Aortic root (circular cross-section)", "Ductus arteriosus (DA)"],
+    normalFindings: ["Aortic root appears circular (AO) with PA wrapping around it", "PA bifurcates into RPA and LPA", "DA connects PA to descending aorta", "RV and RA visible", "PA diameter ≥ Ao diameter in normal fetus"],
+    technique: "Transverse plane at base of heart. Tilt cranially from 3VV level. The aortic root appears as a circle with the RVOT/PA wrapping around it anteriorly — the classic 'circle and sausage' appearance.",
+    doppler: "Color/PW Doppler across pulmonary valve; CW for peak velocity; assess DA flow direction.",
+    pitfalls: ["PA may appear smaller than Ao if oblique — ensure true transverse cut", "DA may be confused with LPA — trace vessel to descending aorta to confirm"],
+    redFlags: ["PA smaller than Ao (pulmonary stenosis/atresia, TOF)", "Absent pulmonary valve", "Reversed DA flow (critical pulmonary obstruction)", "Absent LPA or RPA"],
+    patientPosition: "Mother supine; transverse upper mediastinal view — same level as 3VV, confirm PA and aortic root cross-sections",
   },
   {
-    title: "Systematic Protocol",
-    text: "Always follow the systematic protocol: Situs → 4CV → LVOT → RVOT/3VV → Aortic Arch → Ductal Arch → Pulmonary Veins. Do not skip views even if the clinical question is focused. Document all views with still images and cine loops. Biometry and anatomy survey should accompany the cardiac exam.",
+    id: "bicaval", step: 11, groupColor: "#4ad9e0",
+    name: "Bicaval View", abbr: "Bicaval",
+    description: "A sagittal or near-sagittal view through the right side of the fetus showing both the SVC and IVC draining into the right atrium. Best view for assessing venous return and foramen ovale.",
+    imageUrl: CDN.bicaval,
+    echoImageUrl: CDN.echoBicaval,
+    structures: ["RA", "SVC (right side)", "IVC (left side)", "LA", "Right pulmonary artery (RPA)", "Aorta (AO)"],
+    normalFindings: ["SVC and IVC both drain into RA", "Foramen ovale flap visible in LA", "RPA visible in cross-section", "IVC and SVC enter RA from opposite ends"],
+    technique: "Sagittal or near-sagittal plane through right side of fetus. Rotate from transverse to align with IVC/SVC axis.",
+    doppler: "Color Doppler to confirm SVC and IVC flow into RA; assess foramen ovale shunting.",
+    pitfalls: ["SVC absent (left SVC only — persistent LSVC)", "IVC interruption with azygos continuation (polysplenia)", "Dilated coronary sinus (persistent LSVC)"],
+    redFlags: ["SVC absent (persistent LSVC only)", "IVC interruption with azygos continuation (polysplenia)", "Dilated coronary sinus (persistent LSVC)", "ASD/sinus venosus defect"],
+    patientPosition: "Mother supine; sagittal or oblique view along fetal spine — align with IVC/SVC long axis entering RA",
   },
   {
-    title: "Indications for Referral",
-    text: "High-risk indications include: family history of CHD (recurrence risk 2–3%), maternal diabetes (3–5% CHD risk), maternal phenylketonuria, maternal lupus (heart block risk), maternal medications (lithium, retinoids, NSAIDs), fetal chromosomal anomaly, extracardiac anomaly, abnormal nuchal translucency (≥3.5 mm), or abnormal obstetric screening.",
+    id: "aortic-arch", step: 12, groupColor: "#3ecfd6",
+    name: "Aortic Arch View (Long Axis)", abbr: "Ao Arch",
+    description: "A sagittal view through the left side of the fetus showing the aortic arch in long axis. The classic 'candy cane' shape confirms left aortic arch. Three head and neck vessels arise from the arch.",
+    imageUrl: CDN.aorticArch,
+    echoImageUrl: CDN.echoAorticArch,
+    structures: ["Ascending aorta (ASC AO)", "Aortic arch", "Descending aorta (DESC AO)", "RA", "Right pulmonary artery (RPA)"],
+    normalFindings: ["Candy-cane shape of aortic arch", "3 head/neck vessels arising from arch (innominate, LCCA, LSCA)", "Aortic isthmus visible between LSCA and ductus", "Left-sided arch (curves to left of trachea)"],
+    technique: "Sagittal plane through left side of fetus. Align with aortic arch long axis — should see the classic candy-cane curve.",
+    doppler: "CW/PW at aortic isthmus; retrograde or absent diastolic flow = coarctation/critical obstruction.",
+    pitfalls: ["Ductal arch may be confused with aortic arch — ductal arch is more vertical (hockey stick)", "Only 2 head vessels visible suggests aberrant subclavian artery"],
+    redFlags: ["Right aortic arch (mirror image — 22q11, TOF)", "Coarctation — narrowing at isthmus", "Interrupted aortic arch — gap in arch", "Only 2 head vessels (aberrant subclavian)"],
+    patientPosition: "Mother supine; sagittal view along fetal left side — rotate transducer to align with aortic arch long axis",
+  },
+  {
+    id: "ductal-arch", step: 13, groupColor: "#189aa1",
+    name: "Long Axis Ductal Arch View", abbr: "Ductal Arch",
+    description: "A sagittal view showing the ductus arteriosus connecting the pulmonary artery to the descending aorta. The ductal arch has a characteristic 'hockey stick' shape — more vertical and acute than the aortic arch.",
+    imageUrl: CDN.ductalArch,
+    echoImageUrl: CDN.echoDuctalArch,
+    structures: ["RV", "Pulmonary valve", "Ductus Arteriosus", "Descending aorta (DESC AO)", "Aortic root (LA)"],
+    normalFindings: ["Hockey-stick shape (more acute angle than aortic arch)", "Ductus connects PA directly to descending aorta", "No head/neck vessels arising from ductal arch", "RV and pulmonary valve visible at origin"],
+    technique: "Sagittal plane through right side of fetus. The ductal arch is more vertical and acute than the aortic arch — hockey-stick vs. candy-cane.",
+    doppler: "PW/Color Doppler in ductus; reversed or absent flow = critical right heart obstruction.",
+    pitfalls: ["Ductal arch confused with aortic arch — DA is more anterior and vertical", "Absent DA may indicate pulmonary hypertension or premature closure"],
+    redFlags: ["Absent ductus (isolated ductal absence — rare)", "Constricted ductus (NSAIDs, indomethacin exposure)", "Reversed ductal flow (critical pulmonary stenosis/atresia)", "Aneurysmal ductus"],
+    patientPosition: "Mother supine; sagittal view along fetal right side — rotate transducer to align with ductal arch (more vertical than aortic arch)",
   },
 ];
 
 export default function FetalScanCoach() {
   const [selectedView, setSelectedView] = useState(0);
-  const [showExamTips, setShowExamTips] = useState(false);
+  const [showImages, setShowImages] = useState<"both" | "diagram" | "echo">("both");
   const [showBilling, setShowBilling] = useState(false);
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    howToGet: true,
-    structures: false,
-    tips: false,
-    measurements: false,
-    criticalFindings: false,
-  });
 
   const { mergeView, isLoading } = useScanCoachOverrides("fetal");
 
-  const toggle = (section: string) => {
-    setOpenSections((prev) => ({ ...prev, [section]: !prev[section] }));
-  };
+  const view = useMemo(() => {
+    const base = FETAL_VIEWS[selectedView];
+    return mergeView ? mergeView(base as any) : base;
+  }, [selectedView, mergeView]) as typeof FETAL_VIEWS[0] & { patientPosition?: string };
 
-  const staticView = FETAL_VIEWS[selectedView];
-  const view = useMemo(() => mergeView(staticView as typeof staticView & { id: string }), [mergeView, staticView]);
+  const goNext = () => setSelectedView(v => Math.min(v + 1, FETAL_VIEWS.length - 1));
+  const goPrev = () => setSelectedView(v => Math.max(v - 1, 0));
 
   return (
     <Layout>
-      {/* Header */}
-      <div
-        className="relative overflow-hidden"
-        style={{ background: "linear-gradient(135deg, #0e1e2e 0%, #0e4a50 60%, #189aa1 100%)" }}
-      >
+      {/* Page header */}
+      <div className="relative overflow-hidden" style={{ background: "linear-gradient(135deg, #0e1e2e 0%, #0e4a50 60%, #189aa1 100%)" }}>
         <div className="container py-8 md:py-10">
-          <div className="mb-3">
-            <BackToEchoAssist />
-          </div>
+          <div className="mb-3"><BackToEchoAssist /></div>
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(255,255,255,0.1)" }}>
               <Baby className="w-6 h-6 text-[#4ad9e0]" />
@@ -418,339 +263,231 @@ export default function FetalScanCoach() {
                 <div className="w-2 h-2 rounded-full bg-[#4ad9e0] animate-pulse" />
                 <span className="text-sm text-white/80 font-medium">Fetal Echo · ScanCoach™</span>
               </div>
-              <h1 className="text-2xl md:text-3xl font-black text-white leading-tight" style={{ fontFamily: "Merriweather, serif" }}>
-                Fetal Echo ScanCoach™
+              <h1 className="text-2xl md:text-3xl font-black text-white" style={{ fontFamily: "Merriweather, serif" }}>
+                Fetal Echo ScanCoach
               </h1>
-              <p className="text-[#4ad9e0] font-semibold text-sm mt-0.5">View-by-View Acquisition Guidance</p>
-              <p className="text-white/70 text-sm mt-2 max-w-xl leading-relaxed">
-                View-by-view acquisition guidance for fetal echocardiography, aligned with current AIUM guidelines. Guides systematic cardiac view acquisition with image optimization tips and normal appearance criteria to support confident fetal cardiac assessment.
-              </p>
-              <div className="mt-3">
-                <Link href="/fetal-navigator">
-                  <button className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg font-semibold text-sm border border-white/30 text-white/90 hover:bg-white/10 transition-all">
-                    <Info className="w-3.5 h-3.5" />
-                    Open Navigator
-                  </button>
-                </Link>
-              </div>
+              <p className="text-white/70 mt-1 text-sm">13-view sweep sequence · All About Ultrasound, Inc.</p>
             </div>
           </div>
         </div>
       </div>
 
       <div className="container py-6">
-        {/* View selector */}
-        <div className="flex gap-2 flex-wrap mb-5">
-          {FETAL_VIEWS.map((v, i) => (
-            <button
-              key={i}
-              onClick={() => {
-                setSelectedView(i);
-                setOpenSections({ howToGet: true, structures: false, tips: false, measurements: false, criticalFindings: false });
-              }}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-              style={{
-                background: selectedView === i ? v.groupColor : "white",
-                color: selectedView === i ? "white" : v.groupColor,
-                border: `1px solid ${selectedView === i ? v.groupColor : v.groupColor + "40"}`,
-              }}
-            >
-              {v.name}
-            </button>
-          ))}
-        </div>
-
-        {/* View card */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-4">
-          {/* View header */}
-          <div className="px-5 py-4 border-b border-gray-100" style={{ background: view.groupColor + "08" }}>
-            <div className="flex items-start gap-3">
-              <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: view.groupColor + "20" }}>
-                <Baby className="w-4 h-4" style={{ color: view.groupColor }} />
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-5 items-start">
+          {/* ─── Sidebar view list ─── */}
+          <div className="lg:col-span-1 lg:order-1 order-2 lg:sticky lg:top-4">
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100">
+                <h3 className="font-bold text-sm text-gray-700" style={{ fontFamily: "Merriweather, serif" }}>Fetal Echo Views</h3>
+                <p className="text-xs text-gray-400 mt-0.5">13-view sweep sequence</p>
               </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ background: view.groupColor + "20", color: view.groupColor }}>
-                    {view.group}
-                  </span>
-                </div>
-                <h2 className="text-base font-black text-gray-900 mt-1" style={{ fontFamily: "Merriweather, serif" }}>
-                  {view.name}
-                </h2>
-                <p className="text-xs text-gray-500 mt-0.5">{view.probe}</p>
+              {/* Sweep overview image */}
+              <div className="p-2">
+                <img src={CDN.sweep} alt="Fetal echo sweep overview"
+                  className="w-full rounded-lg object-contain bg-gray-900" style={{ maxHeight: "100px" }} />
+              </div>
+              <div className="p-3 space-y-1 max-h-[calc(100vh-300px)] overflow-y-auto">
+                {FETAL_VIEWS.map((v, i) => (
+                  <button key={v.id} onClick={() => setSelectedView(i)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all ${
+                      selectedView === i ? "text-white shadow-sm" : "hover:bg-gray-50 text-gray-700"
+                    }`}
+                    style={selectedView === i ? { background: v.groupColor } : {}}>
+                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 text-white"
+                      style={{ background: selectedView === i ? "rgba(255,255,255,0.25)" : v.groupColor }}>
+                      {v.step}
+                    </span>
+                    <span className="text-xs font-medium leading-tight">{v.name}</span>
+                  </button>
+                ))}
               </div>
             </div>
           </div>
 
-          {/* Patient positioning */}
-          <div className="px-5 py-3 border-b border-gray-100 bg-blue-50/40">
-            <div className="flex items-start gap-2">
-              <Target className="w-3.5 h-3.5 text-blue-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <span className="text-xs font-bold text-blue-700 uppercase tracking-wider">Patient Positioning</span>
-                <p className="text-xs text-gray-700 mt-0.5 leading-relaxed">{view.patientPosition}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Description */}
-          <div className="px-5 py-4 border-b border-gray-100">
-            <p className="text-sm text-gray-700 leading-relaxed">{view.description}</p>
-          </div>
-
-          {/* Images from DB overrides */}
-          {((view as any).echoImageUrl || (view as any).anatomyImageUrl || (view as any).transducerImageUrl) && (
-            <div className="px-5 py-4 border-b border-gray-100">
-              <div className={`grid gap-3 ${[(view as any).echoImageUrl, (view as any).anatomyImageUrl, (view as any).transducerImageUrl].filter(Boolean).length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
-                {/* Clinical images gallery */}
-            {(() => {
-              const imgs = (view as any).echoImages as Array<{url: string; caption: string | null}> | undefined;
-              const legacyUrl = (view as any).echoImageUrl as string | undefined;
-              const gallery = imgs && imgs.length > 0 ? imgs : legacyUrl ? [{ url: legacyUrl, caption: null }] : [];
-              if (gallery.length === 0) return null;
-              return gallery.length === 1 ? (
-                <div className="rounded-lg overflow-hidden bg-black/20 relative">
-                  <img src={gallery[0].url} alt={gallery[0].caption ?? "Ultrasound Image"} className="max-h-64 object-contain rounded-lg w-full" />
-                  <p className="text-[10px] text-white/60 text-center py-1">{gallery[0].caption ?? "Ultrasound Image"}</p>
-                </div>
-              ) : (
-                <div className="flex gap-2 overflow-x-auto pb-1">
-                  {gallery.map((img, idx) => (
-                    <div key={idx} className="relative flex-shrink-0 rounded-lg overflow-hidden bg-black/20" style={{ width: 150, height: 110 }}>
-                      <img src={img.url} alt={img.caption ?? `Image ${idx + 1}`} className="w-full h-full object-cover" />
-                      {img.caption && (
-                        <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1.5 py-0.5">
-                          <p className="text-xs text-white truncate">{img.caption}</p>
-                        </div>
-                      )}
+          {/* ─── Detail panel ─── */}
+          <div className="lg:col-span-3 lg:order-2 order-1 space-y-4">
+            {/* Header */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-5 py-4 border-b" style={{ borderColor: view.groupColor + "30", background: view.groupColor + "08" }}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+                      style={{ background: view.groupColor }}>
+                      {view.step}
+                    </span>
+                    <div>
+                      <h2 className="font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>{view.name}</h2>
+                      <span className="text-xs text-gray-400">{view.abbr}</span>
                     </div>
-                  ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={goPrev} disabled={selectedView === 0}
+                      className="w-8 h-8 rounded-full flex items-center justify-center border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                      <ChevronLeft className="w-4 h-4 text-gray-500" />
+                    </button>
+                    <button onClick={goNext} disabled={selectedView === FETAL_VIEWS.length - 1}
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                      style={{ background: view.groupColor }}>
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-              );
-            })()}
-                {(view as any).anatomyImageUrl && (
-                  <div className="rounded-lg overflow-hidden bg-black/10">
-                    <img src={(view as any).anatomyImageUrl} alt="Anatomy Diagram" className="max-h-64 object-contain rounded-lg w-full" />
-                    <p className="text-[10px] text-gray-500 text-center py-1">Anatomy Diagram</p>
-                  </div>
-                )}
-                {(view as any).transducerImageUrl && (
-                  <div className="rounded-lg overflow-hidden bg-black/10">
-                    <img src={(view as any).transducerImageUrl} alt="Probe Position" className="max-h-64 object-contain rounded-lg w-full" />
-                    <p className="text-[10px] text-gray-500 text-center py-1">Probe Position</p>
-                  </div>
-                )}
+              </div>
+              <div className="px-5 py-4">
+                <p className="text-sm text-gray-700 leading-relaxed">{view.description}</p>
               </div>
             </div>
-          )}
 
-          {/* How to Get */}
-          <div className="border-b border-gray-100">
-            <button onClick={() => toggle("howToGet")} className="w-full flex items-center justify-between px-5 py-3 text-left hover:bg-gray-50 transition-colors">
-              <div className="flex items-center gap-2">
-                <Target className="w-4 h-4" style={{ color: view.groupColor }} />
-                <span className="text-sm font-bold text-gray-800">How to Get This View</span>
+            {/* Reference Images */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+                <h3 className="font-bold text-sm text-gray-700" style={{ fontFamily: "Merriweather, serif" }}>View Reference Images</h3>
+                <div className="flex items-center gap-3 text-xs text-gray-400">
+                  <button onClick={() => setShowImages("diagram")} className={showImages === "diagram" ? "font-semibold text-gray-700" : "hover:text-gray-600"}>Diagram</button>
+                  <span>·</span>
+                  <button onClick={() => setShowImages("echo")} className={showImages === "echo" ? "font-semibold text-gray-700" : "hover:text-gray-600"}>Clinical Echo</button>
+                  <span>·</span>
+                  <button onClick={() => setShowImages("both")} className={showImages === "both" ? "font-semibold text-gray-700" : "hover:text-gray-600"}>Both</button>
+                </div>
               </div>
-              {openSections.howToGet ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
-            </button>
-            {openSections.howToGet && (
-              <div className="px-5 pb-4">
-                <ol className="space-y-2">
-                  {view.howToGet.map((step: string, i: number) => (
-                    <li key={i} className="flex items-start gap-3 text-xs text-gray-700">
-                      <span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white" style={{ background: view.groupColor }}>{i + 1}</span>
-                      {step}
-                    </li>
-                  ))}
-                </ol>
+              <div className="p-4 bg-gray-900">
+                <div className={`grid gap-3 ${showImages === "both" ? "grid-cols-2" : "grid-cols-1"}`}>
+                  {(showImages === "both" || showImages === "diagram") && view.imageUrl && (
+                    <div>
+                      <div className="text-xs text-gray-400 text-center mb-1">Anatomy Diagram</div>
+                      <img src={view.imageUrl} alt={`${view.name} diagram`}
+                        className="w-full rounded-lg object-contain bg-white" style={{ maxHeight: "260px" }} />
+                    </div>
+                  )}
+                  {(showImages === "both" || showImages === "echo") && view.echoImageUrl && (
+                    <div>
+                      <div className="text-xs text-gray-400 text-center mb-1">Clinical Echo Image</div>
+                      <img src={view.echoImageUrl} alt={`${view.name} echo`}
+                        className="w-full rounded-lg object-contain bg-black" style={{ maxHeight: "260px" }} />
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
-          </div>
+            </div>
 
-          {/* Structures */}
-          <div className="border-b border-gray-100">
-            <button onClick={() => toggle("structures")} className="w-full flex items-center justify-between px-5 py-3 text-left hover:bg-gray-50 transition-colors">
-              <div className="flex items-center gap-2">
-                <BookOpen className="w-4 h-4" style={{ color: view.groupColor }} />
-                <span className="text-sm font-bold text-gray-800">Structures to Identify</span>
-              </div>
-              {openSections.structures ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
-            </button>
-            {openSections.structures && (
-              <div className="px-5 pb-4">
-                <ul className="space-y-1">
-                  {view.structures.map((s: string, i: number) => (
-                    <li key={i} className="flex items-start gap-2 text-xs text-gray-700">
-                      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1.5" style={{ background: view.groupColor }} />
+            {/* Structures & Normal Findings */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Target className="w-4 h-4 flex-shrink-0" style={{ color: BRAND }} />
+                  <h3 className="font-bold text-sm text-gray-700" style={{ fontFamily: "Merriweather, serif" }}>Structures to Identify</h3>
+                </div>
+                <ul className="space-y-1.5">
+                  {view.structures.map((s, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1.5" style={{ background: BRAND }} />
                       {s}
                     </li>
                   ))}
                 </ul>
               </div>
-            )}
-          </div>
-
-          {/* Tips & Pitfalls */}
-          <div className="border-b border-gray-100">
-            <button onClick={() => toggle("tips")} className="w-full flex items-center justify-between px-5 py-3 text-left hover:bg-gray-50 transition-colors">
-              <div className="flex items-center gap-2">
-                <Info className="w-4 h-4" style={{ color: view.groupColor }} />
-                <span className="text-sm font-bold text-gray-800">Tips &amp; Pitfalls</span>
-              </div>
-              {openSections.tips ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
-            </button>
-            {openSections.tips && (
-              <div className="px-5 pb-4 space-y-3">
-                <div>
-                  <p className="text-xs font-semibold text-green-700 mb-1.5 flex items-center gap-1">
-                    <CheckCircle className="w-3.5 h-3.5" /> Scanning Tips
-                  </p>
-                  <ul className="space-y-1">
-                    {view.tips.map((t: string, i: number) => (
-                      <li key={i} className="text-xs text-gray-700 flex items-start gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0 mt-1.5" />
-                        {t}
-                      </li>
-                    ))}
-                  </ul>
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Info className="w-4 h-4 flex-shrink-0" style={{ color: BRAND }} />
+                  <h3 className="font-bold text-sm text-gray-700" style={{ fontFamily: "Merriweather, serif" }}>Normal Findings</h3>
                 </div>
-                <div>
-                  <p className="text-xs font-semibold text-amber-700 mb-1.5 flex items-center gap-1">
-                    <AlertTriangle className="w-3.5 h-3.5" /> Common Pitfalls
-                  </p>
-                  <ul className="space-y-1">
-                    {view.pitfalls.map((p: string, i: number) => (
-                      <li key={i} className="text-xs text-gray-700 flex items-start gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0 mt-1.5" />
-                        {p}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Measurements */}
-          <div className="border-b border-gray-100">
-            <button onClick={() => toggle("measurements")} className="w-full flex items-center justify-between px-5 py-3 text-left hover:bg-gray-50 transition-colors">
-              <div className="flex items-center gap-2">
-                <Lightbulb className="w-4 h-4" style={{ color: view.groupColor }} />
-                <span className="text-sm font-bold text-gray-800">Key Measurements</span>
-              </div>
-              {openSections.measurements ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
-            </button>
-            {openSections.measurements && (
-              <div className="px-5 pb-4">
-                <ul className="space-y-1">
-                  {view.measurements.map((m: string, i: number) => (
-                    <li key={i} className="flex items-start gap-2 text-xs text-gray-700">
-                      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1.5" style={{ background: view.groupColor }} />
-                      {m}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-
-          {/* Critical Findings */}
-          <div>
-            <button onClick={() => toggle("criticalFindings")} className="w-full flex items-center justify-between px-5 py-3 text-left hover:bg-gray-50 transition-colors">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-red-500" />
-                <span className="text-sm font-bold text-gray-800">Critical Findings</span>
-              </div>
-              {openSections.criticalFindings ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
-            </button>
-            {openSections.criticalFindings && (
-              <div className="px-5 pb-4">
-                <ul className="space-y-1">
-                  {view.criticalFindings.map((f: string, i: number) => (
-                    <li key={i} className="flex items-start gap-2 text-xs text-red-700">
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0 mt-1.5" />
+                <ul className="space-y-1.5">
+                  {view.normalFindings.map((f, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                      <CheckCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: BRAND }} />
                       {f}
                     </li>
                   ))}
                 </ul>
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Exam Tips section */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-5">
-          <button
-            className="w-full flex items-center gap-3 px-5 py-3 hover:bg-[#f0fbfc] transition-all"
-            onClick={() => setShowExamTips(!showExamTips)}
-          >
-            <Lightbulb className="w-4 h-4 text-[#189aa1] flex-shrink-0" />
-            <span className="font-bold text-sm text-gray-700 flex-1 text-left" style={{ fontFamily: "Merriweather, serif" }}>
-              Exam Tips
-            </span>
-            {showExamTips ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
-          </button>
-          {showExamTips && (
-            <div className="border-t border-gray-100 p-5 space-y-3">
-              {examTips.map((tip, ti) => (
-                <div key={ti} className="rounded-xl p-4 border" style={{ borderColor: "#189aa140", background: "#f0fbfc" }}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <Lightbulb className="w-3.5 h-3.5 text-[#189aa1] flex-shrink-0" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-[#189aa1]">{tip.title}</span>
-                  </div>
-                  <p className="text-sm text-gray-700 leading-relaxed">{tip.text}</p>
-                </div>
-              ))}
             </div>
-          )}
-        </div>
 
-        {/* Billing Codes */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-5">
-          <button
-            className="w-full flex items-center gap-3 px-5 py-3 hover:bg-[#f0fbfc] transition-all"
-            onClick={() => setShowBilling(!showBilling)}
-          >
-            <Receipt className="w-4 h-4 text-[#189aa1] flex-shrink-0" />
-            <span className="font-bold text-sm text-gray-700 flex-1 text-left" style={{ fontFamily: "Merriweather, serif" }}>Billing Codes (CPT)</span>
-            {showBilling ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
-          </button>
-          {showBilling && (
-            <div className="border-t border-gray-100 p-5 space-y-5">
-              <p className="text-xs text-gray-400 italic">For reference only — verify with current payer policies and local coverage determinations.</p>
-              {fetalBilling.map((section, si) => (
-                <div key={si}>
-                  <div className="text-xs font-bold uppercase tracking-wider text-[#189aa1] mb-2">{section.heading}</div>
-                  <div className="space-y-2">
-                    {section.codes.map((c, ci) => (
-                      <div key={ci} className="rounded-lg border p-3" style={{ borderColor: "#189aa140", background: "#f0fbfc" }}>
-                        <div className="flex items-start gap-2">
-                          <span className="font-mono font-bold text-sm text-[#189aa1] flex-shrink-0">{c.code}</span>
-                          <div>
-                            <div className="text-sm font-medium text-gray-800">{c.description}</div>
-                            {c.note && <div className="text-xs text-gray-500 mt-0.5 leading-relaxed">{c.note}</div>}
+            {/* Technique, Patient Position, Doppler, Pitfalls */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
+              <div>
+                <h4 className="font-semibold text-xs text-gray-500 mb-1 uppercase tracking-wide">Scanning Technique</h4>
+                <p className="text-sm text-gray-700 leading-relaxed">{view.technique}</p>
+              </div>
+              {view.patientPosition && (
+                <div className="pt-3 border-t border-gray-100">
+                  <h4 className="font-semibold text-xs text-gray-500 mb-1 uppercase tracking-wide">Patient Positioning</h4>
+                  <p className="text-sm text-gray-600">{view.patientPosition}</p>
+                </div>
+              )}
+              <div className="pt-3 border-t border-gray-100">
+                <h4 className="font-semibold text-xs text-gray-500 mb-1 uppercase tracking-wide">Doppler</h4>
+                <p className="text-sm text-gray-600">{view.doppler}</p>
+              </div>
+              <div className="pt-3 border-t border-gray-100">
+                <h4 className="font-semibold text-xs text-gray-500 mb-2 uppercase tracking-wide flex items-center gap-1.5">
+                  <AlertTriangle className="w-3 h-3 text-amber-500" />
+                  Common Pitfalls
+                </h4>
+                <ul className="space-y-1">
+                  {view.pitfalls.map((p, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs text-amber-700">
+                      <AlertTriangle className="w-3 h-3 text-amber-500 flex-shrink-0 mt-0.5" />
+                      {p}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            {/* Red Flags */}
+            <div className="bg-white rounded-xl border border-red-50 shadow-sm p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className="w-4 h-4 text-red-500" />
+                <h3 className="font-bold text-sm text-gray-700" style={{ fontFamily: "Merriweather, serif" }}>Red Flags / Abnormal Findings</h3>
+              </div>
+              <ul className="space-y-1.5">
+                {view.redFlags.map((f, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-red-700">
+                    <span className="text-red-500 font-bold mt-0.5 flex-shrink-0">!</span>
+                    {f}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Billing Codes */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+              <button className="w-full flex items-center gap-3 px-5 py-3 hover:bg-[#f0fbfc] transition-all"
+                onClick={() => setShowBilling(!showBilling)}>
+                <Receipt className="w-4 h-4 text-[#189aa1] flex-shrink-0" />
+                <span className="font-bold text-sm text-gray-700 flex-1 text-left" style={{ fontFamily: "Merriweather, serif" }}>Billing Codes (CPT)</span>
+                {showBilling ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+              </button>
+              {showBilling && (
+                <div className="border-t border-gray-100 p-5 space-y-5">
+                  <p className="text-xs text-gray-400 italic">For reference only — verify with current payer policies and local coverage determinations.</p>
+                  {fetalBilling.map((section, si) => (
+                    <div key={si}>
+                      <div className="text-xs font-bold uppercase tracking-wider text-[#189aa1] mb-2">{section.heading}</div>
+                      <div className="space-y-2">
+                        {section.codes.map((c, ci) => (
+                          <div key={ci} className="rounded-lg border p-3" style={{ borderColor: "#189aa140", background: "#f0fbfc" }}>
+                            <div className="flex items-start gap-2">
+                              <span className="font-mono font-bold text-sm text-[#189aa1] flex-shrink-0">{c.code}</span>
+                              <div>
+                                <div className="text-sm font-medium text-gray-800">{c.description}</div>
+                                {c.note && <div className="text-xs text-gray-500 mt-0.5 leading-relaxed">{c.note}</div>}
+                              </div>
+                            </div>
                           </div>
-                        </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          )}
-        </div>
-        {/* Reference */}
-        <div className="text-xs text-gray-400 px-1 mt-4">
-          Based on:{" "}
-          <a
-            href="https://www.aium.org/resources/guidelines/fetalEcho.pdf"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline hover:text-[#189aa1]"
-          >
-            AIUM Practice Guideline for the Performance of Fetal Echocardiography (2020)
-          </a>
-          ; American Society of Echocardiography Guidelines for Fetal Echocardiography.
+
+            {/* Copyright */}
+            <div className="text-xs text-gray-400 text-center py-2">
+              Clinical images © All About Ultrasound, Inc. / iHeartEcho™. Educational use only.
+            </div>
+          </div>
         </div>
       </div>
     </Layout>

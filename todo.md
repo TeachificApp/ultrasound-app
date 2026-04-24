@@ -1287,3 +1287,15 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] tRPC: public/learner listCollections and getCollection procedures
 - [x] Admin UI: Collections tab in LMSAdmin with create/edit/delete dialogs and course assignment picker
 - [x] Learner UI: Collections section on Education Library page and /collections/:id detail page
+
+## Fetal Echo Navigator & Scan Coach Rebuild (Apr 24, 2026)
+- [ ] Extract all 13+ fetal echo views from iHeartEcho app with full clinical data
+- [ ] Update FetalScanCoach.tsx with complete view data (structures, normal findings, abnormal findings, scanning tips, images)
+- [ ] Update FetalNavigator.tsx with complete view data matching iHeartEcho content
+
+## Fetal Echo ScanCoach Rebuild (from iHeartEcho™)
+- [x] Replace 7-view FetalScanCoach with complete 13-view dataset from iHeartEcho™ source
+- [x] Add all CDN image URLs (anatomy diagrams + clinical echo images/GIFs) from iHeartEcho
+- [x] Add missing views: RVOT with MPA Bifurcation, 3VT, LBVC, LV Short Axis, RVOT Short Axis, Bicaval
+- [x] Match iHeartEcho UI layout: sidebar view list with sweep image, side-by-side images, structures, normal findings, technique, doppler, pitfalls, red flags
+- [x] Add prev/next navigation buttons and Diagram/Echo/Both image toggle
