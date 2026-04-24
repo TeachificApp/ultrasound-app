@@ -1331,7 +1331,7 @@ Generate 3-6 sections with 2-5 lessons each. Lesson types can be: text, video (f
         response_format: { type: "json_object" },
       });
 
-      const raw = response?.choices?.[0]?.message?.content ?? "{}";
+      const raw = String(response?.choices?.[0]?.message?.content ?? "{}");
       let parsed: any;
       try {
         parsed = JSON.parse(raw);

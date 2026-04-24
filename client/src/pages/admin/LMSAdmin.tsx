@@ -650,7 +650,7 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
         <AddLessonDialog sectionId={addLessonSection} onClose={() => setAddLessonSection(null)} onCreated={() => { setAddLessonSection(null); refetch(); }} />
       )}
       {importMediaSection && (
-        <ImportMediaAsLessonDialog sectionId={importMediaSection} onClose={() => setImportMediaSection(null)} onCreated={() => { setImportMediaSection(null); refetch(); }} />
+        <ImportMediaAsLessonDialog sectionId={importMediaSection} courseId={courseId} onClose={() => setImportMediaSection(null)} onCreated={() => { setImportMediaSection(null); refetch(); }} />
       )}
       {editLesson && (
         <EditLessonDialog lesson={editLesson} onClose={() => setEditLesson(null)} onSaved={() => { setEditLesson(null); refetch(); }} />
@@ -1050,7 +1050,7 @@ function CourseInstructorsEditor({ courseId, courseInstructors, onSaved }: { cou
 
 // ─── Import Media As Lesson Dialog ──────────────────────────────────────────
 
-function ImportMediaAsLessonDialog({ sectionId, onClose, onCreated }: { sectionId: number; onClose: () => void; onCreated: () => void }) {
+function ImportMediaAsLessonDialog({ sectionId, courseId, onClose, onCreated }: { sectionId: number; courseId: number; onClose: () => void; onCreated: () => void }) {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | "video" | "document" | "scorm" | "html">("all");
   const [selectedAsset, setSelectedAsset] = useState<any>(null);
@@ -1129,9 +1129,10 @@ function ImportMediaAsLessonDialog({ sectionId, onClose, onCreated }: { sectionI
             className="bg-blue-600 hover:bg-blue-700 text-white"
             disabled={!selectedAsset || importLesson.isPending}
             onClick={() => importLesson.mutate({
+              courseId,
               sectionId,
-              assetId: selectedAsset.id,
-              lessonType: lessonTypeForAsset(selectedAsset),
+              mediaAssetId: selectedAsset.id,
+              title: selectedAsset.title,
             })}
           >
             {importLesson.isPending ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Importing...</> : <><FolderOpen className="w-4 h-4 mr-1" /> Import as Lesson</>}
