@@ -33,6 +33,7 @@ import {
   lmsAffiliates,
   lmsAffiliateConversions,
   lmsLandingPages,
+  lmsPageTemplates,
   lmsOrders,
   users,
   mediaAssets,
@@ -589,10 +590,12 @@ export const lmsAdminRouter = router({
       subtitle: z.string().max(500).optional(),
       type: z.enum(["course", "quiz", "download"]).default("course"),
       brand: z.enum(["aaus", "iheartecho"]).default("aaus"),
-      pricingType: z.enum(["free", "one_time", "subscription", "payment_plan"]).default("one_time"),
+      pricingType: z.enum(["free", "one_time", "subscription", "payment_plan", "trial_then_subscription"]).default("one_time"),
       price: z.number().int().min(0).default(0),
       isFree: z.boolean().default(false),
       subscriptionInterval: z.enum(["monthly", "quarterly", "annual"]).optional(),
+      trialDays: z.number().int().min(0).nullable().optional(),
+      accessDurationDays: z.number().int().min(1).nullable().optional(),
       downPayment: z.number().int().min(0).optional(),
       installmentCount: z.number().int().min(0).optional(),
       installmentAmount: z.number().int().min(0).optional(),
@@ -610,6 +613,8 @@ export const lmsAdminRouter = router({
         type: input.type, brand: input.brand, price: input.price,
         isFree, pricingType: input.pricingType,
         subscriptionInterval: input.subscriptionInterval ?? null,
+        trialDays: input.trialDays ?? null,
+        accessDurationDays: input.accessDurationDays ?? null,
         downPayment: input.downPayment ?? null,
         installmentCount: input.installmentCount ?? null,
         installmentAmount: input.installmentAmount ?? null,
@@ -633,8 +638,10 @@ export const lmsAdminRouter = router({
       brand: z.enum(["aaus", "iheartecho"]).optional(),
       price: z.number().int().min(0).optional(),
       isFree: z.boolean().optional(),
-      pricingType: z.enum(["free", "one_time", "subscription", "payment_plan"]).optional(),
+      pricingType: z.enum(["free", "one_time", "subscription", "payment_plan", "trial_then_subscription"]).optional(),
       subscriptionInterval: z.enum(["monthly", "quarterly", "annual"]).nullable().optional(),
+      trialDays: z.number().int().min(0).nullable().optional(),
+      accessDurationDays: z.number().int().min(1).nullable().optional(),
       downPayment: z.number().int().min(0).nullable().optional(),
       installmentCount: z.number().int().min(0).nullable().optional(),
       installmentAmount: z.number().int().min(0).nullable().optional(),
@@ -1046,6 +1053,120 @@ export const lmsAdminRouter = router({
       } else {
         await db.insert(lmsLandingPages).values({ courseId, ...filtered, isCustom: true });
       }
+      return { success: true };
+    }),
+
+  // ── Landing Page Blocks (page builder) ──
+  getLandingPageBlocks: protectedProcedure
+    .input(z.object({ courseId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [lp] = await db.select({
+        blocks: lmsLandingPages.blocks,
+        heroTitle: lmsLandingPages.heroTitle,
+        heroSubtitle: lmsLandingPages.heroSubtitle,
+        heroImageUrl: lmsLandingPages.heroImageUrl,
+        ctaText: lmsLandingPages.ctaText,
+      }).from(lmsLandingPages).where(eq(lmsLandingPages.courseId, input.courseId)).limit(1);
+      const [course] = await db.select({
+        title: lmsCourses.title,
+        slug: lmsCourses.slug,
+        coverImageUrl: lmsCourses.coverImageUrl,
+        subtitle: lmsCourses.subtitle,
+      }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+      return {
+        blocks: lp?.blocks ? JSON.parse(lp.blocks) : null,
+        heroTitle: lp?.heroTitle ?? course?.title ?? "",
+        heroSubtitle: lp?.heroSubtitle ?? course?.subtitle ?? "",
+        heroImageUrl: lp?.heroImageUrl ?? course?.coverImageUrl ?? "",
+        ctaText: lp?.ctaText ?? "Enroll Now",
+        courseTitle: course?.title ?? "",
+        courseSlug: course?.slug ?? "",
+      };
+    }),
+  saveLandingPageBlocks: protectedProcedure
+    .input(z.object({
+      courseId: z.number(),
+      blocks: z.array(z.any()),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const blocksJson = JSON.stringify(input.blocks);
+      const [existing] = await db.select({ id: lmsLandingPages.id })
+        .from(lmsLandingPages).where(eq(lmsLandingPages.courseId, input.courseId)).limit(1);
+      if (existing) {
+        await db.update(lmsLandingPages)
+          .set({ blocks: blocksJson, isCustom: true })
+          .where(eq(lmsLandingPages.courseId, input.courseId));
+      } else {
+        await db.insert(lmsLandingPages).values({ courseId: input.courseId, blocks: blocksJson, isCustom: true });
+      }
+      return { success: true };
+    }),
+  // ── Page Templates ──
+  listPageTemplates: protectedProcedure
+    .input(z.object({ templateType: z.enum(["page", "block"]).optional() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const rows = await db.select().from(lmsPageTemplates)
+        .where(input.templateType ? eq(lmsPageTemplates.templateType, input.templateType) : undefined)
+        .orderBy(lmsPageTemplates.updatedAt);
+      return rows.map(r => ({
+        ...r,
+        blocks: typeof r.blocks === "string" ? JSON.parse(r.blocks) : r.blocks,
+      }));
+    }),
+
+  savePageTemplate: protectedProcedure
+    .input(z.object({
+      id: z.number().optional(),
+      name: z.string().min(1).max(255),
+      description: z.string().optional(),
+      templateType: z.enum(["page", "block"]).default("page"),
+      blockType: z.string().optional(),
+      blocks: z.array(z.any()),
+      thumbnailUrl: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const now = Date.now();
+      const blocksJson = JSON.stringify(input.blocks);
+      if (input.id) {
+        await db.update(lmsPageTemplates)
+          .set({ name: input.name, description: input.description ?? null, templateType: input.templateType, blockType: input.blockType ?? null, blocks: blocksJson, thumbnailUrl: input.thumbnailUrl ?? null, updatedAt: now })
+          .where(eq(lmsPageTemplates.id, input.id));
+        return { id: input.id };
+      } else {
+        const [result] = await db.insert(lmsPageTemplates).values({
+          name: input.name,
+          description: input.description ?? null,
+          templateType: input.templateType,
+          blockType: input.blockType ?? null,
+          blocks: blocksJson,
+          thumbnailUrl: input.thumbnailUrl ?? null,
+          createdBy: ctx.user.id,
+          createdAt: now,
+          updatedAt: now,
+        });
+        return { id: (result as any).insertId };
+      }
+    }),
+
+  deletePageTemplate: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(lmsPageTemplates).where(eq(lmsPageTemplates.id, input.id));
       return { success: true };
     }),
 

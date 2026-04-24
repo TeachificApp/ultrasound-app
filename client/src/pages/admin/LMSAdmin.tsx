@@ -30,7 +30,7 @@ import {
   Link as LinkIcon, UserCheck, ArrowLeft, Upload, ImageIcon,
   Sparkles, Loader2, Eye, FolderOpen, Monitor, Video, FileText, CheckSquare,
 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -562,6 +562,7 @@ function LessonRow({ lesson, onEdit, onQuiz, onDelete }: {
 // ─── Course Editor ────────────────────────────────────────────────────────────
 
 function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => void }) {
+  const [, navigate] = useLocation();
   
   const utils = trpc.useUtils();
   const { data: course, isLoading, refetch } = trpc.lmsAdmin.getCourse.useQuery({ id: courseId });
@@ -605,11 +606,25 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
         <h2 className="font-semibold text-gray-900 text-lg truncate flex-1">{course.title}</h2>
         <Badge className="text-xs bg-gray-100 text-gray-600 border border-gray-200 capitalize">{course.type}</Badge>
         <Badge className={`text-xs ${STATUS_COLORS[course.status]}`}>{course.status}</Badge>
-        <Link href={`/learn/${course.slug}`} target="_blank">
-          <Button size="sm" variant="outline" className="h-8 text-xs text-teal-600 border-teal-300">
-            <LinkIcon className="w-3 h-3 mr-1" /> Preview
+        <Button
+          size="sm" variant="outline"
+          className="h-8 text-xs text-teal-600 border-teal-300"
+          onClick={() => navigate(`/course/${course.slug}/player`)}
+        >
+          <Eye className="w-3 h-3 mr-1" /> Preview Course
+        </Button>
+        <Button
+          size="sm" variant="ghost"
+          className="h-8 text-xs text-gray-500 hover:text-teal-600"
+          onClick={() => navigate(`/admin/lms/${courseId}/landing-builder`)}
+        >
+          <LinkIcon className="w-3 h-3 mr-1" /> Edit Landing Page
+        </Button>
+        <a href={`/learn/${course.slug}`} target="_blank" rel="noopener noreferrer">
+          <Button size="sm" variant="ghost" className="h-8 text-xs text-gray-400 hover:text-gray-600">
+            <Eye className="w-3 h-3 mr-1" /> View Landing Page
           </Button>
-        </Link>
+        </a>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -718,24 +733,26 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
 // ─── Course Settings Form ─────────────────────────────────────────────────────
 
 function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (data: any) => void; saving: boolean }) {
-  const [uploadingCover, setUploadingCover] = useState(false);
-  const uploadCoverImage = trpc.lmsAdmin.uploadCourseCoverImage.useMutation({
-    onSuccess: (data) => { setCoverImageUrl(data.url); toast.success("Cover image uploaded"); },
-    onError: e => toast.error(`Upload failed: ${e.message}`),
-    onSettled: () => setUploadingCover(false),
-  });
-
-  const handleCoverFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+   const [uploadingCover, setUploadingCover] = useState(false);
+  const handleCoverFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 8_000_000) { toast.error("Image must be under 8 MB"); return; }
-    setUploadingCover(true);
-    const reader = new FileReader();
-    reader.onload = () => {
-      uploadCoverImage.mutate({ courseId: course.id, dataUri: reader.result as string, mimeType: file.type as any });
-    };
-    reader.readAsDataURL(file);
+    if (file.size > 10_000_000) { toast.error("Image must be under 10 MB"); return; }
     e.target.value = "";
+    setUploadingCover(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload-course-image", { method: "POST", credentials: "include", body: fd });
+      if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error ?? "Upload failed"); }
+      const { url } = await res.json();
+      setCoverImageUrl(url);
+      toast.success("Cover image uploaded");
+    } catch (err: any) {
+      toast.error(`Upload failed: ${err.message}`);
+    } finally {
+      setUploadingCover(false);
+    }
   };
 
   const [title, setTitle] = useState(course.title);
@@ -743,9 +760,11 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
   const [description, setDescription] = useState(course.description ?? "");
   const [status, setStatus] = useState(course.status);
   const [brand, setBrand] = useState(course.brand);
-  const [pricingType, setPricingType] = useState<"free"|"one_time"|"subscription"|"payment_plan">(course.pricingType ?? (course.isFree ? "free" : "one_time"));
+  const [pricingType, setPricingType] = useState<"free"|"one_time"|"subscription"|"payment_plan"|"trial_then_subscription">(course.pricingType ?? (course.isFree ? "free" : "one_time"));
   const [price, setPrice] = useState(String((course.price / 100).toFixed(2)));
   const [subscriptionInterval, setSubscriptionInterval] = useState<"monthly"|"quarterly"|"annual">(course.subscriptionInterval ?? "monthly");
+  const [trialDays, setTrialDays] = useState(String(course.trialDays ?? ""));
+  const [accessDurationDays, setAccessDurationDays] = useState(String(course.accessDurationDays ?? ""));
   const [downPayment, setDownPayment] = useState(String(((course.downPayment ?? 0) / 100).toFixed(2)));
   const [installmentCount, setInstallmentCount] = useState(String(course.installmentCount ?? ""));
   const [installmentAmount, setInstallmentAmount] = useState(String(((course.installmentAmount ?? 0) / 100).toFixed(2)));
@@ -823,17 +842,47 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
       {/* Pricing */}
       <div className="border border-gray-200 rounded-lg p-4 space-y-4">
         <h3 className="text-sm font-semibold text-gray-700">Pricing</h3>
-        <div>
-          <Label className="text-sm">Pricing Type</Label>
-          <Select value={pricingType} onValueChange={v => setPricingType(v as any)}>
-            <SelectTrigger className="mt-1 w-56"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="free">Free</SelectItem>
-              <SelectItem value="one_time">One-Time Purchase</SelectItem>
-              <SelectItem value="subscription">Subscription</SelectItem>
-              <SelectItem value="payment_plan">Payment Plan</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label className="text-sm">Pricing Type</Label>
+            <Select value={pricingType} onValueChange={v => setPricingType(v as any)}>
+              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="free">Free</SelectItem>
+                <SelectItem value="one_time">One-Time Purchase</SelectItem>
+                <SelectItem value="subscription">Subscription</SelectItem>
+                <SelectItem value="trial_then_subscription">Free Trial → Subscription</SelectItem>
+                <SelectItem value="payment_plan">Payment Plan</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-sm">Content Access Duration</Label>
+            <Select
+              value={accessDurationDays === "" ? "lifetime" : accessDurationDays}
+              onValueChange={v => setAccessDurationDays(v === "lifetime" ? "" : v)}
+            >
+              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="lifetime">Full Lifetime Access</SelectItem>
+                <SelectItem value="30">30 Days</SelectItem>
+                <SelectItem value="60">60 Days</SelectItem>
+                <SelectItem value="90">90 Days</SelectItem>
+                <SelectItem value="180">180 Days (6 months)</SelectItem>
+                <SelectItem value="365">365 Days (1 year)</SelectItem>
+                <SelectItem value="custom">Custom…</SelectItem>
+              </SelectContent>
+            </Select>
+            {accessDurationDays !== "" && !(["30","60","90","180","365"].includes(accessDurationDays)) && (
+              <Input
+                value={accessDurationDays}
+                onChange={e => setAccessDurationDays(e.target.value)}
+                placeholder="Days (e.g. 120)"
+                className="mt-1 h-8 text-sm"
+                type="number" min="1"
+              />
+            )}
+          </div>
         </div>
         {pricingType === "one_time" && (
           <div className="w-40">
@@ -863,6 +912,33 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
                   <SelectItem value="annual">Annual</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+        )}
+        {pricingType === "trial_then_subscription" && (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="text-sm">Price After Trial (USD / period)</Label>
+              <div className="relative mt-1">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
+                <Input value={price} onChange={e => setPrice(e.target.value)} className="pl-7" type="number" min="0" step="0.01" />
+              </div>
+            </div>
+            <div>
+              <Label className="text-sm">Billing Interval</Label>
+              <Select value={subscriptionInterval} onValueChange={v => setSubscriptionInterval(v as any)}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                  <SelectItem value="quarterly">Quarterly</SelectItem>
+                  <SelectItem value="annual">Annual</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-sm">Free Trial Length (days)</Label>
+              <Input value={trialDays} onChange={e => setTrialDays(e.target.value)} placeholder="e.g. 7" className="mt-1" type="number" min="1" />
+              <p className="text-xs text-gray-400 mt-1">Student gets free access for this many days, then is charged.</p>
             </div>
           </div>
         )}
@@ -932,6 +1008,8 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
           installmentCount: pricingType === "payment_plan" ? parseInt(installmentCount || "0") : null,
           installmentAmount: pricingType === "payment_plan" ? Math.round(parseFloat(installmentAmount || "0") * 100) : null,
           installmentIntervalDays: pricingType === "payment_plan" ? parseInt(installmentIntervalDays || "30") : null,
+          trialDays: pricingType === "trial_then_subscription" ? (trialDays ? parseInt(trialDays) : null) : null,
+          accessDurationDays: accessDurationDays ? parseInt(accessDurationDays) : null,
           coverImageUrl: coverImageUrl.trim() || undefined,
         })}
       >
@@ -951,25 +1029,26 @@ function LandingPageEditor({ courseId, landingPage, courseType, onSave, saving }
   const [whatYouLearn, setWhatYouLearn] = useState(landingPage?.whatYouLearn ?? "");
   const [requirements, setRequirements] = useState(landingPage?.requirements ?? "");
   const [bodyContent, setBodyContent] = useState(landingPage?.bodyContent ?? "");
-  const [uploadingHero, setUploadingHero] = useState(false);
-
-  const uploadHeroImage = trpc.lmsAdmin.uploadLandingPageHeroImage.useMutation({
-    onSuccess: (data) => { setHeroImageUrl(data.url); toast.success("Hero image uploaded and saved to Media Library"); },
-    onError: e => toast.error(`Upload failed: ${e.message}`),
-    onSettled: () => setUploadingHero(false),
-  });
-
-  const handleHeroFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+   const [uploadingHero, setUploadingHero] = useState(false);
+  const handleHeroFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 8_000_000) { toast.error("Image must be under 8 MB"); return; }
-    setUploadingHero(true);
-    const reader = new FileReader();
-    reader.onload = () => {
-      uploadHeroImage.mutate({ courseId, dataUri: reader.result as string, mimeType: file.type as any });
-    };
-    reader.readAsDataURL(file);
+    if (file.size > 10_000_000) { toast.error("Image must be under 10 MB"); return; }
     e.target.value = "";
+    setUploadingHero(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload-course-image", { method: "POST", credentials: "include", body: fd });
+      if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error ?? "Upload failed"); }
+      const { url } = await res.json();
+      setHeroImageUrl(url);
+      toast.success("Hero image uploaded");
+    } catch (err: any) {
+      toast.error(`Upload failed: ${err.message}`);
+    } finally {
+      setUploadingHero(false);
+    }
   };
 
   return (

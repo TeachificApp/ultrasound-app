@@ -33,6 +33,7 @@ import EducationLibrary from "./pages/EducationLibrary";
 import CourseLanding from "./pages/CourseLanding";
 import CoursePlayer from "./pages/CoursePlayer";
 import LMSAdmin from "./pages/admin/LMSAdmin";
+import LandingPageBuilder from "./pages/admin/LandingPageBuilder";
 
 // ── UltrasoundAssist™ Hub ────────────────────────────────────────────────────
 import UltrasoundAssistHub from "./pages/UltrasoundAssistHub";
@@ -294,6 +295,7 @@ function Router() {
         <Route path="/learn/:slug/player" component={CoursePlayer} />
         <Route path="/learn/:slug" component={CourseLanding} />
         <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/lms/:courseId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LandingPageBuilder /></RoleGuard>}</Route>
 
         {/* ── Admin ───────────────────────────────────────────────────────────── */}
         <Route path="/admin/cases">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminCaseManagement /></RoleGuard>}</Route>

@@ -2681,8 +2681,12 @@ export const lmsCourses = mysqlTable("lms_courses", {
   isFree: boolean("is_free").default(false).notNull(),
   currency: varchar("currency", { length: 8 }).default("usd").notNull(),
   // Extended pricing model
-  pricingType: mysqlEnum("pricing_type", ["free", "one_time", "subscription", "payment_plan"]).default("one_time").notNull(),
+  pricingType: mysqlEnum("pricing_type", ["free", "one_time", "subscription", "payment_plan", "trial_then_subscription"]).default("one_time").notNull(),
   subscriptionInterval: mysqlEnum("subscription_interval", ["monthly", "quarterly", "annual"]),
+  // Free trial before subscription
+  trialDays: int("trialDays"), // NULL = no trial
+  // Access duration after enrollment (NULL = lifetime)
+  accessDurationDays: int("accessDurationDays"), // e.g. 30, 90, 365
   // Payment plan: down payment (cents) + N installments of installmentAmount (cents)
   downPayment: int("down_payment").default(0), // cents
   installmentCount: int("installment_count").default(0),
@@ -2866,6 +2870,7 @@ export const lmsLandingPages = mysqlTable("lms_landing_pages", {
   whatYouLearn: longtext("what_you_learn"), // rich text
   requirements: longtext("requirements"), // rich text
   isCustom: boolean("is_custom").default(false).notNull(),
+  blocks: longtext("blocks"), // JSON array of page builder blocks
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
 export type LmsLandingPage = typeof lmsLandingPages.$inferSelect;
@@ -2886,3 +2891,20 @@ export const lmsOrders = mysqlTable("lms_orders", {
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
 export type LmsOrder = typeof lmsOrders.$inferSelect;
+
+// ─── LMS Page Templates ───────────────────────────────────────────────────────
+
+export const lmsPageTemplates = mysqlTable("lms_page_templates", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  templateType: mysqlEnum("template_type", ["page", "block"]).notNull().default("page"),
+  blockType: varchar("block_type", { length: 64 }),
+  blocks: longtext("blocks").notNull(), // JSON array of Block objects
+  thumbnailUrl: text("thumbnail_url"),
+  createdBy: int("created_by"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
+});
+export type LmsPageTemplate = typeof lmsPageTemplates.$inferSelect;
+export type NewLmsPageTemplate = typeof lmsPageTemplates.$inferInsert;

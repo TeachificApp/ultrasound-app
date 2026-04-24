@@ -1212,3 +1212,30 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] CoursePlayer: render embed (iframe), video_text (video + text), top-level lessons in sidebar
 - [x] CoursePlayer: video completion gating (requireVideoCompletion), manual complete toggle
 - [x] 817 tests passing, 0 TypeScript errors
+
+## Landing Page Builder (Apr 24 2026)
+- [x] Add `blocks` JSON column to lms_landing_pages table
+- [x] Add saveLandingPageBlocks / getLandingPageBlocks tRPC procedures
+- [x] Build LandingPageBuilder drag-and-drop WYSIWYG editor component (25+ block types including FAQ, Gallery, Icon Grid, Countdown, Instructor, Logos, Reviews, Embed, CTA, Lead Capture, Numbered List, Alert, Flip Cards, Curriculum auto, Pricing auto)
+- [x] Integrate builder into LMSAdmin Landing Page tab
+- [x] Fix admin Preview button → course player (enrolled student view)
+- [x] Add separate Landing Page preview link in admin
+- [x] Fix banner default color to #179ca3
+- [x] Update CourseLanding.tsx to render blocks-based layout
+- [x] Fix upload timeout (multipart /api/upload-course-image endpoint already added)
+
+## Course Pricing Enhancements (Apr 24 2026)
+- [x] DB: add accessDurationDays (NULL=lifetime), trialDays, pricingType (free/one_time/subscription/payment_plan/trial_then_subscription) to lms_courses
+- [x] Server: update createCourse/updateCourse to accept new pricing fields
+- [x] Admin UI: pricing section — access duration selector (lifetime/30/60/90/180/365 days/custom), trial days field, pricing type selector
+- [x] CourseLanding: show correct access duration badge (e.g. "30-day access" vs "Full lifetime access") and trial info ("7-day free trial, then $X/mo")
+
+## Hero Block Enhancements (Apr 24, 2026)
+- [x] Hero block: background type selector (color, gradient, image, video)
+- [x] Hero block: gradient color picker (from/to colors)
+- [x] Hero block: background image upload
+- [x] Hero block: background video (embed URL or direct video URL)
+- [x] Hero block: editable CTA buttons (add/remove/edit text, color, link, style)
+- [x] CourseLanding.tsx: render blocks-based layout with #179ca3 default
+- [x] CourseLanding.tsx: access duration label (e.g. "30-day access")
+- [x] CourseLanding.tsx: trial pricing label (e.g. "7 days free, then $X/mo")

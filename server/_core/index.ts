@@ -16,6 +16,7 @@ import { registerUnsubscribeRoute } from "../routes/unsubscribe";
 import { registerAuthLoginRoute } from "../routes/authLogin";
 import { registerMediaServeRoutes } from "../routes/mediaServe";
 import { registerUploadMediaRepoRoute } from "../routes/uploadMediaRepo";
+import { registerUploadCourseImageRoute } from "../routes/uploadCourseImage";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -79,6 +80,8 @@ async function startServer() {
   registerMediaServeRoutes(app);
   // Media repository multipart upload endpoint (admin only)
   registerUploadMediaRepoRoute(app);
+  // Course/landing-page image upload (multipart, bypasses JSON body limit)
+  registerUploadCourseImageRoute(app);
   // tRPC API
   app.use(
     "/api/trpc",
