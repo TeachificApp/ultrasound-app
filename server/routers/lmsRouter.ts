@@ -229,6 +229,10 @@ export const lmsLearnerRouter = router({
         const lessons = await db.select().from(lmsLessons).where(eq(lmsLessons.sectionId, s.id)).orderBy(asc(lmsLessons.position));
         return { ...s, lessons };
       }));
+      // Top-level lessons (no section)
+      const topLevelLessons = await db.select().from(lmsLessons)
+        .where(and(eq(lmsLessons.courseId, course.id), isNull(lmsLessons.sectionId)))
+        .orderBy(asc(lmsLessons.position));
 
       // Progress
       let progress: typeof lmsLessonProgress.$inferSelect[] = [];
@@ -236,7 +240,7 @@ export const lmsLearnerRouter = router({
         progress = await db.select().from(lmsLessonProgress).where(eq(lmsLessonProgress.enrollmentId, enrollment.id));
       }
 
-      return { course, enrollment: enrollment ?? null, sections: sectionsWithLessons, progress };
+      return { course, enrollment: enrollment ?? null, sections: sectionsWithLessons, topLevelLessons, progress };
     }),
 
   /** Get a single lesson (must be enrolled or lesson is preview) */
@@ -248,13 +252,17 @@ export const lmsLearnerRouter = router({
       const [lesson] = await db.select().from(lmsLessons).where(eq(lmsLessons.id, input.lessonId)).limit(1);
       if (!lesson) throw new TRPCError({ code: "NOT_FOUND" });
 
-      // Get course via section
-      const [section] = await db.select().from(lmsSections).where(eq(lmsSections.id, lesson.sectionId)).limit(1);
-      if (!section) throw new TRPCError({ code: "NOT_FOUND" });
+      // Resolve courseId: from lesson directly, or via section
+      let resolvedCourseId: number | null = lesson.courseId ?? null;
+      if (!resolvedCourseId && lesson.sectionId) {
+        const [section] = await db.select().from(lmsSections).where(eq(lmsSections.id, lesson.sectionId)).limit(1);
+        if (section) resolvedCourseId = section.courseId;
+      }
+      if (!resolvedCourseId) throw new TRPCError({ code: "NOT_FOUND" });
 
       if (!lesson.isPreview) {
         const [enrollment] = await db.select().from(lmsEnrollments)
-          .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, section.courseId))).limit(1);
+          .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, resolvedCourseId))).limit(1);
         if (!enrollment) throw new TRPCError({ code: "FORBIDDEN", message: "Enrollment required" });
       }
 
@@ -797,9 +805,13 @@ export const lmsAdminRouter = router({
         const lessons = await db.select().from(lmsLessons).where(eq(lmsLessons.sectionId, s.id)).orderBy(asc(lmsLessons.position));
         return { ...s, lessons };
       }));
+      // Top-level lessons (not inside any section)
+      const topLevelLessons = await db.select().from(lmsLessons)
+        .where(and(eq(lmsLessons.courseId, course.id), isNull(lmsLessons.sectionId)))
+        .orderBy(asc(lmsLessons.position));
       const [landingPage] = await db.select().from(lmsLandingPages).where(eq(lmsLandingPages.courseId, course.id)).limit(1);
       const cis = await db.select().from(lmsCourseInstructors).where(eq(lmsCourseInstructors.courseId, course.id));
-      return { ...course, sections: sectionsWithLessons, landingPage: landingPage ?? null, courseInstructors: cis };
+      return { ...course, sections: sectionsWithLessons, topLevelLessons, landingPage: landingPage ?? null, courseInstructors: cis };
     }),
 
   // ── Sections ──
@@ -848,22 +860,40 @@ export const lmsAdminRouter = router({
   // ── Lessons ──
   createLesson: protectedProcedure
     .input(z.object({
-      sectionId: z.number(), title: z.string().min(1),
-      type: z.enum(["video", "text", "quiz", "download"]).default("text"),
+      courseId: z.number(),
+      sectionId: z.number().optional(), // optional — top-level lessons have no section
+      title: z.string().min(1),
+      type: z.enum(["video", "text", "quiz", "download", "embed", "video_text"]).default("text"),
       position: z.number().int().default(0),
       content: z.string().optional(),
+      videoContent: z.string().optional(),
+      embedUrl: z.string().max(500).optional(),
       mediaAssetId: z.number().optional(),
       isPreview: z.boolean().default(false),
       dripDays: z.number().int().default(0),
       durationMinutes: z.number().int().optional(),
+      requireVideoCompletion: z.boolean().default(false),
+      requireManualComplete: z.boolean().default(false),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [result] = await db.insert(lmsLessons).values({
-        ...input, content: input.content ?? null, mediaAssetId: input.mediaAssetId ?? null,
+        courseId: input.courseId,
+        sectionId: input.sectionId ?? null,
+        title: input.title,
+        type: input.type,
+        position: input.position,
+        content: input.content ?? null,
+        videoContent: input.videoContent ?? null,
+        embedUrl: input.embedUrl ?? null,
+        mediaAssetId: input.mediaAssetId ?? null,
+        isPreview: input.isPreview,
+        dripDays: input.dripDays,
         durationMinutes: input.durationMinutes ?? null,
+        requireVideoCompletion: input.requireVideoCompletion ? 1 : 0,
+        requireManualComplete: input.requireManualComplete ? 1 : 0,
       }).$returningId();
       // Auto-create quiz if type is quiz
       if (input.type === "quiz") {
@@ -874,19 +904,31 @@ export const lmsAdminRouter = router({
 
   updateLesson: protectedProcedure
     .input(z.object({
-      id: z.number(), title: z.string().min(1).optional(),
-      type: z.enum(["video", "text", "quiz", "download"]).optional(),
-      content: z.string().optional(), mediaAssetId: z.number().nullable().optional(),
-      position: z.number().int().optional(), isPreview: z.boolean().optional(),
-      dripDays: z.number().int().optional(), durationMinutes: z.number().int().nullable().optional(),
+      id: z.number(),
+      title: z.string().min(1).optional(),
+      type: z.enum(["video", "text", "quiz", "download", "embed", "video_text"]).optional(),
+      content: z.string().nullable().optional(),
+      videoContent: z.string().nullable().optional(),
+      embedUrl: z.string().max(500).nullable().optional(),
+      mediaAssetId: z.number().nullable().optional(),
+      position: z.number().int().optional(),
+      isPreview: z.boolean().optional(),
+      dripDays: z.number().int().optional(),
+      durationMinutes: z.number().int().nullable().optional(),
+      requireVideoCompletion: z.boolean().optional(),
+      requireManualComplete: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const { id, ...updates } = input;
-      const filtered = Object.fromEntries(Object.entries(updates).filter(([, v]) => v !== undefined));
-      if (Object.keys(filtered).length > 0) await db.update(lmsLessons).set(filtered).where(eq(lmsLessons.id, id));
+      const { id, requireVideoCompletion, requireManualComplete, ...rest } = input;
+      const updates: Record<string, unknown> = Object.fromEntries(
+        Object.entries(rest).filter(([, v]) => v !== undefined)
+      );
+      if (requireVideoCompletion !== undefined) updates.requireVideoCompletion = requireVideoCompletion ? 1 : 0;
+      if (requireManualComplete !== undefined) updates.requireManualComplete = requireManualComplete ? 1 : 0;
+      if (Object.keys(updates).length > 0) await db.update(lmsLessons).set(updates).where(eq(lmsLessons.id, id));
       return { success: true };
     }),
 
@@ -1390,9 +1432,10 @@ Generate 3-6 sections with 2-5 lessons each. Lesson types can be: text, video (f
               const les = sec.lessons[li];
               const lesType = ["video", "text", "quiz", "download"].includes(les.type) ? les.type : "text";
               const [lesResult] = await db.insert(lmsLessons).values({
+                courseId,
                 sectionId,
                 title: les.title,
-                type: lesType,
+                type: lesType as "video" | "text" | "quiz" | "download" | "embed" | "video_text",
                 position: li,
                 content: les.content ?? null,
                 durationMinutes: les.durationMinutes ?? null,
@@ -1408,7 +1451,9 @@ Generate 3-6 sections with 2-5 lessons each. Lesson types can be: text, video (f
         // For standalone quiz: create a single section + quiz lesson + questions
         const [secResult] = await db.insert(lmsSections).values({ courseId, title: "Quiz Questions", position: 0 }).$returningId();
         const [lesResult] = await db.insert(lmsLessons).values({
-          sectionId: secResult.id, title: generated.title ?? "Quiz",
+          courseId,
+          sectionId: secResult.id,
+          title: generated.title ?? "Quiz",
           type: "quiz", position: 0, content: null, mediaAssetId: null,
         }).$returningId();
         const [quizResult] = await db.insert(lmsQuizzes).values({ lessonId: lesResult.id, title: generated.title ?? "Quiz" }).$returningId();
@@ -1433,7 +1478,7 @@ Generate 3-6 sections with 2-5 lessons each. Lesson types can be: text, video (f
   importMediaAssetAsLesson: protectedProcedure
     .input(z.object({
       courseId: z.number(),
-      sectionId: z.number(),
+      sectionId: z.number().optional(), // optional — top-level lesson if omitted
       mediaAssetId: z.number(),
       title: z.string().min(1).max(255),
       position: z.number().int().default(0),
@@ -1449,13 +1494,14 @@ Generate 3-6 sections with 2-5 lessons each. Lesson types can be: text, video (f
       if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Media asset not found" });
 
       // Map media type to lesson type
-      let lessonType: "video" | "text" | "quiz" | "download" = "text";
+      let lessonType: "video" | "text" | "quiz" | "download" | "embed" | "video_text" = "text";
       if (asset.mediaType === "video") lessonType = "video";
       else if (["document", "zip", "scorm", "html"].includes(asset.mediaType ?? "")) lessonType = "download";
       else if (asset.mediaType === "audio") lessonType = "video"; // treat audio as video player
 
       const [result] = await db.insert(lmsLessons).values({
-        sectionId: input.sectionId,
+        courseId: input.courseId,
+        sectionId: input.sectionId ?? null,
         title: input.title,
         type: lessonType,
         position: input.position,

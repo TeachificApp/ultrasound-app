@@ -3,7 +3,7 @@
  * Enrolled learner's course player — lesson viewer, quiz runner, progress tracking.
  * Route: /learn/:slug/player
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -12,8 +12,13 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { BookOpen, CheckCircle, ChevronLeft, ChevronRight, Download, HelpCircle, Lock, Menu, PlayCircle, X } from "lucide-react";
+import {
+  BookOpen, CheckCircle, ChevronLeft, ChevronRight, Download, HelpCircle,
+  Lock, Menu, PlayCircle, X, Monitor, FileText,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
+
+// ─── Quiz Runner ──────────────────────────────────────────────────────────────
 
 function QuizRunner({ lesson, courseSlug, onComplete }: { lesson: any; courseSlug: string; onComplete: () => void }) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -118,12 +123,27 @@ function QuizRunner({ lesson, courseSlug, onComplete }: { lesson: any; courseSlu
   );
 }
 
+// ─── Lesson icon helper ───────────────────────────────────────────────────────
+
+function LessonIcon({ type, done }: { type: string; done: boolean }) {
+  if (done) return <CheckCircle className="w-4 h-4 text-teal-500" />;
+  if (type === "quiz") return <HelpCircle className="w-4 h-4 text-gray-400" />;
+  if (type === "download") return <Download className="w-4 h-4 text-gray-400" />;
+  if (type === "embed") return <Monitor className="w-4 h-4 text-gray-400" />;
+  if (type === "text") return <FileText className="w-4 h-4 text-gray-400" />;
+  return <PlayCircle className="w-4 h-4 text-gray-400" />;
+}
+
+// ─── Main CoursePlayer ────────────────────────────────────────────────────────
+
 export default function CoursePlayer() {
   const { slug } = useParams<{ slug: string }>();
   const [, navigate] = useLocation();
   const { user } = useAuth();
   const [selectedLessonId, setSelectedLessonId] = useState<number | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [videoWatched, setVideoWatched] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const utils = trpc.useUtils();
 
   const { data, isLoading } = trpc.lmsLearner.getCoursePlayer.useQuery({ slug: slug! }, { enabled: !!slug && !!user });
@@ -138,6 +158,11 @@ export default function CoursePlayer() {
     },
   });
 
+  // Reset videoWatched when lesson changes
+  useEffect(() => {
+    setVideoWatched(false);
+  }, [selectedLessonId]);
+
   const handleMarkComplete = async () => {
     if (!selectedLessonId) return;
     await markComplete.mutateAsync({ lessonId: selectedLessonId, courseSlug: slug! });
@@ -145,11 +170,14 @@ export default function CoursePlayer() {
     if (nextLesson) setSelectedLessonId(nextLesson.id);
   };
 
-  // Auto-select first lesson
+  // Auto-select first lesson (top-level first, then first section lesson)
   useEffect(() => {
     if (data && !selectedLessonId) {
-      const firstLesson = data.sections[0]?.lessons[0];
-      if (firstLesson) setSelectedLessonId(firstLesson.id);
+      const topLevel = (data as any).topLevelLessons ?? [];
+      const firstTopLevel = topLevel[0];
+      const firstSectionLesson = data.sections[0]?.lessons[0];
+      const first = firstTopLevel ?? firstSectionLesson;
+      if (first) setSelectedLessonId(first.id);
     }
   }, [data]);
 
@@ -183,18 +211,23 @@ export default function CoursePlayer() {
   }
 
   const { course, sections, progress } = data;
+  const topLevelLessons: any[] = (data as any).topLevelLessons ?? [];
   const completedIds = new Set(progress.filter((p: any) => p.completedAt).map((p: any) => p.lessonId));
 
-  // Flat lesson list for prev/next navigation
-  const allLessons = sections.flatMap((s: any) => s.lessons);
+  // Flat lesson list for prev/next navigation (top-level first, then by section)
+  const allLessons = [
+    ...topLevelLessons,
+    ...sections.flatMap((s: any) => s.lessons),
+  ];
   const currentIdx = allLessons.findIndex((l: any) => l.id === selectedLessonId);
   const prevLesson = currentIdx > 0 ? allLessons[currentIdx - 1] : null;
   const nextLesson = currentIdx < allLessons.length - 1 ? allLessons[currentIdx + 1] : null;
 
-  if (!user) {
-    navigate("/login");
-    return null;
-  }
+  // Completion gating
+  const isCompleted = selectedLessonId ? completedIds.has(selectedLessonId) : false;
+  const requireVideoCompletion = lessonData?.requireVideoCompletion === 1;
+  const requireManualComplete = lessonData?.requireManualComplete === 1;
+  const canMarkComplete = !requireVideoCompletion || videoWatched;
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
@@ -211,6 +244,31 @@ export default function CoursePlayer() {
             <p className="text-xs text-gray-500 mt-1">{data.enrollment.progressPct}% complete</p>
           </div>
         </div>
+
+        {/* Top-level lessons */}
+        {topLevelLessons.length > 0 && (
+          <div>
+            <div className="px-4 py-2 text-xs font-semibold text-teal-600 uppercase tracking-wide">Course Lessons</div>
+            {topLevelLessons.map((lesson: any) => {
+              const done = completedIds.has(lesson.id);
+              const active = lesson.id === selectedLessonId;
+              return (
+                <button
+                  key={lesson.id}
+                  onClick={() => setSelectedLessonId(lesson.id)}
+                  className={cn(
+                    "w-full text-left px-4 py-2.5 flex items-start gap-3 text-sm transition-colors",
+                    active ? "bg-teal-50 text-teal-800 border-r-2 border-teal-500" : "text-gray-700 hover:bg-gray-50",
+                  )}
+                >
+                  <span className="mt-0.5 flex-shrink-0"><LessonIcon type={lesson.type} done={done} /></span>
+                  <span className="leading-snug">{lesson.title}</span>
+                  {lesson.durationMinutes && <span className="text-xs text-gray-400 ml-auto flex-shrink-0">{lesson.durationMinutes}m</span>}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Sections */}
         <div className="flex-1 overflow-y-auto py-2">
@@ -229,12 +287,7 @@ export default function CoursePlayer() {
                       active ? "bg-teal-50 text-teal-800 border-r-2 border-teal-500" : "text-gray-700 hover:bg-gray-50",
                     )}
                   >
-                    <span className="mt-0.5 flex-shrink-0">
-                      {done ? <CheckCircle className="w-4 h-4 text-teal-500" /> :
-                        lesson.type === "quiz" ? <HelpCircle className="w-4 h-4 text-gray-400" /> :
-                        lesson.type === "download" ? <Download className="w-4 h-4 text-gray-400" /> :
-                        <PlayCircle className="w-4 h-4 text-gray-400" />}
-                    </span>
+                    <span className="mt-0.5 flex-shrink-0"><LessonIcon type={lesson.type} done={done} /></span>
                     <span className="leading-snug">{lesson.title}</span>
                     {lesson.durationMinutes && <span className="text-xs text-gray-400 ml-auto flex-shrink-0">{lesson.durationMinutes}m</span>}
                   </button>
@@ -278,23 +331,73 @@ export default function CoursePlayer() {
             </div>
           ) : lessonData ? (
             <div className="max-w-3xl mx-auto">
-              {/* Video lesson */}
+
+              {/* ── Video lesson ── */}
               {lessonData.type === "video" && lessonData.content && (
                 <div className="mb-6">
                   <div className="aspect-video bg-black rounded-xl overflow-hidden">
-                    <video src={lessonData.content} controls className="w-full h-full" />
+                    <video
+                      ref={videoRef}
+                      src={lessonData.content}
+                      controls
+                      className="w-full h-full"
+                      onEnded={() => setVideoWatched(true)}
+                    />
                   </div>
+                  {requireVideoCompletion && !videoWatched && (
+                    <p className="text-xs text-amber-600 mt-2">Watch the full video to mark this lesson complete.</p>
+                  )}
                 </div>
               )}
 
-              {/* Text lesson */}
+              {/* ── Video + Text lesson ── */}
+              {lessonData.type === "video_text" && (
+                <div className="mb-6 space-y-4">
+                  {lessonData.content && (
+                    <div className="aspect-video bg-black rounded-xl overflow-hidden">
+                      <video
+                        ref={videoRef}
+                        src={lessonData.content}
+                        controls
+                        className="w-full h-full"
+                        onEnded={() => setVideoWatched(true)}
+                      />
+                    </div>
+                  )}
+                  {requireVideoCompletion && !videoWatched && (
+                    <p className="text-xs text-amber-600">Watch the full video to mark this lesson complete.</p>
+                  )}
+                  {lessonData.videoContent && (
+                    <div className="bg-white rounded-xl border border-gray-200 p-6">
+                      <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: lessonData.videoContent }} />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Text lesson ── */}
               {lessonData.type === "text" && lessonData.content && (
                 <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
                   <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: lessonData.content }} />
                 </div>
               )}
 
-              {/* Download lesson */}
+              {/* ── Embed lesson ── */}
+              {lessonData.type === "embed" && lessonData.embedUrl && (
+                <div className="mb-6">
+                  <div className="aspect-video bg-gray-100 rounded-xl overflow-hidden border border-gray-200">
+                    <iframe
+                      src={lessonData.embedUrl}
+                      className="w-full h-full"
+                      allowFullScreen
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      title={lessonData.title}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* ── Download lesson ── */}
               {lessonData.type === "download" && lessonData.content && (
                 <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 flex items-center gap-4">
                   <Download className="w-8 h-8 text-teal-500" />
@@ -305,7 +408,7 @@ export default function CoursePlayer() {
                 </div>
               )}
 
-              {/* Quiz lesson */}
+              {/* ── Quiz lesson ── */}
               {lessonData.type === "quiz" && (
                 <QuizRunner
                   lesson={lessonData}
@@ -314,23 +417,24 @@ export default function CoursePlayer() {
                 />
               )}
 
-              {/* Mark complete button (non-quiz) */}
+              {/* ── Mark complete / navigation ── */}
               {lessonData.type !== "quiz" && (
-                <div className="mt-6 flex items-center gap-3">
-                  {completedIds.has(lessonData.id) ? (
+                <div className="mt-6 flex items-center gap-3 flex-wrap">
+                  {isCompleted ? (
                     <div className="flex items-center gap-2 text-teal-600 text-sm font-medium">
                       <CheckCircle className="w-5 h-5" /> Completed
                     </div>
-                  ) : (
+                  ) : requireManualComplete || lessonData.type === "text" || lessonData.type === "video" || lessonData.type === "video_text" || lessonData.type === "embed" || lessonData.type === "download" ? (
                     <Button
                       className="bg-teal-600 hover:bg-teal-700 text-white"
                       onClick={handleMarkComplete}
-                      disabled={markComplete.isPending}
+                      disabled={markComplete.isPending || !canMarkComplete}
+                      title={!canMarkComplete ? "Watch the full video first" : undefined}
                     >
                       {markComplete.isPending ? "Saving..." : "Mark as Complete"}
                       <CheckCircle className="w-4 h-4 ml-2" />
                     </Button>
-                  )}
+                  ) : null}
                   {nextLesson && (
                     <Button variant="outline" onClick={() => setSelectedLessonId(nextLesson.id)}>
                       Next Lesson <ChevronRight className="w-4 h-4 ml-1" />

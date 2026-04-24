@@ -1198,3 +1198,17 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] AI Generate: streaming progress indicator while LLM generates content
 - [ ] AI Generate: editable preview of generated outline before committing to DB
 - [ ] AI Generate standalone quiz: topic input → LLM generates quiz questions + landing page, preview, commit
+
+## Lesson Type Upgrade (Apr 24, 2026)
+- [x] Allow lessons to be added without requiring sections (top-level / course-level lessons)
+- [x] New lesson types: embed (iframe), video_text (video + rich text below)
+- [x] New DB columns: courseId, videoContent, embedUrl, requireVideoCompletion, requireManualComplete
+- [x] DB migration applied (lms_lessons table updated, section_id nullable)
+- [x] Admin UI: LessonRow component with type badge, completion badges
+- [x] Admin UI: AddLessonDialog — all 6 lesson types, completion toggles, course-level option
+- [x] Admin UI: EditLessonDialog — all 6 lesson types, completion toggles
+- [x] Admin UI: "Add Lesson (No Section)" button in curriculum tab
+- [x] Admin UI: Course-Level Lessons panel in curriculum tab
+- [x] CoursePlayer: render embed (iframe), video_text (video + text), top-level lessons in sidebar
+- [x] CoursePlayer: video completion gating (requireVideoCompletion), manual complete toggle
+- [x] 817 tests passing, 0 TypeScript errors

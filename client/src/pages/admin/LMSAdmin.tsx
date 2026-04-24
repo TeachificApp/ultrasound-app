@@ -28,7 +28,7 @@ import {
   BookOpen, ChevronLeft, ChevronRight, Download, Edit2, HelpCircle, Plus, Trash2,
   Users, DollarSign, BarChart2, GripVertical, CheckCircle, AlertCircle,
   Link as LinkIcon, UserCheck, ArrowLeft, Upload, ImageIcon,
-  Sparkles, Loader2, Eye, FolderOpen,
+  Sparkles, Loader2, Eye, FolderOpen, Monitor, Video, FileText, CheckSquare,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -45,6 +45,19 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
   course: <BookOpen className="w-4 h-4" />,
   quiz: <HelpCircle className="w-4 h-4" />,
   download: <Download className="w-4 h-4" />,
+  video: <Video className="w-4 h-4" />,
+  text: <FileText className="w-4 h-4" />,
+  embed: <Monitor className="w-4 h-4" />,
+  video_text: <Video className="w-4 h-4" />,
+};
+
+const LESSON_TYPE_LABELS: Record<string, string> = {
+  text: "Rich Text",
+  video: "Video",
+  video_text: "Video + Text",
+  embed: "Multimedia Embed",
+  quiz: "Quiz",
+  download: "Download / File",
 };
 
 // ─── Course / Quiz / Download List Tab ──────────────────────────────────────
@@ -514,6 +527,38 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
   );
 }
 
+// ─── Lesson Row ──────────────────────────────────────────────────────────────
+
+function LessonRow({ lesson, onEdit, onQuiz, onDelete }: {
+  lesson: any;
+  onEdit: (lesson: any) => void;
+  onQuiz: (lesson: any) => void;
+  onDelete: (id: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50">
+      <GripVertical className="w-4 h-4 text-gray-300" />
+      <span className="text-gray-400">{TYPE_ICONS[lesson.type] ?? <FileText className="w-4 h-4" />}</span>
+      <span className="text-sm text-gray-700 flex-1">{lesson.title}</span>
+      <span className="text-xs text-gray-400">{LESSON_TYPE_LABELS[lesson.type] ?? lesson.type}</span>
+      {lesson.isPreview && <Badge variant="outline" className="text-xs text-teal-600 border-teal-300">Preview</Badge>}
+      {lesson.requireVideoCompletion === 1 && <Badge variant="outline" className="text-xs text-orange-600 border-orange-300">Video req.</Badge>}
+      {lesson.requireManualComplete === 1 && <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">Manual</Badge>}
+      {lesson.type === "quiz" && (
+        <Button size="sm" variant="ghost" className="h-7 text-xs text-purple-600 hover:bg-purple-50" onClick={() => onQuiz(lesson)}>
+          <HelpCircle className="w-3 h-3 mr-1" /> Quiz
+        </Button>
+      )}
+      <Button size="sm" variant="ghost" className="h-7 text-xs text-teal-600 hover:bg-teal-50" onClick={() => onEdit(lesson)}>
+        <Edit2 className="w-3 h-3" />
+      </Button>
+      <Button size="sm" variant="ghost" className="h-7 text-red-400 hover:bg-red-50" onClick={() => onDelete(lesson.id)}>
+        <Trash2 className="w-3 h-3" />
+      </Button>
+    </div>
+  );
+}
+
 // ─── Course Editor ────────────────────────────────────────────────────────────
 
 function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => void }) {
@@ -523,6 +568,7 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
   const [activeTab, setActiveTab] = useState("settings");
   const [addSectionOpen, setAddSectionOpen] = useState(false);
   const [addLessonSection, setAddLessonSection] = useState<number | null>(null);
+  const [addLessonAtCourseLevel, setAddLessonAtCourseLevel] = useState(false);
   const [editLesson, setEditLesson] = useState<any>(null);
   const [quizLesson, setQuizLesson] = useState<any>(null);
   const [importMediaSection, setImportMediaSection] = useState<number | null>(null);
@@ -584,6 +630,21 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
         {/* Curriculum Tab */}
         <TabsContent value="curriculum" className="mt-4">
           <div className="space-y-4">
+            {/* Top-level lessons (no section) */}
+            {(course.topLevelLessons ?? []).length > 0 && (
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="flex items-center gap-3 px-4 py-3 bg-teal-50 border-b border-teal-200">
+                  <span className="font-medium text-sm text-teal-800 flex-1">Course-Level Lessons</span>
+                  <span className="text-xs text-teal-600">Not inside any section</span>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {(course.topLevelLessons ?? []).map((lesson: any) => (
+                    <LessonRow key={lesson.id} lesson={lesson} onEdit={setEditLesson} onQuiz={setQuizLesson} onDelete={id => { if (confirm(`Delete lesson "${lesson.title}"?`)) deleteLesson.mutate({ id }); }} />
+                  ))}
+                </div>
+              </div>
+            )}
+
             {course.sections.map((section: any) => (
               <div key={section.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                 <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 border-b border-gray-200">
@@ -603,25 +664,7 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
                 </div>
                 <div className="divide-y divide-gray-100">
                   {section.lessons.map((lesson: any) => (
-                    <div key={lesson.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50">
-                      <GripVertical className="w-4 h-4 text-gray-300" />
-                      <span className="text-gray-400">{TYPE_ICONS[lesson.type]}</span>
-                      <span className="text-sm text-gray-700 flex-1">{lesson.title}</span>
-                      {lesson.isPreview && <Badge variant="outline" className="text-xs text-teal-600 border-teal-300">Preview</Badge>}
-                      {lesson.type === "quiz" && (
-                        <Button size="sm" variant="ghost" className="h-7 text-xs text-purple-600 hover:bg-purple-50" onClick={() => setQuizLesson(lesson)}>
-                          <HelpCircle className="w-3 h-3 mr-1" /> Quiz
-                        </Button>
-                      )}
-                      <Button size="sm" variant="ghost" className="h-7 text-xs text-teal-600 hover:bg-teal-50" onClick={() => setEditLesson(lesson)}>
-                        <Edit2 className="w-3 h-3" />
-                      </Button>
-                      <Button size="sm" variant="ghost" className="h-7 text-red-400 hover:bg-red-50" onClick={() => {
-                        if (confirm(`Delete lesson "${lesson.title}"?`)) deleteLesson.mutate({ id: lesson.id });
-                      }}>
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
+                    <LessonRow key={lesson.id} lesson={lesson} onEdit={setEditLesson} onQuiz={setQuizLesson} onDelete={id => { if (confirm(`Delete lesson "${lesson.title}"?`)) deleteLesson.mutate({ id }); }} />
                   ))}
                   {section.lessons.length === 0 && (
                     <div className="px-4 py-3 text-xs text-gray-400">No lessons yet. Add a lesson above.</div>
@@ -629,9 +672,14 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
                 </div>
               </div>
             ))}
-            <Button size="sm" variant="outline" className="border-dashed border-teal-300 text-teal-600 hover:bg-teal-50" onClick={() => setAddSectionOpen(true)}>
-              <Plus className="w-4 h-4 mr-1" /> Add Section
-            </Button>
+            <div className="flex gap-2 flex-wrap">
+              <Button size="sm" variant="outline" className="border-dashed border-teal-300 text-teal-600 hover:bg-teal-50" onClick={() => setAddLessonAtCourseLevel(true)}>
+                <Plus className="w-4 h-4 mr-1" /> Add Lesson (No Section)
+              </Button>
+              <Button size="sm" variant="outline" className="border-dashed border-gray-300 text-gray-600 hover:bg-gray-50" onClick={() => setAddSectionOpen(true)}>
+                <Plus className="w-4 h-4 mr-1" /> Add Section
+              </Button>
+            </div>
           </div>
         </TabsContent>
 
@@ -649,7 +697,10 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
       {/* Dialogs */}
       <AddSectionDialog open={addSectionOpen} courseId={courseId} onClose={() => setAddSectionOpen(false)} onCreated={() => { setAddSectionOpen(false); refetch(); }} />
       {addLessonSection && (
-        <AddLessonDialog sectionId={addLessonSection} onClose={() => setAddLessonSection(null)} onCreated={() => { setAddLessonSection(null); refetch(); }} />
+        <AddLessonDialog courseId={courseId} sectionId={addLessonSection} onClose={() => setAddLessonSection(null)} onCreated={() => { setAddLessonSection(null); refetch(); }} />
+      )}
+      {addLessonAtCourseLevel && (
+        <AddLessonDialog courseId={courseId} sectionId={undefined} onClose={() => setAddLessonAtCourseLevel(false)} onCreated={() => { setAddLessonAtCourseLevel(false); refetch(); }} />
       )}
       {importMediaSection && (
         <ImportMediaAsLessonDialog sectionId={importMediaSection} courseId={courseId} onClose={() => setImportMediaSection(null)} onCreated={() => { setImportMediaSection(null); refetch(); }} />
@@ -1236,13 +1287,22 @@ function MediaPickerDialog({ open, onClose, onSelect }: { open: boolean; onClose
   );
 }
 
-function AddLessonDialog({ sectionId, onClose, onCreated }: { sectionId: number; onClose: () => void; onCreated: () => void }) {
-  
+function AddLessonDialog({ courseId, sectionId, onClose, onCreated }: {
+  courseId: number;
+  sectionId?: number;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  type LessonType = "text" | "video" | "video_text" | "embed" | "quiz" | "download";
   const [title, setTitle] = useState("");
-  const [type, setType] = useState<"video" | "text" | "quiz" | "download">("text");
+  const [type, setType] = useState<LessonType>("text");
   const [isPreview, setIsPreview] = useState(false);
   const [content, setContent] = useState("");
+  const [videoContent, setVideoContent] = useState("");
+  const [embedUrl, setEmbedUrl] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("");
+  const [requireVideoCompletion, setRequireVideoCompletion] = useState(false);
+  const [requireManualComplete, setRequireManualComplete] = useState(false);
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<{ id: number; title: string; s3Url: string; mediaType: string } | null>(null);
 
@@ -1257,26 +1317,49 @@ function AddLessonDialog({ sectionId, onClose, onCreated }: { sectionId: number;
     if (!title.trim()) setTitle(asset.title);
   };
 
+  const handleCreate = () => {
+    create.mutate({
+      courseId,
+      sectionId,
+      title: title.trim(),
+      type,
+      isPreview,
+      content: (type === "text" || type === "video" || type === "download") ? (content || undefined) : undefined,
+      videoContent: type === "video_text" ? (videoContent || undefined) : undefined,
+      embedUrl: type === "embed" ? (embedUrl || undefined) : undefined,
+      mediaAssetId: selectedAsset?.id ?? undefined,
+      durationMinutes: durationMinutes ? parseInt(durationMinutes) : undefined,
+      requireVideoCompletion,
+      requireManualComplete,
+    });
+  };
+
   return (
     <>
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle>Add Lesson</DialogTitle></DialogHeader>
-        <div className="space-y-3 py-2">
+      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Add Lesson{!sectionId ? " (Course Level)" : ""}</DialogTitle>
+          {!sectionId && <p className="text-xs text-teal-600 mt-1">This lesson will appear at the top level, not inside any section.</p>}
+        </DialogHeader>
+        <div className="space-y-4 py-2">
           <div>
             <Label className="text-sm">Title *</Label>
             <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Lesson title" className="mt-1" />
           </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-sm">Type</Label>
-              <Select value={type} onValueChange={v => { setType(v as any); setSelectedAsset(null); setContent(""); }}>
+              <Label className="text-sm">Lesson Type</Label>
+              <Select value={type} onValueChange={v => { setType(v as LessonType); setSelectedAsset(null); setContent(""); setVideoContent(""); setEmbedUrl(""); }}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="text">Text</SelectItem>
+                  <SelectItem value="text">Rich Text</SelectItem>
                   <SelectItem value="video">Video</SelectItem>
+                  <SelectItem value="video_text">Video + Text</SelectItem>
+                  <SelectItem value="embed">Multimedia Embed (iframe)</SelectItem>
                   <SelectItem value="quiz">Quiz</SelectItem>
-                  <SelectItem value="download">Download</SelectItem>
+                  <SelectItem value="download">Download / File</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1285,19 +1368,21 @@ function AddLessonDialog({ sectionId, onClose, onCreated }: { sectionId: number;
               <Input value={durationMinutes} onChange={e => setDurationMinutes(e.target.value)} type="number" min="0" className="mt-1" />
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Switch checked={isPreview} onCheckedChange={setIsPreview} id="preview-switch" />
-            <Label htmlFor="preview-switch" className="text-sm">Free preview (visible without enrollment)</Label>
-          </div>
-          {type !== "quiz" && (
+
+          {/* Content fields by type */}
+          {type === "text" && (
+            <div>
+              <Label className="text-sm">Content</Label>
+              <div className="mt-1"><RichTextEditor value={content} onChange={setContent} /></div>
+            </div>
+          )}
+          {(type === "video" || type === "download") && (
             <div>
               <div className="flex items-center justify-between mb-1">
-                <Label className="text-sm">{type === "video" ? "Video URL" : type === "download" ? "Download URL" : "Content (rich text)"}</Label>
-                {(type === "video" || type === "download") && (
-                  <Button size="sm" variant="outline" className="h-6 text-xs text-teal-600 border-teal-300 hover:bg-teal-50" onClick={() => setMediaPickerOpen(true)}>
-                    Pick from Media Repository
-                  </Button>
-                )}
+                <Label className="text-sm">{type === "video" ? "Video URL" : "Download URL"}</Label>
+                <Button size="sm" variant="outline" className="h-6 text-xs text-teal-600 border-teal-300 hover:bg-teal-50" onClick={() => setMediaPickerOpen(true)}>
+                  Pick from Media Repository
+                </Button>
               </div>
               {selectedAsset && (
                 <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-teal-50 border border-teal-200 rounded-lg text-xs text-teal-700">
@@ -1306,25 +1391,70 @@ function AddLessonDialog({ sectionId, onClose, onCreated }: { sectionId: number;
                   <button className="text-teal-400 hover:text-teal-600" onClick={() => { setSelectedAsset(null); setContent(""); }}>×</button>
                 </div>
               )}
-              {type === "text" ? (
-                <div className="mt-1"><RichTextEditor value={content} onChange={setContent} /></div>
-              ) : (
-                <Input value={content} onChange={e => setContent(e.target.value)} placeholder="https://..." className="mt-1" />
-              )}
+              <Input value={content} onChange={e => setContent(e.target.value)} placeholder="https://..." className="mt-1" />
             </div>
           )}
+          {type === "video_text" && (
+            <div className="space-y-3">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <Label className="text-sm">Video URL</Label>
+                  <Button size="sm" variant="outline" className="h-6 text-xs text-teal-600 border-teal-300 hover:bg-teal-50" onClick={() => setMediaPickerOpen(true)}>
+                    Pick from Media Repository
+                  </Button>
+                </div>
+                {selectedAsset && (
+                  <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-teal-50 border border-teal-200 rounded-lg text-xs text-teal-700">
+                    <span className="font-mono bg-teal-100 px-1 rounded uppercase">{selectedAsset.mediaType}</span>
+                    <span className="flex-1 truncate">{selectedAsset.title}</span>
+                    <button className="text-teal-400 hover:text-teal-600" onClick={() => { setSelectedAsset(null); setContent(""); }}>×</button>
+                  </div>
+                )}
+                <Input value={content} onChange={e => setContent(e.target.value)} placeholder="https://..." className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-sm">Text Content (below video)</Label>
+                <div className="mt-1"><RichTextEditor value={videoContent} onChange={setVideoContent} /></div>
+              </div>
+            </div>
+          )}
+          {type === "embed" && (
+            <div>
+              <Label className="text-sm">Embed URL (iframe src)</Label>
+              <Input value={embedUrl} onChange={e => setEmbedUrl(e.target.value)} placeholder="https://..." className="mt-1" />
+              <p className="text-xs text-gray-400 mt-1">Paste the full URL to embed (e.g., YouTube, Vimeo, SCORM, H5P, etc.)</p>
+            </div>
+          )}
+          {type === "quiz" && (
+            <div className="px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg text-xs text-purple-700">
+              A quiz will be automatically created. Use the Quiz Builder to add questions after saving.
+            </div>
+          )}
+
+          {/* Preview toggle */}
+          <div className="flex items-center gap-2">
+            <Switch checked={isPreview} onCheckedChange={setIsPreview} id="add-preview-switch" />
+            <Label htmlFor="add-preview-switch" className="text-sm">Free preview (requires login)</Label>
+          </div>
+
+          {/* Completion toggles */}
+          {(type === "video" || type === "video_text") && (
+            <div className="flex items-center gap-2">
+              <Switch checked={requireVideoCompletion} onCheckedChange={setRequireVideoCompletion} id="add-req-video" />
+              <Label htmlFor="add-req-video" className="text-sm">Require video completion before marking complete</Label>
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <Switch checked={requireManualComplete} onCheckedChange={setRequireManualComplete} id="add-req-manual" />
+            <Label htmlFor="add-req-manual" className="text-sm">Show "Mark Complete" button (manual completion)</Label>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button
             className="bg-teal-600 hover:bg-teal-700 text-white"
             disabled={!title.trim() || create.isPending}
-            onClick={() => create.mutate({
-              sectionId, title: title.trim(), type, isPreview,
-              content: content || undefined,
-              mediaAssetId: selectedAsset?.id ?? undefined,
-              durationMinutes: durationMinutes ? parseInt(durationMinutes) : undefined,
-            })}
+            onClick={handleCreate}
           >
             {create.isPending ? "Adding..." : "Add Lesson"}
           </Button>
@@ -1339,11 +1469,14 @@ function AddLessonDialog({ sectionId, onClose, onCreated }: { sectionId: number;
 // ─── Edit Lesson Dialog ───────────────────────────────────────────────────────
 
 function EditLessonDialog({ lesson, onClose, onSaved }: { lesson: any; onClose: () => void; onSaved: () => void }) {
-  
   const [title, setTitle] = useState(lesson.title);
   const [content, setContent] = useState(lesson.content ?? "");
-  const [isPreview, setIsPreview] = useState(lesson.isPreview);
+  const [videoContent, setVideoContent] = useState(lesson.videoContent ?? "");
+  const [embedUrl, setEmbedUrl] = useState(lesson.embedUrl ?? "");
+  const [isPreview, setIsPreview] = useState(!!lesson.isPreview);
   const [durationMinutes, setDurationMinutes] = useState(String(lesson.durationMinutes ?? ""));
+  const [requireVideoCompletion, setRequireVideoCompletion] = useState(lesson.requireVideoCompletion === 1);
+  const [requireManualComplete, setRequireManualComplete] = useState(lesson.requireManualComplete === 1);
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<{ id: number; title: string; s3Url: string; mediaType: string } | null>(null);
 
@@ -1352,33 +1485,55 @@ function EditLessonDialog({ lesson, onClose, onSaved }: { lesson: any; onClose: 
     onError: e => toast.error(`Error: ${e.message}`),
   });
 
+  const handleSave = () => {
+    update.mutate({
+      id: lesson.id,
+      title: title.trim(),
+      isPreview,
+      durationMinutes: durationMinutes ? parseInt(durationMinutes) : null,
+      requireVideoCompletion,
+      requireManualComplete,
+      content: (lesson.type === "text" || lesson.type === "video" || lesson.type === "download" || lesson.type === "video_text") ? (content || null) : undefined,
+      videoContent: lesson.type === "video_text" ? (videoContent || null) : undefined,
+      embedUrl: lesson.type === "embed" ? (embedUrl || null) : undefined,
+      mediaAssetId: selectedAsset?.id ?? undefined,
+    });
+  };
+
   return (
     <>
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle>Edit Lesson</DialogTitle></DialogHeader>
-        <div className="space-y-3 py-2">
+      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Edit Lesson</DialogTitle>
+          <p className="text-xs text-gray-500 mt-1">Type: <span className="font-medium">{LESSON_TYPE_LABELS[lesson.type] ?? lesson.type}</span></p>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
           <div>
             <Label className="text-sm">Title</Label>
             <Input value={title} onChange={e => setTitle(e.target.value)} className="mt-1" />
           </div>
-          <div className="flex items-center gap-2">
-            <Switch checked={isPreview} onCheckedChange={setIsPreview} id="edit-preview" />
-            <Label htmlFor="edit-preview" className="text-sm">Free preview</Label>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-sm">Duration (min)</Label>
+              <Input value={durationMinutes} onChange={e => setDurationMinutes(e.target.value)} type="number" min="0" className="mt-1" />
+            </div>
           </div>
-          <div>
-            <Label className="text-sm">Duration (min)</Label>
-            <Input value={durationMinutes} onChange={e => setDurationMinutes(e.target.value)} type="number" min="0" className="mt-1 w-24" />
-          </div>
-          {lesson.type !== "quiz" && (
+
+          {/* Content fields by type */}
+          {lesson.type === "text" && (
+            <div>
+              <Label className="text-sm">Content</Label>
+              <div className="mt-1"><RichTextEditor value={content} onChange={setContent} /></div>
+            </div>
+          )}
+          {(lesson.type === "video" || lesson.type === "download") && (
             <div>
               <div className="flex items-center justify-between mb-1">
-                <Label className="text-sm">{lesson.type === "video" ? "Video URL" : lesson.type === "download" ? "Download URL" : "Content (rich text)"}</Label>
-                {(lesson.type === "video" || lesson.type === "download") && (
-                  <Button size="sm" variant="outline" className="h-6 text-xs text-teal-600 border-teal-300 hover:bg-teal-50" onClick={() => setMediaPickerOpen(true)}>
-                    Pick from Media Repository
-                  </Button>
-                )}
+                <Label className="text-sm">{lesson.type === "video" ? "Video URL" : "Download URL"}</Label>
+                <Button size="sm" variant="outline" className="h-6 text-xs text-teal-600 border-teal-300 hover:bg-teal-50" onClick={() => setMediaPickerOpen(true)}>
+                  Pick from Media Repository
+                </Button>
               </div>
               {selectedAsset && (
                 <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-teal-50 border border-teal-200 rounded-lg text-xs text-teal-700">
@@ -1387,25 +1542,70 @@ function EditLessonDialog({ lesson, onClose, onSaved }: { lesson: any; onClose: 
                   <button className="text-teal-400 hover:text-teal-600" onClick={() => { setSelectedAsset(null); setContent(lesson.content ?? ""); }}>×</button>
                 </div>
               )}
-              {lesson.type === "text" ? (
-                <div className="mt-1"><RichTextEditor value={content} onChange={setContent} /></div>
-              ) : (
-                <Input value={content} onChange={e => setContent(e.target.value)} placeholder="https://..." className="mt-1" />
-              )}
+              <Input value={content} onChange={e => setContent(e.target.value)} placeholder="https://..." className="mt-1" />
             </div>
           )}
+          {lesson.type === "video_text" && (
+            <div className="space-y-3">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <Label className="text-sm">Video URL</Label>
+                  <Button size="sm" variant="outline" className="h-6 text-xs text-teal-600 border-teal-300 hover:bg-teal-50" onClick={() => setMediaPickerOpen(true)}>
+                    Pick from Media Repository
+                  </Button>
+                </div>
+                {selectedAsset && (
+                  <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-teal-50 border border-teal-200 rounded-lg text-xs text-teal-700">
+                    <span className="font-mono bg-teal-100 px-1 rounded uppercase">{selectedAsset.mediaType}</span>
+                    <span className="flex-1 truncate">{selectedAsset.title}</span>
+                    <button className="text-teal-400 hover:text-teal-600" onClick={() => { setSelectedAsset(null); setContent(lesson.content ?? ""); }}>×</button>
+                  </div>
+                )}
+                <Input value={content} onChange={e => setContent(e.target.value)} placeholder="https://..." className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-sm">Text Content (below video)</Label>
+                <div className="mt-1"><RichTextEditor value={videoContent} onChange={setVideoContent} /></div>
+              </div>
+            </div>
+          )}
+          {lesson.type === "embed" && (
+            <div>
+              <Label className="text-sm">Embed URL (iframe src)</Label>
+              <Input value={embedUrl} onChange={e => setEmbedUrl(e.target.value)} placeholder="https://..." className="mt-1" />
+              <p className="text-xs text-gray-400 mt-1">Paste the full URL to embed (YouTube, Vimeo, SCORM, H5P, etc.)</p>
+            </div>
+          )}
+          {lesson.type === "quiz" && (
+            <div className="px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg text-xs text-purple-700">
+              Use the Quiz Builder button to manage questions for this quiz lesson.
+            </div>
+          )}
+
+          {/* Preview toggle */}
+          <div className="flex items-center gap-2">
+            <Switch checked={isPreview} onCheckedChange={setIsPreview} id="edit-preview" />
+            <Label htmlFor="edit-preview" className="text-sm">Free preview (requires login)</Label>
+          </div>
+
+          {/* Completion toggles */}
+          {(lesson.type === "video" || lesson.type === "video_text") && (
+            <div className="flex items-center gap-2">
+              <Switch checked={requireVideoCompletion} onCheckedChange={setRequireVideoCompletion} id="edit-req-video" />
+              <Label htmlFor="edit-req-video" className="text-sm">Require video completion before marking complete</Label>
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <Switch checked={requireManualComplete} onCheckedChange={setRequireManualComplete} id="edit-req-manual" />
+            <Label htmlFor="edit-req-manual" className="text-sm">Show "Mark Complete" button (manual completion)</Label>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button
             className="bg-teal-600 hover:bg-teal-700 text-white"
             disabled={update.isPending}
-            onClick={() => update.mutate({
-              id: lesson.id, title: title.trim(), isPreview,
-              content: content || undefined,
-              mediaAssetId: selectedAsset?.id ?? undefined,
-              durationMinutes: durationMinutes ? parseInt(durationMinutes) : null,
-            })}
+            onClick={handleSave}
           >
             {update.isPending ? "Saving..." : "Save"}
           </Button>

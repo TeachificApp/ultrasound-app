@@ -2716,15 +2716,20 @@ export type LmsSection = typeof lmsSections.$inferSelect;
 
 export const lmsLessons = mysqlTable("lms_lessons", {
   id: int("id").autoincrement().primaryKey(),
-  sectionId: int("section_id").notNull(),
+  courseId: int("course_id"), // direct course reference (sectionId optional for top-level lessons)
+  sectionId: int("section_id"), // nullable — top-level lessons have no section
   title: varchar("title", { length: 255 }).notNull(),
-  type: mysqlEnum("type", ["video", "text", "quiz", "download"]).default("text").notNull(),
+  type: mysqlEnum("type", ["video", "text", "quiz", "download", "embed", "video_text"]).default("text").notNull(),
   content: longtext("content"), // rich text HTML or markdown
+  videoContent: longtext("video_content"), // rich text below the video for video_text lessons
+  embedUrl: varchar("embed_url", { length: 500 }), // iframe src for embed lessons
   mediaAssetId: int("media_asset_id"), // FK to mediaAssets
   position: int("position").default(0).notNull(),
-  isPreview: boolean("is_preview").default(false).notNull(), // visible without enrollment
+  isPreview: boolean("is_preview").default(false).notNull(), // visible without enrollment (login required)
   dripDays: int("drip_days").default(0).notNull(), // days after enrollment to unlock
   durationMinutes: int("duration_minutes"),
+  requireVideoCompletion: int("require_video_completion").default(0).notNull(), // 1 = must watch video before marking complete
+  requireManualComplete: int("require_manual_complete").default(0).notNull(), // 1 = show Mark Complete button
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
