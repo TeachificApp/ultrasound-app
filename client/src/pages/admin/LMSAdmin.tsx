@@ -177,20 +177,22 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
 
   const handleAiCreate = async () => {
     // Step 1: create the course shell
-    const courseTitle = aiPreview?.title || `New ${type === "quiz" ? "Quiz" : "Course"}`;
+    const courseTitle = aiPreview?.title || `New ${type === "quiz" ? "Quiz" : type === "download" ? "Download" : "Course"}`;
     create.mutate({
       title: courseTitle,
       subtitle: aiPreview?.subtitle || undefined,
-      type: type === "download" ? "course" : type,
+      type,
       brand,
       pricingType: "draft" as any,
       isFree: true,
       price: 0,
     }, {
       onSuccess: async (data) => {
-        // Step 2: commit AI content
-        await aiCommit.mutateAsync({ courseId: data.id, productType: type === "quiz" ? "quiz" : "course", generated: aiPreview });
-        toast.success(`${type === "quiz" ? "Quiz" : "Course"} created with AI content!`);
+        // Step 2: commit AI content (only for course and quiz — downloads don't have curriculum)
+        if (type !== "download") {
+          await aiCommit.mutateAsync({ courseId: data.id, productType: type === "quiz" ? "quiz" : "course", generated: aiPreview });
+        }
+        toast.success(`${type === "quiz" ? "Quiz" : type === "download" ? "Download" : "Course"} created${type !== "download" ? " with AI content" : ""}!`);
         onCreated(data.id);
       },
     });
