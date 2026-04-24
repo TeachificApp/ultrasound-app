@@ -15,6 +15,7 @@ import { z } from "zod";
 import { and, desc, eq, isNull, sql, asc, isNotNull } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
+import { storagePut } from "../storage";
 import { getDb } from "../db";
 import {
   lmsCourses,
@@ -658,6 +659,26 @@ export const lmsAdminRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       await db.delete(lmsCourses).where(eq(lmsCourses.id, input.id));
       return { success: true };
+    }),
+
+  uploadCourseCoverImage: protectedProcedure
+    .input(z.object({
+      courseId: z.number(),
+      dataUri: z.string().min(1).max(10_000_000), // ~7.5 MB image
+      mimeType: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const base64Data = input.dataUri.replace(/^data:[^;]+;base64,/, "");
+      const buffer = Buffer.from(base64Data, "base64");
+      const ext = input.mimeType.split("/")[1];
+      const suffix = randomBytes(4).toString("hex");
+      const fileKey = `lms-covers/${input.courseId}-${suffix}.${ext}`;
+      const { url } = await storagePut(fileKey, buffer, input.mimeType);
+      await db.update(lmsCourses).set({ coverImageUrl: url }).where(eq(lmsCourses.id, input.courseId));
+      return { url };
     }),
 
   getCourse: protectedProcedure

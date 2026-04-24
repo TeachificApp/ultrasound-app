@@ -27,7 +27,7 @@ import RichTextEditor from "@/components/RichTextEditor";
 import {
   BookOpen, ChevronLeft, ChevronRight, Download, Edit2, HelpCircle, Plus, Trash2,
   Users, DollarSign, BarChart2, GripVertical, CheckCircle, AlertCircle,
-  Link as LinkIcon, UserCheck, ArrowLeft,
+  Link as LinkIcon, UserCheck, ArrowLeft, Upload, ImageIcon,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -448,6 +448,26 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
 // ─── Course Settings Form ─────────────────────────────────────────────────────
 
 function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (data: any) => void; saving: boolean }) {
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const uploadCoverImage = trpc.lmsAdmin.uploadCourseCoverImage.useMutation({
+    onSuccess: (data) => { setCoverImageUrl(data.url); toast.success("Cover image uploaded"); },
+    onError: e => toast.error(`Upload failed: ${e.message}`),
+    onSettled: () => setUploadingCover(false),
+  });
+
+  const handleCoverFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 8_000_000) { toast.error("Image must be under 8 MB"); return; }
+    setUploadingCover(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      uploadCoverImage.mutate({ courseId: course.id, dataUri: reader.result as string, mimeType: file.type as any });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
   const [title, setTitle] = useState(course.title);
   const [subtitle, setSubtitle] = useState(course.subtitle ?? "");
   const [description, setDescription] = useState(course.description ?? "");
@@ -498,9 +518,36 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
         </div>
       </div>
 
+      {/* Cover Image */}
       <div>
-        <Label className="text-sm">Cover Image URL</Label>
-        <Input value={coverImageUrl} onChange={e => setCoverImageUrl(e.target.value)} placeholder="https://..." className="mt-1" />
+        <Label className="text-sm">Course Card Photo</Label>
+        <div className="mt-2 flex items-start gap-4">
+          {/* Preview */}
+          <div className="w-32 h-20 rounded-lg border-2 border-dashed border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center flex-shrink-0">
+            {coverImageUrl ? (
+              <img src={coverImageUrl} alt="Cover" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-xs text-gray-400 text-center px-2">No image</span>
+            )}
+          </div>
+          <div className="flex-1 space-y-2">
+            {/* Upload button */}
+            <label className="cursor-pointer">
+              <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={handleCoverFileChange} disabled={uploadingCover} />
+              <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors ${
+                uploadingCover
+                  ? "border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed"
+                  : "border-teal-300 text-teal-600 bg-white hover:bg-teal-50 cursor-pointer"
+              }`}>
+                <Upload className="w-3 h-3" />
+                {uploadingCover ? "Uploading..." : "Upload Photo"}
+              </span>
+            </label>
+            {/* URL fallback */}
+            <Input value={coverImageUrl} onChange={e => setCoverImageUrl(e.target.value)} placeholder="Or paste image URL..." className="text-xs h-8" />
+            <p className="text-xs text-gray-400">Recommended: 800×500 px, JPG or PNG, max 8 MB. Displayed as the card thumbnail in the Education Library.</p>
+          </div>
+        </div>
       </div>
 
       {/* Pricing */}
