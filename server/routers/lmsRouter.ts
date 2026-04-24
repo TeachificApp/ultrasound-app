@@ -18,6 +18,8 @@ import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
 import { getDb } from "../db";
 import { invokeLLM } from "../_core/llm";
+import { generateCertificatePdf } from "../lib/certificateGenerator";
+import { sendCertificateEmail } from "../lib/certificateEmail";
 import {
   lmsCourses,
   lmsSections,
@@ -35,6 +37,11 @@ import {
   lmsLandingPages,
   lmsPageTemplates,
   lmsOrders,
+  lmsCertificates,
+  lmsLessonNotes,
+  lmsLessonBookmarks,
+  lmsCollections,
+  lmsCollectionCourses,
   users,
   mediaAssets,
   mediaVersions,
@@ -69,9 +76,9 @@ async function uniqueSlug(db: Awaited<ReturnType<typeof getDb>>, base: string): 
 
 async function recalcProgress(db: Awaited<ReturnType<typeof getDb>>, enrollmentId: number) {
   if (!db) return;
-  const enrollment = await db.select({ courseId: lmsEnrollments.courseId }).from(lmsEnrollments).where(eq(lmsEnrollments.id, enrollmentId)).limit(1);
-  if (!enrollment[0]) return;
-  const courseId = enrollment[0].courseId;
+  const [enrollRow] = await db.select().from(lmsEnrollments).where(eq(lmsEnrollments.id, enrollmentId)).limit(1);
+  if (!enrollRow) return;
+  const courseId = enrollRow.courseId;
 
   // Count total lessons in course
   const sections = await db.select({ id: lmsSections.id }).from(lmsSections).where(eq(lmsSections.courseId, courseId));
@@ -91,11 +98,76 @@ async function recalcProgress(db: Awaited<ReturnType<typeof getDb>>, enrollmentI
   );
   const completed = Number(completedRows[0]?.count ?? 0);
   const pct = Math.round((completed / total) * 100);
+  const wasCompleted = !!enrollRow.completedAt;
 
   await db.update(lmsEnrollments).set({
     progressPct: pct,
     completedAt: pct >= 100 ? new Date() : null,
   }).where(eq(lmsEnrollments.id, enrollmentId));
+
+  // Issue certificate if newly completed and course has hasCertificate enabled
+  if (pct >= 100 && !wasCompleted) {
+    void issueCertificateIfEnabled(db, enrollmentId, enrollRow.userId, courseId).catch(e =>
+      console.error("[certificate] Failed to issue certificate:", e)
+    );
+  }
+}
+
+async function issueCertificateIfEnabled(
+  db: Awaited<ReturnType<typeof getDb>>,
+  enrollmentId: number,
+  userId: number,
+  courseId: number
+) {
+  if (!db) return;
+  // Check course has certificate enabled
+  const [course] = await db.select({ hasCertificate: lmsCourses.hasCertificate, title: lmsCourses.title }).from(lmsCourses).where(eq(lmsCourses.id, courseId)).limit(1);
+  if (!course?.hasCertificate) return;
+
+  // Check if certificate already issued
+  const [existing] = await db.select({ id: lmsCertificates.id }).from(lmsCertificates)
+    .where(and(eq(lmsCertificates.userId, userId), eq(lmsCertificates.courseId, courseId))).limit(1);
+  if (existing) return;
+
+  // Get user info
+  const [user] = await db.select({ name: users.name, email: users.email, displayName: users.displayName, credentials: users.credentials }).from(users).where(eq(users.id, userId)).limit(1);
+  if (!user?.email) return;
+
+  const learnerName = user.displayName || user.name || "Learner";
+  const issuedAt = new Date();
+
+  // Generate PDF
+  const pdfBuffer = await generateCertificatePdf({
+    learnerName,
+    courseTitle: course.title,
+    issuedAt,
+    credentials: user.credentials,
+  });
+
+  // Upload PDF to S3
+  const suffix = randomBytes(6).toString("hex");
+  const fileKey = `certificates/cert-${userId}-${courseId}-${suffix}.pdf`;
+  const { url: certificateUrl } = await storagePut(fileKey, pdfBuffer, "application/pdf");
+
+  // Save certificate record
+  await db.insert(lmsCertificates).values({
+    userId,
+    courseId,
+    enrollmentId,
+    certificateUrl,
+    issuedAt,
+  });
+
+  // Send email
+  await sendCertificateEmail({
+    to: { name: learnerName, email: user.email },
+    courseTitle: course.title,
+    certificateUrl,
+    pdfBuffer,
+    issuedAt,
+  });
+
+  console.log(`[certificate] Issued certificate for user ${userId}, course ${courseId}`);
 }
 
 // ─── Public Router ────────────────────────────────────────────────────────────
@@ -195,6 +267,39 @@ export const lmsPublicRouter = router({
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     return db.select().from(lmsInstructors).where(eq(lmsInstructors.isActive, true)).orderBy(asc(lmsInstructors.name));
   }),
+
+  /** List all published collections (with course count) */
+  listCollections: publicProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const collections = await db.select().from(lmsCollections)
+      .where(eq(lmsCollections.isPublished, true))
+      .orderBy(asc(lmsCollections.position));
+    return Promise.all(collections.map(async (col) => {
+      const [{ count }] = await db.select({ count: sql<number>`count(*)` })
+        .from(lmsCollectionCourses).where(eq(lmsCollectionCourses.collectionId, col.id));
+      return { ...col, courseCount: Number(count) };
+    }));
+  }),
+
+  /** Get a single collection with its courses */
+  getCollection: publicProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [col] = await db.select().from(lmsCollections)
+        .where(and(eq(lmsCollections.id, input.id), eq(lmsCollections.isPublished, true))).limit(1);
+      if (!col) throw new TRPCError({ code: "NOT_FOUND" });
+      const cc = await db.select().from(lmsCollectionCourses)
+        .where(eq(lmsCollectionCourses.collectionId, col.id)).orderBy(asc(lmsCollectionCourses.position));
+      const courses = await Promise.all(cc.map(async ({ courseId }) => {
+        const [c] = await db.select().from(lmsCourses)
+          .where(and(eq(lmsCourses.id, courseId), eq(lmsCourses.status, "public"))).limit(1);
+        return c ?? null;
+      }));
+      return { ...col, courses: courses.filter(Boolean) };
+    }),
 });
 
 // ─── Learner Router ───────────────────────────────────────────────────────────
@@ -558,6 +663,150 @@ export const lmsLearnerRouter = router({
       await db.update(lmsGroupSeats).set({ acceptedAt: new Date(), enrollmentId: result.id }).where(eq(lmsGroupSeats.id, seat.id));
       return { enrollmentId: result.id };
     }),
+
+  // ── Certificates ──────────────────────────────────────────────────────────
+
+  /** Get all certificates for the current user */
+  getMyCertificates: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const certs = await db.select({
+      id: lmsCertificates.id,
+      courseId: lmsCertificates.courseId,
+      certificateUrl: lmsCertificates.certificateUrl,
+      issuedAt: lmsCertificates.issuedAt,
+      courseTitle: lmsCourses.title,
+      courseCoverImageUrl: lmsCourses.coverImageUrl,
+    })
+      .from(lmsCertificates)
+      .innerJoin(lmsCourses, eq(lmsCertificates.courseId, lmsCourses.id))
+      .where(eq(lmsCertificates.userId, ctx.user.id))
+      .orderBy(desc(lmsCertificates.issuedAt));
+    return certs;
+  }),
+
+  /** Get certificate for a specific course (if issued) */
+  getCourseCertificate: protectedProcedure
+    .input(z.object({ courseSlug: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [course] = await db.select({ id: lmsCourses.id }).from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
+      if (!course) return null;
+      const [cert] = await db.select().from(lmsCertificates)
+        .where(and(eq(lmsCertificates.userId, ctx.user.id), eq(lmsCertificates.courseId, course.id))).limit(1);
+      return cert ?? null;
+    }),
+
+  // ── Lesson Notes ──────────────────────────────────────────────────────────
+
+  /** Get all notes for a course (grouped by lesson) */
+  getCourseNotes: protectedProcedure
+    .input(z.object({ courseSlug: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [course] = await db.select({ id: lmsCourses.id }).from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      const notes = await db.select({
+        id: lmsLessonNotes.id,
+        lessonId: lmsLessonNotes.lessonId,
+        note: lmsLessonNotes.note,
+        createdAt: lmsLessonNotes.createdAt,
+        updatedAt: lmsLessonNotes.updatedAt,
+        lessonTitle: lmsLessons.title,
+      })
+        .from(lmsLessonNotes)
+        .innerJoin(lmsLessons, eq(lmsLessonNotes.lessonId, lmsLessons.id))
+        .where(and(eq(lmsLessonNotes.userId, ctx.user.id), eq(lmsLessonNotes.courseId, course.id)))
+        .orderBy(desc(lmsLessonNotes.updatedAt));
+      return notes;
+    }),
+
+  /** Save (create or update) a note for a lesson */
+  saveNote: protectedProcedure
+    .input(z.object({
+      lessonId: z.number(),
+      courseSlug: z.string(),
+      note: z.string().max(10000),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [course] = await db.select({ id: lmsCourses.id }).from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      const [existing] = await db.select({ id: lmsLessonNotes.id }).from(lmsLessonNotes)
+        .where(and(eq(lmsLessonNotes.userId, ctx.user.id), eq(lmsLessonNotes.lessonId, input.lessonId))).limit(1);
+      if (existing) {
+        await db.update(lmsLessonNotes).set({ note: input.note }).where(eq(lmsLessonNotes.id, existing.id));
+        return { id: existing.id };
+      }
+      const [result] = await db.insert(lmsLessonNotes).values({
+        userId: ctx.user.id,
+        lessonId: input.lessonId,
+        courseId: course.id,
+        note: input.note,
+      }).$returningId();
+      return { id: result.id };
+    }),
+
+  /** Delete a note */
+  deleteNote: protectedProcedure
+    .input(z.object({ noteId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [note] = await db.select({ userId: lmsLessonNotes.userId }).from(lmsLessonNotes).where(eq(lmsLessonNotes.id, input.noteId)).limit(1);
+      if (!note || note.userId !== ctx.user.id) throw new TRPCError({ code: "FORBIDDEN" });
+      await db.delete(lmsLessonNotes).where(eq(lmsLessonNotes.id, input.noteId));
+      return { success: true };
+    }),
+
+  // ── Bookmarks ─────────────────────────────────────────────────────────────
+
+  /** Get all bookmarks for a course */
+  getCourseBookmarks: protectedProcedure
+    .input(z.object({ courseSlug: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [course] = await db.select({ id: lmsCourses.id }).from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      const bookmarks = await db.select({
+        id: lmsLessonBookmarks.id,
+        lessonId: lmsLessonBookmarks.lessonId,
+        createdAt: lmsLessonBookmarks.createdAt,
+        lessonTitle: lmsLessons.title,
+        lessonType: lmsLessons.type,
+      })
+        .from(lmsLessonBookmarks)
+        .innerJoin(lmsLessons, eq(lmsLessonBookmarks.lessonId, lmsLessons.id))
+        .where(and(eq(lmsLessonBookmarks.userId, ctx.user.id), eq(lmsLessonBookmarks.courseId, course.id)))
+        .orderBy(desc(lmsLessonBookmarks.createdAt));
+      return bookmarks;
+    }),
+
+  /** Toggle bookmark for a lesson */
+  toggleBookmark: protectedProcedure
+    .input(z.object({ lessonId: z.number(), courseSlug: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [course] = await db.select({ id: lmsCourses.id }).from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      const [existing] = await db.select({ id: lmsLessonBookmarks.id }).from(lmsLessonBookmarks)
+        .where(and(eq(lmsLessonBookmarks.userId, ctx.user.id), eq(lmsLessonBookmarks.lessonId, input.lessonId))).limit(1);
+      if (existing) {
+        await db.delete(lmsLessonBookmarks).where(eq(lmsLessonBookmarks.id, existing.id));
+        return { bookmarked: false };
+      }
+      await db.insert(lmsLessonBookmarks).values({
+        userId: ctx.user.id,
+        lessonId: input.lessonId,
+        courseId: course.id,
+      });
+      return { bookmarked: true };
+    }),
 });
 
 // ─── Admin Router ─────────────────────────────────────────────────────────────
@@ -833,7 +1082,7 @@ export const lmsAdminRouter = router({
     }),
 
   updateSection: protectedProcedure
-    .input(z.object({ id: z.number(), title: z.string().min(1).optional(), position: z.number().int().optional(), isPreview: z.boolean().optional() }))
+    .input(z.object({ id: z.number(), title: z.string().min(1).optional(), position: z.number().int().optional(), isPreview: z.boolean().optional(), dripDays: z.number().int().min(0).optional() }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
@@ -1797,6 +2046,108 @@ Generate 3-6 sections with 2-5 lessons each. Lesson types can be: text, video (f
       }).$returningId();
 
       return { id: result.id, lessonType };
+    }),
+
+  // ─── Collections Admin ────────────────────────────────────────────────────
+
+  /** List all collections (admin — includes unpublished) */
+  listCollections: protectedProcedure.query(async ({ ctx }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const collections = await db.select().from(lmsCollections).orderBy(asc(lmsCollections.position));
+    return Promise.all(collections.map(async (col) => {
+      const cc = await db.select({ courseId: lmsCollectionCourses.courseId })
+        .from(lmsCollectionCourses).where(eq(lmsCollectionCourses.collectionId, col.id));
+      return { ...col, courseCount: cc.length, courseIds: cc.map(c => c.courseId) };
+    }));
+  }),
+
+  /** Create a collection */
+  createCollection: protectedProcedure
+    .input(z.object({
+      title: z.string().min(1).max(200),
+      description: z.string().optional(),
+      label: z.string().max(100).optional(),
+      color: z.string().max(20).optional(),
+      coverImageUrl: z.string().optional(),
+      isPublished: z.boolean().default(true),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [{ maxPos }] = await db.select({ maxPos: sql<number>`COALESCE(MAX(position), -1)` }).from(lmsCollections);
+      const [result] = await db.insert(lmsCollections).values({
+        title: input.title,
+        description: input.description ?? null,
+        label: input.label ?? null,
+        color: input.color ?? "#189aa1",
+        coverImageUrl: input.coverImageUrl ?? null,
+        position: Number(maxPos) + 1,
+        isPublished: input.isPublished,
+      }).$returningId();
+      return { id: result.id };
+    }),
+
+  /** Update a collection */
+  updateCollection: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      title: z.string().min(1).max(200).optional(),
+      description: z.string().optional(),
+      label: z.string().max(100).optional(),
+      color: z.string().max(20).optional(),
+      coverImageUrl: z.string().optional(),
+      isPublished: z.boolean().optional(),
+      position: z.number().int().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { id, ...rest } = input;
+      const updates: Record<string, unknown> = {};
+      if (rest.title !== undefined) updates.title = rest.title;
+      if (rest.description !== undefined) updates.description = rest.description;
+      if (rest.label !== undefined) updates.label = rest.label;
+      if (rest.color !== undefined) updates.color = rest.color;
+      if (rest.coverImageUrl !== undefined) updates.coverImageUrl = rest.coverImageUrl;
+      if (rest.isPublished !== undefined) updates.isPublished = rest.isPublished;
+      if (rest.position !== undefined) updates.position = rest.position;
+      await db.update(lmsCollections).set(updates).where(eq(lmsCollections.id, id));
+      return { success: true };
+    }),
+
+  /** Delete a collection */
+  deleteCollection: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(lmsCollectionCourses).where(eq(lmsCollectionCourses.collectionId, input.id));
+      await db.delete(lmsCollections).where(eq(lmsCollections.id, input.id));
+      return { success: true };
+    }),
+
+  /** Set courses in a collection (replaces existing) */
+  setCollectionCourses: protectedProcedure
+    .input(z.object({
+      collectionId: z.number(),
+      courseIds: z.array(z.number()),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(lmsCollectionCourses).where(eq(lmsCollectionCourses.collectionId, input.collectionId));
+      if (input.courseIds.length > 0) {
+        await db.insert(lmsCollectionCourses).values(
+          input.courseIds.map((courseId, i) => ({ collectionId: input.collectionId, courseId, position: i }))
+        );
+      }
+      return { success: true };
     }),
 });
 

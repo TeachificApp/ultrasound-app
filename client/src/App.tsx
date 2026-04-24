@@ -30,6 +30,7 @@ import Premium from "./pages/Premium";
 
 // ── LMS — Education Library ─────────────────────────────────────────────────
 import EducationLibrary from "./pages/EducationLibrary";
+import CollectionDetail from "./pages/CollectionDetail";
 import CourseLanding from "./pages/CourseLanding";
 import CoursePlayer from "./pages/CoursePlayer";
 import LMSAdmin from "./pages/admin/LMSAdmin";
@@ -292,6 +293,7 @@ function Router() {
 
         {/* ── LMS — Education Library ──────────────────────────────────────────────────── */}
         <Route path="/education-library" component={EducationLibrary} />
+        <Route path="/collections/:id" component={CollectionDetail} />
         <Route path="/learn/:slug/player" component={CoursePlayer} />
         <Route path="/learn/:slug" component={CourseLanding} />
         <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>

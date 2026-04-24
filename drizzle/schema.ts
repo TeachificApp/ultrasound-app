@@ -2714,6 +2714,7 @@ export const lmsSections = mysqlTable("lms_sections", {
   title: varchar("title", { length: 255 }).notNull(),
   position: int("position").default(0).notNull(),
   isPreview: boolean("is_preview").default(false).notNull(),
+  dripDays: int("drip_days").default(0).notNull(), // days after enrollment to unlock the whole section
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 export type LmsSection = typeof lmsSections.$inferSelect;
@@ -2918,3 +2919,62 @@ export const lmsPageTemplates = mysqlTable("lms_page_templates", {
 });
 export type LmsPageTemplate = typeof lmsPageTemplates.$inferSelect;
 export type NewLmsPageTemplate = typeof lmsPageTemplates.$inferInsert;
+
+// ─── LMS Certificates ─────────────────────────────────────────────────────────
+
+export const lmsCertificates = mysqlTable("lms_certificates", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  courseId: int("course_id").notNull(),
+  enrollmentId: int("enrollment_id").notNull(),
+  certificateUrl: text("certificate_url").notNull(),
+  issuedAt: timestamp("issued_at").defaultNow().notNull(),
+});
+export type LmsCertificate = typeof lmsCertificates.$inferSelect;
+
+// ─── LMS Lesson Notes ─────────────────────────────────────────────────────────
+
+export const lmsLessonNotes = mysqlTable("lms_lesson_notes", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  lessonId: int("lesson_id").notNull(),
+  courseId: int("course_id").notNull(),
+  note: longtext("note").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type LmsLessonNote = typeof lmsLessonNotes.$inferSelect;
+
+// ─── LMS Lesson Bookmarks ─────────────────────────────────────────────────────
+
+export const lmsLessonBookmarks = mysqlTable("lms_lesson_bookmarks", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  lessonId: int("lesson_id").notNull(),
+  courseId: int("course_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type LmsLessonBookmark = typeof lmsLessonBookmarks.$inferSelect;
+
+// ─── LMS Collections ─────────────────────────────────────────────────────────
+export const lmsCollections = mysqlTable("lms_collections", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 200 }).notNull(),
+  description: text("description"),
+  label: varchar("label", { length: 100 }),
+  color: varchar("color", { length: 20 }).default("#189aa1"),
+  coverImageUrl: text("cover_image_url"),
+  position: int("position").default(0).notNull(),
+  isPublished: boolean("is_published").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type LmsCollection = typeof lmsCollections.$inferSelect;
+
+export const lmsCollectionCourses = mysqlTable("lms_collection_courses", {
+  id: int("id").autoincrement().primaryKey(),
+  collectionId: int("collection_id").notNull(),
+  courseId: int("course_id").notNull(),
+  position: int("position").default(0).notNull(),
+});
+export type LmsCollectionCourse = typeof lmsCollectionCourses.$inferSelect;

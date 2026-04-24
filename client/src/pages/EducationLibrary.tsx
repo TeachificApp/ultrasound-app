@@ -111,6 +111,14 @@ export default function EducationLibrary() {
   const [isFree, setIsFree] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [activeCollection, setActiveCollection] = useState<number | null>(null);
+
+  // Fetch collections for filter tabs
+  const { data: collections } = trpc.lms.listCollections.useQuery();
+  const { data: collectionDetail } = trpc.lms.getCollection.useQuery(
+    { id: activeCollection! },
+    { enabled: activeCollection !== null }
+  );
 
   const { data, isLoading } = trpc.lms.listCourses.useQuery({
     brand: brand !== "all" ? (brand as "aaus" | "iheartecho") : undefined,
@@ -120,9 +128,16 @@ export default function EducationLibrary() {
     pageSize: 12,
   });
 
-  const courses = data?.courses ?? [];
-  const total = data?.total ?? 0;
-  const totalPages = Math.ceil(total / 12);
+  // When a collection is active, show only its courses
+  const collectionCourses = collectionDetail?.courses ?? [];
+  const courses = activeCollection !== null
+    ? collectionCourses
+    : (data?.courses ?? []).filter(c =>
+        !search || c.title.toLowerCase().includes(search.toLowerCase()) ||
+        (c.subtitle ?? "").toLowerCase().includes(search.toLowerCase())
+      );
+  const total = activeCollection !== null ? collectionCourses.length : (data?.total ?? 0);
+  const totalPages = activeCollection !== null ? 1 : Math.ceil(total / 12);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -137,6 +152,38 @@ export default function EducationLibrary() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-8">
+        {/* Collection Filter Tabs — Thinkific-style */}
+        {collections && collections.length > 0 && (
+          <div className="mb-6 overflow-x-auto">
+            <div className="flex gap-1.5 pb-1 min-w-max flex-wrap">
+              <button
+                onClick={() => { setActiveCollection(null); setPage(1); }}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
+                  activeCollection === null
+                    ? "bg-teal-600 text-white shadow-sm"
+                    : "bg-white border border-gray-200 text-gray-600 hover:border-teal-400 hover:text-teal-700"
+                }`}
+              >
+                All Content
+              </button>
+              {collections.map((col: any) => (
+                <button
+                  key={col.id}
+                  onClick={() => { setActiveCollection(col.id); setPage(1); }}
+                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
+                    activeCollection === col.id
+                      ? "text-white shadow-sm"
+                      : "bg-white border border-gray-200 text-gray-600 hover:border-teal-400 hover:text-teal-700"
+                  }`}
+                  style={activeCollection === col.id ? { backgroundColor: col.color ?? "#189aa1" } : {}}
+                >
+                  {col.title}
+                  <span className="ml-1.5 text-xs opacity-70">({col.courseCount})</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {/* Filters */}
         <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6 flex flex-wrap gap-3 items-center">
           <div className="relative flex-1 min-w-[200px]">

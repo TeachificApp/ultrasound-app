@@ -25,10 +25,10 @@ import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import RichTextEditor from "@/components/RichTextEditor";
 import {
-  BookOpen, ChevronLeft, ChevronRight, Download, Edit2, HelpCircle, Plus, Trash2,
+  BookOpen, ChevronLeft, ChevronRight, Clock, Download, Edit2, HelpCircle, Plus, Trash2,
   Users, DollarSign, BarChart2, GripVertical, CheckCircle, AlertCircle,
   Link as LinkIcon, UserCheck, ArrowLeft, Upload, ImageIcon,
-  Sparkles, Loader2, Eye, FolderOpen, Monitor, Video, FileText, CheckSquare,
+  Sparkles, Loader2, Eye, FolderOpen, Monitor, Video, FileText, CheckSquare, Settings2,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import LessonEffectEditor from "@/components/LessonEffectEditor";
@@ -574,6 +574,12 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
   const [editLesson, setEditLesson] = useState<any>(null);
   const [quizLesson, setQuizLesson] = useState<any>(null);
   const [importMediaSection, setImportMediaSection] = useState<number | null>(null);
+  const [editSectionDrip, setEditSectionDrip] = useState<{ id: number; title: string; dripDays: number } | null>(null);
+
+  const updateSection = trpc.lmsAdmin.updateSection.useMutation({
+    onSuccess: () => { toast.success("Section updated"); setEditSectionDrip(null); refetch(); },
+    onError: e => toast.error(`Error: ${e.message}`),
+  });
 
   const updateCourse = trpc.lmsAdmin.updateCourse.useMutation({
     onSuccess: () => { toast.success("Saved"); refetch(); },
@@ -671,6 +677,9 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
                   </Button>
                   <Button size="sm" variant="ghost" className="h-7 text-xs text-blue-600 hover:bg-blue-50" onClick={() => setImportMediaSection(section.id)}>
                     <FolderOpen className="w-3 h-3 mr-1" /> Import Media
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-7 text-xs text-gray-500 hover:bg-gray-100" title="Drip schedule" onClick={() => setEditSectionDrip({ id: section.id, title: section.title, dripDays: section.dripDays ?? 0 })}>
+                    <Clock className="w-3 h-3 mr-1" />{(section.dripDays ?? 0) > 0 ? `+${section.dripDays}d` : "Drip"}
                   </Button>
                   <Button size="sm" variant="ghost" className="h-7 text-red-400 hover:bg-red-50" onClick={() => {
                     if (confirm(`Delete section "${section.title}" and all its lessons?`)) deleteSection.mutate({ id: section.id });
@@ -2574,6 +2583,7 @@ export default function LMSAdmin() {
             <TabsTrigger value="instructors" className="text-xs">Instructors</TabsTrigger>
             <TabsTrigger value="affiliates" className="text-xs">Affiliates</TabsTrigger>
             <TabsTrigger value="analytics" className="text-xs">Analytics</TabsTrigger>
+            <TabsTrigger value="collections" className="text-xs">Collections</TabsTrigger>
           </TabsList>
           <TabsContent value="courses" className="mt-4"><CoursesTab onEdit={setEditingCourseId} typeFilter="course" /></TabsContent>
           <TabsContent value="quizzes" className="mt-4"><CoursesTab onEdit={setEditingCourseId} typeFilter="quiz" /></TabsContent>
@@ -2583,8 +2593,224 @@ export default function LMSAdmin() {
           <TabsContent value="instructors" className="mt-4"><InstructorsTab /></TabsContent>
           <TabsContent value="affiliates" className="mt-4"><AffiliatesTab /></TabsContent>
           <TabsContent value="analytics" className="mt-4"><AnalyticsTab /></TabsContent>
+          <TabsContent value="collections" className="mt-4"><CollectionsTab /></TabsContent>
         </Tabs>
       )}
     </div>
+  );
+}
+
+// ─── Collections Tab ──────────────────────────────────────────────────────────
+function CollectionsTab() {
+  const utils = trpc.useUtils();
+  const { data: collections, isLoading } = trpc.lmsAdmin.listCollections.useQuery();
+  const { data: allCourses } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", page: 1, pageSize: 200 });
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editCollection, setEditCollection] = useState<any>(null);
+
+  const createCollection = trpc.lmsAdmin.createCollection.useMutation({
+    onSuccess: () => { toast.success("Collection created"); utils.lmsAdmin.listCollections.invalidate(); setCreateOpen(false); },
+    onError: e => toast.error(e.message),
+  });
+  const updateCollection = trpc.lmsAdmin.updateCollection.useMutation({
+    onSuccess: () => { toast.success("Collection updated"); utils.lmsAdmin.listCollections.invalidate(); setEditCollection(null); },
+    onError: e => toast.error(e.message),
+  });
+  const deleteCollection = trpc.lmsAdmin.deleteCollection.useMutation({
+    onSuccess: () => { toast.success("Collection deleted"); utils.lmsAdmin.listCollections.invalidate(); },
+    onError: e => toast.error(e.message),
+  });
+  const setCourses = trpc.lmsAdmin.setCollectionCourses.useMutation({
+    onSuccess: () => { utils.lmsAdmin.listCollections.invalidate(); },
+    onError: e => toast.error(e.message),
+  });
+
+  if (isLoading) return <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}</div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-semibold text-gray-800">Collections</h3>
+          <p className="text-xs text-gray-500 mt-0.5">Group courses by custom labels — shown as filter tabs on the Education Library.</p>
+        </div>
+        <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => setCreateOpen(true)}>
+          <Plus className="w-3.5 h-3.5 mr-1" /> New Collection
+        </Button>
+      </div>
+
+      {(!collections || collections.length === 0) && (
+        <div className="text-center py-12 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">
+          <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-40" />
+          <p className="text-sm">No collections yet. Create one to group courses by topic or label.</p>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {(collections ?? []).map((col: any) => (
+          <div key={col.id} className="bg-white border border-gray-200 rounded-xl p-4 flex items-start gap-4">
+            {/* Color swatch */}
+            <div className="w-10 h-10 rounded-lg flex-shrink-0 flex items-center justify-center text-white text-xs font-bold shadow-sm"
+              style={{ backgroundColor: col.color ?? "#189aa1" }}>
+              {col.title.slice(0, 2).toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-medium text-gray-800 text-sm">{col.title}</span>
+                {col.label && <Badge variant="outline" className="text-xs">{col.label}</Badge>}
+                {!col.isPublished && <Badge variant="outline" className="text-xs text-orange-600 border-orange-300">Draft</Badge>}
+              </div>
+              {col.description && <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{col.description}</p>}
+              <p className="text-xs text-gray-400 mt-1">{col.courseCount} course{col.courseCount !== 1 ? "s" : ""}</p>
+            </div>
+            <div className="flex gap-1 flex-shrink-0">
+              <Button size="sm" variant="ghost" className="h-7 text-xs text-blue-600 hover:bg-blue-50"
+                onClick={() => setEditCollection(col)}>
+                <Edit2 className="w-3 h-3 mr-1" /> Edit
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 text-red-400 hover:bg-red-50"
+                onClick={() => { if (confirm(`Delete collection "${col.title}"?`)) deleteCollection.mutate({ id: col.id }); }}>
+                <Trash2 className="w-3 h-3" />
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Create Dialog */}
+      <CollectionFormDialog
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        allCourses={allCourses?.courses ?? []}
+        onSave={(data, courseIds) => createCollection.mutate({ ...data, isPublished: data.isPublished ?? true } as any)}
+        saving={createCollection.isPending}
+        title="New Collection"
+      />
+
+      {/* Edit Dialog */}
+      {editCollection && (
+        <CollectionFormDialog
+          open={!!editCollection}
+          onClose={() => setEditCollection(null)}
+          allCourses={allCourses?.courses ?? []}
+          initial={editCollection}
+          onSave={(data, courseIds) => {
+            updateCollection.mutate({ id: editCollection.id, ...data } as any);
+            setCourses.mutate({ collectionId: editCollection.id, courseIds });
+          }}
+          saving={updateCollection.isPending || setCourses.isPending}
+          title="Edit Collection"
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Collection Form Dialog ────────────────────────────────────────────────────
+function CollectionFormDialog({
+  open, onClose, allCourses, initial, onSave, saving, title,
+}: {
+  open: boolean;
+  onClose: () => void;
+  allCourses: any[];
+  initial?: any;
+  onSave: (data: any, courseIds: number[]) => void;
+  saving: boolean;
+  title: string;
+}) {
+  const [colTitle, setColTitle] = useState(initial?.title ?? "");
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [label, setLabel] = useState(initial?.label ?? "");
+  const [color, setColor] = useState(initial?.color ?? "#189aa1");
+  const [isPublished, setIsPublished] = useState(initial?.isPublished ?? true);
+  const [selectedCourseIds, setSelectedCourseIds] = useState<number[]>(initial?.courseIds ?? []);
+  const [search, setSearch] = useState("");
+
+  const filteredCourses = allCourses.filter(c =>
+    c.title.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const toggleCourse = (id: number) => {
+    setSelectedCourseIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleSave = () => {
+    if (!colTitle.trim()) return;
+    onSave({ title: colTitle.trim(), description: description || undefined, label: label || undefined, color, isPublished }, selectedCourseIds);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={v => !v && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <Label className="text-xs font-medium">Collection Title *</Label>
+              <Input value={colTitle} onChange={e => setColTitle(e.target.value)} placeholder="e.g. E-Learning & CME" className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-xs font-medium">Label / Tag</Label>
+              <Input value={label} onChange={e => setLabel(e.target.value)} placeholder="e.g. Featured, New, CME" className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-xs font-medium">Accent Color</Label>
+              <div className="flex items-center gap-2 mt-1">
+                <input type="color" value={color} onChange={e => setColor(e.target.value)}
+                  className="w-10 h-9 rounded border border-gray-200 cursor-pointer p-0.5" />
+                <Input value={color} onChange={e => setColor(e.target.value)} className="flex-1 font-mono text-xs" />
+              </div>
+            </div>
+            <div className="col-span-2">
+              <Label className="text-xs font-medium">Description</Label>
+              <Input value={description} onChange={e => setDescription(e.target.value)} placeholder="Short description (optional)" className="mt-1" />
+            </div>
+            <div className="col-span-2 flex items-center gap-2">
+              <Switch checked={isPublished} onCheckedChange={setIsPublished} />
+              <Label className="text-xs">Published (visible on Education Library)</Label>
+            </div>
+          </div>
+
+          {/* Course picker */}
+          <div>
+            <Label className="text-xs font-medium">Courses in this Collection</Label>
+            <p className="text-xs text-gray-400 mb-2">Select which courses appear in this collection. Order matches selection order.</p>
+            <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search courses..." className="mb-2 text-sm" />
+            <div className="border border-gray-200 rounded-lg max-h-52 overflow-y-auto divide-y divide-gray-100">
+              {filteredCourses.length === 0 && (
+                <div className="py-6 text-center text-xs text-gray-400">No courses found</div>
+              )}
+              {filteredCourses.map((c: any) => (
+                <label key={c.id} className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedCourseIds.includes(c.id)}
+                    onChange={() => toggleCourse(c.id)}
+                    className="accent-teal-600"
+                  />
+                  <span className="text-sm text-gray-700 flex-1 truncate">{c.title}</span>
+                  {selectedCourseIds.includes(c.id) && (
+                    <span className="text-xs text-teal-600 font-medium">#{selectedCourseIds.indexOf(c.id) + 1}</span>
+                  )}
+                </label>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-1">{selectedCourseIds.length} course{selectedCourseIds.length !== 1 ? "s" : ""} selected</p>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={handleSave} disabled={saving || !colTitle.trim()}>
+            {saving ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+            Save Collection
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

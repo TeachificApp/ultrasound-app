@@ -1253,3 +1253,37 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Admin UI: LessonEffectEditor panel in EditLessonDialog (banner text/colors, trigger, sound preset + custom URL, confetti toggle + color theme)
 - [x] Player: LessonEffectPlayer component (canvas confetti, Audio sound, animated banner overlay)
 - [x] Player: fire effects on lesson start and/or lesson complete based on trigger setting
+
+## Certificate of Completion (Apr 24, 2026)
+- [x] DB: lms_certificates table (id, userId, courseId, issuedAt, certificateUrl)
+- [x] Server: PDF certificate generation using pdfkit/fpdf with course title, learner name, date, AAUS branding
+- [x] Server: Upload certificate PDF to S3 and store URL in DB
+- [x] Server: Send certificate email via SendGrid with PDF attachment or download link
+- [x] tRPC: issueCertificate procedure (called when progressPct hits 100 in markLessonComplete)
+- [x] tRPC: getMyCertificates procedure (learner can view/download past certificates)
+- [x] Course player: auto-trigger certificate on 100% completion with congratulations dialog
+- [x] Course player: "Download Certificate" button in sidebar/completion state
+
+## Lesson Notes and Bookmarks (Apr 24, 2026)
+- [x] DB: lms_lesson_notes table (id, userId, lessonId, courseId, note, createdAt, updatedAt)
+- [x] DB: lms_lesson_bookmarks table (id, userId, lessonId, courseId, createdAt)
+- [x] tRPC: saveNote, deleteNote, getNotes (per lesson + all course notes)
+- [x] tRPC: toggleBookmark, getBookmarks (per course)
+- [x] Course player: Notes panel in lesson content area (textarea + save + list of past notes with timestamps)
+- [x] Course player: Bookmark icon button in lesson header (toggle)
+- [x] Course player sidebar: "My Notes" tab listing all bookmarked and noted lessons
+
+## Course Drip Scheduling (Apr 24, 2026)
+- [x] DB: add dripDays column to lms_lessons and lms_sections (int, nullable — days after enrollment to unlock)
+- [x] tRPC: update getCoursePlayer to include unlock date per lesson based on enrollment date + dripDays
+- [x] tRPC: update getLesson to enforce drip lock (throw if not yet unlocked)
+- [x] Admin UI: dripDays field in AddLessonDialog, EditLessonDialog, and section editor
+- [x] Course player sidebar: locked lesson UI (lock icon, "Unlocks in X days" label)
+- [x] Scheduled task / cron: daily job to email learners when new drip content unlocks
+- [x] Email: "New content unlocked" notification via SendGrid
+## Collections (Admin Course Grouping) (Apr 24, 2026)
+- [x] DB: lms_collections table (id, title, description, label/color, coverImageUrl, position, createdAt) and lms_collection_courses join table (collectionId, courseId, position)
+- [x] tRPC: admin CRUD for collections (create, update, delete, reorder, addCourse, removeCourse, setCourses)
+- [x] tRPC: public/learner listCollections and getCollection procedures
+- [x] Admin UI: Collections tab in LMSAdmin with create/edit/delete dialogs and course assignment picker
+- [x] Learner UI: Collections section on Education Library page and /collections/:id detail page
