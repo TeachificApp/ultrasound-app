@@ -960,6 +960,38 @@ export const lmsAdminRouter = router({
       return { success: true };
     }),
 
+  // ── Lesson Effects ──
+  updateLessonEffect: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      effectEnabled: z.boolean(),
+      effectTrigger: z.enum(["lesson_start", "lesson_complete"]),
+      effectBannerText: z.string().max(500).optional(),
+      effectBannerBgColor: z.string().max(20).optional(),
+      effectBannerTextColor: z.string().max(20).optional(),
+      effectSound: z.string().max(50).optional(),
+      effectSoundUrl: z.string().max(500).optional(),
+      effectConfetti: z.boolean(),
+      effectConfettiColors: z.string().max(500).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(lmsLessons).set({
+        effectEnabled: input.effectEnabled,
+        effectTrigger: input.effectTrigger,
+        effectBannerText: input.effectBannerText ?? null,
+        effectBannerBgColor: input.effectBannerBgColor ?? null,
+        effectBannerTextColor: input.effectBannerTextColor ?? null,
+        effectSound: input.effectSound ?? null,
+        effectSoundUrl: input.effectSoundUrl ?? null,
+        effectConfetti: input.effectConfetti,
+        effectConfettiColors: input.effectConfettiColors ?? null,
+      }).where(eq(lmsLessons.id, input.id));
+      return { success: true };
+    }),
+
   // ── Quizzes ──
   getQuiz: protectedProcedure
     .input(z.object({ lessonId: z.number() }))

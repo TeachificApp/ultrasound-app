@@ -2734,6 +2734,16 @@ export const lmsLessons = mysqlTable("lms_lessons", {
   durationMinutes: int("duration_minutes"),
   requireVideoCompletion: int("require_video_completion").default(0).notNull(), // 1 = must watch video before marking complete
   requireManualComplete: int("require_manual_complete").default(0).notNull(), // 1 = show Mark Complete button
+  // Lesson Effects
+  effectEnabled: boolean("effect_enabled").default(false),
+  effectTrigger: varchar("effect_trigger", { length: 20 }).default("lesson_start"),
+  effectBannerText: varchar("effect_banner_text", { length: 500 }),
+  effectBannerBgColor: varchar("effect_banner_bg_color", { length: 20 }),
+  effectBannerTextColor: varchar("effect_banner_text_color", { length: 20 }),
+  effectSound: varchar("effect_sound", { length: 50 }),
+  effectSoundUrl: varchar("effect_sound_url", { length: 500 }),
+  effectConfetti: boolean("effect_confetti").default(false),
+  effectConfettiColors: varchar("effect_confetti_colors", { length: 500 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });

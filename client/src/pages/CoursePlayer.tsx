@@ -17,6 +17,7 @@ import {
   Lock, Menu, PlayCircle, X, Monitor, FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import LessonEffectPlayer, { fireLessonCompleteEffect } from "@/components/LessonEffectPlayer";
 
 // ─── Quiz Runner ──────────────────────────────────────────────────────────────
 
@@ -166,6 +167,7 @@ export default function CoursePlayer() {
   const handleMarkComplete = async () => {
     if (!selectedLessonId) return;
     await markComplete.mutateAsync({ lessonId: selectedLessonId, courseSlug: slug! });
+    fireLessonCompleteEffect();
     toast.success("Lesson marked complete!");
     if (nextLesson) setSelectedLessonId(nextLesson.id);
   };
@@ -408,12 +410,27 @@ export default function CoursePlayer() {
                 </div>
               )}
 
+              {/* ── Lesson effects (start + complete triggers) ── */}
+              <LessonEffectPlayer
+                key={`start-${lessonData.id}`}
+                effect={lessonData}
+                trigger="lesson_start"
+              />
+              <LessonEffectPlayer
+                key={`complete-${lessonData.id}`}
+                effect={lessonData}
+                trigger="lesson_complete"
+              />
+
               {/* ── Quiz lesson ── */}
               {lessonData.type === "quiz" && (
                 <QuizRunner
                   lesson={lessonData}
                   courseSlug={slug!}
-                  onComplete={() => utils.lmsLearner.getCoursePlayer.invalidate({ slug: slug! })}
+                  onComplete={() => {
+                    fireLessonCompleteEffect();
+                    utils.lmsLearner.getCoursePlayer.invalidate({ slug: slug! });
+                  }}
                 />
               )}
 

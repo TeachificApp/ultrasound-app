@@ -1246,3 +1246,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Dialog: topic input, question count selector (5/10/15/20/custom), difficulty (beginner/intermediate/advanced), question type (MCQ/true-false/mixed)
 - [x] Preview generated questions before inserting (accept all / edit individual / remove)
 - [x] Insert accepted questions into the quiz question list
+
+## Lesson Effects System (Apr 24, 2026)
+- [x] DB: add effectEnabled, effectTrigger, effectBannerText, effectBannerBgColor, effectBannerTextColor, effectSound, effectSoundUrl, effectConfetti, effectConfettiColors columns to lms_lessons
+- [x] tRPC: updateLessonEffect procedure (admin), getLessonEffect included in getLesson/getCoursePlayer
+- [x] Admin UI: LessonEffectEditor panel in EditLessonDialog (banner text/colors, trigger, sound preset + custom URL, confetti toggle + color theme)
+- [x] Player: LessonEffectPlayer component (canvas confetti, Audio sound, animated banner overlay)
+- [x] Player: fire effects on lesson start and/or lesson complete based on trigger setting

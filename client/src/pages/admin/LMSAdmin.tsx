@@ -31,6 +31,7 @@ import {
   Sparkles, Loader2, Eye, FolderOpen, Monitor, Video, FileText, CheckSquare,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import LessonEffectEditor from "@/components/LessonEffectEditor";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1677,6 +1678,26 @@ function EditLessonDialog({ lesson, onClose, onSaved }: { lesson: any; onClose: 
           <div className="flex items-center gap-2">
             <Switch checked={requireManualComplete} onCheckedChange={setRequireManualComplete} id="edit-req-manual" />
             <Label htmlFor="edit-req-manual" className="text-sm">Show "Mark Complete" button (manual completion)</Label>
+          </div>
+
+          {/* Effects section */}
+          <div className="border-t pt-4">
+            <p className="text-sm font-semibold text-teal-700 mb-3 flex items-center gap-1.5"><Sparkles className="h-4 w-4" /> Lesson Effect</p>
+            <LessonEffectEditor
+              lessonId={lesson.id}
+              initialData={{
+                effectEnabled: lesson.effectEnabled,
+                effectTrigger: lesson.effectTrigger,
+                effectBannerText: lesson.effectBannerText,
+                effectBannerBgColor: lesson.effectBannerBgColor,
+                effectBannerTextColor: lesson.effectBannerTextColor,
+                effectSound: lesson.effectSound,
+                effectSoundUrl: lesson.effectSoundUrl,
+                effectConfetti: lesson.effectConfetti,
+                effectConfettiColors: lesson.effectConfettiColors,
+              }}
+              onSaved={onSaved}
+            />
           </div>
         </div>
         <DialogFooter>
