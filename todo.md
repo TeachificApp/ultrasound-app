@@ -1323,6 +1323,7 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Digital Downloads: Download analytics — track per-product download counts, show in admin
 - [x] Digital Downloads: Email delivery — send confirmation email with file links after purchase
 - [x] Digital Downloads: Bundle pricing — group products into discounted bundles with admin CRUD and public pages
-- [ ] Subdomain separation: Detect hostname and render LMS layout on learn.allaboutultrasound.com
-- [ ] Subdomain separation: Create dedicated LMS layout with its own navigation
-- [ ] Subdomain separation: Route LMS content (courses, quizzes, downloads) on learn subdomain
+- [x] Subdomain separation: Create useSubdomain hook to detect learn.allaboutultrasound.com
+- [x] Subdomain separation: Create LMSLayout with dedicated nav (Education Library, Digital Downloads, Media Repository)
+- [x] Subdomain separation: Conditionally render LMSLayout vs main Layout based on hostname
+- [x] Subdomain separation: On learn subdomain, only show LMS routes (education-library, learn/*, downloads/*, my-downloads, media-repository)

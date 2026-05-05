@@ -12,6 +12,8 @@ import DemoModeBanner from "./components/DemoModeBanner";
 import GetAppBanner from "./components/GetAppBanner";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { RoleGuard } from "@/components/RoleGuard";
+import LMSLayout from "./components/LMSLayout";
+import { isLearnDomain } from "./hooks/useSubdomain";
 
 // ── Core pages ────────────────────────────────────────────────────────────────
 import Home from "./pages/Home";
@@ -351,15 +353,62 @@ function Router() {
   );
 }
 
+/**
+ * LMSRouter — Routes shown only on the learn subdomain.
+ * Wraps all pages in LMSLayout with its own sidebar.
+ */
+function LMSRouter() {
+  return (
+    <LMSLayout>
+      <Switch>
+        {/* LMS Home — Education Library */}
+        <Route path="/" component={EducationLibrary} />
+        <Route path="/education-library" component={EducationLibrary} />
+        <Route path="/collections/:id" component={CollectionDetail} />
+        <Route path="/learn/:slug/player" component={CoursePlayer} />
+        <Route path="/learn/:slug" component={CourseLanding} />
+
+        {/* Digital Downloads */}
+        <Route path="/my-downloads" component={MyDownloads} />
+        <Route path="/downloads/:slug/files" component={DownloadFiles} />
+        <Route path="/downloads/:slug" component={DownloadLanding} />
+        <Route path="/downloads" component={DownloadsBrowse} />
+        <Route path="/bundles/:slug" component={BundleLanding} />
+
+        {/* Admin (platform_admin only) */}
+        <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/lms/:courseId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LandingPageBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/downloads/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><DownloadLandingPageBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/media-repository">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MediaRepository /></RoleGuard>}</Route>
+
+        {/* Auth pages (needed for login flow) */}
+        <Route path="/login" component={Login} />
+        <Route path="/register" component={Register} />
+        <Route path="/profile" component={Profile} />
+
+        {/* Fallback */}
+        <Route component={NotFound} />
+      </Switch>
+    </LMSLayout>
+  );
+}
+
 function App() {
+  const onLearnSubdomain = isLearnDomain();
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster />
-          <DemoModeBanner />
-          <GetAppBanner />
-          <Router />
+          {onLearnSubdomain ? (
+            <LMSRouter />
+          ) : (
+            <>
+              <DemoModeBanner />
+              <GetAppBanner />
+              <Router />
+            </>
+          )}
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>
