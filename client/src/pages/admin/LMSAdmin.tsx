@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import LessonEffectEditor from "@/components/LessonEffectEditor";
+import DigitalDownloadsAdmin from "./DigitalDownloadsAdmin";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -2587,7 +2588,7 @@ export default function LMSAdmin() {
           </TabsList>
           <TabsContent value="courses" className="mt-4"><CoursesTab onEdit={setEditingCourseId} typeFilter="course" /></TabsContent>
           <TabsContent value="quizzes" className="mt-4"><CoursesTab onEdit={setEditingCourseId} typeFilter="quiz" /></TabsContent>
-          <TabsContent value="downloads" className="mt-4"><CoursesTab onEdit={setEditingCourseId} typeFilter="download" /></TabsContent>
+          <TabsContent value="downloads" className="mt-4"><DigitalDownloadsAdmin /></TabsContent>
           <TabsContent value="enrollments" className="mt-4"><EnrollmentsTab /></TabsContent>
           <TabsContent value="groups" className="mt-4"><GroupsTab /></TabsContent>
           <TabsContent value="instructors" className="mt-4"><InstructorsTab /></TabsContent>

@@ -35,6 +35,10 @@ import CourseLanding from "./pages/CourseLanding";
 import CoursePlayer from "./pages/CoursePlayer";
 import LMSAdmin from "./pages/admin/LMSAdmin";
 import LandingPageBuilder from "./pages/admin/LandingPageBuilder";
+// ── Digital Downloads ──────────────────────────────────────────────────────────
+import DownloadsBrowse from "./pages/DownloadsBrowse";
+import DownloadLanding from "./pages/DownloadLanding";
+import DownloadFiles from "./pages/DownloadFiles";
 
 // ── UltrasoundAssist™ Hub ────────────────────────────────────────────────────
 import UltrasoundAssistHub from "./pages/UltrasoundAssistHub";
@@ -296,6 +300,10 @@ function Router() {
         <Route path="/collections/:id" component={CollectionDetail} />
         <Route path="/learn/:slug/player" component={CoursePlayer} />
         <Route path="/learn/:slug" component={CourseLanding} />
+        {/* ── Digital Downloads ─────────────────────────────────────────────────────────── */}
+        <Route path="/downloads/:slug/files" component={DownloadFiles} />
+        <Route path="/downloads/:slug" component={DownloadLanding} />
+        <Route path="/downloads" component={DownloadsBrowse} />
         <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
         <Route path="/admin/lms/:courseId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LandingPageBuilder /></RoleGuard>}</Route>
 

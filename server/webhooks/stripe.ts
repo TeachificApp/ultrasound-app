@@ -16,7 +16,7 @@
  */
 import type { Express, Request, Response } from "express";
 import { getDb, getUserByEmail } from "../db";
-import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions } from "../../drizzle/schema";
+import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases } from "../../drizzle/schema";
 import { and, eq } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 
@@ -163,6 +163,38 @@ async function handleLmsCheckoutCompleted(session: Record<string, unknown>) {
   console.log(`[Stripe] LMS order ${orderId} fulfilled for user ${userId}, course ${courseId}`);
 }
 
+async function handleDigitalDownloadCheckoutCompleted(session: Record<string, unknown>) {
+  const meta = (session.metadata as Record<string, string>) ?? {};
+  if (meta.type !== "digital_download") return; // Not a digital download purchase
+
+  const productId = meta.product_id ? parseInt(meta.product_id) : null;
+  const userId = meta.user_id ? parseInt(meta.user_id) : null;
+  if (!productId || !userId) return;
+
+  const db = await getDb();
+  if (!db) return;
+
+  // Check if already purchased (idempotent)
+  const [existing] = await db.select().from(digitalPurchases)
+    .where(and(eq(digitalPurchases.userId, userId), eq(digitalPurchases.productId, productId))).limit(1);
+  if (existing) {
+    console.log(`[Stripe] Digital download already purchased: user ${userId}, product ${productId}`);
+    return;
+  }
+
+  await db.insert(digitalPurchases).values({
+    userId,
+    productId,
+    stripeCheckoutSessionId: session.id as string,
+  });
+
+  await notifyOwner({
+    title: "📦 New Digital Download Purchase",
+    content: `User ID ${userId} purchased digital product ID ${productId}. Amount: $${(((session.amount_total as number) ?? 0) / 100).toFixed(2)}.`,
+  });
+  console.log(`[Stripe] Digital download purchase recorded: user ${userId}, product ${productId}`);
+}
+
 export function registerStripeWebhook(app: Express) {
   // Raw body needed for Stripe signature verification
   app.post(
@@ -243,6 +275,7 @@ export function registerStripeWebhook(app: Express) {
         if (eventType === "checkout.session.completed") {
           await handleCheckoutSessionCompleted(sessionObj);
           await handleLmsCheckoutCompleted(sessionObj);
+          await handleDigitalDownloadCheckoutCompleted(sessionObj);
         } else {
           console.log(`[Stripe] Unhandled event type: ${eventType}`);
         }

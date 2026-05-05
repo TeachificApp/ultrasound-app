@@ -1299,3 +1299,19 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add missing views: RVOT with MPA Bifurcation, 3VT, LBVC, LV Short Axis, RVOT Short Axis, Bicaval
 - [x] Match iHeartEcho UI layout: sidebar view list with sweep image, side-by-side images, structures, normal findings, technique, doppler, pitfalls, red flags
 - [x] Add prev/next navigation buttons and Diagram/Echo/Both image toggle
+
+## Digital Downloads (File Repository) — May 5, 2026
+- [x] DB: digital_products table (id, title, description, slug, price, thumbnailUrl, status, createdAt)
+- [x] DB: digital_product_files table (id, productId, fileName, fileUrl, fileKey, fileSize, mimeType, sortOrder)
+- [x] DB: digital_purchases table (id, userId, productId, stripePaymentIntentId, purchasedAt)
+- [x] tRPC: admin CRUD for digital products (create, update, delete, list, upload files)
+- [x] tRPC: public listing, product detail, purchase (Stripe checkout), download access
+- [x] Admin UI: Digital Downloads tab in Platform Admin (separate from LMS courses)
+- [x] Admin UI: product editor with file upload, landing page content, pricing
+- [x] Public: digital downloads browse page with product cards
+- [x] Public: product sales/landing page with purchase button
+- [x] Public: file delivery/download page after purchase
+- [x] Stripe webhook handler for digital download checkout completed
+- [x] Free product auto-grant without Stripe checkout
+- [x] Replace old LMS Downloads tab with new DigitalDownloadsAdmin component
+- [ ] Course integration: courses can attach digital download files to lessons

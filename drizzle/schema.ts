@@ -2978,3 +2978,53 @@ export const lmsCollectionCourses = mysqlTable("lms_collection_courses", {
   position: int("position").default(0).notNull(),
 });
 export type LmsCollectionCourse = typeof lmsCollectionCourses.$inferSelect;
+
+
+// ─── Digital Downloads (File Repository) ────────────────────────────────────
+export const digitalProducts = mysqlTable("digital_products", {
+  id: int("id").autoincrement().primaryKey(),
+  slug: varchar("slug", { length: 255 }).notNull().unique(),
+  title: varchar("title", { length: 255 }).notNull(),
+  subtitle: varchar("subtitle", { length: 500 }),
+  description: longtext("description"),
+  thumbnailUrl: text("thumbnail_url"),
+  price: int("price").default(0).notNull(), // cents
+  isFree: boolean("is_free").default(false).notNull(),
+  currency: varchar("currency", { length: 8 }).default("usd").notNull(),
+  status: mysqlEnum("status", ["draft", "published", "archived"]).default("draft").notNull(),
+  // Landing page content
+  landingHeadline: varchar("landing_headline", { length: 500 }),
+  landingBody: longtext("landing_body"),
+  landingFeatures: longtext("landing_features"), // JSON array of feature strings
+  // SEO
+  metaTitle: varchar("meta_title", { length: 255 }),
+  metaDescription: text("meta_description"),
+  // Stats
+  downloadCount: int("download_count").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type DigitalProduct = typeof digitalProducts.$inferSelect;
+
+export const digitalProductFiles = mysqlTable("digital_product_files", {
+  id: int("id").autoincrement().primaryKey(),
+  productId: int("product_id").notNull(),
+  fileName: varchar("file_name", { length: 500 }).notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileKey: varchar("file_key", { length: 500 }).notNull(),
+  fileSize: int("file_size").default(0).notNull(), // bytes
+  mimeType: varchar("mime_type", { length: 100 }),
+  sortOrder: int("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type DigitalProductFile = typeof digitalProductFiles.$inferSelect;
+
+export const digitalPurchases = mysqlTable("digital_purchases", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  productId: int("product_id").notNull(),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
+  stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 255 }),
+  purchasedAt: timestamp("purchased_at").defaultNow().notNull(),
+});
+export type DigitalPurchase = typeof digitalPurchases.$inferSelect;
