@@ -1318,3 +1318,4 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Digital Downloads: Add rich text editor to product description and landing body fields
 - [x] Digital Downloads: Add thumbnail image upload (not just URL paste)
 - [x] Digital Downloads: Integrate drag-and-drop WYSIWYG landing page builder (same as LMS courses)
+- [x] Digital Downloads: Price input should be in dollars and cents (not raw cents)

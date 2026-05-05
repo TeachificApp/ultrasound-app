@@ -142,7 +142,7 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
       title: product.title,
       subtitle: product.subtitle ?? "",
       description: product.description ?? "",
-      price: product.price,
+      price: (product.price / 100).toFixed(2),
       isFree: product.isFree,
       status: product.status,
       thumbnailUrl: product.thumbnailUrl ?? "",
@@ -158,7 +158,7 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
       title: form.title,
       subtitle: form.subtitle || null,
       description: form.description || null,
-      price: form.price,
+      price: Math.round(parseFloat(form.price || "0") * 100),
       isFree: form.isFree,
       status: form.status,
       thumbnailUrl: form.thumbnailUrl || null,
@@ -238,12 +238,12 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Price (cents)</Label>
-              <Input type="number" min={0} value={form.price ?? 0} onChange={(e) => setForm({ ...form, price: parseInt(e.target.value) || 0 })} disabled={form.isFree} />
-              <p className="text-xs text-muted-foreground mt-1">{form.isFree ? "Free" : `$${((form.price ?? 0) / 100).toFixed(2)}`}</p>
+              <Label>Price ($)</Label>
+              <Input type="number" min={0} step="0.01" value={form.price ?? "0.00"} onChange={(e) => setForm({ ...form, price: e.target.value })} disabled={form.isFree} placeholder="29.99" />
+              <p className="text-xs text-muted-foreground mt-1">{form.isFree ? "Free" : `$${parseFloat(form.price || "0").toFixed(2)}`}</p>
             </div>
             <div className="flex items-center gap-2 pt-6">
-              <Switch checked={form.isFree ?? false} onCheckedChange={(v) => setForm({ ...form, isFree: v, price: v ? 0 : form.price })} />
+              <Switch checked={form.isFree ?? false} onCheckedChange={(v) => setForm({ ...form, isFree: v, price: v ? "0.00" : form.price })} />
               <Label>Free product</Label>
             </div>
           </div>
