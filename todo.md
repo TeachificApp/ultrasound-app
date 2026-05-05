@@ -1327,3 +1327,7 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Subdomain separation: Create LMSLayout with dedicated nav (Education Library, Digital Downloads, Media Repository)
 - [x] Subdomain separation: Conditionally render LMSLayout vs main Layout based on hostname
 - [x] Subdomain separation: On learn subdomain, only show LMS routes (education-library, learn/*, downloads/*, my-downloads, media-repository)
+- [x] LMS subdomain: Dedicated home page with hero, featured courses, new downloads, and enrollment CTAs
+- [x] LMS subdomain: Admin can select/toggle featured courses (isFeatured toggle in course settings)
+- [x] LMS subdomain: All landing pages (courses + downloads) use WYSIWYG editor
+- [x] LMS subdomain: Platform Admin on main app can access/manage all LMS admin features (Digital Downloads link added)

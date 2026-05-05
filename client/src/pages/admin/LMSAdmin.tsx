@@ -781,6 +781,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
   const [installmentAmount, setInstallmentAmount] = useState(String(((course.installmentAmount ?? 0) / 100).toFixed(2)));
   const [installmentIntervalDays, setInstallmentIntervalDays] = useState(String(course.installmentIntervalDays ?? 30));
   const [hasCertificate, setHasCertificate] = useState(course.hasCertificate);
+  const [isFeatured, setIsFeatured] = useState(course.isFeatured ?? false);
   const [coverImageUrl, setCoverImageUrl] = useState(course.coverImageUrl ?? "");
 
   return (
@@ -997,6 +998,11 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
         <Label htmlFor="cert-switch" className="text-sm">Certificate of completion</Label>
       </div>
 
+      <div className="flex items-center gap-2">
+        <Switch checked={isFeatured} onCheckedChange={setIsFeatured} id="featured-switch" />
+        <Label htmlFor="featured-switch" className="text-sm">Featured on LMS Home Page</Label>
+      </div>
+
       <div>
         <Label className="text-sm">Description (rich text)</Label>
         <div className="mt-1">
@@ -1013,6 +1019,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
           pricingType,
           isFree: pricingType === "free",
           hasCertificate,
+          isFeatured,
           price: pricingType === "free" ? 0 : Math.round(parseFloat(price || "0") * 100),
           subscriptionInterval: pricingType === "subscription" ? subscriptionInterval : null,
           downPayment: pricingType === "payment_plan" ? Math.round(parseFloat(downPayment || "0") * 100) : null,
@@ -2551,7 +2558,8 @@ function AnalyticsTab() {
 // ─── Main LMSAdmin Component ──────────────────────────────────────────────────
 
 export default function LMSAdmin() {
-  const [activeTab, setActiveTab] = useState("courses");
+  const urlTab = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("tab") : null;
+  const [activeTab, setActiveTab] = useState(urlTab || "courses");
   const [editingCourseId, setEditingCourseId] = useState<number | null>(null);
 
   return (

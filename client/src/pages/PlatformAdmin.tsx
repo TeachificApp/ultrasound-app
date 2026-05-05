@@ -61,6 +61,7 @@ import {
   Image,
   HardDrive,
   GraduationCap,
+  FileDown,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import BulkCsvUploadPanel, { type BulkResult } from "@/components/BulkCsvUploadPanel";
@@ -1079,6 +1080,13 @@ export default function PlatformAdmin() {
                 label: "Education Library",
                 description: "Course creator, quiz builder, enrollments, group seats, instructors, and affiliate management",
                 color: "#0d9488",
+              },
+              {
+                href: "/admin/lms?tab=downloads",
+                icon: FileDown,
+                label: "Digital Downloads",
+                description: "Manage downloadable products, bundles, analytics, and file delivery",
+                color: "#0891b2",
               },
             ].map(({ href, icon: Icon, label, description, color }) => (
               <Link key={href} href={href}>

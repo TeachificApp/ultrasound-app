@@ -210,6 +210,28 @@ export const lmsPublicRouter = router({
       return { courses: enriched, total: Number(count), page: input.page, pageSize: input.pageSize };
     }),
 
+  /** List featured courses for LMS home page */
+  listFeatured: publicProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const courses = await db.select().from(lmsCourses)
+      .where(and(eq(lmsCourses.status, "public"), eq(lmsCourses.isFeatured, true)))
+      .orderBy(desc(lmsCourses.updatedAt))
+      .limit(8);
+    // Attach primary instructor
+    const enriched = await Promise.all(courses.map(async (c) => {
+      const [ci] = await db.select({ instructorId: lmsCourseInstructors.instructorId }).from(lmsCourseInstructors)
+        .where(and(eq(lmsCourseInstructors.courseId, c.id), eq(lmsCourseInstructors.isPrimary, true))).limit(1);
+      let instructor = null;
+      if (ci) {
+        const [ins] = await db.select().from(lmsInstructors).where(eq(lmsInstructors.id, ci.instructorId)).limit(1);
+        instructor = ins ?? null;
+      }
+      return { ...c, instructor };
+    }));
+    return enriched;
+  }),
+
   /** Get a single course by slug (public or preview) */
   getCourse: publicProcedure
     .input(z.object({ slug: z.string() }))
@@ -896,6 +918,7 @@ export const lmsAdminRouter = router({
       installmentAmount: z.number().int().min(0).nullable().optional(),
       installmentIntervalDays: z.number().int().min(1).nullable().optional(),
       hasCertificate: z.boolean().optional(),
+      isFeatured: z.boolean().optional(),
       isDrip: z.boolean().optional(),
       metaTitle: z.string().optional(),
       metaDescription: z.string().optional(),

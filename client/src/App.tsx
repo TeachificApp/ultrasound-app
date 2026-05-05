@@ -32,6 +32,7 @@ import Premium from "./pages/Premium";
 
 // ── LMS — Education Library ─────────────────────────────────────────────────
 import EducationLibrary from "./pages/EducationLibrary";
+import LMSHome from "./pages/LMSHome";
 import CollectionDetail from "./pages/CollectionDetail";
 import CourseLanding from "./pages/CourseLanding";
 import CoursePlayer from "./pages/CoursePlayer";
@@ -361,8 +362,8 @@ function LMSRouter() {
   return (
     <LMSLayout>
       <Switch>
-        {/* LMS Home — Education Library */}
-        <Route path="/" component={EducationLibrary} />
+        {/* LMS Home */}
+        <Route path="/" component={LMSHome} />
         <Route path="/education-library" component={EducationLibrary} />
         <Route path="/collections/:id" component={CollectionDetail} />
         <Route path="/learn/:slug/player" component={CoursePlayer} />

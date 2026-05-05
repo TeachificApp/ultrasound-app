@@ -2699,6 +2699,8 @@ export const lmsCourses = mysqlTable("lms_courses", {
   metaDescription: text("meta_description"),
   // Completion certificate
   hasCertificate: boolean("has_certificate").default(false).notNull(),
+  // Featured: admin-selectable to show on LMS home page
+  isFeatured: boolean("is_featured").default(false).notNull(),
   // Drip: unlock all immediately (false) or by schedule (true)
   isDrip: boolean("is_drip").default(false).notNull(),
   createdByUserId: int("created_by_user_id").notNull(),
