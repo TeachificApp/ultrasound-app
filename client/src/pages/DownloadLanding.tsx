@@ -1,6 +1,8 @@
 /**
  * DownloadLanding.tsx
  * Public landing/sales page for a single digital product — /downloads/:slug
+ * Renders blocks from the page builder when available, otherwise falls back to the
+ * standard layout using landingBody / landingFeatures fields.
  */
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -14,6 +16,243 @@ import { FileDown, Check, ShoppingCart, Download, ArrowLeft } from "lucide-react
 import { Link } from "wouter";
 import { getLoginUrl } from "@/const";
 
+// ─── Block type (matches builder) ─────────────────────────────────────────────
+interface Block { id: string; type: string; data: Record<string, any>; }
+
+// ─── Block Renderer ───────────────────────────────────────────────────────────
+function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug }: {
+  block: Block; onBuy: () => void; buying: boolean; price: string; hasPurchased: boolean; slug: string;
+}) {
+  const d = block.data;
+  switch (block.type) {
+    case "hero": {
+      const buttons = d.buttons ?? [{ text: "Buy Now", color: "#ffffff", textColor: "#179ca3", style: "filled" }];
+      const bgStyle: React.CSSProperties = d.imageUrl
+        ? { backgroundImage: `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url(${d.imageUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
+        : d.bgType === "gradient"
+          ? { background: `linear-gradient(${d.gradientDir ?? "to bottom right"}, ${d.gradientFrom ?? "#179ca3"}, ${d.gradientTo ?? "#0e4a50"})` }
+          : { backgroundColor: d.bgColor ?? "#179ca3" };
+      return (
+        <div style={{ ...bgStyle, color: d.textColor ?? "#fff", textAlign: d.align ?? "left" }} className="px-8 py-20">
+          <div className="max-w-4xl mx-auto">
+            <h1 className="text-4xl font-bold mb-4 leading-tight">{d.headline}</h1>
+            {d.subheadline && <p className="text-xl opacity-90 mb-8">{d.subheadline}</p>}
+            <div className="flex flex-wrap gap-3" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
+              {buttons.map((btn: any, i: number) => (
+                <button key={i} onClick={btn.link ? () => { window.location.href = btn.link; } : hasPurchased ? () => { window.location.href = `/downloads/${slug}/files`; } : onBuy}
+                  disabled={buying}
+                  className="px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-opacity hover:opacity-90 disabled:opacity-60"
+                  style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
+                  {hasPurchased ? "Access Files" : btn.text}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+    case "text":
+      return (
+        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff", color: d.textColor ?? "#1a1a1a", textAlign: d.align ?? "left" }}>
+          <div className="max-w-3xl mx-auto prose" dangerouslySetInnerHTML={{ __html: d.html ?? "" }} />
+        </div>
+      );
+    case "image":
+      return (
+        <div className="px-8 py-6 text-center">
+          {d.url && <img src={d.url} alt={d.alt ?? ""} className="mx-auto rounded-lg shadow" style={{ maxWidth: d.maxWidth ?? "100%" }} />}
+          {d.caption && <p className="text-sm text-gray-500 mt-2">{d.caption}</p>}
+        </div>
+      );
+    case "video": {
+      let embedUrl = d.url ?? "";
+      if (embedUrl.includes("youtube.com/watch")) {
+        const vid = new URL(embedUrl).searchParams.get("v");
+        embedUrl = `https://www.youtube.com/embed/${vid}`;
+      } else if (embedUrl.includes("youtu.be/")) {
+        embedUrl = `https://www.youtube.com/embed/${embedUrl.split("youtu.be/")[1]}`;
+      }
+      return (
+        <div className="px-8 py-6 max-w-4xl mx-auto">
+          {embedUrl && (
+            <div className="relative w-full rounded-lg overflow-hidden shadow" style={{ paddingBottom: "56.25%" }}>
+              <iframe src={embedUrl} className="absolute inset-0 w-full h-full" allowFullScreen title="Video" />
+            </div>
+          )}
+        </div>
+      );
+    }
+    case "bullets":
+      return (
+        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
+          <div className="max-w-3xl mx-auto">
+            {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900">{d.headline}</h2>}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {(d.items ?? []).map((item: string, i: number) => (
+                <div key={i} className="flex items-start gap-3">
+                  <span className="mt-0.5 flex-shrink-0 text-lg" style={{ color: d.iconColor ?? "#179ca3" }}>✓</span>
+                  <span className="text-gray-700">{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    case "numbered_list":
+      return (
+        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <div className="max-w-2xl mx-auto">
+            {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900">{d.headline}</h2>}
+            <div className="space-y-4">
+              {(d.items ?? []).map((item: string, i: number) => (
+                <div key={i} className="flex items-start gap-4">
+                  <span className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold" style={{ backgroundColor: d.accentColor ?? "#179ca3" }}>{i + 1}</span>
+                  <span className="text-gray-700 pt-1">{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    case "testimonial":
+      return (
+        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f0fdfa" }}>
+          <div className="max-w-2xl mx-auto text-center">
+            <blockquote className="text-xl italic text-gray-700 mb-4">"{d.quote}"</blockquote>
+            <div className="flex items-center justify-center gap-3">
+              {d.avatarUrl && <img src={d.avatarUrl} alt="" className="w-10 h-10 rounded-full object-cover" />}
+              <div>
+                <p className="font-semibold text-gray-900">{d.author}</p>
+                {d.role && <p className="text-sm text-gray-500">{d.role}</p>}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    case "pricing_cta":
+      return (
+        <div className="px-8 py-12 text-center" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          {d.headline && <h2 className="text-3xl font-bold text-gray-900 mb-3">{d.headline}</h2>}
+          {d.subtext && <p className="text-gray-600 mb-6 max-w-xl mx-auto">{d.subtext}</p>}
+          {d.showPrice && <p className="text-4xl font-bold mb-6" style={{ color: d.ctaColor ?? "#179ca3" }}>{price}</p>}
+          <button
+            onClick={hasPurchased ? () => { window.location.href = `/downloads/${slug}/files`; } : onBuy}
+            disabled={buying}
+            className="px-10 py-4 rounded-xl font-bold text-lg shadow-lg disabled:opacity-60 transition-opacity hover:opacity-90"
+            style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}
+          >
+            {buying ? "Processing…" : hasPurchased ? "Access Your Files" : (d.ctaText ?? `Buy Now — ${price}`)}
+          </button>
+        </div>
+      );
+    case "cta_standalone":
+      return (
+        <div className="px-8 py-8" style={{ textAlign: d.align ?? "center" }}>
+          <button
+            onClick={d.link ? () => { window.location.href = d.link; } : hasPurchased ? () => { window.location.href = `/downloads/${slug}/files`; } : onBuy}
+            disabled={buying}
+            className={`inline-block px-8 py-3 rounded-lg font-semibold shadow disabled:opacity-60 transition-opacity hover:opacity-90 ${d.size === "lg" ? "text-lg px-10 py-4" : ""}`}
+            style={{ backgroundColor: d.color ?? "#179ca3", color: d.textColor ?? "#fff" }}
+          >
+            {hasPurchased ? "Access Files" : (d.text ?? "Buy Now")}
+          </button>
+        </div>
+      );
+    case "faq":
+      return (
+        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <div className="max-w-3xl mx-auto">
+            {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900">{d.headline}</h2>}
+            <div className="space-y-2">
+              {(d.items ?? []).map((item: any, i: number) => (
+                <details key={i} className="group border border-gray-200 rounded-lg overflow-hidden">
+                  <summary className="px-5 py-4 cursor-pointer font-medium text-gray-800 hover:bg-gray-50">{item.q}</summary>
+                  <div className="px-5 py-4 text-gray-600 border-t border-gray-100">{item.a}</div>
+                </details>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    case "alert": {
+      const alertStyles: Record<string, string> = { info: "bg-blue-50 border-blue-300 text-blue-800", success: "bg-green-50 border-green-300 text-green-800", warning: "bg-yellow-50 border-yellow-300 text-yellow-800", error: "bg-red-50 border-red-300 text-red-800" };
+      return (
+        <div className={`mx-8 my-4 px-5 py-4 rounded-lg border-l-4 flex items-start gap-3 ${alertStyles[d.type ?? "info"] ?? alertStyles.info}`}>
+          <p className="font-medium">{d.title && <strong>{d.title}: </strong>}{d.message}</p>
+        </div>
+      );
+    }
+    case "reviews":
+      return (
+        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <div className="max-w-4xl mx-auto">
+            {d.headline && <h2 className="text-2xl font-bold mb-6 text-center text-gray-900">{d.headline}</h2>}
+            <div className="grid md:grid-cols-2 gap-4">
+              {(d.items ?? []).map((item: any, i: number) => (
+                <div key={i} className="p-5 rounded-lg border bg-white shadow-sm">
+                  <div className="flex items-center gap-1 mb-2">
+                    {Array.from({ length: item.rating ?? 5 }).map((_, j) => <span key={j} className="text-yellow-400">★</span>)}
+                  </div>
+                  <p className="text-gray-700 text-sm mb-2">{item.text}</p>
+                  <p className="text-xs font-semibold text-gray-500">— {item.name}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    case "icon_grid":
+      return (
+        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <div className="max-w-4xl mx-auto">
+            {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900">{d.headline}</h2>}
+            <div className="grid gap-6" style={{ gridTemplateColumns: `repeat(${d.columns ?? 3}, 1fr)` }}>
+              {(d.items ?? []).map((item: any, i: number) => (
+                <div key={i} className="text-center p-4">
+                  <div className="text-4xl mb-3">{item.icon}</div>
+                  <h3 className="font-semibold text-gray-900 mb-1">{item.title}</h3>
+                  <p className="text-sm text-gray-600">{item.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    case "gallery":
+      return (
+        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <div className="grid gap-4 max-w-4xl mx-auto" style={{ gridTemplateColumns: `repeat(${d.columns ?? 3}, 1fr)` }}>
+            {(d.images ?? []).map((img: string, i: number) => (
+              <div key={i} className="rounded-lg overflow-hidden shadow">
+                <img src={img} alt="" className="w-full h-40 object-cover" />
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    case "two_column":
+      return (
+        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <div className="max-w-4xl mx-auto grid gap-8" style={{ gridTemplateColumns: `${d.leftRatio ?? 50}% 1fr` }}>
+            <div className="prose" dangerouslySetInnerHTML={{ __html: d.leftHtml ?? "" }} />
+            <div className="prose" dangerouslySetInnerHTML={{ __html: d.rightHtml ?? "" }} />
+          </div>
+        </div>
+      );
+    case "spacer":
+      return <div style={{ height: d.height ?? 48 }} />;
+    case "divider":
+      return (
+        <div style={{ padding: `${(d.spacing ?? 32) / 2}px 2rem` }}>
+          <hr style={{ borderColor: d.color ?? "#e5e7eb", borderWidth: `${d.thickness ?? 1}px 0 0 0` }} />
+        </div>
+      );
+    default:
+      return null;
+  }
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function DownloadLanding() {
   const { slug } = useParams<{ slug: string }>();
   const { user } = useAuth();
@@ -73,6 +312,24 @@ export default function DownloadLanding() {
     checkoutMut.mutate({ productId: product.id });
   };
 
+  // ── Parse landing page blocks ──
+  let blocks: Block[] = [];
+  if (product.landingBlocks) {
+    try { blocks = typeof product.landingBlocks === "string" ? JSON.parse(product.landingBlocks) : product.landingBlocks; } catch { blocks = []; }
+  }
+
+  // ── Blocks-based rendering ──
+  if (blocks.length > 0) {
+    return (
+      <div className="min-h-screen bg-white">
+        {blocks.map(block => (
+          <RenderBlock key={block.id} block={block} onBuy={handleBuy} buying={checkoutMut.isPending} price={price} hasPurchased={hasPurchased} slug={slug!} />
+        ))}
+      </div>
+    );
+  }
+
+  // ── Fallback: standard layout ──
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Hero */}
@@ -120,15 +377,11 @@ export default function DownloadLanding() {
           {/* Main content */}
           <div className="md:col-span-2 space-y-8">
             {product.landingBody && (
-              <div className="prose prose-gray max-w-none">
-                <div dangerouslySetInnerHTML={{ __html: product.landingBody.replace(/\n/g, "<br/>") }} />
-              </div>
+              <div className="prose prose-gray max-w-none" dangerouslySetInnerHTML={{ __html: product.landingBody }} />
             )}
 
             {product.description && !product.landingBody && (
-              <div className="prose prose-gray max-w-none">
-                <div dangerouslySetInnerHTML={{ __html: product.description.replace(/\n/g, "<br/>") }} />
-              </div>
+              <div className="prose prose-gray max-w-none" dangerouslySetInnerHTML={{ __html: product.description }} />
             )}
 
             {/* Features */}

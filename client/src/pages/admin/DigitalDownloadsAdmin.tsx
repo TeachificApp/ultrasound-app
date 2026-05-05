@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Upload, FileIcon, GripVertical, ArrowLeft, ExternalLink, Eye, EyeOff } from "lucide-react";
+import { Plus, Pencil, Trash2, Upload, FileIcon, GripVertical, ArrowLeft, ExternalLink, Eye, EyeOff, Image as ImageIcon, Link as LinkIcon } from "lucide-react";
+import RichTextEditor from "@/components/RichTextEditor";
 
 // ─── Product List View ──────────────────────────────────────────────────────
 function ProductList({ onEdit }: { onEdit: (id: number) => void }) {
@@ -118,6 +120,7 @@ function CreateProductDialog({ open, onClose, onCreated }: { open: boolean; onCl
 // ─── Product Editor ─────────────────────────────────────────────────────────
 function ProductEditor({ productId, onBack }: { productId: number; onBack: () => void }) {
   const { data: product, isLoading } = trpc.downloadsAdmin.get.useQuery({ id: productId });
+  const [, navigate] = useLocation();
   const utils = trpc.useUtils();
   const updateMut = trpc.downloadsAdmin.update.useMutation({
     onSuccess: () => { utils.downloadsAdmin.get.invalidate({ id: productId }); utils.downloadsAdmin.list.invalidate(); toast.success("Saved"); },
@@ -126,6 +129,8 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
 
   const [form, setForm] = useState<Record<string, any>>({});
   const initialized = useRef(false);
+  const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
+  const thumbnailInputRef = useRef<HTMLInputElement>(null);
 
   if (isLoading) return <div className="text-center py-8 text-muted-foreground">Loading...</div>;
   if (!product) return <div className="text-center py-8 text-muted-foreground">Product not found</div>;
@@ -163,12 +168,51 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
     });
   };
 
+  const handleThumbnailUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10_000_000) { toast.error("Image must be under 10 MB"); return; }
+    e.target.value = "";
+    setUploadingThumbnail(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload-course-image", { method: "POST", credentials: "include", body: fd });
+      if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error ?? "Upload failed"); }
+      const { url } = await res.json();
+      setForm((prev: any) => ({ ...prev, thumbnailUrl: url }));
+      toast.success("Thumbnail uploaded");
+    } catch (err: any) {
+      toast.error(`Upload failed: ${err.message}`);
+    } finally {
+      setUploadingThumbnail(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft className="w-4 h-4 mr-1" /> Back</Button>
         <h3 className="text-lg font-semibold flex-1">{product.title}</h3>
         <Badge variant={product.status === "published" ? "default" : "outline"}>{product.status}</Badge>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <Button
+          size="sm" variant="outline"
+          className="text-xs"
+          onClick={() => navigate(`/admin/downloads/${productId}/landing-builder`)}
+        >
+          <LinkIcon className="w-3 h-3 mr-1" /> Edit Landing Page
+        </Button>
+        {product.slug && (
+          <a href={`/downloads/${product.slug}`} target="_blank" rel="noopener noreferrer">
+            <Button size="sm" variant="ghost" className="text-xs text-gray-500 hover:text-teal-600">
+              <Eye className="w-3 h-3 mr-1" /> View Public Page
+            </Button>
+          </a>
+        )}
       </div>
 
       {/* General Settings */}
@@ -184,8 +228,13 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
             <Input value={form.subtitle ?? ""} onChange={(e) => setForm({ ...form, subtitle: e.target.value })} placeholder="Short tagline" />
           </div>
           <div>
-            <Label>Description</Label>
-            <Textarea value={form.description ?? ""} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={4} placeholder="Detailed product description..." />
+            <Label>Description (Rich Text)</Label>
+            <RichTextEditor
+              value={form.description ?? ""}
+              onChange={(html) => setForm({ ...form, description: html })}
+              placeholder="Detailed product description..."
+              minHeight={120}
+            />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -199,9 +248,35 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
             </div>
           </div>
           <div>
-            <Label>Thumbnail URL</Label>
-            <Input value={form.thumbnailUrl ?? ""} onChange={(e) => setForm({ ...form, thumbnailUrl: e.target.value })} placeholder="https://..." />
-            {form.thumbnailUrl && <img src={form.thumbnailUrl} alt="" className="w-20 h-20 rounded object-cover mt-2" />}
+            <Label>Thumbnail</Label>
+            <div className="flex items-start gap-3 mt-1">
+              {form.thumbnailUrl ? (
+                <img src={form.thumbnailUrl} alt="" className="w-24 h-24 rounded object-cover border" />
+              ) : (
+                <div className="w-24 h-24 rounded border-2 border-dashed flex items-center justify-center bg-muted/30">
+                  <ImageIcon className="w-8 h-8 text-muted-foreground" />
+                </div>
+              )}
+              <div className="flex flex-col gap-2">
+                <input ref={thumbnailInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={handleThumbnailUpload} />
+                <Button size="sm" variant="outline" onClick={() => thumbnailInputRef.current?.click()} disabled={uploadingThumbnail}>
+                  <Upload className="w-3 h-3 mr-1" /> {uploadingThumbnail ? "Uploading..." : "Upload Image"}
+                </Button>
+                <div className="flex items-center gap-1">
+                  <Input
+                    className="text-xs h-7"
+                    value={form.thumbnailUrl ?? ""}
+                    onChange={(e) => setForm({ ...form, thumbnailUrl: e.target.value })}
+                    placeholder="Or paste URL..."
+                  />
+                </div>
+                {form.thumbnailUrl && (
+                  <button className="text-xs text-destructive hover:underline self-start" onClick={() => setForm({ ...form, thumbnailUrl: "" })}>
+                    Remove
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <Label>Status</Label>
@@ -220,20 +295,39 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
 
       {/* Landing Page Content */}
       <Card>
-        <CardHeader><CardTitle className="text-sm">Landing Page Content</CardTitle></CardHeader>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm">Landing Page Content</CardTitle>
+            <Button
+              size="sm" variant="outline"
+              className="text-xs h-7"
+              onClick={() => navigate(`/admin/downloads/${productId}/landing-builder`)}
+            >
+              <LinkIcon className="w-3 h-3 mr-1" /> Open Page Builder
+            </Button>
+          </div>
+        </CardHeader>
         <CardContent className="space-y-4">
           <div>
             <Label>Headline</Label>
             <Input value={form.landingHeadline ?? ""} onChange={(e) => setForm({ ...form, landingHeadline: e.target.value })} placeholder="Compelling headline for the sales page" />
           </div>
           <div>
-            <Label>Body (Markdown supported)</Label>
-            <Textarea value={form.landingBody ?? ""} onChange={(e) => setForm({ ...form, landingBody: e.target.value })} rows={6} placeholder="Detailed description of what buyers will get..." />
+            <Label>Body (Rich Text)</Label>
+            <RichTextEditor
+              value={form.landingBody ?? ""}
+              onChange={(html) => setForm({ ...form, landingBody: html })}
+              placeholder="Detailed description of what buyers will get..."
+              minHeight={150}
+            />
           </div>
           <div>
             <Label>Features (one per line)</Label>
             <Textarea value={form.landingFeatures ?? ""} onChange={(e) => setForm({ ...form, landingFeatures: e.target.value })} rows={4} placeholder="Feature 1&#10;Feature 2&#10;Feature 3" />
           </div>
+          <p className="text-xs text-muted-foreground">
+            For a full drag-and-drop landing page, use the <strong>Page Builder</strong> above. The fields here serve as fallback content when no builder blocks are configured.
+          </p>
         </CardContent>
       </Card>
 

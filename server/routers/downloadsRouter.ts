@@ -268,6 +268,7 @@ export const downloadsAdminRouter = router({
       landingHeadline: z.string().nullable().optional(),
       landingBody: z.string().nullable().optional(),
       landingFeatures: z.string().nullable().optional(),
+      landingBlocks: z.string().nullable().optional(),
       metaTitle: z.string().nullable().optional(),
       metaDescription: z.string().nullable().optional(),
     }))
@@ -277,6 +278,50 @@ export const downloadsAdminRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const { id, ...data } = input;
       await db.update(digitalProducts).set(data).where(eq(digitalProducts.id, id));
+      return { success: true };
+    }),
+
+  /** Get landing page blocks for a digital product */
+  getLandingBlocks: protectedProcedure
+    .input(z.object({ productId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [product] = await db.select({
+        id: digitalProducts.id,
+        title: digitalProducts.title,
+        slug: digitalProducts.slug,
+        subtitle: digitalProducts.subtitle,
+        thumbnailUrl: digitalProducts.thumbnailUrl,
+        landingBlocks: digitalProducts.landingBlocks,
+        landingHeadline: digitalProducts.landingHeadline,
+      }).from(digitalProducts).where(eq(digitalProducts.id, input.productId)).limit(1);
+      if (!product) throw new TRPCError({ code: "NOT_FOUND" });
+      return {
+        blocks: product.landingBlocks ? JSON.parse(product.landingBlocks) : null,
+        productTitle: product.title,
+        productSlug: product.slug,
+        heroTitle: product.landingHeadline ?? product.title,
+        heroSubtitle: product.subtitle ?? "",
+        heroImageUrl: product.thumbnailUrl ?? "",
+      };
+    }),
+
+  /** Save landing page blocks for a digital product */
+  saveLandingBlocks: protectedProcedure
+    .input(z.object({
+      productId: z.number(),
+      blocks: z.array(z.any()),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const blocksJson = JSON.stringify(input.blocks);
+      await db.update(digitalProducts)
+        .set({ landingBlocks: blocksJson })
+        .where(eq(digitalProducts.id, input.productId));
       return { success: true };
     }),
 

@@ -1315,3 +1315,6 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Free product auto-grant without Stripe checkout
 - [x] Replace old LMS Downloads tab with new DigitalDownloadsAdmin component
 - [ ] Course integration: courses can attach digital download files to lessons
+- [x] Digital Downloads: Add rich text editor to product description and landing body fields
+- [x] Digital Downloads: Add thumbnail image upload (not just URL paste)
+- [x] Digital Downloads: Integrate drag-and-drop WYSIWYG landing page builder (same as LMS courses)

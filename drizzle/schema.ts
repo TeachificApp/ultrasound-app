@@ -2996,6 +2996,7 @@ export const digitalProducts = mysqlTable("digital_products", {
   landingHeadline: varchar("landing_headline", { length: 500 }),
   landingBody: longtext("landing_body"),
   landingFeatures: longtext("landing_features"), // JSON array of feature strings
+  landingBlocks: longtext("landing_blocks"), // JSON array of page builder blocks
   // SEO
   metaTitle: varchar("meta_title", { length: 255 }),
   metaDescription: text("meta_description"),
