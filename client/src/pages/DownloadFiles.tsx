@@ -98,6 +98,7 @@ export default function DownloadFiles() {
     );
   }
 
+  const trackDownload = trpc.downloadsLearner.trackDownload.useMutation();
   const files = downloadData?.files ?? [];
 
   return (
@@ -149,7 +150,8 @@ export default function DownloadFiles() {
                       {file.mimeType && <Badge variant="outline" className="text-xs">{file.mimeType.split("/")[1]?.toUpperCase()}</Badge>}
                     </div>
                   </div>
-                  <a href={file.fileUrl} target="_blank" rel="noopener noreferrer" download={file.fileName}>
+                  <a href={file.fileUrl} target="_blank" rel="noopener noreferrer" download={file.fileName}
+                    onClick={() => trackDownload.mutate({ productId: product!.id, fileId: file.id })}>
                     <Button size="sm" variant="outline" className="gap-1">
                       <Download className="w-4 h-4" /> Download
                     </Button>

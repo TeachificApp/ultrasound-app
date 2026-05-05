@@ -41,6 +41,7 @@ import DownloadLanding from "./pages/DownloadLanding";
 import DownloadFiles from "./pages/DownloadFiles";
 import DownloadLandingPageBuilder from "./pages/admin/DownloadLandingPageBuilder";
 import MyDownloads from "./pages/MyDownloads";
+import BundleLanding from "./pages/BundleLanding";
 
 // ── UltrasoundAssist™ Hub ────────────────────────────────────────────────────
 import UltrasoundAssistHub from "./pages/UltrasoundAssistHub";
@@ -307,6 +308,7 @@ function Router() {
         <Route path="/downloads/:slug/files" component={DownloadFiles} />
         <Route path="/downloads/:slug" component={DownloadLanding} />
         <Route path="/downloads" component={DownloadsBrowse} />
+        <Route path="/bundles/:slug" component={BundleLanding} />
         <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
         <Route path="/admin/lms/:courseId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/downloads/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><DownloadLandingPageBuilder /></RoleGuard>}</Route>

@@ -1,0 +1,303 @@
+/**
+ * BundlesAdmin.tsx — Admin CRUD for digital product bundles
+ */
+import { useState } from "react";
+import { trpc } from "@/lib/trpc";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { toast } from "sonner";
+import { Plus, Pencil, Trash2, Package, ArrowLeft, Check } from "lucide-react";
+
+function BundleList({ onEdit }: { onEdit: (id: number) => void }) {
+  const { data: bundles, isLoading } = trpc.downloadsAdmin.listBundles.useQuery();
+  const utils = trpc.useUtils();
+  const deleteMut = trpc.downloadsAdmin.deleteBundle.useMutation({
+    onSuccess: () => { utils.downloadsAdmin.listBundles.invalidate(); toast.success("Bundle deleted"); },
+  });
+  const [showCreate, setShowCreate] = useState(false);
+
+  if (isLoading) return <div className="text-center py-8 text-muted-foreground">Loading...</div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Product Bundles</h3>
+        <Button size="sm" onClick={() => setShowCreate(true)}>
+          <Plus className="w-4 h-4 mr-1" /> New Bundle
+        </Button>
+      </div>
+
+      {(!bundles || bundles.length === 0) ? (
+        <Card className="border-dashed">
+          <CardContent className="py-12 text-center">
+            <Package className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
+            <p className="text-muted-foreground">No bundles yet. Create one to offer discounted product collections.</p>
+            <Button variant="outline" size="sm" className="mt-3" onClick={() => setShowCreate(true)}>
+              <Plus className="w-4 h-4 mr-1" /> Create Your First Bundle
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-3">
+          {bundles.map((b) => (
+            <Card key={b.id} className="hover:border-teal-500/50 transition-colors">
+              <CardContent className="p-4 flex items-center gap-4">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-teal-100 to-cyan-100 flex items-center justify-center flex-shrink-0">
+                  <Package className="w-5 h-5 text-teal-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate">{b.title}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-xs text-muted-foreground">{b.items.length} product{b.items.length !== 1 ? "s" : ""}</span>
+                    <span className="text-xs text-muted-foreground">·</span>
+                    <span className="text-xs font-medium text-green-600">
+                      ${(b.discountPrice / 100).toFixed(2)}
+                    </span>
+                    {b.originalPrice > b.discountPrice && (
+                      <span className="text-xs text-muted-foreground line-through">
+                        ${(b.originalPrice / 100).toFixed(2)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <Badge variant={b.status === "published" ? "default" : "secondary"} className="text-xs">
+                  {b.status}
+                </Badge>
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="sm" onClick={() => onEdit(b.id)}>
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="text-destructive" onClick={() => {
+                    if (confirm("Delete this bundle?")) deleteMut.mutate({ id: b.id });
+                  }}>
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {showCreate && <CreateBundleDialog open={showCreate} onClose={() => setShowCreate(false)} />}
+    </div>
+  );
+}
+
+function CreateBundleDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [title, setTitle] = useState("");
+  const [subtitle, setSubtitle] = useState("");
+  const utils = trpc.useUtils();
+  const createMut = trpc.downloadsAdmin.createBundle.useMutation({
+    onSuccess: () => {
+      utils.downloadsAdmin.listBundles.invalidate();
+      toast.success("Bundle created");
+      onClose();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Create New Bundle</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label>Title</Label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g., Complete Ultrasound Resource Pack" />
+          </div>
+          <div>
+            <Label>Subtitle (optional)</Label>
+            <Input value={subtitle} onChange={(e) => setSubtitle(e.target.value)} placeholder="Save 40% on all resources" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={() => createMut.mutate({ title, subtitle: subtitle || undefined })} disabled={!title || createMut.isPending}>
+            Create Bundle
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function BundleEditor({ bundleId, onBack }: { bundleId: number; onBack: () => void }) {
+  const { data: bundles } = trpc.downloadsAdmin.listBundles.useQuery();
+  const { data: allProducts } = trpc.downloadsAdmin.list.useQuery();
+  const utils = trpc.useUtils();
+  const updateMut = trpc.downloadsAdmin.updateBundle.useMutation({
+    onSuccess: () => { utils.downloadsAdmin.listBundles.invalidate(); toast.success("Bundle updated"); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const bundle = bundles?.find((b) => b.id === bundleId);
+  const [title, setTitle] = useState(bundle?.title ?? "");
+  const [subtitle, setSubtitle] = useState(bundle?.subtitle ?? "");
+  const [description, setDescription] = useState(bundle?.description ?? "");
+  const [originalPrice, setOriginalPrice] = useState(((bundle?.originalPrice ?? 0) / 100).toFixed(2));
+  const [discountPrice, setDiscountPrice] = useState(((bundle?.discountPrice ?? 0) / 100).toFixed(2));
+  const [status, setStatus] = useState(bundle?.status ?? "draft");
+  const [selectedProductIds, setSelectedProductIds] = useState<number[]>(
+    bundle?.items.map((i) => i.productId) ?? []
+  );
+
+  if (!bundle) return <div className="text-center py-8 text-muted-foreground">Loading...</div>;
+
+  const handleSave = () => {
+    updateMut.mutate({
+      id: bundleId,
+      title,
+      subtitle: subtitle || null,
+      description: description || null,
+      originalPrice: Math.round(parseFloat(originalPrice || "0") * 100),
+      discountPrice: Math.round(parseFloat(discountPrice || "0") * 100),
+      status,
+      productIds: selectedProductIds,
+    });
+  };
+
+  const toggleProduct = (productId: number) => {
+    setSelectedProductIds((prev) =>
+      prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId]
+    );
+  };
+
+  const savings = parseFloat(originalPrice || "0") - parseFloat(discountPrice || "0");
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="sm" onClick={onBack}>
+          <ArrowLeft className="w-4 h-4 mr-1" /> Back
+        </Button>
+        <h3 className="text-lg font-semibold flex-1">Edit Bundle</h3>
+        <Button onClick={handleSave} disabled={updateMut.isPending}>
+          {updateMut.isPending ? "Saving..." : "Save Changes"}
+        </Button>
+      </div>
+
+      {/* Basic Info */}
+      <Card>
+        <CardHeader><CardTitle className="text-base">Bundle Details</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label>Title</Label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+          </div>
+          <div>
+            <Label>Subtitle</Label>
+            <Input value={subtitle} onChange={(e) => setSubtitle(e.target.value)} />
+          </div>
+          <div>
+            <Label>Description</Label>
+            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Label>Published</Label>
+              <Switch
+                checked={status === "published"}
+                onCheckedChange={(v) => setStatus(v ? "published" : "draft")}
+              />
+            </div>
+            <Badge variant={status === "published" ? "default" : "secondary"}>{status}</Badge>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Pricing */}
+      <Card>
+        <CardHeader><CardTitle className="text-base">Pricing</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Original Price ($)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={originalPrice}
+                onChange={(e) => setOriginalPrice(e.target.value)}
+                placeholder="0.00"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Total value if bought separately</p>
+            </div>
+            <div>
+              <Label>Bundle Price ($)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={discountPrice}
+                onChange={(e) => setDiscountPrice(e.target.value)}
+                placeholder="0.00"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Discounted bundle price</p>
+            </div>
+          </div>
+          {savings > 0 && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <p className="text-sm text-green-700 font-medium">
+                Customers save ${savings.toFixed(2)} ({((savings / parseFloat(originalPrice || "1")) * 100).toFixed(0)}% off)
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Products in Bundle */}
+      <Card>
+        <CardHeader><CardTitle className="text-base">Products in Bundle ({selectedProductIds.length})</CardTitle></CardHeader>
+        <CardContent>
+          {(!allProducts || allProducts.length === 0) ? (
+            <p className="text-sm text-muted-foreground">No products available. Create some products first.</p>
+          ) : (
+            <div className="space-y-2">
+              {allProducts.map((p) => {
+                const isSelected = selectedProductIds.includes(p.id);
+                return (
+                  <div
+                    key={p.id}
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      isSelected ? "border-teal-500 bg-teal-50" : "border-gray-200 hover:border-gray-300"
+                    }`}
+                    onClick={() => toggleProduct(p.id)}
+                  >
+                    <div className={`w-5 h-5 rounded border flex items-center justify-center ${
+                      isSelected ? "bg-teal-500 border-teal-500" : "border-gray-300"
+                    }`}>
+                      {isSelected && <Check className="w-3 h-3 text-white" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{p.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {p.isFree ? "Free" : `$${(p.price / 100).toFixed(2)}`} · {p.status}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+export default function BundlesAdmin() {
+  const [editingId, setEditingId] = useState<number | null>(null);
+  if (editingId) {
+    return <BundleEditor bundleId={editingId} onBack={() => setEditingId(null)} />;
+  }
+  return <BundleList onEdit={setEditingId} />;
+}

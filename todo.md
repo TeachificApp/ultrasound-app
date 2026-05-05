@@ -1320,3 +1320,9 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Digital Downloads: Integrate drag-and-drop WYSIWYG landing page builder (same as LMS courses)
 - [x] Digital Downloads: Price input should be in dollars and cents (not raw cents)
 - [x] Digital Downloads: My Downloads page (/my-downloads) for users to access purchased products
+- [x] Digital Downloads: Download analytics — track per-product download counts, show in admin
+- [x] Digital Downloads: Email delivery — send confirmation email with file links after purchase
+- [x] Digital Downloads: Bundle pricing — group products into discounted bundles with admin CRUD and public pages
+- [ ] Subdomain separation: Detect hostname and render LMS layout on learn.allaboutultrasound.com
+- [ ] Subdomain separation: Create dedicated LMS layout with its own navigation
+- [ ] Subdomain separation: Route LMS content (courses, quizzes, downloads) on learn subdomain

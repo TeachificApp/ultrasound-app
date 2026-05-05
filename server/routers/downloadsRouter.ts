@@ -3,12 +3,17 @@ import { z } from "zod";
 import { and, desc, eq, sql, asc } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
-import { getDb } from "../db";
+import { getDb, getUserById } from "../db";
 import {
   digitalProducts,
   digitalProductFiles,
   digitalPurchases,
+  digitalDownloadEvents,
+  digitalBundles,
+  digitalBundleItems,
+  digitalBundlePurchases,
 } from "../../drizzle/schema";
+import { sendEmail } from "../_core/email";
 
 // ─── Public Router ──────────────────────────────────────────────────────────
 export const downloadsPublicRouter = router({
@@ -193,6 +198,137 @@ export const downloadsLearnerRouter = router({
       });
 
       return { checkoutUrl: session.url, free: false };
+    }),
+
+  /** Track a file download event (analytics) */
+  trackDownload: protectedProcedure
+    .input(z.object({ productId: z.number(), fileId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return { success: false };
+      await db.insert(digitalDownloadEvents).values({
+        userId: ctx.user.id,
+        productId: input.productId,
+        fileId: input.fileId,
+      });
+      // Increment product download count
+      await db.update(digitalProducts)
+        .set({ downloadCount: sql`download_count + 1` })
+        .where(eq(digitalProducts.id, input.productId));
+      return { success: true };
+    }),
+
+  /** Create Stripe checkout session for a bundle */
+  createBundleCheckout: protectedProcedure
+    .input(z.object({ bundleId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const [bundle] = await db.select().from(digitalBundles)
+        .where(eq(digitalBundles.id, input.bundleId)).limit(1);
+      if (!bundle || bundle.status !== "published") throw new TRPCError({ code: "NOT_FOUND" });
+
+      // Check if already purchased
+      const [existing] = await db.select().from(digitalBundlePurchases)
+        .where(and(
+          eq(digitalBundlePurchases.userId, ctx.user.id),
+          eq(digitalBundlePurchases.bundleId, input.bundleId),
+        )).limit(1);
+      if (existing) return { checkoutUrl: null, alreadyPurchased: true };
+
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+
+      const origin = ctx.req.headers.origin || `https://${ctx.req.headers.host}`;
+      const session = await stripe.checkout.sessions.create({
+        mode: "payment",
+        customer_email: ctx.user.email ?? undefined,
+        client_reference_id: ctx.user.id.toString(),
+        allow_promotion_codes: true,
+        line_items: [{
+          price_data: {
+            currency: bundle.currency,
+            product_data: {
+              name: bundle.title,
+              description: bundle.subtitle ?? undefined,
+              images: bundle.thumbnailUrl ? [bundle.thumbnailUrl] : undefined,
+            },
+            unit_amount: bundle.discountPrice,
+          },
+          quantity: 1,
+        }],
+        metadata: {
+          type: "digital_bundle",
+          bundle_id: bundle.id.toString(),
+          user_id: ctx.user.id.toString(),
+          customer_email: ctx.user.email ?? "",
+        },
+        success_url: `${origin}/my-downloads?success=1`,
+        cancel_url: `${origin}/bundles/${bundle.slug}`,
+      });
+
+      return { checkoutUrl: session.url, alreadyPurchased: false };
+    }),
+
+  /** List published bundles */
+  listBundles: publicProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return [];
+    const bundles = await db.select().from(digitalBundles)
+      .where(eq(digitalBundles.status, "published"))
+      .orderBy(desc(digitalBundles.createdAt));
+    // Get items for each bundle
+    const result = await Promise.all(bundles.map(async (bundle) => {
+      const items = await db.select({
+        productId: digitalBundleItems.productId,
+        title: digitalProducts.title,
+        thumbnailUrl: digitalProducts.thumbnailUrl,
+        slug: digitalProducts.slug,
+      }).from(digitalBundleItems)
+        .innerJoin(digitalProducts, eq(digitalBundleItems.productId, digitalProducts.id))
+        .where(eq(digitalBundleItems.bundleId, bundle.id))
+        .orderBy(asc(digitalBundleItems.sortOrder));
+      return { ...bundle, items };
+    }));
+    return result;
+  }),
+
+  /** Get bundle by slug */
+  getBundleBySlug: publicProcedure
+    .input(z.object({ slug: z.string() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [bundle] = await db.select().from(digitalBundles)
+        .where(eq(digitalBundles.slug, input.slug)).limit(1);
+      if (!bundle || bundle.status !== "published") throw new TRPCError({ code: "NOT_FOUND" });
+      const items = await db.select({
+        productId: digitalBundleItems.productId,
+        title: digitalProducts.title,
+        thumbnailUrl: digitalProducts.thumbnailUrl,
+        slug: digitalProducts.slug,
+        price: digitalProducts.price,
+        isFree: digitalProducts.isFree,
+      }).from(digitalBundleItems)
+        .innerJoin(digitalProducts, eq(digitalBundleItems.productId, digitalProducts.id))
+        .where(eq(digitalBundleItems.bundleId, bundle.id))
+        .orderBy(asc(digitalBundleItems.sortOrder));
+      return { ...bundle, items };
+    }),
+
+  /** Check if user has purchased a bundle */
+  hasPurchasedBundle: protectedProcedure
+    .input(z.object({ bundleId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return { purchased: false };
+      const [purchase] = await db.select().from(digitalBundlePurchases)
+        .where(and(
+          eq(digitalBundlePurchases.userId, ctx.user.id),
+          eq(digitalBundlePurchases.bundleId, input.bundleId),
+        )).limit(1);
+      return { purchased: !!purchase };
     }),
 });
 
@@ -402,4 +538,193 @@ export const downloadsAdminRouter = router({
       }
       return { success: true };
     }),
+
+  /** Get download analytics for all products (admin) */
+  getAnalytics: protectedProcedure.query(async ({ ctx }) => {
+    if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    const db = await getDb();
+    if (!db) return { products: [], recentDownloads: [] };
+
+    // Per-product stats
+    const products = await db.select({
+      id: digitalProducts.id,
+      title: digitalProducts.title,
+      downloadCount: digitalProducts.downloadCount,
+      slug: digitalProducts.slug,
+    }).from(digitalProducts).orderBy(desc(digitalProducts.downloadCount));
+
+    // Recent 50 download events
+    const recentDownloads = await db.select({
+      id: digitalDownloadEvents.id,
+      userId: digitalDownloadEvents.userId,
+      productId: digitalDownloadEvents.productId,
+      fileId: digitalDownloadEvents.fileId,
+      downloadedAt: digitalDownloadEvents.downloadedAt,
+      productTitle: digitalProducts.title,
+      fileName: digitalProductFiles.fileName,
+    }).from(digitalDownloadEvents)
+      .leftJoin(digitalProducts, eq(digitalDownloadEvents.productId, digitalProducts.id))
+      .leftJoin(digitalProductFiles, eq(digitalDownloadEvents.fileId, digitalProductFiles.id))
+      .orderBy(desc(digitalDownloadEvents.downloadedAt))
+      .limit(50);
+
+    return { products, recentDownloads };
+  }),
+
+  // ─── Bundle Admin CRUD ─────────────────────────────────────────────────────
+  /** List all bundles (admin) */
+  listBundles: protectedProcedure.query(async ({ ctx }) => {
+    if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    const db = await getDb();
+    if (!db) return [];
+    const bundles = await db.select().from(digitalBundles).orderBy(desc(digitalBundles.createdAt));
+    const result = await Promise.all(bundles.map(async (bundle) => {
+      const items = await db.select({
+        productId: digitalBundleItems.productId,
+        title: digitalProducts.title,
+      }).from(digitalBundleItems)
+        .innerJoin(digitalProducts, eq(digitalBundleItems.productId, digitalProducts.id))
+        .where(eq(digitalBundleItems.bundleId, bundle.id))
+        .orderBy(asc(digitalBundleItems.sortOrder));
+      return { ...bundle, items };
+    }));
+    return result;
+  }),
+
+  /** Create a bundle */
+  createBundle: protectedProcedure
+    .input(z.object({
+      title: z.string().min(1),
+      subtitle: z.string().optional(),
+      description: z.string().optional(),
+      thumbnailUrl: z.string().optional(),
+      originalPrice: z.number().min(0).default(0),
+      discountPrice: z.number().min(0).default(0),
+      status: z.enum(["draft", "published", "archived"]).default("draft"),
+      productIds: z.array(z.number()).default([]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      let slug = input.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      const [existing] = await db.select({ id: digitalBundles.id }).from(digitalBundles)
+        .where(eq(digitalBundles.slug, slug)).limit(1);
+      if (existing) slug += `-${Date.now().toString(36)}`;
+
+      const { productIds, ...bundleData } = input;
+      const [result] = await db.insert(digitalBundles).values({ ...bundleData, slug }).$returningId();
+
+      if (productIds.length > 0) {
+        await db.insert(digitalBundleItems).values(
+          productIds.map((pid, i) => ({ bundleId: result.id, productId: pid, sortOrder: i }))
+        );
+      }
+      return { id: result.id, slug };
+    }),
+
+  /** Update a bundle */
+  updateBundle: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      title: z.string().optional(),
+      subtitle: z.string().nullable().optional(),
+      description: z.string().nullable().optional(),
+      thumbnailUrl: z.string().nullable().optional(),
+      originalPrice: z.number().min(0).optional(),
+      discountPrice: z.number().min(0).optional(),
+      status: z.enum(["draft", "published", "archived"]).optional(),
+      productIds: z.array(z.number()).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { id, productIds, ...data } = input;
+      await db.update(digitalBundles).set(data).where(eq(digitalBundles.id, id));
+
+      if (productIds !== undefined) {
+        await db.delete(digitalBundleItems).where(eq(digitalBundleItems.bundleId, id));
+        if (productIds.length > 0) {
+          await db.insert(digitalBundleItems).values(
+            productIds.map((pid, i) => ({ bundleId: id, productId: pid, sortOrder: i }))
+          );
+        }
+      }
+      return { success: true };
+    }),
+
+  /** Delete a bundle */
+  deleteBundle: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(digitalBundleItems).where(eq(digitalBundleItems.bundleId, input.id));
+      await db.delete(digitalBundles).where(eq(digitalBundles.id, input.id));
+      return { success: true };
+    }),
 });
+
+// ─── Email Helper ───────────────────────────────────────────────────────────
+export async function sendPurchaseConfirmationEmail(userId: number, productId: number) {
+  const db = await getDb();
+  if (!db) return;
+  const user = await getUserById(userId);
+  if (!user || !user.email) return;
+
+  const [product] = await db.select().from(digitalProducts)
+    .where(eq(digitalProducts.id, productId)).limit(1);
+  if (!product) return;
+
+  const files = await db.select().from(digitalProductFiles)
+    .where(eq(digitalProductFiles.productId, productId))
+    .orderBy(asc(digitalProductFiles.sortOrder));
+
+  const appUrl = process.env.VITE_APP_URL || 'https://app.allaboutultrasound.com';
+  const filesUrl = `${appUrl}/downloads/${product.slug}/files`;
+
+  const fileListHtml = files.map(f => 
+    `<li style="margin:4px 0;"><a href="${f.fileUrl}" style="color:#189aa1;">${f.fileName}</a> (${(f.fileSize / 1024 / 1024).toFixed(1)} MB)</li>`
+  ).join("");
+
+  const htmlBody = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
+<body style="margin:0;padding:0;background:#f0fbfc;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0fbfc;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+        <tr><td style="background:linear-gradient(135deg,#0e1e2e 0%,#0e4a50 60%,#189aa1 100%);padding:28px 32px;text-align:center;">
+          <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp" alt="All About Ultrasound" width="60" height="60" style="border-radius:50%;display:block;margin:0 auto 12px;" />
+          <div style="font-size:18px;font-weight:700;color:#ffffff;font-family:Georgia,serif;">Purchase Confirmed</div>
+        </td></tr>
+        <tr><td style="padding:32px;">
+          <h2 style="margin:0 0 8px;font-size:20px;color:#0e1e2e;font-family:Georgia,serif;">Thank you for your purchase!</h2>
+          <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">Hi ${user.name || "there"}, your download is ready.</p>
+          <div style="background:#f0fbfc;border-left:3px solid #189aa1;padding:12px 16px;border-radius:0 8px 8px 0;margin:0 0 20px;">
+            <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#189aa1;">Product: ${product.title}</p>
+            <ul style="margin:0;padding-left:20px;font-size:14px;color:#475569;">${fileListHtml}</ul>
+          </div>
+          <div style="text-align:center;margin:28px 0;">
+            <a href="${filesUrl}" style="display:inline-block;background:linear-gradient(135deg,#189aa1,#4ad9e0);color:#ffffff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;">Access Your Files</a>
+          </div>
+          <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.5;">Questions? Contact us at <a href="mailto:support@allaboutultrasound.com" style="color:#189aa1;">support@allaboutultrasound.com</a>.</p>
+        </td></tr>
+        <tr><td style="background:#f8fffe;border-top:1px solid #e5f7f8;padding:20px 32px;text-align:center;">
+          <p style="margin:0;font-size:12px;color:#94a3b8;">© All About Ultrasound™ · <a href="https://www.allaboutultrasound.com" style="color:#189aa1;text-decoration:none;">www.allaboutultrasound.com</a></p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+
+  await sendEmail({
+    to: { name: user.name || "Customer", email: user.email },
+    subject: `Your download is ready: ${product.title}`,
+    htmlBody,
+    previewText: `Your download "${product.title}" is ready — access your files now.`,
+  });
+}

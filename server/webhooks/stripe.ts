@@ -16,9 +16,10 @@
  */
 import type { Express, Request, Response } from "express";
 import { getDb, getUserByEmail } from "../db";
-import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases } from "../../drizzle/schema";
+import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems } from "../../drizzle/schema";
 import { and, eq } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
+import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
 
 // Stripe webhook secret — optional but strongly recommended in production
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET ?? "";
@@ -192,7 +193,59 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
     title: "📦 New Digital Download Purchase",
     content: `User ID ${userId} purchased digital product ID ${productId}. Amount: $${(((session.amount_total as number) ?? 0) / 100).toFixed(2)}.`,
   });
+  // Send purchase confirmation email with file links
+  await sendPurchaseConfirmationEmail(userId, productId);
   console.log(`[Stripe] Digital download purchase recorded: user ${userId}, product ${productId}`);
+}
+
+async function handleDigitalBundleCheckoutCompleted(session: Record<string, unknown>) {
+  const meta = (session.metadata as Record<string, string>) ?? {};
+  if (meta.type !== "digital_bundle") return;
+
+  const bundleId = meta.bundle_id ? parseInt(meta.bundle_id) : null;
+  const userId = meta.user_id ? parseInt(meta.user_id) : null;
+  if (!bundleId || !userId) return;
+
+  const db = await getDb();
+  if (!db) return;
+
+  // Check if already purchased (idempotent)
+  const [existing] = await db.select().from(digitalBundlePurchases)
+    .where(and(eq(digitalBundlePurchases.userId, userId), eq(digitalBundlePurchases.bundleId, bundleId))).limit(1);
+  if (existing) {
+    console.log(`[Stripe] Digital bundle already purchased: user ${userId}, bundle ${bundleId}`);
+    return;
+  }
+
+  // Record bundle purchase
+  await db.insert(digitalBundlePurchases).values({
+    userId,
+    bundleId,
+    stripeCheckoutSessionId: session.id as string,
+  });
+
+  // Grant access to all products in the bundle
+  const bundleItems = await db.select().from(digitalBundleItems)
+    .where(eq(digitalBundleItems.bundleId, bundleId));
+  for (const item of bundleItems) {
+    const [existingPurchase] = await db.select().from(digitalPurchases)
+      .where(and(eq(digitalPurchases.userId, userId), eq(digitalPurchases.productId, item.productId))).limit(1);
+    if (!existingPurchase) {
+      await db.insert(digitalPurchases).values({
+        userId,
+        productId: item.productId,
+        stripeCheckoutSessionId: session.id as string,
+      });
+      // Send email for each product in the bundle
+      await sendPurchaseConfirmationEmail(userId, item.productId);
+    }
+  }
+
+  await notifyOwner({
+    title: "🎁 New Digital Bundle Purchase",
+    content: `User ID ${userId} purchased bundle ID ${bundleId} (${bundleItems.length} products). Amount: $${(((session.amount_total as number) ?? 0) / 100).toFixed(2)}.`,
+  });
+  console.log(`[Stripe] Digital bundle purchase recorded: user ${userId}, bundle ${bundleId}`);
 }
 
 export function registerStripeWebhook(app: Express) {
@@ -276,6 +329,7 @@ export function registerStripeWebhook(app: Express) {
           await handleCheckoutSessionCompleted(sessionObj);
           await handleLmsCheckoutCompleted(sessionObj);
           await handleDigitalDownloadCheckoutCompleted(sessionObj);
+          await handleDigitalBundleCheckoutCompleted(sessionObj);
         } else {
           console.log(`[Stripe] Unhandled event type: ${eventType}`);
         }

@@ -3029,3 +3029,47 @@ export const digitalPurchases = mysqlTable("digital_purchases", {
   purchasedAt: timestamp("purchased_at").defaultNow().notNull(),
 });
 export type DigitalPurchase = typeof digitalPurchases.$inferSelect;
+
+// ─── Digital Download Events (Analytics) ────────────────────────────────────
+export const digitalDownloadEvents = mysqlTable("digital_download_events", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  productId: int("product_id").notNull(),
+  fileId: int("file_id").notNull(),
+  downloadedAt: timestamp("downloaded_at").defaultNow().notNull(),
+});
+export type DigitalDownloadEvent = typeof digitalDownloadEvents.$inferSelect;
+
+// ─── Digital Bundles ────────────────────────────────────────────────────────
+export const digitalBundles = mysqlTable("digital_bundles", {
+  id: int("id").autoincrement().primaryKey(),
+  slug: varchar("slug", { length: 255 }).notNull().unique(),
+  title: varchar("title", { length: 255 }).notNull(),
+  subtitle: varchar("subtitle", { length: 500 }),
+  description: longtext("description"),
+  thumbnailUrl: text("thumbnail_url"),
+  originalPrice: int("original_price").default(0).notNull(), // cents
+  discountPrice: int("discount_price").default(0).notNull(), // cents
+  currency: varchar("currency", { length: 8 }).default("usd").notNull(),
+  status: mysqlEnum("status", ["draft", "published", "archived"]).default("draft").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type DigitalBundle = typeof digitalBundles.$inferSelect;
+
+export const digitalBundleItems = mysqlTable("digital_bundle_items", {
+  id: int("id").autoincrement().primaryKey(),
+  bundleId: int("bundle_id").notNull(),
+  productId: int("product_id").notNull(),
+  sortOrder: int("sort_order").default(0).notNull(),
+});
+export type DigitalBundleItem = typeof digitalBundleItems.$inferSelect;
+
+export const digitalBundlePurchases = mysqlTable("digital_bundle_purchases", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  bundleId: int("bundle_id").notNull(),
+  stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 255 }),
+  purchasedAt: timestamp("purchased_at").defaultNow().notNull(),
+});
+export type DigitalBundlePurchase = typeof digitalBundlePurchases.$inferSelect;

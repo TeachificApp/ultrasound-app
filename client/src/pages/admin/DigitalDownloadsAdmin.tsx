@@ -420,13 +420,35 @@ function FileManager({ productId, files }: { productId: number; files: any[] }) 
   );
 }
 
-// ─── Main Export ────────────────────────────────────────────────────────────
+// ─── Main Export ──────────────────────────────────────────────────────────────────
+import DownloadAnalytics from "./DownloadAnalytics";
+import BundlesAdmin from "./BundlesAdmin";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 export default function DigitalDownloadsAdmin() {
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState("products");
 
   if (editingId) {
     return <ProductEditor productId={editingId} onBack={() => setEditingId(null)} />;
   }
 
-  return <ProductList onEdit={setEditingId} />;
+  return (
+    <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <TabsList>
+        <TabsTrigger value="products">Products</TabsTrigger>
+        <TabsTrigger value="bundles">Bundles</TabsTrigger>
+        <TabsTrigger value="analytics">Analytics</TabsTrigger>
+      </TabsList>
+      <TabsContent value="products" className="mt-4">
+        <ProductList onEdit={setEditingId} />
+      </TabsContent>
+      <TabsContent value="bundles" className="mt-4">
+        <BundlesAdmin />
+      </TabsContent>
+      <TabsContent value="analytics" className="mt-4">
+        <DownloadAnalytics />
+      </TabsContent>
+    </Tabs>
+  );
 }
