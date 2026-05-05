@@ -201,7 +201,7 @@ export default function Premium() {
                     Checking…
                   </div>
                 ) : status?.isPremium ? (
-                  <div className="flex items-center justify-center gap-2 text-emerald-600 font-semibold text-sm">
+                  <div className="flex items-center justify-center gap-2 text-teal-600 font-semibold text-sm">
                     <Check className="w-4 h-4" /> Active
                   </div>
                 ) : user ? (
@@ -235,7 +235,7 @@ export default function Premium() {
                     Checking…
                   </div>
                 ) : status?.isPremium ? (
-                  <div className="flex items-center justify-center gap-2 text-emerald-600 font-semibold text-sm">
+                  <div className="flex items-center justify-center gap-2 text-teal-600 font-semibold text-sm">
                     <Check className="w-4 h-4" /> Active
                   </div>
                 ) : user ? (

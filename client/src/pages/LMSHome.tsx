@@ -136,7 +136,7 @@ export default function LMSHome() {
                       </div>
                     )}
                     {course.isFree && (
-                      <Badge className="absolute top-2 left-2 bg-green-500 text-white text-xs">Free</Badge>
+                      <Badge className="absolute top-2 left-2 bg-teal-500 text-white text-xs">Free</Badge>
                     )}
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
                       <Play className="w-10 h-10 text-white opacity-0 group-hover:opacity-80 transition-opacity drop-shadow-lg" />
@@ -221,7 +221,7 @@ export default function LMSHome() {
                         </div>
                       )}
                       {product.price === 0 && (
-                        <Badge className="absolute top-2 left-2 bg-green-500 text-white text-xs">Free</Badge>
+                        <Badge className="absolute top-2 left-2 bg-teal-500 text-white text-xs">Free</Badge>
                       )}
                     </div>
                     <div className="p-4 flex flex-col flex-1">

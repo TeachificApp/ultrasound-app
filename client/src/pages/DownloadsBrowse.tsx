@@ -24,7 +24,7 @@ function ProductCard({ product }: { product: any }) {
             </div>
           )}
           {product.isFree && (
-            <Badge className="absolute top-3 left-3 bg-green-500 text-white text-xs">Free</Badge>
+            <Badge className="absolute top-3 left-3 bg-teal-500 text-white text-xs">Free</Badge>
           )}
         </div>
         <div className="p-4 flex-1 flex flex-col">
@@ -67,7 +67,7 @@ function BundlesSection() {
                       {savings > 0 && (
                         <>
                           <span className="text-sm text-gray-400 line-through">${(b.originalPrice / 100).toFixed(2)}</span>
-                          <Badge className="bg-green-500 text-white text-xs">Save {pct}%</Badge>
+                          <Badge className="bg-teal-500 text-white text-xs">Save {pct}%</Badge>
                         </>
                       )}
                     </div>

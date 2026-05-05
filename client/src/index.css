@@ -52,11 +52,23 @@
   --color-sidebar-ring: var(--sidebar-ring);
 
   /* AAU Brand tokens */
-  --color-teal: #189aa1;
   --color-aqua: #4ad9e0;
   --color-teal-light: #f0fbfc;
   --color-teal-dark: #0e6b70;
   --color-navy: #023E8A;
+
+  /* Override Tailwind teal palette with brand teal (#189aa1 base) */
+  --color-teal-50: #f0fbfc;
+  --color-teal-100: #d4f3f5;
+  --color-teal-200: #a8e7eb;
+  --color-teal-300: #6dd5dc;
+  --color-teal-400: #35bfc8;
+  --color-teal-500: #1dadb5;
+  --color-teal-600: #189aa1;
+  --color-teal-700: #157d83;
+  --color-teal-800: #12636a;
+  --color-teal-900: #0e4a50;
+  --color-teal-950: #082e33;
 }
 
 :root {

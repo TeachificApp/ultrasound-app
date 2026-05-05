@@ -346,7 +346,7 @@ export default function DownloadLanding() {
               {product.subtitle && <p className="text-teal-100 text-lg mt-3">{product.subtitle}</p>}
               <div className="flex items-center gap-3 mt-6">
                 <span className="text-3xl font-bold">{price}</span>
-                {product.isFree && <Badge className="bg-green-500 text-white">Free</Badge>}
+                {product.isFree && <Badge className="bg-teal-500 text-white">Free</Badge>}
               </div>
               <div className="mt-6">
                 {hasPurchased ? (

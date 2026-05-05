@@ -93,7 +93,7 @@ export default function BundleLanding() {
             {savings > 0 && (
               <>
                 <span className="text-xl text-gray-400 line-through">${(bundle.originalPrice / 100).toFixed(2)}</span>
-                <Badge className="bg-green-500 text-white text-sm">Save {savingsPercent}%</Badge>
+                <Badge className="bg-teal-500 text-white text-sm">Save {savingsPercent}%</Badge>
               </>
             )}
           </div>
@@ -102,7 +102,7 @@ export default function BundleLanding() {
           <div className="mt-6">
             {hasPurchased ? (
               <Link href="/my-downloads">
-                <Button size="lg" className="bg-green-500 hover:bg-green-600 gap-2">
+                <Button size="lg" className="bg-teal-500 hover:bg-teal-600 gap-2">
                   <Check className="w-5 h-5" /> Already Purchased — View Downloads
                 </Button>
               </Link>
@@ -155,15 +155,15 @@ export default function BundleLanding() {
                     {item.isFree ? "Free" : `$${(item.price / 100).toFixed(2)}`}
                   </p>
                 </div>
-                <Check className="w-5 h-5 text-green-500" />
+                <Check className="w-5 h-5 text-teal-500" />
               </CardContent>
             </Card>
           ))}
         </div>
 
         {savings > 0 && (
-          <div className="mt-6 bg-green-50 border border-green-200 rounded-xl p-4 text-center">
-            <p className="text-green-700 font-medium">
+          <div className="mt-6 bg-teal-50 border border-teal-200 rounded-xl p-4 text-center">
+            <p className="text-teal-700 font-medium">
               You save ${(savings / 100).toFixed(2)} ({savingsPercent}% off) compared to buying individually
             </p>
           </div>
