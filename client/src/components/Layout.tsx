@@ -10,7 +10,7 @@ import {
   Scan, BookOpen, FileText, Menu, X, ChevronRight,
   Stethoscope, Zap, ExternalLink, ShoppingBag, FlaskConical, MessageCircle, Award, Shield, GraduationCap,
   BookMarked, Library, Plus, Crown, Droplets, Building2, Users, UserPlus,
-  LogIn, LogOut, Settings, ChevronDown, Webhook, Layers, CreditCard, Lock, ClipboardCheck, Brain
+  LogIn, LogOut, Settings, ChevronDown, Webhook, Layers, CreditCard, Lock, ClipboardCheck, Brain, Download
 } from "lucide-react";
 
 import { trpc } from "@/lib/trpc";
@@ -75,6 +75,7 @@ const BASE_NAV_GROUPS = [
       { path: "/soundbytes", label: "SoundBytes™", icon: BookMarked },
       { path: "/cme", label: "CME Hub", icon: GraduationCap },
       { path: "/registry-review", label: "Registry Review Hub", icon: ClipboardCheck },
+      { path: "/my-downloads", label: "My Downloads", icon: Download },
       // Learn links below use __LEARN_FETAL_ECHO_URL__, __LEARN_ECHO_URL__, __LEARN_POCUS_URL__
       // as placeholders — replaced at runtime in the Layout component with DB values
       { path: "__LEARN_FETAL_ECHO_URL__", label: "Learn Fetal Echo", icon: BookOpen, external: true },

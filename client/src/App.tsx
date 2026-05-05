@@ -40,6 +40,7 @@ import DownloadsBrowse from "./pages/DownloadsBrowse";
 import DownloadLanding from "./pages/DownloadLanding";
 import DownloadFiles from "./pages/DownloadFiles";
 import DownloadLandingPageBuilder from "./pages/admin/DownloadLandingPageBuilder";
+import MyDownloads from "./pages/MyDownloads";
 
 // ── UltrasoundAssist™ Hub ────────────────────────────────────────────────────
 import UltrasoundAssistHub from "./pages/UltrasoundAssistHub";
@@ -301,7 +302,8 @@ function Router() {
         <Route path="/collections/:id" component={CollectionDetail} />
         <Route path="/learn/:slug/player" component={CoursePlayer} />
         <Route path="/learn/:slug" component={CourseLanding} />
-        {/* ── Digital Downloads ─────────────────────────────────────────────────────────── */}
+          {/* ── Digital Downloads ───────────────────────────────────────────────────────── */}
+        <Route path="/my-downloads" component={MyDownloads} />
         <Route path="/downloads/:slug/files" component={DownloadFiles} />
         <Route path="/downloads/:slug" component={DownloadLanding} />
         <Route path="/downloads" component={DownloadsBrowse} />
