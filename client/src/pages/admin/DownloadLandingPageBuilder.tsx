@@ -131,7 +131,8 @@ function BlockEditorPanel({ block, onUpdate }: { block: Block; onUpdate: (data: 
     case "hero":
       return (
         <div className="space-y-3">
-          <div><label className="text-xs font-medium text-gray-600">Headline</label><Input value={d.headline ?? ""} onChange={e => set("headline", e.target.value)} /></div>
+          <div><label className="text-xs font-medium text-gray-600">Headline (Line 1)</label><Input value={d.headline ?? ""} onChange={e => set("headline", e.target.value)} /></div>
+          <div><label className="text-xs font-medium text-gray-600">Headline (Line 2)</label><Input value={d.headline2 ?? ""} onChange={e => set("headline2", e.target.value)} placeholder="Optional second line" /></div>
           <div><label className="text-xs font-medium text-gray-600">Subheadline</label><Textarea value={d.subheadline ?? ""} onChange={e => set("subheadline", e.target.value)} rows={2} /></div>
           <div><label className="text-xs font-medium text-gray-600">Background Color</label><input type="color" value={d.bgColor ?? "#179ca3"} onChange={e => set("bgColor", e.target.value)} className="w-8 h-8 rounded cursor-pointer" /></div>
           <div><label className="text-xs font-medium text-gray-600">Text Color</label><input type="color" value={d.textColor ?? "#ffffff"} onChange={e => set("textColor", e.target.value)} className="w-8 h-8 rounded cursor-pointer" /></div>
@@ -394,7 +395,7 @@ function BlockPreview({ block }: { block: Block }) {
       return (
         <div className="relative px-8 py-16 overflow-hidden" style={{ ...bgStyle, color: d.textColor ?? "#fff", textAlign: d.align ?? "left" }}>
           <div className="relative max-w-3xl">
-            <h1 className="text-4xl font-bold mb-4 leading-tight">{d.headline}</h1>
+            <h1 className="text-4xl font-bold mb-4 leading-tight">{d.headline}{d.headline2 && <><br />{d.headline2}</>}</h1>
             {d.subheadline && <p className="text-xl opacity-90 mb-8">{d.subheadline}</p>}
             <div className="flex flex-wrap gap-3" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
               {buttons.map((btn: any, i: number) => (

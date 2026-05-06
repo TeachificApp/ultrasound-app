@@ -146,7 +146,7 @@ function BlockPreview({ block, coursePrice, courseTitle }: { block: Block; cours
             <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
           )}
           <div className="relative max-w-3xl">
-            <h1 className="text-4xl font-bold mb-4 leading-tight">{d.headline}</h1>
+            <h1 className="text-4xl font-bold mb-4 leading-tight">{d.headline}{d.headline2 && <><br />{d.headline2}</>}</h1>
             {d.subheadline && <p className="text-xl opacity-90 mb-8">{d.subheadline}</p>}
             <div className="flex flex-wrap gap-3" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
               {heroButtons.map((btn, i) => (
@@ -498,7 +498,8 @@ function BlockSettings({ block, onChange }: { block: Block; onChange: (data: Rec
       const removeBtn = (idx: number) => onChange({ ...d, buttons: buttons.filter((_, i) => i !== idx) });
       return (
         <div className="space-y-3">
-          <TextField label="Headline" field="headline" />
+          <TextField label="Headline (Line 1)" field="headline" />
+          <TextField label="Headline (Line 2)" field="headline2" />
           <TextField label="Subheadline" field="subheadline" multiline />
           <ColorField label="Text Color" field="textColor" />
           <div>

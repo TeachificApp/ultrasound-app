@@ -36,7 +36,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug }: {
       return (
         <div style={{ ...bgStyle, color: d.textColor ?? "#fff", textAlign: d.align ?? "left" }} className="px-8 py-20">
           <div className="max-w-4xl mx-auto">
-            <h1 className="text-4xl font-bold mb-4 leading-tight">{d.headline}</h1>
+            <h1 className="text-4xl font-bold mb-4 leading-tight">{d.headline}{d.headline2 && <><br />{d.headline2}</>}</h1>
             {d.subheadline && <p className="text-xl opacity-90 mb-8">{d.subheadline}</p>}
             <div className="flex flex-wrap gap-3" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
               {buttons.map((btn: any, i: number) => (
