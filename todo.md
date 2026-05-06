@@ -1339,3 +1339,4 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add Embed HTML block type to page builder
 - [x] Add Divided Columns block type for side-by-side elements
 - [x] Ensure all block editors use friendly UI inputs (no raw JSON/HTML/code for end users)
+- [x] Add live preview pane to DownloadLandingPageBuilder (real-time rendering as user edits)

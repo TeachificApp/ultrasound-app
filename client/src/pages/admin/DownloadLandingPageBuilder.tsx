@@ -382,6 +382,232 @@ function BlockEditorPanel({ block, onUpdate }: { block: Block; onUpdate: (data: 
   }
 }
 
+// ─── Block Preview (Live Canvas Rendering) ──────────────────────────────────
+function BlockPreview({ block }: { block: Block }) {
+  const d = block.data;
+  switch (block.type) {
+    case "hero": {
+      const buttons = d.buttons ?? [{ text: "Buy Now", color: "#ffffff", textColor: "#179ca3", style: "filled" }];
+      const bgStyle: React.CSSProperties = d.imageUrl
+        ? { backgroundImage: `url(${d.imageUrl})`, backgroundSize: "cover", backgroundPosition: "center", backgroundColor: d.bgColor ?? "#179ca3" }
+        : { backgroundColor: d.bgColor ?? "#179ca3" };
+      return (
+        <div className="relative px-8 py-16 overflow-hidden" style={{ ...bgStyle, color: d.textColor ?? "#fff", textAlign: d.align ?? "left" }}>
+          <div className="relative max-w-3xl">
+            <h1 className="text-4xl font-bold mb-4 leading-tight">{d.headline}</h1>
+            {d.subheadline && <p className="text-xl opacity-90 mb-8">{d.subheadline}</p>}
+            <div className="flex flex-wrap gap-3" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
+              {buttons.map((btn: any, i: number) => (
+                <button key={i} className="px-8 py-3 rounded-lg font-semibold text-lg shadow-lg"
+                  style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
+                  {btn.text}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+    case "text":
+      return (
+        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff", color: d.textColor ?? "#1a1a1a", textAlign: d.align ?? "left" }}>
+          <div className="max-w-3xl mx-auto prose" dangerouslySetInnerHTML={{ __html: d.html ?? "" }} />
+        </div>
+      );
+    case "image":
+      return (
+        <div className="px-8 py-6 text-center">
+          {d.url ? <img src={d.url} alt={d.alt ?? ""} className="mx-auto rounded-lg shadow" style={{ maxWidth: d.maxWidth ?? "100%" }} /> : <div className="w-full h-40 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400"><Image size={32} /></div>}
+          {d.caption && <p className="text-sm text-gray-500 mt-2">{d.caption}</p>}
+        </div>
+      );
+    case "video":
+      return (
+        <div className="px-8 py-6">
+          {d.url ? (
+            <div className="relative w-full rounded-lg overflow-hidden shadow" style={{ paddingBottom: "56.25%" }}>
+              <iframe src={d.url.replace("watch?v=", "embed/")} className="absolute inset-0 w-full h-full" allowFullScreen title="Video" />
+            </div>
+          ) : <div className="w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400"><Video size={32} /></div>}
+        </div>
+      );
+    case "embed":
+      return (
+        <div className="px-8 py-6">
+          <div className="max-w-4xl mx-auto">
+            {d.embedCode ? (
+              <div dangerouslySetInnerHTML={{ __html: d.embedCode }} style={{ height: d.height ?? 400 }} />
+            ) : <div className="w-full bg-gray-100 rounded-lg flex items-center justify-center text-gray-400" style={{ height: d.height ?? 400 }}><Globe size={32} /></div>}
+            {d.caption && <p className="text-sm text-gray-500 mt-2 text-center">{d.caption}</p>}
+          </div>
+        </div>
+      );
+    case "bullets":
+      return (
+        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
+          <div className="max-w-3xl mx-auto">
+            {d.headline && <h2 className="text-2xl font-bold mb-4 text-gray-900">{d.headline}</h2>}
+            <ul className="space-y-2">
+              {(d.items ?? []).map((item: string, i: number) => (
+                <li key={i} className="flex items-start gap-3">
+                  <span className="mt-1 flex-shrink-0" style={{ color: d.iconColor ?? "#179ca3" }}>✓</span>
+                  <span className="text-gray-700">{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      );
+    case "numbered_list":
+      return (
+        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <div className="max-w-3xl mx-auto">
+            {d.headline && <h2 className="text-2xl font-bold mb-4 text-gray-900">{d.headline}</h2>}
+            <ol className="space-y-3">
+              {(d.items ?? []).map((item: string, i: number) => (
+                <li key={i} className="flex items-start gap-3">
+                  <span className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold text-white" style={{ backgroundColor: d.accentColor ?? "#179ca3" }}>{i + 1}</span>
+                  <span className="text-gray-700 pt-0.5">{item}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </div>
+      );
+    case "testimonial":
+      return (
+        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f0fdfa" }}>
+          <div className="max-w-2xl mx-auto text-center">
+            <div className="text-4xl text-teal-300 mb-4">"</div>
+            <blockquote className="text-lg text-gray-700 italic mb-4">{d.quote}</blockquote>
+            <p className="font-semibold text-gray-900">{d.author}</p>
+            {d.role && <p className="text-sm text-gray-500">{d.role}</p>}
+          </div>
+        </div>
+      );
+    case "pricing_cta":
+      return (
+        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <div className="max-w-lg mx-auto text-center">
+            <h2 className="text-2xl font-bold mb-2 text-gray-900">{d.headline}</h2>
+            {d.subtext && <p className="text-gray-600 mb-6">{d.subtext}</p>}
+            <button className="px-8 py-3 rounded-lg font-semibold text-lg shadow-lg" style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>{d.ctaText ?? "Buy Now"}</button>
+          </div>
+        </div>
+      );
+    case "cta_standalone":
+      return (
+        <div className="px-8 py-6" style={{ textAlign: d.align ?? "center" }}>
+          <button className={`px-8 py-3 rounded-lg font-semibold shadow-lg ${d.size === "sm" ? "text-sm" : d.size === "lg" ? "text-lg" : "text-base"}`}
+            style={{ backgroundColor: d.color ?? "#179ca3", color: d.textColor ?? "#fff" }}>{d.text ?? "Click Here"}</button>
+        </div>
+      );
+    case "faq":
+      return (
+        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <div className="max-w-3xl mx-auto">
+            {d.headline && <h2 className="text-2xl font-bold mb-6 text-center text-gray-900">{d.headline}</h2>}
+            <div className="space-y-3">
+              {(d.items ?? []).map((item: any, i: number) => (
+                <details key={i} className="border border-gray-200 rounded-lg">
+                  <summary className="px-5 py-3 font-medium text-gray-800 cursor-pointer hover:bg-gray-50">{item.q}</summary>
+                  <p className="px-5 pb-4 text-gray-600">{item.a}</p>
+                </details>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    case "alert": {
+      const alertStyles: Record<string, string> = { info: "bg-blue-50 border-blue-300 text-blue-800", success: "bg-green-50 border-green-300 text-green-800", warning: "bg-yellow-50 border-yellow-300 text-yellow-800", error: "bg-red-50 border-red-300 text-red-800" };
+      return (
+        <div className={`mx-8 my-4 px-5 py-4 rounded-lg border-l-4 flex items-start gap-3 ${alertStyles[d.type ?? "info"] ?? alertStyles.info}`}>
+          <p className="font-medium">{d.title && <strong>{d.title}: </strong>}{d.message}</p>
+        </div>
+      );
+    }
+    case "reviews":
+      return (
+        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <div className="max-w-4xl mx-auto">
+            {d.headline && <h2 className="text-2xl font-bold mb-6 text-center text-gray-900">{d.headline}</h2>}
+            <div className="grid md:grid-cols-2 gap-4">
+              {(d.items ?? []).map((item: any, i: number) => (
+                <div key={i} className="p-5 rounded-lg border bg-white shadow-sm">
+                  <div className="flex items-center gap-1 mb-2">
+                    {Array.from({ length: item.rating ?? 5 }).map((_, j) => <span key={j} className="text-yellow-400">★</span>)}
+                  </div>
+                  <p className="text-gray-700 text-sm mb-2">{item.text}</p>
+                  <p className="text-xs font-semibold text-gray-500">— {item.name}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    case "icon_grid":
+      return (
+        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <div className="max-w-4xl mx-auto">
+            {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900">{d.headline}</h2>}
+            <div className="grid gap-6" style={{ gridTemplateColumns: `repeat(${d.columns ?? 3}, 1fr)` }}>
+              {(d.items ?? []).map((item: any, i: number) => (
+                <div key={i} className="text-center p-4">
+                  <div className="text-4xl mb-3">{item.icon}</div>
+                  <h3 className="font-semibold text-gray-900 mb-1">{item.title}</h3>
+                  <p className="text-sm text-gray-600">{item.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    case "gallery":
+      return (
+        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <div className="grid gap-4 max-w-4xl mx-auto" style={{ gridTemplateColumns: `repeat(${d.columns ?? 3}, 1fr)` }}>
+            {(d.images ?? []).map((img: string, i: number) => (
+              <div key={i} className="rounded-lg overflow-hidden shadow">
+                {img ? <img src={img} alt="" className="w-full h-40 object-cover" /> : <div className="w-full h-40 bg-gray-100 flex items-center justify-center text-gray-400"><Image size={24} /></div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    case "two_column":
+      return (
+        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <div className="max-w-4xl mx-auto grid gap-8" style={{ gridTemplateColumns: `${d.leftRatio ?? 50}% 1fr` }}>
+            <div className="prose" dangerouslySetInnerHTML={{ __html: d.leftHtml ?? "" }} />
+            <div className="prose" dangerouslySetInnerHTML={{ __html: d.rightHtml ?? "" }} />
+          </div>
+        </div>
+      );
+    case "divided_columns": {
+      const cols = d.columns ?? [{ html: "" }, { html: "" }];
+      return (
+        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <div className="max-w-5xl mx-auto grid" style={{ gridTemplateColumns: `repeat(${cols.length}, 1fr)`, gap: `${d.gap ?? 32}px` }}>
+            {cols.map((col: any, i: number) => (
+              <div key={i} className="prose" dangerouslySetInnerHTML={{ __html: col.html ?? "" }} />
+            ))}
+          </div>
+        </div>
+      );
+    }
+    case "spacer":
+      return <div style={{ height: d.height ?? 48 }} className="bg-gray-50/50" />;
+    case "divider":
+      return (
+        <div style={{ padding: `${(d.spacing ?? 32) / 2}px 2rem` }}>
+          <hr style={{ borderColor: d.color ?? "#e5e7eb", borderWidth: `${d.thickness ?? 1}px 0 0 0` }} />
+        </div>
+      );
+    default:
+      return <div className="px-8 py-4 text-gray-400 text-sm text-center">Block preview not available</div>;
+  }
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function DownloadLandingPageBuilder() {
   const { productId } = useParams<{ productId: string }>();
@@ -489,7 +715,7 @@ export default function DownloadLandingPageBuilder() {
       {/* Main Area */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left Panel — Block List */}
-        <div className="w-64 bg-white border-r border-gray-200 flex flex-col overflow-hidden flex-shrink-0">
+        <div className="w-56 bg-white border-r border-gray-200 flex flex-col overflow-hidden flex-shrink-0">
           <div className="p-3 border-b border-gray-100">
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Blocks ({blocks.length})</h3>
           </div>
@@ -530,24 +756,61 @@ export default function DownloadLandingPageBuilder() {
           </div>
         </div>
 
-        {/* Right Panel — Block Editor */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {selectedBlock ? (
-            <div className="max-w-lg mx-auto">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-gray-700">
-                  Edit: {BLOCK_CATALOG.find(c => c.type === selectedBlock.type)?.label ?? selectedBlock.type}
-                </h3>
-                <button onClick={() => setSelectedId(null)} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
-              </div>
-              <BlockEditorPanel block={selectedBlock} onUpdate={(data) => updateBlock(selectedBlock.id, data)} />
+        {/* Center — Live Preview Canvas */}
+        <div className="flex-1 overflow-y-auto bg-gray-100">
+          {isLoading ? (
+            <div className="flex items-center justify-center h-full text-gray-400">Loading...</div>
+          ) : blocks.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-4">
+              <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center"><Plus size={24} /></div>
+              <p className="text-sm">Click a block type on the left to get started</p>
             </div>
           ) : (
-            <div className="flex items-center justify-center h-full text-gray-400">
-              <div className="text-center">
-                <Layers size={32} className="mx-auto mb-2 opacity-50" />
-                <p className="text-sm">Select a block to edit, or add a new one from the left panel.</p>
+            <div className="bg-white min-h-full shadow-sm mx-auto" style={{ maxWidth: "900px" }}>
+              {blocks.map(block => (
+                <div
+                  key={block.id}
+                  onClick={() => setSelectedId(block.id)}
+                  className={`relative group cursor-pointer border-2 transition-all ${
+                    selectedId === block.id ? "border-teal-500 shadow-lg shadow-teal-100" : "border-transparent hover:border-teal-200"
+                  }`}
+                >
+                  <div className={`absolute top-2 right-2 z-10 flex gap-1 ${
+                    selectedId === block.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                  } transition-opacity`}>
+                    <button onClick={e => { e.stopPropagation(); duplicateBlock(block.id); }} className="w-7 h-7 bg-white border border-gray-200 rounded shadow text-gray-500 hover:text-teal-600 flex items-center justify-center" title="Duplicate"><Copy size={12} /></button>
+                    <button onClick={e => { e.stopPropagation(); deleteBlock(block.id); }} className="w-7 h-7 bg-white border border-gray-200 rounded shadow text-gray-500 hover:text-red-500 flex items-center justify-center" title="Delete"><Trash2 size={12} /></button>
+                  </div>
+                  <BlockPreview block={block} />
+                </div>
+              ))}
+              <div className="flex justify-center py-6 border-t border-dashed border-gray-200">
+                <button onClick={() => addBlock("text")} className="flex items-center gap-2 text-sm text-gray-400 hover:text-teal-600 transition-colors">
+                  <Plus size={16} /> Add a block
+                </button>
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right Panel — Block Editor */}
+        <div className="w-80 flex-shrink-0 bg-white border-l border-gray-200 overflow-y-auto">
+          {selectedBlock ? (
+            <>
+              <div className="flex items-center justify-between p-3 border-b border-gray-100">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  {BLOCK_CATALOG.find(c => c.type === selectedBlock.type)?.label ?? "Block"} Settings
+                </p>
+                <button onClick={() => setSelectedId(null)} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>
+              </div>
+              <div className="p-3">
+                <BlockEditorPanel block={selectedBlock} onUpdate={(data) => updateBlock(selectedBlock.id, data)} />
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-gray-400 p-6 text-center">
+              <Palette size={24} className="mb-2 opacity-50" />
+              <p className="text-sm">Click any block on the canvas to edit its settings</p>
             </div>
           )}
         </div>
