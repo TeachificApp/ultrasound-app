@@ -400,6 +400,18 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price }: {
           </div>
         </div>
       );
+    case "divided_columns": {
+      const cols = d.columns ?? [{ html: "" }, { html: "" }];
+      return (
+        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <div className="max-w-5xl mx-auto grid" style={{ gridTemplateColumns: `repeat(${cols.length}, 1fr)`, gap: `${d.gap ?? 32}px` }}>
+            {cols.map((col: any, i: number) => (
+              <div key={i} className="prose" dangerouslySetInnerHTML={{ __html: col.html ?? "" }} />
+            ))}
+          </div>
+        </div>
+      );
+    }
     case "spacer":
       return <div style={{ height: d.height ?? 48 }} />;
     default:

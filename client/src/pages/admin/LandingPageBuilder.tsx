@@ -40,7 +40,7 @@ import {
 
 export type BlockType =
   | "hero" | "text" | "image" | "video" | "bullets" | "testimonial"
-  | "pricing_cta" | "divider" | "two_column" | "spacer"
+  | "pricing_cta" | "divider" | "two_column" | "divided_columns" | "spacer"
   | "faq" | "image_text" | "gallery" | "icon_grid" | "countdown"
   | "instructor" | "logos" | "reviews" | "embed" | "cta_standalone"
   | "lead_capture" | "numbered_list" | "alert" | "flip_cards"
@@ -69,6 +69,8 @@ const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactNode; ca
   },
   { type: "two_column", label: "Two Columns", icon: <Columns size={14} />, category: "Layout",
     defaultData: { leftHtml: "<p>Left column content</p>", rightHtml: "<p>Right column content</p>", leftRatio: 50, bgColor: "#ffffff" } },
+  { type: "divided_columns", label: "Divided Columns", icon: <Columns size={14} />, category: "Layout",
+    defaultData: { columns: [{ html: "<p>Column 1</p>" }, { html: "<p>Column 2</p>" }], gap: 32, bgColor: "#ffffff" } },
   { type: "spacer", label: "Spacer", icon: <Minus size={14} />, category: "Layout",
     defaultData: { height: 48 } },
   { type: "divider", label: "Divider", icon: <Minus size={14} />, category: "Layout",
@@ -431,6 +433,18 @@ function BlockPreview({ block, coursePrice, courseTitle }: { block: Block; cours
           </div>
         </div>
       );
+    case "divided_columns": {
+      const cols = d.columns ?? [{ html: "" }, { html: "" }];
+      return (
+        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <div className="grid" style={{ gridTemplateColumns: `repeat(${cols.length}, 1fr)`, gap: `${d.gap ?? 32}px` }}>
+            {cols.map((col: any, i: number) => (
+              <div key={i} className="prose" dangerouslySetInnerHTML={{ __html: col.html ?? "" }} />
+            ))}
+          </div>
+        </div>
+      );
+    }
     case "spacer":
       return <div style={{ height: d.height ?? 48 }} className="bg-transparent" />;
     default:
@@ -585,6 +599,10 @@ function BlockSettings({ block, onChange }: { block: Block; onChange: (data: Rec
       return (<div className="space-y-3"><div><label className="text-xs text-gray-500 block mb-1">Style</label><select value={d.style ?? "solid"} onChange={e => set("style", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select></div><ColorField label="Color" field="color" /><div><label className="text-xs text-gray-500 block mb-1">Thickness (px)</label><Input type="number" value={d.thickness ?? 1} onChange={e => set("thickness", Number(e.target.value))} className="h-8 text-sm" min={1} max={10} /></div><div><label className="text-xs text-gray-500 block mb-1">Vertical Spacing (px)</label><Input type="number" value={d.spacing ?? 32} onChange={e => set("spacing", Number(e.target.value))} className="h-8 text-sm" min={0} max={200} /></div></div>);
     case "two_column":
       return (<div className="space-y-3"><div><label className="text-xs text-gray-500 block mb-1">Left Column</label><RichTextEditor value={d.leftHtml ?? ""} onChange={(html) => set("leftHtml", html)} minHeight={100} maxHeight={300} placeholder="Left column content..." /></div><div><label className="text-xs text-gray-500 block mb-1">Right Column</label><RichTextEditor value={d.rightHtml ?? ""} onChange={(html) => set("rightHtml", html)} minHeight={100} maxHeight={300} placeholder="Right column content..." /></div><div><label className="text-xs text-gray-500 block mb-1">Left Column Width (%)</label><Input type="number" value={d.leftRatio ?? 50} onChange={e => set("leftRatio", Number(e.target.value))} className="h-8 text-sm" min={20} max={80} /></div><ColorField label="Background" field="bgColor" /></div>);
+    case "divided_columns": {
+      const cols: Array<{ html: string }> = d.columns ?? [{ html: "" }, { html: "" }];
+      return (<div className="space-y-3"><div className="flex items-center justify-between"><label className="text-xs text-gray-500 font-medium">Columns ({cols.length})</label>{cols.length < 4 && <button onClick={() => set("columns", [...cols, { html: "<p>New column</p>" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add Column</button>}</div>{cols.map((col, i) => (<div key={i} className="border border-gray-200 rounded p-2 space-y-1"><div className="flex justify-between items-center mb-1"><span className="text-xs text-gray-500">Column {i + 1}</span>{cols.length > 2 && <button onClick={() => set("columns", cols.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button>}</div><RichTextEditor value={col.html ?? ""} onChange={(html) => { const next = cols.map((c, j) => j === i ? { ...c, html } : c); set("columns", next); }} minHeight={80} maxHeight={250} placeholder={`Column ${i + 1} content...`} /></div>))}<div><label className="text-xs text-gray-500 block mb-1">Gap (px)</label><Input type="number" value={d.gap ?? 32} onChange={e => set("gap", Number(e.target.value))} className="h-8 text-sm" min={0} max={80} /></div><ColorField label="Background" field="bgColor" /></div>);
+    }
     case "spacer":
       return (<div><label className="text-xs text-gray-500 block mb-1">Height (px)</label><Input type="number" value={d.height ?? 48} onChange={e => set("height", Number(e.target.value))} className="h-8 text-sm" min={8} max={400} /></div>);
     default:

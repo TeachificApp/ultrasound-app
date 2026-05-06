@@ -1335,3 +1335,7 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Landing Page Builder: Replace plain textarea in Text/Rich Text block with full WYSIWYG editor (bold, italic, headings, fonts, sizes, images, links, lists)
 
 - [x] Fix bullet points / list styles not rendering on published landing pages (Tailwind preflight resets list-style)
+- [x] FAQ editor: Replace JSON textarea with user-friendly Q&A input fields (add/remove individual items)
+- [x] Add Embed HTML block type to page builder
+- [x] Add Divided Columns block type for side-by-side elements
+- [x] Ensure all block editors use friendly UI inputs (no raw JSON/HTML/code for end users)

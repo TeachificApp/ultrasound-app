@@ -32,7 +32,7 @@ import {
   List, Quote, CreditCard, Minus, Columns, X, Palette, AlignLeft,
   AlignCenter, AlignRight, HelpCircle, Users, Star, Globe, Timer,
   AlertTriangle, CheckSquare, LayoutGrid, Layers, BookOpen, Tag,
-  ChevronDown, ChevronUp, Copy, FolderOpen, BookMarked,
+  ChevronDown, ChevronUp, Copy, FolderOpen, BookMarked, Code,
 } from "lucide-react";
 import type { Block, BlockType } from "./LandingPageBuilder";
 
@@ -54,6 +54,8 @@ const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactNode; ca
   },
   { type: "two_column", label: "Two Columns", icon: <Columns size={14} />, category: "Layout",
     defaultData: { leftHtml: "<p>Left column content</p>", rightHtml: "<p>Right column content</p>", leftRatio: 50, bgColor: "#ffffff" } },
+  { type: "divided_columns" as BlockType, label: "Divided Columns", icon: <Columns size={14} />, category: "Layout",
+    defaultData: { columns: [{ html: "<p>Column 1</p>" }, { html: "<p>Column 2</p>" }], gap: 32, bgColor: "#ffffff" } },
   { type: "spacer", label: "Spacer", icon: <Minus size={14} />, category: "Layout",
     defaultData: { height: 48 } },
   { type: "divider", label: "Divider", icon: <Minus size={14} />, category: "Layout",
@@ -65,6 +67,8 @@ const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactNode; ca
     defaultData: { url: "", alt: "", caption: "", align: "center", maxWidth: "100%" } },
   { type: "video", label: "Video Embed", icon: <Video size={14} />, category: "Content",
     defaultData: { url: "", type: "youtube", aspectRatio: "16:9" } },
+  { type: "embed" as BlockType, label: "Embed HTML", icon: <Code size={14} />, category: "Content",
+    defaultData: { embedCode: "", height: 400, caption: "" } },
   { type: "bullets", label: "Bullet List", icon: <List size={14} />, category: "Content",
     defaultData: { headline: "What's Included", items: ["Item one", "Item two", "Item three"], iconColor: "#179ca3", bgColor: "#f8fffe" } },
   { type: "numbered_list", label: "Numbered List", icon: <List size={14} />, category: "Content",
@@ -194,13 +198,33 @@ function BlockEditorPanel({ block, onUpdate }: { block: Block; onUpdate: (data: 
           <div><label className="text-xs font-medium text-gray-600">Text Color</label><input type="color" value={d.textColor ?? "#ffffff"} onChange={e => set("textColor", e.target.value)} className="w-8 h-8 rounded cursor-pointer" /></div>
         </div>
       );
-    case "faq":
+    case "faq": {
+      const faqItems: Array<{ q: string; a: string }> = d.items ?? [];
       return (
         <div className="space-y-3">
           <div><label className="text-xs font-medium text-gray-600">Headline</label><Input value={d.headline ?? ""} onChange={e => set("headline", e.target.value)} /></div>
-          <div><label className="text-xs font-medium text-gray-600">Items (JSON)</label><Textarea value={JSON.stringify(d.items ?? [], null, 2)} onChange={e => { try { set("items", JSON.parse(e.target.value)); } catch {} }} rows={6} /></div>
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-medium text-gray-600">FAQ Items</label>
+              <button onClick={() => set("items", [...faqItems, { q: "New question?", a: "Answer here." }])} className="text-xs text-teal-600 flex items-center gap-1 hover:text-teal-800"><Plus size={12} /> Add</button>
+            </div>
+            <div className="space-y-2">
+              {faqItems.map((item, i) => (
+                <div key={i} className="border border-gray-200 rounded-lg p-3 space-y-2 bg-gray-50">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-medium text-gray-400 uppercase">Question {i + 1}</span>
+                    <button onClick={() => set("items", faqItems.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><Trash2 size={12} /></button>
+                  </div>
+                  <Input value={item.q} onChange={e => { const next = faqItems.map((it, j) => j === i ? { ...it, q: e.target.value } : it); set("items", next); }} placeholder="Enter question..." className="text-sm" />
+                  <Textarea value={item.a} onChange={e => { const next = faqItems.map((it, j) => j === i ? { ...it, a: e.target.value } : it); set("items", next); }} placeholder="Enter answer..." rows={2} className="text-sm" />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div><label className="text-xs font-medium text-gray-600">Background Color</label><input type="color" value={d.bgColor ?? "#ffffff"} onChange={e => set("bgColor", e.target.value)} className="w-8 h-8 rounded cursor-pointer" /></div>
         </div>
       );
+    }
     case "alert":
       return (
         <div className="space-y-3">
@@ -213,21 +237,70 @@ function BlockEditorPanel({ block, onUpdate }: { block: Block; onUpdate: (data: 
           <div><label className="text-xs font-medium text-gray-600">Message</label><Textarea value={d.message ?? ""} onChange={e => set("message", e.target.value)} rows={3} /></div>
         </div>
       );
-    case "reviews":
+    case "reviews": {
+      const reviewItems: Array<{ name: string; rating: number; text: string }> = d.items ?? [];
       return (
         <div className="space-y-3">
           <div><label className="text-xs font-medium text-gray-600">Headline</label><Input value={d.headline ?? ""} onChange={e => set("headline", e.target.value)} /></div>
-          <div><label className="text-xs font-medium text-gray-600">Reviews (JSON)</label><Textarea value={JSON.stringify(d.items ?? [], null, 2)} onChange={e => { try { set("items", JSON.parse(e.target.value)); } catch {} }} rows={6} /></div>
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-medium text-gray-600">Reviews</label>
+              <button onClick={() => set("items", [...reviewItems, { name: "Reviewer Name", rating: 5, text: "Great product!" }])} className="text-xs text-teal-600 flex items-center gap-1 hover:text-teal-800"><Plus size={12} /> Add</button>
+            </div>
+            <div className="space-y-2">
+              {reviewItems.map((r, i) => (
+                <div key={i} className="border border-gray-200 rounded-lg p-3 space-y-2 bg-gray-50">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-medium text-gray-400 uppercase">Review {i + 1}</span>
+                    <button onClick={() => set("items", reviewItems.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><Trash2 size={12} /></button>
+                  </div>
+                  <Input value={r.name} onChange={e => { const next = reviewItems.map((rv, j) => j === i ? { ...rv, name: e.target.value } : rv); set("items", next); }} placeholder="Reviewer name" className="text-sm" />
+                  <div className="flex items-center gap-2">
+                    <label className="text-[10px] text-gray-500">Rating:</label>
+                    {[1,2,3,4,5].map(star => (
+                      <button key={star} onClick={() => { const next = reviewItems.map((rv, j) => j === i ? { ...rv, rating: star } : rv); set("items", next); }} className={`text-lg ${star <= (r.rating ?? 5) ? "text-yellow-400" : "text-gray-300"}`}>★</button>
+                    ))}
+                  </div>
+                  <Textarea value={r.text} onChange={e => { const next = reviewItems.map((rv, j) => j === i ? { ...rv, text: e.target.value } : rv); set("items", next); }} placeholder="Review text..." rows={2} className="text-sm" />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div><label className="text-xs font-medium text-gray-600">Background Color</label><input type="color" value={d.bgColor ?? "#ffffff"} onChange={e => set("bgColor", e.target.value)} className="w-8 h-8 rounded cursor-pointer" /></div>
         </div>
       );
-    case "icon_grid":
+    }
+    case "icon_grid": {
+      const gridItems: Array<{ icon: string; title: string; desc: string }> = d.items ?? [];
       return (
         <div className="space-y-3">
           <div><label className="text-xs font-medium text-gray-600">Headline</label><Input value={d.headline ?? ""} onChange={e => set("headline", e.target.value)} /></div>
           <div><label className="text-xs font-medium text-gray-600">Columns</label><Input type="number" min={2} max={4} value={d.columns ?? 3} onChange={e => set("columns", parseInt(e.target.value))} /></div>
-          <div><label className="text-xs font-medium text-gray-600">Items (JSON)</label><Textarea value={JSON.stringify(d.items ?? [], null, 2)} onChange={e => { try { set("items", JSON.parse(e.target.value)); } catch {} }} rows={6} /></div>
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-medium text-gray-600">Features</label>
+              <button onClick={() => set("items", [...gridItems, { icon: "⭐", title: "Feature", desc: "Description" }])} className="text-xs text-teal-600 flex items-center gap-1 hover:text-teal-800"><Plus size={12} /> Add</button>
+            </div>
+            <div className="space-y-2">
+              {gridItems.map((item, i) => (
+                <div key={i} className="border border-gray-200 rounded-lg p-3 space-y-2 bg-gray-50">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-medium text-gray-400 uppercase">Feature {i + 1}</span>
+                    <button onClick={() => set("items", gridItems.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><Trash2 size={12} /></button>
+                  </div>
+                  <div className="flex gap-2">
+                    <Input value={item.icon} onChange={e => { const next = gridItems.map((it, j) => j === i ? { ...it, icon: e.target.value } : it); set("items", next); }} placeholder="Emoji (e.g. ✓)" className="text-sm w-20" />
+                    <Input value={item.title} onChange={e => { const next = gridItems.map((it, j) => j === i ? { ...it, title: e.target.value } : it); set("items", next); }} placeholder="Title" className="text-sm flex-1" />
+                  </div>
+                  <Input value={item.desc} onChange={e => { const next = gridItems.map((it, j) => j === i ? { ...it, desc: e.target.value } : it); set("items", next); }} placeholder="Description" className="text-sm" />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div><label className="text-xs font-medium text-gray-600">Background Color</label><input type="color" value={d.bgColor ?? "#f8fffe"} onChange={e => set("bgColor", e.target.value)} className="w-8 h-8 rounded cursor-pointer" /></div>
         </div>
       );
+    }
     case "two_column":
       return (
         <div className="space-y-3">
@@ -249,13 +322,61 @@ function BlockEditorPanel({ block, onUpdate }: { block: Block; onUpdate: (data: 
           <div><label className="text-xs font-medium text-gray-600">Thickness</label><Input type="number" min={1} max={10} value={d.thickness ?? 1} onChange={e => set("thickness", parseInt(e.target.value))} /></div>
         </div>
       );
-    case "gallery":
+    case "gallery": {
+      const galleryImages: string[] = Array.isArray(d.images) ? d.images.map((img: any) => typeof img === 'string' ? img : img?.url ?? '') : [];
       return (
         <div className="space-y-3">
-          <div><label className="text-xs font-medium text-gray-600">Image URLs (one per line)</label><Textarea value={(d.images ?? []).join("\n")} onChange={e => set("images", e.target.value.split("\n").filter(Boolean))} rows={5} /></div>
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-medium text-gray-600">Images</label>
+              <button onClick={() => set("images", [...galleryImages, ""])} className="text-xs text-teal-600 flex items-center gap-1 hover:text-teal-800"><Plus size={12} /> Add</button>
+            </div>
+            <div className="space-y-1">
+              {galleryImages.map((url: string, i: number) => (
+                <div key={i} className="flex gap-1 items-center">
+                  <Input value={url} onChange={e => { const next = [...galleryImages]; next[i] = e.target.value; set("images", next); }} placeholder="Image URL" className="text-sm flex-1" />
+                  <button onClick={() => set("images", galleryImages.filter((_: any, j: number) => j !== i))} className="text-red-400 hover:text-red-600 flex-shrink-0"><Trash2 size={12} /></button>
+                </div>
+              ))}
+            </div>
+          </div>
           <div><label className="text-xs font-medium text-gray-600">Columns</label><Input type="number" min={2} max={5} value={d.columns ?? 3} onChange={e => set("columns", parseInt(e.target.value))} /></div>
+          <div><label className="text-xs font-medium text-gray-600">Background Color</label><input type="color" value={d.bgColor ?? "#ffffff"} onChange={e => set("bgColor", e.target.value)} className="w-8 h-8 rounded cursor-pointer" /></div>
         </div>
       );
+    }
+    case "embed":
+      return (
+        <div className="space-y-3">
+          <div><label className="text-xs font-medium text-gray-600">Embed Code (paste iframe or HTML)</label><Textarea value={d.embedCode ?? ""} onChange={e => set("embedCode", e.target.value)} rows={5} className="font-mono text-xs" placeholder='<iframe src="https://..." width="100%" height="400"></iframe>' /></div>
+          <div><label className="text-xs font-medium text-gray-600">Height (px)</label><Input type="number" min={100} max={1200} value={d.height ?? 400} onChange={e => set("height", parseInt(e.target.value))} /></div>
+          <div><label className="text-xs font-medium text-gray-600">Caption (optional)</label><Input value={d.caption ?? ""} onChange={e => set("caption", e.target.value)} placeholder="Optional caption below embed" /></div>
+        </div>
+      );
+    case "divided_columns": {
+      const cols: Array<{ html: string }> = d.columns ?? [{ html: "<p>Column 1</p>" }, { html: "<p>Column 2</p>" }];
+      return (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-medium text-gray-600">Columns ({cols.length})</label>
+            {cols.length < 4 && (
+              <button onClick={() => set("columns", [...cols, { html: "<p>New column</p>" }])} className="text-xs text-teal-600 flex items-center gap-1 hover:text-teal-800"><Plus size={12} /> Add Column</button>
+            )}
+          </div>
+          {cols.map((col, i) => (
+            <div key={i} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-[10px] font-medium text-gray-400 uppercase">Column {i + 1}</span>
+                {cols.length > 2 && <button onClick={() => set("columns", cols.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><Trash2 size={12} /></button>}
+              </div>
+              <RichTextEditor value={col.html ?? ""} onChange={(html) => { const next = cols.map((c, j) => j === i ? { ...c, html } : c); set("columns", next); }} minHeight={80} maxHeight={250} placeholder={`Column ${i + 1} content...`} />
+            </div>
+          ))}
+          <div><label className="text-xs font-medium text-gray-600">Gap (px)</label><Input type="number" min={0} max={80} value={d.gap ?? 32} onChange={e => set("gap", parseInt(e.target.value))} /></div>
+          <div><label className="text-xs font-medium text-gray-600">Background Color</label><input type="color" value={d.bgColor ?? "#ffffff"} onChange={e => set("bgColor", e.target.value)} className="w-8 h-8 rounded cursor-pointer" /></div>
+        </div>
+      );
+    }
     default:
       return <p className="text-xs text-gray-500 italic">No editor available for this block type.</p>;
   }
