@@ -1332,3 +1332,4 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] LMS subdomain: All landing pages (courses + downloads) use WYSIWYG editor
 - [x] LMS subdomain: Platform Admin on main app can access/manage all LMS admin features (Digital Downloads link added)
 - [x] Fix: Change all green buttons/elements to brand teal (#189aa1) across the site (overrode Tailwind teal palette in @theme, replaced green badges/buttons in LMS pages, Premium.tsx emerald→teal)
+- [x] Landing Page Builder: Replace plain textarea in Text/Rich Text block with full WYSIWYG editor (bold, italic, headings, fonts, sizes, images, links, lists)

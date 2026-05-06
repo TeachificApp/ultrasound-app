@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import RichTextEditor from "@/components/RichTextEditor";
 import {
   ArrowLeft, Save, Eye, Plus, Trash2, GripVertical, Type, Image, Video,
   List, Quote, CreditCard, Minus, Columns, X, Palette, AlignLeft,
@@ -523,7 +524,7 @@ function BlockSettings({ block, onChange }: { block: Block; onChange: (data: Rec
       );
     }
     case "text":
-      return (<div className="space-y-3"><div><label className="text-xs text-gray-500 block mb-1">HTML Content</label><Textarea value={d.html ?? ""} onChange={e => set("html", e.target.value)} className="text-sm min-h-[120px] font-mono text-xs" placeholder="<p>Your content...</p>" /></div><AlignField /><ColorField label="Background" field="bgColor" /><ColorField label="Text Color" field="textColor" /></div>);
+      return (<div className="space-y-3"><div><label className="text-xs text-gray-500 block mb-1">Content</label><RichTextEditor value={d.html ?? ""} onChange={(html) => set("html", html)} minHeight={150} maxHeight={400} placeholder="Start typing your content..." /></div><AlignField /><ColorField label="Background" field="bgColor" /><ColorField label="Text Color" field="textColor" /></div>);
     case "image":
       return (<div className="space-y-3"><TextField label="Image URL" field="url" /><TextField label="Alt Text" field="alt" /><TextField label="Caption" field="caption" /><div><label className="text-xs text-gray-500 block mb-1">Max Width</label><Input value={d.maxWidth ?? "100%"} onChange={e => set("maxWidth", e.target.value)} className="h-8 text-sm" placeholder="100%, 600px, etc." /></div></div>);
     case "video":
@@ -583,7 +584,7 @@ function BlockSettings({ block, onChange }: { block: Block; onChange: (data: Rec
     case "divider":
       return (<div className="space-y-3"><div><label className="text-xs text-gray-500 block mb-1">Style</label><select value={d.style ?? "solid"} onChange={e => set("style", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select></div><ColorField label="Color" field="color" /><div><label className="text-xs text-gray-500 block mb-1">Thickness (px)</label><Input type="number" value={d.thickness ?? 1} onChange={e => set("thickness", Number(e.target.value))} className="h-8 text-sm" min={1} max={10} /></div><div><label className="text-xs text-gray-500 block mb-1">Vertical Spacing (px)</label><Input type="number" value={d.spacing ?? 32} onChange={e => set("spacing", Number(e.target.value))} className="h-8 text-sm" min={0} max={200} /></div></div>);
     case "two_column":
-      return (<div className="space-y-3"><div><label className="text-xs text-gray-500 block mb-1">Left Column HTML</label><Textarea value={d.leftHtml ?? ""} onChange={e => set("leftHtml", e.target.value)} className="text-sm min-h-[80px] font-mono text-xs" /></div><div><label className="text-xs text-gray-500 block mb-1">Right Column HTML</label><Textarea value={d.rightHtml ?? ""} onChange={e => set("rightHtml", e.target.value)} className="text-sm min-h-[80px] font-mono text-xs" /></div><div><label className="text-xs text-gray-500 block mb-1">Left Column Width (%)</label><Input type="number" value={d.leftRatio ?? 50} onChange={e => set("leftRatio", Number(e.target.value))} className="h-8 text-sm" min={20} max={80} /></div><ColorField label="Background" field="bgColor" /></div>);
+      return (<div className="space-y-3"><div><label className="text-xs text-gray-500 block mb-1">Left Column</label><RichTextEditor value={d.leftHtml ?? ""} onChange={(html) => set("leftHtml", html)} minHeight={100} maxHeight={300} placeholder="Left column content..." /></div><div><label className="text-xs text-gray-500 block mb-1">Right Column</label><RichTextEditor value={d.rightHtml ?? ""} onChange={(html) => set("rightHtml", html)} minHeight={100} maxHeight={300} placeholder="Right column content..." /></div><div><label className="text-xs text-gray-500 block mb-1">Left Column Width (%)</label><Input type="number" value={d.leftRatio ?? 50} onChange={e => set("leftRatio", Number(e.target.value))} className="h-8 text-sm" min={20} max={80} /></div><ColorField label="Background" field="bgColor" /></div>);
     case "spacer":
       return (<div><label className="text-xs text-gray-500 block mb-1">Height (px)</label><Input type="number" value={d.height ?? 48} onChange={e => set("height", Number(e.target.value))} className="h-8 text-sm" min={8} max={400} /></div>);
     default:

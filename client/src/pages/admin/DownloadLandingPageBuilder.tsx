@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import RichTextEditor from "@/components/RichTextEditor";
 import {
   ArrowLeft, Save, Eye, Plus, Trash2, GripVertical, Type, Image, Video,
   List, Quote, CreditCard, Minus, Columns, X, Palette, AlignLeft,
@@ -137,7 +138,7 @@ function BlockEditorPanel({ block, onUpdate }: { block: Block; onUpdate: (data: 
     case "text":
       return (
         <div className="space-y-3">
-          <div><label className="text-xs font-medium text-gray-600">Content (HTML)</label><Textarea value={d.html ?? ""} onChange={e => set("html", e.target.value)} rows={6} /></div>
+          <div><label className="text-xs font-medium text-gray-600">Content</label><RichTextEditor value={d.html ?? ""} onChange={(html) => set("html", html)} minHeight={150} maxHeight={400} placeholder="Start typing your content..." /></div>
           <div><label className="text-xs font-medium text-gray-600">Background Color</label><input type="color" value={d.bgColor ?? "#ffffff"} onChange={e => set("bgColor", e.target.value)} className="w-8 h-8 rounded cursor-pointer" /></div>
           <div><label className="text-xs font-medium text-gray-600">Text Color</label><input type="color" value={d.textColor ?? "#1a1a1a"} onChange={e => set("textColor", e.target.value)} className="w-8 h-8 rounded cursor-pointer" /></div>
         </div>
@@ -230,8 +231,8 @@ function BlockEditorPanel({ block, onUpdate }: { block: Block; onUpdate: (data: 
     case "two_column":
       return (
         <div className="space-y-3">
-          <div><label className="text-xs font-medium text-gray-600">Left Column (HTML)</label><Textarea value={d.leftHtml ?? ""} onChange={e => set("leftHtml", e.target.value)} rows={4} /></div>
-          <div><label className="text-xs font-medium text-gray-600">Right Column (HTML)</label><Textarea value={d.rightHtml ?? ""} onChange={e => set("rightHtml", e.target.value)} rows={4} /></div>
+          <div><label className="text-xs font-medium text-gray-600">Left Column</label><RichTextEditor value={d.leftHtml ?? ""} onChange={(html) => set("leftHtml", html)} minHeight={100} maxHeight={300} placeholder="Left column content..." /></div>
+          <div><label className="text-xs font-medium text-gray-600">Right Column</label><RichTextEditor value={d.rightHtml ?? ""} onChange={(html) => set("rightHtml", html)} minHeight={100} maxHeight={300} placeholder="Right column content..." /></div>
           <div><label className="text-xs font-medium text-gray-600">Left Width %</label><Input type="number" min={20} max={80} value={d.leftRatio ?? 50} onChange={e => set("leftRatio", parseInt(e.target.value))} /></div>
         </div>
       );
