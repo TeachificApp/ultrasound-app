@@ -214,7 +214,7 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
           </a>
         )}
         {product.slug && (
-          <a href={`${window.location.origin.replace("app.", "learn.")}/downloads/${product.slug}/files?preview=student`} target="_blank" rel="noopener noreferrer">
+          <a href={`/downloads/${product.slug}/files?preview=student`} target="_blank" rel="noopener noreferrer">
             <Button size="sm" variant="outline" className="text-xs text-purple-600 border-purple-300 hover:bg-purple-50">
               <Users className="w-3 h-3 mr-1" /> Preview as Student
             </Button>
