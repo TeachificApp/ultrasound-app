@@ -5,7 +5,7 @@
  * Supports 25+ block types + Template Library (save/reuse pages and blocks).
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import {
   DndContext,
@@ -33,7 +33,7 @@ import {
   List, Quote, CreditCard, Minus, Columns, X, Palette, AlignLeft,
   AlignCenter, AlignRight, HelpCircle, Users, Star, Globe, Timer,
   AlertTriangle, CheckSquare, LayoutGrid, Layers, BookOpen, Tag,
-  ChevronDown, ChevronUp, Copy, FolderOpen, BookMarked,
+  ChevronDown, ChevronUp, Copy, FolderOpen, BookMarked, Upload, Code,
 } from "lucide-react";
 
 // ─── Block Types ──────────────────────────────────────────────────────────────
@@ -61,9 +61,11 @@ const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactNode; ca
   {
     type: "hero", label: "Hero / Banner", icon: <Image size={14} />, category: "Layout",
     defaultData: {
-      headline: "Your Course Headline", subheadline: "A compelling subtitle that explains the value",
+      headline: "Your Course Headline", headline2: "", subheadline: "A compelling subtitle that explains the value",
       bgType: "color", bgColor: "#179ca3", gradientFrom: "#179ca3", gradientTo: "#0e4a50",
-      gradientDir: "to bottom right", imageUrl: "", videoUrl: "", textColor: "#ffffff", align: "left",
+      gradientDir: "to bottom right", imageUrl: "", videoUrl: "", textColor: "#ffffff",
+      headlineColor: "", headline2Color: "",
+      align: "left", inlineMediaUrl: "", inlineMediaType: "image", inlineMediaPlacement: "right",
       buttons: [{ text: "Enroll Now", color: "#ffffff", textColor: "#179ca3", link: "", style: "filled" }],
     },
   },
@@ -496,10 +498,29 @@ function BlockSettings({ block, onChange }: { block: Block; onChange: (data: Rec
       const setBtn = (idx: number, key: string, val: string) => { const next = buttons.map((b, i) => i === idx ? { ...b, [key]: val } : b); onChange({ ...d, buttons: next }); };
       const addBtn = () => onChange({ ...d, buttons: [...buttons, { text: "Learn More", color: "transparent", textColor: "#fff", link: "", style: "outline" }] });
       const removeBtn = (idx: number) => onChange({ ...d, buttons: buttons.filter((_, i) => i !== idx) });
+      const bgImageRef = useRef<HTMLInputElement>(null);
+      const bgVideoRef = useRef<HTMLInputElement>(null);
+      const inlineMediaRef = useRef<HTMLInputElement>(null);
+      const [uploading, setUploading] = useState<string | null>(null);
+      const uploadMedia = trpc.auth.uploadPageMedia.useMutation();
+      const handleFileUpload = async (file: File, targetField: string, context: string) => {
+        if (file.size > 40 * 1024 * 1024) { toast.error("File must be under 40 MB"); return; }
+        setUploading(targetField);
+        try {
+          const reader = new FileReader();
+          const dataUri = await new Promise<string>((resolve) => { reader.onload = () => resolve(reader.result as string); reader.readAsDataURL(file); });
+          const result = await uploadMedia.mutateAsync({ dataUri, mimeType: file.type, fileName: file.name, context });
+          set(targetField, result.url);
+          toast.success("File uploaded successfully");
+        } catch (err: any) { toast.error(err.message || "Upload failed"); }
+        setUploading(null);
+      };
       return (
         <div className="space-y-3">
           <TextField label="Headline (Line 1)" field="headline" />
+          <ColorField label="Line 1 Color" field="headlineColor" />
           <TextField label="Headline (Line 2)" field="headline2" />
+          <ColorField label="Line 2 Color" field="headline2Color" />
           <TextField label="Subheadline" field="subheadline" multiline />
           <ColorField label="Text Color" field="textColor" />
           <div>
@@ -514,8 +535,57 @@ function BlockSettings({ block, onChange }: { block: Block; onChange: (data: Rec
           </div>
           {bgType === "color" && <ColorField label="Background" field="bgColor" />}
           {bgType === "gradient" && (<><ColorField label="From" field="gradientFrom" /><ColorField label="To" field="gradientTo" /><div><label className="text-xs text-gray-500 block mb-1">Direction</label><select value={d.gradientDir ?? "to bottom right"} onChange={e => set("gradientDir", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="to right">Left → Right</option><option value="to bottom">Top → Bottom</option><option value="to bottom right">Diagonal ↘</option><option value="to bottom left">Diagonal ↙</option><option value="135deg">135°</option></select></div></>)}
-          {bgType === "image" && <TextField label="Background Image URL" field="imageUrl" />}
-          {bgType === "video" && <TextField label="Video URL (.mp4)" field="videoUrl" />}
+          {bgType === "image" && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Input value={d.imageUrl ?? ""} onChange={e => set("imageUrl", e.target.value)} placeholder="Image URL or upload" className="h-8 text-sm flex-1" />
+                <button onClick={() => bgImageRef.current?.click()} className="px-2 py-1.5 text-xs bg-teal-50 text-teal-700 rounded border border-teal-200 hover:bg-teal-100 flex items-center gap-1" disabled={uploading === "imageUrl"}>
+                  {uploading === "imageUrl" ? "..." : <><Upload size={12} /> Upload</>}
+                </button>
+                <input ref={bgImageRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, "imageUrl", "hero-bg"); e.target.value = ""; }} />
+              </div>
+              {d.imageUrl && <img src={d.imageUrl} className="w-full h-16 object-cover rounded border" />}
+            </div>
+          )}
+          {bgType === "video" && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Input value={d.videoUrl ?? ""} onChange={e => set("videoUrl", e.target.value)} placeholder="Video URL or upload" className="h-8 text-sm flex-1" />
+                <button onClick={() => bgVideoRef.current?.click()} className="px-2 py-1.5 text-xs bg-teal-50 text-teal-700 rounded border border-teal-200 hover:bg-teal-100 flex items-center gap-1" disabled={uploading === "videoUrl"}>
+                  {uploading === "videoUrl" ? "..." : <><Upload size={12} /> Upload</>}
+                </button>
+                <input ref={bgVideoRef} type="file" accept="video/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, "videoUrl", "hero-bg-video"); e.target.value = ""; }} />
+              </div>
+              <p className="text-[10px] text-gray-400">Video will autoplay muted as background</p>
+            </div>
+          )}
+          {/* Inline Media */}
+          <div className="border-t pt-3 mt-3">
+            <label className="text-xs text-gray-500 font-medium block mb-2">Inline Media (within banner)</label>
+            <div className="space-y-2">
+              <select value={d.inlineMediaType ?? "image"} onChange={e => set("inlineMediaType", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+                <option value="image">Image</option>
+                <option value="video">Video</option>
+              </select>
+              <div className="flex items-center gap-2">
+                <Input value={d.inlineMediaUrl ?? ""} onChange={e => set("inlineMediaUrl", e.target.value)} placeholder={d.inlineMediaType === "video" ? "Video URL" : "Image URL"} className="h-8 text-sm flex-1" />
+                <button onClick={() => inlineMediaRef.current?.click()} className="px-2 py-1.5 text-xs bg-teal-50 text-teal-700 rounded border border-teal-200 hover:bg-teal-100 flex items-center gap-1" disabled={uploading === "inlineMediaUrl"}>
+                  {uploading === "inlineMediaUrl" ? "..." : <><Upload size={12} /> Upload</>}
+                </button>
+                <input ref={inlineMediaRef} type="file" accept={d.inlineMediaType === "video" ? "video/*" : "image/*"} className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, "inlineMediaUrl", "hero-inline"); e.target.value = ""; }} />
+              </div>
+              {d.inlineMediaUrl && (
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Placement</label>
+                  <div className="flex gap-1">
+                    {(["left", "center", "right"] as const).map(pos => (
+                      <button key={pos} onClick={() => set("inlineMediaPlacement", pos)} className={`flex-1 py-1 text-xs rounded border capitalize ${d.inlineMediaPlacement === pos ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>{pos}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
           <AlignField />
           <div>
             <div className="flex items-center justify-between mb-2">

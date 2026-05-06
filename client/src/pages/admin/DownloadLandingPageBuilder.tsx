@@ -4,7 +4,7 @@
  * Route: /admin/downloads/:productId/landing-builder
  * Reuses the same block system as the LMS LandingPageBuilder.
  */
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import {
   DndContext,
@@ -32,7 +32,7 @@ import {
   List, Quote, CreditCard, Minus, Columns, X, Palette, AlignLeft,
   AlignCenter, AlignRight, HelpCircle, Users, Star, Globe, Timer,
   AlertTriangle, CheckSquare, LayoutGrid, Layers, BookOpen, Tag,
-  ChevronDown, ChevronUp, Copy, FolderOpen, BookMarked, Code,
+  ChevronDown, ChevronUp, Copy, FolderOpen, BookMarked, Code, Upload,
 } from "lucide-react";
 import type { Block, BlockType } from "./LandingPageBuilder";
 
@@ -46,9 +46,11 @@ const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactNode; ca
   {
     type: "hero", label: "Hero / Banner", icon: <Image size={14} />, category: "Layout",
     defaultData: {
-      headline: "Your Product Headline", subheadline: "A compelling subtitle that explains the value",
+      headline: "Your Product Headline", headline2: "", subheadline: "A compelling subtitle that explains the value",
       bgType: "color", bgColor: "#179ca3", gradientFrom: "#179ca3", gradientTo: "#0e4a50",
-      gradientDir: "to bottom right", imageUrl: "", videoUrl: "", textColor: "#ffffff", align: "left",
+      gradientDir: "to bottom right", imageUrl: "", videoUrl: "", textColor: "#ffffff",
+      headlineColor: "", headline2Color: "",
+      align: "left", inlineMediaUrl: "", inlineMediaType: "image", inlineMediaPlacement: "right",
       buttons: [{ text: "Buy Now", color: "#ffffff", textColor: "#179ca3", link: "", style: "filled" }],
     },
   },
@@ -122,6 +124,163 @@ function SortableBlockItem({ block, isSelected, onSelect, onDelete, onDuplicate 
   );
 }
 
+// ─── Hero Editor Component ───────────────────────────────────────────────────────
+function HeroEditor({ d, set, onUpdate }: { d: Record<string, any>; set: (key: string, val: any) => void; onUpdate: (data: Record<string, any>) => void }) {
+  const bgImageRef = useRef<HTMLInputElement>(null);
+  const bgVideoRef = useRef<HTMLInputElement>(null);
+  const inlineMediaRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState<string | null>(null);
+  const uploadMedia = trpc.auth.uploadPageMedia.useMutation();
+
+  const handleFileUpload = async (file: File, targetField: string, context: string) => {
+    if (file.size > 40 * 1024 * 1024) { toast.error("File must be under 40 MB"); return; }
+    setUploading(targetField);
+    try {
+      const reader = new FileReader();
+      const dataUri = await new Promise<string>((resolve) => { reader.onload = () => resolve(reader.result as string); reader.readAsDataURL(file); });
+      const result = await uploadMedia.mutateAsync({ dataUri, mimeType: file.type, fileName: file.name, context });
+      set(targetField, result.url);
+      toast.success("File uploaded successfully");
+    } catch (err: any) { toast.error(err.message || "Upload failed"); }
+    setUploading(null);
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* ── Headlines ── */}
+      <div className="border-b pb-3">
+        <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Headlines</h4>
+        <div className="space-y-2">
+          <div><label className="text-xs font-medium text-gray-600">Headline (Line 1)</label><Input value={d.headline ?? ""} onChange={e => set("headline", e.target.value)} /></div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium text-gray-600">Line 1 Color</label>
+            <input type="color" value={d.headlineColor || d.textColor || "#ffffff"} onChange={e => set("headlineColor", e.target.value)} className="w-6 h-6 rounded cursor-pointer" />
+            {d.headlineColor && <button onClick={() => set("headlineColor", "")} className="text-[10px] text-gray-400 hover:text-red-500">Reset</button>}
+          </div>
+          <div><label className="text-xs font-medium text-gray-600">Headline (Line 2)</label><Input value={d.headline2 ?? ""} onChange={e => set("headline2", e.target.value)} placeholder="Optional second line" /></div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium text-gray-600">Line 2 Color</label>
+            <input type="color" value={d.headline2Color || d.textColor || "#ffffff"} onChange={e => set("headline2Color", e.target.value)} className="w-6 h-6 rounded cursor-pointer" />
+            {d.headline2Color && <button onClick={() => set("headline2Color", "")} className="text-[10px] text-gray-400 hover:text-red-500">Reset</button>}
+          </div>
+          <div><label className="text-xs font-medium text-gray-600">Subheadline</label><Textarea value={d.subheadline ?? ""} onChange={e => set("subheadline", e.target.value)} rows={2} /></div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium text-gray-600">Default Text Color</label>
+            <input type="color" value={d.textColor ?? "#ffffff"} onChange={e => set("textColor", e.target.value)} className="w-6 h-6 rounded cursor-pointer" />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Background ── */}
+      <div className="border-b pb-3">
+        <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Background</h4>
+        <div className="space-y-2">
+          <div>
+            <label className="text-xs font-medium text-gray-600">Background Type</label>
+            <select value={d.bgType ?? "color"} onChange={e => set("bgType", e.target.value)} className="w-full mt-1 text-sm border rounded px-2 py-1.5">
+              <option value="color">Solid Color</option>
+              <option value="gradient">Gradient</option>
+              <option value="image">Image</option>
+              <option value="video">Video</option>
+            </select>
+          </div>
+          {(d.bgType === "color" || !d.bgType) && (
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-medium text-gray-600">Color</label>
+              <input type="color" value={d.bgColor ?? "#179ca3"} onChange={e => set("bgColor", e.target.value)} className="w-6 h-6 rounded cursor-pointer" />
+            </div>
+          )}
+          {d.bgType === "gradient" && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2"><label className="text-xs text-gray-600">From</label><input type="color" value={d.gradientFrom ?? "#179ca3"} onChange={e => set("gradientFrom", e.target.value)} className="w-6 h-6 rounded cursor-pointer" /></div>
+              <div className="flex items-center gap-2"><label className="text-xs text-gray-600">To</label><input type="color" value={d.gradientTo ?? "#0e4a50"} onChange={e => set("gradientTo", e.target.value)} className="w-6 h-6 rounded cursor-pointer" /></div>
+            </div>
+          )}
+          {d.bgType === "image" && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Input value={d.imageUrl ?? ""} onChange={e => set("imageUrl", e.target.value)} placeholder="Image URL or upload" className="flex-1" />
+                <button onClick={() => bgImageRef.current?.click()} className="px-2 py-1.5 text-xs bg-teal-50 text-teal-700 rounded border border-teal-200 hover:bg-teal-100 flex items-center gap-1" disabled={uploading === "imageUrl"}>
+                  {uploading === "imageUrl" ? "..." : <><Upload size={12} /> Upload</>}
+                </button>
+                <input ref={bgImageRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, "imageUrl", "hero-bg"); e.target.value = ""; }} />
+              </div>
+              {d.imageUrl && <img src={d.imageUrl} className="w-full h-20 object-cover rounded border" />}
+            </div>
+          )}
+          {d.bgType === "video" && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Input value={d.videoUrl ?? ""} onChange={e => set("videoUrl", e.target.value)} placeholder="Video URL or upload" className="flex-1" />
+                <button onClick={() => bgVideoRef.current?.click()} className="px-2 py-1.5 text-xs bg-teal-50 text-teal-700 rounded border border-teal-200 hover:bg-teal-100 flex items-center gap-1" disabled={uploading === "videoUrl"}>
+                  {uploading === "videoUrl" ? "..." : <><Upload size={12} /> Upload</>}
+                </button>
+                <input ref={bgVideoRef} type="file" accept="video/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, "videoUrl", "hero-bg-video"); e.target.value = ""; }} />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-gray-600">Fallback Color</label>
+                <input type="color" value={d.bgColor ?? "#179ca3"} onChange={e => set("bgColor", e.target.value)} className="w-6 h-6 rounded cursor-pointer" />
+              </div>
+              {d.videoUrl && <p className="text-[10px] text-gray-400">Video will autoplay muted as background</p>}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Inline Media (image/video within the banner) ── */}
+      <div className="border-b pb-3">
+        <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Inline Media (within banner)</h4>
+        <div className="space-y-2">
+          <div>
+            <label className="text-xs font-medium text-gray-600">Media Type</label>
+            <select value={d.inlineMediaType ?? "image"} onChange={e => set("inlineMediaType", e.target.value)} className="w-full mt-1 text-sm border rounded px-2 py-1.5">
+              <option value="image">Image</option>
+              <option value="video">Video</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <Input value={d.inlineMediaUrl ?? ""} onChange={e => set("inlineMediaUrl", e.target.value)} placeholder={d.inlineMediaType === "video" ? "Video URL" : "Image URL"} className="flex-1" />
+            <button onClick={() => inlineMediaRef.current?.click()} className="px-2 py-1.5 text-xs bg-teal-50 text-teal-700 rounded border border-teal-200 hover:bg-teal-100 flex items-center gap-1" disabled={uploading === "inlineMediaUrl"}>
+              {uploading === "inlineMediaUrl" ? "..." : <><Upload size={12} /> Upload</>}
+            </button>
+            <input ref={inlineMediaRef} type="file" accept={d.inlineMediaType === "video" ? "video/*" : "image/*"} className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, "inlineMediaUrl", "hero-inline"); e.target.value = ""; }} />
+          </div>
+          {d.inlineMediaUrl && (
+            <div>
+              <label className="text-xs font-medium text-gray-600">Placement</label>
+              <div className="flex gap-1 mt-1">
+                {["left", "center", "right"].map(pos => (
+                  <button key={pos} onClick={() => set("inlineMediaPlacement", pos)}
+                    className={`px-3 py-1 text-xs rounded border ${d.inlineMediaPlacement === pos ? "bg-teal-500 text-white border-teal-500" : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"}`}>
+                    {pos.charAt(0).toUpperCase() + pos.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {d.inlineMediaUrl && d.inlineMediaType === "image" && <img src={d.inlineMediaUrl} className="w-full h-20 object-contain rounded border" />}
+        </div>
+      </div>
+
+      {/* ── CTA Button ── */}
+      <div>
+        <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">CTA Button</h4>
+        <div className="space-y-2">
+          <div><label className="text-xs font-medium text-gray-600">Button Text</label><Input value={d.buttons?.[0]?.text ?? "Buy Now"} onChange={e => set("buttons", [{ ...d.buttons?.[0], text: e.target.value }])} /></div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-600">Button Color</label>
+            <input type="color" value={d.buttons?.[0]?.color ?? "#ffffff"} onChange={e => set("buttons", [{ ...d.buttons?.[0], color: e.target.value }])} className="w-6 h-6 rounded cursor-pointer" />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-600">Button Text Color</label>
+            <input type="color" value={d.buttons?.[0]?.textColor ?? "#179ca3"} onChange={e => set("buttons", [{ ...d.buttons?.[0], textColor: e.target.value }])} className="w-6 h-6 rounded cursor-pointer" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Block Editor Panel ───────────────────────────────────────────────────────
 function BlockEditorPanel({ block, onUpdate }: { block: Block; onUpdate: (data: Record<string, any>) => void }) {
   const d = block.data;
@@ -129,17 +288,7 @@ function BlockEditorPanel({ block, onUpdate }: { block: Block; onUpdate: (data: 
 
   switch (block.type) {
     case "hero":
-      return (
-        <div className="space-y-3">
-          <div><label className="text-xs font-medium text-gray-600">Headline (Line 1)</label><Input value={d.headline ?? ""} onChange={e => set("headline", e.target.value)} /></div>
-          <div><label className="text-xs font-medium text-gray-600">Headline (Line 2)</label><Input value={d.headline2 ?? ""} onChange={e => set("headline2", e.target.value)} placeholder="Optional second line" /></div>
-          <div><label className="text-xs font-medium text-gray-600">Subheadline</label><Textarea value={d.subheadline ?? ""} onChange={e => set("subheadline", e.target.value)} rows={2} /></div>
-          <div><label className="text-xs font-medium text-gray-600">Background Color</label><input type="color" value={d.bgColor ?? "#179ca3"} onChange={e => set("bgColor", e.target.value)} className="w-8 h-8 rounded cursor-pointer" /></div>
-          <div><label className="text-xs font-medium text-gray-600">Text Color</label><input type="color" value={d.textColor ?? "#ffffff"} onChange={e => set("textColor", e.target.value)} className="w-8 h-8 rounded cursor-pointer" /></div>
-          <div><label className="text-xs font-medium text-gray-600">Background Image URL</label><Input value={d.imageUrl ?? ""} onChange={e => set("imageUrl", e.target.value)} placeholder="https://..." /></div>
-          <div><label className="text-xs font-medium text-gray-600">CTA Button Text</label><Input value={d.buttons?.[0]?.text ?? "Buy Now"} onChange={e => set("buttons", [{ ...d.buttons?.[0], text: e.target.value }])} /></div>
-        </div>
-      );
+      return <HeroEditor d={d} set={set} onUpdate={onUpdate} />;
     case "text":
       return (
         <div className="space-y-3">
@@ -384,27 +533,50 @@ function BlockEditorPanel({ block, onUpdate }: { block: Block; onUpdate: (data: 
 }
 
 // ─── Block Preview (Live Canvas Rendering) ──────────────────────────────────
-function BlockPreview({ block }: { block: Block }) {
+function BlockPreview({ block, previewMode = "editor" }: { block: Block; previewMode?: "editor" | "visitor" | "customer" }) {
   const d = block.data;
   switch (block.type) {
     case "hero": {
       const buttons = d.buttons ?? [{ text: "Buy Now", color: "#ffffff", textColor: "#179ca3", style: "filled" }];
-      const bgStyle: React.CSSProperties = d.imageUrl
-        ? { backgroundImage: `url(${d.imageUrl})`, backgroundSize: "cover", backgroundPosition: "center", backgroundColor: d.bgColor ?? "#179ca3" }
-        : { backgroundColor: d.bgColor ?? "#179ca3" };
+      const bgType = d.bgType ?? "color";
+      let bgStyle: React.CSSProperties = {};
+      if (bgType === "color") bgStyle = { backgroundColor: d.bgColor ?? "#179ca3" };
+      else if (bgType === "gradient") bgStyle = { background: `linear-gradient(${d.gradientDir ?? "to bottom right"}, ${d.gradientFrom ?? "#179ca3"}, ${d.gradientTo ?? "#0e4a50"})` };
+      else if (bgType === "image") bgStyle = { backgroundImage: `url(${d.imageUrl})`, backgroundSize: "cover", backgroundPosition: "center" };
+      else if (bgType === "video") bgStyle = { backgroundColor: "#000" };
+      const hasInlineMedia = !!d.inlineMediaUrl;
+      const placement = d.inlineMediaPlacement ?? "right";
+      const isHorizontal = placement === "left" || placement === "right";
       return (
-        <div className="relative px-8 py-16 overflow-hidden" style={{ ...bgStyle, color: d.textColor ?? "#fff", textAlign: d.align ?? "left" }}>
-          <div className="relative max-w-3xl">
-            <h1 className="text-4xl font-bold mb-4 leading-tight">{d.headline}{d.headline2 && <><br />{d.headline2}</>}</h1>
-            {d.subheadline && <p className="text-xl opacity-90 mb-8">{d.subheadline}</p>}
-            <div className="flex flex-wrap gap-3" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
-              {buttons.map((btn: any, i: number) => (
-                <button key={i} className="px-8 py-3 rounded-lg font-semibold text-lg shadow-lg"
-                  style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
-                  {btn.text}
-                </button>
-              ))}
+        <div className="relative px-8 py-16 overflow-hidden" style={{ ...bgStyle, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left") }}>
+          {bgType === "video" && d.bgVideoUrl && (
+            <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.bgVideoUrl} /></video>
+          )}
+          <div className={`relative max-w-5xl mx-auto ${hasInlineMedia && isHorizontal ? "flex items-center gap-8" : ""} ${hasInlineMedia && placement === "left" ? "flex-row-reverse" : ""}`}>
+            <div className={hasInlineMedia && isHorizontal ? "flex-1" : "max-w-3xl"}>
+              <h1 className="text-4xl font-bold mb-4 leading-tight">
+                <span style={d.headlineColor ? { color: d.headlineColor } : undefined}>{d.headline}</span>
+                {d.headline2 && <><br /><span style={d.headline2Color ? { color: d.headline2Color } : undefined}>{d.headline2}</span></>}
+              </h1>
+              {d.subheadline && <p className="text-xl opacity-90 mb-8">{d.subheadline}</p>}
+              <div className="flex flex-wrap gap-3" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
+                {buttons.map((btn: any, i: number) => (
+                  <button key={i} className="px-8 py-3 rounded-lg font-semibold text-lg shadow-lg"
+                    style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
+                    {previewMode === "customer" ? "Access Files" : btn.text}
+                  </button>
+                ))}
+              </div>
             </div>
+            {hasInlineMedia && (
+              <div className={isHorizontal ? "flex-1 max-w-xs" : "mt-8 max-w-md mx-auto"}>
+                {d.inlineMediaType === "video" ? (
+                  <video autoPlay muted loop playsInline className="w-full rounded-lg shadow-2xl"><source src={d.inlineMediaUrl} /></video>
+                ) : (
+                  <img src={d.inlineMediaUrl} alt="" className="w-full rounded-lg shadow-2xl" />
+                )}
+              </div>
+            )}
           </div>
         </div>
       );
@@ -492,15 +664,23 @@ function BlockPreview({ block }: { block: Block }) {
           <div className="max-w-lg mx-auto text-center">
             <h2 className="text-2xl font-bold mb-2 text-gray-900">{d.headline}</h2>
             {d.subtext && <p className="text-gray-600 mb-6">{d.subtext}</p>}
-            <button className="px-8 py-3 rounded-lg font-semibold text-lg shadow-lg" style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>{d.ctaText ?? "Buy Now"}</button>
+            {previewMode === "customer" ? (
+              <div className="inline-flex items-center gap-2 px-6 py-3 bg-green-100 text-green-700 rounded-lg font-semibold">✓ Purchased — Access Files</div>
+            ) : (
+              <button className="px-8 py-3 rounded-lg font-semibold text-lg shadow-lg" style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>{d.ctaText ?? "Buy Now"}</button>
+            )}
           </div>
         </div>
       );
     case "cta_standalone":
       return (
         <div className="px-8 py-6" style={{ textAlign: d.align ?? "center" }}>
-          <button className={`px-8 py-3 rounded-lg font-semibold shadow-lg ${d.size === "sm" ? "text-sm" : d.size === "lg" ? "text-lg" : "text-base"}`}
-            style={{ backgroundColor: d.color ?? "#179ca3", color: d.textColor ?? "#fff" }}>{d.text ?? "Click Here"}</button>
+          {previewMode === "customer" ? (
+            <div className="inline-flex items-center gap-2 px-6 py-3 bg-green-100 text-green-700 rounded-lg font-semibold">✓ Purchased — Access Files</div>
+          ) : (
+            <button className={`px-8 py-3 rounded-lg font-semibold shadow-lg ${d.size === "sm" ? "text-sm" : d.size === "lg" ? "text-lg" : "text-base"}`}
+              style={{ backgroundColor: d.color ?? "#179ca3", color: d.textColor ?? "#fff" }}>{d.text ?? "Click Here"}</button>
+          )}
         </div>
       );
     case "faq":
@@ -620,6 +800,7 @@ export default function DownloadLandingPageBuilder() {
   const [hasLoaded, setHasLoaded] = useState(false);
   const [productInfo, setProductInfo] = useState<{ title: string; slug: string } | null>(null);
   const [activeCat, setActiveCat] = useState<string>("Layout");
+  const [previewMode, setPreviewMode] = useState<"editor" | "visitor" | "customer">("editor");
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const { isLoading, data: lpData } = trpc.downloadsAdmin.getLandingBlocks.useQuery(
@@ -702,9 +883,14 @@ export default function DownloadLandingPageBuilder() {
           <span className="text-sm font-semibold text-gray-800 truncate max-w-[200px]">{productInfo?.title ?? "Loading..."}</span>
         </div>
         <div className="flex items-center gap-2">
+          <div className="flex items-center border border-gray-200 rounded-md overflow-hidden text-xs">
+            <button onClick={() => setPreviewMode("editor")} className={`px-3 py-1.5 ${previewMode === "editor" ? "bg-teal-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>Editor</button>
+            <button onClick={() => setPreviewMode("visitor")} className={`px-3 py-1.5 border-l border-gray-200 ${previewMode === "visitor" ? "bg-teal-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>As Visitor</button>
+            <button onClick={() => setPreviewMode("customer")} className={`px-3 py-1.5 border-l border-gray-200 ${previewMode === "customer" ? "bg-teal-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>As Customer</button>
+          </div>
           {productInfo?.slug && (
             <a href={`/downloads/${productInfo.slug}`} target="_blank" rel="noopener noreferrer" className="text-xs text-gray-500 hover:text-teal-600 flex items-center gap-1">
-              <Eye size={14} /> Preview
+              <Eye size={14} /> Open Page
             </a>
           )}
           <Button size="sm" onClick={handleSave} disabled={isSaving} className="bg-teal-600 hover:bg-teal-700 text-white">
@@ -715,8 +901,8 @@ export default function DownloadLandingPageBuilder() {
 
       {/* Main Area */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left Panel — Block List */}
-        <div className="w-56 bg-white border-r border-gray-200 flex flex-col overflow-hidden flex-shrink-0">
+        {/* Left Panel — Block List (hidden in preview modes) */}
+        <div className={`w-56 bg-white border-r border-gray-200 flex flex-col overflow-hidden flex-shrink-0 ${previewMode !== "editor" ? "hidden" : ""}`}>
           <div className="p-3 border-b border-gray-100">
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Blocks ({blocks.length})</h3>
           </div>
@@ -768,35 +954,45 @@ export default function DownloadLandingPageBuilder() {
             </div>
           ) : (
             <div className="bg-white min-h-full shadow-sm mx-auto" style={{ maxWidth: "900px" }}>
+              {previewMode !== "editor" && (
+                <div className="sticky top-0 z-20 bg-amber-50 border-b border-amber-200 px-4 py-2 text-xs text-amber-700 flex items-center gap-2">
+                  <Eye size={12} /> Previewing as <strong>{previewMode === "customer" ? "Customer (purchased)" : "New Visitor"}</strong>
+                  <button onClick={() => setPreviewMode("editor")} className="ml-auto text-amber-600 hover:text-amber-800 underline">Back to Editor</button>
+                </div>
+              )}
               {blocks.map(block => (
                 <div
                   key={block.id}
-                  onClick={() => setSelectedId(block.id)}
-                  className={`relative group cursor-pointer border-2 transition-all ${
+                  onClick={previewMode === "editor" ? () => setSelectedId(block.id) : undefined}
+                  className={previewMode === "editor" ? `relative group cursor-pointer border-2 transition-all ${
                     selectedId === block.id ? "border-teal-500 shadow-lg shadow-teal-100" : "border-transparent hover:border-teal-200"
-                  }`}
+                  }` : ""}
                 >
-                  <div className={`absolute top-2 right-2 z-10 flex gap-1 ${
-                    selectedId === block.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                  } transition-opacity`}>
-                    <button onClick={e => { e.stopPropagation(); duplicateBlock(block.id); }} className="w-7 h-7 bg-white border border-gray-200 rounded shadow text-gray-500 hover:text-teal-600 flex items-center justify-center" title="Duplicate"><Copy size={12} /></button>
-                    <button onClick={e => { e.stopPropagation(); deleteBlock(block.id); }} className="w-7 h-7 bg-white border border-gray-200 rounded shadow text-gray-500 hover:text-red-500 flex items-center justify-center" title="Delete"><Trash2 size={12} /></button>
-                  </div>
-                  <BlockPreview block={block} />
+                  {previewMode === "editor" && (
+                    <div className={`absolute top-2 right-2 z-10 flex gap-1 ${
+                      selectedId === block.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                    } transition-opacity`}>
+                      <button onClick={e => { e.stopPropagation(); duplicateBlock(block.id); }} className="w-7 h-7 bg-white border border-gray-200 rounded shadow text-gray-500 hover:text-teal-600 flex items-center justify-center" title="Duplicate"><Copy size={12} /></button>
+                      <button onClick={e => { e.stopPropagation(); deleteBlock(block.id); }} className="w-7 h-7 bg-white border border-gray-200 rounded shadow text-gray-500 hover:text-red-500 flex items-center justify-center" title="Delete"><Trash2 size={12} /></button>
+                    </div>
+                  )}
+                  <BlockPreview block={block} previewMode={previewMode} />
                 </div>
               ))}
-              <div className="flex justify-center py-6 border-t border-dashed border-gray-200">
-                <button onClick={() => addBlock("text")} className="flex items-center gap-2 text-sm text-gray-400 hover:text-teal-600 transition-colors">
-                  <Plus size={16} /> Add a block
-                </button>
-              </div>
+              {previewMode === "editor" && (
+                <div className="flex justify-center py-6 border-t border-dashed border-gray-200">
+                  <button onClick={() => addBlock("text")} className="flex items-center gap-2 text-sm text-gray-400 hover:text-teal-600 transition-colors">
+                    <Plus size={16} /> Add a block
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
 
       </div>
       {/* Editor Drawer — overlays the preview from the right */}
-      {selectedBlock && (
+      {selectedBlock && previewMode === "editor" && (
         <div className="fixed top-12 right-0 bottom-0 w-[420px] bg-white border-l border-gray-200 shadow-2xl z-40 flex flex-col overflow-hidden" style={{ animation: 'slideInRight 0.2s ease-out' }}>
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 flex-shrink-0 bg-gray-50">
             <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">

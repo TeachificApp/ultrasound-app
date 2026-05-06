@@ -232,6 +232,28 @@ export const appRouter = router({
         return { avatarUrl: url };
       }),
 
+    // ─── Page Builder Media Upload ─────────────────────────────────────────────
+    uploadPageMedia: protectedProcedure
+      .input(z.object({
+        dataUri: z.string().min(1).max(50_000_000),
+        mimeType: z.string().min(1),
+        fileName: z.string().min(1).max(255),
+        context: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const base64Data = input.dataUri.replace(/^data:[^;]+;base64,/, "");
+        const buffer = Buffer.from(base64Data, "base64");
+        if (buffer.byteLength > 40 * 1024 * 1024) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "File must be under 40 MB" });
+        }
+        const suffix = Math.random().toString(36).slice(2, 10);
+        const sanitizedName = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const fileKey = `page-builder/${input.context ?? "media"}/${suffix}-${sanitizedName}`;
+        const { url } = await storagePut(fileKey, buffer, input.mimeType);
+        return { url, fileKey };
+      }),
+
     // ─── Email Change Verification ────────────────────────────────────────────
 
     requestEmailChange: protectedProcedure

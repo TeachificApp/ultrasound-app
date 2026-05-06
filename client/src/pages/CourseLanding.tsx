@@ -98,23 +98,40 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price }: {
       else if (bgType === "video") heroBg = { backgroundColor: "#000" };
       const buttons: Array<{ text: string; color: string; textColor: string; link: string; style: string }> =
         d.buttons?.length ? d.buttons : [{ text: d.ctaText ?? "Enroll Now", color: "#fff", textColor: "#179ca3", link: "", style: "filled" }];
+      const hasInlineMedia = !!d.inlineMediaUrl;
+      const placement = d.inlineMediaPlacement ?? "right";
+      const isHorizontal = placement === "left" || placement === "right";
       return (
-        <div className="relative px-8 py-16 overflow-hidden" style={{ ...heroBg, color: d.textColor ?? "#fff", textAlign: d.align ?? "left" }}>
+        <div className="relative px-8 py-16 overflow-hidden" style={{ ...heroBg, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left") }}>
           {bgType === "video" && d.videoUrl && (
             <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
           )}
-          <div className="relative max-w-3xl mx-auto overflow-hidden">
-            <h1 className="text-4xl font-bold mb-4 leading-tight animate-fade-slide-up">{d.headline}{d.headline2 && <><br />{d.headline2}</>}</h1>
-            {d.subheadline && <p className="text-xl opacity-90 mb-8 animate-fade-slide-up-delay-1">{d.subheadline}</p>}
-            <div className="flex flex-wrap gap-3 animate-fade-slide-up-delay-2" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
-              {buttons.map((btn, i) => (
-                <button key={i} onClick={btn.link ? () => window.location.href = btn.link : onEnroll}
-                  className="px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-opacity hover:opacity-90"
-                  style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
-                  {btn.text}
-                </button>
-              ))}
+          <div className={`relative max-w-5xl mx-auto ${hasInlineMedia && isHorizontal ? "flex items-center gap-10" : ""} ${hasInlineMedia && placement === "left" ? "flex-row-reverse" : ""}`}>
+            <div className={hasInlineMedia && isHorizontal ? "flex-1" : "max-w-3xl mx-auto"}>
+              <h1 className="text-4xl font-bold mb-4 leading-tight animate-fade-slide-up">
+                <span style={d.headlineColor ? { color: d.headlineColor } : undefined}>{d.headline}</span>
+                {d.headline2 && <><br /><span style={d.headline2Color ? { color: d.headline2Color } : undefined}>{d.headline2}</span></>}
+              </h1>
+              {d.subheadline && <p className="text-xl opacity-90 mb-8 animate-fade-slide-up-delay-1">{d.subheadline}</p>}
+              <div className="flex flex-wrap gap-3 animate-fade-slide-up-delay-2" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
+                {buttons.map((btn, i) => (
+                  <button key={i} onClick={btn.link ? () => window.location.href = btn.link : onEnroll}
+                    className="px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-opacity hover:opacity-90"
+                    style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
+                    {btn.text}
+                  </button>
+                ))}
+              </div>
             </div>
+            {hasInlineMedia && (
+              <div className={`animate-fade-slide-up-delay-1 ${isHorizontal ? "flex-1 max-w-md" : "mt-8 max-w-lg mx-auto"}`}>
+                {d.inlineMediaType === "video" ? (
+                  <video autoPlay muted loop playsInline className="w-full rounded-lg shadow-2xl"><source src={d.inlineMediaUrl} /></video>
+                ) : (
+                  <img src={d.inlineMediaUrl} alt="" className="w-full rounded-lg shadow-2xl" />
+                )}
+              </div>
+            )}
           </div>
         </div>
       );

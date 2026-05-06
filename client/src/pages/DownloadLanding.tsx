@@ -28,26 +28,47 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug }: {
   switch (block.type) {
     case "hero": {
       const buttons = d.buttons ?? [{ text: "Buy Now", color: "#ffffff", textColor: "#179ca3", style: "filled" }];
-      const bgStyle: React.CSSProperties = d.imageUrl
-        ? { backgroundImage: `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url(${d.imageUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
-        : d.bgType === "gradient"
-          ? { background: `linear-gradient(${d.gradientDir ?? "to bottom right"}, ${d.gradientFrom ?? "#179ca3"}, ${d.gradientTo ?? "#0e4a50"})` }
-          : { backgroundColor: d.bgColor ?? "#179ca3" };
+      const bgType = d.bgType ?? (d.imageUrl ? "image" : "color");
+      let bgStyle: React.CSSProperties = {};
+      if (bgType === "image" && d.imageUrl) bgStyle = { backgroundImage: `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url(${d.imageUrl})`, backgroundSize: "cover", backgroundPosition: "center" };
+      else if (bgType === "gradient") bgStyle = { background: `linear-gradient(${d.gradientDir ?? "to bottom right"}, ${d.gradientFrom ?? "#179ca3"}, ${d.gradientTo ?? "#0e4a50"})` };
+      else if (bgType === "video") bgStyle = { backgroundColor: "#000" };
+      else bgStyle = { backgroundColor: d.bgColor ?? "#179ca3" };
+      const hasInlineMedia = !!d.inlineMediaUrl;
+      const placement = d.inlineMediaPlacement ?? "right";
+      const isHorizontal = placement === "left" || placement === "right";
       return (
-        <div style={{ ...bgStyle, color: d.textColor ?? "#fff", textAlign: d.align ?? "left" }} className="px-8 py-20 overflow-hidden">
-          <div className="max-w-4xl mx-auto">
-            <h1 className="text-4xl font-bold mb-4 leading-tight animate-fade-slide-up">{d.headline}{d.headline2 && <><br />{d.headline2}</>}</h1>
-            {d.subheadline && <p className="text-xl opacity-90 mb-8 animate-fade-slide-up-delay-1">{d.subheadline}</p>}
-            <div className="flex flex-wrap gap-3 animate-fade-slide-up-delay-2" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
-              {buttons.map((btn: any, i: number) => (
-                <button key={i} onClick={btn.link ? () => { window.location.href = btn.link; } : hasPurchased ? () => { window.location.href = `/downloads/${slug}/files`; } : onBuy}
-                  disabled={buying}
-                  className="px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-opacity hover:opacity-90 disabled:opacity-60"
-                  style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
-                  {hasPurchased ? "Access Files" : btn.text}
-                </button>
-              ))}
+        <div style={{ ...bgStyle, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left") }} className="relative px-8 py-20 overflow-hidden">
+          {bgType === "video" && d.videoUrl && (
+            <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
+          )}
+          <div className={`relative max-w-5xl mx-auto ${hasInlineMedia && isHorizontal ? "flex items-center gap-10" : ""} ${hasInlineMedia && placement === "left" ? "flex-row-reverse" : ""}`}>
+            <div className={hasInlineMedia && isHorizontal ? "flex-1" : "max-w-4xl mx-auto"}>
+              <h1 className="text-4xl font-bold mb-4 leading-tight animate-fade-slide-up">
+                <span style={d.headlineColor ? { color: d.headlineColor } : undefined}>{d.headline}</span>
+                {d.headline2 && <><br /><span style={d.headline2Color ? { color: d.headline2Color } : undefined}>{d.headline2}</span></>}
+              </h1>
+              {d.subheadline && <p className="text-xl opacity-90 mb-8 animate-fade-slide-up-delay-1">{d.subheadline}</p>}
+              <div className="flex flex-wrap gap-3 animate-fade-slide-up-delay-2" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
+                {buttons.map((btn: any, i: number) => (
+                  <button key={i} onClick={btn.link ? () => { window.location.href = btn.link; } : hasPurchased ? () => { window.location.href = `/downloads/${slug}/files`; } : onBuy}
+                    disabled={buying}
+                    className="px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-opacity hover:opacity-90 disabled:opacity-60"
+                    style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
+                    {hasPurchased ? "Access Files" : btn.text}
+                  </button>
+                ))}
+              </div>
             </div>
+            {hasInlineMedia && (
+              <div className={`animate-fade-slide-up-delay-1 ${isHorizontal ? "flex-1 max-w-md" : "mt-8 max-w-lg mx-auto"}`}>
+                {d.inlineMediaType === "video" ? (
+                  <video autoPlay muted loop playsInline className="w-full rounded-lg shadow-2xl"><source src={d.inlineMediaUrl} /></video>
+                ) : (
+                  <img src={d.inlineMediaUrl} alt="" className="w-full rounded-lg shadow-2xl" />
+                )}
+              </div>
+            )}
           </div>
         </div>
       );

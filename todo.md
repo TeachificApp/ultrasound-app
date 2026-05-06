@@ -1356,3 +1356,8 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Page builder layout fix: Preview takes entire right side, editor opens as overlay/drawer on top of preview
 - [x] Hero/Banner block: Add second headline field (headline2) to allow text distribution across two lines
 - [x] Hero/Banner: Add subtle fade-in/slide-up animation for headline text on page load
+- [x] Hero/Banner: Add video background option to DownloadLandingPageBuilder
+- [x] Hero/Banner: Direct file upload for image/video backgrounds (S3 upload)
+- [x] Hero/Banner: Separate font color selection for headline 1 and headline 2
+- [x] Hero/Banner: Inline image/video within banner with left/center/right placement option
+- [x] Page builder: Add "Preview as Student/Member/Customer" toggle to see page from buyer's perspective
