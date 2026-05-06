@@ -10,7 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Download, FileDown, ArrowLeft, CheckCircle, Lock } from "lucide-react";
+import { Download, Eye, FileDown, ArrowLeft, CheckCircle, Lock } from "lucide-react";
 import { Link } from "wouter";
 import { getLoginUrl } from "@/const";
 import { useEffect } from "react";
@@ -20,6 +20,7 @@ export default function DownloadFiles() {
   const { slug } = useParams<{ slug: string }>();
   const searchString = useSearch();
   const isSuccess = searchString.includes("success=1");
+  const isPreviewMode = searchString.includes("preview=student");
   const { user, loading: authLoading } = useAuth();
 
   // Get the product info first
@@ -30,7 +31,7 @@ export default function DownloadFiles() {
 
   // Get download files (requires auth + purchase)
   const { data: downloadData, isLoading: filesLoading, error: filesError } = trpc.downloadsLearner.getDownloadFiles.useQuery(
-    { productId: product?.id ?? 0 },
+    { productId: product?.id ?? 0, preview: isPreviewMode },
     { enabled: !!user && !!product }
   );
 
@@ -81,8 +82,8 @@ export default function DownloadFiles() {
     );
   }
 
-  // Not purchased
-  if (filesError) {
+  // Not purchased (skip for admin preview)
+  if (filesError && !isPreviewMode) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Card className="max-w-md w-full mx-4">
@@ -104,6 +105,14 @@ export default function DownloadFiles() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Admin Preview Banner */}
+      {isPreviewMode && (
+        <div className="bg-purple-600 text-white text-center py-2 px-4 text-sm font-medium flex items-center justify-center gap-2 sticky top-0 z-50">
+          <Eye className="w-4 h-4" />
+          <span>Preview Mode — You are viewing this download as a student would see it</span>
+          <button onClick={() => window.close()} className="ml-4 px-2 py-0.5 bg-purple-700 hover:bg-purple-800 rounded text-xs">Exit Preview</button>
+        </div>
+      )}
       {/* Header */}
       <div className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white py-8">
         <div className="max-w-3xl mx-auto px-4">
@@ -111,7 +120,8 @@ export default function DownloadFiles() {
             <ArrowLeft className="w-3 h-3" /> All Downloads
           </Link>
           <div className="flex items-center gap-3">
-            {isSuccess && <CheckCircle className="w-6 h-6 text-green-300" />}
+            {isPreviewMode && <Eye className="w-6 h-6 text-purple-300" />}
+          {isSuccess && <CheckCircle className="w-6 h-6 text-green-300" />}
             <h1 className="text-2xl font-bold">{product.title}</h1>
           </div>
           {isSuccess && <p className="text-teal-100 mt-1">Thank you for your purchase! Your files are ready.</p>}

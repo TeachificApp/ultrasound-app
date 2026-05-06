@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Upload, FileIcon, GripVertical, ArrowLeft, ExternalLink, Eye, EyeOff, Image as ImageIcon, Link as LinkIcon } from "lucide-react";
+import { Plus, Pencil, Trash2, Upload, FileIcon, GripVertical, ArrowLeft, ExternalLink, Eye, EyeOff, Image as ImageIcon, Link as LinkIcon, Users } from "lucide-react";
 import RichTextEditor from "@/components/RichTextEditor";
 
 // ─── Product List View ──────────────────────────────────────────────────────
@@ -210,6 +210,13 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
           <a href={`/downloads/${product.slug}`} target="_blank" rel="noopener noreferrer">
             <Button size="sm" variant="ghost" className="text-xs text-gray-500 hover:text-teal-600">
               <Eye className="w-3 h-3 mr-1" /> View Public Page
+            </Button>
+          </a>
+        )}
+        {product.slug && (
+          <a href={`/downloads/${product.slug}/files?preview=student`} target="_blank" rel="noopener noreferrer">
+            <Button size="sm" variant="outline" className="text-xs text-purple-600 border-purple-300 hover:bg-purple-50">
+              <Users className="w-3 h-3 mr-1" /> Preview as Student
             </Button>
           </a>
         )}

@@ -342,12 +342,14 @@ export const lmsLearnerRouter = router({
 
   /** Get full course content for enrolled user (or preview lessons) */
   getCoursePlayer: protectedProcedure
-    .input(z.object({ slug: z.string() }))
+    .input(z.object({ slug: z.string(), preview: z.boolean().optional() }))
     .query(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.slug)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      // Admin preview mode: bypass enrollment requirement
+      const isAdminPreview = input.preview && ctx.user.role === "admin";
 
       // Check enrollment
       const [enrollment] = await db.select().from(lmsEnrollments)
@@ -369,7 +371,9 @@ export const lmsLearnerRouter = router({
         progress = await db.select().from(lmsLessonProgress).where(eq(lmsLessonProgress.enrollmentId, enrollment.id));
       }
 
-      return { course, enrollment: enrollment ?? null, sections: sectionsWithLessons, topLevelLessons, progress };
+      // For admin preview, provide a synthetic enrollment so the player renders
+      const effectiveEnrollment = enrollment ?? (isAdminPreview ? { id: -1, userId: ctx.user.id, courseId: course.id, enrolledAt: new Date(), progressPct: 0, completedAt: null, lastAccessedAt: new Date(), certificateIssuedAt: null } as any : null);
+      return { course, enrollment: effectiveEnrollment, sections: sectionsWithLessons, topLevelLessons, progress, isAdminPreview: !!isAdminPreview };
     }),
 
   /** Get a single lesson (must be enrolled or lesson is preview) */
@@ -389,7 +393,7 @@ export const lmsLearnerRouter = router({
       }
       if (!resolvedCourseId) throw new TRPCError({ code: "NOT_FOUND" });
 
-      if (!lesson.isPreview) {
+      if (!lesson.isPreview && ctx.user.role !== "admin") {
         const [enrollment] = await db.select().from(lmsEnrollments)
           .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, resolvedCourseId))).limit(1);
         if (!enrollment) throw new TRPCError({ code: "FORBIDDEN", message: "Enrollment required" });

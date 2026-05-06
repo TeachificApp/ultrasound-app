@@ -4,7 +4,7 @@
  * Route: /learn/:slug/player
  */
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useParams, useLocation } from "wouter";
+import { useParams, useLocation, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { toast } from "sonner";
 import {
   Award, BookOpen, Bookmark, BookmarkCheck, CheckCircle, ChevronLeft, ChevronRight,
-  Download, FileText, HelpCircle, Lock, Menu, Monitor, PlayCircle, StickyNote, X,
+  Download, Eye, FileText, HelpCircle, Lock, Menu, Monitor, PlayCircle, StickyNote, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import LessonEffectPlayer, { fireLessonCompleteEffect } from "@/components/LessonEffectPlayer";
@@ -197,6 +197,8 @@ function CertificateDialog({ open, onClose, courseTitle, certificateUrl }: {
 // ─── Main CoursePlayer ────────────────────────────────────────────────────────
 export default function CoursePlayer() {
   const { slug } = useParams<{ slug: string }>();
+  const searchString = useSearch();
+  const isPreviewMode = searchString.includes("preview=student");
   const [, navigate] = useLocation();
   const { user } = useAuth();
   const [selectedLessonId, setSelectedLessonId] = useState<number | null>(null);
@@ -208,7 +210,7 @@ export default function CoursePlayer() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const utils = trpc.useUtils();
 
-  const { data, isLoading } = trpc.lmsLearner.getCoursePlayer.useQuery({ slug: slug! }, { enabled: !!slug && !!user });
+  const { data, isLoading } = trpc.lmsLearner.getCoursePlayer.useQuery({ slug: slug!, preview: isPreviewMode }, { enabled: !!slug && !!user });
   const { data: lessonData, isLoading: lessonLoading } = trpc.lmsLearner.getLesson.useQuery(
     { lessonId: selectedLessonId! },
     { enabled: !!selectedLessonId }
@@ -308,7 +310,7 @@ export default function CoursePlayer() {
     );
   }
 
-  if (!data?.enrollment) {
+  if (!data?.enrollment && !isPreviewMode) {
     return (
       <div className="text-center py-20">
         <Lock className="w-12 h-12 mx-auto mb-3 text-gray-300" />
@@ -346,7 +348,16 @@ export default function CoursePlayer() {
   const canMarkComplete = !requireVideoCompletion || videoWatched;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50">
+    <div className="flex flex-col h-screen overflow-hidden bg-gray-50">
+      {/* Admin Preview Banner */}
+      {isPreviewMode && (
+        <div className="bg-purple-600 text-white text-center py-2 px-4 text-sm font-medium flex items-center justify-center gap-2 shrink-0 z-50">
+          <Eye className="w-4 h-4" />
+          <span>Preview Mode — You are viewing this course as a student would see it</span>
+          <button onClick={() => window.close()} className="ml-4 px-2 py-0.5 bg-purple-700 hover:bg-purple-800 rounded text-xs">Exit Preview</button>
+        </div>
+      )}
+      <div className="flex flex-1 overflow-hidden">
       {/* Certificate Dialog */}
       <CertificateDialog
         open={showCertDialog}
@@ -743,6 +754,7 @@ export default function CoursePlayer() {
           )}
         </div>
       </div>
+    </div>
     </div>
   );
 }

@@ -92,7 +92,7 @@ export const downloadsLearnerRouter = router({
 
   /** Get download links for a purchased product */
   getDownloadFiles: protectedProcedure
-    .input(z.object({ productId: z.number() }))
+    .input(z.object({ productId: z.number(), preview: z.boolean().optional() }))
     .query(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
@@ -102,7 +102,9 @@ export const downloadsLearnerRouter = router({
         .where(eq(digitalProducts.id, input.productId)).limit(1);
       if (!product) throw new TRPCError({ code: "NOT_FOUND" });
 
-      if (!product.isFree) {
+      // Admin preview mode bypasses purchase check
+      const isAdminPreview = input.preview && ctx.user.role === "admin";
+      if (!product.isFree && !isAdminPreview) {
         const [purchase] = await db.select().from(digitalPurchases)
           .where(and(
             eq(digitalPurchases.userId, ctx.user.id),
