@@ -2562,9 +2562,12 @@ function AnalyticsTab() {
 // ─── Main LMSAdmin Component ──────────────────────────────────────────────────
 
 export default function LMSAdmin() {
-  const urlTab = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("tab") : null;
-  const [activeTab, setActiveTab] = useState(urlTab || "courses");
-  const [editingCourseId, setEditingCourseId] = useState<number | null>(null);
+  const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  const urlTab = urlParams?.get("tab") ?? null;
+  const urlEditCourse = urlParams?.get("editCourse") ?? null;
+  const urlEditDownload = urlParams?.get("editDownload") ?? null;
+  const [activeTab, setActiveTab] = useState(urlTab || (urlEditDownload ? "downloads" : "courses"));
+  const [editingCourseId, setEditingCourseId] = useState<number | null>(urlEditCourse ? Number(urlEditCourse) : null);
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-5">
@@ -2601,7 +2604,7 @@ export default function LMSAdmin() {
           </TabsList>
           <TabsContent value="courses" className="mt-4"><CoursesTab onEdit={setEditingCourseId} typeFilter="course" /></TabsContent>
           <TabsContent value="quizzes" className="mt-4"><CoursesTab onEdit={setEditingCourseId} typeFilter="quiz" /></TabsContent>
-          <TabsContent value="downloads" className="mt-4"><DigitalDownloadsAdmin /></TabsContent>
+          <TabsContent value="downloads" className="mt-4"><DigitalDownloadsAdmin initialEditId={urlEditDownload ? Number(urlEditDownload) : undefined} /></TabsContent>
           <TabsContent value="enrollments" className="mt-4"><EnrollmentsTab /></TabsContent>
           <TabsContent value="groups" className="mt-4"><GroupsTab /></TabsContent>
           <TabsContent value="instructors" className="mt-4"><InstructorsTab /></TabsContent>
