@@ -40,6 +40,7 @@ export default function DownloadFiles() {
       toast.success("Purchase successful! Your files are ready to download.");
     }
   }, [isSuccess]);
+  const trackDownload = trpc.downloadsLearner.trackDownload.useMutation();
 
   if (authLoading || productLoading) {
     return (
@@ -100,7 +101,6 @@ export default function DownloadFiles() {
     );
   }
 
-  const trackDownload = trpc.downloadsLearner.trackDownload.useMutation();
   const files = downloadData?.files ?? [];
 
   return (

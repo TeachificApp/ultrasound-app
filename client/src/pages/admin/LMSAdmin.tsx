@@ -636,7 +636,7 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
             <Eye className="w-3 h-3 mr-1" /> View Landing Page
           </Button>
         </a>
-        <a href={`/learn/${course.slug}/player?preview=student`} target="_blank" rel="noopener noreferrer">
+        <a href={`${window.location.origin.replace('app.', 'learn.')}/learn/${course.slug}/player?preview=student`} target="_blank" rel="noopener noreferrer">
           <Button size="sm" variant="outline" className="h-8 text-xs text-purple-600 border-purple-300 hover:bg-purple-50">
             <Users className="w-3 h-3 mr-1" /> Preview as Student
           </Button>

@@ -1363,3 +1363,5 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Page builder: Add "Preview as Student/Member/Customer" toggle to see page from buyer's perspective
 - [x] Page builder: "Back to Admin" should return to the specific product edit page (course/download/quiz) not generic admin
 - [x] Add "Preview as Student" button to CourseEditor and ProductEditor (download) admin pages
+- [x] Fix React Error #310 on DownloadFiles page (hooks order issue from preview mode)
+- [x] Fix Preview as Student button URLs to use learn subdomain instead of app subdomain
