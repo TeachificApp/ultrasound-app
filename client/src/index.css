@@ -416,3 +416,9 @@ textarea,
   padding: 0;
   color: inherit;
 }
+
+/* Page Builder Editor Drawer animation */
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}

@@ -1340,3 +1340,17 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add Divided Columns block type for side-by-side elements
 - [x] Ensure all block editors use friendly UI inputs (no raw JSON/HTML/code for end users)
 - [x] Add live preview pane to DownloadLandingPageBuilder (real-time rendering as user edits)
+- [x] Order Bumps: Database schema (orderBumps table with trigger timing, connected product/course/download)
+- [x] Order Bumps: Backend routers for CRUD operations
+- [x] Order Bumps: Admin UI for managing bumps (create, edit, delete, connect to products)
+- [x] Order Bumps: Editable bump landing page (mini page builder for bump offer)
+- [x] Order Bumps: Display bump offers in checkout flow (before checkout, after checkout/redirect)
+- [x] Order Bumps: Handle bump purchase logic (add to cart, process payment)
+- [x] Visibility Status: Add status field (draft, published, hidden, private, archived) to courses schema
+- [x] Visibility Status: Add status field to downloads schema
+- [x] Visibility Status: Add status field to quizzes schema
+- [x] Visibility Status: Backend logic to filter by status on public pages
+- [x] Visibility Status: Hidden items accessible via direct URL but not in directory
+- [x] Visibility Status: Private items only accessible via email invite
+- [x] Visibility Status: Admin UI for managing visibility status on all content types
+- [x] Page builder layout fix: Preview takes entire right side, editor opens as overlay/drawer on top of preview

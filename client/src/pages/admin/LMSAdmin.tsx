@@ -33,6 +33,7 @@ import {
 import { Link, useLocation } from "wouter";
 import LessonEffectEditor from "@/components/LessonEffectEditor";
 import DigitalDownloadsAdmin from "./DigitalDownloadsAdmin";
+import OrderBumpsAdmin from "./OrderBumpsAdmin";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -41,6 +42,7 @@ const STATUS_COLORS: Record<string, string> = {
   public: "bg-green-100 text-green-700",
   hidden: "bg-yellow-100 text-yellow-700",
   private: "bg-blue-100 text-blue-700",
+  archived: "bg-red-100 text-red-600",
 };
 
 const TYPE_ICONS: Record<string, React.ReactNode> = {
@@ -94,6 +96,7 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
               <SelectItem value="public">Public</SelectItem>
               <SelectItem value="hidden">Hidden</SelectItem>
               <SelectItem value="private">Private</SelectItem>
+              <SelectItem value="archived">Archived</SelectItem>
             </SelectContent>
           </Select>
           {data && <span className="text-sm text-gray-500">{data.total} {data.total !== 1 ? typeLabelPlural : typeLabel.toLowerCase()}</span>}
@@ -804,6 +807,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
               <SelectItem value="public">Public</SelectItem>
               <SelectItem value="hidden">Hidden</SelectItem>
               <SelectItem value="private">Private (invite only)</SelectItem>
+              <SelectItem value="archived">Archived</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -2593,6 +2597,7 @@ export default function LMSAdmin() {
             <TabsTrigger value="affiliates" className="text-xs">Affiliates</TabsTrigger>
             <TabsTrigger value="analytics" className="text-xs">Analytics</TabsTrigger>
             <TabsTrigger value="collections" className="text-xs">Collections</TabsTrigger>
+            <TabsTrigger value="orderbumps" className="text-xs">Order Bumps</TabsTrigger>
           </TabsList>
           <TabsContent value="courses" className="mt-4"><CoursesTab onEdit={setEditingCourseId} typeFilter="course" /></TabsContent>
           <TabsContent value="quizzes" className="mt-4"><CoursesTab onEdit={setEditingCourseId} typeFilter="quiz" /></TabsContent>
@@ -2603,6 +2608,7 @@ export default function LMSAdmin() {
           <TabsContent value="affiliates" className="mt-4"><AffiliatesTab /></TabsContent>
           <TabsContent value="analytics" className="mt-4"><AnalyticsTab /></TabsContent>
           <TabsContent value="collections" className="mt-4"><CollectionsTab /></TabsContent>
+          <TabsContent value="orderbumps" className="mt-4"><OrderBumpsAdmin /></TabsContent>
         </Tabs>
       )}
     </div>

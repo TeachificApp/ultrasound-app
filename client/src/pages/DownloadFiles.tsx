@@ -14,6 +14,7 @@ import { Download, FileDown, ArrowLeft, CheckCircle, Lock } from "lucide-react";
 import { Link } from "wouter";
 import { getLoginUrl } from "@/const";
 import { useEffect } from "react";
+import OrderBumpOffer from "@/components/OrderBumpOffer";
 
 export default function DownloadFiles() {
   const { slug } = useParams<{ slug: string }>();
@@ -116,6 +117,17 @@ export default function DownloadFiles() {
           {isSuccess && <p className="text-teal-100 mt-1">Thank you for your purchase! Your files are ready.</p>}
         </div>
       </div>
+
+      {/* Order Bump Offer (after checkout) */}
+      {isSuccess && product && (
+        <div className="max-w-3xl mx-auto px-4 pt-6">
+          <OrderBumpOffer
+            triggerType="download"
+            triggerProductId={product.id}
+            timing="after_checkout"
+          />
+        </div>
+      )}
 
       {/* Files */}
       <div className="max-w-3xl mx-auto px-4 py-8">

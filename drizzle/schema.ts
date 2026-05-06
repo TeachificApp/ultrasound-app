@@ -2674,7 +2674,7 @@ export const lmsCourses = mysqlTable("lms_courses", {
   subtitle: varchar("subtitle", { length: 500 }),
   description: longtext("description"),
   coverImageUrl: text("cover_image_url"),
-  status: mysqlEnum("status", ["draft", "public", "hidden", "private"]).default("draft").notNull(),
+  status: mysqlEnum("status", ["draft", "public", "hidden", "private", "archived"]).default("draft").notNull(),
   type: mysqlEnum("type", ["course", "quiz", "download"]).default("course").notNull(),
   brand: mysqlEnum("brand", ["aaus", "iheartecho"]).default("aaus").notNull(),
   price: int("price").default(0).notNull(), // cents — used for one_time and payment_plan total
@@ -2993,7 +2993,7 @@ export const digitalProducts = mysqlTable("digital_products", {
   price: int("price").default(0).notNull(), // cents
   isFree: boolean("is_free").default(false).notNull(),
   currency: varchar("currency", { length: 8 }).default("usd").notNull(),
-  status: mysqlEnum("status", ["draft", "published", "archived"]).default("draft").notNull(),
+  status: mysqlEnum("status", ["draft", "published", "hidden", "private", "archived"]).default("draft").notNull(),
   // Landing page content
   landingHeadline: varchar("landing_headline", { length: 500 }),
   landingBody: longtext("landing_body"),
@@ -3053,7 +3053,7 @@ export const digitalBundles = mysqlTable("digital_bundles", {
   originalPrice: int("original_price").default(0).notNull(), // cents
   discountPrice: int("discount_price").default(0).notNull(), // cents
   currency: varchar("currency", { length: 8 }).default("usd").notNull(),
-  status: mysqlEnum("status", ["draft", "published", "archived"]).default("draft").notNull(),
+  status: mysqlEnum("status", ["draft", "published", "hidden", "private", "archived"]).default("draft").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -3075,3 +3075,52 @@ export const digitalBundlePurchases = mysqlTable("digital_bundle_purchases", {
   purchasedAt: timestamp("purchased_at").defaultNow().notNull(),
 });
 export type DigitalBundlePurchase = typeof digitalBundlePurchases.$inferSelect;
+
+// ─── Order Bumps ────────────────────────────────────────────────────────────
+export const orderBumps = mysqlTable("order_bumps", {
+  id: int("id").autoincrement().primaryKey(),
+  // The trigger product — when a user buys this, the bump is offered
+  triggerType: mysqlEnum("trigger_type", ["course", "download", "bundle"]).notNull(),
+  triggerProductId: int("trigger_product_id").notNull(),
+  // The bump offer — what product is being offered as the bump
+  bumpType: mysqlEnum("bump_type", ["course", "download", "bundle"]).notNull(),
+  bumpProductId: int("bump_product_id").notNull(),
+  // When to show the bump
+  timing: mysqlEnum("timing", ["before_checkout", "after_checkout"]).default("after_checkout").notNull(),
+  // Pricing
+  bumpPrice: int("bump_price").default(0).notNull(), // cents — special bump price (0 = use product's normal price)
+  discountLabel: varchar("discount_label", { length: 255 }), // e.g. "50% OFF — Today Only!"
+  // Landing page content (mini page builder)
+  headline: varchar("headline", { length: 500 }),
+  subheadline: varchar("subheadline", { length: 500 }),
+  bodyHtml: longtext("body_html"), // rich text description of the bump offer
+  imageUrl: text("image_url"),
+  ctaText: varchar("cta_text", { length: 100 }).default("Add to Order").notNull(),
+  ctaColor: varchar("cta_color", { length: 20 }).default("#179ca3").notNull(),
+  skipText: varchar("skip_text", { length: 100 }).default("No thanks, continue").notNull(),
+  // Status
+  isActive: boolean("is_active").default(true).notNull(),
+  // Stats
+  impressions: int("impressions").default(0).notNull(),
+  conversions: int("conversions").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type OrderBump = typeof orderBumps.$inferSelect;
+export type InsertOrderBump = typeof orderBumps.$inferInsert;
+
+// ─── Order Bump Conversions (tracking) ──────────────────────────────────────
+export const orderBumpConversions = mysqlTable("order_bump_conversions", {
+  id: int("id").autoincrement().primaryKey(),
+  bumpId: int("bump_id").notNull(),
+  userId: int("user_id").notNull(),
+  // The original purchase that triggered the bump
+  triggerOrderType: mysqlEnum("trigger_order_type", ["course", "download", "bundle"]).notNull(),
+  triggerOrderId: int("trigger_order_id"), // lms_orders.id or digital_purchases.id
+  // The bump purchase
+  stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 255 }),
+  bumpAmount: int("bump_amount").default(0).notNull(), // cents actually charged
+  status: mysqlEnum("status", ["pending", "completed", "declined"]).default("pending").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type OrderBumpConversion = typeof orderBumpConversions.$inferSelect;

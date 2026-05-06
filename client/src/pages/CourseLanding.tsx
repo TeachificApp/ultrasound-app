@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { toast } from "sonner";
 import { BookOpen, CheckCircle, ChevronRight, Clock, Download, HelpCircle, Lock, PlayCircle, Star, Users, AlertTriangle, Globe, LayoutGrid, Layers, BookMarked, Timer, Tag, CreditCard, List } from "lucide-react";
+import OrderBumpOffer from "@/components/OrderBumpOffer";
 import type { Block } from "./admin/LandingPageBuilder";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -494,6 +495,16 @@ export default function CourseLanding() {
         {blocks.map(block => (
           <RenderBlock key={block.id} block={block} course={course} onEnroll={handleEnroll} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} />
         ))}
+        {/* Before-checkout order bump */}
+        {!course.isEnrolled && course && (
+          <div className="max-w-2xl mx-auto px-4 py-8">
+            <OrderBumpOffer
+              triggerType="course"
+              triggerProductId={course.id}
+              timing="before_checkout"
+            />
+          </div>
+        )}
       </div>
     );
   }

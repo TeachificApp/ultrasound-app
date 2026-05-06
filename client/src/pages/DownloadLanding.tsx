@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { FileDown, Check, ShoppingCart, Download, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
 import { getLoginUrl } from "@/const";
+import OrderBumpOffer from "@/components/OrderBumpOffer";
 
 // ─── Block type (matches builder) ─────────────────────────────────────────────
 interface Block { id: string; type: string; data: Record<string, any>; }
@@ -350,6 +351,16 @@ export default function DownloadLanding() {
         {blocks.map(block => (
           <RenderBlock key={block.id} block={block} onBuy={handleBuy} buying={checkoutMut.isPending} price={price} hasPurchased={hasPurchased} slug={slug!} />
         ))}
+        {/* Before-checkout order bump */}
+        {!hasPurchased && product && (
+          <div className="max-w-2xl mx-auto px-4 py-8">
+            <OrderBumpOffer
+              triggerType="download"
+              triggerProductId={product.id}
+              timing="before_checkout"
+            />
+          </div>
+        )}
       </div>
     );
   }

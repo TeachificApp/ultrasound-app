@@ -240,7 +240,8 @@ export const lmsPublicRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.slug)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
-      if (course.status === "draft") throw new TRPCError({ code: "NOT_FOUND" });
+      // draft, archived, and private are not publicly accessible; hidden is accessible by direct URL
+      if (course.status === "draft" || course.status === "archived" || course.status === "private") throw new TRPCError({ code: "NOT_FOUND" });
 
       // Sections + preview lessons
       const sections = await db.select().from(lmsSections).where(eq(lmsSections.courseId, course.id)).orderBy(asc(lmsSections.position));
@@ -837,7 +838,7 @@ export const lmsAdminRouter = router({
   // ── Courses ──
   listCourses: protectedProcedure
     .input(z.object({
-      status: z.enum(["draft", "public", "hidden", "private", "all"]).default("all"),
+      status: z.enum(["draft", "public", "hidden", "private", "archived", "all"]).default("all"),
       type: z.enum(["course", "quiz", "download", "all"]).default("all"),
       page: z.number().int().min(1).default(1),
       pageSize: z.number().int().min(1).max(100).default(20),
@@ -904,7 +905,7 @@ export const lmsAdminRouter = router({
       subtitle: z.string().max(500).optional(),
       description: z.string().optional(),
       coverImageUrl: z.string().optional(),
-      status: z.enum(["draft", "public", "hidden", "private"]).optional(),
+      status: z.enum(["draft", "public", "hidden", "private", "archived"]).optional(),
       type: z.enum(["course", "quiz", "download"]).optional(),
       brand: z.enum(["aaus", "iheartecho"]).optional(),
       price: z.number().int().min(0).optional(),

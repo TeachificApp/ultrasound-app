@@ -24,6 +24,7 @@ import { menuLinksRouter } from "./routers/menuLinksRouter";
 import { navigatorAdminRouter } from "./routers/navigatorAdminRouter";
 import { lmsPublicRouter, lmsLearnerRouter, lmsAdminRouter, lmsGroupRouter } from "./routers/lmsRouter";
 import { downloadsPublicRouter, downloadsLearnerRouter, downloadsAdminRouter } from "./routers/downloadsRouter";
+import { orderBumpsAdminRouter, orderBumpsPublicRouter } from "./routers/orderBumpsRouter";
 import {
   getUserById,
   getUsersByIds,
@@ -1782,6 +1783,8 @@ export const appRouter = router({
   downloads: downloadsPublicRouter,
   downloadsLearner: downloadsLearnerRouter,
   downloadsAdmin: downloadsAdminRouter,
+  orderBumpsAdmin: orderBumpsAdminRouter,
+  orderBumps: orderBumpsPublicRouter,
 
   // ─── Physician Over-Read Workflow (Step 1 & Step 2) ──────────────────────────
   physicianOverRead: router({

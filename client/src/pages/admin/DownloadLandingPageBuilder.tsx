@@ -793,28 +793,21 @@ export default function DownloadLandingPageBuilder() {
           )}
         </div>
 
-        {/* Right Panel — Block Editor */}
-        <div className="w-80 flex-shrink-0 bg-white border-l border-gray-200 overflow-y-auto">
-          {selectedBlock ? (
-            <>
-              <div className="flex items-center justify-between p-3 border-b border-gray-100">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  {BLOCK_CATALOG.find(c => c.type === selectedBlock.type)?.label ?? "Block"} Settings
-                </p>
-                <button onClick={() => setSelectedId(null)} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>
-              </div>
-              <div className="p-3">
-                <BlockEditorPanel block={selectedBlock} onUpdate={(data) => updateBlock(selectedBlock.id, data)} />
-              </div>
-            </>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full text-gray-400 p-6 text-center">
-              <Palette size={24} className="mb-2 opacity-50" />
-              <p className="text-sm">Click any block on the canvas to edit its settings</p>
-            </div>
-          )}
-        </div>
       </div>
+      {/* Editor Drawer — overlays the preview from the right */}
+      {selectedBlock && (
+        <div className="fixed top-12 right-0 bottom-0 w-[420px] bg-white border-l border-gray-200 shadow-2xl z-40 flex flex-col overflow-hidden" style={{ animation: 'slideInRight 0.2s ease-out' }}>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 flex-shrink-0 bg-gray-50">
+            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              Edit: {BLOCK_CATALOG.find(c => c.type === selectedBlock.type)?.label ?? "Block"}
+            </p>
+            <button onClick={() => setSelectedId(null)} className="w-7 h-7 rounded-full bg-white border border-gray-200 hover:bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors shadow-sm"><X size={14} /></button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4">
+            <BlockEditorPanel block={selectedBlock} onUpdate={(data) => updateBlock(selectedBlock.id, data)} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

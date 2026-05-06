@@ -56,7 +56,8 @@ export const downloadsPublicRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [product] = await db.select().from(digitalProducts)
         .where(eq(digitalProducts.slug, input.slug)).limit(1);
-      if (!product || product.status !== "published") {
+      // 'published' and 'hidden' are accessible by direct URL; draft/archived/private are not
+      if (!product || product.status === "draft" || product.status === "archived" || product.status === "private") {
         throw new TRPCError({ code: "NOT_FOUND", message: "Product not found" });
       }
       // Get file count (not full URLs — those are only for purchasers)
@@ -367,7 +368,7 @@ export const downloadsAdminRouter = router({
       price: z.number().min(0).default(0),
       isFree: z.boolean().default(false),
       thumbnailUrl: z.string().optional(),
-      status: z.enum(["draft", "published", "archived"]).default("draft"),
+      status: z.enum(["draft", "published", "hidden", "private", "archived"]).default("draft"),
       landingHeadline: z.string().optional(),
       landingBody: z.string().optional(),
       landingFeatures: z.string().optional(),
@@ -400,7 +401,7 @@ export const downloadsAdminRouter = router({
       price: z.number().min(0).optional(),
       isFree: z.boolean().optional(),
       thumbnailUrl: z.string().nullable().optional(),
-      status: z.enum(["draft", "published", "archived"]).optional(),
+      status: z.enum(["draft", "published", "hidden", "private", "archived"]).optional(),
       landingHeadline: z.string().nullable().optional(),
       landingBody: z.string().nullable().optional(),
       landingFeatures: z.string().nullable().optional(),
@@ -600,7 +601,7 @@ export const downloadsAdminRouter = router({
       thumbnailUrl: z.string().optional(),
       originalPrice: z.number().min(0).default(0),
       discountPrice: z.number().min(0).default(0),
-      status: z.enum(["draft", "published", "archived"]).default("draft"),
+      status: z.enum(["draft", "published", "hidden", "private", "archived"]).default("draft"),
       productIds: z.array(z.number()).default([]),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -634,7 +635,7 @@ export const downloadsAdminRouter = router({
       thumbnailUrl: z.string().nullable().optional(),
       originalPrice: z.number().min(0).optional(),
       discountPrice: z.number().min(0).optional(),
-      status: z.enum(["draft", "published", "archived"]).optional(),
+      status: z.enum(["draft", "published", "hidden", "private", "archived"]).optional(),
       productIds: z.array(z.number()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {

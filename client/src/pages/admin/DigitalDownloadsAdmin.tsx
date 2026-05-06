@@ -287,6 +287,8 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
             >
               <option value="draft">Draft</option>
               <option value="published">Published</option>
+              <option value="hidden">Hidden (URL only)</option>
+              <option value="private">Private (invite only)</option>
               <option value="archived">Archived</option>
             </select>
           </div>
