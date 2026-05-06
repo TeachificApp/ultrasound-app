@@ -1355,3 +1355,4 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Visibility Status: Admin UI for managing visibility status on all content types
 - [x] Page builder layout fix: Preview takes entire right side, editor opens as overlay/drawer on top of preview
 - [x] Hero/Banner block: Add second headline field (headline2) to allow text distribution across two lines
+- [x] Hero/Banner: Add subtle fade-in/slide-up animation for headline text on page load
