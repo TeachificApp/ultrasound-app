@@ -1,0 +1,382 @@
+{
+  "query": "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME;",
+  "rows": [
+    {
+      "TABLE_NAME": "__drizzle_migrations"
+    },
+    {
+      "TABLE_NAME": "accreditationFormBranchRules"
+    },
+    {
+      "TABLE_NAME": "accreditationFormItems"
+    },
+    {
+      "TABLE_NAME": "accreditationFormOptions"
+    },
+    {
+      "TABLE_NAME": "accreditationFormOrgVisibilityRules"
+    },
+    {
+      "TABLE_NAME": "accreditationFormSections"
+    },
+    {
+      "TABLE_NAME": "accreditationFormSubmissions"
+    },
+    {
+      "TABLE_NAME": "accreditationFormTemplateAssignments"
+    },
+    {
+      "TABLE_NAME": "accreditationFormTemplates"
+    },
+    {
+      "TABLE_NAME": "accreditationReadiness"
+    },
+    {
+      "TABLE_NAME": "accreditationReadinessNavigator"
+    },
+    {
+      "TABLE_NAME": "accreditationTasks"
+    },
+    {
+      "TABLE_NAME": "appSettings"
+    },
+    {
+      "TABLE_NAME": "appropriateUseCases"
+    },
+    {
+      "TABLE_NAME": "caseMixSubmissions"
+    },
+    {
+      "TABLE_NAME": "caseViewEvents"
+    },
+    {
+      "TABLE_NAME": "cases"
+    },
+    {
+      "TABLE_NAME": "challengeResponses"
+    },
+    {
+      "TABLE_NAME": "cmeCourseMeta"
+    },
+    {
+      "TABLE_NAME": "cmeCoursesCache"
+    },
+    {
+      "TABLE_NAME": "cmeEnrollmentCache"
+    },
+    {
+      "TABLE_NAME": "cmeEntries"
+    },
+    {
+      "TABLE_NAME": "dailyChallenges"
+    },
+    {
+      "TABLE_NAME": "digital_bundle_items"
+    },
+    {
+      "TABLE_NAME": "digital_bundle_purchases"
+    },
+    {
+      "TABLE_NAME": "digital_bundles"
+    },
+    {
+      "TABLE_NAME": "digital_download_events"
+    },
+    {
+      "TABLE_NAME": "digital_product_files"
+    },
+    {
+      "TABLE_NAME": "digital_products"
+    },
+    {
+      "TABLE_NAME": "digital_purchases"
+    },
+    {
+      "TABLE_NAME": "diyConciergePurchases"
+    },
+    {
+      "TABLE_NAME": "diyOrgMembers"
+    },
+    {
+      "TABLE_NAME": "diyOrganizations"
+    },
+    {
+      "TABLE_NAME": "diySubscriptions"
+    },
+    {
+      "TABLE_NAME": "echoCases"
+    },
+    {
+      "TABLE_NAME": "echoCorrelations"
+    },
+    {
+      "TABLE_NAME": "echoLibraryCaseAttempts"
+    },
+    {
+      "TABLE_NAME": "echoLibraryCaseMedia"
+    },
+    {
+      "TABLE_NAME": "echoLibraryCaseQuestions"
+    },
+    {
+      "TABLE_NAME": "echoLibraryCases"
+    },
+    {
+      "TABLE_NAME": "educatorAnnouncements"
+    },
+    {
+      "TABLE_NAME": "educatorAssignments"
+    },
+    {
+      "TABLE_NAME": "educatorCompetencies"
+    },
+    {
+      "TABLE_NAME": "educatorCourses"
+    },
+    {
+      "TABLE_NAME": "educatorModules"
+    },
+    {
+      "TABLE_NAME": "educatorOrgMembers"
+    },
+    {
+      "TABLE_NAME": "educatorOrgs"
+    },
+    {
+      "TABLE_NAME": "educatorPresentations"
+    },
+    {
+      "TABLE_NAME": "educatorQuizAttempts"
+    },
+    {
+      "TABLE_NAME": "educatorQuizQuestions"
+    },
+    {
+      "TABLE_NAME": "educatorQuizzes"
+    },
+    {
+      "TABLE_NAME": "educatorStudentCompetencies"
+    },
+    {
+      "TABLE_NAME": "educatorStudentProgress"
+    },
+    {
+      "TABLE_NAME": "emailCampaigns"
+    },
+    {
+      "TABLE_NAME": "emailTemplates"
+    },
+    {
+      "TABLE_NAME": "flashcardGuestDailyUsage"
+    },
+    {
+      "TABLE_NAME": "flashcards"
+    },
+    {
+      "TABLE_NAME": "imageQualityReviews"
+    },
+    {
+      "TABLE_NAME": "labMembers"
+    },
+    {
+      "TABLE_NAME": "labPeerReviews"
+    },
+    {
+      "TABLE_NAME": "labSubscriptions"
+    },
+    {
+      "TABLE_NAME": "lms_affiliate_conversions"
+    },
+    {
+      "TABLE_NAME": "lms_affiliates"
+    },
+    {
+      "TABLE_NAME": "lms_certificates"
+    },
+    {
+      "TABLE_NAME": "lms_collection_courses"
+    },
+    {
+      "TABLE_NAME": "lms_collections"
+    },
+    {
+      "TABLE_NAME": "lms_course_instructors"
+    },
+    {
+      "TABLE_NAME": "lms_courses"
+    },
+    {
+      "TABLE_NAME": "lms_enrollments"
+    },
+    {
+      "TABLE_NAME": "lms_group_seats"
+    },
+    {
+      "TABLE_NAME": "lms_groups"
+    },
+    {
+      "TABLE_NAME": "lms_instructors"
+    },
+    {
+      "TABLE_NAME": "lms_landing_pages"
+    },
+    {
+      "TABLE_NAME": "lms_lesson_bookmarks"
+    },
+    {
+      "TABLE_NAME": "lms_lesson_notes"
+    },
+    {
+      "TABLE_NAME": "lms_lesson_progress"
+    },
+    {
+      "TABLE_NAME": "lms_lessons"
+    },
+    {
+      "TABLE_NAME": "lms_orders"
+    },
+    {
+      "TABLE_NAME": "lms_page_templates"
+    },
+    {
+      "TABLE_NAME": "lms_quiz_questions"
+    },
+    {
+      "TABLE_NAME": "lms_quizzes"
+    },
+    {
+      "TABLE_NAME": "lms_sections"
+    },
+    {
+      "TABLE_NAME": "managedAccounts"
+    },
+    {
+      "TABLE_NAME": "mediaAccessGrants"
+    },
+    {
+      "TABLE_NAME": "mediaAssets"
+    },
+    {
+      "TABLE_NAME": "mediaVersions"
+    },
+    {
+      "TABLE_NAME": "mediaViewEvents"
+    },
+    {
+      "TABLE_NAME": "media_folders"
+    },
+    {
+      "TABLE_NAME": "meetingAttendees"
+    },
+    {
+      "TABLE_NAME": "meetingMinutesDrafts"
+    },
+    {
+      "TABLE_NAME": "meetingRecordings"
+    },
+    {
+      "TABLE_NAME": "meetingTranscripts"
+    },
+    {
+      "TABLE_NAME": "navigatorOverrides"
+    },
+    {
+      "TABLE_NAME": "order_bump_conversions"
+    },
+    {
+      "TABLE_NAME": "order_bumps"
+    },
+    {
+      "TABLE_NAME": "peerReviews"
+    },
+    {
+      "TABLE_NAME": "physicianComparisonReviews"
+    },
+    {
+      "TABLE_NAME": "physicianNotifications"
+    },
+    {
+      "TABLE_NAME": "physicianOverReadInvitations"
+    },
+    {
+      "TABLE_NAME": "physicianOverReadSubmissions"
+    },
+    {
+      "TABLE_NAME": "physicianPeerReviews"
+    },
+    {
+      "TABLE_NAME": "platformFeatureFlags"
+    },
+    {
+      "TABLE_NAME": "policies"
+    },
+    {
+      "TABLE_NAME": "possibleCaseStudies"
+    },
+    {
+      "TABLE_NAME": "qaLogs"
+    },
+    {
+      "TABLE_NAME": "qualityMeetings"
+    },
+    {
+      "TABLE_NAME": "quickfireAttempts"
+    },
+    {
+      "TABLE_NAME": "quickfireChallenges"
+    },
+    {
+      "TABLE_NAME": "quickfireDailySets"
+    },
+    {
+      "TABLE_NAME": "quickfireQuestions"
+    },
+    {
+      "TABLE_NAME": "scanCoachMedia"
+    },
+    {
+      "TABLE_NAME": "scanCoachOverrides"
+    },
+    {
+      "TABLE_NAME": "sonoQuizAnswers"
+    },
+    {
+      "TABLE_NAME": "sonoQuizParticipants"
+    },
+    {
+      "TABLE_NAME": "sonoQuizQuestions"
+    },
+    {
+      "TABLE_NAME": "sonoQuizSessions"
+    },
+    {
+      "TABLE_NAME": "sonoQuizzes"
+    },
+    {
+      "TABLE_NAME": "soundbytes"
+    },
+    {
+      "TABLE_NAME": "strainSnapshots"
+    },
+    {
+      "TABLE_NAME": "thinkificWebhookEvents"
+    },
+    {
+      "TABLE_NAME": "userCaseViews"
+    },
+    {
+      "TABLE_NAME": "userRoles"
+    },
+    {
+      "TABLE_NAME": "users"
+    },
+    {
+      "TABLE_NAME": "webhookEvents"
+    }
+  ],
+  "messages": [],
+  "stdout": "TABLE_NAME\n__drizzle_migrations\naccreditationFormBranchRules\naccreditationFormItems\naccreditationFormOptions\naccreditationFormOrgVisibilityRules\naccreditationFormSections\naccreditationFormSubmissions\naccreditationFormTemplateAssignments\naccreditationFormTemplates\naccreditationReadiness\naccreditationReadinessNavigator\naccreditationTasks\nappSettings\nappropriateUseCases\ncaseMixSubmissions\ncaseViewEvents\ncases\nchallengeResponses\ncmeCourseMeta\ncmeCoursesCache\ncmeEnrollmentCache\ncmeEntries\ndailyChallenges\ndigital_bundle_items\ndigital_bundle_purchases\ndigital_bundles\ndigital_download_events\ndigital_product_files\ndigital_products\ndigital_purchases\ndiyConciergePurchases\ndiyOrgMembers\ndiyOrganizations\ndiySubscriptions\nechoCases\nechoCorrelations\nechoLibraryCaseAttempts\nechoLibraryCaseMedia\nechoLibraryCaseQuestions\nechoLibraryCases\neducatorAnnouncements\neducatorAssignments\neducatorCompetencies\neducatorCourses\neducatorModules\neducatorOrgMembers\neducatorOrgs\neducatorPresentations\neducatorQuizAttempts\neducatorQuizQuestions\neducatorQuizzes\neducatorStudentCompetencies\neducatorStudentProgress\nemailCampaigns\nemailTemplates\nflashcardGuestDailyUsage\nflashcards\nimageQualityReviews\nlabMembers\nlabPeerReviews\nlabSubscriptions\nlms_affiliate_conversions\nlms_affiliates\nlms_certificates\nlms_collection_courses\nlms_collections\nlms_course_instructors\nlms_courses\nlms_enrollments\nlms_group_seats\nlms_groups\nlms_instructors\nlms_landing_pages\nlms_lesson_bookmarks\nlms_lesson_notes\nlms_lesson_progress\nlms_lessons\nlms_orders\nlms_page_templates\nlms_quiz_questions\nlms_quizzes\nlms_sections\nmanagedAccounts\nmediaAccessGrants\nmediaAssets\nmediaVersions\nmediaViewEvents\nmedia_folders\nmeetingAttendees\nmeetingMinutesDrafts\nmeetingRecordings\nmeetingTranscripts\nnavigatorOverrides\norder_bump_conversions\norder_bumps\npeerReviews\nphysicianComparisonReviews\nphysicianNotifications\nphysicianOverReadInvitations\nphysicianOverReadSubmissions\nphysicianPeerReviews\nplatformFeatureFlags\npolicies\npossibleCaseStudies\nqaLogs\nqualityMeetings\nquickfireAttempts\nquickfireChallenges\nquickfireDailySets\nquickfireQuestions\nscanCoachMedia\nscanCoachOverrides\nsonoQuizAnswers\nsonoQuizParticipants\nsonoQuizQuestions\nsonoQuizSessions\nsonoQuizzes\nsoundbytes\nstrainSnapshots\nthinkificWebhookEvents\nuserCaseViews\nuserRoles\nusers\nwebhookEvents\n",
+  "stderr": "",
+  "execution_time_ms": 263
+}

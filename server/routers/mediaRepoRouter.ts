@@ -589,10 +589,8 @@ export const mediaRepoRouter = router({
         createdByUserId: ctx.user.id,
       });
 
-      // Build access URL (uses the app's origin from env)
-      const origin = process.env.VITE_OAUTH_PORTAL_URL
-        ? process.env.VITE_OAUTH_PORTAL_URL.replace("portal.", "app.")
-        : "https://app.allaboutultrasound.com";
+      // Build access URL (uses the app's canonical URL from env)
+      const origin = process.env.VITE_APP_URL || "https://app.allaboutultrasound.com";
       const accessUrl = `${origin}/media/${asset.slug}?token=${token}`;
 
       await sendEmail({

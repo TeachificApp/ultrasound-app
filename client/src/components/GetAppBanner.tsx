@@ -93,7 +93,7 @@ export default function GetAppBanner() {
       setDeferredPrompt(null);
     } else {
       // Fallback: link to the app URL for manual install
-      window.open("https://app.allaboutultrasound.com", "_blank");
+      window.open(import.meta.env.VITE_APP_URL || "https://app.allaboutultrasound.com", "_blank");
     }
   }
 

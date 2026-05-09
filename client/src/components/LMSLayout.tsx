@@ -152,7 +152,7 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
         {/* Back to main app link */}
         <div className="px-3 pb-2">
           <a
-            href="https://app.allaboutultrasound.com"
+            href={import.meta.env.VITE_APP_URL || "https://app.allaboutultrasound.com"}
             className="flex items-center gap-2 px-3 py-2.5 rounded-lg transition-all duration-150 group w-full"
             style={{ background: "linear-gradient(135deg, #189aa1 0%, #4ad9e0 100%)" }}
           >

@@ -298,7 +298,7 @@ export default function LMSHome() {
               © {new Date().getFullYear()} All About Ultrasound™. All rights reserved.
             </div>
             <div className="flex items-center gap-6">
-              <a href="https://app.allaboutultrasound.com" className="text-sm text-[#189aa1] hover:text-[#0e6b70] font-medium">
+              <a href={import.meta.env.VITE_APP_URL || "https://app.allaboutultrasound.com"} className="text-sm text-[#189aa1] hover:text-[#0e6b70] font-medium">
                 Clinical Tools →
               </a>
               <a href="https://www.allaboutultrasound.com" target="_blank" rel="noopener noreferrer" className="text-sm text-gray-500 hover:text-gray-700">

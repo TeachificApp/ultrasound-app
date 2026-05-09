@@ -1,0 +1,382 @@
+{
+  "query": "SHOW TABLES;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SHOW TABLES;",
+  "rows": [
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "__drizzle_migrations"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "accreditationFormBranchRules"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "accreditationFormItems"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "accreditationFormOptions"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "accreditationFormOrgVisibilityRules"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "accreditationFormSections"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "accreditationFormSubmissions"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "accreditationFormTemplateAssignments"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "accreditationFormTemplates"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "accreditationReadiness"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "accreditationReadinessNavigator"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "accreditationTasks"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "appSettings"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "appropriateUseCases"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "caseMixSubmissions"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "caseViewEvents"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "cases"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "challengeResponses"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "cmeCourseMeta"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "cmeCoursesCache"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "cmeEnrollmentCache"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "cmeEntries"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "dailyChallenges"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "digital_bundle_items"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "digital_bundle_purchases"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "digital_bundles"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "digital_download_events"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "digital_product_files"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "digital_products"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "digital_purchases"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "diyConciergePurchases"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "diyOrgMembers"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "diyOrganizations"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "diySubscriptions"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "echoCases"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "echoCorrelations"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "echoLibraryCaseAttempts"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "echoLibraryCaseMedia"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "echoLibraryCaseQuestions"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "echoLibraryCases"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "educatorAnnouncements"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "educatorAssignments"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "educatorCompetencies"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "educatorCourses"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "educatorModules"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "educatorOrgMembers"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "educatorOrgs"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "educatorPresentations"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "educatorQuizAttempts"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "educatorQuizQuestions"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "educatorQuizzes"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "educatorStudentCompetencies"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "educatorStudentProgress"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "emailCampaigns"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "emailTemplates"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "flashcardGuestDailyUsage"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "flashcards"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "imageQualityReviews"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "labMembers"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "labPeerReviews"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "labSubscriptions"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "lms_affiliate_conversions"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "lms_affiliates"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "lms_certificates"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "lms_collection_courses"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "lms_collections"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "lms_course_instructors"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "lms_courses"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "lms_enrollments"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "lms_group_seats"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "lms_groups"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "lms_instructors"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "lms_landing_pages"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "lms_lesson_bookmarks"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "lms_lesson_notes"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "lms_lesson_progress"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "lms_lessons"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "lms_orders"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "lms_page_templates"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "lms_quiz_questions"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "lms_quizzes"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "lms_sections"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "managedAccounts"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "mediaAccessGrants"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "mediaAssets"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "mediaVersions"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "mediaViewEvents"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "media_folders"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "meetingAttendees"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "meetingMinutesDrafts"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "meetingRecordings"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "meetingTranscripts"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "navigatorOverrides"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "order_bump_conversions"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "order_bumps"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "peerReviews"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "physicianComparisonReviews"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "physicianNotifications"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "physicianOverReadInvitations"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "physicianOverReadSubmissions"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "physicianPeerReviews"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "platformFeatureFlags"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "policies"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "possibleCaseStudies"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "qaLogs"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "qualityMeetings"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "quickfireAttempts"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "quickfireChallenges"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "quickfireDailySets"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "quickfireQuestions"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "scanCoachMedia"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "scanCoachOverrides"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "sonoQuizAnswers"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "sonoQuizParticipants"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "sonoQuizQuestions"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "sonoQuizSessions"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "sonoQuizzes"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "soundbytes"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "strainSnapshots"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "thinkificWebhookEvents"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "userCaseViews"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "userRoles"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "users"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe": "webhookEvents"
+    }
+  ],
+  "messages": [],
+  "stdout": "Tables_in_UrcfdRVE8J6mpMNR48QuFe\n__drizzle_migrations\naccreditationFormBranchRules\naccreditationFormItems\naccreditationFormOptions\naccreditationFormOrgVisibilityRules\naccreditationFormSections\naccreditationFormSubmissions\naccreditationFormTemplateAssignments\naccreditationFormTemplates\naccreditationReadiness\naccreditationReadinessNavigator\naccreditationTasks\nappSettings\nappropriateUseCases\ncaseMixSubmissions\ncaseViewEvents\ncases\nchallengeResponses\ncmeCourseMeta\ncmeCoursesCache\ncmeEnrollmentCache\ncmeEntries\ndailyChallenges\ndigital_bundle_items\ndigital_bundle_purchases\ndigital_bundles\ndigital_download_events\ndigital_product_files\ndigital_products\ndigital_purchases\ndiyConciergePurchases\ndiyOrgMembers\ndiyOrganizations\ndiySubscriptions\nechoCases\nechoCorrelations\nechoLibraryCaseAttempts\nechoLibraryCaseMedia\nechoLibraryCaseQuestions\nechoLibraryCases\neducatorAnnouncements\neducatorAssignments\neducatorCompetencies\neducatorCourses\neducatorModules\neducatorOrgMembers\neducatorOrgs\neducatorPresentations\neducatorQuizAttempts\neducatorQuizQuestions\neducatorQuizzes\neducatorStudentCompetencies\neducatorStudentProgress\nemailCampaigns\nemailTemplates\nflashcardGuestDailyUsage\nflashcards\nimageQualityReviews\nlabMembers\nlabPeerReviews\nlabSubscriptions\nlms_affiliate_conversions\nlms_affiliates\nlms_certificates\nlms_collection_courses\nlms_collections\nlms_course_instructors\nlms_courses\nlms_enrollments\nlms_group_seats\nlms_groups\nlms_instructors\nlms_landing_pages\nlms_lesson_bookmarks\nlms_lesson_notes\nlms_lesson_progress\nlms_lessons\nlms_orders\nlms_page_templates\nlms_quiz_questions\nlms_quizzes\nlms_sections\nmanagedAccounts\nmediaAccessGrants\nmediaAssets\nmediaVersions\nmediaViewEvents\nmedia_folders\nmeetingAttendees\nmeetingMinutesDrafts\nmeetingRecordings\nmeetingTranscripts\nnavigatorOverrides\norder_bump_conversions\norder_bumps\npeerReviews\nphysicianComparisonReviews\nphysicianNotifications\nphysicianOverReadInvitations\nphysicianOverReadSubmissions\nphysicianPeerReviews\nplatformFeatureFlags\npolicies\npossibleCaseStudies\nqaLogs\nqualityMeetings\nquickfireAttempts\nquickfireChallenges\nquickfireDailySets\nquickfireQuestions\nscanCoachMedia\nscanCoachOverrides\nsonoQuizAnswers\nsonoQuizParticipants\nsonoQuizQuestions\nsonoQuizSessions\nsonoQuizzes\nsoundbytes\nstrainSnapshots\nthinkificWebhookEvents\nuserCaseViews\nuserRoles\nusers\nwebhookEvents\n",
+  "stderr": "",
+  "execution_time_ms": 321
+}

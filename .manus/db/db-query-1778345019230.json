@@ -1,0 +1,61 @@
+{
+  "query": "SHOW TABLES LIKE '%quiz%'; SHOW TABLES LIKE '%scorm%'; SHOW TABLES LIKE '%file%'; SHOW TABLES LIKE '%lesson%';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SHOW TABLES LIKE '%quiz%'; SHOW TABLES LIKE '%scorm%'; SHOW TABLES LIKE '%file%'; SHOW TABLES LIKE '%lesson%';",
+  "rows": [
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (%quiz%)": "educatorQuizAttempts"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (%quiz%)": "educatorQuizQuestions"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (%quiz%)": "educatorQuizzes"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (%quiz%)": "lms_quiz_questions"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (%quiz%)": "lms_quizzes"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (%quiz%)": "sonoQuizAnswers"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (%quiz%)": "sonoQuizParticipants"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (%quiz%)": "sonoQuizQuestions"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (%quiz%)": "sonoQuizSessions"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (%quiz%)": "sonoQuizzes"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (%quiz%)": "Tables_in_UrcfdRVE8J6mpMNR48QuFe (%file%)"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (%quiz%)": "digital_product_files"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (%quiz%)": "Tables_in_UrcfdRVE8J6mpMNR48QuFe (%lesson%)"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (%quiz%)": "lms_lesson_bookmarks"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (%quiz%)": "lms_lesson_notes"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (%quiz%)": "lms_lesson_progress"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (%quiz%)": "lms_lessons"
+    }
+  ],
+  "messages": [],
+  "stdout": "Tables_in_UrcfdRVE8J6mpMNR48QuFe (%quiz%)\neducatorQuizAttempts\neducatorQuizQuestions\neducatorQuizzes\nlms_quiz_questions\nlms_quizzes\nsonoQuizAnswers\nsonoQuizParticipants\nsonoQuizQuestions\nsonoQuizSessions\nsonoQuizzes\nTables_in_UrcfdRVE8J6mpMNR48QuFe (%file%)\ndigital_product_files\nTables_in_UrcfdRVE8J6mpMNR48QuFe (%lesson%)\nlms_lesson_bookmarks\nlms_lesson_notes\nlms_lesson_progress\nlms_lessons\n",
+  "stderr": "",
+  "execution_time_ms": 266
+}
