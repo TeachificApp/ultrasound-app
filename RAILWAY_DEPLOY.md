@@ -12,14 +12,18 @@ Both domains point to the same Railway service. The app detects which subdomain 
 
 ## Build & Start Commands
 
-Railway will auto-detect these from `package.json`:
+Railway auto-detects configuration from these files:
+
+- `railway.toml` — Build/deploy settings, health checks, restart policy
+- `railway.json` — Service configuration (alternative format)
+- `nixpacks.toml` — Nixpacks builder config (Node.js 22, pnpm)
 
 ```
-Build: pnpm build
+Build: pnpm install && pnpm build
 Start: pnpm start
 ```
 
-The `railway.toml` is also configured with these commands.
+Railway will automatically deploy on every push to `main`.
 
 ---
 
