@@ -54,6 +54,14 @@ async function startServer() {
   // No body-parser limit for chunked media uploads — multer handles streaming directly
   app.use(express.json({ limit: "100mb" }));
   app.use(express.urlencoded({ limit: "100mb", extended: true }));
+  // Temporary debug endpoint to diagnose Railway DB connection
+  app.get("/api/debug/db-status", async (_req, res) => {
+    const { getDb } = await import("../db");
+    const hasDbUrl = !!process.env.DATABASE_URL;
+    const dbUrlPrefix = process.env.DATABASE_URL?.substring(0, 30) || "NOT SET";
+    const db = await getDb();
+    res.json({ hasDbUrl, dbUrlPrefix, dbConnected: !!db });
+  });
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // Chat API with streaming and tool calling
