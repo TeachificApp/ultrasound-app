@@ -62,6 +62,26 @@ async function startServer() {
     const db = await getDb();
     res.json({ hasDbUrl, dbUrlPrefix, dbConnected: !!db });
   });
+  // Temporary debug endpoint to diagnose email/SendGrid configuration
+  app.get("/api/debug/email-status", async (_req, res) => {
+    const hasSendGridKey = !!process.env.SENDGRID_API_KEY;
+    const keyPrefix = process.env.SENDGRID_API_KEY?.substring(0, 7) || "NOT SET";
+    const fromEmail = process.env.SENDGRID_FROM_EMAIL || "NOT SET";
+    const fromName = process.env.SENDGRID_FROM_NAME || "NOT SET";
+    res.json({ hasSendGridKey, keyPrefix, fromEmail, fromName, deployedAt: new Date().toISOString() });
+  });
+  // Temporary debug endpoint to test sending an email via SendGrid
+  app.get("/api/debug/test-email", async (req, res) => {
+    const to = req.query.to as string;
+    if (!to) return res.status(400).json({ error: "Pass ?to=your@email.com" });
+    const { sendEmail } = await import("./email");
+    const result = await sendEmail({
+      to: { name: "Test", email: to },
+      subject: "UltrasoundAssist™ Email Test",
+      htmlBody: "<h2>Email is working!</h2><p>If you see this, SendGrid is correctly configured.</p>",
+    });
+    res.json({ sent: result, to, timestamp: new Date().toISOString() });
+  });
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // Chat API with streaming and tool calling
