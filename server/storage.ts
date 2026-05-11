@@ -1,7 +1,9 @@
 // Preconfigured storage helpers for Manus WebDev templates
 // Uses the Biz-provided storage proxy (Authorization: Bearer <token>)
+// Also supports dual-write to Cloudflare R2 for mirroring
 
 import { ENV } from './_core/env';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
 type StorageConfig = { baseUrl: string; apiKey: string };
 
@@ -67,6 +69,63 @@ function buildAuthHeaders(apiKey: string): HeadersInit {
   return { Authorization: `Bearer ${apiKey}` };
 }
 
+// ── R2 Dual-Write Support ──────────────────────────────────────────────────────
+
+let r2Client: S3Client | null = null;
+
+function getR2Client(): S3Client | null {
+  if (r2Client) return r2Client;
+
+  const accountId = process.env.CF_R2_ACCOUNT_ID;
+  const accessKeyId = process.env.CF_R2_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.CF_R2_SECRET_ACCESS_KEY;
+
+  if (!accountId || !accessKeyId || !secretAccessKey) return null;
+
+  r2Client = new S3Client({
+    region: "auto",
+    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+    credentials: { accessKeyId, secretAccessKey },
+  });
+
+  return r2Client;
+}
+
+function getR2Bucket(): string {
+  return process.env.CF_R2_BUCKET_NAME || "ultrasound-assist";
+}
+
+/**
+ * Mirror a file upload to Cloudflare R2 (fire-and-forget).
+ * This runs in the background and does not block the primary upload.
+ */
+async function mirrorToR2(
+  relKey: string,
+  data: Buffer | Uint8Array | string,
+  contentType: string
+): Promise<void> {
+  const client = getR2Client();
+  if (!client) return;
+
+  try {
+    const body = typeof data === "string" ? Buffer.from(data) : data;
+    await client.send(
+      new PutObjectCommand({
+        Bucket: getR2Bucket(),
+        Key: normalizeKey(relKey),
+        Body: body as any,
+        ContentType: contentType,
+      })
+    );
+    console.log(`[R2Mirror] Uploaded: ${relKey}`);
+  } catch (err: any) {
+    // Don't fail the primary upload if R2 mirror fails
+    console.error(`[R2Mirror] Failed to mirror ${relKey}: ${err.message}`);
+  }
+}
+
+// ── Primary Storage Operations ─────────────────────────────────────────────────
+
 export async function storagePut(
   relKey: string,
   data: Buffer | Uint8Array | string,
@@ -89,6 +148,10 @@ export async function storagePut(
     );
   }
   const url = (await response.json()).url;
+
+  // Fire-and-forget: mirror to R2 in background
+  mirrorToR2(key, data, contentType).catch(() => {});
+
   return { key, url };
 }
 
@@ -114,5 +177,14 @@ export async function storageDelete(relKey: string): Promise<void> {
   if (!response.ok && response.status !== 404) {
     const message = await response.text().catch(() => response.statusText);
     throw new Error(`Storage delete failed (${response.status}): ${message}`);
+  }
+
+  // Also delete from R2 (fire-and-forget)
+  const client = getR2Client();
+  if (client) {
+    import("@aws-sdk/client-s3").then(({ DeleteObjectCommand }) => {
+      client.send(new DeleteObjectCommand({ Bucket: getR2Bucket(), Key: key }))
+        .catch((err: any) => console.error(`[R2Mirror] Failed to delete ${key}: ${err.message}`));
+    }).catch(() => {});
   }
 }

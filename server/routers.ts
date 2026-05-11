@@ -5,6 +5,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { storagePut } from "./storage";
+import { runMirrorSync, getLastSyncResult, isSyncRunning } from "./jobs/mirrorSync";
 import { platformAdminRouter, labSeatsRouter } from "./routers/adminRouter";
 import { cmeRouter } from "./routers/cmeRouter";
 import { emailAuthRouter } from "./routers/emailAuthRouter";
@@ -2344,6 +2345,35 @@ export const appRouter = router({
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(DEMO_COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true };
+    }),
+  }),
+
+  // ── Mirror Sync (admin only) ──────────────────────────────────────────────
+  mirrorSync: router({
+    /** Get the status of the last mirror sync run */
+    status: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") {
+        throw new (await import("@trpc/server")).TRPCError({ code: "FORBIDDEN" });
+      }
+      return {
+        isRunning: isSyncRunning(),
+        lastResult: getLastSyncResult(),
+      };
+    }),
+
+    /** Trigger a manual mirror sync (admin only) */
+    trigger: protectedProcedure.mutation(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") {
+        throw new (await import("@trpc/server")).TRPCError({ code: "FORBIDDEN" });
+      }
+      if (isSyncRunning()) {
+        return { started: false, message: "Sync already in progress" };
+      }
+      // Run in background — don't await
+      runMirrorSync().catch((err) =>
+        console.error("[MirrorSync] Manual trigger failed:", err)
+      );
+      return { started: true, message: "Mirror sync started" };
     }),
   }),
 });

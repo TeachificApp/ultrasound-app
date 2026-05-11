@@ -25,6 +25,7 @@ import { startMediaPurgeCron } from "../jobs/mediaPurgeCron";
 import { startEmailCampaignScheduler } from "../routers/emailCampaignRouter";
 import { startThinkificMemberSync } from "../jobs/thinkificMemberSync";
 import { initSonoQuizHub } from "../sonoQuizHub";
+import { startMirrorSync } from "../jobs/mirrorSync";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -148,6 +149,8 @@ async function startServer() {
     startThinkificMemberSync();
     // Start the Media Repository purge cron (hard-deletes assets soft-deleted > 30 days ago)
     startMediaPurgeCron();
+    // Start the Railway/R2 mirror sync (syncs DB and media every 6 hours)
+    startMirrorSync();
   });
 }
 

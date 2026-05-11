@@ -1376,3 +1376,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Clean up Manus-specific dev tooling for production build
 - [x] Document required Railway env vars
 - [ ] Document webhook/OAuth callback URL updates needed
+
+## Railway/R2 Mirror Sync
+- [x] Copy all media files from Manus S3 to Cloudflare R2 (30 unique files, all succeeded)
+- [x] Refresh Railway MySQL with latest Manus database dump (124 tables, 14131 users)
+- [x] Build periodic sync script for DB and media mirroring (server/jobs/mirrorSync.ts)
+- [x] Integrate sync into the app as a scheduled task (6h interval, admin tRPC trigger, dual-write storage)
+- [x] Store R2 credentials securely in project secrets (CF_R2_*, RAILWAY_MYSQL_URL)
