@@ -3083,7 +3083,7 @@ export const orderBumps = mysqlTable("order_bumps", {
   triggerType: mysqlEnum("trigger_type", ["course", "download", "bundle"]).notNull(),
   triggerProductId: int("trigger_product_id").notNull(),
   // The bump offer — what product is being offered as the bump
-  bumpType: mysqlEnum("bump_type", ["course", "download", "bundle"]).notNull(),
+  bumpType: mysqlEnum("bump_type", ["course", "download", "bundle", "physical"]).notNull(),
   bumpProductId: int("bump_product_id").notNull(),
   // When to show the bump
   timing: mysqlEnum("timing", ["before_checkout", "after_checkout"]).default("after_checkout").notNull(),

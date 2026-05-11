@@ -27,12 +27,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import RichTextEditor from "@/components/RichTextEditor";
+import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
+import { FUNNEL_TEMPLATES, getFunnelTemplateBlocks } from "@/lib/funnelTemplates";
 import {
   ArrowLeft, Save, Eye, Plus, Trash2, GripVertical, Type, Image, Video,
   List, Quote, CreditCard, Minus, Columns, X, Palette, AlignLeft,
   AlignCenter, AlignRight, HelpCircle, Users, Star, Globe, Timer,
   AlertTriangle, CheckSquare, LayoutGrid, Layers, BookOpen, Tag,
-  ChevronDown, ChevronUp, Copy, FolderOpen, BookMarked, Code, Upload,
+  ChevronDown, ChevronUp, Copy, FolderOpen, BookMarked, Code, Upload, ShoppingCart, Package,
 } from "lucide-react";
 import type { Block, BlockType } from "./LandingPageBuilder";
 
@@ -86,6 +88,13 @@ const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactNode; ca
     defaultData: { headline: "Frequently Asked Questions", items: [{ q: "What format are the files?", a: "PDF format, ready to print." }], bgColor: "#ffffff" } },
   { type: "alert", label: "Alert / Notice", icon: <AlertTriangle size={14} />, category: "Conversion",
     defaultData: { type: "info", title: "Important", message: "This is a limited-time offer.", bgColor: "" } },
+  // ── Funnel
+  { type: "funnel_workflow", label: "Funnel Workflow", icon: <Layers size={14} />, category: "Funnel",
+    defaultData: { eyebrow: "Sales funnel", headline: "Connected sales workflow", subtext: "Link landing, checkout, bump, and thank-you pages together.", accentColor: "#179ca3", bgColor: "#f8fffe", steps: [{ name: "Landing Page", role: "Warm traffic with the offer.", url: "#top", cta: "Open" }, { name: "Checkout", role: "Sell the core product.", url: "#checkout", cta: "Buy" }, { name: "Order Bump", role: "Add a digital or physical product.", url: "#order-bump", cta: "View" }, { name: "Thank You", role: "Confirm delivery.", url: "/thank-you", cta: "Next" }] } },
+  { type: "product_offer_stack", label: "Product Offer Stack", icon: <Package size={14} />, category: "Funnel",
+    defaultData: { headline: "Build a higher-value cart", subtext: "Promote digital and physical add-ons.", accentColor: "#179ca3", bgColor: "#ffffff", products: [{ type: "digital", title: "Digital Pack", description: "Instant-access files and templates.", price: "$49", ctaText: "Add digital item", ctaLink: "#checkout", fulfillment: "Delivered instantly." }, { type: "physical", title: "Printed Workbook", description: "A shipped companion product.", price: "$29", ctaText: "Add physical item", ctaLink: "#order-bump", fulfillment: "Ships after checkout." }] } },
+  { type: "order_bump_checkout", label: "Order Bump Checkout", icon: <ShoppingCart size={14} />, category: "Funnel",
+    defaultData: { anchorId: "order-bump", discountLabel: "One-time offer", headline: "Add the printed workbook", subheadline: "A checkout-ready bump for buyers.", description: "Promote a digital bonus or physical add-on before payment.", productType: "physical", price: "$29", compareAtPrice: "$59", checkboxLabel: "Yes, add this to my order", ctaText: "Add bump and continue", skipText: "Continue without bump", shippingNote: "Shipping collected at checkout", features: ["Digital or physical products", "One-click add-to-order messaging", "Pairs with Order Bumps admin"], accentColor: "#f59e0b", bgColor: "#fff7ed" } },
   // ── Social Proof
   { type: "reviews", label: "Reviews", icon: <Star size={14} />, category: "Social Proof",
     defaultData: { headline: "What Others Say", items: [{ name: "Jane D.", rating: 5, text: "Exactly what I needed!" }], bgColor: "#ffffff" } },
@@ -95,7 +104,7 @@ const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactNode; ca
     defaultData: { images: [], columns: 3, gap: 8, bgColor: "#ffffff" } },
 ];
 
-const CATEGORIES = ["Layout", "Content", "Conversion", "Social Proof"];
+const CATEGORIES = ["Layout", "Content", "Conversion", "Funnel", "Social Proof"];
 
 // ─── Sortable Block Item ──────────────────────────────────────────────────────
 function SortableBlockItem({ block, isSelected, onSelect, onDelete, onDuplicate }: {
@@ -385,6 +394,45 @@ function BlockEditorPanel({ block, onUpdate }: { block: Block; onUpdate: (data: 
           </div>
           <div><label className="text-xs font-medium text-gray-600">Title</label><Input value={d.title ?? ""} onChange={e => set("title", e.target.value)} /></div>
           <div><label className="text-xs font-medium text-gray-600">Message</label><Textarea value={d.message ?? ""} onChange={e => set("message", e.target.value)} rows={3} /></div>
+        </div>
+      );
+    case "funnel_workflow":
+      return (
+        <div className="space-y-3">
+          <Input value={d.eyebrow ?? ""} onChange={e => set("eyebrow", e.target.value)} placeholder="Eyebrow" />
+          <Input value={d.headline ?? ""} onChange={e => set("headline", e.target.value)} placeholder="Headline" />
+          <Textarea value={d.subtext ?? ""} onChange={e => set("subtext", e.target.value)} rows={3} placeholder="Subtext" />
+          <Textarea value={(d.steps ?? []).map((s: any) => `${s.name}|${s.role}|${s.url}|${s.cta}`).join("\n")} onChange={e => set("steps", e.target.value.split("\n").filter(Boolean).map(line => { const [name, role, url, cta] = line.split("|"); return { name, role, url, cta }; }))} rows={6} placeholder="Name|Role|URL|CTA, one step per line" />
+          <div><label className="text-xs font-medium text-gray-600">Accent</label><input type="color" value={d.accentColor ?? "#179ca3"} onChange={e => set("accentColor", e.target.value)} className="w-8 h-8 rounded cursor-pointer" /></div>
+        </div>
+      );
+    case "product_offer_stack":
+      return (
+        <div className="space-y-3">
+          <Input value={d.headline ?? ""} onChange={e => set("headline", e.target.value)} placeholder="Headline" />
+          <Textarea value={d.subtext ?? ""} onChange={e => set("subtext", e.target.value)} rows={3} placeholder="Subtext" />
+          <Textarea value={(d.products ?? []).map((p: any) => `${p.type}|${p.title}|${p.description}|${p.price}|${p.ctaText}|${p.ctaLink ?? ""}|${p.fulfillment ?? ""}`).join("\n")} onChange={e => set("products", e.target.value.split("\n").filter(Boolean).map(line => { const [type, title, description, price, ctaText, ctaLink, fulfillment] = line.split("|"); return { type, title, description, price, ctaText, ctaLink, fulfillment }; }))} rows={7} placeholder="type|title|description|price|cta|link|fulfillment" />
+          <div><label className="text-xs font-medium text-gray-600">Accent</label><input type="color" value={d.accentColor ?? "#179ca3"} onChange={e => set("accentColor", e.target.value)} className="w-8 h-8 rounded cursor-pointer" /></div>
+        </div>
+      );
+    case "order_bump_checkout":
+      return (
+        <div className="space-y-3">
+          <Input value={d.headline ?? ""} onChange={e => set("headline", e.target.value)} placeholder="Headline" />
+          <Input value={d.subheadline ?? ""} onChange={e => set("subheadline", e.target.value)} placeholder="Subheadline" />
+          <Textarea value={d.description ?? ""} onChange={e => set("description", e.target.value)} rows={3} placeholder="Description" />
+          <select className="w-full border rounded px-2 py-1 text-sm" value={d.productType ?? "digital"} onChange={e => set("productType", e.target.value)}>
+            <option value="digital">Digital item</option>
+            <option value="physical">Physical item</option>
+          </select>
+          <div className="grid grid-cols-2 gap-2">
+            <Input value={d.price ?? ""} onChange={e => set("price", e.target.value)} placeholder="$29" />
+            <Input value={d.compareAtPrice ?? ""} onChange={e => set("compareAtPrice", e.target.value)} placeholder="$59" />
+          </div>
+          <Input value={d.checkboxLabel ?? ""} onChange={e => set("checkboxLabel", e.target.value)} placeholder="Checkbox label" />
+          <Input value={d.shippingNote ?? ""} onChange={e => set("shippingNote", e.target.value)} placeholder="Shipping note" />
+          <Textarea value={(d.features ?? []).join("\n")} onChange={e => set("features", e.target.value.split("\n").filter(Boolean))} rows={4} placeholder="Feature bullets" />
+          <div><label className="text-xs font-medium text-gray-600">Accent</label><input type="color" value={d.accentColor ?? "#f59e0b"} onChange={e => set("accentColor", e.target.value)} className="w-8 h-8 rounded cursor-pointer" /></div>
         </div>
       );
     case "reviews": {
@@ -707,6 +755,12 @@ function BlockPreview({ block, previewMode = "editor" }: { block: Block; preview
         </div>
       );
     }
+    case "funnel_workflow":
+      return <FunnelWorkflowBlock data={d} />;
+    case "product_offer_stack":
+      return <ProductOfferStackBlock data={d} />;
+    case "order_bump_checkout":
+      return <InlineOrderBumpBlock data={d} />;
     case "reviews":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
@@ -924,6 +978,18 @@ export default function DownloadLandingPageBuilder() {
           </div>
           {/* Add Block */}
           <div className="border-t border-gray-100 p-2">
+            <div className="mb-2 rounded-lg border border-amber-200 bg-amber-50 p-2">
+              <p className="text-[10px] font-semibold text-amber-700 mb-1">Sales funnel templates</p>
+              {FUNNEL_TEMPLATES.map((template, index) => (
+                <button
+                  key={template.name}
+                  onClick={() => setBlocks(prev => [...prev, ...getFunnelTemplateBlocks(index)])}
+                  className="w-full text-left text-[11px] text-amber-800 hover:text-amber-950 hover:underline"
+                >
+                  + {template.name}
+                </button>
+              ))}
+            </div>
             <div className="flex gap-1 mb-2 flex-wrap">
               {CATEGORIES.map(cat => (
                 <button key={cat} onClick={() => setActiveCat(cat)}

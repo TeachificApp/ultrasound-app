@@ -16,6 +16,8 @@ import { FileDown, Check, ShoppingCart, Download, ArrowLeft } from "lucide-react
 import { Link } from "wouter";
 import { getLoginUrl } from "@/const";
 import OrderBumpOffer from "@/components/OrderBumpOffer";
+import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
+import { useState } from "react";
 
 // ─── Block type (matches builder) ─────────────────────────────────────────────
 interface Block { id: string; type: string; data: Record<string, any>; }
@@ -167,6 +169,12 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug }: {
           </button>
         </div>
       );
+    case "funnel_workflow":
+      return <FunnelWorkflowBlock data={d} />;
+    case "product_offer_stack":
+      return <ProductOfferStackBlock data={d} onPrimaryCta={onBuy} />;
+    case "order_bump_checkout":
+      return <InlineOrderBumpBlock data={d} onPrimaryCta={onBuy} />;
     case "cta_standalone":
       return (
         <div className="px-8 py-8" style={{ textAlign: d.align ?? "center" }}>
@@ -303,6 +311,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug }: {
 export default function DownloadLanding() {
   const { slug } = useParams<{ slug: string }>();
   const { user } = useAuth();
+  const [selectedOrderBumpId, setSelectedOrderBumpId] = useState<number | undefined>();
   const { data: product, isLoading, error } = trpc.downloads.getBySlug.useQuery({ slug: slug! });
 
   // Check if user has purchased (only if logged in and product loaded)
@@ -353,10 +362,10 @@ export default function DownloadLanding() {
 
   const handleBuy = () => {
     if (!user) {
-      window.location.href = getLoginUrl(`/downloads/${slug}`);
+      window.location.href = getLoginUrl();
       return;
     }
-    checkoutMut.mutate({ productId: product.id });
+    checkoutMut.mutate({ productId: product.id, orderBumpId: selectedOrderBumpId });
   };
 
   // ── Parse landing page blocks ──
@@ -379,7 +388,16 @@ export default function DownloadLanding() {
               triggerType="download"
               triggerProductId={product.id}
               timing="before_checkout"
+              onAccept={(bump) => setSelectedOrderBumpId(bump.bumpId)}
+              onDecline={() => setSelectedOrderBumpId(undefined)}
             />
+            {selectedOrderBumpId && (
+              <div className="mt-3 text-center">
+                <Button onClick={handleBuy} disabled={checkoutMut.isPending} className="bg-amber-500 hover:bg-amber-600 text-white">
+                  Continue to checkout with selected bump
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -19,7 +19,7 @@ type OrderBump = {
   id: number;
   triggerType: "course" | "download" | "bundle";
   triggerProductId: number;
-  bumpType: "course" | "download" | "bundle";
+  bumpType: "course" | "download" | "bundle" | "physical";
   bumpProductId: number;
   timing: "before_checkout" | "after_checkout";
   bumpPrice: number;
@@ -42,6 +42,7 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
   course: <BookOpen size={14} className="text-teal-600" />,
   download: <Download size={14} className="text-blue-600" />,
   bundle: <Layers size={14} className="text-purple-600" />,
+  physical: <Package size={14} className="text-amber-600" />,
 };
 
 export default function OrderBumpsAdmin() {
@@ -51,8 +52,9 @@ export default function OrderBumpsAdmin() {
   const [isCreating, setIsCreating] = useState(false);
 
   // Get product names for display
-  const { data: courses } = trpc.lmsAdmin.listCourses.useQuery();
+  const { data: coursesResult } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", page: 1, pageSize: 200 });
   const { data: downloads } = trpc.downloadsAdmin.list.useQuery();
+  const courses = coursesResult?.courses ?? [];
 
   const deleteMutation = trpc.orderBumpsAdmin.delete.useMutation({
     onSuccess: () => { toast.success("Order bump deleted"); utils.orderBumpsAdmin.list.invalidate(); },
@@ -73,6 +75,7 @@ export default function OrderBumpsAdmin() {
       const dl = downloads?.find((d: any) => d.id === id);
       return dl?.title ?? `Download #${id}`;
     }
+    if (type === "physical") return `Physical item #${id}`;
     return `Bundle #${id}`;
   }
 
@@ -163,7 +166,7 @@ function OrderBumpEditor({ bump, courses, downloads, onClose, onSaved }: {
   const [form, setForm] = useState({
     triggerType: bump?.triggerType ?? "course" as "course" | "download" | "bundle",
     triggerProductId: bump?.triggerProductId ?? 0,
-    bumpType: bump?.bumpType ?? "download" as "course" | "download" | "bundle",
+    bumpType: bump?.bumpType ?? "download" as "course" | "download" | "bundle" | "physical",
     bumpProductId: bump?.bumpProductId ?? 0,
     timing: bump?.timing ?? "after_checkout" as "before_checkout" | "after_checkout",
     bumpPrice: bump?.bumpPrice ?? 0,
@@ -203,7 +206,7 @@ function OrderBumpEditor({ bump, courses, downloads, onClose, onSaved }: {
   const triggerProducts = form.triggerType === "course" ? courses.filter((c: any) => c.type === "course") :
     form.triggerType === "download" ? downloads : [];
   const bumpProducts = form.bumpType === "course" ? courses.filter((c: any) => c.type === "course") :
-    form.bumpType === "download" ? downloads : [];
+    form.bumpType === "download" ? downloads : form.bumpType === "physical" ? [{ id: form.bumpProductId || 1, title: form.headline || "Physical add-on" }] : [];
 
   return (
     <div className="space-y-6">
@@ -221,6 +224,7 @@ function OrderBumpEditor({ bump, courses, downloads, onClose, onSaved }: {
             <option value="course">Course</option>
             <option value="download">Download</option>
             <option value="bundle">Bundle</option>
+            <option value="physical">Physical Item</option>
           </select>
           <select value={form.triggerProductId} onChange={e => setForm({ ...form, triggerProductId: Number(e.target.value) })}
             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
