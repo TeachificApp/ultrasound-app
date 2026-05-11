@@ -575,6 +575,7 @@ export default function SocialContentGenerator() {
   const [items, setItems] = useState<GeneratedItem[]>([]);
   const [batchLoading, setBatchLoading] = useState(false);
   const [regeneratingImageIdx, setRegeneratingImageIdx] = useState<number | null>(null);
+  const [perCardImagePrompts, setPerCardImagePrompts] = useState<Record<number, string>>({});
   const cardRefs = useRef<Record<number, CardHandle>>({});
 
   const generateMutation = trpc.socialContent.generateContent.useMutation({
@@ -854,12 +855,22 @@ export default function SocialContentGenerator() {
                       <ImageLucide className="w-3 h-3" style={{ color: BRAND_AQUA }} />
                       <span className="text-[10px] font-semibold text-white/50 uppercase tracking-wider">Image</span>
                     </div>
+                    {/* Per-card image prompt input */}
+                    <div className="flex gap-1.5 items-center">
+                      <input
+                        type="text"
+                        value={perCardImagePrompts[idx] || ""}
+                        onChange={(e) => setPerCardImagePrompts((prev) => ({ ...prev, [idx]: e.target.value }))}
+                        placeholder="Describe image (e.g., ultrasound of liver, probe on patient)..."
+                        className="flex-1 px-2.5 py-1.5 rounded-md text-xs bg-white/5 border border-white/10 text-white outline-none placeholder:text-white/25 focus:border-[#4ad9e0]/50 transition-colors"
+                      />
+                    </div>
                     <div className="flex flex-wrap gap-1.5">
                       {item.imageUrl ? (
                         <>
-                          <Button size="sm" variant="outline" onClick={() => handleRegenerateAbstract(idx, item)} disabled={regeneratingImageIdx === idx} className="gap-1.5 text-white/50 border-white/15 hover:bg-white/10 text-xs">
+                          <Button size="sm" variant="outline" onClick={() => handleRegenerateAbstract(idx, item, perCardImagePrompts[idx])} disabled={regeneratingImageIdx === idx} className="gap-1.5 text-white/50 border-white/15 hover:bg-white/10 text-xs">
                             {regeneratingImageIdx === idx ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                            New Abstract
+                            {perCardImagePrompts[idx]?.trim() ? "Generate from Prompt" : "New Abstract"}
                           </Button>
                           <ImageUploadButton onUploaded={(url) => handleUploadedImage(idx, url)} disabled={regeneratingImageIdx === idx} />
                           <Button size="sm" variant="outline" onClick={() => handleRemoveImage(idx)} className="gap-1.5 text-red-400/70 border-red-400/20 hover:bg-red-400/10 text-xs">
@@ -873,13 +884,30 @@ export default function SocialContentGenerator() {
                         </>
                       ) : (
                         <>
-                          <Button size="sm" variant="outline" onClick={() => handleRegenerateAbstract(idx, item)} disabled={regeneratingImageIdx === idx} className="gap-1.5 text-white/50 border-white/15 hover:bg-white/10 text-xs">
+                          <Button size="sm" variant="outline" onClick={() => handleRegenerateAbstract(idx, item, perCardImagePrompts[idx])} disabled={regeneratingImageIdx === idx} className="gap-1.5 text-white/50 border-white/15 hover:bg-white/10 text-xs">
                             {regeneratingImageIdx === idx ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                            Add Abstract
+                            {perCardImagePrompts[idx]?.trim() ? "Generate from Prompt" : "Add Abstract"}
                           </Button>
                           <ImageUploadButton onUploaded={(url) => handleUploadedImage(idx, url)} disabled={regeneratingImageIdx === idx} />
                         </>
                       )}
+                    </div>
+                    {/* Quick prompt suggestions */}
+                    <div className="flex flex-wrap gap-1">
+                      {["ultrasound probe", "sonogram screen", "medical team", "teal waveform", "abstract mesh"].map((hint) => (
+                        <button
+                          key={hint}
+                          onClick={() => setPerCardImagePrompts((prev) => ({ ...prev, [idx]: hint }))}
+                          className="px-1.5 py-0.5 rounded text-[9px] font-medium transition-colors cursor-pointer"
+                          style={{
+                            background: perCardImagePrompts[idx] === hint ? `${BRAND}33` : "rgba(255,255,255,0.04)",
+                            border: `1px solid ${perCardImagePrompts[idx] === hint ? BRAND : "rgba(255,255,255,0.06)"}`,
+                            color: perCardImagePrompts[idx] === hint ? BRAND_AQUA : "rgba(255,255,255,0.35)",
+                          }}
+                        >
+                          {hint}
+                        </button>
+                      ))}
                     </div>
                   </div>
                   {/* Quick regenerate */}
