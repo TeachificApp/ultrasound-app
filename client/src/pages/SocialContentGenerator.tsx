@@ -3,6 +3,7 @@
  * AI-powered ultrasound & echocardiography social media content generator.
  * Produces branded 1080×1080 image cards (memes, clinical pearls, tips, etc.)
  * with dark/light themes, PNG download, and ready-to-copy social posts.
+ * Supports optional AI-generated images within the graphic cards.
  */
 import { useRef, useCallback, useState } from "react";
 import { trpc } from "@/lib/trpc";
@@ -12,7 +13,7 @@ import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import {
   ArrowLeft, Download, Loader2, AlertCircle, ImageIcon,
-  Sparkles, Package, Share2, Copy, Check, RefreshCw,
+  Sparkles, Package, Share2, Copy, Check, RefreshCw, Image as ImageLucide,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -220,6 +221,7 @@ function ContentCard({
 }) {
   const icon = CONTENT_TYPE_ICONS[item.contentType] || "📸";
   const label = CONTENT_TYPE_LABELS[item.contentType] || item.contentType;
+  const hasImage = !!item.imageUrl;
 
   return (
     <CardShell t={t}>
@@ -267,20 +269,60 @@ function ContentCard({
       </div>
 
       {/* Divider */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 32 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: hasImage ? 24 : 32 }}>
         <div style={{ height: 3, width: 44, borderRadius: 2, background: `linear-gradient(90deg, ${BRAND_AQUA}, ${BRAND})` }} />
         <div style={{ height: 3, width: 10, borderRadius: 2, background: t.dividerColor }} />
         <div style={{ height: 3, width: 5, borderRadius: 2, background: t.dividerColor + "88" }} />
       </div>
 
+      {/* AI-Generated Image */}
+      {hasImage && (
+        <div
+          style={{
+            width: "100%",
+            height: 380,
+            borderRadius: 16,
+            overflow: "hidden",
+            marginBottom: 24,
+            border: `2px solid ${BRAND}44`,
+            boxShadow: `0 4px 24px rgba(0,0,0,0.3)`,
+            position: "relative",
+          }}
+        >
+          <img
+            src={item.imageUrl}
+            alt={item.headline}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+            }}
+            crossOrigin="anonymous"
+          />
+          {/* Subtle gradient overlay at bottom for text readability */}
+          <div
+            style={{
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: 60,
+              background: t === DARK_THEME
+                ? "linear-gradient(transparent, rgba(7,19,24,0.6))"
+                : "linear-gradient(transparent, rgba(232,247,248,0.6))",
+            }}
+          />
+        </div>
+      )}
+
       {/* Headline */}
       <div
         style={{
           color: t.headingColor,
-          fontSize: 52,
+          fontSize: hasImage ? 44 : 52,
           fontWeight: 800,
           lineHeight: 1.25,
-          marginBottom: 28,
+          marginBottom: hasImage ? 18 : 28,
           fontFamily: "'Georgia', 'Merriweather', serif",
           textShadow: t === DARK_THEME ? "0 2px 20px rgba(0,0,0,0.5)" : "none",
         }}
@@ -292,7 +334,7 @@ function ContentCard({
       <div
         style={{
           color: t.bodyColor,
-          fontSize: 30,
+          fontSize: hasImage ? 26 : 30,
           fontWeight: 400,
           lineHeight: 1.55,
           marginBottom: item.subtext ? 24 : 0,
@@ -496,6 +538,7 @@ type GeneratedItem = {
   socialCaption: string;
   category: string;
   contentType: string;
+  imageUrl?: string;
 };
 
 // ── Main Page ────────────────────────────────────────────────────────────────
@@ -517,14 +560,30 @@ const CATEGORIES = [
   "MSK", "POCUS", "Physics", "Echocardiography", "General Ultrasound",
 ] as const;
 
+const IMAGE_PROMPT_SUGGESTIONS = [
+  "Ultrasound of liver",
+  "Ultrasound machine",
+  "Ultrasound probe",
+  "Sonographer scanning patient",
+  "Echocardiogram on screen",
+  "Fetal ultrasound image",
+  "Vascular Doppler scan",
+  "Thyroid ultrasound",
+  "POCUS at bedside",
+  "Ultrasound transducer close-up",
+];
+
 export default function SocialContentGenerator() {
   const [contentType, setContentType] = useState<string>("meme");
   const [category, setCategory] = useState<string>("General Ultrasound");
   const [customTopic, setCustomTopic] = useState("");
   const [count, setCount] = useState(2);
   const [cardTheme, setCardTheme] = useState<CardTheme>("dark");
+  const [includeImage, setIncludeImage] = useState(false);
+  const [imagePrompt, setImagePrompt] = useState("");
   const [items, setItems] = useState<GeneratedItem[]>([]);
   const [batchLoading, setBatchLoading] = useState(false);
+  const [regeneratingImageIdx, setRegeneratingImageIdx] = useState<number | null>(null);
 
   const cardRefs = useRef<Record<number, CardHandle>>({});
 
@@ -538,14 +597,60 @@ export default function SocialContentGenerator() {
     },
   });
 
+  const generateImageMutation = trpc.socialContent.generateImage.useMutation();
+
   const handleGenerate = () => {
     generateMutation.mutate({
       contentType: contentType as any,
       category: category as any,
       customTopic: customTopic.trim() || undefined,
       count,
+      includeImage,
+      imagePrompt: includeImage ? (imagePrompt.trim() || undefined) : undefined,
     });
   };
+
+  const handleRegenerateImage = useCallback(async (idx: number, item: GeneratedItem, customPrompt?: string) => {
+    setRegeneratingImageIdx(idx);
+    try {
+      const result = await generateImageMutation.mutateAsync({
+        headline: item.headline,
+        body: item.body,
+        category: item.category,
+        contentType: item.contentType,
+        imagePrompt: customPrompt?.trim() || undefined,
+      });
+      setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl: result.imageUrl } : p)));
+      toast.success("Image regenerated!");
+    } catch (err: any) {
+      toast.error("Image generation failed", { description: err.message });
+    } finally {
+      setRegeneratingImageIdx(null);
+    }
+  }, [generateImageMutation]);
+
+  const handleAddImage = useCallback(async (idx: number, item: GeneratedItem) => {
+    setRegeneratingImageIdx(idx);
+    try {
+      const result = await generateImageMutation.mutateAsync({
+        headline: item.headline,
+        body: item.body,
+        category: item.category,
+        contentType: item.contentType,
+      });
+      setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl: result.imageUrl } : p)));
+      toast.success("Image added!");
+    } catch (err: any) {
+      toast.error("Image generation failed", { description: err.message });
+    } finally {
+      setRegeneratingImageIdx(null);
+    }
+  }, [generateImageMutation]);
+
+  const handleRemoveImage = useCallback((idx: number) => {
+    setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl: undefined } : p)));
+    toast.success("Image removed from card");
+  }, []);
 
   const handleBatchDownload = useCallback(async () => {
     if (items.length === 0) return;
@@ -717,6 +822,85 @@ export default function SocialContentGenerator() {
             </Button>
           </div>
 
+          {/* Image toggle row */}
+          <div
+            className="mt-3 rounded-lg p-3 flex flex-col gap-2"
+            style={{
+              background: includeImage ? `${BRAND}12` : "rgba(255,255,255,0.02)",
+              border: `1px solid ${includeImage ? BRAND + "44" : "rgba(255,255,255,0.06)"}`,
+              transition: "all 0.2s ease",
+            }}
+          >
+            <div className="flex items-center gap-3">
+              {/* Toggle switch */}
+              <button
+                onClick={() => setIncludeImage(!includeImage)}
+                className="relative flex-shrink-0"
+                style={{ width: 44, height: 24 }}
+              >
+                <div
+                  className="rounded-full transition-all duration-200"
+                  style={{
+                    width: 44,
+                    height: 24,
+                    background: includeImage ? `linear-gradient(90deg, ${BRAND}, ${BRAND_AQUA})` : "rgba(255,255,255,0.15)",
+                  }}
+                />
+                <div
+                  className="absolute top-0.5 rounded-full bg-white shadow-md transition-all duration-200"
+                  style={{
+                    width: 20,
+                    height: 20,
+                    left: includeImage ? 22 : 2,
+                  }}
+                />
+              </button>
+              <div className="flex items-center gap-2">
+                <ImageLucide className="w-4 h-4" style={{ color: includeImage ? BRAND_AQUA : "rgba(255,255,255,0.35)" }} />
+                <span className="text-xs font-semibold" style={{ color: includeImage ? BRAND_AQUA : "rgba(255,255,255,0.5)" }}>
+                  Include AI Image
+                </span>
+                {includeImage && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: `${BRAND}22`, color: BRAND_AQUA }}>
+                    5-20s per image
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Image prompt input (shown when toggle is on) */}
+            {includeImage && (
+              <div className="flex flex-col gap-2 mt-1">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={imagePrompt}
+                    onChange={(e) => setImagePrompt(e.target.value)}
+                    placeholder="Describe the image (leave blank for AI to decide based on content)"
+                    className="flex-1 px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none placeholder:text-white/25"
+                  />
+                </div>
+                {/* Quick image prompt suggestions */}
+                <div className="flex flex-wrap gap-1.5">
+                  {IMAGE_PROMPT_SUGGESTIONS.map((suggestion) => (
+                    <button
+                      key={suggestion}
+                      onClick={() => setImagePrompt(suggestion)}
+                      className="px-2 py-0.5 rounded-md text-[10px] font-medium transition-colors"
+                      style={{
+                        background: imagePrompt === suggestion ? `${BRAND}33` : "rgba(255,255,255,0.04)",
+                        border: `1px solid ${imagePrompt === suggestion ? BRAND : "rgba(255,255,255,0.06)"}`,
+                        color: imagePrompt === suggestion ? BRAND_AQUA : "rgba(255,255,255,0.4)",
+                      }}
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Quick topic buttons */}
           <div className="flex flex-wrap gap-1.5 mt-3">
             {[
@@ -755,9 +939,9 @@ export default function SocialContentGenerator() {
           <p className="text-white/60">
             Generate <strong className="text-white">ultrasound &amp; echocardiography</strong> social media content with AI.
             Each card is <strong className="text-white">1080×1080 px</strong> — ideal for Instagram, Facebook, and LinkedIn.
-            Choose a content type, pick a category or enter a custom topic, then click <strong className="text-white">Generate</strong>.
+            Toggle <strong className="text-white">Include AI Image</strong> to add a generated image to each card.
+            You can provide a custom image prompt (e.g., "ultrasound of liver") or leave it blank for the AI to choose based on the content.
             Download individual PNGs or use <strong className="text-white">Download All</strong> for a ZIP.
-            Copy the ready-to-post caption with hashtags for each card.
           </p>
         </div>
 
@@ -778,8 +962,11 @@ export default function SocialContentGenerator() {
         )}
 
         {generateMutation.isPending && items.length === 0 && (
-          <div className="flex items-center justify-center py-16">
+          <div className="flex flex-col items-center justify-center py-16 gap-3">
             <Loader2 className="w-7 h-7 animate-spin" style={{ color: BRAND_AQUA }} />
+            {includeImage && (
+              <span className="text-xs text-white/40">Generating content and images — this may take a moment...</span>
+            )}
           </div>
         )}
 
@@ -800,6 +987,11 @@ export default function SocialContentGenerator() {
                   <Badge className="text-[10px] px-1.5 py-0" style={{ background: BRAND + "22", color: BRAND_AQUA, border: "none" }}>
                     {item.category}
                   </Badge>
+                  {item.imageUrl && (
+                    <Badge className="text-[10px] px-1.5 py-0" style={{ background: "#166534", color: "#4ade80", border: "none" }}>
+                      With Image
+                    </Badge>
+                  )}
                 </div>
                 <button
                   onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
@@ -831,13 +1023,85 @@ export default function SocialContentGenerator() {
                   </div>
                   <SocialPostPanel item={item} />
 
+                  {/* Image controls */}
+                  <div className="flex flex-col gap-1.5 mt-1">
+                    <div className="flex items-center gap-1.5">
+                      <ImageLucide className="w-3 h-3" style={{ color: BRAND_AQUA }} />
+                      <span className="text-[10px] font-semibold text-white/50 uppercase tracking-wider">Image</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {item.imageUrl ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleRegenerateImage(idx, item)}
+                            disabled={regeneratingImageIdx === idx}
+                            className="gap-1.5 text-white/50 border-white/15 hover:bg-white/10 text-xs"
+                          >
+                            {regeneratingImageIdx === idx ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <RefreshCw className="w-3 h-3" />
+                            )}
+                            Regenerate Image
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleRemoveImage(idx)}
+                            className="gap-1.5 text-red-400/70 border-red-400/20 hover:bg-red-400/10 text-xs"
+                          >
+                            Remove Image
+                          </Button>
+                          {/* Download standalone image */}
+                          <a
+                            href={item.imageUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download
+                          >
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-1.5 text-white/50 border-white/15 hover:bg-white/10 text-xs"
+                            >
+                              <Download className="w-3 h-3" />
+                              Image Only
+                            </Button>
+                          </a>
+                        </>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleAddImage(idx, item)}
+                          disabled={regeneratingImageIdx === idx}
+                          className="gap-1.5 text-white/50 border-white/15 hover:bg-white/10 text-xs"
+                        >
+                          {regeneratingImageIdx === idx ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <ImageLucide className="w-3 h-3" />
+                          )}
+                          Add AI Image
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
                   {/* Quick regenerate */}
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => {
                       generateMutation.mutate(
-                        { contentType: item.contentType as any, category: item.category as any, count: 1 },
+                        {
+                          contentType: item.contentType as any,
+                          category: item.category as any,
+                          count: 1,
+                          includeImage: !!item.imageUrl,
+                        },
                         {
                           onSuccess: (data) => {
                             if (data.items[0]) {
@@ -849,10 +1113,10 @@ export default function SocialContentGenerator() {
                       );
                     }}
                     disabled={generateMutation.isPending}
-                    className="gap-1.5 text-white/50 border-white/15 hover:bg-white/10 text-xs mt-2"
+                    className="gap-1.5 text-white/50 border-white/15 hover:bg-white/10 text-xs mt-1"
                   >
                     <RefreshCw className="w-3 h-3" />
-                    Regenerate this one
+                    Regenerate Everything
                   </Button>
                 </div>
               </div>

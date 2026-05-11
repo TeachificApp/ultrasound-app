@@ -3,13 +3,14 @@
  *
  * Admin-only tRPC procedures for generating ultrasound/echocardiography
  * social media content (memes, educational posts, clinical pearls, etc.)
- * using the Forge LLM API.
+ * using the Forge LLM API, with optional AI image generation.
  */
 
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "../_core/trpc";
 import { invokeLLM } from "../_core/llm";
+import { generateImage } from "../_core/imageGeneration";
 import { getUserRoles } from "../db";
 
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
@@ -105,6 +106,42 @@ Return your response as a JSON object with exactly these fields:
 IMPORTANT: Return ONLY the JSON object, no markdown formatting or code blocks.`;
 }
 
+/**
+ * Build a descriptive image generation prompt based on the social content.
+ * If the user provides a custom image prompt, use that; otherwise auto-generate
+ * a relevant prompt from the content itself.
+ */
+function buildImagePrompt(
+  item: { headline: string; body: string; category: string; contentType: string },
+  userImagePrompt?: string
+): string {
+  if (userImagePrompt && userImagePrompt.trim()) {
+    // Enhance the user's prompt with ultrasound context
+    return `Professional medical illustration for social media: ${userImagePrompt.trim()}. Clean, modern style with teal/aqua color accents. High quality, suitable for medical education content. No text overlays.`;
+  }
+
+  // Auto-generate based on content
+  const categoryImageHints: Record<string, string> = {
+    "Abdominal": "abdominal ultrasound scan showing liver or gallbladder",
+    "Small Parts": "thyroid or small parts ultrasound examination",
+    "Pelvic/Gyn": "pelvic ultrasound examination",
+    "OB 1st Trimester": "first trimester obstetric ultrasound",
+    "OB 2nd/3rd Trimester": "fetal ultrasound scan showing fetal anatomy",
+    "Fetal Echo": "fetal echocardiography showing four-chamber heart view",
+    "Breast": "breast ultrasound examination",
+    "Vascular": "vascular duplex ultrasound with color Doppler",
+    "MSK": "musculoskeletal ultrasound of a joint or tendon",
+    "POCUS": "point-of-care ultrasound at bedside",
+    "Physics": "ultrasound transducer with sound wave visualization",
+    "Echocardiography": "echocardiogram showing cardiac chambers",
+    "General Ultrasound": "modern ultrasound machine in a clinical setting",
+  };
+
+  const hint = categoryImageHints[item.category] || "ultrasound examination in a medical setting";
+
+  return `Professional medical illustration for social media about "${item.headline}". Scene: ${hint}. Clean, modern style with teal/aqua color accents (#189aa1). High quality, suitable for medical education content. No text overlays, no watermarks.`;
+}
+
 export const socialContentRouter = router({
   generateContent: adminProcedure
     .input(
@@ -113,10 +150,12 @@ export const socialContentRouter = router({
         category: z.enum(CATEGORIES),
         customTopic: z.string().max(200).optional(),
         count: z.number().min(1).max(5).default(1),
+        includeImage: z.boolean().default(false),
+        imagePrompt: z.string().max(500).optional(),
       })
     )
     .mutation(async ({ input }) => {
-      const { contentType, category, customTopic, count } = input;
+      const { contentType, category, customTopic, count, includeImage, imagePrompt } = input;
 
       const results: Array<{
         headline: string;
@@ -125,6 +164,7 @@ export const socialContentRouter = router({
         socialCaption: string;
         category: string;
         contentType: string;
+        imageUrl?: string;
       }> = [];
 
       for (let i = 0; i < count; i++) {
@@ -147,14 +187,31 @@ export const socialContentRouter = router({
           }
 
           const parsed = JSON.parse(jsonMatch[0]);
-          results.push({
+          const item = {
             headline: parsed.headline || "Untitled",
             body: parsed.body || "",
             subtext: parsed.subtext || "",
             socialCaption: parsed.socialCaption || "",
             category,
             contentType,
-          });
+            imageUrl: undefined as string | undefined,
+          };
+
+          // Generate image if requested
+          if (includeImage) {
+            try {
+              const prompt = buildImagePrompt(item, imagePrompt);
+              console.log(`[SocialContent] Generating image for item ${i + 1}: "${prompt.slice(0, 100)}..."`);
+              const { url } = await generateImage({ prompt });
+              item.imageUrl = url;
+              console.log(`[SocialContent] Image generated: ${url}`);
+            } catch (imgErr) {
+              console.error(`[SocialContent] Image generation failed for item ${i + 1}:`, imgErr);
+              // Don't fail the whole item — just skip the image
+            }
+          }
+
+          results.push(item);
         } catch (err) {
           console.error(`[SocialContent] Generation ${i + 1} failed:`, err);
           if (i === 0 && results.length === 0) {
@@ -167,6 +224,27 @@ export const socialContentRouter = router({
       }
 
       return { items: results };
+    }),
+
+  /** Generate an image standalone (for regenerating just the image) */
+  generateImage: adminProcedure
+    .input(
+      z.object({
+        imagePrompt: z.string().max(500).optional(),
+        headline: z.string(),
+        body: z.string(),
+        category: z.string(),
+        contentType: z.string(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const prompt = buildImagePrompt(
+        { headline: input.headline, body: input.body, category: input.category, contentType: input.contentType },
+        input.imagePrompt
+      );
+      console.log(`[SocialContent] Generating standalone image: "${prompt.slice(0, 100)}..."`);
+      const { url } = await generateImage({ prompt });
+      return { imageUrl: url };
     }),
 
   getContentTypes: adminProcedure.query(() => {

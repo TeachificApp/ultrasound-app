@@ -1383,3 +1383,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Build periodic sync script for DB and media mirroring (server/jobs/mirrorSync.ts)
 - [x] Integrate sync into the app as a scheduled task (6h interval, admin tRPC trigger, dual-write storage)
 - [x] Store R2 credentials securely in project secrets (CF_R2_*, RAILWAY_MYSQL_URL)
+
+## Social Content Generator - Image Toggle
+- [x] Add image generation toggle to Social Content Generator
+- [x] Add optional text prompt for image (e.g. "ultrasound of liver", "ultrasound machine")
+- [x] Auto-generate image based on social content when prompt is left blank
+- [x] Backend procedure for image generation via AI
+- [x] Display generated image in the content preview
