@@ -20,6 +20,7 @@ import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnroll
 import { and, eq } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
+import { fulfillOrderBumpPurchase } from "../lib/orderBumpCheckout";
 
 // Stripe webhook secret — optional but strongly recommended in production
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET ?? "";
@@ -161,6 +162,12 @@ async function handleLmsCheckoutCompleted(session: Record<string, unknown>) {
     title: "🎓 New LMS Course Purchase",
     content: `User ID ${userId} purchased course ID ${courseId} (${seats} seat${seats > 1 ? 's' : ''}). Order #${orderId}. Amount: $${((session.amount_total as number ?? 0) / 100).toFixed(2)}.`,
   });
+  await fulfillOrderBumpPurchase(db, meta, {
+    userId,
+    sessionId,
+    triggerOrderType: "course",
+    triggerOrderId: orderId,
+  });
   console.log(`[Stripe] LMS order ${orderId} fulfilled for user ${userId}, course ${courseId}`);
 }
 
@@ -180,6 +187,11 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
     .where(and(eq(digitalPurchases.userId, userId), eq(digitalPurchases.productId, productId))).limit(1);
   if (existing) {
     console.log(`[Stripe] Digital download already purchased: user ${userId}, product ${productId}`);
+    await fulfillOrderBumpPurchase(db, meta, {
+      userId,
+      sessionId: session.id as string,
+      triggerOrderType: "download",
+    });
     return;
   }
 
@@ -195,6 +207,11 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
   });
   // Send purchase confirmation email with file links
   await sendPurchaseConfirmationEmail(userId, productId);
+  await fulfillOrderBumpPurchase(db, meta, {
+    userId,
+    sessionId: session.id as string,
+    triggerOrderType: "download",
+  });
   console.log(`[Stripe] Digital download purchase recorded: user ${userId}, product ${productId}`);
 }
 
@@ -214,6 +231,11 @@ async function handleDigitalBundleCheckoutCompleted(session: Record<string, unkn
     .where(and(eq(digitalBundlePurchases.userId, userId), eq(digitalBundlePurchases.bundleId, bundleId))).limit(1);
   if (existing) {
     console.log(`[Stripe] Digital bundle already purchased: user ${userId}, bundle ${bundleId}`);
+    await fulfillOrderBumpPurchase(db, meta, {
+      userId,
+      sessionId: session.id as string,
+      triggerOrderType: "bundle",
+    });
     return;
   }
 
@@ -244,6 +266,11 @@ async function handleDigitalBundleCheckoutCompleted(session: Record<string, unkn
   await notifyOwner({
     title: "🎁 New Digital Bundle Purchase",
     content: `User ID ${userId} purchased bundle ID ${bundleId} (${bundleItems.length} products). Amount: $${(((session.amount_total as number) ?? 0) / 100).toFixed(2)}.`,
+  });
+  await fulfillOrderBumpPurchase(db, meta, {
+    userId,
+    sessionId: session.id as string,
+    triggerOrderType: "bundle",
   });
   console.log(`[Stripe] Digital bundle purchase recorded: user ${userId}, bundle ${bundleId}`);
 }

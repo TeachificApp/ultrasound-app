@@ -40,7 +40,7 @@ export const orderBumpsAdminRouter = router({
     .input(z.object({
       triggerType: z.enum(["course", "download", "bundle"]),
       triggerProductId: z.number(),
-      bumpType: z.enum(["course", "download", "bundle"]),
+      bumpType: z.enum(["course", "download", "bundle", "physical"]),
       bumpProductId: z.number(),
       timing: z.enum(["before_checkout", "after_checkout"]).default("after_checkout"),
       bumpPrice: z.number().min(0),
@@ -83,7 +83,7 @@ export const orderBumpsAdminRouter = router({
       id: z.number(),
       triggerType: z.enum(["course", "download", "bundle"]).optional(),
       triggerProductId: z.number().optional(),
-      bumpType: z.enum(["course", "download", "bundle"]).optional(),
+      bumpType: z.enum(["course", "download", "bundle", "physical"]).optional(),
       bumpProductId: z.number().optional(),
       timing: z.enum(["before_checkout", "after_checkout"]).optional(),
       bumpPrice: z.number().min(0).optional(),
@@ -192,9 +192,11 @@ export const orderBumpsPublicRouter = router({
 
       return { 
         success: true, 
+        bumpId: bump.id,
         bumpPrice: bump.bumpPrice,
         bumpType: bump.bumpType,
         bumpProductId: bump.bumpProductId,
+        headline: bump.headline,
       };
     }),
 });

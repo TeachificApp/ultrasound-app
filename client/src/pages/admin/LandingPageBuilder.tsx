@@ -28,12 +28,15 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import RichTextEditor from "@/components/RichTextEditor";
+import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
+import { FUNNEL_TEMPLATES, getFunnelTemplateBlocks } from "@/lib/funnelTemplates";
 import {
   ArrowLeft, Save, Eye, Plus, Trash2, GripVertical, Type, Image, Video,
   List, Quote, CreditCard, Minus, Columns, X, Palette, AlignLeft,
   AlignCenter, AlignRight, HelpCircle, Users, Star, Globe, Timer,
   AlertTriangle, CheckSquare, LayoutGrid, Layers, BookOpen, Tag,
   ChevronDown, ChevronUp, Copy, FolderOpen, BookMarked, Upload, Code,
+  ShoppingCart, Package,
 } from "lucide-react";
 
 // ─── Block Types ──────────────────────────────────────────────────────────────
@@ -44,7 +47,8 @@ export type BlockType =
   | "faq" | "image_text" | "gallery" | "icon_grid" | "countdown"
   | "instructor" | "logos" | "reviews" | "embed" | "cta_standalone"
   | "lead_capture" | "numbered_list" | "alert" | "flip_cards"
-  | "curriculum_auto" | "pricing_options_auto";
+  | "curriculum_auto" | "pricing_options_auto"
+  | "funnel_workflow" | "product_offer_stack" | "order_bump_checkout";
 
 export interface Block {
   id: string;
@@ -118,6 +122,33 @@ const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactNode; ca
     defaultData: { headline: "Start Learning Today", subtext: "", ctaText: "Get Started", ctaLink: "", ctaColor: "#179ca3", ctaTextColor: "#ffffff", bgColor: "#f0fafa", align: "center" } },
   { type: "lead_capture", label: "Lead Capture Form", icon: <BookMarked size={14} />, category: "Conversion",
     defaultData: { headline: "Get a Free Preview", subtext: "Enter your email to get instant access.", ctaText: "Send Me Access", bgColor: "#179ca3", textColor: "#ffffff" } },
+  { type: "funnel_workflow", label: "Funnel Workflow", icon: <Layers size={14} />, category: "Funnel",
+    defaultData: {
+      eyebrow: "Sales funnel", headline: "A complete funnel from first click to fulfilled order", subtext: "Link landing, checkout, bump, and thank-you pages together for a ClickFunnels-style workflow.",
+      accentColor: "#179ca3", bgColor: "#f8fffe",
+      steps: [
+        { name: "Landing Page", role: "Warm up traffic with the offer, story, proof, and guarantee.", url: "#top", cta: "Open page" },
+        { name: "Checkout", role: "Send buyers into the primary product checkout.", url: "#checkout", cta: "Go to checkout" },
+        { name: "Order Bump", role: "Add a one-click digital or physical product before payment.", url: "#order-bump", cta: "View bump" },
+        { name: "Thank You", role: "Confirm purchase and point customers to delivery or next offer.", url: "/thank-you", cta: "Next step" },
+      ],
+    } },
+  { type: "product_offer_stack", label: "Product Offer Stack", icon: <Package size={14} />, category: "Funnel",
+    defaultData: {
+      headline: "Build a higher-value cart", subtext: "Promote digital downloads, courses, bundles, and physical kits from one sales page.",
+      accentColor: "#179ca3", bgColor: "#ffffff",
+      products: [
+        { type: "digital", title: "Digital Protocol Pack", description: "Instant access files, templates, and quick-reference guides.", price: "$49", ctaText: "Add digital item", ctaLink: "#checkout", fulfillment: "Delivered immediately after checkout." },
+        { type: "physical", title: "Printed Pocket Cards", description: "A shipped companion product that reinforces the digital training.", price: "$29", ctaText: "Add physical item", ctaLink: "#order-bump", fulfillment: "Ships after the order is processed." },
+      ],
+    } },
+  { type: "order_bump_checkout", label: "Order Bump Checkout", icon: <ShoppingCart size={14} />, category: "Funnel",
+    defaultData: {
+      anchorId: "order-bump", discountLabel: "One-time offer", headline: "Add the printed scan checklist to your order", subheadline: "A high-converting bump offer for buyers already in checkout mode.",
+      description: "Use this block to promote a digital bonus, shipped product, or bundle as part of the sales workflow.", productType: "physical",
+      price: "$19", compareAtPrice: "$39", checkboxLabel: "Yes, add this order bump", ctaText: "Add bump and continue", skipText: "Continue without bump",
+      shippingNote: "Shipping collected at checkout", features: ["Works for physical or digital bump offers", "Designed for one-click add-to-order messaging", "Pairs with the Order Bumps admin tab"], accentColor: "#f59e0b", bgColor: "#fff7ed",
+    } },
   // ── Smart Sections
   { type: "curriculum_auto", label: "Curriculum (Auto)", icon: <BookOpen size={14} />, category: "Smart",
     defaultData: { headline: "Course Curriculum", bgColor: "#ffffff", showLocked: true } },
@@ -125,7 +156,7 @@ const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactNode; ca
     defaultData: { headline: "Choose Your Plan", bgColor: "#f9fafb" } },
 ];
 
-const CATALOG_CATEGORIES = ["Layout", "Content", "Marketing", "Conversion", "Smart"];
+const CATALOG_CATEGORIES = ["Layout", "Content", "Marketing", "Conversion", "Funnel", "Smart"];
 
 // ─── Block Preview ─────────────────────────────────────────────────────────────
 
@@ -388,6 +419,12 @@ function BlockPreview({ block, coursePrice, courseTitle }: { block: Block; cours
           </div>
         </div>
       );
+    case "funnel_workflow":
+      return <FunnelWorkflowBlock data={d} />;
+    case "product_offer_stack":
+      return <ProductOfferStackBlock data={d} />;
+    case "order_bump_checkout":
+      return <InlineOrderBumpBlock data={d} />;
     case "curriculum_auto":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
@@ -662,6 +699,122 @@ function BlockSettings({ block, onChange }: { block: Block; onChange: (data: Rec
       return (<div className="space-y-3"><TextField label="Headline" field="headline" /><TextField label="Subtext" field="subtext" multiline /><TextField label="Button Text" field="ctaText" /><TextField label="Button Link" field="ctaLink" placeholder="/learn/course-slug or https://..." /><ColorField label="Button Color" field="ctaColor" /><ColorField label="Button Text Color" field="ctaTextColor" /><ColorField label="Background" field="bgColor" /><AlignField /></div>);
     case "lead_capture":
       return (<div className="space-y-3"><TextField label="Headline" field="headline" /><TextField label="Subtext" field="subtext" multiline /><TextField label="Button Text" field="ctaText" /><ColorField label="Background" field="bgColor" /><ColorField label="Text Color" field="textColor" /></div>);
+    case "funnel_workflow": {
+      const steps: Array<{ name: string; role: string; url: string; cta: string }> = d.steps ?? [];
+      return (
+        <div className="space-y-3">
+          <TextField label="Eyebrow" field="eyebrow" />
+          <TextField label="Headline" field="headline" />
+          <TextField label="Subtext" field="subtext" multiline />
+          <ColorField label="Accent" field="accentColor" />
+          <ColorField label="Background" field="bgColor" />
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs text-gray-500 font-medium">Funnel Steps</label>
+              <button onClick={() => set("steps", [...steps, { name: "New Step", role: "Describe this step", url: "#", cta: "Open" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button>
+            </div>
+            <div className="space-y-2">
+              {steps.map((step, i) => (
+                <div key={i} className="border border-gray-200 rounded p-2 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500">Step {i + 1}</span>
+                    <button onClick={() => set("steps", steps.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button>
+                  </div>
+                  <Input value={step.name} onChange={e => set("steps", steps.map((s, j) => j === i ? { ...s, name: e.target.value } : s))} className="h-7 text-xs" placeholder="Step name" />
+                  <Textarea value={step.role} onChange={e => set("steps", steps.map((s, j) => j === i ? { ...s, role: e.target.value } : s))} className="text-xs min-h-[52px]" placeholder="Role in the sales workflow" />
+                  <Input value={step.url} onChange={e => set("steps", steps.map((s, j) => j === i ? { ...s, url: e.target.value } : s))} className="h-7 text-xs" placeholder="/checkout or #order-bump" />
+                  <Input value={step.cta} onChange={e => set("steps", steps.map((s, j) => j === i ? { ...s, cta: e.target.value } : s))} className="h-7 text-xs" placeholder="CTA label" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+    case "product_offer_stack": {
+      const products: Array<{ type: "digital" | "physical"; title: string; description: string; price: string; imageUrl?: string; ctaText: string; ctaLink?: string; fulfillment?: string }> = d.products ?? [];
+      return (
+        <div className="space-y-3">
+          <TextField label="Headline" field="headline" />
+          <TextField label="Subtext" field="subtext" multiline />
+          <ColorField label="Accent" field="accentColor" />
+          <ColorField label="Background" field="bgColor" />
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs text-gray-500 font-medium">Promoted Products</label>
+              <button onClick={() => set("products", [...products, { type: "digital", title: "New Product", description: "Describe the offer", price: "$0", ctaText: "Add to order", ctaLink: "#checkout", fulfillment: "Delivered after checkout." }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button>
+            </div>
+            <div className="space-y-2">
+              {products.map((product, i) => (
+                <div key={i} className="border border-gray-200 rounded p-2 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500">Product {i + 1}</span>
+                    <button onClick={() => set("products", products.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button>
+                  </div>
+                  <select value={product.type} onChange={e => set("products", products.map((p, j) => j === i ? { ...p, type: e.target.value as "digital" | "physical" } : p))} className="w-full h-7 text-xs rounded border border-gray-200 px-2">
+                    <option value="digital">Digital item</option>
+                    <option value="physical">Physical item</option>
+                  </select>
+                  <Input value={product.title} onChange={e => set("products", products.map((p, j) => j === i ? { ...p, title: e.target.value } : p))} className="h-7 text-xs" placeholder="Product title" />
+                  <Textarea value={product.description} onChange={e => set("products", products.map((p, j) => j === i ? { ...p, description: e.target.value } : p))} className="text-xs min-h-[52px]" placeholder="Description" />
+                  <div className="grid grid-cols-2 gap-1">
+                    <Input value={product.price} onChange={e => set("products", products.map((p, j) => j === i ? { ...p, price: e.target.value } : p))} className="h-7 text-xs" placeholder="$49" />
+                    <Input value={product.ctaText} onChange={e => set("products", products.map((p, j) => j === i ? { ...p, ctaText: e.target.value } : p))} className="h-7 text-xs" placeholder="CTA" />
+                  </div>
+                  <Input value={product.ctaLink ?? ""} onChange={e => set("products", products.map((p, j) => j === i ? { ...p, ctaLink: e.target.value } : p))} className="h-7 text-xs" placeholder="CTA link" />
+                  <Input value={product.fulfillment ?? ""} onChange={e => set("products", products.map((p, j) => j === i ? { ...p, fulfillment: e.target.value } : p))} className="h-7 text-xs" placeholder="Fulfillment note" />
+                  <Input value={product.imageUrl ?? ""} onChange={e => set("products", products.map((p, j) => j === i ? { ...p, imageUrl: e.target.value } : p))} className="h-7 text-xs" placeholder="Image URL" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+    case "order_bump_checkout": {
+      const features: string[] = d.features ?? [];
+      return (
+        <div className="space-y-3">
+          <TextField label="Anchor ID" field="anchorId" placeholder="order-bump" />
+          <TextField label="Discount Label" field="discountLabel" />
+          <TextField label="Headline" field="headline" />
+          <TextField label="Subheadline" field="subheadline" />
+          <TextField label="Description" field="description" multiline />
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Bump Product Type</label>
+            <select value={d.productType ?? "digital"} onChange={e => set("productType", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+              <option value="digital">Digital item</option>
+              <option value="physical">Physical item</option>
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <TextField label="Price" field="price" />
+            <TextField label="Compare At" field="compareAtPrice" />
+          </div>
+          <TextField label="Checkbox Label" field="checkboxLabel" />
+          <TextField label="CTA Text" field="ctaText" />
+          <TextField label="Skip Text" field="skipText" />
+          <TextField label="Shipping Note" field="shippingNote" />
+          <TextField label="Image URL" field="imageUrl" />
+          <ColorField label="Accent" field="accentColor" />
+          <ColorField label="Background" field="bgColor" />
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs text-gray-500 font-medium">Feature Bullets</label>
+              <button onClick={() => set("features", [...features, "New benefit"])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button>
+            </div>
+            <div className="space-y-1">
+              {features.map((feature, i) => (
+                <div key={i} className="flex gap-1">
+                  <Input value={feature} onChange={e => set("features", features.map((f, j) => j === i ? e.target.value : f))} className="h-7 text-xs flex-1" />
+                  <button onClick={() => set("features", features.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 flex-shrink-0"><X size={12} /></button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
     case "curriculum_auto":
       return (<div className="space-y-3"><TextField label="Section Headline" field="headline" /><ColorField label="Background" field="bgColor" /><div className="flex items-center gap-2"><input type="checkbox" checked={d.showLocked ?? true} onChange={e => set("showLocked", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show locked lessons</label></div></div>);
     case "pricing_options_auto":
@@ -746,6 +899,23 @@ function TemplateLibrary({ blocks, onInsert, onClose }: {
           ))}
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* Built-in sales funnel templates */}
+          {tab === "page" && (
+            <div className="border border-amber-200 rounded-xl p-4 bg-amber-50/70">
+              <p className="text-xs font-semibold text-amber-700 mb-3">Built-in Sales Funnel Templates</p>
+              <div className="space-y-2">
+                {FUNNEL_TEMPLATES.map((template, index) => (
+                  <div key={template.name} className="bg-white border border-amber-100 rounded-lg p-3">
+                    <h3 className="font-semibold text-gray-900 text-sm">{template.name}</h3>
+                    <p className="text-xs text-gray-500 mt-1">{template.description}</p>
+                    <Button onClick={() => { onInsert(getFunnelTemplateBlocks(index)); onClose(); }} className="mt-3 h-7 text-xs bg-amber-500 hover:bg-amber-600 text-white">
+                      Insert funnel page
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {/* Save current page as template */}
           <div className="border border-dashed border-teal-300 rounded-xl p-4 bg-teal-50/50">
             <p className="text-xs font-semibold text-teal-700 mb-3">Save Current {tab === "page" ? "Page" : "Selection"} as Template</p>

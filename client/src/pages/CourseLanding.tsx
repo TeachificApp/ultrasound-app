@@ -15,6 +15,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { toast } from "sonner";
 import { BookOpen, CheckCircle, ChevronRight, Clock, Download, HelpCircle, Lock, PlayCircle, Star, Users, AlertTriangle, Globe, LayoutGrid, Layers, BookMarked, Timer, Tag, CreditCard, List } from "lucide-react";
 import OrderBumpOffer from "@/components/OrderBumpOffer";
+import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import type { Block } from "./admin/LandingPageBuilder";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -363,6 +364,12 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price }: {
           </div>
         </div>
       );
+    case "funnel_workflow":
+      return <FunnelWorkflowBlock data={d} />;
+    case "product_offer_stack":
+      return <ProductOfferStackBlock data={d} onPrimaryCta={onEnroll} />;
+    case "order_bump_checkout":
+      return <InlineOrderBumpBlock data={d} onPrimaryCta={onEnroll} />;
     case "curriculum_auto":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
@@ -444,6 +451,7 @@ export default function CourseLanding() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
   const [enrolling, setEnrolling] = useState(false);
+  const [selectedOrderBumpId, setSelectedOrderBumpId] = useState<number | undefined>();
 
   const { data: course, isLoading } = trpc.lms.getCourse.useQuery({ slug: slug! }, { enabled: !!slug });
   const { data: myCourses } = trpc.lmsLearner.getMyCourses.useQuery(undefined, { enabled: !!user });
@@ -465,7 +473,7 @@ export default function CourseLanding() {
     try {
       const pt = course?.pricingType ?? (course?.isFree ? "free" : "one_time");
       if (pt === "free") await enrollFree.mutateAsync({ courseSlug: slug! });
-      else await createCheckout.mutateAsync({ courseSlug: slug!, seats: 1, origin: window.location.origin });
+      else await createCheckout.mutateAsync({ courseSlug: slug!, seats: 1, origin: window.location.origin, orderBumpId: selectedOrderBumpId });
     } finally { setEnrolling(false); }
   };
 
@@ -519,7 +527,16 @@ export default function CourseLanding() {
               triggerType="course"
               triggerProductId={course.id}
               timing="before_checkout"
+              onAccept={(bump) => setSelectedOrderBumpId(bump.bumpId)}
+              onDecline={() => setSelectedOrderBumpId(undefined)}
             />
+            {selectedOrderBumpId && (
+              <div className="mt-3 text-center">
+                <Button onClick={handleEnroll} disabled={enrolling || createCheckout.isPending} className="bg-amber-500 hover:bg-amber-600 text-white">
+                  Continue to checkout with selected bump
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -13,7 +13,7 @@ interface OrderBumpOfferProps {
   triggerType: "course" | "download" | "bundle";
   triggerProductId: number;
   timing: "before_checkout" | "after_checkout";
-  onAccept?: (bumpData: { bumpType: string; bumpProductId: number; bumpPrice: number }) => void;
+  onAccept?: (bumpData: { bumpId: number; bumpType: string; bumpProductId: number; bumpPrice: number; headline?: string | null }) => void;
   onDecline?: () => void;
 }
 
@@ -31,7 +31,7 @@ export default function OrderBumpOffer({ triggerType, triggerProductId, timing, 
     onSuccess: (data) => {
       setAccepted(true);
       toast.success("Added to your order!");
-      onAccept?.({ bumpType: data.bumpType, bumpProductId: data.bumpProductId, bumpPrice: data.bumpPrice });
+      onAccept?.({ bumpId: data.bumpId, bumpType: data.bumpType, bumpProductId: data.bumpProductId, bumpPrice: data.bumpPrice, headline: data.headline });
     },
     onError: (e) => toast.error(e.message),
   });
@@ -51,6 +51,18 @@ export default function OrderBumpOffer({ triggerType, triggerProductId, timing, 
   const bump = bumps[0] as any;
 
   function handleAccept() {
+    if (timing === "before_checkout" && onAccept) {
+      setAccepted(true);
+      toast.success("Order bump added to checkout.");
+      onAccept({
+        bumpId: bump.id,
+        bumpType: bump.bumpType,
+        bumpProductId: bump.bumpProductId,
+        bumpPrice: bump.bumpPrice,
+        headline: bump.headline,
+      });
+      return;
+    }
     acceptBump.mutate({
       bumpId: bump.id,
       triggerOrderType: triggerType,
@@ -70,11 +82,16 @@ export default function OrderBumpOffer({ triggerType, triggerProductId, timing, 
       </button>
 
       {/* Discount badge */}
-      {bump.discountLabel && (
-        <span className="inline-block px-3 py-1 rounded-full text-xs font-bold text-white bg-gradient-to-r from-red-500 to-pink-500 mb-3 shadow-sm">
-          {bump.discountLabel}
+      <div className="flex flex-wrap gap-2 mb-3">
+        {bump.discountLabel && (
+          <span className="inline-block px-3 py-1 rounded-full text-xs font-bold text-white bg-gradient-to-r from-red-500 to-pink-500 shadow-sm">
+            {bump.discountLabel}
+          </span>
+        )}
+        <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${bump.bumpType === "physical" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>
+          {bump.bumpType === "physical" ? "Physical add-on" : "Digital add-on"}
         </span>
-      )}
+      </div>
 
       {/* Headline */}
       <div className="flex items-start gap-2 mb-2">
@@ -103,7 +120,7 @@ export default function OrderBumpOffer({ triggerType, triggerProductId, timing, 
           className="w-full py-3 text-white font-semibold shadow-md hover:shadow-lg transition-all"
           style={{ backgroundColor: bump.ctaColor }}
         >
-          {acceptBump.isPending ? "Adding..." : `${bump.ctaText} — $${(bump.bumpPrice / 100).toFixed(2)}`}
+          {acceptBump.isPending ? "Adding..." : `${bump.ctaText} - $${(bump.bumpPrice / 100).toFixed(2)}`}
         </Button>
         <button onClick={handleDecline} className="text-xs text-gray-400 hover:text-gray-600 underline text-center py-1">
           {bump.skipText}

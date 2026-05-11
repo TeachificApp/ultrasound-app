@@ -14,6 +14,7 @@ import {
   digitalBundlePurchases,
 } from "../../drizzle/schema";
 import { sendEmail } from "../_core/email";
+import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 
 // ─── Public Router ──────────────────────────────────────────────────────────
 export const downloadsPublicRouter = router({
@@ -142,7 +143,7 @@ export const downloadsLearnerRouter = router({
 
   /** Create Stripe checkout session for a digital product */
   createCheckout: protectedProcedure
-    .input(z.object({ productId: z.number() }))
+    .input(z.object({ productId: z.number(), orderBumpId: z.number().optional() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
@@ -150,7 +151,14 @@ export const downloadsLearnerRouter = router({
       const [product] = await db.select().from(digitalProducts)
         .where(eq(digitalProducts.id, input.productId)).limit(1);
       if (!product) throw new TRPCError({ code: "NOT_FOUND" });
-      if (product.isFree) {
+      const orderBumpCheckout = await buildOrderBumpCheckoutLine(db, {
+        orderBumpId: input.orderBumpId,
+        triggerType: "download",
+        triggerProductId: product.id,
+        currency: product.currency,
+      });
+
+      if (product.isFree && !orderBumpCheckout) {
         // Auto-grant free product
         await db.insert(digitalPurchases).values({
           userId: ctx.user.id,
@@ -165,7 +173,7 @@ export const downloadsLearnerRouter = router({
           eq(digitalPurchases.userId, ctx.user.id),
           eq(digitalPurchases.productId, input.productId),
         )).limit(1);
-      if (existing) {
+      if (existing && !orderBumpCheckout) {
         return { checkoutUrl: null, free: false, alreadyPurchased: true };
       }
 
@@ -173,31 +181,38 @@ export const downloadsLearnerRouter = router({
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
 
       const origin = ctx.req.headers.origin || `https://${ctx.req.headers.host}`;
+      const shippingOptions = orderBumpCheckout?.requiresShipping
+        ? { shipping_address_collection: { allowed_countries: ["US", "CA"] as any } }
+        : {};
+      const primaryLineItem = product.isFree ? [] : [{
+        price_data: {
+          currency: product.currency,
+          product_data: {
+            name: product.title,
+            description: product.subtitle ?? undefined,
+            images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined,
+          },
+          unit_amount: product.price,
+        },
+        quantity: 1,
+      }];
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
         customer_email: ctx.user.email ?? undefined,
         client_reference_id: ctx.user.id.toString(),
         allow_promotion_codes: true,
-        line_items: [{
-          price_data: {
-            currency: product.currency,
-            product_data: {
-              name: product.title,
-              description: product.subtitle ?? undefined,
-              images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined,
-            },
-            unit_amount: product.price,
-          },
-          quantity: 1,
-        }],
+        line_items: [...primaryLineItem, ...(orderBumpCheckout ? [orderBumpCheckout.lineItem] : [])],
         metadata: {
           type: "digital_download",
           product_id: product.id.toString(),
           user_id: ctx.user.id.toString(),
           customer_email: ctx.user.email ?? "",
+          trigger_order_type: "download",
+          ...orderBumpCheckout?.metadata,
         },
         success_url: `${origin}/downloads/${product.slug}/files?success=1`,
         cancel_url: `${origin}/downloads/${product.slug}`,
+        ...shippingOptions,
       });
 
       return { checkoutUrl: session.url, free: false };

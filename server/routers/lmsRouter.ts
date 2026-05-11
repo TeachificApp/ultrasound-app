@@ -20,6 +20,7 @@ import { getDb } from "../db";
 import { invokeLLM } from "../_core/llm";
 import { generateCertificatePdf } from "../lib/certificateGenerator";
 import { sendCertificateEmail } from "../lib/certificateEmail";
+import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import {
   lmsCourses,
   lmsSections,
@@ -516,6 +517,7 @@ export const lmsLearnerRouter = router({
       affiliateCode: z.string().optional(),
       seats: z.number().int().min(1).default(1),
       origin: z.string(),
+      orderBumpId: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -528,10 +530,20 @@ export const lmsLearnerRouter = router({
       const Stripe = (await import("stripe")).default;
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2026-03-25.dahlia" });
 
+      const orderBumpCheckout = await buildOrderBumpCheckoutLine(db, {
+        orderBumpId: input.orderBumpId,
+        triggerType: "course",
+        triggerProductId: course.id,
+        currency: course.currency,
+      });
+      const shippingOptions = orderBumpCheckout?.requiresShipping
+        ? { shipping_address_collection: { allowed_countries: ["US", "CA"] as any } }
+        : {};
+
       // Create order record
-      const orderAmount = pricingType === "payment_plan"
+      const orderAmount = (pricingType === "payment_plan"
         ? (course.downPayment ?? 0)
-        : course.price * input.seats;
+        : course.price * input.seats) + (orderBumpCheckout?.amount ?? 0);
       const [orderResult] = await db.insert(lmsOrders).values({
         userId: ctx.user.id, courseId: course.id,
         amount: orderAmount,
@@ -545,6 +557,8 @@ export const lmsLearnerRouter = router({
         affiliate_code: input.affiliateCode ?? "",
         seats: input.seats.toString(),
         pricing_type: pricingType,
+        trigger_order_type: "course",
+        ...orderBumpCheckout?.metadata,
       };
       const successUrl = `${input.origin}/learn/${course.slug}/success?session_id={CHECKOUT_SESSION_ID}`;
       const cancelUrl = `${input.origin}/learn/${course.slug}`;
@@ -563,10 +577,11 @@ export const lmsLearnerRouter = router({
               unit_amount: course.price,
             },
             quantity: input.seats,
-          }],
+          }, ...(orderBumpCheckout ? [orderBumpCheckout.lineItem] : [])],
           success_url: successUrl, cancel_url: cancelUrl,
           client_reference_id: ctx.user.id.toString(),
           metadata: commonMeta,
+          ...shippingOptions,
         });
 
       } else if (pricingType === "subscription") {
@@ -594,10 +609,11 @@ export const lmsLearnerRouter = router({
           mode: "subscription",
           customer_email: ctx.user.email ?? undefined,
           allow_promotion_codes: true,
-          line_items: [{ price: stripePriceId, quantity: 1 }],
+          line_items: [{ price: stripePriceId, quantity: 1 }, ...(orderBumpCheckout ? [orderBumpCheckout.lineItem] : [])],
           success_url: successUrl, cancel_url: cancelUrl,
           client_reference_id: ctx.user.id.toString(),
           metadata: commonMeta,
+          ...shippingOptions,
         });
 
       } else if (pricingType === "payment_plan") {
@@ -644,10 +660,11 @@ export const lmsLearnerRouter = router({
           mode: hasInstallments ? "subscription" : "payment",
           customer_email: ctx.user.email ?? undefined,
           allow_promotion_codes: true,
-          line_items: lineItems,
+          line_items: [...lineItems, ...(orderBumpCheckout ? [orderBumpCheckout.lineItem] : [])],
           success_url: successUrl, cancel_url: cancelUrl,
           client_reference_id: ctx.user.id.toString(),
           metadata: { ...commonMeta, installment_count: installmentCount.toString() },
+          ...shippingOptions,
         });
       } else {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Unknown pricing type" });
