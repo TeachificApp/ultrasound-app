@@ -50,7 +50,7 @@ export function FunnelWorkflowBlock({ data }: { data: Record<string, any> }) {
                 className="mt-4 text-sm font-semibold hover:underline"
                 style={{ color: accentColor }}
               >
-                {step.cta} ->
+                {step.cta} {"->"}
               </button>
             </div>
           ))}

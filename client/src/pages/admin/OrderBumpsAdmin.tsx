@@ -52,8 +52,9 @@ export default function OrderBumpsAdmin() {
   const [isCreating, setIsCreating] = useState(false);
 
   // Get product names for display
-  const { data: courses } = trpc.lmsAdmin.listCourses.useQuery();
+  const { data: coursesResult } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", page: 1, pageSize: 200 });
   const { data: downloads } = trpc.downloadsAdmin.list.useQuery();
+  const courses = coursesResult?.courses ?? [];
 
   const deleteMutation = trpc.orderBumpsAdmin.delete.useMutation({
     onSuccess: () => { toast.success("Order bump deleted"); utils.orderBumpsAdmin.list.invalidate(); },

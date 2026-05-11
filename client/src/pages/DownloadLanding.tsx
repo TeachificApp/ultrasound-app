@@ -362,7 +362,7 @@ export default function DownloadLanding() {
 
   const handleBuy = () => {
     if (!user) {
-      window.location.href = getLoginUrl(`/downloads/${slug}`);
+      window.location.href = getLoginUrl();
       return;
     }
     checkoutMut.mutate({ productId: product.id, orderBumpId: selectedOrderBumpId });
