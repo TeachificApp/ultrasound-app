@@ -144,6 +144,7 @@ import SoundBytes from "./pages/SoundBytes";
 import AdminCaseManagement from "./pages/AdminCaseManagement";
 import QuickFireAdmin from "./pages/QuickFireAdmin";
 import ChallengeCardGenerator from "./pages/ChallengeCardGenerator";
+import SocialContentGenerator from "./pages/SocialContentGenerator";
 import ScanCoachEditor from "./pages/ScanCoachEditor";
 import NavigatorEditor from "./pages/NavigatorEditor";
 import MediaRepository from "./pages/admin/MediaRepository";
@@ -320,6 +321,7 @@ function Router() {
         <Route path="/admin/cases">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminCaseManagement /></RoleGuard>}</Route>
         <Route path="/admin/quickfire">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuickFireAdmin /></RoleGuard>}</Route>
         <Route path="/admin/challenge-cards">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ChallengeCardGenerator /></RoleGuard>}</Route>
+        <Route path="/admin/social-content">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SocialContentGenerator /></RoleGuard>}</Route>
         <Route path="/admin/scancoach">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ScanCoachEditor /></RoleGuard>}</Route>
         <Route path="/admin/navigator">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><NavigatorEditor /></RoleGuard>}</Route>
         <Route path="/admin/media-repository">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MediaRepository /></RoleGuard>}</Route>
