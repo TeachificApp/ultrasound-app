@@ -1068,6 +1068,13 @@ export default function PlatformAdmin() {
                 color: "#189aa1",
               },
               {
+                href: "/admin/social-content",
+                icon: Image,
+                label: "Social Content Generator",
+                description: "AI-powered memes, clinical pearls, tips & social posts for ultrasound",
+                color: "#7c3aed",
+              },
+              {
                 href: "/admin/media-repository",
                 icon: HardDrive,
                 label: "Media Repository",
