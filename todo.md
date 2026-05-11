@@ -1390,3 +1390,20 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Auto-generate image based on social content when prompt is left blank
 - [x] Backend procedure for image generation via AI
 - [x] Display generated image in the content preview
+
+## Social Content Generator - Image Approach Overhaul
+- [x] Replace anatomical AI prompts with abstract/decorative background prompts
+- [x] Add image upload endpoint for custom clinical images
+- [x] Add image source selector UI (Abstract AI Background / Upload Own Image)
+- [x] Add drag-and-drop or file picker for image upload
+- [x] Update card rendering to support both image sources
+- [x] Write tests for new image upload and abstract prompt logic
+
+## Social Content Generator - Infographic Redesign
+- [x] Update LLM prompt to generate structured infographic content (sections, key findings, bullet points)
+- [x] Redesign card renderer to AAU infographic style (multi-column, teal banners, icons, branded footer)
+- [x] Add image source selector (Abstract AI / Upload Own Image / None)
+- [x] Add drag-and-drop image upload UI for custom clinical images
+- [x] Update card to support central image area for uploaded images
+- [x] Add branded bottom banner with tagline
+- [x] Write tests for new structured content schema (833 tests passing)

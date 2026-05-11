@@ -3,7 +3,12 @@
  *
  * Admin-only tRPC procedures for generating ultrasound/echocardiography
  * social media content (memes, educational posts, clinical pearls, etc.)
- * using the Forge LLM API, with optional AI image generation.
+ * using the Forge LLM API, with optional abstract AI background generation.
+ *
+ * Image approach:
+ * - "abstract" = AI-generated abstract/decorative backgrounds (no anatomy)
+ * - "upload"   = admin uploads their own clinical image via /api/upload-social-image
+ * - "none"     = text-only card (no image)
  */
 
 import { z } from "zod";
@@ -107,39 +112,38 @@ IMPORTANT: Return ONLY the JSON object, no markdown formatting or code blocks.`;
 }
 
 /**
- * Build a descriptive image generation prompt based on the social content.
- * If the user provides a custom image prompt, use that; otherwise auto-generate
- * a relevant prompt from the content itself.
+ * Build an ABSTRACT background prompt — no anatomical imagery.
+ * Generates decorative, professional backgrounds with medical-themed
+ * abstract elements (waveforms, gradients, geometric patterns).
  */
-function buildImagePrompt(
-  item: { headline: string; body: string; category: string; contentType: string },
-  userImagePrompt?: string
+function buildAbstractImagePrompt(
+  item: { headline: string; category: string; contentType: string },
+  userStyleHint?: string
 ): string {
-  if (userImagePrompt && userImagePrompt.trim()) {
-    // Enhance the user's prompt with ultrasound context
-    return `Professional medical illustration for social media: ${userImagePrompt.trim()}. Clean, modern style with teal/aqua color accents. High quality, suitable for medical education content. No text overlays.`;
+  if (userStyleHint && userStyleHint.trim()) {
+    return `Abstract decorative background for a medical education social media card. Style: ${userStyleHint.trim()}. Use teal (#189aa1) and aqua (#4ad9e0) color accents on a dark background. NO anatomical imagery, NO ultrasound images, NO organs, NO medical equipment. Only abstract shapes, gradients, waveforms, geometric patterns, or bokeh effects. Clean, modern, professional. No text.`;
   }
 
-  // Auto-generate based on content
-  const categoryImageHints: Record<string, string> = {
-    "Abdominal": "abdominal ultrasound scan showing liver or gallbladder",
-    "Small Parts": "thyroid or small parts ultrasound examination",
-    "Pelvic/Gyn": "pelvic ultrasound examination",
-    "OB 1st Trimester": "first trimester obstetric ultrasound",
-    "OB 2nd/3rd Trimester": "fetal ultrasound scan showing fetal anatomy",
-    "Fetal Echo": "fetal echocardiography showing four-chamber heart view",
-    "Breast": "breast ultrasound examination",
-    "Vascular": "vascular duplex ultrasound with color Doppler",
-    "MSK": "musculoskeletal ultrasound of a joint or tendon",
-    "POCUS": "point-of-care ultrasound at bedside",
-    "Physics": "ultrasound transducer with sound wave visualization",
-    "Echocardiography": "echocardiogram showing cardiac chambers",
-    "General Ultrasound": "modern ultrasound machine in a clinical setting",
+  // Category-themed abstract styles (no anatomy)
+  const categoryStyles: Record<string, string> = {
+    "Abdominal": "flowing wave patterns with warm teal gradients, subtle circular bokeh",
+    "Small Parts": "delicate geometric mesh with fine teal lines on dark background",
+    "Pelvic/Gyn": "soft gradient curves with layered teal and aqua tones",
+    "OB 1st Trimester": "gentle flowing curves with soft aqua light effects",
+    "OB 2nd/3rd Trimester": "smooth organic curves with warm teal gradient layers",
+    "Fetal Echo": "rhythmic wave patterns suggesting heartbeat, teal pulse lines on dark",
+    "Breast": "clean radial gradient with subtle teal concentric rings",
+    "Vascular": "flowing stream-like abstract lines in teal and aqua on dark background",
+    "MSK": "angular geometric patterns with strong teal accent lines",
+    "POCUS": "dynamic abstract waveform burst with teal energy ripples",
+    "Physics": "sound wave visualization pattern, abstract frequency lines in teal/aqua",
+    "Echocardiography": "rhythmic pulse wave pattern with teal and aqua gradient, abstract heartbeat lines",
+    "General Ultrasound": "abstract sound wave ripples with teal gradient on dark background",
   };
 
-  const hint = categoryImageHints[item.category] || "ultrasound examination in a medical setting";
+  const style = categoryStyles[item.category] || "abstract teal gradient with geometric patterns on dark background";
 
-  return `Professional medical illustration for social media about "${item.headline}". Scene: ${hint}. Clean, modern style with teal/aqua color accents (#189aa1). High quality, suitable for medical education content. No text overlays, no watermarks.`;
+  return `Abstract decorative background for a medical education social media card about "${item.headline}". Style: ${style}. Use teal (#189aa1) and aqua (#4ad9e0) color accents. NO anatomical imagery, NO ultrasound images, NO organs, NO medical devices, NO people. Only abstract shapes, gradients, waveforms, geometric patterns, or light effects. Clean, modern, professional. No text, no watermarks.`;
 }
 
 export const socialContentRouter = router({
@@ -150,12 +154,12 @@ export const socialContentRouter = router({
         category: z.enum(CATEGORIES),
         customTopic: z.string().max(200).optional(),
         count: z.number().min(1).max(5).default(1),
-        includeImage: z.boolean().default(false),
-        imagePrompt: z.string().max(500).optional(),
+        imageMode: z.enum(["none", "abstract", "upload"]).default("none"),
+        imageStyleHint: z.string().max(500).optional(),
       })
     )
     .mutation(async ({ input }) => {
-      const { contentType, category, customTopic, count, includeImage, imagePrompt } = input;
+      const { contentType, category, customTopic, count, imageMode, imageStyleHint } = input;
 
       const results: Array<{
         headline: string;
@@ -165,6 +169,7 @@ export const socialContentRouter = router({
         category: string;
         contentType: string;
         imageUrl?: string;
+        imageSource?: "abstract" | "upload";
       }> = [];
 
       for (let i = 0; i < count; i++) {
@@ -180,7 +185,6 @@ export const socialContentRouter = router({
           const raw = response.choices?.[0]?.message?.content;
           const text = typeof raw === "string" ? raw : Array.isArray(raw) ? raw.map((p: any) => p.text || "").join("") : "";
 
-          // Parse JSON from response (handle markdown code blocks)
           const jsonMatch = text.match(/\{[\s\S]*\}/);
           if (!jsonMatch) {
             throw new Error("No JSON object found in LLM response");
@@ -195,19 +199,20 @@ export const socialContentRouter = router({
             category,
             contentType,
             imageUrl: undefined as string | undefined,
+            imageSource: undefined as "abstract" | "upload" | undefined,
           };
 
-          // Generate image if requested
-          if (includeImage) {
+          // Generate abstract background if requested
+          if (imageMode === "abstract") {
             try {
-              const prompt = buildImagePrompt(item, imagePrompt);
-              console.log(`[SocialContent] Generating image for item ${i + 1}: "${prompt.slice(0, 100)}..."`);
+              const prompt = buildAbstractImagePrompt(item, imageStyleHint);
+              console.log(`[SocialContent] Generating abstract background for item ${i + 1}`);
               const { url } = await generateImage({ prompt });
               item.imageUrl = url;
-              console.log(`[SocialContent] Image generated: ${url}`);
+              item.imageSource = "abstract";
+              console.log(`[SocialContent] Abstract background generated: ${url}`);
             } catch (imgErr) {
-              console.error(`[SocialContent] Image generation failed for item ${i + 1}:`, imgErr);
-              // Don't fail the whole item — just skip the image
+              console.error(`[SocialContent] Abstract image generation failed for item ${i + 1}:`, imgErr);
             }
           }
 
@@ -226,23 +231,22 @@ export const socialContentRouter = router({
       return { items: results };
     }),
 
-  /** Generate an image standalone (for regenerating just the image) */
-  generateImage: adminProcedure
+  /** Generate a standalone abstract background image */
+  generateAbstractImage: adminProcedure
     .input(
       z.object({
-        imagePrompt: z.string().max(500).optional(),
+        styleHint: z.string().max(500).optional(),
         headline: z.string(),
-        body: z.string(),
         category: z.string(),
         contentType: z.string(),
       })
     )
     .mutation(async ({ input }) => {
-      const prompt = buildImagePrompt(
-        { headline: input.headline, body: input.body, category: input.category, contentType: input.contentType },
-        input.imagePrompt
+      const prompt = buildAbstractImagePrompt(
+        { headline: input.headline, category: input.category, contentType: input.contentType },
+        input.styleHint
       );
-      console.log(`[SocialContent] Generating standalone image: "${prompt.slice(0, 100)}..."`);
+      console.log(`[SocialContent] Generating standalone abstract image`);
       const { url } = await generateImage({ prompt });
       return { imageUrl: url };
     }),

@@ -1,19 +1,23 @@
 /*
  * SocialContentGenerator — Admin Only
  * AI-powered ultrasound & echocardiography social media content generator.
- * Produces branded 1080×1080 image cards (memes, clinical pearls, tips, etc.)
- * with dark/light themes, PNG download, and ready-to-copy social posts.
- * Supports optional AI-generated images within the graphic cards.
+ * Produces branded 1080×1080 image cards in two layouts:
+ *   1. "Card" — clean branded card with AAU teal/aqua styling
+ *   2. "Infographic" — multi-section educational layout with structured panels
+ * Both layouts support dark/light themes, PNG download, and ready-to-copy social posts.
+ * Image options: None, Abstract AI background, or Upload custom clinical image.
  */
-import { useRef, useCallback, useState } from "react";
+import { useRef, useCallback, useState, type ChangeEvent } from "react";
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
 import { toPng } from "html-to-image";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import {
-  ArrowLeft, Download, Loader2, AlertCircle, ImageIcon,
-  Sparkles, Package, Share2, Copy, Check, RefreshCw, Image as ImageLucide,
+  ArrowLeft, Download, Loader2,
+  Sparkles, Package, Share2, Copy, Check, RefreshCw,
+  Image as ImageLucide, Upload, LayoutGrid, CreditCard,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,20 +27,24 @@ import { toast } from "sonner";
 const BRAND = "#189aa1";
 const BRAND_DARK = "#0d3d44";
 const BRAND_AQUA = "#4ad9e0";
-const LOGO_URL =
+const LOGO_ICON =
   "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_icon_192_teal_f0c966ce.png";
+const LOGO_RING =
+  "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp";
 
 // ── Theme tokens ─────────────────────────────────────────────────────────────
 type CardTheme = "dark" | "light";
+type LayoutMode = "card" | "infographic";
+type ImageMode = "none" | "abstract" | "upload";
 
 interface ThemeTokens {
   cardBg: string;
   overlayBg: string;
   accentBar: string;
-  leftStripe: string;
   headingColor: string;
   bodyColor: string;
   mutedColor: string;
+  footerBg: string;
   footerColor: string;
   footerRight: string;
   dividerColor: string;
@@ -46,37 +54,51 @@ interface ThemeTokens {
   pillBg: string;
   pillBorder: string;
   pillColor: string;
+  panelBg: string;
+  panelBorder: string;
+  sectionHeaderBg: string;
+  sectionHeaderColor: string;
+  taglineBg: string;
+  taglineColor: string;
+  isDark: boolean;
 }
 
 const DARK_THEME: ThemeTokens = {
-  cardBg: "#071318",
-  overlayBg: "linear-gradient(160deg, rgba(5,14,22,0.92) 0%, rgba(7,25,35,0.88) 50%, rgba(5,14,22,0.94) 100%)",
+  cardBg: "#0a1620",
+  overlayBg: "linear-gradient(160deg, rgba(10,22,32,0.97) 0%, rgba(13,30,42,0.95) 50%, rgba(10,22,32,0.98) 100%)",
   accentBar: `linear-gradient(90deg, ${BRAND_DARK}, ${BRAND}, ${BRAND_AQUA}, ${BRAND})`,
-  leftStripe: `linear-gradient(180deg, ${BRAND_AQUA}bb 0%, ${BRAND}44 60%, transparent 100%)`,
   headingColor: "#fff",
   bodyColor: "rgba(255,255,255,0.88)",
   mutedColor: "rgba(255,255,255,0.55)",
-  footerColor: BRAND_AQUA,
-  footerRight: "rgba(255,255,255,0.25)",
+  footerBg: `linear-gradient(90deg, ${BRAND_DARK}, ${BRAND}cc)`,
+  footerColor: "#fff",
+  footerRight: "rgba(255,255,255,0.5)",
   dividerColor: `${BRAND}55`,
-  subtextBg: `linear-gradient(135deg, ${BRAND}12, rgba(255,255,255,0.02))`,
+  subtextBg: `linear-gradient(135deg, ${BRAND}15, rgba(255,255,255,0.03))`,
   subtextBorder: `${BRAND}44`,
   subtextColor: "rgba(255,255,255,0.70)",
   pillBg: `linear-gradient(135deg, ${BRAND}33, ${BRAND_AQUA}18)`,
   pillBorder: BRAND_AQUA,
   pillColor: BRAND_AQUA,
+  panelBg: "rgba(255,255,255,0.04)",
+  panelBorder: `${BRAND}33`,
+  sectionHeaderBg: BRAND,
+  sectionHeaderColor: "#fff",
+  taglineBg: `linear-gradient(90deg, ${BRAND_DARK}, ${BRAND}dd)`,
+  taglineColor: "#fff",
+  isDark: true,
 };
 
 const LIGHT_THEME: ThemeTokens = {
-  cardBg: "#e8f7f8",
-  overlayBg: "linear-gradient(160deg, rgba(220,245,248,0.95) 0%, rgba(200,238,242,0.90) 50%, rgba(215,244,247,0.96) 100%)",
+  cardBg: "#eaf6f7",
+  overlayBg: "linear-gradient(160deg, rgba(234,246,247,0.98) 0%, rgba(220,242,244,0.95) 50%, rgba(234,246,247,0.98) 100%)",
   accentBar: `linear-gradient(90deg, ${BRAND_DARK}, ${BRAND}, ${BRAND_AQUA}, ${BRAND})`,
-  leftStripe: `linear-gradient(180deg, ${BRAND}cc 0%, ${BRAND}55 60%, transparent 100%)`,
   headingColor: BRAND_DARK,
   bodyColor: "#0d3d44",
   mutedColor: `${BRAND_DARK}bb`,
-  footerColor: BRAND,
-  footerRight: `${BRAND_DARK}66`,
+  footerBg: `linear-gradient(90deg, ${BRAND}, ${BRAND_AQUA})`,
+  footerColor: "#fff",
+  footerRight: "rgba(255,255,255,0.7)",
   dividerColor: `${BRAND}44`,
   subtextBg: `linear-gradient(135deg, ${BRAND}0e, rgba(74,217,224,0.06))`,
   subtextBorder: `${BRAND}44`,
@@ -84,19 +106,20 @@ const LIGHT_THEME: ThemeTokens = {
   pillBg: `linear-gradient(135deg, ${BRAND}22, ${BRAND_AQUA}18)`,
   pillBorder: BRAND,
   pillColor: BRAND_DARK,
+  panelBg: "rgba(255,255,255,0.7)",
+  panelBorder: `${BRAND}44`,
+  sectionHeaderBg: BRAND,
+  sectionHeaderColor: "#fff",
+  taglineBg: `linear-gradient(90deg, ${BRAND}, ${BRAND_AQUA})`,
+  taglineColor: "#fff",
+  isDark: false,
 };
 
 // ── Hashtags ─────────────────────────────────────────────────────────────────
 const REQUIRED_HASHTAGS = [
-  "#AllAboutUltrasound",
-  "#UltrasoundAssist",
-  "#Sonography",
-  "#Ultrasound",
-  "#MedicalImaging",
-  "#Sonographer",
-  "#UltrasoundEducation",
+  "#AllAboutUltrasound", "#UltrasoundAssist", "#Sonography",
+  "#Ultrasound", "#MedicalImaging", "#Sonographer", "#UltrasoundEducation",
 ];
-
 const CATEGORY_HASHTAGS: Record<string, string[]> = {
   "Abdominal": ["#AbdominalUltrasound", "#AbdominalImaging"],
   "Small Parts": ["#ThyroidUltrasound", "#SmallPartsUltrasound"],
@@ -112,310 +135,285 @@ const CATEGORY_HASHTAGS: Record<string, string[]> = {
   "Echocardiography": ["#Echocardiography", "#CardiacUltrasound", "#EchoFirst"],
   "General Ultrasound": ["#DiagnosticUltrasound", "#SonographyLife"],
 };
-
 const CONTENT_TYPE_ICONS: Record<string, string> = {
-  meme: "😂",
-  clinical_pearl: "💎",
-  did_you_know: "🤔",
-  motivational: "💪",
-  myth_vs_fact: "⚡",
-  tip_of_the_day: "💡",
-  anatomy_spotlight: "🔬",
-  case_teaser: "🔍",
+  meme: "😂", clinical_pearl: "💎", did_you_know: "🤔", motivational: "💪",
+  myth_vs_fact: "⚡", tip_of_the_day: "💡", anatomy_spotlight: "🔬", case_teaser: "🔍",
 };
-
 const CONTENT_TYPE_LABELS: Record<string, string> = {
-  meme: "Meme",
-  clinical_pearl: "Clinical Pearl",
-  did_you_know: "Did You Know?",
-  motivational: "Motivational",
-  myth_vs_fact: "Myth vs Fact",
-  tip_of_the_day: "Tip of the Day",
-  anatomy_spotlight: "Anatomy Spotlight",
-  case_teaser: "Case Teaser",
+  meme: "Meme", clinical_pearl: "Clinical Pearl", did_you_know: "Did You Know?",
+  motivational: "Motivational", myth_vs_fact: "Myth vs Fact", tip_of_the_day: "Tip of the Day",
+  anatomy_spotlight: "Anatomy Spotlight", case_teaser: "Case Teaser",
 };
 
 // ── Render helpers ───────────────────────────────────────────────────────────
+type GeneratedItem = {
+  headline: string;
+  body: string;
+  subtext: string;
+  socialCaption: string;
+  category: string;
+  contentType: string;
+  imageUrl?: string;
+  imageSource?: "abstract" | "upload";
+};
 
 function buildFullSocialPost(item: GeneratedItem): string {
   const catTags = CATEGORY_HASHTAGS[item.category] || [];
   const allHashtags = [...REQUIRED_HASHTAGS, ...catTags].join(" ");
   const icon = CONTENT_TYPE_ICONS[item.contentType] || "📸";
   const label = CONTENT_TYPE_LABELS[item.contentType] || item.contentType;
-
-  return `${icon} ${label} — ${item.category}
-
-${item.socialCaption}
-
-🔗 app.allaboutultrasound.com
-
-${allHashtags}`;
+  return `${icon} ${label} — ${item.category}\n${item.socialCaption}\n🔗 app.allaboutultrasound.com\n${allHashtags}`;
 }
 
 async function renderCardToPng(el: HTMLElement): Promise<string> {
   const actualHeight = el.scrollHeight || 1080;
-  return toPng(el, {
-    cacheBust: true,
-    pixelRatio: 1,
-    width: 1080,
-    height: actualHeight,
-  });
+  return toPng(el, { cacheBust: true, pixelRatio: 1, width: 1080, height: actualHeight });
 }
 
-// ── Card Components ──────────────────────────────────────────────────────────
-
+// ── Card Shell ───────────────────────────────────────────────────────────────
 function CardShell({ children, t }: { children: React.ReactNode; t: ThemeTokens }) {
   return (
-    <div
-      style={{
-        width: 1080,
-        minHeight: 1080,
-        position: "relative",
-        fontFamily: "'Segoe UI', 'Open Sans', sans-serif",
-        boxSizing: "border-box",
-        background: t.cardBg,
-      }}
-    >
-      {/* Abstract background pattern */}
+    <div style={{ width: 1080, minHeight: 1080, position: "relative", fontFamily: "'Segoe UI', 'Open Sans', sans-serif", boxSizing: "border-box", background: t.cardBg }}>
       <div style={{ position: "absolute", inset: 0, background: t.overlayBg }} />
-      {/* Top accent bar */}
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 7, background: t.accentBar }} />
-      {/* Left accent stripe */}
-      <div style={{ position: "absolute", top: 7, left: 0, bottom: 0, width: 4, background: t.leftStripe }} />
-      {/* Corner glow */}
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          right: 0,
-          width: 300,
-          height: 300,
-          background: `linear-gradient(225deg, ${BRAND}1a 0%, transparent 60%)`,
-          clipPath: "polygon(100% 0, 0 0, 100% 100%)",
-        }}
-      />
-      {/* Content */}
-      <div
-        style={{
-          position: "relative",
-          width: "100%",
-          minHeight: 1080,
-          display: "flex",
-          flexDirection: "column",
-          padding: "52px 64px 44px 68px",
-          boxSizing: "border-box",
-        }}
-      >
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 6, background: t.accentBar }} />
+      <div style={{ position: "relative", width: "100%", minHeight: 1080, display: "flex", flexDirection: "column", boxSizing: "border-box" }}>
         {children}
       </div>
     </div>
   );
 }
 
-function ContentCard({
-  item,
-  t,
-}: {
-  item: GeneratedItem;
-  t: ThemeTokens;
-}) {
+// ── Branded Header (shared by both layouts) ──────────────────────────────────
+function BrandedHeader({ item, t }: { item: GeneratedItem; t: ThemeTokens }) {
   const icon = CONTENT_TYPE_ICONS[item.contentType] || "📸";
   const label = CONTENT_TYPE_LABELS[item.contentType] || item.contentType;
-  const hasImage = !!item.imageUrl;
-
   return (
-    <CardShell t={t}>
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-          <div
-            style={{
-              width: 72,
-              height: 72,
-              borderRadius: 18,
-              overflow: "hidden",
-              border: `2.5px solid ${BRAND}88`,
-              boxShadow: `0 0 24px ${BRAND}55`,
-              flexShrink: 0,
-            }}
-          >
-            <img src={LOGO_URL} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          </div>
-          <div>
-            <span style={{ color: t.headingColor, fontSize: 28, fontWeight: 800, letterSpacing: "-0.5px", lineHeight: 1 }}>
-              All About Ultrasound™
-            </span>
-            <div style={{ color: BRAND, fontSize: 13, fontWeight: 600, marginTop: 4, letterSpacing: "0.8px", textTransform: "uppercase" }}>
-              {item.category}
-            </div>
-          </div>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "36px 48px 24px 48px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <div style={{ width: 64, height: 64, borderRadius: "50%", overflow: "hidden", border: `3px solid ${BRAND}88`, boxShadow: `0 0 20px ${BRAND}44`, flexShrink: 0 }}>
+          <img src={LOGO_RING} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} crossOrigin="anonymous" />
         </div>
-        {/* Type pill */}
-        <div
-          style={{
-            background: t.pillBg,
-            border: `1.5px solid ${t.pillBorder}`,
-            borderRadius: 28,
-            padding: "9px 22px",
-            color: t.pillColor,
-            fontSize: 13,
-            fontWeight: 800,
-            letterSpacing: "1.5px",
-            textTransform: "uppercase",
-          }}
-        >
-          {icon} {label}
+        <div>
+          <div style={{ color: t.headingColor, fontSize: 26, fontWeight: 800, letterSpacing: "-0.5px", lineHeight: 1.1 }}>
+            All About Ultrasound™
+          </div>
+          <div style={{ color: BRAND, fontSize: 13, fontWeight: 700, marginTop: 4, letterSpacing: "1.2px", textTransform: "uppercase" }}>
+            {item.category}
+          </div>
         </div>
       </div>
+      <div style={{ background: t.pillBg, border: `2px solid ${t.pillBorder}`, borderRadius: 28, padding: "8px 20px", color: t.pillColor, fontSize: 13, fontWeight: 800, letterSpacing: "1.5px", textTransform: "uppercase" }}>
+        {icon} {label}
+      </div>
+    </div>
+  );
+}
 
+// ── Branded Footer (shared by both layouts) ──────────────────────────────────
+function BrandedFooter({ t }: { t: ThemeTokens }) {
+  return (
+    <div style={{ marginTop: "auto" }}>
+      {/* Tagline banner */}
+      <div style={{ background: t.taglineBg, padding: "16px 48px", display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
+        <span style={{ fontSize: 14, color: t.taglineColor, fontWeight: 400, opacity: 0.7 }}>♡</span>
+        <span style={{ fontSize: 16, color: t.taglineColor, fontWeight: 800, letterSpacing: "2px", textTransform: "uppercase" }}>
+          See It. Measure It. Make a Difference.
+        </span>
+        <span style={{ fontSize: 14, color: t.taglineColor, fontWeight: 400, opacity: 0.7 }}>♡</span>
+      </div>
+      {/* URL bar */}
+      <div style={{ background: t.isDark ? "#060e14" : "#d0eced", padding: "10px 48px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ color: BRAND, fontSize: 13, fontWeight: 700, letterSpacing: "0.3px" }}>
+          app.allaboutultrasound.com
+        </div>
+        <div style={{ color: t.mutedColor, fontSize: 11 }}>
+          Follow for daily ultrasound content
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Simple Card Layout ───────────────────────────────────────────────────────
+function SimpleContentCard({ item, t }: { item: GeneratedItem; t: ThemeTokens }) {
+  const hasImage = !!item.imageUrl;
+  return (
+    <CardShell t={t}>
+      <BrandedHeader item={item} t={t} />
       {/* Divider */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: hasImage ? 24 : 32 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 48px", marginBottom: 24 }}>
         <div style={{ height: 3, width: 44, borderRadius: 2, background: `linear-gradient(90deg, ${BRAND_AQUA}, ${BRAND})` }} />
         <div style={{ height: 3, width: 10, borderRadius: 2, background: t.dividerColor }} />
         <div style={{ height: 3, width: 5, borderRadius: 2, background: t.dividerColor + "88" }} />
       </div>
-
-      {/* AI-Generated Image */}
+      {/* Image area */}
       {hasImage && (
-        <div
-          style={{
-            width: "100%",
-            height: 380,
-            borderRadius: 16,
-            overflow: "hidden",
-            marginBottom: 24,
-            border: `2px solid ${BRAND}44`,
-            boxShadow: `0 4px 24px rgba(0,0,0,0.3)`,
-            position: "relative",
-          }}
-        >
-          <img
-            src={item.imageUrl}
-            alt={item.headline}
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-            }}
-            crossOrigin="anonymous"
-          />
-          {/* Subtle gradient overlay at bottom for text readability */}
-          <div
-            style={{
-              position: "absolute",
-              bottom: 0,
-              left: 0,
-              right: 0,
-              height: 60,
-              background: t === DARK_THEME
-                ? "linear-gradient(transparent, rgba(7,19,24,0.6))"
-                : "linear-gradient(transparent, rgba(232,247,248,0.6))",
-            }}
-          />
+        <div style={{ margin: "0 48px 24px 48px", height: 360, borderRadius: 16, overflow: "hidden", border: `2px solid ${BRAND}44`, boxShadow: `0 4px 24px rgba(0,0,0,0.25)`, position: "relative" }}>
+          <img src={item.imageUrl} alt={item.headline} style={{ width: "100%", height: "100%", objectFit: "cover" }} crossOrigin="anonymous" />
+          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 60, background: t.isDark ? "linear-gradient(transparent, rgba(10,22,32,0.6))" : "linear-gradient(transparent, rgba(234,246,247,0.6))" }} />
         </div>
       )}
-
-      {/* Headline */}
-      <div
-        style={{
-          color: t.headingColor,
-          fontSize: hasImage ? 44 : 52,
-          fontWeight: 800,
-          lineHeight: 1.25,
-          marginBottom: hasImage ? 18 : 28,
-          fontFamily: "'Georgia', 'Merriweather', serif",
-          textShadow: t === DARK_THEME ? "0 2px 20px rgba(0,0,0,0.5)" : "none",
-        }}
-      >
-        {item.headline}
+      {/* Content area */}
+      <div style={{ padding: "0 48px", flex: "1 1 auto", display: "flex", flexDirection: "column" }}>
+        <div style={{ color: t.headingColor, fontSize: hasImage ? 42 : 50, fontWeight: 800, lineHeight: 1.2, marginBottom: hasImage ? 16 : 24, fontFamily: "'Georgia', 'Merriweather', serif" }}>
+          {item.headline}
+        </div>
+        <div style={{ color: t.bodyColor, fontSize: hasImage ? 26 : 30, fontWeight: 400, lineHeight: 1.55, marginBottom: item.subtext ? 24 : 0, flex: "1 1 auto" }}>
+          {item.body}
+        </div>
+        {item.subtext && (
+          <div style={{ background: t.subtextBg, border: `1px solid ${t.subtextBorder}`, borderRadius: 12, padding: "14px 20px", marginBottom: 24 }}>
+            <div style={{ color: t.subtextColor, fontSize: 19, fontWeight: 500, lineHeight: 1.5, fontStyle: "italic" }}>
+              {item.subtext}
+            </div>
+          </div>
+        )}
       </div>
+      <BrandedFooter t={t} />
+    </CardShell>
+  );
+}
 
-      {/* Body */}
-      <div
-        style={{
-          color: t.bodyColor,
-          fontSize: hasImage ? 26 : 30,
-          fontWeight: 400,
-          lineHeight: 1.55,
-          marginBottom: item.subtext ? 24 : 0,
-          flex: "1 1 auto",
-        }}
-      >
-        {item.body}
+// ── Infographic Layout ───────────────────────────────────────────────────────
+function InfographicCard({ item, t }: { item: GeneratedItem; t: ThemeTokens }) {
+  const hasImage = !!item.imageUrl;
+  // Split body text into bullet points for the infographic
+  const bodyLines = item.body.split(/[.!?]+/).filter((s) => s.trim().length > 5).slice(0, 5);
+  const leftLines = bodyLines.slice(0, Math.ceil(bodyLines.length / 2));
+  const rightLines = bodyLines.slice(Math.ceil(bodyLines.length / 2));
+
+  return (
+    <CardShell t={t}>
+      {/* Large branded header */}
+      <div style={{ padding: "36px 48px 0 48px", display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ width: 80, height: 80, borderRadius: "50%", overflow: "hidden", border: `3px solid ${BRAND}88`, boxShadow: `0 0 24px ${BRAND}44`, flexShrink: 0 }}>
+            <img src={LOGO_RING} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} crossOrigin="anonymous" />
+          </div>
+        </div>
+        <div style={{ textAlign: "center", flex: 1 }}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: t.mutedColor, letterSpacing: "3px", textTransform: "uppercase" }}>
+            ALL ABOUT
+          </div>
+          <div style={{ fontSize: 48, fontWeight: 900, color: BRAND, letterSpacing: "-1px", lineHeight: 1.1 }}>
+            ULTRASOUND™
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: t.mutedColor, letterSpacing: "2px", marginTop: 4 }}>
+            — on —
+          </div>
+        </div>
+        <div style={{ width: 80 }} />
       </div>
-
+      {/* Topic title */}
+      <div style={{ textAlign: "center", padding: "8px 48px 24px 48px" }}>
+        <div style={{ display: "inline-block", background: BRAND, padding: "10px 32px", borderRadius: 8 }}>
+          <span style={{ color: "#fff", fontSize: 28, fontWeight: 800, letterSpacing: "1px", textTransform: "uppercase" }}>
+            {item.headline}
+          </span>
+        </div>
+        <div style={{ color: t.mutedColor, fontSize: 13, fontWeight: 600, marginTop: 8, letterSpacing: "1px", textTransform: "uppercase" }}>
+          {item.category}
+        </div>
+      </div>
+      {/* Three-column content area */}
+      <div style={{ display: "flex", gap: 16, padding: "0 32px", flex: "1 1 auto" }}>
+        {/* Left panel */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ background: t.sectionHeaderBg, borderRadius: "8px 8px 0 0", padding: "8px 16px" }}>
+            <span style={{ color: t.sectionHeaderColor, fontSize: 14, fontWeight: 800, letterSpacing: "1.5px", textTransform: "uppercase" }}>
+              Key Points
+            </span>
+          </div>
+          <div style={{ background: t.panelBg, border: `1px solid ${t.panelBorder}`, borderRadius: "0 0 8px 8px", padding: "16px", flex: 1 }}>
+            {leftLines.map((line, i) => (
+              <div key={i} style={{ display: "flex", gap: 10, marginBottom: 14, alignItems: "flex-start" }}>
+                <div style={{ width: 28, height: 28, borderRadius: "50%", background: `${BRAND}22`, border: `2px solid ${BRAND}66`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>
+                  <span style={{ color: BRAND, fontSize: 13, fontWeight: 800 }}>{i + 1}</span>
+                </div>
+                <span style={{ color: t.bodyColor, fontSize: 18, lineHeight: 1.45, fontWeight: 400 }}>
+                  {line.trim()}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+        {/* Center — image or highlight */}
+        <div style={{ flex: 1.2, display: "flex", flexDirection: "column", gap: 12 }}>
+          {hasImage ? (
+            <div style={{ flex: 1, borderRadius: 12, overflow: "hidden", border: `2px solid ${BRAND}44`, boxShadow: `0 4px 20px rgba(0,0,0,0.2)` }}>
+              <img src={item.imageUrl} alt={item.headline} style={{ width: "100%", height: "100%", objectFit: "cover" }} crossOrigin="anonymous" />
+            </div>
+          ) : (
+            <div style={{ flex: 1, borderRadius: 12, background: `linear-gradient(135deg, ${BRAND}22, ${BRAND_AQUA}11)`, border: `2px solid ${BRAND}33`, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 48, marginBottom: 12 }}>{CONTENT_TYPE_ICONS[item.contentType] || "📸"}</div>
+                <div style={{ color: t.headingColor, fontSize: 22, fontWeight: 700, lineHeight: 1.3 }}>
+                  {item.headline}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+        {/* Right panel */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ background: t.sectionHeaderBg, borderRadius: "8px 8px 0 0", padding: "8px 16px" }}>
+            <span style={{ color: t.sectionHeaderColor, fontSize: 14, fontWeight: 800, letterSpacing: "1.5px", textTransform: "uppercase" }}>
+              {item.contentType === "myth_vs_fact" ? "The Facts" : "Remember"}
+            </span>
+          </div>
+          <div style={{ background: t.panelBg, border: `1px solid ${t.panelBorder}`, borderRadius: "0 0 8px 8px", padding: "16px", flex: 1 }}>
+            {rightLines.length > 0 ? rightLines.map((line, i) => (
+              <div key={i} style={{ display: "flex", gap: 10, marginBottom: 14, alignItems: "flex-start" }}>
+                <div style={{ width: 28, height: 28, borderRadius: "50%", background: `${BRAND}22`, border: `2px solid ${BRAND}66`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>
+                  <span style={{ color: BRAND, fontSize: 14 }}>✓</span>
+                </div>
+                <span style={{ color: t.bodyColor, fontSize: 18, lineHeight: 1.45, fontWeight: 400 }}>
+                  {line.trim()}
+                </span>
+              </div>
+            )) : (
+              <div style={{ color: t.bodyColor, fontSize: 18, lineHeight: 1.5 }}>
+                {item.body}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
       {/* Subtext / source */}
       {item.subtext && (
-        <div
-          style={{
-            background: t.subtextBg,
-            border: `1px solid ${t.subtextBorder}`,
-            borderRadius: 12,
-            padding: "14px 20px",
-            marginBottom: 0,
-          }}
-        >
-          <div style={{ color: t.subtextColor, fontSize: 20, fontWeight: 500, lineHeight: 1.5, fontStyle: "italic" }}>
-            {item.subtext}
+        <div style={{ margin: "16px 32px 0 32px", display: "flex", gap: 16 }}>
+          <div style={{ flex: 1, background: t.panelBg, border: `1px solid ${t.panelBorder}`, borderRadius: 8, padding: "14px 20px", display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 36, height: 36, borderRadius: "50%", background: `${BRAND}22`, border: `2px solid ${BRAND}66`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <span style={{ fontSize: 16 }}>📋</span>
+            </div>
+            <span style={{ color: t.subtextColor, fontSize: 16, fontWeight: 500, lineHeight: 1.4, fontStyle: "italic" }}>
+              {item.subtext}
+            </span>
           </div>
         </div>
       )}
-
-      {/* Footer */}
-      <div
-        style={{
-          marginTop: "auto",
-          paddingTop: 24,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          borderTop: `1px solid ${t.dividerColor}`,
-        }}
-      >
-        <div style={{ color: t.footerColor, fontSize: 14, fontWeight: 700, opacity: 0.8, letterSpacing: "0.3px" }}>
-          app.allaboutultrasound.com
-        </div>
-        <div style={{ color: t.footerRight, fontSize: 12 }}>
-          Follow for daily ultrasound content
-        </div>
-      </div>
+      {/* Spacer */}
+      <div style={{ height: 16 }} />
+      <BrandedFooter t={t} />
     </CardShell>
   );
 }
 
 // ── Downloadable wrapper ─────────────────────────────────────────────────────
-
-interface CardHandle {
-  exportPng: () => Promise<string>;
-}
-
+interface CardHandle { exportPng: () => Promise<string>; }
 const PREVIEW_SIZE = 540;
 const SCALE = PREVIEW_SIZE / 1080;
 
-function DownloadableCard({
-  filename,
-  children,
-  onRef,
-}: {
-  filename: string;
-  children: React.ReactNode;
-  onRef?: (handle: CardHandle) => void;
-}) {
+function DownloadableCard({ filename, children, onRef }: { filename: string; children: React.ReactNode; onRef?: (handle: CardHandle) => void }) {
   const ref = useRef<HTMLDivElement>(null);
-
   const exportPng = useCallback(async (): Promise<string> => {
     if (!ref.current) throw new Error("Card not mounted");
     return renderCardToPng(ref.current);
   }, []);
-
-  const refCallback = useCallback(
-    (el: HTMLDivElement | null) => {
-      (ref as any).current = el;
-      if (el && onRef) onRef({ exportPng });
-    },
-    [exportPng, onRef]
-  );
-
+  const refCallback = useCallback((el: HTMLDivElement | null) => {
+    (ref as any).current = el;
+    if (el && onRef) onRef({ exportPng });
+  }, [exportPng, onRef]);
   const handleDownload = useCallback(async () => {
     try {
       const dataUrl = await exportPng();
@@ -429,42 +427,15 @@ function DownloadableCard({
       toast.error("Export failed. Please try again.");
     }
   }, [exportPng, filename]);
-
   return (
     <div className="flex flex-col">
-      <div
-        style={{
-          width: PREVIEW_SIZE,
-          position: "relative",
-          overflow: "hidden",
-          borderRadius: "10px 10px 0 0",
-          border: "1px solid rgba(255,255,255,0.1)",
-          borderBottom: "none",
-          background: "#071318",
-          flexShrink: 0,
-        }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            width: 1080,
-            transform: `scale(${SCALE})`,
-            transformOrigin: "top left",
-          }}
-        >
+      <div style={{ width: PREVIEW_SIZE, position: "relative", overflow: "hidden", borderRadius: "10px 10px 0 0", border: "1px solid rgba(255,255,255,0.1)", borderBottom: "none", background: "#0a1620", flexShrink: 0 }}>
+        <div style={{ position: "absolute", top: 0, left: 0, width: 1080, transform: `scale(${SCALE})`, transformOrigin: "top left" }}>
           <div ref={refCallback}>{children}</div>
         </div>
-        {/* Reserve space for the scaled card */}
         <div style={{ paddingBottom: "100%" }} />
       </div>
-      <Button
-        onClick={handleDownload}
-        size="sm"
-        className="w-full gap-2 text-white font-semibold text-xs rounded-t-none"
-        style={{ background: `linear-gradient(90deg, ${BRAND}, ${BRAND_DARK})`, borderRadius: "0 0 10px 10px" }}
-      >
+      <Button onClick={handleDownload} size="sm" className="w-full gap-2 text-white font-semibold text-xs rounded-t-none" style={{ background: `linear-gradient(90deg, ${BRAND}, ${BRAND_DARK})`, borderRadius: "0 0 10px 10px" }}>
         <Download className="w-3 h-3" />
         Download PNG
       </Button>
@@ -473,11 +444,9 @@ function DownloadableCard({
 }
 
 // ── Social Post Panel ────────────────────────────────────────────────────────
-
 function SocialPostPanel({ item }: { item: GeneratedItem }) {
   const [copied, setCopied] = useState(false);
   const post = buildFullSocialPost(item);
-
   const handleCopy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(post);
@@ -496,53 +465,79 @@ function SocialPostPanel({ item }: { item: GeneratedItem }) {
       setTimeout(() => setCopied(false), 2500);
     }
   }, [post]);
-
   return (
     <div className="rounded-lg overflow-hidden" style={{ border: `1px solid ${BRAND}33`, background: "#0a1620" }}>
-      <div
-        className="flex items-center justify-between px-3 py-2"
-        style={{ borderBottom: `1px solid ${BRAND}22`, background: `${BRAND}0a` }}
-      >
+      <div className="flex items-center justify-between px-3 py-2" style={{ borderBottom: `1px solid ${BRAND}22`, background: `${BRAND}0a` }}>
         <div className="flex items-center gap-1.5">
           <Share2 className="w-3 h-3" style={{ color: BRAND_AQUA }} />
-          <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: BRAND_AQUA }}>
-            Social Post
-          </span>
+          <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: BRAND_AQUA }}>Social Post</span>
         </div>
-        <Button
-          size="sm"
-          onClick={handleCopy}
-          className="h-6 px-2 gap-1 text-[10px] font-semibold text-white"
-          style={{ background: copied ? "#166534" : `linear-gradient(90deg, ${BRAND}, ${BRAND_DARK})` }}
-        >
+        <Button size="sm" onClick={handleCopy} className="h-6 px-2 gap-1 text-[10px] font-semibold text-white" style={{ background: copied ? "#166534" : `linear-gradient(90deg, ${BRAND}, ${BRAND_DARK})` }}>
           {copied ? <Check className="w-2.5 h-2.5" /> : <Copy className="w-2.5 h-2.5" />}
           {copied ? "Copied!" : "Copy"}
         </Button>
       </div>
-      <div
-        className="px-3 py-2.5 text-[11px] leading-relaxed whitespace-pre-wrap"
-        style={{ color: "rgba(255,255,255,0.65)", maxHeight: 200, overflowY: "auto" }}
-      >
+      <div className="px-3 py-2.5 text-[11px] leading-relaxed whitespace-pre-wrap" style={{ color: "rgba(255,255,255,0.65)", maxHeight: 200, overflowY: "auto" }}>
         {post}
       </div>
     </div>
   );
 }
 
-// ── Types ────────────────────────────────────────────────────────────────────
+// ── Image Upload Helper ──────────────────────────────────────────────────────
+function ImageUploadButton({ onUploaded, disabled }: { onUploaded: (url: string) => void; disabled?: boolean }) {
+  const [uploading, setUploading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-type GeneratedItem = {
-  headline: string;
-  body: string;
-  subtext: string;
-  socialCaption: string;
-  category: string;
-  contentType: string;
-  imageUrl?: string;
-};
+  const handleFile = useCallback(async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Only image files are allowed");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("File too large (max 10 MB)");
+      return;
+    }
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload-social-image", { method: "POST", body: formData, credentials: "include" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Upload failed" }));
+        throw new Error(err.error || "Upload failed");
+      }
+      const { url } = await res.json();
+      onUploaded(url);
+      toast.success("Image uploaded!");
+    } catch (err: any) {
+      toast.error("Upload failed", { description: err.message });
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  }, [onUploaded]);
 
-// ── Main Page ────────────────────────────────────────────────────────────────
+  return (
+    <>
+      <input ref={inputRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => inputRef.current?.click()}
+        disabled={disabled || uploading}
+        className="gap-1.5 text-white/50 border-white/15 hover:bg-white/10 text-xs"
+      >
+        {uploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+        {uploading ? "Uploading..." : "Upload Image"}
+      </Button>
+    </>
+  );
+}
 
+// ── Constants ────────────────────────────────────────────────────────────────
 const CONTENT_TYPES = [
   { value: "meme", label: "😂 Meme" },
   { value: "clinical_pearl", label: "💎 Clinical Pearl" },
@@ -553,38 +548,33 @@ const CONTENT_TYPES = [
   { value: "anatomy_spotlight", label: "🔬 Anatomy Spotlight" },
   { value: "case_teaser", label: "🔍 Case Teaser" },
 ] as const;
-
 const CATEGORIES = [
   "Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester",
   "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular",
   "MSK", "POCUS", "Physics", "Echocardiography", "General Ultrasound",
 ] as const;
-
-const IMAGE_PROMPT_SUGGESTIONS = [
-  "Ultrasound of liver",
-  "Ultrasound machine",
-  "Ultrasound probe",
-  "Sonographer scanning patient",
-  "Echocardiogram on screen",
-  "Fetal ultrasound image",
-  "Vascular Doppler scan",
-  "Thyroid ultrasound",
-  "POCUS at bedside",
-  "Ultrasound transducer close-up",
+const IMAGE_STYLE_HINTS = [
+  "Teal waveform pattern",
+  "Geometric mesh",
+  "Gradient bokeh",
+  "Pulse wave lines",
+  "Abstract sound waves",
+  "Flowing teal streams",
 ];
 
+// ── Main Page ────────────────────────────────────────────────────────────────
 export default function SocialContentGenerator() {
   const [contentType, setContentType] = useState<string>("meme");
   const [category, setCategory] = useState<string>("General Ultrasound");
   const [customTopic, setCustomTopic] = useState("");
   const [count, setCount] = useState(2);
-  const [cardTheme, setCardTheme] = useState<CardTheme>("dark");
-  const [includeImage, setIncludeImage] = useState(false);
-  const [imagePrompt, setImagePrompt] = useState("");
+  const [cardTheme, setCardTheme] = useState<CardTheme>("light");
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>("card");
+  const [imageMode, setImageMode] = useState<ImageMode>("none");
+  const [imageStyleHint, setImageStyleHint] = useState("");
   const [items, setItems] = useState<GeneratedItem[]>([]);
   const [batchLoading, setBatchLoading] = useState(false);
   const [regeneratingImageIdx, setRegeneratingImageIdx] = useState<number | null>(null);
-
   const cardRefs = useRef<Record<number, CardHandle>>({});
 
   const generateMutation = trpc.socialContent.generateContent.useMutation({
@@ -597,7 +587,7 @@ export default function SocialContentGenerator() {
     },
   });
 
-  const generateImageMutation = trpc.socialContent.generateImage.useMutation();
+  const generateAbstractMutation = trpc.socialContent.generateAbstractImage.useMutation();
 
   const handleGenerate = () => {
     generateMutation.mutate({
@@ -605,50 +595,35 @@ export default function SocialContentGenerator() {
       category: category as any,
       customTopic: customTopic.trim() || undefined,
       count,
-      includeImage,
-      imagePrompt: includeImage ? (imagePrompt.trim() || undefined) : undefined,
+      imageMode,
+      imageStyleHint: imageMode === "abstract" ? (imageStyleHint.trim() || undefined) : undefined,
     });
   };
 
-  const handleRegenerateImage = useCallback(async (idx: number, item: GeneratedItem, customPrompt?: string) => {
+  const handleRegenerateAbstract = useCallback(async (idx: number, item: GeneratedItem, styleHint?: string) => {
     setRegeneratingImageIdx(idx);
     try {
-      const result = await generateImageMutation.mutateAsync({
+      const result = await generateAbstractMutation.mutateAsync({
         headline: item.headline,
-        body: item.body,
         category: item.category,
         contentType: item.contentType,
-        imagePrompt: customPrompt?.trim() || undefined,
+        styleHint: styleHint?.trim() || undefined,
       });
-      setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl: result.imageUrl } : p)));
-      toast.success("Image regenerated!");
+      setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl: result.imageUrl, imageSource: "abstract" as const } : p)));
+      toast.success("Abstract background regenerated!");
     } catch (err: any) {
       toast.error("Image generation failed", { description: err.message });
     } finally {
       setRegeneratingImageIdx(null);
     }
-  }, [generateImageMutation]);
+  }, [generateAbstractMutation]);
 
-  const handleAddImage = useCallback(async (idx: number, item: GeneratedItem) => {
-    setRegeneratingImageIdx(idx);
-    try {
-      const result = await generateImageMutation.mutateAsync({
-        headline: item.headline,
-        body: item.body,
-        category: item.category,
-        contentType: item.contentType,
-      });
-      setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl: result.imageUrl } : p)));
-      toast.success("Image added!");
-    } catch (err: any) {
-      toast.error("Image generation failed", { description: err.message });
-    } finally {
-      setRegeneratingImageIdx(null);
-    }
-  }, [generateImageMutation]);
+  const handleUploadedImage = useCallback((idx: number, url: string) => {
+    setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl: url, imageSource: "upload" as const } : p)));
+  }, []);
 
   const handleRemoveImage = useCallback((idx: number) => {
-    setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl: undefined } : p)));
+    setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl: undefined, imageSource: undefined } : p)));
     toast.success("Image removed from card");
   }, []);
 
@@ -692,337 +667,187 @@ export default function SocialContentGenerator() {
           </Link>
           <Sparkles className="w-4 h-4" style={{ color: BRAND_AQUA }} />
           <h1 className="text-base font-bold text-white">Social Content Generator</h1>
-          <Badge className="text-[10px] px-1.5 py-0 ml-0.5" style={{ background: BRAND + "22", color: BRAND_AQUA, border: "none" }}>
-            Admin
-          </Badge>
-
+          <Badge className="text-[10px] px-1.5 py-0 ml-0.5" style={{ background: BRAND + "22", color: BRAND_AQUA, border: "none" }}>Admin</Badge>
           <div className="ml-auto flex items-center gap-2">
-            {/* Dark / Light toggle */}
-            <div
-              className="flex items-center gap-1 rounded-lg p-0.5"
-              style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)" }}
-            >
+            {/* Layout toggle */}
+            <div className="flex rounded-lg overflow-hidden" style={{ border: `1px solid ${BRAND}44` }}>
+              <button
+                onClick={() => setLayoutMode("card")}
+                className="px-3 py-1.5 text-[11px] font-semibold flex items-center gap-1.5 transition-colors"
+                style={{ background: layoutMode === "card" ? BRAND : "transparent", color: layoutMode === "card" ? "#fff" : "rgba(255,255,255,0.5)" }}
+              >
+                <CreditCard className="w-3 h-3" /> Card
+              </button>
+              <button
+                onClick={() => setLayoutMode("infographic")}
+                className="px-3 py-1.5 text-[11px] font-semibold flex items-center gap-1.5 transition-colors"
+                style={{ background: layoutMode === "infographic" ? BRAND : "transparent", color: layoutMode === "infographic" ? "#fff" : "rgba(255,255,255,0.5)" }}
+              >
+                <LayoutGrid className="w-3 h-3" /> Infographic
+              </button>
+            </div>
+            {/* Theme toggle */}
+            <div className="flex rounded-lg overflow-hidden" style={{ border: `1px solid ${BRAND}44` }}>
               <button
                 onClick={() => setCardTheme("dark")}
-                className="px-3 py-1 rounded-md text-xs font-semibold transition-all"
-                style={{
-                  background: cardTheme === "dark" ? `linear-gradient(90deg, ${BRAND}, ${BRAND_AQUA})` : "transparent",
-                  color: cardTheme === "dark" ? "#fff" : "rgba(255,255,255,0.4)",
-                }}
+                className="px-3 py-1.5 text-[11px] font-semibold transition-colors"
+                style={{ background: cardTheme === "dark" ? BRAND_DARK : "transparent", color: cardTheme === "dark" ? BRAND_AQUA : "rgba(255,255,255,0.4)" }}
               >
-                🌙 Dark
+                Dark
               </button>
               <button
                 onClick={() => setCardTheme("light")}
-                className="px-3 py-1 rounded-md text-xs font-semibold transition-all"
-                style={{
-                  background: cardTheme === "light" ? `linear-gradient(90deg, ${BRAND}, ${BRAND_AQUA})` : "transparent",
-                  color: cardTheme === "light" ? "#fff" : "rgba(255,255,255,0.4)",
-                }}
+                className="px-3 py-1.5 text-[11px] font-semibold transition-colors"
+                style={{ background: cardTheme === "light" ? "#e8f7f8" : "transparent", color: cardTheme === "light" ? BRAND_DARK : "rgba(255,255,255,0.4)" }}
               >
-                ☀️ Light
+                Light
               </button>
             </div>
-            {items.length > 0 && (
-              <Button
-                size="sm"
-                onClick={handleBatchDownload}
-                disabled={batchLoading}
-                className="gap-1.5 text-white text-xs font-semibold"
-                style={{ background: `linear-gradient(90deg, ${BRAND}, ${BRAND_DARK})` }}
-              >
+            {items.length > 1 && (
+              <Button onClick={handleBatchDownload} disabled={batchLoading} size="sm" className="gap-1.5 text-xs text-white" style={{ background: `linear-gradient(90deg, ${BRAND}, ${BRAND_DARK})` }}>
                 {batchLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Package className="w-3 h-3" />}
-                Download All
+                Download All ({items.length})
               </Button>
             )}
           </div>
         </div>
       </div>
 
+      {/* Controls */}
       <div className="max-w-screen-2xl mx-auto px-6 py-4">
-        {/* Generator controls */}
-        <div
-          className="rounded-lg p-4 mb-4"
-          style={{ background: "#0e1a24", border: "1px solid rgba(255,255,255,0.08)" }}
-        >
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
-            {/* Content type */}
+        <div className="rounded-xl p-4" style={{ background: "#0e1a24", border: "1px solid rgba(255,255,255,0.08)" }}>
+          <div className="flex flex-wrap items-end gap-3">
+            {/* Content Type */}
             <div className="flex flex-col gap-1">
               <label className="text-[10px] font-semibold text-white/50 uppercase tracking-wider">Content Type</label>
-              <select
-                value={contentType}
-                onChange={(e) => setContentType(e.target.value)}
-                className="px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none"
-              >
-                {CONTENT_TYPES.map((ct) => (
-                  <option key={ct.value} value={ct.value} style={{ background: "#0e1a24" }}>
-                    {ct.label}
-                  </option>
-                ))}
+              <select value={contentType} onChange={(e) => setContentType(e.target.value)} className="px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none">
+                {CONTENT_TYPES.map((ct) => (<option key={ct.value} value={ct.value} style={{ background: "#0e1a24" }}>{ct.label}</option>))}
               </select>
             </div>
-
             {/* Category */}
             <div className="flex flex-col gap-1">
               <label className="text-[10px] font-semibold text-white/50 uppercase tracking-wider">Category</label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none"
-              >
-                {CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat} style={{ background: "#0e1a24" }}>
-                    {cat}
-                  </option>
-                ))}
+              <select value={category} onChange={(e) => setCategory(e.target.value)} className="px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none">
+                {CATEGORIES.map((c) => (<option key={c} value={c} style={{ background: "#0e1a24" }}>{c}</option>))}
               </select>
             </div>
-
-            {/* Custom topic */}
-            <div className="flex flex-col gap-1">
+            {/* Custom Topic */}
+            <div className="flex flex-col gap-1 flex-1 min-w-[200px]">
               <label className="text-[10px] font-semibold text-white/50 uppercase tracking-wider">Custom Topic (optional)</label>
-              <input
-                type="text"
-                value={customTopic}
-                onChange={(e) => setCustomTopic(e.target.value)}
-                placeholder="e.g. IVC collapsibility"
-                className="px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none placeholder:text-white/30"
-              />
+              <input type="text" value={customTopic} onChange={(e) => setCustomTopic(e.target.value)} placeholder="e.g., Aortic stenosis scanning tips" className="px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none placeholder:text-white/25" />
             </div>
-
             {/* Count */}
             <div className="flex flex-col gap-1">
               <label className="text-[10px] font-semibold text-white/50 uppercase tracking-wider">Count</label>
-              <select
-                value={count}
-                onChange={(e) => setCount(Number(e.target.value))}
-                className="px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none"
-              >
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <option key={n} value={n} style={{ background: "#0e1a24" }}>
-                    {n} {n === 1 ? "item" : "items"}
-                  </option>
-                ))}
+              <select value={count} onChange={(e) => setCount(Number(e.target.value))} className="px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none">
+                {[1, 2, 3, 4, 5].map((n) => (<option key={n} value={n} style={{ background: "#0e1a24" }}>{n} {n === 1 ? "item" : "items"}</option>))}
               </select>
             </div>
-
-            {/* Generate button */}
-            <Button
-              onClick={handleGenerate}
-              disabled={generateMutation.isPending}
-              className="gap-2 text-white font-semibold"
-              style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_AQUA})`, height: 42 }}
-            >
-              {generateMutation.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Sparkles className="w-4 h-4" />
-              )}
+            {/* Generate */}
+            <Button onClick={handleGenerate} disabled={generateMutation.isPending} className="gap-2 text-white font-semibold" style={{ background: `linear-gradient(135deg, ${BRAND}, ${BRAND_AQUA})`, height: 42 }}>
+              {generateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
               {generateMutation.isPending ? "Generating..." : "Generate"}
             </Button>
           </div>
 
-          {/* Image toggle row */}
-          <div
-            className="mt-3 rounded-lg p-3 flex flex-col gap-2"
-            style={{
-              background: includeImage ? `${BRAND}12` : "rgba(255,255,255,0.02)",
-              border: `1px solid ${includeImage ? BRAND + "44" : "rgba(255,255,255,0.06)"}`,
-              transition: "all 0.2s ease",
-            }}
-          >
+          {/* Image mode selector */}
+          <div className="mt-3 rounded-lg p-3" style={{ background: imageMode !== "none" ? `${BRAND}12` : "rgba(255,255,255,0.02)", border: `1px solid ${imageMode !== "none" ? BRAND + "44" : "rgba(255,255,255,0.06)"}`, transition: "all 0.2s ease" }}>
             <div className="flex items-center gap-3">
-              {/* Toggle switch */}
-              <button
-                onClick={() => setIncludeImage(!includeImage)}
-                className="relative flex-shrink-0"
-                style={{ width: 44, height: 24 }}
-              >
-                <div
-                  className="rounded-full transition-all duration-200"
+              <span className="text-xs font-semibold text-white/50 uppercase tracking-wider mr-2">Image:</span>
+              {(["none", "abstract", "upload"] as ImageMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setImageMode(mode)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
                   style={{
-                    width: 44,
-                    height: 24,
-                    background: includeImage ? `linear-gradient(90deg, ${BRAND}, ${BRAND_AQUA})` : "rgba(255,255,255,0.15)",
+                    background: imageMode === mode ? `${BRAND}33` : "rgba(255,255,255,0.04)",
+                    border: `1px solid ${imageMode === mode ? BRAND : "rgba(255,255,255,0.08)"}`,
+                    color: imageMode === mode ? BRAND_AQUA : "rgba(255,255,255,0.4)",
                   }}
-                />
-                <div
-                  className="absolute top-0.5 rounded-full bg-white shadow-md transition-all duration-200"
-                  style={{
-                    width: 20,
-                    height: 20,
-                    left: includeImage ? 22 : 2,
-                  }}
-                />
-              </button>
-              <div className="flex items-center gap-2">
-                <ImageLucide className="w-4 h-4" style={{ color: includeImage ? BRAND_AQUA : "rgba(255,255,255,0.35)" }} />
-                <span className="text-xs font-semibold" style={{ color: includeImage ? BRAND_AQUA : "rgba(255,255,255,0.5)" }}>
-                  Include AI Image
+                >
+                  {mode === "none" && <><X className="w-3 h-3" /> None</>}
+                  {mode === "abstract" && <><Sparkles className="w-3 h-3" /> Abstract AI</>}
+                  {mode === "upload" && <><Upload className="w-3 h-3" /> Upload After</>}
+                </button>
+              ))}
+              {imageMode === "abstract" && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full ml-1" style={{ background: `${BRAND}22`, color: BRAND_AQUA }}>
+                  5-20s per image
                 </span>
-                {includeImage && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: `${BRAND}22`, color: BRAND_AQUA }}>
-                    5-20s per image
-                  </span>
-                )}
-              </div>
+              )}
+              {imageMode === "upload" && (
+                <span className="text-[10px] text-white/40 ml-1">
+                  Upload your own clinical images after generating
+                </span>
+              )}
             </div>
-
-            {/* Image prompt input (shown when toggle is on) */}
-            {includeImage && (
-              <div className="flex flex-col gap-2 mt-1">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={imagePrompt}
-                    onChange={(e) => setImagePrompt(e.target.value)}
-                    placeholder="Describe the image (leave blank for AI to decide based on content)"
-                    className="flex-1 px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none placeholder:text-white/25"
-                  />
-                </div>
-                {/* Quick image prompt suggestions */}
+            {/* Abstract style hint */}
+            {imageMode === "abstract" && (
+              <div className="flex flex-col gap-2 mt-2">
+                <input type="text" value={imageStyleHint} onChange={(e) => setImageStyleHint(e.target.value)} placeholder="Style hint (optional) — e.g., teal waveform pattern, geometric mesh" className="px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none placeholder:text-white/25" />
                 <div className="flex flex-wrap gap-1.5">
-                  {IMAGE_PROMPT_SUGGESTIONS.map((suggestion) => (
-                    <button
-                      key={suggestion}
-                      onClick={() => setImagePrompt(suggestion)}
-                      className="px-2 py-0.5 rounded-md text-[10px] font-medium transition-colors"
-                      style={{
-                        background: imagePrompt === suggestion ? `${BRAND}33` : "rgba(255,255,255,0.04)",
-                        border: `1px solid ${imagePrompt === suggestion ? BRAND : "rgba(255,255,255,0.06)"}`,
-                        color: imagePrompt === suggestion ? BRAND_AQUA : "rgba(255,255,255,0.4)",
-                      }}
-                    >
-                      {suggestion}
+                  {IMAGE_STYLE_HINTS.map((hint) => (
+                    <button key={hint} onClick={() => setImageStyleHint(hint)} className="px-2 py-0.5 rounded-md text-[10px] font-medium transition-colors" style={{ background: imageStyleHint === hint ? `${BRAND}33` : "rgba(255,255,255,0.04)", border: `1px solid ${imageStyleHint === hint ? BRAND : "rgba(255,255,255,0.06)"}`, color: imageStyleHint === hint ? BRAND_AQUA : "rgba(255,255,255,0.4)" }}>
+                      {hint}
                     </button>
                   ))}
                 </div>
               </div>
             )}
           </div>
+        </div>
+      </div>
 
-          {/* Quick topic buttons */}
-          <div className="flex flex-wrap gap-1.5 mt-3">
-            {[
-              "Liver scanning tips",
-              "Carotid stenosis grading",
-              "Fetal echo views",
-              "POCUS eFAST",
-              "Thyroid TI-RADS",
-              "DVT compression technique",
-              "Breast BI-RADS",
-              "IVC assessment",
-              "Gallbladder wall thickening",
-              "Ovarian cyst characterization",
-            ].map((topic) => (
-              <button
-                key={topic}
-                onClick={() => setCustomTopic(topic)}
-                className="px-2 py-1 rounded-md text-[10px] font-medium transition-colors"
-                style={{
-                  background: customTopic === topic ? `${BRAND}33` : "rgba(255,255,255,0.05)",
-                  border: `1px solid ${customTopic === topic ? BRAND : "rgba(255,255,255,0.08)"}`,
-                  color: customTopic === topic ? BRAND_AQUA : "rgba(255,255,255,0.5)",
-                }}
-              >
-                {topic}
-              </button>
-            ))}
+      {/* Empty state */}
+      {items.length === 0 && !generateMutation.isPending && (
+        <div className="max-w-screen-2xl mx-auto px-6 py-20 flex flex-col items-center gap-4 text-center">
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: `${BRAND}15`, border: `1px solid ${BRAND}33` }}>
+            <Sparkles className="w-7 h-7" style={{ color: BRAND_AQUA }} />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-white/80">Generate Social Content</h2>
+            <p className="text-sm text-white/40 mt-1 max-w-md">
+              Choose a content type, category, and count above, then click Generate to create branded social media cards.
+            </p>
           </div>
         </div>
+      )}
 
-        {/* Info bar */}
-        <div
-          className="rounded-lg p-3 mb-4 text-xs"
-          style={{ background: BRAND + "14", border: `1px solid ${BRAND}2a` }}
-        >
-          <p className="text-white/60">
-            Generate <strong className="text-white">ultrasound &amp; echocardiography</strong> social media content with AI.
-            Each card is <strong className="text-white">1080×1080 px</strong> — ideal for Instagram, Facebook, and LinkedIn.
-            Toggle <strong className="text-white">Include AI Image</strong> to add a generated image to each card.
-            You can provide a custom image prompt (e.g., "ultrasound of liver") or leave it blank for the AI to choose based on the content.
-            Download individual PNGs or use <strong className="text-white">Download All</strong> for a ZIP.
-          </p>
+      {/* Loading */}
+      {generateMutation.isPending && (
+        <div className="max-w-screen-2xl mx-auto px-6 py-12 flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 animate-spin" style={{ color: BRAND_AQUA }} />
+          <p className="text-sm text-white/50">Generating content{imageMode === "abstract" ? " with abstract backgrounds" : ""}...</p>
         </div>
+      )}
 
-        {/* Error */}
-        {generateMutation.isError && (
-          <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300 flex items-center gap-2 mb-4">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            <span>{generateMutation.error.message}</span>
-          </div>
-        )}
-
-        {/* Generated items */}
-        {items.length === 0 && !generateMutation.isPending && (
-          <div className="text-center py-16 text-white/30 text-sm">
-            <ImageIcon className="w-10 h-10 mx-auto mb-3 opacity-30" />
-            <p>No content generated yet. Select your options above and click Generate.</p>
-          </div>
-        )}
-
-        {generateMutation.isPending && items.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-16 gap-3">
-            <Loader2 className="w-7 h-7 animate-spin" style={{ color: BRAND_AQUA }} />
-            {includeImage && (
-              <span className="text-xs text-white/40">Generating content and images — this may take a moment...</span>
-            )}
-          </div>
-        )}
-
-        <div className="space-y-4">
-          {items.map((item, idx) => (
-            <div
-              key={`${item.contentType}-${item.category}-${idx}`}
-              className="rounded-lg border border-white/10 overflow-hidden"
-              style={{ background: "#0e1a24" }}
-            >
-              {/* Item header */}
-              <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
-                <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ background: BRAND_AQUA, boxShadow: `0 0 6px ${BRAND_AQUA}` }} />
-                  <span className="font-bold text-white text-sm">
-                    {CONTENT_TYPE_ICONS[item.contentType]} {CONTENT_TYPE_LABELS[item.contentType]}
-                  </span>
-                  <Badge className="text-[10px] px-1.5 py-0" style={{ background: BRAND + "22", color: BRAND_AQUA, border: "none" }}>
-                    {item.category}
-                  </Badge>
-                  {item.imageUrl && (
-                    <Badge className="text-[10px] px-1.5 py-0" style={{ background: "#166534", color: "#4ade80", border: "none" }}>
-                      With Image
-                    </Badge>
-                  )}
-                </div>
-                <button
-                  onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
-                  className="text-white/30 hover:text-red-400 text-xs transition-colors"
+      {/* Cards grid */}
+      {items.length > 0 && (
+        <div className="max-w-screen-2xl mx-auto px-6 pb-12">
+          <div className="flex flex-col gap-8">
+            {items.map((item, idx) => (
+              <div key={`${item.headline}-${idx}`} className="flex gap-6 items-start">
+                {/* Card preview */}
+                <DownloadableCard
+                  filename={`${item.contentType}-${item.category.replace(/[\s/]+/g, "-")}-${idx + 1}.png`}
+                  onRef={(handle) => { cardRefs.current[idx] = handle; }}
                 >
-                  Remove
-                </button>
-              </div>
-
-              {/* Card + social post side by side */}
-              <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-1.5">
-                    <ImageIcon className="w-3 h-3" style={{ color: BRAND_AQUA }} />
-                    <span className="text-[10px] font-semibold text-white/50 uppercase tracking-wider">Card Preview</span>
+                  {layoutMode === "infographic" ? (
+                    <InfographicCard item={item} t={t} />
+                  ) : (
+                    <SimpleContentCard item={item} t={t} />
+                  )}
+                </DownloadableCard>
+                {/* Actions panel */}
+                <div className="flex-1 min-w-[280px] max-w-md flex flex-col gap-3">
+                  {/* Social post */}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <Share2 className="w-3 h-3" style={{ color: BRAND_AQUA }} />
+                      <span className="text-[10px] font-semibold text-white/50 uppercase tracking-wider">Social Post</span>
+                    </div>
+                    <SocialPostPanel item={item} />
                   </div>
-                  <DownloadableCard
-                    filename={`${item.contentType}-${item.category.replace(/[\s/]+/g, "-")}-${idx + 1}.png`}
-                    onRef={(h) => { cardRefs.current[idx] = h; }}
-                  >
-                    <ContentCard item={item} t={t} />
-                  </DownloadableCard>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-1.5">
-                    <Share2 className="w-3 h-3" style={{ color: BRAND_AQUA }} />
-                    <span className="text-[10px] font-semibold text-white/50 uppercase tracking-wider">Social Post</span>
-                  </div>
-                  <SocialPostPanel item={item} />
-
                   {/* Image controls */}
                   <div className="flex flex-col gap-1.5 mt-1">
                     <div className="flex items-center gap-1.5">
@@ -1032,84 +857,39 @@ export default function SocialContentGenerator() {
                     <div className="flex flex-wrap gap-1.5">
                       {item.imageUrl ? (
                         <>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleRegenerateImage(idx, item)}
-                            disabled={regeneratingImageIdx === idx}
-                            className="gap-1.5 text-white/50 border-white/15 hover:bg-white/10 text-xs"
-                          >
-                            {regeneratingImageIdx === idx ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : (
-                              <RefreshCw className="w-3 h-3" />
-                            )}
-                            Regenerate Image
+                          <Button size="sm" variant="outline" onClick={() => handleRegenerateAbstract(idx, item)} disabled={regeneratingImageIdx === idx} className="gap-1.5 text-white/50 border-white/15 hover:bg-white/10 text-xs">
+                            {regeneratingImageIdx === idx ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                            New Abstract
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleRemoveImage(idx)}
-                            className="gap-1.5 text-red-400/70 border-red-400/20 hover:bg-red-400/10 text-xs"
-                          >
-                            Remove Image
+                          <ImageUploadButton onUploaded={(url) => handleUploadedImage(idx, url)} disabled={regeneratingImageIdx === idx} />
+                          <Button size="sm" variant="outline" onClick={() => handleRemoveImage(idx)} className="gap-1.5 text-red-400/70 border-red-400/20 hover:bg-red-400/10 text-xs">
+                            <X className="w-3 h-3" /> Remove
                           </Button>
-                          {/* Download standalone image */}
-                          <a
-                            href={item.imageUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            download
-                          >
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="gap-1.5 text-white/50 border-white/15 hover:bg-white/10 text-xs"
-                            >
-                              <Download className="w-3 h-3" />
-                              Image Only
+                          <a href={item.imageUrl} target="_blank" rel="noopener noreferrer" download>
+                            <Button size="sm" variant="outline" className="gap-1.5 text-white/50 border-white/15 hover:bg-white/10 text-xs">
+                              <Download className="w-3 h-3" /> Image Only
                             </Button>
                           </a>
                         </>
                       ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleAddImage(idx, item)}
-                          disabled={regeneratingImageIdx === idx}
-                          className="gap-1.5 text-white/50 border-white/15 hover:bg-white/10 text-xs"
-                        >
-                          {regeneratingImageIdx === idx ? (
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                          ) : (
-                            <ImageLucide className="w-3 h-3" />
-                          )}
-                          Add AI Image
-                        </Button>
+                        <>
+                          <Button size="sm" variant="outline" onClick={() => handleRegenerateAbstract(idx, item)} disabled={regeneratingImageIdx === idx} className="gap-1.5 text-white/50 border-white/15 hover:bg-white/10 text-xs">
+                            {regeneratingImageIdx === idx ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                            Add Abstract
+                          </Button>
+                          <ImageUploadButton onUploaded={(url) => handleUploadedImage(idx, url)} disabled={regeneratingImageIdx === idx} />
+                        </>
                       )}
                     </div>
                   </div>
-
                   {/* Quick regenerate */}
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => {
                       generateMutation.mutate(
-                        {
-                          contentType: item.contentType as any,
-                          category: item.category as any,
-                          count: 1,
-                          includeImage: !!item.imageUrl,
-                        },
-                        {
-                          onSuccess: (data) => {
-                            if (data.items[0]) {
-                              setItems((prev) => prev.map((p, i) => (i === idx ? data.items[0] : p)));
-                              toast.success("Regenerated!");
-                            }
-                          },
-                        }
+                        { contentType: item.contentType as any, category: item.category as any, count: 1, imageMode: item.imageUrl ? "abstract" : "none" },
+                        { onSuccess: (data) => { if (data.items[0]) { setItems((prev) => prev.map((p, i) => (i === idx ? data.items[0] : p))); toast.success("Regenerated!"); } } }
                       );
                     }}
                     disabled={generateMutation.isPending}
@@ -1120,10 +900,10 @@ export default function SocialContentGenerator() {
                   </Button>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
