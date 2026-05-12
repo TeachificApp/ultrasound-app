@@ -28,6 +28,7 @@ import { downloadsPublicRouter, downloadsLearnerRouter, downloadsAdminRouter } f
 import { orderBumpsAdminRouter, orderBumpsPublicRouter } from "./routers/orderBumpsRouter";
 import { socialContentRouter } from "./routers/socialContentRouter";
 import { funnelRouter, funnelPublicRouter } from "./routers/funnelRouter";
+import { sharingMonitorRouter } from "./routers/sharingMonitorRouter";
 import {
   getUserById,
   getUsersByIds,
@@ -1813,6 +1814,7 @@ export const appRouter = router({
   socialContent: socialContentRouter,
   funnel: funnelRouter,
   funnelPublic: funnelPublicRouter,
+  sharingMonitor: sharingMonitorRouter,
 
   // ─── Physician Over-Read Workflow (Step 1 & Step 2) ──────────────────────────
   physicianOverRead: router({

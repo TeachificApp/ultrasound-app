@@ -27,6 +27,7 @@ import { startEmailCampaignScheduler } from "../routers/emailCampaignRouter";
 import { startThinkificMemberSync } from "../jobs/thinkificMemberSync";
 import { initSonoQuizHub } from "../sonoQuizHub";
 import { startMirrorSync } from "../jobs/mirrorSync";
+import { startSharingMonitor } from "../jobs/sharingMonitor";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -154,6 +155,8 @@ async function startServer() {
     startMediaPurgeCron();
     // Start the Railway/R2 mirror sync (syncs DB and media every 6 hours)
     startMirrorSync();
+    // Start the Account Sharing Monitor (detects multi-IP abuse every 30 min)
+    startSharingMonitor();
   });
 }
 

@@ -1152,23 +1152,41 @@ function LandingPageEditor({ courseId, landingPage, courseType, onSave, saving }
 
 function CourseInstructorsEditor({ courseId, courseInstructors, onSaved }: { courseId: number; courseInstructors: any[]; onSaved: () => void }) {
   
-  const { data: allInstructors } = trpc.lmsAdmin.listInstructors.useQuery();
+  const { data: allInstructors, refetch: refetchInstructors } = trpc.lmsAdmin.listInstructors.useQuery();
   const [assignments, setAssignments] = useState<Array<{ instructorId: number; revenueSharePct: number; isPrimary: boolean }>>(
     courseInstructors.map(ci => ({ instructorId: ci.instructorId, revenueSharePct: ci.revenueSharePct, isPrimary: ci.isPrimary }))
   );
+  const [createOpen, setCreateOpen] = useState(false);
 
   const setCourseInstructors = trpc.lmsAdmin.setCourseInstructors.useMutation({
     onSuccess: () => { toast.success("Instructors saved"); onSaved(); },
     onError: e => toast.error(`Error: ${e.message}`),
   });
 
+  const createInstructor = trpc.lmsAdmin.createInstructor.useMutation({
+    onSuccess: (data) => {
+      toast.success("Instructor profile created");
+      setCreateOpen(false);
+      refetchInstructors();
+      // Auto-assign the newly created instructor
+      setAssignments(a => [...a, { instructorId: data.id, revenueSharePct: 0, isPrimary: a.length === 0 }]);
+    },
+    onError: e => toast.error(`Error: ${e.message}`),
+  });
+
   const addAssignment = () => {
     const available = (allInstructors ?? []).find((i: any) => !assignments.find(a => a.instructorId === i.id));
-    if (available) setAssignments(a => [...a, { instructorId: available.id, revenueSharePct: 0, isPrimary: assignments.length === 0 }]);
+    if (available) {
+      setAssignments(a => [...a, { instructorId: available.id, revenueSharePct: 0, isPrimary: assignments.length === 0 }]);
+    } else {
+      // No existing instructors available — open create dialog
+      setCreateOpen(true);
+    }
   };
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+      {/* Existing assignments */}
       <div className="space-y-3">
         {assignments.map((a, idx) => {
           const ins = (allInstructors ?? []).find((i: any) => i.id === a.instructorId);
@@ -1195,14 +1213,29 @@ function CourseInstructorsEditor({ courseId, courseInstructors, onSaved }: { cou
           );
         })}
       </div>
-      <div className="flex gap-3">
-        <Button size="sm" variant="outline" className="border-dashed border-teal-300 text-teal-600 hover:bg-teal-50" onClick={addAssignment} disabled={!allInstructors?.length}>
-          <Plus className="w-4 h-4 mr-1" /> Add Instructor
+
+      {/* Action buttons */}
+      <div className="flex gap-3 flex-wrap">
+        <Button size="sm" variant="outline" className="border-dashed border-teal-300 text-teal-600 hover:bg-teal-50" onClick={addAssignment}>
+          <Plus className="w-4 h-4 mr-1" /> {(allInstructors ?? []).length > 0 ? "Add Instructor" : "Create & Add Instructor"}
         </Button>
+        {(allInstructors ?? []).length > 0 && (
+          <Button size="sm" variant="outline" className="border-dashed border-purple-300 text-purple-600 hover:bg-purple-50" onClick={() => setCreateOpen(true)}>
+            <Plus className="w-4 h-4 mr-1" /> Create New Profile
+          </Button>
+        )}
         <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" disabled={setCourseInstructors.isPending} onClick={() => setCourseInstructors.mutate({ courseId, instructors: assignments })}>
           {setCourseInstructors.isPending ? "Saving..." : "Save"}
         </Button>
       </div>
+
+      {/* Hint about global profiles */}
+      <p className="text-xs text-gray-400">
+        Instructor profiles are saved globally and can be reused across all courses. Manage all profiles from the <span className="font-medium text-teal-600">Instructors</span> tab in the main Education Library view.
+      </p>
+
+      {/* Create Instructor Dialog */}
+      {createOpen && <InstructorFormDialog title="New Instructor Profile" onClose={() => setCreateOpen(false)} onSave={data => createInstructor.mutate(data)} saving={createInstructor.isPending} />}
     </div>
   );
 }

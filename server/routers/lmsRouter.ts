@@ -374,6 +374,15 @@ export const lmsLearnerRouter = router({
 
       // For admin preview, provide a synthetic enrollment so the player renders
       const effectiveEnrollment = enrollment ?? (isAdminPreview ? { id: -1, userId: ctx.user.id, courseId: course.id, enrolledAt: new Date(), progressPct: 0, completedAt: null, lastAccessedAt: new Date(), certificateIssuedAt: null } as any : null);
+
+      // Track IP access for paid content monitoring (non-blocking)
+      if (enrollment && !course.isFree && ctx.user.role !== "admin") {
+        const { logIpAccess } = await import("../jobs/sharingMonitor");
+        const fwd = ctx.req?.headers?.["x-forwarded-for"];
+        const ip = typeof fwd === "string" ? fwd.split(",")[0].trim() : ctx.req?.socket?.remoteAddress || "unknown";
+        logIpAccess({ userId: ctx.user.id, ipAddress: ip, userAgent: ctx.req?.headers?.["user-agent"] || undefined, contentType: "course", contentId: course.id }).catch(() => {});
+      }
+
       return { course, enrollment: effectiveEnrollment, sections: sectionsWithLessons, topLevelLessons, progress, isAdminPreview: !!isAdminPreview };
     }),
 

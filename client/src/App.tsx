@@ -41,6 +41,7 @@ import LandingPageBuilder from "./pages/admin/LandingPageBuilder";
 const FunnelBuilder = lazy(() => import("./pages/admin/FunnelBuilder"));
 const FunnelPageEditor = lazy(() => import("./pages/admin/FunnelPageEditor"));
 const ContactsAdmin = lazy(() => import("./pages/admin/ContactsAdmin"));
+const SharingMonitor = lazy(() => import("./pages/admin/SharingMonitor"));
 const PublicFunnelPage = lazy(() => import("./pages/PublicFunnelPage"));
 // ── Digital Downloads ──────────────────────────────────────────────────────────
 import DownloadsBrowse from "./pages/DownloadsBrowse";
@@ -337,6 +338,7 @@ function Router() {
         <Route path="/admin/form-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
         <Route path="/admin/form-builder/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
         <Route path="/admin/email">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><EmailAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/sharing-monitor">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><SharingMonitor /></Suspense></RoleGuard>}</Route>
         <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
         <Route path="/educator-assist">{() => <EducatorAssist />}</Route>
         {/* ── SonoQuiz (admin-only during testing) ──────────────────────── */}

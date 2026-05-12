@@ -233,6 +233,13 @@ export const downloadsLearnerRouter = router({
       await db.update(digitalProducts)
         .set({ downloadCount: sql`download_count + 1` })
         .where(eq(digitalProducts.id, input.productId));
+
+      // Track IP access for sharing monitoring (non-blocking)
+      const { logIpAccess } = await import("../jobs/sharingMonitor");
+      const fwd = ctx.req?.headers?.["x-forwarded-for"];
+      const ip = typeof fwd === "string" ? fwd.split(",")[0].trim() : ctx.req?.socket?.remoteAddress || "unknown";
+      logIpAccess({ userId: ctx.user.id, ipAddress: ip, userAgent: ctx.req?.headers?.["user-agent"] || undefined, contentType: "download", contentId: input.productId }).catch(() => {});
+
       return { success: true };
     }),
 

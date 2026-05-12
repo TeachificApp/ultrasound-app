@@ -3216,3 +3216,33 @@ export const funnelTemplates = mysqlTable("funnel_templates", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 export type FunnelTemplate = typeof funnelTemplates.$inferSelect;
+
+
+// ─── Account Sharing Monitoring ───────────────────────────────────────────────
+
+export const ipAccessLogs = mysqlTable("ip_access_logs", {
+  id: int("id").primaryKey().autoincrement(),
+  userId: int("user_id").notNull(),
+  ipAddress: varchar("ip_address", { length: 45 }).notNull(), // IPv6 max length
+  userAgent: text("user_agent"),
+  contentType: mysqlEnum("content_type", ["course", "download", "paid_content"]).notNull(),
+  contentId: int("content_id"), // course_id, product_id, etc.
+  accessedAt: timestamp("accessed_at").defaultNow().notNull(),
+});
+export type IpAccessLog = typeof ipAccessLogs.$inferSelect;
+
+export const sharingAbuseFlags = mysqlTable("sharing_abuse_flags", {
+  id: int("id").primaryKey().autoincrement(),
+  userId: int("user_id").notNull(),
+  status: mysqlEnum("status", ["flagged", "confirmed", "dismissed", "warned"]).default("flagged").notNull(),
+  distinctIpCount: int("distinct_ip_count").default(0).notNull(),
+  ipAddresses: longtext("ip_addresses"), // JSON array of IPs with timestamps
+  detectionReason: text("detection_reason"),
+  alertSentAt: timestamp("alert_sent_at"),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewedBy: int("reviewed_by"), // admin user ID
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type SharingAbuseFlag = typeof sharingAbuseFlags.$inferSelect;

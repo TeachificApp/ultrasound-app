@@ -1110,6 +1110,13 @@ export default function PlatformAdmin() {
                 description: "View and manage funnel leads, checkout submissions, and contact details",
                 color: "#0d9488",
               },
+              {
+                href: "/admin/sharing-monitor",
+                icon: Shield,
+                label: "Sharing Monitor",
+                description: "Detect account sharing abuse via multi-IP monitoring for paid content",
+                color: "#dc2626",
+              },
             ].map(({ href, icon: Icon, label, description, color }) => (
               <Link key={href} href={href}>
                 <div className="group flex flex-col gap-3 p-4 rounded-xl border border-gray-100 bg-white shadow-sm hover:shadow-md hover:border-gray-200 cursor-pointer transition-all h-full">

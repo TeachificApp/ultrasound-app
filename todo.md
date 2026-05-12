@@ -1504,3 +1504,12 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add Platform Admin breadcrumb to the Funnel Builder page (list view and detail view)
 - [x] Increase topics character limit for AI course generation (2000 → 10000)
 - [x] Fix pricingType validation error when creating AI-generated courses (was sending invalid "draft", now defaults to "free")
+- [x] Account sharing monitoring: database schema for IP access logs and abuse flags
+- [x] Account sharing monitoring: IP tracking middleware for paid content (courses, downloads, paid content)
+- [x] Account sharing monitoring: detection logic for multiple IPs per account
+- [x] Account sharing monitoring: SendGrid email alerts to support@allaboutultrasound.com
+- [x] Account sharing monitoring: admin UI for viewing flagged accounts and IP activity
+- [x] Account sharing monitoring: periodic job for pattern detection
+- [x] Redesign course player to match reference: dark teal/navy sidebar with numbered modules, large video area, "In This Module" panel, progress bar, "Mark Complete" button
+- [x] Fix "Add Instructor" button not working in course Instructors tab
+- [x] Implement global instructor profiles that can be saved and reused across courses
