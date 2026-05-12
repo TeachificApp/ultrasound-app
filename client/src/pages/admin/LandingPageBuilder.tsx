@@ -48,7 +48,8 @@ export type BlockType =
   | "instructor" | "logos" | "reviews" | "embed" | "cta_standalone"
   | "lead_capture" | "numbered_list" | "alert" | "flip_cards"
   | "curriculum_auto" | "pricing_options_auto"
-  | "funnel_workflow" | "product_offer_stack" | "order_bump_checkout";
+  | "funnel_workflow" | "product_offer_stack" | "order_bump_checkout"
+  | "price_stack" | "urgency_offer";
 
 export interface Block {
   id: string;
@@ -110,7 +111,7 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
   { type: "faq", label: "FAQ / Accordion", icon: <HelpCircle size={14} />, category: "Marketing",
     defaultData: { headline: "Frequently Asked Questions", items: [{ q: "Who is this course for?", a: "This course is designed for..." }, { q: "How long do I have access?", a: "You get lifetime access." }], bgColor: "#ffffff", accentColor: "#179ca3" } },
   { type: "countdown", label: "Countdown Timer", icon: <Timer size={14} />, category: "Marketing",
-    defaultData: { headline: "Enrollment Closes In", targetDate: "", bgColor: "#179ca3", textColor: "#ffffff" } },
+    defaultData: { headline: "LIMITED TIME OFFER!", mode: "on_load", durationMinutes: 90, targetDate: "", bgColor: "#ffffff", textColor: "#0e1e2e", accentColor: "#179ca3", showBorder: true } },
   { type: "alert", label: "Alert / Callout", icon: <AlertTriangle size={14} />, category: "Marketing",
     defaultData: { text: "Limited time offer — enroll today!", alertType: "info", icon: "💡" } },
   { type: "flip_cards", label: "Flip Cards", icon: <Layers size={14} />, category: "Marketing",
@@ -148,6 +149,24 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
       description: "Use this block to promote a digital bonus, shipped product, or bundle as part of the sales workflow.", productType: "physical",
       price: "$19", compareAtPrice: "$39", checkboxLabel: "Yes, add this order bump", ctaText: "Add bump and continue", skipText: "Continue without bump",
       shippingNote: "Shipping collected at checkout", features: ["Works for physical or digital bump offers", "Designed for one-click add-to-order messaging", "Pairs with the Order Bumps admin tab"], accentColor: "#f59e0b", bgColor: "#fff7ed",
+    } },
+  { type: "price_stack", label: "Price Stack CTA", icon: <CreditCard size={14} />, category: "Funnel",
+    defaultData: {
+      imageUrl: "", headline: "WHEN YOU UPGRADE RIGHT NOW,\nYOU'LL GET:",
+      items: [{ text: "Hands-On Access", price: "(Normally $3497)" }, { text: "LIVE in-person mentorship", price: "(cannot put a price tag)" }],
+      totalValueText: "TOTAL VALUE: Over $5000", originalPrice: "NORMALLY $3497", finalPrice: "$2497", finalPriceLabel: "Today Only:",
+      ctaText: "ENROLL NOW", ctaLink: "", ctaColor: "#179ca3", ctaTextColor: "#ffffff",
+      bgColor: "#ffffff", textColor: "#0e1e2e", borderColor: "#1a5f7a", showBorder: true,
+    } },
+  { type: "urgency_offer", label: "Urgency Offer", icon: <Timer size={14} />, category: "Funnel",
+    defaultData: {
+      headline: "Take What You Learn...\nand Actually Scan",
+      description: "Upgrade your experience with an exclusive hands-on workshop",
+      bodyHtml: "<p>You can understand ultrasound...</p><p>But confidence comes from putting your hands on the probe. <strong>This is where everything clicks.</strong></p>",
+      ctaText: "Add on now for $2497", ctaEmoji: "\uD83D\uDC4D", ctaLink: "",
+      countdownMode: "on_load", countdownMinutes: 90, countdownTargetDate: "",
+      countdownHeadline: "LIMITED TIME OFFER!",
+      bgColor: "#ffffff", textColor: "#0e1e2e", accentColor: "#179ca3", showBorder: true,
     } },
   // ── Smart Sections
   { type: "curriculum_auto", label: "Curriculum (Auto)", icon: <BookOpen size={14} />, category: "Smart",
@@ -354,20 +373,28 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
           </div>
         </div>
       );
-    case "countdown":
+    case "countdown": {
+      const mode = d.mode ?? "on_load";
+      const units = mode === "event" ? ["Days", "Hours", "Minutes", "Seconds"] : ["Hours", "Minutes", "Seconds"];
+      const placeholders = mode === "event" ? ["00", "00", "00", "00"] : [String(Math.floor((d.durationMinutes ?? 90) / 60)).padStart(2, "0"), String((d.durationMinutes ?? 90) % 60).padStart(2, "0"), "00"];
       return (
-        <div className="px-8 py-10 text-center" style={{ backgroundColor: d.bgColor ?? "#179ca3", color: d.textColor ?? "#fff" }}>
-          {d.headline && <h2 className="text-2xl font-bold mb-6">{d.headline}</h2>}
-          <div className="flex justify-center gap-4">
-            {["Days", "Hours", "Mins", "Secs"].map(unit => (
-              <div key={unit} className="bg-white/20 rounded-xl px-6 py-4 min-w-[80px]">
-                <div className="text-4xl font-bold">00</div>
-                <div className="text-sm opacity-80 mt-1">{unit}</div>
+        <div className={`px-8 py-10 text-center ${d.showBorder ? "border-2 rounded-2xl mx-4 my-4" : ""}`} style={{ backgroundColor: d.bgColor ?? "#ffffff", color: d.textColor ?? "#0e1e2e", borderColor: d.showBorder ? (d.accentColor ?? "#179ca3") : undefined }}>
+          {d.headline && <h2 className="text-lg font-bold uppercase tracking-wide mb-4" style={{ color: d.accentColor ?? "#179ca3" }}>{d.headline}</h2>}
+          <div className="flex justify-center items-center gap-2">
+            {units.map((unit, i) => (
+              <div key={unit} className="flex items-center gap-2">
+                <div className="text-center">
+                  <div className="text-5xl font-black tracking-tight">{placeholders[i]}</div>
+                  <div className="text-xs font-medium mt-1 opacity-70">{unit}</div>
+                </div>
+                {i < units.length - 1 && <span className="text-4xl font-bold opacity-50 -mt-4">:</span>}
               </div>
             ))}
           </div>
+          {mode === "on_load" && <p className="text-xs text-gray-400 mt-3">Timer starts when visitor loads page ({d.durationMinutes ?? 90} min)</p>}
         </div>
       );
+    }
     case "alert": {
       const alertStyles: Record<string, string> = { info: "bg-blue-50 border-blue-300 text-blue-800", success: "bg-green-50 border-green-300 text-green-800", warning: "bg-yellow-50 border-yellow-300 text-yellow-800", error: "bg-red-50 border-red-300 text-red-800" };
       return (
@@ -425,6 +452,69 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       return <ProductOfferStackBlock data={d} />;
     case "order_bump_checkout":
       return <InlineOrderBumpBlock data={d} />;
+    case "price_stack": {
+      const items: Array<{ text: string; price: string }> = d.items ?? [];
+      return (
+        <div className={`px-8 py-10 text-center ${d.showBorder ? "border-2 rounded-2xl mx-4 my-4" : ""}`} style={{ backgroundColor: d.bgColor ?? "#ffffff", color: d.textColor ?? "#0e1e2e", borderColor: d.showBorder ? (d.borderColor ?? "#1a5f7a") : undefined }}>
+          {d.imageUrl && <img src={d.imageUrl} alt="" className="w-full max-w-lg mx-auto rounded-lg mb-6 object-cover" />}
+          {d.headline && <h2 className="text-2xl md:text-3xl font-black uppercase mb-6 whitespace-pre-line">{d.headline}</h2>}
+          {items.length > 0 && (
+            <div className="space-y-2 mb-8 max-w-md mx-auto text-left">
+              {items.map((item, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <span className="text-teal-600">▶</span>
+                  <span className="font-medium">{item.text}</span>
+                  <span className="text-gray-500 ml-auto">{item.price}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {d.totalValueText && <p className="text-2xl md:text-3xl font-black italic mb-1">{d.totalValueText}</p>}
+          {d.originalPrice && <p className="text-xl font-bold uppercase line-through opacity-60 mb-1">{d.originalPrice}</p>}
+          {(d.finalPriceLabel || d.finalPrice) && (
+            <p className="text-3xl md:text-4xl font-black mb-6">
+              {d.finalPriceLabel && <span>{d.finalPriceLabel} </span>}
+              {d.finalPrice && <span className="underline decoration-4 underline-offset-4">{d.finalPrice}</span>}
+            </p>
+          )}
+          {d.ctaText && <button className="px-10 py-4 rounded-xl font-bold text-lg shadow-lg" style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>{d.ctaText}</button>}
+        </div>
+      );
+    }
+    case "urgency_offer": {
+      const cMode = d.countdownMode ?? "on_load";
+      const cUnits = cMode === "event" ? ["Days", "Hours", "Minutes", "Seconds"] : ["Hours", "Minutes", "Seconds"];
+      const cPlaceholders = cMode === "event" ? ["00", "00", "00", "00"] : [String(Math.floor((d.countdownMinutes ?? 90) / 60)).padStart(2, "0"), String((d.countdownMinutes ?? 90) % 60).padStart(2, "0"), "00"];
+      return (
+        <div className={`px-8 py-10 ${d.showBorder ? "border-2 rounded-2xl mx-4 my-4" : ""}`} style={{ backgroundColor: d.bgColor ?? "#ffffff", color: d.textColor ?? "#0e1e2e", borderColor: d.showBorder ? (d.accentColor ?? "#179ca3") : undefined }}>
+          {/* Countdown section */}
+          <div className="text-center mb-8">
+            {d.countdownHeadline && <h3 className="text-lg font-bold uppercase tracking-wide mb-3" style={{ color: d.accentColor ?? "#179ca3" }}>{d.countdownHeadline}</h3>}
+            <div className="flex justify-center items-center gap-2">
+              {cUnits.map((unit, i) => (
+                <div key={unit} className="flex items-center gap-2">
+                  <div className="text-center">
+                    <div className="text-4xl font-black tracking-tight">{cPlaceholders[i]}</div>
+                    <div className="text-xs font-medium mt-1 opacity-70">{unit}</div>
+                  </div>
+                  {i < cUnits.length - 1 && <span className="text-3xl font-bold opacity-50 -mt-4">:</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Content section */}
+          {d.headline && <h2 className="text-2xl md:text-3xl font-black text-center mb-4 whitespace-pre-line">{d.headline}</h2>}
+          {d.description && <p className="italic mb-4" style={{ color: d.accentColor ?? "#179ca3" }}>{d.description}</p>}
+          {d.bodyHtml && <div className="prose max-w-none mb-6" dangerouslySetInnerHTML={{ __html: d.bodyHtml }} />}
+          {d.ctaText && (
+            <p className="font-bold" style={{ color: d.accentColor ?? "#179ca3" }}>
+              {d.ctaEmoji && <span className="mr-1">{d.ctaEmoji}</span>}
+              {d.ctaText}
+            </p>
+          )}
+        </div>
+      );
+    }
     case "curriculum_auto":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
@@ -686,7 +776,7 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
       return (<div className="space-y-3"><TextField label="Section Headline" field="headline" /><ColorField label="Background" field="bgColor" /><ColorField label="Accent Color" field="accentColor" /><div><div className="flex items-center justify-between mb-2"><label className="text-xs text-gray-500 font-medium">FAQ Items</label><button onClick={() => set("items", [...items, { q: "Question?", a: "Answer." }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div><div className="space-y-2">{items.map((item, i) => (<div key={i} className="border border-gray-200 rounded p-2 space-y-1"><div className="flex justify-between items-center mb-1"><span className="text-xs text-gray-500">Q{i + 1}</span><button onClick={() => set("items", items.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div><Input value={item.q} onChange={e => { const next = items.map((it, j) => j === i ? { ...it, q: e.target.value } : it); set("items", next); }} className="h-7 text-xs" placeholder="Question" /><Textarea value={item.a} onChange={e => { const next = items.map((it, j) => j === i ? { ...it, a: e.target.value } : it); set("items", next); }} className="text-xs min-h-[60px]" placeholder="Answer" /></div>))}</div></div></div>);
     }
     case "countdown":
-      return (<div className="space-y-3"><TextField label="Headline" field="headline" /><div><label className="text-xs text-gray-500 block mb-1">Target Date & Time</label><Input type="datetime-local" value={d.targetDate ?? ""} onChange={e => set("targetDate", e.target.value)} className="h-8 text-sm" /></div><ColorField label="Background" field="bgColor" /><ColorField label="Text Color" field="textColor" /></div>);
+      return (<div className="space-y-3"><TextField label="Headline" field="headline" /><div><label className="text-xs text-gray-500 block mb-1">Timer Mode</label><select value={d.mode ?? "on_load"} onChange={e => set("mode", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="on_load">Countdown on page load (minutes)</option><option value="event">Countdown to specific date/time</option></select></div>{(d.mode ?? "on_load") === "on_load" ? (<div><label className="text-xs text-gray-500 block mb-1">Duration (minutes)</label><Input type="number" value={d.durationMinutes ?? 90} onChange={e => set("durationMinutes", Number(e.target.value))} className="h-8 text-sm" min={1} max={10080} /></div>) : (<div><label className="text-xs text-gray-500 block mb-1">Target Date & Time</label><Input type="datetime-local" value={d.targetDate ?? ""} onChange={e => set("targetDate", e.target.value)} className="h-8 text-sm" /></div>)}<ColorField label="Background" field="bgColor" /><ColorField label="Text Color" field="textColor" /><ColorField label="Accent Color" field="accentColor" /><div className="flex items-center gap-2"><input type="checkbox" checked={d.showBorder ?? true} onChange={e => set("showBorder", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show border</label></div></div>);
     case "alert":
       return (<div className="space-y-3"><TextField label="Alert Text" field="text" /><div><label className="text-xs text-gray-500 block mb-1">Alert Type</label><select value={d.alertType ?? "info"} onChange={e => set("alertType", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="info">Info (Blue)</option><option value="success">Success (Green)</option><option value="warning">Warning (Yellow)</option><option value="error">Error (Red)</option></select></div><TextField label="Icon (emoji)" field="icon" placeholder="💡" /></div>);
     case "flip_cards": {
@@ -815,6 +905,64 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
         </div>
       );
     }
+    case "price_stack": {
+      const items: Array<{ text: string; price: string }> = d.items ?? [];
+      return (
+        <div className="space-y-3">
+          <TextField label="Image URL" field="imageUrl" placeholder="https://..." />
+          <TextField label="Headline" field="headline" multiline />
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs text-gray-500 font-medium">Value Items</label>
+              <button onClick={() => set("items", [...items, { text: "New item", price: "($XX)" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button>
+            </div>
+            <div className="space-y-2">
+              {items.map((item, i) => (
+                <div key={i} className="flex gap-1 items-center">
+                  <Input value={item.text} onChange={e => set("items", items.map((it, j) => j === i ? { ...it, text: e.target.value } : it))} className="h-7 text-xs flex-1" placeholder="Item name" />
+                  <Input value={item.price} onChange={e => set("items", items.map((it, j) => j === i ? { ...it, price: e.target.value } : it))} className="h-7 text-xs w-32" placeholder="(Normally $X)" />
+                  <button onClick={() => set("items", items.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 flex-shrink-0"><X size={12} /></button>
+                </div>
+              ))}
+            </div>
+          </div>
+          <TextField label="Total Value Text" field="totalValueText" placeholder="TOTAL VALUE: Over $5000" />
+          <TextField label="Original Price (strikethrough)" field="originalPrice" placeholder="NORMALLY $3497" />
+          <div className="grid grid-cols-2 gap-2">
+            <TextField label="Final Price Label" field="finalPriceLabel" placeholder="Today Only:" />
+            <TextField label="Final Price" field="finalPrice" placeholder="$2497" />
+          </div>
+          <TextField label="CTA Button Text" field="ctaText" />
+          <TextField label="CTA Link" field="ctaLink" placeholder="/checkout or https://..." />
+          <ColorField label="CTA Color" field="ctaColor" />
+          <ColorField label="CTA Text Color" field="ctaTextColor" />
+          <ColorField label="Background" field="bgColor" />
+          <ColorField label="Text Color" field="textColor" />
+          <ColorField label="Border Color" field="borderColor" />
+          <div className="flex items-center gap-2"><input type="checkbox" checked={d.showBorder ?? true} onChange={e => set("showBorder", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show border</label></div>
+        </div>
+      );
+    }
+    case "urgency_offer":
+      return (
+        <div className="space-y-3">
+          <TextField label="Countdown Headline" field="countdownHeadline" placeholder="LIMITED TIME OFFER!" />
+          <div><label className="text-xs text-gray-500 block mb-1">Countdown Mode</label><select value={d.countdownMode ?? "on_load"} onChange={e => set("countdownMode", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="on_load">Countdown on page load (minutes)</option><option value="event">Countdown to specific date/time</option></select></div>
+          {(d.countdownMode ?? "on_load") === "on_load" ? (<div><label className="text-xs text-gray-500 block mb-1">Duration (minutes)</label><Input type="number" value={d.countdownMinutes ?? 90} onChange={e => set("countdownMinutes", Number(e.target.value))} className="h-8 text-sm" min={1} max={10080} /></div>) : (<div><label className="text-xs text-gray-500 block mb-1">Target Date & Time</label><Input type="datetime-local" value={d.countdownTargetDate ?? ""} onChange={e => set("countdownTargetDate", e.target.value)} className="h-8 text-sm" /></div>)}
+          <TextField label="Headline" field="headline" multiline />
+          <TextField label="Description (italic)" field="description" multiline />
+          <div><label className="text-xs text-gray-500 block mb-1">Body Content (HTML)</label><RichTextEditor value={d.bodyHtml ?? ""} onChange={(html) => set("bodyHtml", html)} minHeight={100} maxHeight={300} placeholder="Rich text body content..." /></div>
+          <div className="grid grid-cols-3 gap-2">
+            <TextField label="CTA Emoji" field="ctaEmoji" placeholder="\uD83D\uDC4D" />
+            <div className="col-span-2"><TextField label="CTA Text" field="ctaText" placeholder="Add on now for $X" /></div>
+          </div>
+          <TextField label="CTA Link" field="ctaLink" placeholder="/checkout or https://..." />
+          <ColorField label="Background" field="bgColor" />
+          <ColorField label="Text Color" field="textColor" />
+          <ColorField label="Accent Color" field="accentColor" />
+          <div className="flex items-center gap-2"><input type="checkbox" checked={d.showBorder ?? true} onChange={e => set("showBorder", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show border</label></div>
+        </div>
+      );
     case "curriculum_auto":
       return (<div className="space-y-3"><TextField label="Section Headline" field="headline" /><ColorField label="Background" field="bgColor" /><div className="flex items-center gap-2"><input type="checkbox" checked={d.showLocked ?? true} onChange={e => set("showLocked", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show locked lessons</label></div></div>);
     case "pricing_options_auto":

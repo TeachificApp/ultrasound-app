@@ -1434,3 +1434,9 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Backend: Checkout session creation for standalone funnel products (createCheckout procedure)
 - [x] Frontend: Funnel checkout page with Stripe integration and order bumps
 - [x] Write tests for funnel builder features (21 tests passing)
+
+## Funnel Builder — New Content Blocks
+- [x] Countdown Timer block (live HH:MM:SS with on_load/event modes, urgency header text, configurable duration)
+- [x] Price Stack CTA block (value items list, strikethrough original price, final price underlined, CTA button)
+- [x] Urgency Offer block (countdown + headline + italic description + rich body + emoji CTA link)
+- [x] All blocks added to catalog, BlockPreview, BlockSettings, and PublicFunnelPage renderer

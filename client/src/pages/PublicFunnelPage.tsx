@@ -3,7 +3,7 @@
  * Renders a public funnel page at /f/:slug/:pageSlug
  * Displays the block-based content and handles lead capture + checkout CTAs.
  */
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,80 @@ import { toast } from "sonner";
 import { Loader2, ArrowRight, CheckCircle } from "lucide-react";
 import type { Block } from "./admin/LandingPageBuilder";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
+
+// ─── Live Countdown Hook ─────────────────────────────────────────────────────
+
+function useCountdown(mode: "on_load" | "event", durationMinutes: number, targetDate?: string) {
+  const endRef = useRef<number | null>(null);
+  const [remaining, setRemaining] = useState<{ days: number; hours: number; minutes: number; seconds: number }>({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+
+  useEffect(() => {
+    if (mode === "event" && targetDate) {
+      endRef.current = new Date(targetDate).getTime();
+    } else if (mode === "on_load") {
+      // Use sessionStorage to persist the end time across re-renders within same session
+      const storageKey = `countdown_${durationMinutes}`;
+      const stored = sessionStorage.getItem(storageKey);
+      if (stored) {
+        endRef.current = Number(stored);
+      } else {
+        const end = Date.now() + durationMinutes * 60 * 1000;
+        endRef.current = end;
+        sessionStorage.setItem(storageKey, String(end));
+      }
+    }
+
+    const tick = () => {
+      if (!endRef.current) return;
+      const diff = Math.max(0, endRef.current - Date.now());
+      const totalSec = Math.floor(diff / 1000);
+      setRemaining({
+        days: Math.floor(totalSec / 86400),
+        hours: Math.floor((totalSec % 86400) / 3600),
+        minutes: Math.floor((totalSec % 3600) / 60),
+        seconds: totalSec % 60,
+      });
+    };
+
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [mode, durationMinutes, targetDate]);
+
+  return remaining;
+}
+
+// ─── Live Countdown Display Component ────────────────────────────────────────
+
+function CountdownDisplay({ mode, durationMinutes, targetDate, headline, accentColor, textColor, showBorder, bgColor }: {
+  mode: "on_load" | "event"; durationMinutes: number; targetDate?: string;
+  headline?: string; accentColor?: string; textColor?: string; showBorder?: boolean; bgColor?: string;
+}) {
+  const { days, hours, minutes, seconds } = useCountdown(mode, durationMinutes, targetDate);
+  const units = mode === "event"
+    ? [{ label: "Days", value: days }, { label: "Hours", value: hours }, { label: "Minutes", value: minutes }, { label: "Seconds", value: seconds }]
+    : [{ label: "Hours", value: hours }, { label: "Minutes", value: minutes }, { label: "Seconds", value: seconds }];
+
+  return (
+    <div className={`px-8 py-10 text-center ${showBorder ? "border-2 rounded-2xl mx-4 my-4" : ""}`}
+      style={{ backgroundColor: bgColor ?? "#ffffff", color: textColor ?? "#0e1e2e", borderColor: showBorder ? (accentColor ?? "#179ca3") : undefined }}>
+      {headline && <h2 className="text-lg font-bold uppercase tracking-wide mb-4" style={{ color: accentColor ?? "#179ca3" }}>{headline}</h2>}
+      <div className="flex justify-center items-center gap-3">
+        {units.map((unit, i) => (
+          <div key={unit.label} className="flex items-center gap-3">
+            <div className="text-center">
+              <div className="text-5xl font-black tracking-tight" style={{ color: textColor ?? "#0e1e2e" }}>
+                {String(unit.value).padStart(2, "0")}
+              </div>
+              <div className="text-xs font-medium mt-1 opacity-70">{unit.label}</div>
+            </div>
+            {i < units.length - 1 && <span className="text-4xl font-bold opacity-40 -mt-4">:</span>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // ─── Public Block Renderer ───────────────────────────────────────────────────
 
@@ -178,12 +252,16 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
       );
     case "countdown":
       return (
-        <div className="px-8 py-12 text-center" style={{ backgroundColor: d.bgColor ?? "#179ca3", color: d.textColor ?? "#ffffff" }}>
-          <div className="max-w-3xl mx-auto">
-            <h2 className="text-2xl font-bold mb-4">{d.headline}</h2>
-            <p className="text-lg opacity-80">Countdown timer — set a target date in the editor</p>
-          </div>
-        </div>
+        <CountdownDisplay
+          mode={d.mode ?? "on_load"}
+          durationMinutes={d.durationMinutes ?? 90}
+          targetDate={d.targetDate}
+          headline={d.headline}
+          accentColor={d.accentColor}
+          textColor={d.textColor}
+          showBorder={d.showBorder}
+          bgColor={d.bgColor}
+        />
       );
     case "divider":
       return (
@@ -285,6 +363,10 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
       return <ProductOfferStackBlock data={d} />;
     case "order_bump_checkout":
       return <InlineOrderBumpBlock data={d} />;
+    case "price_stack":
+      return <PriceStackBlock data={d} />;
+    case "urgency_offer":
+      return <UrgencyOfferBlock data={d} />;
     case "embed":
       return (
         <div className="px-8 py-8">
@@ -330,6 +412,94 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
     default:
       return null;
   }
+}
+
+// ─── Price Stack CTA Block ──────────────────────────────────────────────────
+
+function PriceStackBlock({ data: d }: { data: Record<string, any> }) {
+  const items: Array<{ text: string; price: string }> = d.items ?? [];
+  return (
+    <div className={`px-8 py-12 text-center ${d.showBorder ? "border-2 rounded-2xl mx-4 my-4" : ""}`}
+      style={{ backgroundColor: d.bgColor ?? "#ffffff", color: d.textColor ?? "#0e1e2e", borderColor: d.showBorder ? (d.borderColor ?? "#1a5f7a") : undefined }}>
+      <div className="max-w-2xl mx-auto">
+        {d.imageUrl && <img src={d.imageUrl} alt="" className="w-full max-w-lg mx-auto rounded-lg mb-8 object-cover" />}
+        {d.headline && <h2 className="text-2xl md:text-3xl font-black uppercase mb-8 whitespace-pre-line leading-tight">{d.headline}</h2>}
+        {items.length > 0 && (
+          <div className="space-y-3 mb-10 max-w-md mx-auto text-left">
+            {items.map((item, i) => (
+              <div key={i} className="flex items-center gap-3 text-lg">
+                <span className="text-teal-600 flex-shrink-0">▶</span>
+                <span className="font-medium">{item.text}</span>
+                <span className="text-gray-500 ml-auto text-sm">{item.price}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {d.totalValueText && <p className="text-2xl md:text-3xl font-black italic mb-2">{d.totalValueText}</p>}
+        {d.originalPrice && <p className="text-xl font-bold uppercase line-through opacity-50 mb-2">{d.originalPrice}</p>}
+        {(d.finalPriceLabel || d.finalPrice) && (
+          <p className="text-3xl md:text-5xl font-black mb-8">
+            {d.finalPriceLabel && <span>{d.finalPriceLabel} </span>}
+            {d.finalPrice && <span className="underline decoration-4 underline-offset-8">{d.finalPrice}</span>}
+          </p>
+        )}
+        {d.ctaText && (
+          <a href={d.ctaLink || "#"}
+            className="inline-block px-12 py-5 rounded-xl font-bold text-xl shadow-lg transition-transform hover:scale-105"
+            style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#ffffff" }}>
+            {d.ctaText}
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Urgency Offer Block ────────────────────────────────────────────────────
+
+function UrgencyOfferBlock({ data: d }: { data: Record<string, any> }) {
+  const { days, hours, minutes, seconds } = useCountdown(
+    d.countdownMode ?? "on_load",
+    d.countdownMinutes ?? 90,
+    d.countdownTargetDate
+  );
+  const mode = d.countdownMode ?? "on_load";
+  const units = mode === "event"
+    ? [{ label: "Days", value: days }, { label: "Hours", value: hours }, { label: "Minutes", value: minutes }, { label: "Seconds", value: seconds }]
+    : [{ label: "Hours", value: hours }, { label: "Minutes", value: minutes }, { label: "Seconds", value: seconds }];
+
+  return (
+    <div className={`px-8 py-10 ${d.showBorder ? "border-2 rounded-2xl mx-4 my-4" : ""}`}
+      style={{ backgroundColor: d.bgColor ?? "#ffffff", color: d.textColor ?? "#0e1e2e", borderColor: d.showBorder ? (d.accentColor ?? "#179ca3") : undefined }}>
+      <div className="max-w-2xl mx-auto">
+        {/* Countdown section */}
+        <div className="text-center mb-8">
+          {d.countdownHeadline && <h3 className="text-lg font-bold uppercase tracking-wide mb-4" style={{ color: d.accentColor ?? "#179ca3" }}>{d.countdownHeadline}</h3>}
+          <div className="flex justify-center items-center gap-3">
+            {units.map((unit, i) => (
+              <div key={unit.label} className="flex items-center gap-3">
+                <div className="text-center">
+                  <div className="text-5xl font-black tracking-tight">{String(unit.value).padStart(2, "0")}</div>
+                  <div className="text-xs font-medium mt-1 opacity-70">{unit.label}</div>
+                </div>
+                {i < units.length - 1 && <span className="text-4xl font-bold opacity-40 -mt-4">:</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+        {/* Content section */}
+        {d.headline && <h2 className="text-2xl md:text-3xl font-black text-center mb-6 whitespace-pre-line leading-tight">{d.headline}</h2>}
+        {d.description && <p className="italic text-lg mb-4" style={{ color: d.accentColor ?? "#179ca3" }}>{d.description}</p>}
+        {d.bodyHtml && <div className="prose prose-lg max-w-none mb-6" dangerouslySetInnerHTML={{ __html: d.bodyHtml }} />}
+        {d.ctaText && (
+          <a href={d.ctaLink || "#"} className="inline-flex items-center gap-2 font-bold text-lg transition-opacity hover:opacity-80" style={{ color: d.accentColor ?? "#179ca3" }}>
+            {d.ctaEmoji && <span>{d.ctaEmoji}</span>}
+            {d.ctaText}
+          </a>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // ─── Lead Capture Block ──────────────────────────────────────────────────────
