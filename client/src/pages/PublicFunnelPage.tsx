@@ -152,7 +152,7 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
         <div className="px-8 py-8">
           <div className="mx-auto" style={{ maxWidth: d.maxWidth ?? "56rem" }}>
             {d.embedUrl && (
-              <div className="relative w-full overflow-hidden shadow-lg" style={{ paddingBottom: d.height ? undefined : "56.25%", height: d.height || undefined, borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined }>>
+              <div className="relative w-full overflow-hidden shadow-lg" style={{ paddingBottom: d.height ? undefined : "56.25%", height: d.height || undefined, borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem",border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined }}>
                 <iframe src={d.embedUrl} className="absolute inset-0 w-full h-full" allowFullScreen />
               </div>
             )}
