@@ -201,7 +201,7 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
       subtitle: aiPreview?.subtitle || undefined,
       type,
       brand,
-      pricingType: "draft" as any,
+      pricingType: "free",
       isFree: true,
       price: 0,
     }, {

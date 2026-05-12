@@ -1503,3 +1503,4 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix "Back to Funnel" navigation — URL-based routing so navigating back lands on the specific funnel detail view
 - [x] Add Platform Admin breadcrumb to the Funnel Builder page (list view and detail view)
 - [x] Increase topics character limit for AI course generation (2000 → 10000)
+- [x] Fix pricingType validation error when creating AI-generated courses (was sending invalid "draft", now defaults to "free")
