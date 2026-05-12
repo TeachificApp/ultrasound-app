@@ -1413,3 +1413,6 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Expandable text prompt input for custom image description
 - [x] Allow generating image after content is already produced
 - [x] Keep existing pre-generation image toggle as well
+
+## Funnel Builder in Platform Admin
+- [x] Add funnel/landing page builders to Platform Admin navigation (Funnel Builder card → /admin/lms?tab=orderbumps)
