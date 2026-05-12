@@ -450,3 +450,36 @@ textarea,
   animation: fadeSlideUp 0.8s ease-out 0.45s forwards;
   opacity: 0;
 }
+
+/* ─── Button Animations ─── */
+@keyframes btnPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+@keyframes btnBounce {
+  0%, 100% { transform: translateY(0); }
+  25% { transform: translateY(-6px); }
+  50% { transform: translateY(0); }
+  75% { transform: translateY(-3px); }
+}
+@keyframes btnShake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
+  20%, 40%, 60%, 80% { transform: translateX(2px); }
+}
+@keyframes btnGlow {
+  0%, 100% { box-shadow: 0 0 5px rgba(23, 156, 163, 0.4); }
+  50% { box-shadow: 0 0 20px rgba(23, 156, 163, 0.8), 0 0 40px rgba(23, 156, 163, 0.4); }
+}
+.animate-pulse-btn {
+  animation: btnPulse 2s ease-in-out infinite;
+}
+.animate-bounce-btn {
+  animation: btnBounce 2s ease-in-out infinite;
+}
+.animate-shake-btn {
+  animation: btnShake 3s ease-in-out infinite;
+}
+.animate-glow-btn {
+  animation: btnGlow 2s ease-in-out infinite;
+}

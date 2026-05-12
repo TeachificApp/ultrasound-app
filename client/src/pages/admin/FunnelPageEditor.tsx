@@ -4,7 +4,7 @@
  * Route: /admin/funnels/:funnelId/pages/:pageId/edit
  * Reuses the same block system as the LMS LandingPageBuilder.
  */
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import {
   DndContext,
@@ -50,6 +50,12 @@ export default function FunnelPageEditor() {
   const [hasLoaded, setHasLoaded] = useState(false);
   const [activeCat, setActiveCat] = useState<string>("Layout");
 
+  // Auto-scroll preview canvas to the selected block
+  useEffect(() => {
+    if (!selectedId) return;
+    const el = document.querySelector(`[data-block-id="${selectedId}"]`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [selectedId]);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   // Load page data

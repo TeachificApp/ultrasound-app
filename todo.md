@@ -1487,3 +1487,13 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add public renderer for footer and logo_strip in PublicFunnelPage, CourseLanding, DownloadLanding
 - [x] Add "hide buttons" toggle to hero/banner BlockSettings and respect it in preview + public renderer
 - [x] Allow HTML (br, p) in banner/CTA headlines, subtitles, and block titles across all renderers (dangerouslySetInnerHTML with color picker still working)
+- [x] Auto-scroll preview panel to selected block when clicking a block in the sidebar
+- [x] Add inline image/video style controls: size (width/height), border-radius, border width + color picker
+- [x] Apply image/video styles in BlockPreview and all public renderers
+- [x] Add global margin and padding controls to every content block's settings panel
+- [x] Apply margin/padding styles in BlockPreview and all public renderers
+- [x] Enhance 2-column layout block with selectable content types per column (rich text, CTA, countdown, contact form, sales form)
+- [x] Add animation features to buttons and CTA blocks (pulse, bounce, shake, glow, etc.)
+- [x] Add 3-column content block with optional vertical dividers (color picker, style: solid/dashed/dotted)
+- [x] Add border style option (solid/dashed/dotted) to all existing border controls (image, video, divider blocks)
+- [x] Add border rounding options to all borders (image, video, divider, 3-column dividers)

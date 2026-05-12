@@ -856,6 +856,12 @@ export default function DownloadLandingPageBuilder() {
   const [activeCat, setActiveCat] = useState<string>("Layout");
   const [previewMode, setPreviewMode] = useState<"editor" | "visitor" | "customer">("editor");
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  // Auto-scroll preview canvas to the selected block
+  useEffect(() => {
+    if (!selectedId) return;
+    const el = document.querySelector(`[data-block-id="${selectedId}"]`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [selectedId]);
 
   const { isLoading, data: lpData } = trpc.downloadsAdmin.getLandingBlocks.useQuery(
     { productId: numericProductId },
@@ -1027,12 +1033,13 @@ export default function DownloadLandingPageBuilder() {
                 </div>
               )}
               {blocks.map(block => (
-                <div
+                <div data-block-id={block.id}
                   key={block.id}
                   onClick={previewMode === "editor" ? () => setSelectedId(block.id) : undefined}
                   className={previewMode === "editor" ? `relative group cursor-pointer border-2 transition-all ${
                     selectedId === block.id ? "border-teal-500 shadow-lg shadow-teal-100" : "border-transparent hover:border-teal-200"
                   }` : ""}
+                  style={{ marginTop: block.data?.marginTop ? `${block.data.marginTop}px` : undefined, marginBottom: block.data?.marginBottom ? `${block.data.marginBottom}px` : undefined, paddingTop: block.data?.paddingTop ? `${block.data.paddingTop}px` : undefined, paddingBottom: block.data?.paddingBottom ? `${block.data.paddingBottom}px` : undefined, paddingLeft: block.data?.paddingLeft ? `${block.data.paddingLeft}px` : undefined, paddingRight: block.data?.paddingRight ? `${block.data.paddingRight}px` : undefined }}
                 >
                   {previewMode === "editor" && (
                     <div className={`absolute top-2 right-2 z-10 flex gap-1 ${

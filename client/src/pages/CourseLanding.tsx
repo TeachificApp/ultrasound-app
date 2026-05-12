@@ -143,19 +143,21 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price }: {
     case "image":
       return (
         <div className="px-8 py-6 text-center">
-          {d.url && <img src={d.url} alt={d.alt ?? ""} className="mx-auto rounded-lg shadow" style={{ maxWidth: d.maxWidth ?? "100%" }} />}
+          {d.url && <img src={d.url} alt={d.alt ?? ""} className="mx-auto shadow" style={{ maxWidth: d.maxWidth ?? "100%", height: d.height || "auto", objectFit: "cover", borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined }} />}
           {d.caption && <p className="text-sm text-gray-500 mt-2">{d.caption}</p>}
         </div>
       );
     case "video":
       return (
         <div className="px-8 py-6">
-          {d.embedUrl && (
-            <div className="relative w-full rounded-lg overflow-hidden shadow" style={{ paddingBottom: "56.25%" }}>
-              <iframe src={d.embedUrl} className="absolute inset-0 w-full h-full" allowFullScreen title="Video" />
-            </div>
-          )}
-          {d.caption && <p className="text-sm text-gray-500 mt-2 text-center">{d.caption}</p>}
+          <div className="mx-auto" style={{ maxWidth: d.maxWidth ?? "100%" }}>
+            {d.embedUrl && (
+              <div className="relative w-full overflow-hidden shadow" style={{ paddingBottom: d.height ? undefined : "56.25%", height: d.height || undefined, borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined }}>
+                <iframe src={d.embedUrl} className="absolute inset-0 w-full h-full" allowFullScreen title="Video" />
+              </div>
+            )}
+            {d.caption && <p className="text-sm text-gray-500 mt-2 text-center">{d.caption}</p>}
+          </div>
         </div>
       );
     case "embed":
@@ -412,7 +414,7 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price }: {
         </div>
       );
     case "divider":
-      return <div style={{ padding: `${d.spacing ?? 32}px 32px` }}><hr style={{ borderTop: `${d.thickness ?? 1}px ${d.style ?? "solid"} ${d.color ?? "#e5e7eb"}` }} /></div>;
+      return <div style={{ padding: `${d.spacing ?? 32}px 32px` }}><hr style={{ borderTop: `${d.thickness ?? 1}px ${d.style ?? "solid"} ${d.color ?? "#e5e7eb"}`, borderRadius: d.borderRadius ? `${d.borderRadius}px` : undefined }} /></div>;
     case "two_column":
       return (
         <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
@@ -430,6 +432,18 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price }: {
             {cols.map((col: any, i: number) => (
               <div key={i} className="prose" dangerouslySetInnerHTML={{ __html: col.html ?? "" }} />
             ))}
+          </div>
+        </div>
+      );
+    }
+    case "three_column": {
+      const divStyle3 = d.showDividers ? { borderRightWidth: `${d.dividerWidth ?? 1}px`, borderRightStyle: (d.dividerStyle ?? "solid") as any, borderRightColor: d.dividerColor ?? "#e5e7eb", borderRadius: d.dividerRadius ? `${d.dividerRadius}px` : undefined } : {};
+      return (
+        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
+            <div className="prose prose-lg pr-4" style={divStyle3} dangerouslySetInnerHTML={{ __html: d.col1Html ?? "" }} />
+            <div className="prose prose-lg px-4" style={divStyle3} dangerouslySetInnerHTML={{ __html: d.col2Html ?? "" }} />
+            <div className="prose prose-lg pl-4" dangerouslySetInnerHTML={{ __html: d.col3Html ?? "" }} />
           </div>
         </div>
       );
@@ -547,7 +561,9 @@ export default function CourseLanding() {
     return (
       <div className="min-h-screen bg-white">
         {blocks.map(block => (
-          <RenderBlock key={block.id} block={block} course={course} onEnroll={handleEnroll} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} />
+          <div key={block.id} style={{ marginTop: block.data?.marginTop ? `${block.data.marginTop}px` : undefined, marginBottom: block.data?.marginBottom ? `${block.data.marginBottom}px` : undefined, paddingTop: block.data?.paddingTop ? `${block.data.paddingTop}px` : undefined, paddingBottom: block.data?.paddingBottom ? `${block.data.paddingBottom}px` : undefined, paddingLeft: block.data?.paddingLeft ? `${block.data.paddingLeft}px` : undefined, paddingRight: block.data?.paddingRight ? `${block.data.paddingRight}px` : undefined }}>
+            <RenderBlock block={block} course={course} onEnroll={handleEnroll} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} />
+          </div>
         ))}
         {/* Before-checkout order bump */}
         {!enrollment && course && (

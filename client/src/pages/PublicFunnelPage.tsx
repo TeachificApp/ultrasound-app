@@ -122,7 +122,7 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
             {d.subheadline && <p className="text-xl opacity-90 mb-8 max-w-2xl" dangerouslySetInnerHTML={{ __html: d.subheadline }} />}
             {!d.hideButtons && <div className="flex flex-wrap gap-3" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
               {heroButtons.map((btn, i) => (
-                <a key={i} href={btn.link || "#"} className="px-8 py-3 rounded-lg font-semibold text-lg shadow-lg inline-block transition-transform hover:scale-105"
+                <a key={i} href={btn.link || "#"} className={`px-8 py-3 rounded-lg font-semibold text-lg shadow-lg inline-block transition-transform hover:scale-105 ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
                   style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
                   {btn.text}
                 </a>
@@ -142,7 +142,7 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
       return (
         <div className="px-8 py-8" style={{ textAlign: d.align ?? "center" }}>
           <div className="max-w-4xl mx-auto">
-            {d.url && <img src={d.url} alt={d.alt ?? ""} className="rounded-lg shadow-md mx-auto" style={{ maxWidth: d.maxWidth ?? "100%" }} />}
+            {d.url && <img src={d.url} alt={d.alt ?? ""} className="shadow-md mx-auto" style={{ maxWidth: d.maxWidth ?? "100%", height: d.height || "auto", objectFit: "cover", borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined }} />}
             {d.caption && <p className="text-sm text-gray-500 mt-2 text-center">{d.caption}</p>}
           </div>
         </div>
@@ -150,10 +150,10 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
     case "video":
       return (
         <div className="px-8 py-8">
-          <div className="max-w-4xl mx-auto">
+          <div className="mx-auto" style={{ maxWidth: d.maxWidth ?? "56rem" }}>
             {d.embedUrl && (
-              <div className="aspect-video rounded-lg overflow-hidden shadow-lg">
-                <iframe src={d.embedUrl} className="w-full h-full" allowFullScreen />
+              <div className="relative w-full overflow-hidden shadow-lg" style={{ paddingBottom: d.height ? undefined : "56.25%", height: d.height || undefined, borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined }>>
+                <iframe src={d.embedUrl} className="absolute inset-0 w-full h-full" allowFullScreen />
               </div>
             )}
             {d.caption && <p className="text-sm text-gray-500 mt-2 text-center">{d.caption}</p>}
@@ -213,7 +213,7 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
           <div className="max-w-2xl mx-auto text-center">
             <h2 className="text-3xl font-bold mb-4 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />
             {d.subtext && <p className="text-lg text-gray-600 mb-8" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
-            <button className="px-10 py-4 rounded-xl font-bold text-xl shadow-lg transition-transform hover:scale-105"
+            <button className={`px-10 py-4 rounded-xl font-bold text-xl shadow-lg transition-transform hover:scale-105 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
               style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#ffffff" }}>
               {d.ctaText ?? "Get Started"}
             </button>
@@ -226,7 +226,7 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
           <div className="max-w-3xl mx-auto">
             <h2 className="text-2xl font-bold mb-3 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />
             {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
-            <a href={d.ctaLink || "#"} className="inline-block px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-transform hover:scale-105"
+            <a href={d.ctaLink || "#"} className={`inline-block px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-transform hover:scale-105 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
               style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#ffffff" }}>
               {d.ctaText ?? "Get Started"}
             </a>
@@ -270,20 +270,45 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
     case "divider":
       return (
         <div style={{ padding: `${(d.spacing ?? 32) / 2}px 0` }}>
-          <hr style={{ borderColor: d.color ?? "#e5e7eb", borderStyle: d.style ?? "solid", borderWidth: `${d.thickness ?? 1}px 0 0 0` }} />
+          <hr style={{ borderColor: d.color ?? "#e5e7eb", borderStyle: d.style ?? "solid", borderWidth: `${d.thickness ?? 1}px 0 0 0`, borderRadius: d.borderRadius ? `${d.borderRadius}px` : undefined }} />
         </div>
       );
-    case "spacer":
-      return <div style={{ height: d.height ?? 48 }} />;
-    case "two_column":
+    case "three_column": {
+      const divStyle3 = d.showDividers ? { borderRightWidth: `${d.dividerWidth ?? 1}px`, borderRightStyle: (d.dividerStyle ?? "solid") as any, borderRightColor: d.dividerColor ?? "#e5e7eb", borderRadius: d.dividerRadius ? `${d.dividerRadius}px` : undefined } : {};
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
-          <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="prose" dangerouslySetInnerHTML={{ __html: d.leftHtml ?? "" }} />
-            <div className="prose" dangerouslySetInnerHTML={{ __html: d.rightHtml ?? "" }} />
+        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
+            <div className="prose prose-lg pr-4" style={divStyle3} dangerouslySetInnerHTML={{ __html: d.col1Html ?? "" }} />
+            <div className="prose prose-lg px-4" style={divStyle3} dangerouslySetInnerHTML={{ __html: d.col2Html ?? "" }} />
+            <div className="prose prose-lg pl-4" dangerouslySetInnerHTML={{ __html: d.col3Html ?? "" }} />
           </div>
         </div>
       );
+    }
+    case "spacer":
+      return <div style={{ height: d.height ?? 48 }} />;
+    case "two_column": {
+      const renderCol = (side: "left" | "right") => {
+        const colType = d[`${side}Type`] ?? "rich_text";
+        switch (colType) {
+          case "rich_text": return <div className="prose" dangerouslySetInnerHTML={{ __html: d[`${side}Html`] ?? "" }} />;
+          case "cta": return <div className="flex items-center justify-center h-full"><a href={d[`${side}CtaLink`] || "#"} className={`px-8 py-4 rounded-lg font-bold text-lg shadow-lg inline-block ${d[`${side}CtaAnimation`] && d[`${side}CtaAnimation`] !== "none" ? `animate-${d[`${side}CtaAnimation`]}-btn` : ""}`} style={{ backgroundColor: d[`${side}CtaColor`] ?? "#179ca3", color: d[`${side}CtaTextColor`] ?? "#fff" }}>{d[`${side}CtaText`] ?? "Click Here"}</a></div>;
+          case "countdown": return <CountdownDisplay mode="on_load" durationMinutes={Number(d[`${side}CountdownMinutes`]) || 60} headline={d[`${side}CountdownHeadline`]} accentColor={d[`${side}CountdownColor`]} />;
+          case "contact_form": return <div className="space-y-3"><p className="text-lg font-semibold">{d[`${side}FormHeadline`] ?? "Get in Touch"}</p>{(d[`${side}FormFields`] ?? "name,email,message").split(",").map((f: string) => <input key={f} type="text" placeholder={f.trim()} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />)}<button className="w-full py-2 rounded-lg text-white font-medium" style={{ backgroundColor: d[`${side}FormBtnColor`] ?? "#179ca3" }}>Submit</button></div>;
+          case "image": return d[`${side}ImageUrl`] ? <img src={d[`${side}ImageUrl`]} alt={d[`${side}ImageAlt`] ?? ""} className="w-full rounded-lg shadow" /> : null;
+          case "video": return d[`${side}VideoUrl`] ? <div className="relative w-full rounded-lg overflow-hidden shadow" style={{ paddingBottom: "56.25%" }}><iframe src={d[`${side}VideoUrl`]} className="absolute inset-0 w-full h-full" allowFullScreen /></div> : null;
+          default: return null;
+        }
+      };
+      return (
+        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
+          <div className="max-w-5xl mx-auto flex flex-col md:flex-row gap-8">
+            <div style={{ flex: d.leftRatio ?? 50 }}>{renderCol("left")}</div>
+            <div style={{ flex: 100 - (d.leftRatio ?? 50) }}>{renderCol("right")}</div>
+          </div>
+        </div>
+      );
+    }
     case "instructor":
       return (
         <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
@@ -663,14 +688,15 @@ export default function PublicFunnelPage() {
     <div className="min-h-screen bg-white">
       {/* Render all blocks */}
       {blocks.map((block) => (
-        <RenderBlock
-          key={block.id}
-          block={block}
-          funnelId={funnel.id}
-          pageId={page.id}
-          funnelSlug={funnel.slug}
-          nextPage={nextPage}
-        />
+        <div key={block.id} style={{ marginTop: block.data.marginTop ? `${block.data.marginTop}px` : undefined, marginBottom: block.data.marginBottom ? `${block.data.marginBottom}px` : undefined, paddingTop: block.data.paddingTop ? `${block.data.paddingTop}px` : undefined, paddingBottom: block.data.paddingBottom ? `${block.data.paddingBottom}px` : undefined, paddingLeft: block.data.paddingLeft ? `${block.data.paddingLeft}px` : undefined, paddingRight: block.data.paddingRight ? `${block.data.paddingRight}px` : undefined }}>
+          <RenderBlock
+            block={block}
+            funnelId={funnel.id}
+            pageId={page.id}
+            funnelSlug={funnel.slug}
+            nextPage={nextPage}
+          />
+        </div>
       ))}
 
       {/* Next page navigation (if connected) */}
