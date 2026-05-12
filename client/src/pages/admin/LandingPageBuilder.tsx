@@ -230,25 +230,39 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       else if (bgType === "video") heroBg = { backgroundColor: "#000" };
       const heroButtons: Array<{ text: string; color: string; textColor: string; link: string; style: string }> =
         d.buttons?.length ? d.buttons : [{ text: d.ctaText ?? "Enroll Now", color: d.ctaColor ?? "#fff", textColor: d.ctaTextColor ?? "#179ca3", link: "", style: "filled" }];
+      const hasInlineMedia = !!d.inlineMediaUrl;
+      const placement = d.inlineMediaPlacement ?? "right";
+      const isHorizontal = placement === "left" || placement === "right";
       return (
-        <div className="relative px-8 py-16 overflow-hidden" style={{ ...heroBg, color: d.textColor ?? "#fff", textAlign: d.align ?? "left" }}>
+        <div className="relative px-8 py-16 overflow-hidden" style={{ ...heroBg, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left") }}>
           {bgType === "video" && d.videoUrl && (
             <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
           )}
-          <div className="relative max-w-3xl">
-            <h1 className="text-4xl font-bold mb-4 leading-tight">
-              <span style={d.headlineColor ? { color: d.headlineColor } : undefined} dangerouslySetInnerHTML={{ __html: d.headline ?? '' }} />
-              {d.headline2 && <><br /><span style={d.headline2Color ? { color: d.headline2Color } : undefined} dangerouslySetInnerHTML={{ __html: d.headline2 }} /></>}
-            </h1>
-            {d.subheadline && <p className="text-xl opacity-90 mb-8" dangerouslySetInnerHTML={{ __html: d.subheadline }} />}
-            {!d.hideButtons && <div className="flex flex-wrap gap-3" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
-              {heroButtons.map((btn, i) => (
-                <button key={i} className={`px-8 py-3 rounded-lg font-semibold text-lg shadow-lg ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
-                  style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
-                  {btn.text}
-                </button>
-              ))}
-            </div>}
+          <div className={`relative max-w-5xl mx-auto ${hasInlineMedia && isHorizontal ? "flex items-center gap-8" : ""} ${hasInlineMedia && placement === "left" ? "flex-row-reverse" : ""}`}>
+            <div className={hasInlineMedia && isHorizontal ? "flex-1" : "max-w-3xl"}>
+              <h1 className="text-4xl font-bold mb-4 leading-tight">
+                <span style={d.headlineColor ? { color: d.headlineColor } : undefined} dangerouslySetInnerHTML={{ __html: d.headline ?? '' }} />
+                {d.headline2 && <><br /><span style={d.headline2Color ? { color: d.headline2Color } : undefined} dangerouslySetInnerHTML={{ __html: d.headline2 }} /></>}
+              </h1>
+              {d.subheadline && <p className="text-xl opacity-90 mb-8" dangerouslySetInnerHTML={{ __html: d.subheadline }} />}
+              {!d.hideButtons && <div className="flex flex-wrap gap-3" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
+                {heroButtons.map((btn, i) => (
+                  <button key={i} className={`px-8 py-3 rounded-lg font-semibold text-lg shadow-lg ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
+                    style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
+                    {btn.text}
+                  </button>
+                ))}
+              </div>}
+            </div>
+            {hasInlineMedia && (
+              <div className={isHorizontal ? "flex-1 max-w-xs" : "mt-8 max-w-sm mx-auto"}>
+                {d.inlineMediaType === "video" ? (
+                  <video autoPlay muted loop playsInline className="w-full rounded-lg shadow-2xl"><source src={d.inlineMediaUrl} /></video>
+                ) : (
+                  <img src={d.inlineMediaUrl} alt="" className="w-full rounded-lg shadow-2xl" />
+                )}
+              </div>
+            )}
           </div>
         </div>
       );

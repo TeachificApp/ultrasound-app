@@ -109,25 +109,39 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
       else if (bgType === "video") heroBg = { backgroundColor: "#000" };
       const heroButtons: Array<{ text: string; color: string; textColor: string; link: string; style: string }> =
         d.buttons?.length ? d.buttons : [{ text: d.ctaText ?? "Get Started", color: "#fff", textColor: "#179ca3", link: "", style: "filled" }];
+      const hasInlineMedia = !!d.inlineMediaUrl;
+      const placement = d.inlineMediaPlacement ?? "right";
+      const isHorizontal = placement === "left" || placement === "right";
       return (
-        <div className="relative px-8 py-20 overflow-hidden" style={{ ...heroBg, color: d.textColor ?? "#fff", textAlign: d.align ?? "left" }}>
+        <div className="relative px-8 py-20 overflow-hidden" style={{ ...heroBg, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left") }}>
           {bgType === "video" && d.videoUrl && (
             <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
           )}
-          <div className="relative max-w-4xl mx-auto">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4 leading-tight">
-              <span style={d.headlineColor ? { color: d.headlineColor } : undefined} dangerouslySetInnerHTML={{ __html: d.headline ?? '' }} />
-              {d.headline2 && <><br /><span style={d.headline2Color ? { color: d.headline2Color } : undefined} dangerouslySetInnerHTML={{ __html: d.headline2 }} /></>}
-            </h1>
-            {d.subheadline && <p className="text-xl opacity-90 mb-8 max-w-2xl" dangerouslySetInnerHTML={{ __html: d.subheadline }} />}
-            {!d.hideButtons && <div className="flex flex-wrap gap-3" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
-              {heroButtons.map((btn, i) => (
-                <a key={i} href={btn.link || "#"} className={`px-8 py-3 rounded-lg font-semibold text-lg shadow-lg inline-block transition-transform hover:scale-105 ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
-                  style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
-                  {btn.text}
-                </a>
-              ))}
-            </div>}
+          <div className={`relative max-w-5xl mx-auto ${hasInlineMedia && isHorizontal ? "flex items-center gap-10" : ""} ${hasInlineMedia && placement === "left" ? "flex-row-reverse" : ""}`}>
+            <div className={hasInlineMedia && isHorizontal ? "flex-1" : "max-w-4xl mx-auto"}>
+              <h1 className="text-4xl md:text-5xl font-bold mb-4 leading-tight">
+                <span style={d.headlineColor ? { color: d.headlineColor } : undefined} dangerouslySetInnerHTML={{ __html: d.headline ?? '' }} />
+                {d.headline2 && <><br /><span style={d.headline2Color ? { color: d.headline2Color } : undefined} dangerouslySetInnerHTML={{ __html: d.headline2 }} /></>}
+              </h1>
+              {d.subheadline && <p className="text-xl opacity-90 mb-8 max-w-2xl" dangerouslySetInnerHTML={{ __html: d.subheadline }} />}
+              {!d.hideButtons && <div className="flex flex-wrap gap-3" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
+                {heroButtons.map((btn, i) => (
+                  <a key={i} href={btn.link || "#"} className={`px-8 py-3 rounded-lg font-semibold text-lg shadow-lg inline-block transition-transform hover:scale-105 ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
+                    style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
+                    {btn.text}
+                  </a>
+                ))}
+              </div>}
+            </div>
+            {hasInlineMedia && (
+              <div className={isHorizontal ? "flex-1 max-w-md" : "mt-8 max-w-lg mx-auto"}>
+                {d.inlineMediaType === "video" ? (
+                  <video autoPlay muted loop playsInline className="w-full rounded-lg shadow-2xl"><source src={d.inlineMediaUrl} /></video>
+                ) : (
+                  <img src={d.inlineMediaUrl} alt="" className="w-full rounded-lg shadow-2xl" />
+                )}
+              </div>
+            )}
           </div>
         </div>
       );
