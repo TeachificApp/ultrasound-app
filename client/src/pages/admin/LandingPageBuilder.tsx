@@ -675,9 +675,53 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
 
 // ─── Block Settings ────────────────────────────────────────────────────────────
 
+// ─── Stable sub-components for BlockSettings (defined outside to avoid remount on re-render) ───
+function BSTextField({ label, field, multiline = false, placeholder = "", data, onSet }: { label: string; field: string; multiline?: boolean; placeholder?: string; data: Record<string, any>; onSet: (key: string, value: any) => void }) {
+  return (
+    <div>
+      <label className="text-xs text-gray-500 block mb-1">{label}</label>
+      {multiline
+        ? <DebouncedTextarea value={data[field] ?? ""} onChange={v => onSet(field, v)} className="text-sm min-h-[80px]" placeholder={placeholder} />
+        : <DebouncedInput value={data[field] ?? ""} onChange={v => onSet(field, v)} className="h-8 text-sm" placeholder={placeholder} />}
+    </div>
+  );
+}
+
+function BSColorField({ label, field, data, onSet }: { label: string; field: string; data: Record<string, any>; onSet: (key: string, value: any) => void }) {
+  return (
+    <div className="flex items-center gap-2">
+      <label className="text-xs text-gray-500 w-24 flex-shrink-0">{label}</label>
+      <input type="color" value={data[field] ?? "#179ca3"} onChange={e => onSet(field, e.target.value)} className="w-7 h-7 rounded cursor-pointer border border-gray-200 flex-shrink-0" />
+      <DebouncedInput value={data[field] ?? ""} onChange={v => onSet(field, v)} className="h-7 text-xs flex-1" />
+    </div>
+  );
+}
+
+function BSAlignField({ data, onSet }: { data: Record<string, any>; onSet: (key: string, value: any) => void }) {
+  return (
+    <div>
+      <label className="text-xs text-gray-500 block mb-1">Alignment</label>
+      <div className="flex gap-1">
+        {(["left", "center", "right"] as const).map(a => (
+          <button key={a} onClick={() => onSet("align", a)} className={`flex-1 py-1 text-xs rounded border ${data.align === a ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>
+            {a === "left" ? <AlignLeft size={12} className="mx-auto" /> : a === "center" ? <AlignCenter size={12} className="mx-auto" /> : <AlignRight size={12} className="mx-auto" />}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function BlockSettings({ block, onChange }: { block: Block; onChange: (data: Record<string, any>) => void }) {
   const d = block.data;
-  const set = (key: string, value: any) => onChange({ ...d, [key]: value });
+  // Use refs to avoid stale closures with debounced inputs
+  const dataRef = useRef(block.data);
+  const onChangeRef = useRef(onChange);
+  dataRef.current = block.data;
+  onChangeRef.current = onChange;
+  const set = useCallback((key: string, value: any) => {
+    onChangeRef.current({ ...dataRef.current, [key]: value });
+  }, []);
   // Upload hooks — must be at top level (React rules of hooks)
   const bgImageRef = useRef<HTMLInputElement>(null);
   const bgVideoRef = useRef<HTMLInputElement>(null);
@@ -697,53 +741,23 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
     setUploading(null);
   };
 
-  const TextField = ({ label, field, multiline = false, placeholder = "" }: { label: string; field: string; multiline?: boolean; placeholder?: string }) => (
-    <div>
-      <label className="text-xs text-gray-500 block mb-1">{label}</label>
-      {multiline
-        ? <DebouncedTextarea value={d[field] ?? ""} onChange={v => set(field, v)} className="text-sm min-h-[80px]" placeholder={placeholder} />
-        : <DebouncedInput value={d[field] ?? ""} onChange={v => set(field, v)} className="h-8 text-sm" placeholder={placeholder} />}
-    </div>
-  );
-
-  const ColorField = ({ label, field }: { label: string; field: string }) => (
-    <div className="flex items-center gap-2">
-      <label className="text-xs text-gray-500 w-24 flex-shrink-0">{label}</label>
-      <input type="color" value={d[field] ?? "#179ca3"} onChange={e => set(field, e.target.value)} className="w-7 h-7 rounded cursor-pointer border border-gray-200 flex-shrink-0" />
-      <DebouncedInput value={d[field] ?? ""} onChange={v => set(field, v)} className="h-7 text-xs flex-1" />
-    </div>
-  );
-
-  const AlignField = () => (
-    <div>
-      <label className="text-xs text-gray-500 block mb-1">Alignment</label>
-      <div className="flex gap-1">
-        {(["left", "center", "right"] as const).map(a => (
-          <button key={a} onClick={() => set("align", a)} className={`flex-1 py-1 text-xs rounded border ${d.align === a ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>
-            {a === "left" ? <AlignLeft size={12} className="mx-auto" /> : a === "center" ? <AlignCenter size={12} className="mx-auto" /> : <AlignRight size={12} className="mx-auto" />}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-
   switch (block.type) {
     case "hero": {
       const bgType = d.bgType ?? "color";
       const buttons: Array<{ text: string; color: string; textColor: string; link: string; style: string }> =
         d.buttons?.length ? d.buttons : [{ text: d.ctaText ?? "Enroll Now", color: d.ctaColor ?? "#fff", textColor: d.ctaTextColor ?? "#179ca3", link: "", style: "filled" }];
-      const setBtn = (idx: number, key: string, val: string) => { const next = buttons.map((b, i) => i === idx ? { ...b, [key]: val } : b); onChange({ ...d, buttons: next }); };
+      const setBtn = (idx: number, key: string, val: string) => { const next = buttons.map((b, i) => i === idx ? { ...b, [key]: val } : b); onChangeRef.current({ ...dataRef.current, buttons: next }); };
       const addBtn = () => onChange({ ...d, buttons: [...buttons, { text: "Learn More", color: "transparent", textColor: "#fff", link: "", style: "outline" }] });
       const removeBtn = (idx: number) => onChange({ ...d, buttons: buttons.filter((_, i) => i !== idx) });
 
       return (
         <div className="space-y-3">
-          <TextField label="Headline (Line 1)" field="headline" />
-          <ColorField label="Line 1 Color" field="headlineColor" />
-          <TextField label="Headline (Line 2)" field="headline2" />
-          <ColorField label="Line 2 Color" field="headline2Color" />
-          <TextField label="Subheadline" field="subheadline" multiline />
-          <ColorField label="Text Color" field="textColor" />
+          <BSTextField data={d} onSet={set} label="Headline (Line 1)" field="headline" />
+          <BSColorField data={d} onSet={set} label="Line 1 Color" field="headlineColor" />
+          <BSTextField data={d} onSet={set} label="Headline (Line 2)" field="headline2" />
+          <BSColorField data={d} onSet={set} label="Line 2 Color" field="headline2Color" />
+          <BSTextField data={d} onSet={set} label="Subheadline" field="subheadline" multiline />
+          <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
           <div>
             <label className="text-xs text-gray-500 block mb-1">Background Type</label>
             <div className="grid grid-cols-2 gap-1">
@@ -754,8 +768,8 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
               ))}
             </div>
           </div>
-          {bgType === "color" && <ColorField label="Background" field="bgColor" />}
-          {bgType === "gradient" && (<><ColorField label="From" field="gradientFrom" /><ColorField label="To" field="gradientTo" /><div><label className="text-xs text-gray-500 block mb-1">Direction</label><select value={d.gradientDir ?? "to bottom right"} onChange={e => set("gradientDir", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="to right">Left → Right</option><option value="to bottom">Top → Bottom</option><option value="to bottom right">Diagonal ↘</option><option value="to bottom left">Diagonal ↙</option><option value="135deg">135°</option></select></div></>)}
+          {bgType === "color" && <BSColorField data={d} onSet={set} label="Background" field="bgColor" />}
+          {bgType === "gradient" && (<><BSColorField data={d} onSet={set} label="From" field="gradientFrom" /><BSColorField data={d} onSet={set} label="To" field="gradientTo" /><div><label className="text-xs text-gray-500 block mb-1">Direction</label><select value={d.gradientDir ?? "to bottom right"} onChange={e => set("gradientDir", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="to right">Left → Right</option><option value="to bottom">Top → Bottom</option><option value="to bottom right">Diagonal ↘</option><option value="to bottom left">Diagonal ↙</option><option value="135deg">135°</option></select></div></>)}
           {bgType === "image" && (
             <div className="space-y-2">
               <div className="flex items-center gap-2">
@@ -807,7 +821,7 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
               )}
             </div>
           </div>
-          <AlignField />
+          <BSAlignField data={d} onSet={set} />
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs text-gray-500 font-medium">CTA Buttons</label>
@@ -830,68 +844,68 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
       );
     }
     case "text":
-      return (<div className="space-y-3"><div><label className="text-xs text-gray-500 block mb-1">Content</label><RichTextEditor value={d.html ?? ""} onChange={(html) => set("html", html)} minHeight={150} maxHeight={400} placeholder="Start typing your content..." /></div><AlignField /><ColorField label="Background" field="bgColor" /><ColorField label="Text Color" field="textColor" /></div>);
+      return (<div className="space-y-3"><div><label className="text-xs text-gray-500 block mb-1">Content</label><RichTextEditor value={d.html ?? ""} onChange={(html) => set("html", html)} minHeight={150} maxHeight={400} placeholder="Start typing your content..." /></div><BSAlignField data={d} onSet={set} /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><BSColorField data={d} onSet={set} label="Text Color" field="textColor" /></div>);
     case "image":
-      return (<div className="space-y-3"><div><label className="text-xs text-gray-500 block mb-1">Image URL</label><div className="flex items-center gap-2"><DebouncedInput value={d.url ?? ""} onChange={v => set("url", v)} className="h-8 text-sm flex-1" placeholder="Image URL or upload" /><button onClick={() => bgImageRef.current?.click()} className="px-2 py-1.5 text-xs bg-teal-50 text-teal-700 rounded border border-teal-200 hover:bg-teal-100 flex items-center gap-1" disabled={uploading === "url"}>{uploading === "url" ? "..." : <><Upload size={12} /> Upload</>}</button><input ref={bgImageRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, "url", "image-block"); e.target.value = ""; }} /></div>{d.url && <img src={d.url} className="w-full h-16 object-cover rounded border mt-1" />}</div><TextField label="Alt Text" field="alt" /><TextField label="Caption" field="caption" /><div><label className="text-xs text-gray-500 block mb-1">Max Width</label><DebouncedInput value={d.maxWidth ?? "100%"} onChange={v => set("maxWidth", v)} className="h-8 text-sm" placeholder="100%, 600px, etc." /></div></div>);
+      return (<div className="space-y-3"><div><label className="text-xs text-gray-500 block mb-1">Image URL</label><div className="flex items-center gap-2"><DebouncedInput value={d.url ?? ""} onChange={v => set("url", v)} className="h-8 text-sm flex-1" placeholder="Image URL or upload" /><button onClick={() => bgImageRef.current?.click()} className="px-2 py-1.5 text-xs bg-teal-50 text-teal-700 rounded border border-teal-200 hover:bg-teal-100 flex items-center gap-1" disabled={uploading === "url"}>{uploading === "url" ? "..." : <><Upload size={12} /> Upload</>}</button><input ref={bgImageRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, "url", "image-block"); e.target.value = ""; }} /></div>{d.url && <img src={d.url} className="w-full h-16 object-cover rounded border mt-1" />}</div><BSTextField data={d} onSet={set} label="Alt Text" field="alt" /><BSTextField data={d} onSet={set} label="Caption" field="caption" /><div><label className="text-xs text-gray-500 block mb-1">Max Width</label><DebouncedInput value={d.maxWidth ?? "100%"} onChange={v => set("maxWidth", v)} className="h-8 text-sm" placeholder="100%, 600px, etc." /></div></div>);
     case "video":
-      return (<div className="space-y-3"><TextField label="Embed URL (YouTube, Vimeo, Wistia)" field="embedUrl" /><TextField label="Caption" field="caption" /></div>);
+      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Embed URL (YouTube, Vimeo, Wistia)" field="embedUrl" /><BSTextField data={d} onSet={set} label="Caption" field="caption" /></div>);
     case "embed":
-      return (<div className="space-y-3"><div><label className="text-xs text-gray-500 block mb-1">Embed Code (iframe or HTML)</label><DebouncedTextarea value={d.embedCode ?? ""} onChange={v => set("embedCode", v)} className="text-sm min-h-[100px] font-mono text-xs" placeholder='<iframe src="..." />' /></div><div><label className="text-xs text-gray-500 block mb-1">Height (px)</label><Input type="number" value={d.height ?? 400} onChange={e => set("height", Number(e.target.value))} className="h-8 text-sm" /></div><TextField label="Caption" field="caption" /></div>);
+      return (<div className="space-y-3"><div><label className="text-xs text-gray-500 block mb-1">Embed Code (iframe or HTML)</label><DebouncedTextarea value={d.embedCode ?? ""} onChange={v => set("embedCode", v)} className="text-sm min-h-[100px] font-mono text-xs" placeholder='<iframe src="..." />' /></div><div><label className="text-xs text-gray-500 block mb-1">Height (px)</label><Input type="number" value={d.height ?? 400} onChange={e => set("height", Number(e.target.value))} className="h-8 text-sm" /></div><BSTextField data={d} onSet={set} label="Caption" field="caption" /></div>);
     case "gallery": {
       const images: Array<{ url: string; caption: string }> = d.images ?? [];
-      return (<div className="space-y-3"><div><label className="text-xs text-gray-500 block mb-1">Columns</label><Input type="number" value={d.columns ?? 3} onChange={e => set("columns", Number(e.target.value))} className="h-8 text-sm" min={1} max={6} /></div><ColorField label="Background" field="bgColor" /><div><div className="flex items-center justify-between mb-2"><label className="text-xs text-gray-500 font-medium">Images</label><button onClick={() => set("images", [...images, { url: "", caption: "" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div><div className="space-y-2">{images.map((img, i) => (<div key={i} className="border border-gray-200 rounded p-2 space-y-1"><div className="flex justify-between items-center mb-1"><span className="text-xs text-gray-500">Image {i + 1}</span><button onClick={() => set("images", images.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div><DebouncedInput value={img.url} onChange={v => { const next = images.map((im, j) => j === i ? { ...im, url: v } : im); set("images", next); }} className="h-7 text-xs" placeholder="Image URL" /><DebouncedInput value={img.caption} onChange={v => { const next = images.map((im, j) => j === i ? { ...im, caption: v } : im); set("images", next); }} className="h-7 text-xs" placeholder="Caption (optional)" /></div>))}</div></div></div>);
+      return (<div className="space-y-3"><div><label className="text-xs text-gray-500 block mb-1">Columns</label><Input type="number" value={d.columns ?? 3} onChange={e => set("columns", Number(e.target.value))} className="h-8 text-sm" min={1} max={6} /></div><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div><div className="flex items-center justify-between mb-2"><label className="text-xs text-gray-500 font-medium">Images</label><button onClick={() => set("images", [...images, { url: "", caption: "" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div><div className="space-y-2">{images.map((img, i) => (<div key={i} className="border border-gray-200 rounded p-2 space-y-1"><div className="flex justify-between items-center mb-1"><span className="text-xs text-gray-500">Image {i + 1}</span><button onClick={() => set("images", images.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div><DebouncedInput value={img.url} onChange={v => { const next = images.map((im, j) => j === i ? { ...im, url: v } : im); set("images", next); }} className="h-7 text-xs" placeholder="Image URL" /><DebouncedInput value={img.caption} onChange={v => { const next = images.map((im, j) => j === i ? { ...im, caption: v } : im); set("images", next); }} className="h-7 text-xs" placeholder="Caption (optional)" /></div>))}</div></div></div>);
     }
     case "bullets": {
       const items: string[] = d.items ?? [];
-      return (<div className="space-y-3"><TextField label="Section Headline" field="headline" /><div><div className="flex items-center justify-between mb-2"><label className="text-xs text-gray-500 font-medium">Items</label><button onClick={() => set("items", [...items, "New item"])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div><div className="space-y-1">{items.map((item, i) => (<div key={i} className="flex gap-1"><DebouncedInput value={item} onChange={v => { const next = items.map((it, j) => j === i ? v : it); set("items", next); }} className="h-7 text-xs flex-1" /><button onClick={() => set("items", items.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 flex-shrink-0"><X size={12} /></button></div>))}</div></div><ColorField label="Icon Color" field="iconColor" /><ColorField label="Background" field="bgColor" /></div>);
+      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Section Headline" field="headline" /><div><div className="flex items-center justify-between mb-2"><label className="text-xs text-gray-500 font-medium">Items</label><button onClick={() => set("items", [...items, "New item"])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div><div className="space-y-1">{items.map((item, i) => (<div key={i} className="flex gap-1"><DebouncedInput value={item} onChange={v => { const next = items.map((it, j) => j === i ? v : it); set("items", next); }} className="h-7 text-xs flex-1" /><button onClick={() => set("items", items.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 flex-shrink-0"><X size={12} /></button></div>))}</div></div><BSColorField data={d} onSet={set} label="Icon Color" field="iconColor" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /></div>);
     }
     case "numbered_list": {
       const items: string[] = d.items ?? [];
-      return (<div className="space-y-3"><TextField label="Section Headline" field="headline" /><div><div className="flex items-center justify-between mb-2"><label className="text-xs text-gray-500 font-medium">Items</label><button onClick={() => set("items", [...items, "New step"])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div><div className="space-y-1">{items.map((item, i) => (<div key={i} className="flex gap-1 items-center"><span className="text-xs text-gray-400 w-5 flex-shrink-0">{i + 1}.</span><DebouncedInput value={item} onChange={v => { const next = items.map((it, j) => j === i ? v : it); set("items", next); }} className="h-7 text-xs flex-1" /><button onClick={() => set("items", items.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 flex-shrink-0"><X size={12} /></button></div>))}</div></div><ColorField label="Accent Color" field="accentColor" /><ColorField label="Background" field="bgColor" /></div>);
+      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Section Headline" field="headline" /><div><div className="flex items-center justify-between mb-2"><label className="text-xs text-gray-500 font-medium">Items</label><button onClick={() => set("items", [...items, "New step"])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div><div className="space-y-1">{items.map((item, i) => (<div key={i} className="flex gap-1 items-center"><span className="text-xs text-gray-400 w-5 flex-shrink-0">{i + 1}.</span><DebouncedInput value={item} onChange={v => { const next = items.map((it, j) => j === i ? v : it); set("items", next); }} className="h-7 text-xs flex-1" /><button onClick={() => set("items", items.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 flex-shrink-0"><X size={12} /></button></div>))}</div></div><BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /></div>);
     }
     case "icon_grid": {
       const items: Array<{ icon: string; title: string; text: string }> = d.items ?? [];
-      return (<div className="space-y-3"><TextField label="Section Headline" field="headline" /><div><label className="text-xs text-gray-500 block mb-1">Columns</label><Input type="number" value={d.columns ?? 3} onChange={e => set("columns", Number(e.target.value))} className="h-8 text-sm" min={1} max={6} /></div><ColorField label="Background" field="bgColor" /><div><div className="flex items-center justify-between mb-2"><label className="text-xs text-gray-500 font-medium">Items</label><button onClick={() => set("items", [...items, { icon: "⭐", title: "Feature", text: "Description" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div><div className="space-y-2">{items.map((item, i) => (<div key={i} className="border border-gray-200 rounded p-2 space-y-1"><div className="flex justify-between items-center mb-1"><span className="text-xs text-gray-500">Item {i + 1}</span><button onClick={() => set("items", items.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div><DebouncedInput value={item.icon} onChange={v => { const next = items.map((it, j) => j === i ? { ...it, icon: v } : it); set("items", next); }} className="h-7 text-xs" placeholder="Emoji or icon" /><DebouncedInput value={item.title} onChange={v => { const next = items.map((it, j) => j === i ? { ...it, title: v } : it); set("items", next); }} className="h-7 text-xs" placeholder="Title" /><DebouncedInput value={item.text} onChange={v => { const next = items.map((it, j) => j === i ? { ...it, text: v } : it); set("items", next); }} className="h-7 text-xs" placeholder="Description" /></div>))}</div></div></div>);
+      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Section Headline" field="headline" /><div><label className="text-xs text-gray-500 block mb-1">Columns</label><Input type="number" value={d.columns ?? 3} onChange={e => set("columns", Number(e.target.value))} className="h-8 text-sm" min={1} max={6} /></div><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div><div className="flex items-center justify-between mb-2"><label className="text-xs text-gray-500 font-medium">Items</label><button onClick={() => set("items", [...items, { icon: "⭐", title: "Feature", text: "Description" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div><div className="space-y-2">{items.map((item, i) => (<div key={i} className="border border-gray-200 rounded p-2 space-y-1"><div className="flex justify-between items-center mb-1"><span className="text-xs text-gray-500">Item {i + 1}</span><button onClick={() => set("items", items.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div><DebouncedInput value={item.icon} onChange={v => { const next = items.map((it, j) => j === i ? { ...it, icon: v } : it); set("items", next); }} className="h-7 text-xs" placeholder="Emoji or icon" /><DebouncedInput value={item.title} onChange={v => { const next = items.map((it, j) => j === i ? { ...it, title: v } : it); set("items", next); }} className="h-7 text-xs" placeholder="Title" /><DebouncedInput value={item.text} onChange={v => { const next = items.map((it, j) => j === i ? { ...it, text: v } : it); set("items", next); }} className="h-7 text-xs" placeholder="Description" /></div>))}</div></div></div>);
     }
     case "testimonial":
-      return (<div className="space-y-3"><TextField label="Quote" field="quote" multiline /><TextField label="Author" field="author" /><TextField label="Avatar URL" field="avatarUrl" /><ColorField label="Background" field="bgColor" /><ColorField label="Accent Color" field="accentColor" /></div>);
+      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Quote" field="quote" multiline /><BSTextField data={d} onSet={set} label="Author" field="author" /><BSTextField data={d} onSet={set} label="Avatar URL" field="avatarUrl" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" /></div>);
     case "reviews": {
       const reviews: Array<{ name: string; rating: number; text: string }> = d.reviews ?? [];
-      return (<div className="space-y-3"><TextField label="Section Headline" field="headline" /><ColorField label="Background" field="bgColor" /><div><div className="flex items-center justify-between mb-2"><label className="text-xs text-gray-500 font-medium">Reviews</label><button onClick={() => set("reviews", [...reviews, { name: "Student Name", rating: 5, text: "Great course!" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div><div className="space-y-2">{reviews.map((r, i) => (<div key={i} className="border border-gray-200 rounded p-2 space-y-1"><div className="flex justify-between items-center mb-1"><span className="text-xs text-gray-500">Review {i + 1}</span><button onClick={() => set("reviews", reviews.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div><DebouncedInput value={r.name} onChange={v => { const next = reviews.map((rv, j) => j === i ? { ...rv, name: v } : rv); set("reviews", next); }} className="h-7 text-xs" placeholder="Name" /><Input type="number" value={r.rating} onChange={e => { const next = reviews.map((rv, j) => j === i ? { ...rv, rating: Number(e.target.value) } : rv); set("reviews", next); }} className="h-7 text-xs" min={1} max={5} placeholder="Rating (1-5)" /><DebouncedTextarea value={r.text} onChange={v => { const next = reviews.map((rv, j) => j === i ? { ...rv, text: v } : rv); set("reviews", next); }} className="text-xs min-h-[60px]" placeholder="Review text" /></div>))}</div></div></div>);
+      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Section Headline" field="headline" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div><div className="flex items-center justify-between mb-2"><label className="text-xs text-gray-500 font-medium">Reviews</label><button onClick={() => set("reviews", [...reviews, { name: "Student Name", rating: 5, text: "Great course!" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div><div className="space-y-2">{reviews.map((r, i) => (<div key={i} className="border border-gray-200 rounded p-2 space-y-1"><div className="flex justify-between items-center mb-1"><span className="text-xs text-gray-500">Review {i + 1}</span><button onClick={() => set("reviews", reviews.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div><DebouncedInput value={r.name} onChange={v => { const next = reviews.map((rv, j) => j === i ? { ...rv, name: v } : rv); set("reviews", next); }} className="h-7 text-xs" placeholder="Name" /><Input type="number" value={r.rating} onChange={e => { const next = reviews.map((rv, j) => j === i ? { ...rv, rating: Number(e.target.value) } : rv); set("reviews", next); }} className="h-7 text-xs" min={1} max={5} placeholder="Rating (1-5)" /><DebouncedTextarea value={r.text} onChange={v => { const next = reviews.map((rv, j) => j === i ? { ...rv, text: v } : rv); set("reviews", next); }} className="text-xs min-h-[60px]" placeholder="Review text" /></div>))}</div></div></div>);
     }
     case "logos": {
       const logos: Array<{ url: string; alt: string }> = d.logos ?? [];
-      return (<div className="space-y-3"><TextField label="Headline" field="headline" /><ColorField label="Background" field="bgColor" /><div><div className="flex items-center justify-between mb-2"><label className="text-xs text-gray-500 font-medium">Logos</label><button onClick={() => set("logos", [...logos, { url: "", alt: "" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div><div className="space-y-2">{logos.map((logo, i) => (<div key={i} className="flex gap-1 items-center"><DebouncedInput value={logo.url} onChange={v => { const next = logos.map((l, j) => j === i ? { ...l, url: v } : l); set("logos", next); }} className="h-7 text-xs flex-1" placeholder="Logo URL" /><DebouncedInput value={logo.alt} onChange={v => { const next = logos.map((l, j) => j === i ? { ...l, alt: v } : l); set("logos", next); }} className="h-7 text-xs w-24" placeholder="Alt" /><button onClick={() => set("logos", logos.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 flex-shrink-0"><X size={12} /></button></div>))}</div></div></div>);
+      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Headline" field="headline" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div><div className="flex items-center justify-between mb-2"><label className="text-xs text-gray-500 font-medium">Logos</label><button onClick={() => set("logos", [...logos, { url: "", alt: "" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div><div className="space-y-2">{logos.map((logo, i) => (<div key={i} className="flex gap-1 items-center"><DebouncedInput value={logo.url} onChange={v => { const next = logos.map((l, j) => j === i ? { ...l, url: v } : l); set("logos", next); }} className="h-7 text-xs flex-1" placeholder="Logo URL" /><DebouncedInput value={logo.alt} onChange={v => { const next = logos.map((l, j) => j === i ? { ...l, alt: v } : l); set("logos", next); }} className="h-7 text-xs w-24" placeholder="Alt" /><button onClick={() => set("logos", logos.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 flex-shrink-0"><X size={12} /></button></div>))}</div></div></div>);
     }
     case "instructor":
-      return (<div className="space-y-3"><TextField label="Name" field="name" /><TextField label="Title / Credentials" field="title" /><TextField label="Bio" field="bio" multiline /><div><label className="text-xs text-gray-500 block mb-1">Avatar</label><div className="flex items-center gap-2"><DebouncedInput value={d.avatarUrl ?? ""} onChange={v => set("avatarUrl", v)} className="h-8 text-sm flex-1" placeholder="Avatar URL or upload" /><button onClick={() => inlineMediaRef.current?.click()} className="px-2 py-1.5 text-xs bg-teal-50 text-teal-700 rounded border border-teal-200 hover:bg-teal-100 flex items-center gap-1" disabled={uploading === "avatarUrl"}>{uploading === "avatarUrl" ? "..." : <><Upload size={12} /> Upload</>}</button><input ref={inlineMediaRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, "avatarUrl", "instructor-avatar"); e.target.value = ""; }} /></div>{d.avatarUrl && <img src={d.avatarUrl} className="w-12 h-12 rounded-full object-cover border mt-1" />}</div><ColorField label="Background" field="bgColor" /></div>);
+      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Name" field="name" /><BSTextField data={d} onSet={set} label="Title / Credentials" field="title" /><BSTextField data={d} onSet={set} label="Bio" field="bio" multiline /><div><label className="text-xs text-gray-500 block mb-1">Avatar</label><div className="flex items-center gap-2"><DebouncedInput value={d.avatarUrl ?? ""} onChange={v => set("avatarUrl", v)} className="h-8 text-sm flex-1" placeholder="Avatar URL or upload" /><button onClick={() => inlineMediaRef.current?.click()} className="px-2 py-1.5 text-xs bg-teal-50 text-teal-700 rounded border border-teal-200 hover:bg-teal-100 flex items-center gap-1" disabled={uploading === "avatarUrl"}>{uploading === "avatarUrl" ? "..." : <><Upload size={12} /> Upload</>}</button><input ref={inlineMediaRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, "avatarUrl", "instructor-avatar"); e.target.value = ""; }} /></div>{d.avatarUrl && <img src={d.avatarUrl} className="w-12 h-12 rounded-full object-cover border mt-1" />}</div><BSColorField data={d} onSet={set} label="Background" field="bgColor" /></div>);
     case "faq": {
       const items: Array<{ q: string; a: string }> = d.items ?? [];
-      return (<div className="space-y-3"><TextField label="Section Headline" field="headline" /><ColorField label="Background" field="bgColor" /><ColorField label="Accent Color" field="accentColor" /><div><div className="flex items-center justify-between mb-2"><label className="text-xs text-gray-500 font-medium">FAQ Items</label><button onClick={() => set("items", [...items, { q: "Question?", a: "Answer." }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div><div className="space-y-2">{items.map((item, i) => (<div key={i} className="border border-gray-200 rounded p-2 space-y-1"><div className="flex justify-between items-center mb-1"><span className="text-xs text-gray-500">Q{i + 1}</span><button onClick={() => set("items", items.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div><DebouncedInput value={item.q} onChange={v => { const next = items.map((it, j) => j === i ? { ...it, q: v } : it); set("items", next); }} className="h-7 text-xs" placeholder="Question" /><DebouncedTextarea value={item.a} onChange={v => { const next = items.map((it, j) => j === i ? { ...it, a: v } : it); set("items", next); }} className="text-xs min-h-[60px]" placeholder="Answer" /></div>))}</div></div></div>);
+      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Section Headline" field="headline" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" /><div><div className="flex items-center justify-between mb-2"><label className="text-xs text-gray-500 font-medium">FAQ Items</label><button onClick={() => set("items", [...items, { q: "Question?", a: "Answer." }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div><div className="space-y-2">{items.map((item, i) => (<div key={i} className="border border-gray-200 rounded p-2 space-y-1"><div className="flex justify-between items-center mb-1"><span className="text-xs text-gray-500">Q{i + 1}</span><button onClick={() => set("items", items.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div><DebouncedInput value={item.q} onChange={v => { const next = items.map((it, j) => j === i ? { ...it, q: v } : it); set("items", next); }} className="h-7 text-xs" placeholder="Question" /><DebouncedTextarea value={item.a} onChange={v => { const next = items.map((it, j) => j === i ? { ...it, a: v } : it); set("items", next); }} className="text-xs min-h-[60px]" placeholder="Answer" /></div>))}</div></div></div>);
     }
     case "countdown":
-      return (<div className="space-y-3"><TextField label="Headline" field="headline" /><div><label className="text-xs text-gray-500 block mb-1">Timer Mode</label><select value={d.mode ?? "on_load"} onChange={e => set("mode", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="on_load">Countdown on page load (minutes)</option><option value="event">Countdown to specific date/time</option></select></div>{(d.mode ?? "on_load") === "on_load" ? (<div><label className="text-xs text-gray-500 block mb-1">Duration (minutes)</label><Input type="number" value={d.durationMinutes ?? 90} onChange={e => set("durationMinutes", Number(e.target.value))} className="h-8 text-sm" min={1} max={10080} /></div>) : (<div><label className="text-xs text-gray-500 block mb-1">Target Date & Time</label><Input type="datetime-local" value={d.targetDate ?? ""} onChange={e => set("targetDate", e.target.value)} className="h-8 text-sm" /></div>)}<ColorField label="Background" field="bgColor" /><ColorField label="Text Color" field="textColor" /><ColorField label="Accent Color" field="accentColor" /><div className="flex items-center gap-2"><input type="checkbox" checked={d.showBorder ?? true} onChange={e => set("showBorder", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show border</label></div></div>);
+      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Headline" field="headline" /><div><label className="text-xs text-gray-500 block mb-1">Timer Mode</label><select value={d.mode ?? "on_load"} onChange={e => set("mode", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="on_load">Countdown on page load (minutes)</option><option value="event">Countdown to specific date/time</option></select></div>{(d.mode ?? "on_load") === "on_load" ? (<div><label className="text-xs text-gray-500 block mb-1">Duration (minutes)</label><Input type="number" value={d.durationMinutes ?? 90} onChange={e => set("durationMinutes", Number(e.target.value))} className="h-8 text-sm" min={1} max={10080} /></div>) : (<div><label className="text-xs text-gray-500 block mb-1">Target Date & Time</label><Input type="datetime-local" value={d.targetDate ?? ""} onChange={e => set("targetDate", e.target.value)} className="h-8 text-sm" /></div>)}<BSColorField data={d} onSet={set} label="Background" field="bgColor" /><BSColorField data={d} onSet={set} label="Text Color" field="textColor" /><BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" /><div className="flex items-center gap-2"><input type="checkbox" checked={d.showBorder ?? true} onChange={e => set("showBorder", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show border</label></div></div>);
     case "alert":
-      return (<div className="space-y-3"><TextField label="Alert Text" field="text" /><div><label className="text-xs text-gray-500 block mb-1">Alert Type</label><select value={d.alertType ?? "info"} onChange={e => set("alertType", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="info">Info (Blue)</option><option value="success">Success (Green)</option><option value="warning">Warning (Yellow)</option><option value="error">Error (Red)</option></select></div><TextField label="Icon (emoji)" field="icon" placeholder="💡" /></div>);
+      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Alert Text" field="text" /><div><label className="text-xs text-gray-500 block mb-1">Alert Type</label><select value={d.alertType ?? "info"} onChange={e => set("alertType", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="info">Info (Blue)</option><option value="success">Success (Green)</option><option value="warning">Warning (Yellow)</option><option value="error">Error (Red)</option></select></div><BSTextField data={d} onSet={set} label="Icon (emoji)" field="icon" placeholder="💡" /></div>);
     case "flip_cards": {
       const cards: Array<{ front: string; back: string }> = d.cards ?? [];
-      return (<div className="space-y-3"><TextField label="Section Headline" field="headline" /><ColorField label="Accent Color" field="accentColor" /><ColorField label="Background" field="bgColor" /><div><div className="flex items-center justify-between mb-2"><label className="text-xs text-gray-500 font-medium">Cards</label><button onClick={() => set("cards", [...cards, { front: "Card Title", back: "Card description" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div><div className="space-y-2">{cards.map((card, i) => (<div key={i} className="border border-gray-200 rounded p-2 space-y-1"><div className="flex justify-between items-center mb-1"><span className="text-xs text-gray-500">Card {i + 1}</span><button onClick={() => set("cards", cards.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div><DebouncedInput value={card.front} onChange={v => { const next = cards.map((c, j) => j === i ? { ...c, front: v } : c); set("cards", next); }} className="h-7 text-xs" placeholder="Front (title)" /><DebouncedTextarea value={card.back} onChange={v => { const next = cards.map((c, j) => j === i ? { ...c, back: v } : c); set("cards", next); }} className="text-xs min-h-[60px]" placeholder="Back (description)" /></div>))}</div></div></div>);
+      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Section Headline" field="headline" /><BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div><div className="flex items-center justify-between mb-2"><label className="text-xs text-gray-500 font-medium">Cards</label><button onClick={() => set("cards", [...cards, { front: "Card Title", back: "Card description" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div><div className="space-y-2">{cards.map((card, i) => (<div key={i} className="border border-gray-200 rounded p-2 space-y-1"><div className="flex justify-between items-center mb-1"><span className="text-xs text-gray-500">Card {i + 1}</span><button onClick={() => set("cards", cards.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div><DebouncedInput value={card.front} onChange={v => { const next = cards.map((c, j) => j === i ? { ...c, front: v } : c); set("cards", next); }} className="h-7 text-xs" placeholder="Front (title)" /><DebouncedTextarea value={card.back} onChange={v => { const next = cards.map((c, j) => j === i ? { ...c, back: v } : c); set("cards", next); }} className="text-xs min-h-[60px]" placeholder="Back (description)" /></div>))}</div></div></div>);
     }
     case "pricing_cta":
-      return (<div className="space-y-3"><TextField label="Headline" field="headline" /><TextField label="Subtext" field="subtext" multiline /><TextField label="CTA Button Text" field="ctaText" /><ColorField label="CTA Color" field="ctaColor" /><ColorField label="CTA Text Color" field="ctaTextColor" /><ColorField label="Background" field="bgColor" /><div className="flex items-center gap-2"><input type="checkbox" checked={d.showPrice ?? true} onChange={e => set("showPrice", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show course price</label></div></div>);
+      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Headline" field="headline" /><BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline /><BSTextField data={d} onSet={set} label="CTA Button Text" field="ctaText" /><BSColorField data={d} onSet={set} label="CTA Color" field="ctaColor" /><BSColorField data={d} onSet={set} label="CTA Text Color" field="ctaTextColor" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div className="flex items-center gap-2"><input type="checkbox" checked={d.showPrice ?? true} onChange={e => set("showPrice", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show course price</label></div></div>);
     case "cta_standalone":
-      return (<div className="space-y-3"><TextField label="Headline" field="headline" /><TextField label="Subtext" field="subtext" multiline /><TextField label="Button Text" field="ctaText" /><TextField label="Button Link" field="ctaLink" placeholder="/learn/course-slug or https://..." /><ColorField label="Button Color" field="ctaColor" /><ColorField label="Button Text Color" field="ctaTextColor" /><ColorField label="Background" field="bgColor" /><AlignField /></div>);
+      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Headline" field="headline" /><BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline /><BSTextField data={d} onSet={set} label="Button Text" field="ctaText" /><BSTextField data={d} onSet={set} label="Button Link" field="ctaLink" placeholder="/learn/course-slug or https://..." /><BSColorField data={d} onSet={set} label="Button Color" field="ctaColor" /><BSColorField data={d} onSet={set} label="Button Text Color" field="ctaTextColor" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><BSAlignField data={d} onSet={set} /></div>);
     case "lead_capture":
-      return (<div className="space-y-3"><TextField label="Headline" field="headline" /><TextField label="Subtext" field="subtext" multiline /><TextField label="Button Text" field="ctaText" /><ColorField label="Background" field="bgColor" /><ColorField label="Text Color" field="textColor" /></div>);
+      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Headline" field="headline" /><BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline /><BSTextField data={d} onSet={set} label="Button Text" field="ctaText" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><BSColorField data={d} onSet={set} label="Text Color" field="textColor" /></div>);
     case "funnel_workflow": {
       const steps: Array<{ name: string; role: string; url: string; cta: string }> = d.steps ?? [];
       return (
         <div className="space-y-3">
-          <TextField label="Eyebrow" field="eyebrow" />
-          <TextField label="Headline" field="headline" />
-          <TextField label="Subtext" field="subtext" multiline />
-          <ColorField label="Accent" field="accentColor" />
-          <ColorField label="Background" field="bgColor" />
+          <BSTextField data={d} onSet={set} label="Eyebrow" field="eyebrow" />
+          <BSTextField data={d} onSet={set} label="Headline" field="headline" />
+          <BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline />
+          <BSColorField data={d} onSet={set} label="Accent" field="accentColor" />
+          <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs text-gray-500 font-medium">Funnel Steps</label>
@@ -919,10 +933,10 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
       const products: Array<{ type: "digital" | "physical"; title: string; description: string; price: string; imageUrl?: string; ctaText: string; ctaLink?: string; fulfillment?: string }> = d.products ?? [];
       return (
         <div className="space-y-3">
-          <TextField label="Headline" field="headline" />
-          <TextField label="Subtext" field="subtext" multiline />
-          <ColorField label="Accent" field="accentColor" />
-          <ColorField label="Background" field="bgColor" />
+          <BSTextField data={d} onSet={set} label="Headline" field="headline" />
+          <BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline />
+          <BSColorField data={d} onSet={set} label="Accent" field="accentColor" />
+          <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs text-gray-500 font-medium">Promoted Products</label>
@@ -959,11 +973,11 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
       const features: string[] = d.features ?? [];
       return (
         <div className="space-y-3">
-          <TextField label="Anchor ID" field="anchorId" placeholder="order-bump" />
-          <TextField label="Discount Label" field="discountLabel" />
-          <TextField label="Headline" field="headline" />
-          <TextField label="Subheadline" field="subheadline" />
-          <TextField label="Description" field="description" multiline />
+          <BSTextField data={d} onSet={set} label="Anchor ID" field="anchorId" placeholder="order-bump" />
+          <BSTextField data={d} onSet={set} label="Discount Label" field="discountLabel" />
+          <BSTextField data={d} onSet={set} label="Headline" field="headline" />
+          <BSTextField data={d} onSet={set} label="Subheadline" field="subheadline" />
+          <BSTextField data={d} onSet={set} label="Description" field="description" multiline />
           <div>
             <label className="text-xs text-gray-500 block mb-1">Bump Product Type</label>
             <select value={d.productType ?? "digital"} onChange={e => set("productType", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
@@ -972,16 +986,16 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
             </select>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <TextField label="Price" field="price" />
-            <TextField label="Compare At" field="compareAtPrice" />
+            <BSTextField data={d} onSet={set} label="Price" field="price" />
+            <BSTextField data={d} onSet={set} label="Compare At" field="compareAtPrice" />
           </div>
-          <TextField label="Checkbox Label" field="checkboxLabel" />
-          <TextField label="CTA Text" field="ctaText" />
-          <TextField label="Skip Text" field="skipText" />
-          <TextField label="Shipping Note" field="shippingNote" />
-          <TextField label="Image URL" field="imageUrl" />
-          <ColorField label="Accent" field="accentColor" />
-          <ColorField label="Background" field="bgColor" />
+          <BSTextField data={d} onSet={set} label="Checkbox Label" field="checkboxLabel" />
+          <BSTextField data={d} onSet={set} label="CTA Text" field="ctaText" />
+          <BSTextField data={d} onSet={set} label="Skip Text" field="skipText" />
+          <BSTextField data={d} onSet={set} label="Shipping Note" field="shippingNote" />
+          <BSTextField data={d} onSet={set} label="Image URL" field="imageUrl" />
+          <BSColorField data={d} onSet={set} label="Accent" field="accentColor" />
+          <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs text-gray-500 font-medium">Feature Bullets</label>
@@ -1003,8 +1017,8 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
       const items: Array<{ text: string; price: string }> = d.items ?? [];
       return (
         <div className="space-y-3">
-          <TextField label="Image URL" field="imageUrl" placeholder="https://..." />
-          <TextField label="Headline" field="headline" multiline />
+          <BSTextField data={d} onSet={set} label="Image URL" field="imageUrl" placeholder="https://..." />
+          <BSTextField data={d} onSet={set} label="Headline" field="headline" multiline />
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs text-gray-500 font-medium">Value Items</label>
@@ -1020,19 +1034,19 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
               ))}
             </div>
           </div>
-          <TextField label="Total Value Text" field="totalValueText" placeholder="TOTAL VALUE: Over $5000" />
-          <TextField label="Original Price (strikethrough)" field="originalPrice" placeholder="NORMALLY $3497" />
+          <BSTextField data={d} onSet={set} label="Total Value Text" field="totalValueText" placeholder="TOTAL VALUE: Over $5000" />
+          <BSTextField data={d} onSet={set} label="Original Price (strikethrough)" field="originalPrice" placeholder="NORMALLY $3497" />
           <div className="grid grid-cols-2 gap-2">
-            <TextField label="Final Price Label" field="finalPriceLabel" placeholder="Today Only:" />
-            <TextField label="Final Price" field="finalPrice" placeholder="$2497" />
+            <BSTextField data={d} onSet={set} label="Final Price Label" field="finalPriceLabel" placeholder="Today Only:" />
+            <BSTextField data={d} onSet={set} label="Final Price" field="finalPrice" placeholder="$2497" />
           </div>
-          <TextField label="CTA Button Text" field="ctaText" />
-          <TextField label="CTA Link" field="ctaLink" placeholder="/checkout or https://..." />
-          <ColorField label="CTA Color" field="ctaColor" />
-          <ColorField label="CTA Text Color" field="ctaTextColor" />
-          <ColorField label="Background" field="bgColor" />
-          <ColorField label="Text Color" field="textColor" />
-          <ColorField label="Border Color" field="borderColor" />
+          <BSTextField data={d} onSet={set} label="CTA Button Text" field="ctaText" />
+          <BSTextField data={d} onSet={set} label="CTA Link" field="ctaLink" placeholder="/checkout or https://..." />
+          <BSColorField data={d} onSet={set} label="CTA Color" field="ctaColor" />
+          <BSColorField data={d} onSet={set} label="CTA Text Color" field="ctaTextColor" />
+          <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
+          <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
+          <BSColorField data={d} onSet={set} label="Border Color" field="borderColor" />
           <div className="flex items-center gap-2"><input type="checkbox" checked={d.showBorder ?? true} onChange={e => set("showBorder", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show border</label></div>
         </div>
       );
@@ -1040,20 +1054,20 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
     case "urgency_offer":
       return (
         <div className="space-y-3">
-          <TextField label="Countdown Headline" field="countdownHeadline" placeholder="LIMITED TIME OFFER!" />
+          <BSTextField data={d} onSet={set} label="Countdown Headline" field="countdownHeadline" placeholder="LIMITED TIME OFFER!" />
           <div><label className="text-xs text-gray-500 block mb-1">Countdown Mode</label><select value={d.countdownMode ?? "on_load"} onChange={e => set("countdownMode", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="on_load">Countdown on page load (minutes)</option><option value="event">Countdown to specific date/time</option></select></div>
           {(d.countdownMode ?? "on_load") === "on_load" ? (<div><label className="text-xs text-gray-500 block mb-1">Duration (minutes)</label><Input type="number" value={d.countdownMinutes ?? 90} onChange={e => set("countdownMinutes", Number(e.target.value))} className="h-8 text-sm" min={1} max={10080} /></div>) : (<div><label className="text-xs text-gray-500 block mb-1">Target Date & Time</label><Input type="datetime-local" value={d.countdownTargetDate ?? ""} onChange={e => set("countdownTargetDate", e.target.value)} className="h-8 text-sm" /></div>)}
-          <TextField label="Headline" field="headline" multiline />
-          <TextField label="Description (italic)" field="description" multiline />
+          <BSTextField data={d} onSet={set} label="Headline" field="headline" multiline />
+          <BSTextField data={d} onSet={set} label="Description (italic)" field="description" multiline />
           <div><label className="text-xs text-gray-500 block mb-1">Body Content (HTML)</label><RichTextEditor value={d.bodyHtml ?? ""} onChange={(html) => set("bodyHtml", html)} minHeight={100} maxHeight={300} placeholder="Rich text body content..." /></div>
           <div className="grid grid-cols-3 gap-2">
-            <TextField label="CTA Emoji" field="ctaEmoji" placeholder="\uD83D\uDC4D" />
-            <div className="col-span-2"><TextField label="CTA Text" field="ctaText" placeholder="Add on now for $X" /></div>
+            <BSTextField data={d} onSet={set} label="CTA Emoji" field="ctaEmoji" placeholder="\uD83D\uDC4D" />
+            <div className="col-span-2"><BSTextField data={d} onSet={set} label="CTA Text" field="ctaText" placeholder="Add on now for $X" /></div>
           </div>
-          <TextField label="CTA Link" field="ctaLink" placeholder="/checkout or https://..." />
-          <ColorField label="Background" field="bgColor" />
-          <ColorField label="Text Color" field="textColor" />
-          <ColorField label="Accent Color" field="accentColor" />
+          <BSTextField data={d} onSet={set} label="CTA Link" field="ctaLink" placeholder="/checkout or https://..." />
+          <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
+          <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
+          <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />
           <div className="flex items-center gap-2"><input type="checkbox" checked={d.showBorder ?? true} onChange={e => set("showBorder", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show border</label></div>
         </div>
       );
@@ -1065,8 +1079,8 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
           {/* Display Mode */}
           <div><label className="text-xs text-gray-500 block mb-1">Display Mode</label><select value={d.displayMode ?? "inline"} onChange={e => set("displayMode", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="inline">Inline (embedded on page)</option><option value="standalone">Standalone Page (/f/slug/checkout)</option></select></div>
           {/* Header */}
-          <TextField label="Header Text" field="headerText" placeholder="Lock in your seat now!" />
-          <TextField label="Header Price" field="headerPrice" placeholder="$1997" />
+          <BSTextField data={d} onSet={set} label="Header Text" field="headerText" placeholder="Lock in your seat now!" />
+          <BSTextField data={d} onSet={set} label="Header Price" field="headerPrice" placeholder="$1997" />
           {/* Sections Toggle */}
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2"><input type="checkbox" checked={d.showContactInfo ?? true} onChange={e => set("showContactInfo", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show Contact Info</label></div>
@@ -1108,31 +1122,31 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
             ))}
           </div>
           {/* Terms & Submit */}
-          <TextField label="Terms Text" field="termsText" multiline />
+          <BSTextField data={d} onSet={set} label="Terms Text" field="termsText" multiline />
           <div className="grid grid-cols-2 gap-2">
-            <TextField label="Terms Link Text" field="termsLinkText" placeholder="TERMS OF SERVICE" />
-            <TextField label="Terms Link URL" field="termsLinkUrl" placeholder="/terms" />
+            <BSTextField data={d} onSet={set} label="Terms Link Text" field="termsLinkText" placeholder="TERMS OF SERVICE" />
+            <BSTextField data={d} onSet={set} label="Terms Link URL" field="termsLinkUrl" placeholder="/terms" />
           </div>
-          <TextField label="Submit Button Text" field="submitText" placeholder="Submit" />
-          <TextField label="Success Redirect URL" field="successRedirect" placeholder="/thank-you or https://..." />
+          <BSTextField data={d} onSet={set} label="Submit Button Text" field="submitText" placeholder="Submit" />
+          <BSTextField data={d} onSet={set} label="Success Redirect URL" field="successRedirect" placeholder="/thank-you or https://..." />
           {/* Colors */}
-          <ColorField label="Accent Color" field="accentColor" />
-          <ColorField label="Background" field="bgColor" />
-          <ColorField label="Text Color" field="textColor" />
+          <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />
+          <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
+          <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
         </div>
       );
     }
     case "curriculum_auto":
-      return (<div className="space-y-3"><TextField label="Section Headline" field="headline" /><ColorField label="Background" field="bgColor" /><div className="flex items-center gap-2"><input type="checkbox" checked={d.showLocked ?? true} onChange={e => set("showLocked", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show locked lessons</label></div></div>);
+      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Section Headline" field="headline" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div className="flex items-center gap-2"><input type="checkbox" checked={d.showLocked ?? true} onChange={e => set("showLocked", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show locked lessons</label></div></div>);
     case "pricing_options_auto":
-      return (<div className="space-y-3"><TextField label="Section Headline" field="headline" /><ColorField label="Background" field="bgColor" /></div>);
+      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Section Headline" field="headline" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /></div>);
     case "divider":
-      return (<div className="space-y-3"><div><label className="text-xs text-gray-500 block mb-1">Style</label><select value={d.style ?? "solid"} onChange={e => set("style", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select></div><ColorField label="Color" field="color" /><div><label className="text-xs text-gray-500 block mb-1">Thickness (px)</label><Input type="number" value={d.thickness ?? 1} onChange={e => set("thickness", Number(e.target.value))} className="h-8 text-sm" min={1} max={10} /></div><div><label className="text-xs text-gray-500 block mb-1">Vertical Spacing (px)</label><Input type="number" value={d.spacing ?? 32} onChange={e => set("spacing", Number(e.target.value))} className="h-8 text-sm" min={0} max={200} /></div></div>);
+      return (<div className="space-y-3"><div><label className="text-xs text-gray-500 block mb-1">Style</label><select value={d.style ?? "solid"} onChange={e => set("style", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select></div><BSColorField data={d} onSet={set} label="Color" field="color" /><div><label className="text-xs text-gray-500 block mb-1">Thickness (px)</label><Input type="number" value={d.thickness ?? 1} onChange={e => set("thickness", Number(e.target.value))} className="h-8 text-sm" min={1} max={10} /></div><div><label className="text-xs text-gray-500 block mb-1">Vertical Spacing (px)</label><Input type="number" value={d.spacing ?? 32} onChange={e => set("spacing", Number(e.target.value))} className="h-8 text-sm" min={0} max={200} /></div></div>);
     case "two_column":
-      return (<div className="space-y-3"><div><label className="text-xs text-gray-500 block mb-1">Left Column</label><RichTextEditor value={d.leftHtml ?? ""} onChange={(html) => set("leftHtml", html)} minHeight={100} maxHeight={300} placeholder="Left column content..." /></div><div><label className="text-xs text-gray-500 block mb-1">Right Column</label><RichTextEditor value={d.rightHtml ?? ""} onChange={(html) => set("rightHtml", html)} minHeight={100} maxHeight={300} placeholder="Right column content..." /></div><div><label className="text-xs text-gray-500 block mb-1">Left Column Width (%)</label><Input type="number" value={d.leftRatio ?? 50} onChange={e => set("leftRatio", Number(e.target.value))} className="h-8 text-sm" min={20} max={80} /></div><ColorField label="Background" field="bgColor" /></div>);
+      return (<div className="space-y-3"><div><label className="text-xs text-gray-500 block mb-1">Left Column</label><RichTextEditor value={d.leftHtml ?? ""} onChange={(html) => set("leftHtml", html)} minHeight={100} maxHeight={300} placeholder="Left column content..." /></div><div><label className="text-xs text-gray-500 block mb-1">Right Column</label><RichTextEditor value={d.rightHtml ?? ""} onChange={(html) => set("rightHtml", html)} minHeight={100} maxHeight={300} placeholder="Right column content..." /></div><div><label className="text-xs text-gray-500 block mb-1">Left Column Width (%)</label><Input type="number" value={d.leftRatio ?? 50} onChange={e => set("leftRatio", Number(e.target.value))} className="h-8 text-sm" min={20} max={80} /></div><BSColorField data={d} onSet={set} label="Background" field="bgColor" /></div>);
     case "divided_columns": {
       const cols: Array<{ html: string }> = d.columns ?? [{ html: "" }, { html: "" }];
-      return (<div className="space-y-3"><div className="flex items-center justify-between"><label className="text-xs text-gray-500 font-medium">Columns ({cols.length})</label>{cols.length < 4 && <button onClick={() => set("columns", [...cols, { html: "<p>New column</p>" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add Column</button>}</div>{cols.map((col, i) => (<div key={i} className="border border-gray-200 rounded p-2 space-y-1"><div className="flex justify-between items-center mb-1"><span className="text-xs text-gray-500">Column {i + 1}</span>{cols.length > 2 && <button onClick={() => set("columns", cols.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button>}</div><RichTextEditor value={col.html ?? ""} onChange={(html) => { const next = cols.map((c, j) => j === i ? { ...c, html } : c); set("columns", next); }} minHeight={80} maxHeight={250} placeholder={`Column ${i + 1} content...`} /></div>))}<div><label className="text-xs text-gray-500 block mb-1">Gap (px)</label><Input type="number" value={d.gap ?? 32} onChange={e => set("gap", Number(e.target.value))} className="h-8 text-sm" min={0} max={80} /></div><ColorField label="Background" field="bgColor" /></div>);
+      return (<div className="space-y-3"><div className="flex items-center justify-between"><label className="text-xs text-gray-500 font-medium">Columns ({cols.length})</label>{cols.length < 4 && <button onClick={() => set("columns", [...cols, { html: "<p>New column</p>" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add Column</button>}</div>{cols.map((col, i) => (<div key={i} className="border border-gray-200 rounded p-2 space-y-1"><div className="flex justify-between items-center mb-1"><span className="text-xs text-gray-500">Column {i + 1}</span>{cols.length > 2 && <button onClick={() => set("columns", cols.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button>}</div><RichTextEditor value={col.html ?? ""} onChange={(html) => { const next = cols.map((c, j) => j === i ? { ...c, html } : c); set("columns", next); }} minHeight={80} maxHeight={250} placeholder={`Column ${i + 1} content...`} /></div>))}<div><label className="text-xs text-gray-500 block mb-1">Gap (px)</label><Input type="number" value={d.gap ?? 32} onChange={e => set("gap", Number(e.target.value))} className="h-8 text-sm" min={0} max={80} /></div><BSColorField data={d} onSet={set} label="Background" field="bgColor" /></div>);
     }
     case "spacer":
       return (<div><label className="text-xs text-gray-500 block mb-1">Height (px)</label><Input type="number" value={d.height ?? 48} onChange={e => set("height", Number(e.target.value))} className="h-8 text-sm" min={8} max={400} /></div>);
