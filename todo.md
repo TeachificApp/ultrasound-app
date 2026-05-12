@@ -1500,3 +1500,6 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix "Back to Funnel" navigation in FunnelPageEditor to return to the specific funnel being edited (not funnels list)
 - [x] Add star rating option to testimonial block (settings, preview, and public renderers)
 - [x] Fix banner/hero block inline media not displaying in admin preview and PublicFunnelPage renderer
+- [x] Fix "Back to Funnel" navigation — URL-based routing so navigating back lands on the specific funnel detail view
+- [x] Add Platform Admin breadcrumb to the Funnel Builder page (list view and detail view)
+- [x] Increase topics character limit for AI course generation (2000 → 10000)

@@ -1866,7 +1866,7 @@ Rules:
   // ── AI Generate ──
   aiGenerateCourse: protectedProcedure
     .input(z.object({
-      topics: z.string().min(3).max(2000),
+      topics: z.string().min(3).max(10000),
       productType: z.enum(["course", "quiz"]).default("course"),
       targetAudience: z.string().max(500).optional(),
       difficultyLevel: z.enum(["beginner", "intermediate", "advanced"]).optional(),

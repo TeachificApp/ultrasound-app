@@ -6,7 +6,7 @@
  * that can optionally attach courses, downloads, or standalone products.
  */
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useLocation, useParams } from "wouter";
+import { useLocation, useParams, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,7 @@ import { FUNNEL_TEMPLATES, getFunnelTemplateBlocks } from "@/lib/funnelTemplates
 import {
   ArrowLeft, Plus, Trash2, Copy, Eye, Settings, MoreHorizontal,
   Globe, FileText, CreditCard, Gift, ThumbsUp, Layers, ArrowRight,
-  ExternalLink, BarChart3, Pencil, Check, X, ChevronDown, Zap,
+  ExternalLink, BarChart3, Pencil, Check, X, ChevronDown, ChevronLeft, Zap,
   LayoutTemplate, ShoppingCart, Download, BookOpen, Package,
 } from "lucide-react";
 
@@ -86,6 +86,12 @@ function FunnelListView({ onSelect, onCreate }: { onSelect: (id: number) => void
 
   return (
     <div className="max-w-5xl mx-auto p-8">
+      {/* Platform Admin breadcrumb */}
+      <div className="mb-1">
+        <Link href="/platform-admin" className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700 transition-colors">
+          <ChevronLeft className="w-3 h-3" /> Platform Admin
+        </Link>
+      </div>
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -370,6 +376,12 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
 
   return (
     <div className="max-w-5xl mx-auto p-8">
+      {/* Breadcrumb */}
+      <div className="mb-1 flex items-center gap-1 text-xs text-gray-400">
+        <Link href="/platform-admin" className="hover:text-gray-700 transition-colors">Platform Admin</Link>
+        <span>/</span>
+        <Link href="/admin/funnels" className="hover:text-gray-700 transition-colors">Funnels</Link>
+      </div>
       {/* Top Bar */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
@@ -598,6 +610,7 @@ function getTemplatePages(templateName: string): Array<{ type: PageType; title: 
 
 export default function FunnelBuilder() {
   const params = useParams<{ funnelId?: string }>();
+  const [, navigate] = useLocation();
   const urlFunnelId = params.funnelId ? Number(params.funnelId) : null;
 
   const [view, setView] = useState<"list" | "detail" | "edit">(
@@ -607,21 +620,27 @@ export default function FunnelBuilder() {
   const [editPageId, setEditPageId] = useState<number | null>(null);
   const [showCreate, setShowCreate] = useState(false);
 
+  // Sync URL params to state when navigating back from page editor
+  useEffect(() => {
+    if (urlFunnelId) {
+      setSelectedFunnelId(urlFunnelId);
+      setView("detail");
+    } else {
+      setView("list");
+    }
+  }, [urlFunnelId]);
+
   const handleSelectFunnel = (id: number) => {
-    setSelectedFunnelId(id);
-    setView("detail");
+    navigate(`/admin/funnels/${id}`);
   };
 
   const handleCreated = (id: number) => {
     setShowCreate(false);
-    setSelectedFunnelId(id);
-    setView("detail");
+    navigate(`/admin/funnels/${id}`);
   };
 
   const handleEditPage = (funnelId: number, pageId: number) => {
-    setSelectedFunnelId(funnelId);
-    setEditPageId(pageId);
-    setView("edit");
+    navigate(`/admin/funnels/${funnelId}/pages/${pageId}/edit`);
   };
 
   return (
@@ -632,7 +651,7 @@ export default function FunnelBuilder() {
       {view === "detail" && selectedFunnelId && (
         <FunnelDetailView
           funnelId={selectedFunnelId}
-          onBack={() => setView("list")}
+          onBack={() => navigate("/admin/funnels")}
           onEditPage={handleEditPage}
         />
       )}
