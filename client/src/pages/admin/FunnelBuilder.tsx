@@ -6,7 +6,7 @@
  * that can optionally attach courses, downloads, or standalone products.
  */
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -597,8 +597,13 @@ function getTemplatePages(templateName: string): Array<{ type: PageType; title: 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function FunnelBuilder() {
-  const [view, setView] = useState<"list" | "detail" | "edit">("list");
-  const [selectedFunnelId, setSelectedFunnelId] = useState<number | null>(null);
+  const params = useParams<{ funnelId?: string }>();
+  const urlFunnelId = params.funnelId ? Number(params.funnelId) : null;
+
+  const [view, setView] = useState<"list" | "detail" | "edit">(
+    urlFunnelId ? "detail" : "list"
+  );
+  const [selectedFunnelId, setSelectedFunnelId] = useState<number | null>(urlFunnelId);
   const [editPageId, setEditPageId] = useState<number | null>(null);
   const [showCreate, setShowCreate] = useState(false);
 

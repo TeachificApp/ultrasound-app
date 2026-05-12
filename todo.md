@@ -1497,3 +1497,4 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add 3-column content block with optional vertical dividers (color picker, style: solid/dashed/dotted)
 - [x] Add border style option (solid/dashed/dotted) to all existing border controls (image, video, divider blocks)
 - [x] Add border rounding options to all borders (image, video, divider, 3-column dividers)
+- [x] Fix "Back to Funnel" navigation in FunnelPageEditor to return to the specific funnel being edited (not funnels list)
