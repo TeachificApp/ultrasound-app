@@ -1103,6 +1103,13 @@ export default function PlatformAdmin() {
                 description: "Landing pages, order bumps, and sales funnels for courses and downloads",
                 color: "#e11d48",
               },
+              {
+                href: "/admin/contacts",
+                icon: Users,
+                label: "Contacts",
+                description: "View and manage funnel leads, checkout submissions, and contact details",
+                color: "#0d9488",
+              },
             ].map(({ href, icon: Icon, label, description, color }) => (
               <Link key={href} href={href}>
                 <div className="group flex flex-col gap-3 p-4 rounded-xl border border-gray-100 bg-white shadow-sm hover:shadow-md hover:border-gray-200 cursor-pointer transition-all h-full">

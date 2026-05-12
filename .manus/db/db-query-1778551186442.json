@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE funnel_leads \n  ADD COLUMN referrer VARCHAR(2048) NULL,\n  ADD COLUMN timezone VARCHAR(100) NULL,\n  ADD COLUMN source_page VARCHAR(2048) NULL,\n  ADD COLUMN tags VARCHAR(500) NULL,\n  ADD COLUMN last_active_at TIMESTAMP NULL;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute ALTER TABLE funnel_leads \n  ADD COLUMN referrer VARCHAR(2048) NULL,\n  ADD COLUMN timezone VARCHAR(100) NULL,\n  ADD COLUMN source_page VARCHAR(2048) NULL,\n  ADD COLUMN tags VARCHAR(500) NULL,\n  ADD COLUMN last_active_at TIMESTAMP NULL;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 930
+}

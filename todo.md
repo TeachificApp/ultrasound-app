@@ -1440,3 +1440,37 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Price Stack CTA block (value items list, strikethrough original price, final price underlined, CTA button)
 - [x] Urgency Offer block (countdown + headline + italic description + rich body + emoji CTA link)
 - [x] All blocks added to catalog, BlockPreview, BlockSettings, and PublicFunnelPage renderer
+
+## Funnel Builder — Checkout Form Block
+- [ ] New block type: checkout_form (inline on page or standalone /f/:slug/checkout route)
+- [ ] Admin settings: display mode (inline vs standalone page), header text, accent color
+- [ ] Admin settings: products list (name, description, image, price, type: course/quiz/product/external)
+- [ ] Admin settings: order bumps (image, title, description, price, CTA text, external URL option)
+- [ ] Contact info section (first name, last name, email, phone)
+- [ ] Product selection section (radio buttons with price dropdown)
+- [ ] Billing info section (address, country, state, city, postal code)
+- [ ] Payment info section (Stripe card element)
+- [ ] Order bumps section (inline between payment and submit, +Add button)
+- [ ] Summary section (expandable)
+- [ ] Terms checkbox with configurable link
+- [ ] Submit button with Stripe checkout integration
+- [ ] Standalone checkout page route at /f/:slug/checkout
+- [ ] Backend: createFunnelCheckout procedure for processing payment
+
+## Funnel Builder — Enhanced Contacts & Leads
+- [ ] Enhance funnel_leads table: add ip_address, user_agent, referrer, timezone, source_page columns
+- [ ] Update lead capture submission to collect IP, user agent, referrer, timezone, source page
+- [ ] Update checkout form submission to also store rich contact data
+- [ ] Build admin Contacts/Leads list page (/admin/contacts)
+- [ ] Build admin Contact Detail view (name, email, phone, tags, timezone, source, activity, orders)
+- [ ] Add checkout_form BlockSettings to admin editor (products, order bumps, display mode, terms)
+
+## Bug Fixes — Funnel Builder
+- [ ] Fix image/video upload to banner not working
+- [x] Fix page publication not working (removed active status requirement — pages always viewable)
+
+## Funnel Builder — Performance & Features
+- [x] Lazy-load PublicFunnelPage to reduce initial bundle size
+- [x] Edit page name and slug in funnel editor (Rename button on page cards)
+- [x] Duplicate individual funnel pages (Duplicate button on page cards)
+- [x] Save funnel as template (Save as Template button + listTemplates in create dialog)

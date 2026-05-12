@@ -49,7 +49,7 @@ export type BlockType =
   | "lead_capture" | "numbered_list" | "alert" | "flip_cards"
   | "curriculum_auto" | "pricing_options_auto"
   | "funnel_workflow" | "product_offer_stack" | "order_bump_checkout"
-  | "price_stack" | "urgency_offer";
+  | "price_stack" | "urgency_offer" | "checkout_form";
 
 export interface Block {
   id: string;
@@ -167,6 +167,29 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
       countdownMode: "on_load", countdownMinutes: 90, countdownTargetDate: "",
       countdownHeadline: "LIMITED TIME OFFER!",
       bgColor: "#ffffff", textColor: "#0e1e2e", accentColor: "#179ca3", showBorder: true,
+    } },
+  { type: "checkout_form", label: "Checkout Form", icon: <CreditCard size={14} />, category: "Funnel",
+    defaultData: {
+      displayMode: "inline", // "inline" or "standalone"
+      headerText: "Lock in your seat now!",
+      headerPrice: "$1997",
+      accentColor: "#179ca3",
+      bgColor: "#ffffff",
+      textColor: "#0e1e2e",
+      showContactInfo: true,
+      showBillingInfo: true,
+      showProductSelect: true,
+      products: [
+        { name: "Main Course", description: "Full access to the course", price: 199700, imageUrl: "", type: "course" }
+      ],
+      orderBumps: [
+        { title: "Workbook", headline: "Workbooks will arrive approximately 1 week prior to the start of the course.", description: "Your step-by-step companion to actually understand, retain, and apply everything you learn.", price: 29997, imageUrl: "", ctaText: "+ Add", ctaEmoji: "\uD83D\uDC4D", externalUrl: "" }
+      ],
+      termsText: "I attest that I meet the pre-requisites for this course and I agree to the",
+      termsLinkText: "TERMS OF SERVICE",
+      termsLinkUrl: "/terms",
+      submitText: "Submit",
+      successRedirect: "",
     } },
   // ── Smart Sections
   { type: "curriculum_auto", label: "Curriculum (Auto)", icon: <BookOpen size={14} />, category: "Smart",
@@ -512,6 +535,75 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
               {d.ctaText}
             </p>
           )}
+        </div>
+      );
+    }
+    case "checkout_form": {
+      const cfProducts: Array<{ name: string; description: string; price: number; imageUrl: string; type: string }> = d.products ?? [];
+      const cfBumps: Array<{ title: string; headline: string; description: string; price: number; imageUrl: string; ctaText: string }> = d.orderBumps ?? [];
+      return (
+        <div className="py-6 px-4" style={{ backgroundColor: d.bgColor ?? "#ffffff", color: d.textColor ?? "#0e1e2e" }}>
+          {/* Header */}
+          <div className="rounded-lg px-6 py-4 mb-6 text-center text-white font-bold text-lg flex items-center justify-center gap-2" style={{ backgroundColor: d.accentColor ?? "#179ca3" }}>
+            <span>\uD83D\uDD12</span> {d.headerText ?? "Lock in your seat now!"} {d.headerPrice ?? ""}
+          </div>
+          {/* Contact Info */}
+          {d.showContactInfo && (
+            <fieldset className="border border-gray-300 rounded-lg p-4 mb-4">
+              <legend className="text-xs font-bold tracking-wider text-gray-600 px-2">CONTACT INFORMATION</legend>
+              <div className="grid grid-cols-2 gap-2 mb-2"><div className="border border-gray-200 rounded px-3 py-2 text-sm text-gray-400">First Name</div><div className="border border-gray-200 rounded px-3 py-2 text-sm text-gray-400">Last Name</div></div>
+              <div className="border border-gray-200 rounded px-3 py-2 text-sm text-gray-400 mb-2">Email</div>
+              <div className="border border-gray-200 rounded px-3 py-2 text-sm text-gray-400">Phone Number</div>
+            </fieldset>
+          )}
+          {/* Product Selection */}
+          {d.showProductSelect && cfProducts.length > 0 && (
+            <fieldset className="border border-gray-300 rounded-lg p-4 mb-4">
+              <legend className="text-xs font-bold tracking-wider text-gray-600 px-2">SELECT PRODUCT</legend>
+              {cfProducts.map((p, i) => (
+                <div key={i} className="flex items-center gap-3 py-2">
+                  <span className="w-4 h-4 rounded-full border-2 border-teal-500 flex-shrink-0" style={{ backgroundColor: i === 0 ? d.accentColor ?? "#179ca3" : "transparent" }} />
+                  {p.imageUrl && <img src={p.imageUrl} alt="" className="w-8 h-8 rounded object-cover" />}
+                  <div className="flex-1"><div className="font-semibold text-sm">{p.name}</div><div className="text-xs text-gray-500">{p.description}</div></div>
+                  <span className="text-sm font-medium">${(p.price / 100).toFixed(2)}</span>
+                </div>
+              ))}
+            </fieldset>
+          )}
+          {/* Billing Info */}
+          {d.showBillingInfo && (
+            <fieldset className="border border-gray-300 rounded-lg p-4 mb-4">
+              <legend className="text-xs font-bold tracking-wider text-gray-600 px-2">BILLING INFORMATION</legend>
+              <div className="space-y-2">
+                <div className="border border-gray-200 rounded px-3 py-2 text-sm text-gray-400">Address</div>
+                <div className="grid grid-cols-2 gap-2"><div className="border border-gray-200 rounded px-3 py-2 text-sm text-gray-400">Country</div><div className="border border-gray-200 rounded px-3 py-2 text-sm text-gray-400">State</div></div>
+                <div className="grid grid-cols-2 gap-2"><div className="border border-gray-200 rounded px-3 py-2 text-sm text-gray-400">City</div><div className="border border-gray-200 rounded px-3 py-2 text-sm text-gray-400">Postal Code</div></div>
+              </div>
+            </fieldset>
+          )}
+          {/* Payment Info */}
+          <fieldset className="border border-gray-300 rounded-lg p-4 mb-4">
+            <legend className="text-xs font-bold tracking-wider text-gray-600 px-2">PAYMENT INFORMATION</legend>
+            <div className="border border-gray-200 rounded px-3 py-2 text-sm text-gray-400 flex items-center gap-4"><span>\uD83D\uDCB3 Card number</span><span className="ml-auto">MM / YY</span><span>CVV</span></div>
+          </fieldset>
+          {/* Order Bumps */}
+          {cfBumps.length > 0 && cfBumps.map((bump, i) => (
+            <div key={i} className="border-2 rounded-lg p-4 mb-4 flex items-start gap-4" style={{ borderColor: d.accentColor ?? "#179ca3" }}>
+              {bump.imageUrl && <img src={bump.imageUrl} alt="" className="w-16 h-16 rounded object-cover flex-shrink-0" />}
+              <div className="flex-1">
+                <div className="text-sm font-bold">{bump.headline}</div>
+                <div className="text-sm font-semibold">{bump.title}</div>
+                <div className="text-xs text-gray-600 mt-1">{bump.description}</div>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <div className="text-sm font-bold" style={{ color: d.accentColor ?? "#179ca3" }}>${(bump.price / 100).toFixed(2)}</div>
+                <button className="mt-2 px-4 py-1 border-2 rounded font-semibold text-sm" style={{ borderColor: d.accentColor ?? "#179ca3", color: d.accentColor ?? "#179ca3" }}>{bump.ctaText || "+ Add"}</button>
+              </div>
+            </div>
+          ))}
+          {/* Submit */}
+          <button className="w-full py-4 rounded-lg font-bold text-white text-lg mt-2" style={{ backgroundColor: d.accentColor ?? "#179ca3" }}>{d.submitText ?? "Submit"}</button>
+          {d.displayMode === "standalone" && <p className="text-xs text-center text-gray-400 mt-2">This form will render as a standalone page</p>}
         </div>
       );
     }
@@ -963,6 +1055,71 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
           <div className="flex items-center gap-2"><input type="checkbox" checked={d.showBorder ?? true} onChange={e => set("showBorder", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show border</label></div>
         </div>
       );
+    case "checkout_form": {
+      const cfProds: Array<{ name: string; description: string; price: number; imageUrl: string; type: string }> = d.products ?? [];
+      const cfBumps: Array<{ title: string; headline: string; description: string; price: number; imageUrl: string; ctaText: string; ctaEmoji: string; externalUrl: string }> = d.orderBumps ?? [];
+      return (
+        <div className="space-y-4">
+          {/* Display Mode */}
+          <div><label className="text-xs text-gray-500 block mb-1">Display Mode</label><select value={d.displayMode ?? "inline"} onChange={e => set("displayMode", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="inline">Inline (embedded on page)</option><option value="standalone">Standalone Page (/f/slug/checkout)</option></select></div>
+          {/* Header */}
+          <TextField label="Header Text" field="headerText" placeholder="Lock in your seat now!" />
+          <TextField label="Header Price" field="headerPrice" placeholder="$1997" />
+          {/* Sections Toggle */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2"><input type="checkbox" checked={d.showContactInfo ?? true} onChange={e => set("showContactInfo", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show Contact Info</label></div>
+            <div className="flex items-center gap-2"><input type="checkbox" checked={d.showBillingInfo ?? true} onChange={e => set("showBillingInfo", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show Billing Info</label></div>
+            <div className="flex items-center gap-2"><input type="checkbox" checked={d.showProductSelect ?? true} onChange={e => set("showProductSelect", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show Product Selection</label></div>
+          </div>
+          {/* Products */}
+          <div className="border border-gray-200 rounded p-3 space-y-2">
+            <div className="flex items-center justify-between"><span className="text-xs font-semibold text-gray-700">Products ({cfProds.length})</span><button onClick={() => set("products", [...cfProds, { name: "New Product", description: "", price: 0, imageUrl: "", type: "course" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div>
+            {cfProds.map((p, i) => (
+              <div key={i} className="border border-gray-100 rounded p-2 space-y-1">
+                <div className="flex items-center justify-between"><span className="text-xs text-gray-500">Product {i + 1}</span><button onClick={() => set("products", cfProds.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div>
+                <Input value={p.name} onChange={e => { const next = [...cfProds]; next[i] = { ...next[i], name: e.target.value }; set("products", next); }} className="h-7 text-xs" placeholder="Product name" />
+                <Input value={p.description} onChange={e => { const next = [...cfProds]; next[i] = { ...next[i], description: e.target.value }; set("products", next); }} className="h-7 text-xs" placeholder="Description" />
+                <div className="grid grid-cols-2 gap-2">
+                  <Input type="number" value={p.price} onChange={e => { const next = [...cfProds]; next[i] = { ...next[i], price: Number(e.target.value) }; set("products", next); }} className="h-7 text-xs" placeholder="Price (cents)" />
+                  <select value={p.type} onChange={e => { const next = [...cfProds]; next[i] = { ...next[i], type: e.target.value }; set("products", next); }} className="h-7 text-xs rounded border border-gray-200 px-2"><option value="course">Course</option><option value="quiz">Quiz</option><option value="product">Product</option><option value="external">External (URL)</option></select>
+                </div>
+                <Input value={p.imageUrl} onChange={e => { const next = [...cfProds]; next[i] = { ...next[i], imageUrl: e.target.value }; set("products", next); }} className="h-7 text-xs" placeholder="Image URL (optional)" />
+              </div>
+            ))}
+          </div>
+          {/* Order Bumps */}
+          <div className="border border-gray-200 rounded p-3 space-y-2">
+            <div className="flex items-center justify-between"><span className="text-xs font-semibold text-gray-700">Order Bumps ({cfBumps.length})</span><button onClick={() => set("orderBumps", [...cfBumps, { title: "New Bump", headline: "", description: "", price: 0, imageUrl: "", ctaText: "+ Add", ctaEmoji: "\uD83D\uDC4D", externalUrl: "" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div>
+            {cfBumps.map((b, i) => (
+              <div key={i} className="border border-gray-100 rounded p-2 space-y-1">
+                <div className="flex items-center justify-between"><span className="text-xs text-gray-500">Bump {i + 1}</span><button onClick={() => set("orderBumps", cfBumps.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div>
+                <Input value={b.title} onChange={e => { const next = [...cfBumps]; next[i] = { ...next[i], title: e.target.value }; set("orderBumps", next); }} className="h-7 text-xs" placeholder="Title (e.g. Workbook)" />
+                <Input value={b.headline} onChange={e => { const next = [...cfBumps]; next[i] = { ...next[i], headline: e.target.value }; set("orderBumps", next); }} className="h-7 text-xs" placeholder="Headline text" />
+                <Input value={b.description} onChange={e => { const next = [...cfBumps]; next[i] = { ...next[i], description: e.target.value }; set("orderBumps", next); }} className="h-7 text-xs" placeholder="Description" />
+                <div className="grid grid-cols-2 gap-2">
+                  <Input type="number" value={b.price} onChange={e => { const next = [...cfBumps]; next[i] = { ...next[i], price: Number(e.target.value) }; set("orderBumps", next); }} className="h-7 text-xs" placeholder="Price (cents)" />
+                  <Input value={b.ctaText} onChange={e => { const next = [...cfBumps]; next[i] = { ...next[i], ctaText: e.target.value }; set("orderBumps", next); }} className="h-7 text-xs" placeholder="CTA text" />
+                </div>
+                <Input value={b.imageUrl} onChange={e => { const next = [...cfBumps]; next[i] = { ...next[i], imageUrl: e.target.value }; set("orderBumps", next); }} className="h-7 text-xs" placeholder="Image URL (optional)" />
+                <Input value={b.externalUrl} onChange={e => { const next = [...cfBumps]; next[i] = { ...next[i], externalUrl: e.target.value }; set("orderBumps", next); }} className="h-7 text-xs" placeholder="External URL (optional — for non-platform products)" />
+              </div>
+            ))}
+          </div>
+          {/* Terms & Submit */}
+          <TextField label="Terms Text" field="termsText" multiline />
+          <div className="grid grid-cols-2 gap-2">
+            <TextField label="Terms Link Text" field="termsLinkText" placeholder="TERMS OF SERVICE" />
+            <TextField label="Terms Link URL" field="termsLinkUrl" placeholder="/terms" />
+          </div>
+          <TextField label="Submit Button Text" field="submitText" placeholder="Submit" />
+          <TextField label="Success Redirect URL" field="successRedirect" placeholder="/thank-you or https://..." />
+          {/* Colors */}
+          <ColorField label="Accent Color" field="accentColor" />
+          <ColorField label="Background" field="bgColor" />
+          <ColorField label="Text Color" field="textColor" />
+        </div>
+      );
+    }
     case "curriculum_auto":
       return (<div className="space-y-3"><TextField label="Section Headline" field="headline" /><ColorField label="Background" field="bgColor" /><div className="flex items-center gap-2"><input type="checkbox" checked={d.showLocked ?? true} onChange={e => set("showLocked", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show locked lessons</label></div></div>);
     case "pricing_options_auto":

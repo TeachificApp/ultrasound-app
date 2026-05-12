@@ -1,0 +1,16 @@
+{
+  "query": "SELECT id, name, slug, status FROM funnels ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT id, name, slug, status FROM funnels ORDER BY id;",
+  "rows": [
+    {
+      "id": "1",
+      "name": "Vascular Cross Training Course",
+      "slug": "vascular-cross-training-course",
+      "status": "draft"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tslug\tstatus\n1\tVascular Cross Training Course\tvascular-cross-training-course\tdraft\n",
+  "stderr": "",
+  "execution_time_ms": 260
+}

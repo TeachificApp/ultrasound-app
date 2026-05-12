@@ -7,7 +7,7 @@ import { z } from "zod";
 import { router, protectedProcedure, publicProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
-import { funnels, funnelPages, funnelLeads } from "../../drizzle/schema";
+import { funnels, funnelPages, funnelLeads, funnelTemplates } from "../../drizzle/schema";
 import { eq, and, asc, desc, sql } from "drizzle-orm";
 
 function slugify(text: string): string {
@@ -189,6 +189,41 @@ export const funnelRouter = router({
       }
       return { id: newFunnelId, slug };
     }),
+  /** Save a funnel as a reusable template */
+  saveAsTemplate: protectedProcedure
+    .input(z.object({ id: z.number(), templateName: z.string().min(1).max(255) }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      const [funnel] = await db.select().from(funnels).where(eq(funnels.id, input.id));
+      if (!funnel) throw new TRPCError({ code: "NOT_FOUND" });
+      const pages = await db.select().from(funnelPages).where(eq(funnelPages.funnelId, input.id)).orderBy(asc(funnelPages.sortOrder));
+      const pagesData = pages.map(p => ({ pageType: p.pageType, title: p.title, slug: p.slug, blocks: p.blocks, productType: p.productType, productId: p.productId, customPrice: p.customPrice, customPriceLabel: p.customPriceLabel, orderBumpId: p.orderBumpId, isActive: p.isActive }));
+      await db.insert(funnelTemplates).values({
+        name: input.templateName,
+        description: funnel.description,
+        pagesJson: JSON.stringify(pagesData),
+        accentColor: funnel.accentColor,
+        bgColor: funnel.bgColor,
+        logoUrl: funnel.logoUrl,
+      });
+      return { success: true };
+    }),
+  /** List user-saved templates */
+  listTemplates: protectedProcedure.query(async ({ ctx }) => {
+    if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    const db = await getDb();
+    return db.select().from(funnelTemplates).orderBy(desc(funnelTemplates.createdAt));
+  }),
+  /** Delete a saved template */
+  deleteTemplate: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      await db.delete(funnelTemplates).where(eq(funnelTemplates.id, input.id));
+      return { success: true };
+    }),
 
   // ─── Page Management ─────────────────────────────────────────────────────
 
@@ -259,6 +294,36 @@ export const funnelRouter = router({
       const { id, ...data } = input;
       await db.update(funnelPages).set(data).where(eq(funnelPages.id, id));
       return { success: true };
+    }),
+  /** Duplicate a funnel page */
+  duplicatePage: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      const [original] = await db.select().from(funnelPages).where(eq(funnelPages.id, input.id));
+      if (!original) throw new TRPCError({ code: "NOT_FOUND" });
+      const pageSlug = original.slug + "-copy-" + Date.now().toString(36).slice(-4);
+      const [maxOrder] = await db
+        .select({ max: sql<number>`COALESCE(MAX(sort_order), -1)` })
+        .from(funnelPages)
+        .where(eq(funnelPages.funnelId, original.funnelId));
+      const sortOrder = (maxOrder?.max ?? -1) + 1;
+      const result = await db.insert(funnelPages).values({
+        funnelId: original.funnelId,
+        pageType: original.pageType,
+        title: original.title + " (Copy)",
+        slug: pageSlug,
+        blocks: original.blocks,
+        productType: original.productType,
+        productId: original.productId,
+        customPrice: original.customPrice,
+        customPriceLabel: original.customPriceLabel,
+        orderBumpId: original.orderBumpId,
+        sortOrder,
+        isActive: original.isActive,
+      });
+      return { id: result[0].insertId };
     }),
 
   /** Delete a funnel page */
@@ -409,6 +474,98 @@ export const funnelRouter = router({
         .orderBy(asc(funnelPages.sortOrder));
       return { page, funnel, allPages };
     }),
+
+  // ─── Leads / Contacts Management ────────────────────────────────────────────
+
+  /** List all leads with pagination and filtering */
+  listLeads: protectedProcedure
+    .input(z.object({
+      page: z.number().default(1),
+      limit: z.number().default(50),
+      search: z.string().optional(),
+      source: z.string().optional(),
+      funnelId: z.number().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      const offset = (input.page - 1) * input.limit;
+
+      let conditions: any[] = [];
+      if (input.funnelId) conditions.push(eq(funnelLeads.funnelId, input.funnelId));
+      if (input.source) conditions.push(eq(funnelLeads.source, input.source));
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      // Get total count
+      const [countResult] = await db.select({ count: sql<number>`COUNT(*)` }).from(funnelLeads).where(whereClause);
+      const total = Number(countResult?.count ?? 0);
+
+      // Get leads with search
+      let query = db.select().from(funnelLeads).where(whereClause).orderBy(desc(funnelLeads.createdAt)).limit(input.limit).offset(offset);
+
+      let leads = await query;
+
+      // Client-side search filter (for simplicity)
+      if (input.search) {
+        const s = input.search.toLowerCase();
+        leads = leads.filter(l =>
+          l.email.toLowerCase().includes(s) ||
+          (l.name && l.name.toLowerCase().includes(s)) ||
+          (l.phone && l.phone.includes(s))
+        );
+      }
+
+      return { leads, total, page: input.page, totalPages: Math.ceil(total / input.limit) };
+    }),
+
+  /** Get a single lead by ID with full details */
+  getLeadById: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      const [lead] = await db.select().from(funnelLeads).where(eq(funnelLeads.id, input.id));
+      if (!lead) throw new TRPCError({ code: "NOT_FOUND", message: "Lead not found" });
+
+      // Get funnel info
+      const [funnel] = await db.select({ name: funnels.name, slug: funnels.slug }).from(funnels).where(eq(funnels.id, lead.funnelId));
+      // Get page info
+      const [page] = await db.select({ title: funnelPages.title, slug: funnelPages.slug, pageType: funnelPages.pageType }).from(funnelPages).where(eq(funnelPages.id, lead.funnelPageId));
+
+      return { lead, funnel: funnel || null, page: page || null };
+    }),
+
+  /** Update a lead (tags, name, phone) */
+  updateLead: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      name: z.string().optional(),
+      phone: z.string().optional(),
+      tags: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      const updates: any = {};
+      if (input.name !== undefined) updates.name = input.name;
+      if (input.phone !== undefined) updates.phone = input.phone;
+      if (input.tags !== undefined) updates.tags = input.tags;
+      await db.update(funnelLeads).set(updates).where(eq(funnelLeads.id, input.id));
+      return { success: true };
+    }),
+
+  /** Delete leads by IDs */
+  deleteLeads: protectedProcedure
+    .input(z.object({ ids: z.array(z.number()) }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      for (const id of input.ids) {
+        await db.delete(funnelLeads).where(eq(funnelLeads.id, id));
+      }
+      return { success: true, deleted: input.ids.length };
+    }),
 });
 
 // ─── Public Router (for rendering funnel pages) ─────────────────────────────
@@ -422,14 +579,14 @@ export const funnelPublicRouter = router({
       const [funnel] = await db
         .select()
         .from(funnels)
-        .where(and(eq(funnels.slug, input.slug), eq(funnels.status, "active")));
+        .where(eq(funnels.slug, input.slug));
       if (!funnel) throw new TRPCError({ code: "NOT_FOUND", message: "Funnel not found" });
       // Track view
       await db.execute(sql`UPDATE funnels SET total_views = total_views + 1 WHERE id = ${funnel.id}`);
       const pages = await db
         .select()
         .from(funnelPages)
-        .where(and(eq(funnelPages.funnelId, funnel.id), eq(funnelPages.isActive, true)))
+        .where(eq(funnelPages.funnelId, funnel.id))
         .orderBy(asc(funnelPages.sortOrder));
       return { ...funnel, pages };
     }),
@@ -442,7 +599,7 @@ export const funnelPublicRouter = router({
       const [funnel] = await db
         .select()
         .from(funnels)
-        .where(and(eq(funnels.slug, input.funnelSlug), eq(funnels.status, "active")));
+        .where(eq(funnels.slug, input.funnelSlug));
       if (!funnel) throw new TRPCError({ code: "NOT_FOUND", message: "Funnel not found" });
       const [page] = await db
         .select()
@@ -450,8 +607,7 @@ export const funnelPublicRouter = router({
         .where(
           and(
             eq(funnelPages.funnelId, funnel.id),
-            eq(funnelPages.slug, input.pageSlug),
-            eq(funnelPages.isActive, true)
+            eq(funnelPages.slug, input.pageSlug)
           )
         );
       if (!page) throw new TRPCError({ code: "NOT_FOUND", message: "Page not found" });
@@ -469,6 +625,146 @@ export const funnelPublicRouter = router({
       return { funnel, page, nextPage };
     }),
 
+  /** Create a checkout session from the checkout form block (public — no login required) */
+  createFunnelFormCheckout: publicProcedure
+    .input(
+      z.object({
+        funnelId: z.number(),
+        pageId: z.number(),
+        origin: z.string(),
+        email: z.string().email(),
+        firstName: z.string().optional(),
+        lastName: z.string().optional(),
+        phone: z.string().optional(),
+        selectedProductIndex: z.number().default(0),
+        addedBumpIndexes: z.array(z.number()).default([]),
+        billingAddress: z.object({
+          address: z.string(),
+          address2: z.string().optional(),
+          country: z.string(),
+          state: z.string(),
+          city: z.string(),
+          postalCode: z.string(),
+        }).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      const [page] = await db.select().from(funnelPages).where(eq(funnelPages.id, input.pageId));
+      if (!page) throw new TRPCError({ code: "NOT_FOUND", message: "Funnel page not found" });
+      const [funnel] = await db.select().from(funnels).where(eq(funnels.id, input.funnelId));
+      if (!funnel) throw new TRPCError({ code: "NOT_FOUND", message: "Funnel not found" });
+
+      // Parse blocks to find checkout_form block
+      let checkoutBlock: any = null;
+      try {
+        const blocks = JSON.parse(page.blocks || "[]");
+        checkoutBlock = blocks.find((b: any) => b.type === "checkout_form");
+      } catch {}
+
+      if (!checkoutBlock) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "No checkout form found on this page" });
+      }
+
+      const products = checkoutBlock.data?.products ?? [];
+      const orderBumps = checkoutBlock.data?.orderBumps ?? [];
+      const selectedProduct = products[input.selectedProductIndex];
+
+      if (!selectedProduct) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid product selection" });
+      }
+
+      // Build line items
+      const lineItems: any[] = [
+        {
+          price_data: {
+            currency: "usd",
+            product_data: { name: selectedProduct.name, description: selectedProduct.description || undefined },
+            unit_amount: selectedProduct.price,
+          },
+          quantity: 1,
+        },
+      ];
+
+      // Add order bumps
+      for (const bumpIdx of input.addedBumpIndexes) {
+        const bump = orderBumps[bumpIdx];
+        if (bump && bump.price > 0) {
+          lineItems.push({
+            price_data: {
+              currency: "usd",
+              product_data: { name: bump.title, description: bump.headline || undefined },
+              unit_amount: bump.price,
+            },
+            quantity: 1,
+          });
+        }
+      }
+
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+
+      // Find thank you page for success redirect
+      const allPages = await db.select().from(funnelPages)
+        .where(eq(funnelPages.funnelId, funnel.id))
+        .orderBy(asc(funnelPages.sortOrder));
+      const thankYouPage = allPages.find(p => p.pageType === "thank_you");
+      const successRedirect = checkoutBlock.data?.successRedirect;
+      const successUrl = successRedirect
+        ? (successRedirect.startsWith("http") ? successRedirect : `${input.origin}${successRedirect}`)
+        : thankYouPage
+          ? `${input.origin}/f/${funnel.slug}/${thankYouPage.slug}?success=1`
+          : `${input.origin}/f/${funnel.slug}/${page.slug}?success=1`;
+      const cancelUrl = `${input.origin}/f/${funnel.slug}/${page.slug}`;
+
+      const session = await stripe.checkout.sessions.create({
+        mode: "payment",
+        customer_email: input.email,
+        allow_promotion_codes: true,
+        line_items: lineItems,
+        metadata: {
+          type: "funnel_form_purchase",
+          funnel_id: funnel.id.toString(),
+          funnel_page_id: page.id.toString(),
+          customer_email: input.email,
+          customer_name: `${input.firstName || ""} ${input.lastName || ""}`.trim(),
+          customer_phone: input.phone || "",
+          bumps_added: input.addedBumpIndexes.join(","),
+          user_id: ctx.user?.id?.toString() || "",
+        },
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+      });
+
+      // Extract IP and user agent from request
+      const fwd = ctx.req?.headers?.["x-forwarded-for"];
+      const ip = typeof fwd === "string" ? fwd.split(",")[0].trim() : ctx.req?.socket?.remoteAddress || null;
+      const ua = ctx.req?.headers?.["user-agent"] || null;
+
+      // Also store as a lead
+      await db.insert(funnelLeads).values({
+        funnelId: input.funnelId,
+        funnelPageId: input.pageId,
+        email: input.email,
+        name: `${input.firstName || ""} ${input.lastName || ""}`.trim() || null,
+        phone: input.phone || null,
+        customFields: JSON.stringify({
+          selectedProduct: selectedProduct.name,
+          bumps: input.addedBumpIndexes.map(i => orderBumps[i]?.title).filter(Boolean),
+          billingAddress: input.billingAddress,
+        }),
+        userId: ctx.user?.id || null,
+        source: "checkout_form",
+        ipAddress: ip || null,
+        userAgent: ua || null,
+        sourcePage: input.origin ? `${input.origin}/f/${funnel.slug}/${page.slug}` : null,
+      });
+
+      // Track conversion
+      await db.execute(sql`UPDATE funnel_pages SET conversions = conversions + 1 WHERE id = ${page.id}`);
+      return { checkoutUrl: session.url };
+    }),
+
   /** Submit a lead capture form (public) */
   submitLead: publicProcedure
     .input(
@@ -479,10 +775,19 @@ export const funnelPublicRouter = router({
         name: z.string().optional(),
         phone: z.string().optional(),
         customFields: z.record(z.string(), z.string()).optional(),
+        // Rich contact data collected from the browser
+        timezone: z.string().optional(),
+        referrer: z.string().optional(),
+        sourcePage: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
+      // Extract IP from request headers (X-Forwarded-For or direct)
+      const forwarded = ctx.req?.headers?.["x-forwarded-for"];
+      const ipAddress = typeof forwarded === "string" ? forwarded.split(",")[0].trim() : ctx.req?.socket?.remoteAddress || null;
+      const userAgent = ctx.req?.headers?.["user-agent"] || null;
+
       await db.insert(funnelLeads).values({
         funnelId: input.funnelId,
         funnelPageId: input.funnelPageId,
@@ -492,6 +797,11 @@ export const funnelPublicRouter = router({
         customFields: input.customFields ? JSON.stringify(input.customFields) : null,
         userId: ctx.user?.id || null,
         source: "funnel",
+        ipAddress: ipAddress || null,
+        userAgent: userAgent || null,
+        referrer: input.referrer || null,
+        timezone: input.timezone || null,
+        sourcePage: input.sourcePage || null,
       });
       // Track conversion
       await db.execute(sql`UPDATE funnel_pages SET conversions = conversions + 1 WHERE id = ${input.funnelPageId}`);

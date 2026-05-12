@@ -156,6 +156,7 @@ function CreateFunnelDialog({ onClose, onCreated }: { onClose: () => void; onCre
   const [description, setDescription] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [step, setStep] = useState<"template" | "details">("template");
+  const { data: savedTemplates } = trpc.funnel.listTemplates.useQuery();
 
   const createFunnel = trpc.funnel.create.useMutation({
     onSuccess: (data) => {
@@ -176,7 +177,22 @@ function CreateFunnelDialog({ onClose, onCreated }: { onClose: () => void; onCre
     });
 
     // If a template is selected, create default pages from template
-    if (selectedTemplate) {
+    if (selectedTemplate?.startsWith("saved:")) {
+      // User-saved template — load pages from database
+      const tplId = parseInt(selectedTemplate.replace("saved:", ""));
+      const tpl = savedTemplates?.find(t => t.id === tplId);
+      if (tpl) {
+        const pages = JSON.parse(tpl.pagesJson || "[]") as Array<{ pageType: string; title: string; slug?: string; blocks?: string }>;
+        for (const page of pages) {
+          await addPage.mutateAsync({
+            funnelId: result.id,
+            pageType: page.pageType as any,
+            title: page.title,
+            blocks: typeof page.blocks === "string" ? page.blocks : JSON.stringify(page.blocks || []),
+          });
+        }
+      }
+    } else if (selectedTemplate) {
       const templatePages = getTemplatePages(selectedTemplate);
       for (const page of templatePages) {
         await addPage.mutateAsync({
@@ -241,6 +257,29 @@ function CreateFunnelDialog({ onClose, onCreated }: { onClose: () => void; onCre
                   </div>
                 </div>
               ))}
+              {/* User-saved templates */}
+              {savedTemplates && savedTemplates.length > 0 && (
+                <>
+                  <div className="mt-4 pt-4 border-t border-gray-100">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Your Saved Templates</p>
+                  </div>
+                  {savedTemplates.map(tpl => (
+                    <div
+                      key={`saved-${tpl.id}`}
+                      onClick={() => { setSelectedTemplate(`saved:${tpl.id}`); setStep("details"); }}
+                      className={`p-4 rounded-xl border-2 cursor-pointer transition-all hover:border-purple-300 hover:shadow-sm ${selectedTemplate === `saved:${tpl.id}` ? "border-purple-500 bg-purple-50" : "border-gray-200"}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600"><LayoutTemplate size={20} /></div>
+                        <div>
+                          <h3 className="font-semibold text-gray-900">{tpl.name}</h3>
+                          <p className="text-sm text-gray-500">{tpl.description || "Custom saved template"}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
           ) : (
             <div className="space-y-4">
@@ -297,7 +336,10 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
   const duplicateFunnel = trpc.funnel.duplicate.useMutation({ onSuccess: () => { refetch(); toast.success("Funnel duplicated"); } });
   const addPage = trpc.funnel.addPage.useMutation({ onSuccess: () => { refetch(); setShowAddPage(false); toast.success("Page added"); } });
   const deletePage = trpc.funnel.deletePage.useMutation({ onSuccess: () => { refetch(); toast.success("Page deleted"); } });
+  const duplicatePage = trpc.funnel.duplicatePage.useMutation({ onSuccess: () => { refetch(); toast.success("Page duplicated"); } });
   const connectPages = trpc.funnel.connectPages.useMutation({ onSuccess: () => { refetch(); } });
+  const updatePage = trpc.funnel.updatePage.useMutation({ onSuccess: () => { refetch(); toast.success("Page updated"); } });
+  const saveAsTemplate = trpc.funnel.saveAsTemplate.useMutation({ onSuccess: () => { toast.success("Saved as template! It will appear in the template list when creating new funnels."); } });
 
   useEffect(() => {
     if (funnel) setNameValue(funnel.name);
@@ -357,6 +399,9 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
           </Button>
           <Button variant="outline" size="sm" onClick={() => duplicateFunnel.mutate({ id: funnelId })} className="gap-1.5 text-xs">
             <Copy size={14} /> Duplicate
+          <Button variant="outline" size="sm" onClick={() => { const tplName = prompt("Template name:", funnel.name + " Template"); if (tplName) saveAsTemplate.mutate({ id: funnelId, templateName: tplName }); }} className="gap-1.5 text-xs text-purple-600 border-purple-200 hover:bg-purple-50">
+            <LayoutTemplate size={14} /> Save as Template
+          </Button>
           </Button>
           <Button variant="outline" size="sm" onClick={() => { if (confirm("Delete this funnel?")) deleteFunnel.mutate({ id: funnelId }); }} className="gap-1.5 text-xs text-red-600 border-red-200 hover:bg-red-50">
             <Trash2 size={14} /> Delete
@@ -437,6 +482,12 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
                   <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={() => onEditPage(funnelId, page.id)} className="text-xs text-teal-600 hover:text-teal-700 flex items-center gap-1 bg-teal-50 px-2 py-1 rounded-lg">
                       <Pencil size={12} /> Edit Page
+                    </button>
+                    <button onClick={() => duplicatePage.mutate({ id: page.id })} className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 bg-blue-50 px-2 py-1 rounded-lg">
+                      <Copy size={12} /> Duplicate
+                    </button>
+                    <button onClick={() => { const newTitle = prompt("Page title:", page.title); if (newTitle && newTitle !== page.title) updatePage.mutate({ id: page.id, title: newTitle }); }} className="text-xs text-gray-600 hover:text-gray-700 flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-lg">
+                      <Settings size={12} /> Rename
                     </button>
                     <button onClick={() => { if (confirm("Delete this page?")) deletePage.mutate({ id: page.id }); }} className="text-xs text-red-500 hover:text-red-600 px-2 py-1 rounded-lg hover:bg-red-50">
                       <Trash2 size={12} />

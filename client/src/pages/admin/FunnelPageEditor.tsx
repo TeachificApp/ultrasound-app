@@ -147,10 +147,10 @@ export default function FunnelPageEditor() {
       <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200 shadow-sm flex-shrink-0">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate(`/admin/funnels`)}
+            onClick={() => navigate(`/admin/funnels/${funnelId}`)}
             className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-teal-700 font-medium transition-colors"
           >
-            <ArrowLeft size={16} /> Back to Funnels
+            <ArrowLeft size={16} /> Back to Funnel
           </button>
           <div className="w-px h-5 bg-gray-200" />
           <span className="text-sm font-semibold text-gray-800 truncate max-w-xs">

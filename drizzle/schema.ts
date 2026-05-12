@@ -3194,7 +3194,25 @@ export const funnelLeads = mysqlTable("funnel_leads", {
   source: varchar("source", { length: 100 }), // e.g. "funnel", "landing_page"
   ipAddress: varchar("ip_address", { length: 45 }),
   userAgent: text("user_agent"),
+  referrer: varchar("referrer", { length: 2048 }),
+  timezone: varchar("timezone", { length: 100 }),
+  sourcePage: varchar("source_page", { length: 2048 }),
+  tags: varchar("tags", { length: 500 }),
+  lastActiveAt: timestamp("last_active_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 export type FunnelLead = typeof funnelLeads.$inferSelect;
 export type InsertFunnelLead = typeof funnelLeads.$inferInsert;
+
+// ─── Funnel Templates (user-saved) ────────────────────────────────────────────
+export const funnelTemplates = mysqlTable("funnel_templates", {
+  id: int("id").primaryKey().autoincrement(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  pagesJson: longtext("pages_json").notNull(), // JSON array of page definitions with blocks
+  accentColor: varchar("accent_color", { length: 20 }).default("#0d9488"),
+  bgColor: varchar("bg_color", { length: 20 }).default("#f8fafc"),
+  logoUrl: text("logo_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export type FunnelTemplate = typeof funnelTemplates.$inferSelect;

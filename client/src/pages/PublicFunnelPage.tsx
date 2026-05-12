@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { Loader2, ArrowRight, CheckCircle } from "lucide-react";
 import type { Block } from "./admin/LandingPageBuilder";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
+import CheckoutFormBlock from "@/components/CheckoutFormBlock";
 
 // ─── Live Countdown Hook ─────────────────────────────────────────────────────
 
@@ -409,6 +410,8 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
           </div>
         </div>
       );
+    case "checkout_form":
+      return <CheckoutFormBlock data={d} funnelId={funnelId} pageId={pageId} funnelSlug={funnelSlug} />;
     default:
       return null;
   }
