@@ -603,10 +603,10 @@ function BlockPreview({ block, previewMode = "editor" }: { block: Block; preview
           <div className={`relative max-w-5xl mx-auto ${hasInlineMedia && isHorizontal ? "flex items-center gap-8" : ""} ${hasInlineMedia && placement === "left" ? "flex-row-reverse" : ""}`}>
             <div className={hasInlineMedia && isHorizontal ? "flex-1" : "max-w-3xl"}>
               <h1 className="text-4xl font-bold mb-4 leading-tight">
-                <span style={d.headlineColor ? { color: d.headlineColor } : undefined}>{d.headline}</span>
-                {d.headline2 && <><br /><span style={d.headline2Color ? { color: d.headline2Color } : undefined}>{d.headline2}</span></>}
+                <span style={d.headlineColor ? { color: d.headlineColor } : undefined} dangerouslySetInnerHTML={{ __html: d.headline ?? '' }} />
+                {d.headline2 && <><br /><span style={d.headline2Color ? { color: d.headline2Color } : undefined} dangerouslySetInnerHTML={{ __html: d.headline2 }} /></>}
               </h1>
-              {d.subheadline && <p className="text-xl opacity-90 mb-8">{d.subheadline}</p>}
+              {d.subheadline && <p className="text-xl opacity-90 mb-8" dangerouslySetInnerHTML={{ __html: d.subheadline }} />}
               <div className="flex flex-wrap gap-3" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
                 {buttons.map((btn: any, i: number) => (
                   <button key={i} className="px-8 py-3 rounded-lg font-semibold text-lg shadow-lg"
@@ -667,7 +667,7 @@ function BlockPreview({ block, previewMode = "editor" }: { block: Block; preview
       return (
         <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
           <div className="max-w-3xl mx-auto">
-            {d.headline && <h2 className="text-2xl font-bold mb-4 text-gray-900">{d.headline}</h2>}
+            {d.headline && <h2 className="text-2xl font-bold mb-4 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <ul className="space-y-2">
               {(d.items ?? []).map((item: string, i: number) => (
                 <li key={i} className="flex items-start gap-3">
@@ -683,7 +683,7 @@ function BlockPreview({ block, previewMode = "editor" }: { block: Block; preview
       return (
         <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           <div className="max-w-3xl mx-auto">
-            {d.headline && <h2 className="text-2xl font-bold mb-4 text-gray-900">{d.headline}</h2>}
+            {d.headline && <h2 className="text-2xl font-bold mb-4 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <ol className="space-y-3">
               {(d.items ?? []).map((item: string, i: number) => (
                 <li key={i} className="flex items-start gap-3">
@@ -710,8 +710,8 @@ function BlockPreview({ block, previewMode = "editor" }: { block: Block; preview
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           <div className="max-w-lg mx-auto text-center">
-            <h2 className="text-2xl font-bold mb-2 text-gray-900">{d.headline}</h2>
-            {d.subtext && <p className="text-gray-600 mb-6">{d.subtext}</p>}
+            <h2 className="text-2xl font-bold mb-2 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />
+            {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
             {previewMode === "customer" ? (
               <div className="inline-flex items-center gap-2 px-6 py-3 bg-green-100 text-green-700 rounded-lg font-semibold">✓ Purchased — Access Files</div>
             ) : (
@@ -735,7 +735,7 @@ function BlockPreview({ block, previewMode = "editor" }: { block: Block; preview
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           <div className="max-w-3xl mx-auto">
-            {d.headline && <h2 className="text-2xl font-bold mb-6 text-center text-gray-900">{d.headline}</h2>}
+            {d.headline && <h2 className="text-2xl font-bold mb-6 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <div className="space-y-3">
               {(d.items ?? []).map((item: any, i: number) => (
                 <details key={i} className="border border-gray-200 rounded-lg">
@@ -765,7 +765,7 @@ function BlockPreview({ block, previewMode = "editor" }: { block: Block; preview
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           <div className="max-w-4xl mx-auto">
-            {d.headline && <h2 className="text-2xl font-bold mb-6 text-center text-gray-900">{d.headline}</h2>}
+            {d.headline && <h2 className="text-2xl font-bold mb-6 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <div className="grid md:grid-cols-2 gap-4">
               {(d.items ?? []).map((item: any, i: number) => (
                 <div key={i} className="p-5 rounded-lg border bg-white shadow-sm">
@@ -784,7 +784,7 @@ function BlockPreview({ block, previewMode = "editor" }: { block: Block; preview
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           <div className="max-w-4xl mx-auto">
-            {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900">{d.headline}</h2>}
+            {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <div className="grid gap-6" style={{ gridTemplateColumns: `repeat(${d.columns ?? 3}, 1fr)` }}>
               {(d.items ?? []).map((item: any, i: number) => (
                 <div key={i} className="text-center p-4">

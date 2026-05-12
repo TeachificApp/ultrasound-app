@@ -109,12 +109,9 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price }: {
           )}
           <div className={`relative max-w-5xl mx-auto ${hasInlineMedia && isHorizontal ? "flex items-center gap-10" : ""} ${hasInlineMedia && placement === "left" ? "flex-row-reverse" : ""}`}>
             <div className={hasInlineMedia && isHorizontal ? "flex-1" : "max-w-3xl mx-auto"}>
-              <h1 className="text-4xl font-bold mb-4 leading-tight animate-fade-slide-up">
-                <span style={d.headlineColor ? { color: d.headlineColor } : undefined}>{d.headline}</span>
-                {d.headline2 && <><br /><span style={d.headline2Color ? { color: d.headline2Color } : undefined}>{d.headline2}</span></>}
-              </h1>
-              {d.subheadline && <p className="text-xl opacity-90 mb-8 animate-fade-slide-up-delay-1">{d.subheadline}</p>}
-              <div className="flex flex-wrap gap-3 animate-fade-slide-up-delay-2" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
+              <h1 className="text-4xl font-bold mb-4 leading-tight animate-fade-slide-up" dangerouslySetInnerHTML={{ __html: `<span style="${d.headlineColor ? `color:${d.headlineColor}` : ''}">${d.headline ?? ''}</span>${d.headline2 ? `<br/><span style="${d.headline2Color ? `color:${d.headline2Color}` : ''}">${d.headline2}</span>` : ''}` }} />
+              {d.subheadline && <p className="text-xl opacity-90 mb-8 animate-fade-slide-up-delay-1" dangerouslySetInnerHTML={{ __html: d.subheadline }} />}
+              {!d.hideButtons && <div className="flex flex-wrap gap-3 animate-fade-slide-up-delay-2" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
                 {buttons.map((btn, i) => (
                   <button key={i} onClick={btn.link ? () => window.location.href = btn.link : onEnroll}
                     className="px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-opacity hover:opacity-90"
@@ -122,7 +119,7 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price }: {
                     {btn.text}
                   </button>
                 ))}
-              </div>
+              </div>}
             </div>
             {hasInlineMedia && (
               <div className={`animate-fade-slide-up-delay-1 ${isHorizontal ? "flex-1 max-w-md" : "mt-8 max-w-lg mx-auto"}`}>
@@ -184,7 +181,7 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price }: {
     case "bullets":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
-          {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900">{d.headline}</h2>}
+          {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-3xl">
             {(d.items ?? []).map((item: string, i: number) => (
               <div key={i} className="flex items-start gap-3">
@@ -198,7 +195,7 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price }: {
     case "numbered_list":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900">{d.headline}</h2>}
+          {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="space-y-4 max-w-2xl">
             {(d.items ?? []).map((item: string, i: number) => (
               <div key={i} className="flex items-start gap-4">
@@ -212,7 +209,7 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price }: {
     case "icon_grid":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900">{d.headline}</h2>}
+          {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="grid gap-6" style={{ gridTemplateColumns: `repeat(${d.columns ?? 3}, 1fr)` }}>
             {(d.items ?? []).map((item: any, i: number) => (
               <div key={i} className="text-center p-4">
@@ -240,7 +237,7 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price }: {
     case "reviews":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900">{d.headline}</h2>}
+          {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
             {(d.reviews ?? []).map((r: any, i: number) => (
               <div key={i} className="bg-gray-50 rounded-xl p-5 shadow-sm">
@@ -255,7 +252,7 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price }: {
     case "logos":
       return (
         <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
-          {d.headline && <p className="text-center text-sm font-semibold text-gray-500 uppercase tracking-wider mb-6">{d.headline}</p>}
+          {d.headline && <p className="text-center text-sm font-semibold text-gray-500 uppercase tracking-wider mb-6" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="flex flex-wrap items-center justify-center gap-8">
             {(d.logos ?? []).map((logo: any, i: number) => (
               logo.url ? <img key={i} src={logo.url} alt={logo.alt ?? ""} className="h-10 object-contain opacity-70 hover:opacity-100 transition-opacity" />
@@ -281,7 +278,7 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price }: {
     case "faq":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          {d.headline && <h2 className="text-2xl font-bold mb-8 text-gray-900">{d.headline}</h2>}
+          {d.headline && <h2 className="text-2xl font-bold mb-8 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="max-w-3xl space-y-3">
             {(d.items ?? []).map((item: any, i: number) => (
               <details key={i} className="border border-gray-200 rounded-lg overflow-hidden">
@@ -295,7 +292,7 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price }: {
     case "countdown":
       return (
         <div className="px-8 py-10 text-center" style={{ backgroundColor: d.bgColor ?? "#179ca3" }}>
-          {d.headline && <h2 className="text-2xl font-bold mb-6" style={{ color: d.textColor ?? "#fff" }}>{d.headline}</h2>}
+          {d.headline && <h2 className="text-2xl font-bold mb-6" style={{ color: d.textColor ?? "#fff" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.targetDate ? <CountdownTimer targetDate={d.targetDate} textColor={d.textColor ?? "#fff"} /> : (
             <div className="flex justify-center gap-4">
               {["Days", "Hours", "Mins", "Secs"].map(u => (
@@ -320,7 +317,7 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price }: {
     case "flip_cards":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
-          {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900">{d.headline}</h2>}
+          {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
             {(d.cards ?? []).map((card: any, i: number) => (
               <div key={i} className="rounded-xl overflow-hidden shadow-sm border border-gray-200">
@@ -334,8 +331,8 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price }: {
     case "pricing_cta":
       return (
         <div className="px-8 py-12 text-center" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          {d.headline && <h2 className="text-3xl font-bold text-gray-900 mb-3">{d.headline}</h2>}
-          {d.subtext && <p className="text-gray-600 mb-6 max-w-xl mx-auto">{d.subtext}</p>}
+          {d.headline && <h2 className="text-3xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          {d.subtext && <p className="text-gray-600 mb-6 max-w-xl mx-auto" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           {d.showPrice && <p className="text-4xl font-bold mb-6" style={{ color: d.ctaColor ?? "#179ca3" }}>{price}</p>}
           <button onClick={onEnroll} disabled={enrolling} className="px-10 py-4 rounded-xl font-bold text-lg shadow-lg disabled:opacity-60 transition-opacity hover:opacity-90" style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
             {enrolling ? "Processing…" : (d.ctaText ?? ctaText)}
@@ -345,8 +342,8 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price }: {
     case "cta_standalone":
       return (
         <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa", textAlign: d.align ?? "center" }}>
-          {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3">{d.headline}</h2>}
-          {d.subtext && <p className="text-gray-600 mb-6">{d.subtext}</p>}
+          {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           <button onClick={d.ctaLink ? () => window.location.href = d.ctaLink : onEnroll} disabled={enrolling}
             className="inline-block px-8 py-3 rounded-lg font-semibold shadow disabled:opacity-60 transition-opacity hover:opacity-90" style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
             {d.ctaText ?? ctaText}
@@ -356,8 +353,8 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price }: {
     case "lead_capture":
       return (
         <div className="px-8 py-12 text-center" style={{ backgroundColor: d.bgColor ?? "#179ca3", color: d.textColor ?? "#fff" }}>
-          {d.headline && <h2 className="text-2xl font-bold mb-3">{d.headline}</h2>}
-          {d.subtext && <p className="opacity-90 mb-6">{d.subtext}</p>}
+          {d.headline && <h2 className="text-2xl font-bold mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          {d.subtext && <p className="opacity-90 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           <div className="flex max-w-md mx-auto gap-2">
             <input type="email" placeholder="Your email address" className="flex-1 px-4 py-3 rounded-lg text-gray-900 border-0 focus:ring-2 focus:ring-white/50" />
             <button className="px-6 py-3 bg-white font-semibold rounded-lg" style={{ color: d.bgColor ?? "#179ca3" }}>{d.ctaText ?? "Send Me Access"}</button>
@@ -373,7 +370,7 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price }: {
     case "curriculum_auto":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900">{d.headline}</h2>}
+          {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="border border-gray-200 rounded-xl overflow-hidden max-w-3xl">
             <Accordion type="multiple" defaultValue={["section-0"]}>
               {course.sections.map((section: any, si: number) => (
@@ -402,7 +399,7 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price }: {
     case "pricing_options_auto":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
-          {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900">{d.headline}</h2>}
+          {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="flex justify-center max-w-sm mx-auto">
             <div className="w-full border-2 border-teal-500 rounded-xl p-6 text-center shadow-lg">
               <h3 className="font-bold text-gray-900 mb-2">{course.title}</h3>
@@ -439,6 +436,38 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price }: {
     }
     case "spacer":
       return <div style={{ height: d.height ?? 48 }} />;
+    case "logo_strip": {
+      const logoAlign = d.align ?? "center";
+      return (
+        <div style={{ backgroundColor: d.bgColor ?? "#ffffff", padding: d.padding ?? "16px 0" }}>
+          <div className={`flex ${logoAlign === "left" ? "justify-start" : logoAlign === "right" ? "justify-end" : "justify-center"} px-6`}>
+            {d.logoUrl ? (
+              d.link ? <a href={d.link}><img src={d.logoUrl} alt="Logo" style={{ maxWidth: d.maxWidth ?? "200px", height: "auto" }} className="object-contain" /></a>
+              : <img src={d.logoUrl} alt="Logo" style={{ maxWidth: d.maxWidth ?? "200px", height: "auto" }} className="object-contain" />
+            ) : null}
+          </div>
+        </div>
+      );
+    }
+    case "footer": {
+      const footerLinks: Array<{ text: string; url: string }> = d.links ?? [];
+      const socialLinks = d.socialLinks ?? {};
+      return (
+        <footer style={{ backgroundColor: d.bgColor ?? "#0e1e2e", color: d.textColor ?? "#ffffff" }} className="px-6 py-8">
+          {d.logoUrl && <div className="flex justify-center mb-4"><img src={d.logoUrl} alt="Logo" style={{ maxWidth: d.logoMaxWidth ?? "120px" }} className="object-contain" /></div>}
+          {footerLinks.length > 0 && <div className="flex flex-wrap justify-center gap-4 mb-4">{footerLinks.map((l, i) => <a key={i} href={l.url} className="text-sm opacity-80 hover:opacity-100 underline" style={{ color: d.textColor ?? "#ffffff" }}>{l.text}</a>)}</div>}
+          {d.showSocial && (socialLinks.facebook || socialLinks.instagram || socialLinks.youtube || socialLinks.linkedin) && (
+            <div className="flex justify-center gap-4 mb-4">
+              {socialLinks.facebook && <a href={socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="opacity-70 hover:opacity-100">FB</a>}
+              {socialLinks.instagram && <a href={socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="opacity-70 hover:opacity-100">IG</a>}
+              {socialLinks.youtube && <a href={socialLinks.youtube} target="_blank" rel="noopener noreferrer" className="opacity-70 hover:opacity-100">YT</a>}
+              {socialLinks.linkedin && <a href={socialLinks.linkedin} target="_blank" rel="noopener noreferrer" className="opacity-70 hover:opacity-100">LI</a>}
+            </div>
+          )}
+          <p className="text-xs text-center opacity-60">{d.copyrightText ?? "\u00a9 2026 All rights reserved."}</p>
+        </footer>
+      );
+    }
     default:
       return null;
   }

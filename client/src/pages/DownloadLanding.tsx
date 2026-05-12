@@ -47,11 +47,11 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug }: {
           <div className={`relative max-w-5xl mx-auto ${hasInlineMedia && isHorizontal ? "flex items-center gap-10" : ""} ${hasInlineMedia && placement === "left" ? "flex-row-reverse" : ""}`}>
             <div className={hasInlineMedia && isHorizontal ? "flex-1" : "max-w-4xl mx-auto"}>
               <h1 className="text-4xl font-bold mb-4 leading-tight animate-fade-slide-up">
-                <span style={d.headlineColor ? { color: d.headlineColor } : undefined}>{d.headline}</span>
-                {d.headline2 && <><br /><span style={d.headline2Color ? { color: d.headline2Color } : undefined}>{d.headline2}</span></>}
+                <span style={d.headlineColor ? { color: d.headlineColor } : undefined} dangerouslySetInnerHTML={{ __html: d.headline ?? '' }} />
+                {d.headline2 && <><br /><span style={d.headline2Color ? { color: d.headline2Color } : undefined} dangerouslySetInnerHTML={{ __html: d.headline2 }} /></>}
               </h1>
-              {d.subheadline && <p className="text-xl opacity-90 mb-8 animate-fade-slide-up-delay-1">{d.subheadline}</p>}
-              <div className="flex flex-wrap gap-3 animate-fade-slide-up-delay-2" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
+              {d.subheadline && <p className="text-xl opacity-90 mb-8 animate-fade-slide-up-delay-1" dangerouslySetInnerHTML={{ __html: d.subheadline }} />}
+              {!d.hideButtons && <div className="flex flex-wrap gap-3 animate-fade-slide-up-delay-2" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
                 {buttons.map((btn: any, i: number) => (
                   <button key={i} onClick={btn.link ? () => { window.location.href = btn.link; } : hasPurchased ? () => { window.location.href = `/downloads/${slug}/files`; } : onBuy}
                     disabled={buying}
@@ -60,7 +60,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug }: {
                     {hasPurchased ? "Access Files" : btn.text}
                   </button>
                 ))}
-              </div>
+              </div>}
             </div>
             {hasInlineMedia && (
               <div className={`animate-fade-slide-up-delay-1 ${isHorizontal ? "flex-1 max-w-md" : "mt-8 max-w-lg mx-auto"}`}>
@@ -110,7 +110,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug }: {
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
           <div className="max-w-3xl mx-auto">
-            {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900">{d.headline}</h2>}
+            {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {(d.items ?? []).map((item: string, i: number) => (
                 <div key={i} className="flex items-start gap-3">
@@ -126,7 +126,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug }: {
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           <div className="max-w-2xl mx-auto">
-            {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900">{d.headline}</h2>}
+            {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <div className="space-y-4">
               {(d.items ?? []).map((item: string, i: number) => (
                 <div key={i} className="flex items-start gap-4">
@@ -156,8 +156,8 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug }: {
     case "pricing_cta":
       return (
         <div className="px-8 py-12 text-center" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          {d.headline && <h2 className="text-3xl font-bold text-gray-900 mb-3">{d.headline}</h2>}
-          {d.subtext && <p className="text-gray-600 mb-6 max-w-xl mx-auto">{d.subtext}</p>}
+          {d.headline && <h2 className="text-3xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          {d.subtext && <p className="text-gray-600 mb-6 max-w-xl mx-auto" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           {d.showPrice && <p className="text-4xl font-bold mb-6" style={{ color: d.ctaColor ?? "#179ca3" }}>{price}</p>}
           <button
             onClick={hasPurchased ? () => { window.location.href = `/downloads/${slug}/files`; } : onBuy}
@@ -192,7 +192,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug }: {
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           <div className="max-w-3xl mx-auto">
-            {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900">{d.headline}</h2>}
+            {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <div className="space-y-2">
               {(d.items ?? []).map((item: any, i: number) => (
                 <details key={i} className="group border border-gray-200 rounded-lg overflow-hidden">
@@ -216,7 +216,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug }: {
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           <div className="max-w-4xl mx-auto">
-            {d.headline && <h2 className="text-2xl font-bold mb-6 text-center text-gray-900">{d.headline}</h2>}
+            {d.headline && <h2 className="text-2xl font-bold mb-6 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <div className="grid md:grid-cols-2 gap-4">
               {(d.items ?? []).map((item: any, i: number) => (
                 <div key={i} className="p-5 rounded-lg border bg-white shadow-sm">
@@ -235,7 +235,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug }: {
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           <div className="max-w-4xl mx-auto">
-            {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900">{d.headline}</h2>}
+            {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <div className="grid gap-6" style={{ gridTemplateColumns: `repeat(${d.columns ?? 3}, 1fr)` }}>
               {(d.items ?? []).map((item: any, i: number) => (
                 <div key={i} className="text-center p-4">
@@ -302,6 +302,35 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug }: {
           <hr style={{ borderColor: d.color ?? "#e5e7eb", borderWidth: `${d.thickness ?? 1}px 0 0 0` }} />
         </div>
       );
+    case "logo_strip": {
+      const logoAlign = d.align ?? "center";
+      return (
+        <div style={{ backgroundColor: d.bgColor ?? "#ffffff", padding: d.padding ?? "16px 0" }}>
+          <div className={`flex ${logoAlign === "left" ? "justify-start" : logoAlign === "right" ? "justify-end" : "justify-center"} px-6`}>
+            {d.logoUrl ? (d.link ? <a href={d.link}><img src={d.logoUrl} alt="Logo" style={{ maxWidth: d.maxWidth ?? "200px", height: "auto" }} className="object-contain" /></a> : <img src={d.logoUrl} alt="Logo" style={{ maxWidth: d.maxWidth ?? "200px", height: "auto" }} className="object-contain" />) : null}
+          </div>
+        </div>
+      );
+    }
+    case "footer": {
+      const footerLinks: Array<{ text: string; url: string }> = d.links ?? [];
+      const socialLinks = d.socialLinks ?? {};
+      return (
+        <footer style={{ backgroundColor: d.bgColor ?? "#0e1e2e", color: d.textColor ?? "#ffffff" }} className="px-6 py-8">
+          {d.logoUrl && <div className="flex justify-center mb-4"><img src={d.logoUrl} alt="Logo" style={{ maxWidth: d.logoMaxWidth ?? "120px" }} className="object-contain" /></div>}
+          {footerLinks.length > 0 && <div className="flex flex-wrap justify-center gap-4 mb-4">{footerLinks.map((l, i) => <a key={i} href={l.url} className="text-sm opacity-80 hover:opacity-100 underline" style={{ color: d.textColor ?? "#ffffff" }}>{l.text}</a>)}</div>}
+          {d.showSocial && (socialLinks.facebook || socialLinks.instagram || socialLinks.youtube || socialLinks.linkedin) && (
+            <div className="flex justify-center gap-4 mb-4">
+              {socialLinks.facebook && <a href={socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="opacity-70 hover:opacity-100">FB</a>}
+              {socialLinks.instagram && <a href={socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="opacity-70 hover:opacity-100">IG</a>}
+              {socialLinks.youtube && <a href={socialLinks.youtube} target="_blank" rel="noopener noreferrer" className="opacity-70 hover:opacity-100">YT</a>}
+              {socialLinks.linkedin && <a href={socialLinks.linkedin} target="_blank" rel="noopener noreferrer" className="opacity-70 hover:opacity-100">LI</a>}
+            </div>
+          )}
+          <p className="text-xs text-center opacity-60">{d.copyrightText ?? "\u00a9 2026 All rights reserved."}</p>
+        </footer>
+      );
+    }
     default:
       return null;
   }

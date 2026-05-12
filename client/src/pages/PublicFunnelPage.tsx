@@ -115,16 +115,19 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
             <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
           )}
           <div className="relative max-w-4xl mx-auto">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4 leading-tight">{d.headline}{d.headline2 && <><br />{d.headline2}</>}</h1>
-            {d.subheadline && <p className="text-xl opacity-90 mb-8 max-w-2xl">{d.subheadline}</p>}
-            <div className="flex flex-wrap gap-3" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
+            <h1 className="text-4xl md:text-5xl font-bold mb-4 leading-tight">
+              <span style={d.headlineColor ? { color: d.headlineColor } : undefined} dangerouslySetInnerHTML={{ __html: d.headline ?? '' }} />
+              {d.headline2 && <><br /><span style={d.headline2Color ? { color: d.headline2Color } : undefined} dangerouslySetInnerHTML={{ __html: d.headline2 }} /></>}
+            </h1>
+            {d.subheadline && <p className="text-xl opacity-90 mb-8 max-w-2xl" dangerouslySetInnerHTML={{ __html: d.subheadline }} />}
+            {!d.hideButtons && <div className="flex flex-wrap gap-3" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
               {heroButtons.map((btn, i) => (
                 <a key={i} href={btn.link || "#"} className="px-8 py-3 rounded-lg font-semibold text-lg shadow-lg inline-block transition-transform hover:scale-105"
                   style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
                   {btn.text}
                 </a>
               ))}
-            </div>
+            </div>}
           </div>
         </div>
       );
@@ -161,7 +164,7 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
       return (
         <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
           <div className="max-w-4xl mx-auto">
-            {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900">{d.headline}</h2>}
+            {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <ul className="space-y-3">
               {(d.items ?? []).map((item: string, i: number) => (
                 <li key={i} className="flex items-start gap-3 text-lg text-gray-700">
@@ -187,7 +190,7 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
       return (
         <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
           <div className="max-w-4xl mx-auto">
-            {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900">{d.headline}</h2>}
+            {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {(d.reviews ?? []).map((review: any, i: number) => (
                 <div key={i} className="bg-white border border-gray-100 rounded-xl p-6 shadow-sm">
@@ -208,8 +211,8 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
       return (
         <div className="px-8 py-16" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
           <div className="max-w-2xl mx-auto text-center">
-            <h2 className="text-3xl font-bold mb-4 text-gray-900">{d.headline}</h2>
-            {d.subtext && <p className="text-lg text-gray-600 mb-8">{d.subtext}</p>}
+            <h2 className="text-3xl font-bold mb-4 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />
+            {d.subtext && <p className="text-lg text-gray-600 mb-8" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
             <button className="px-10 py-4 rounded-xl font-bold text-xl shadow-lg transition-transform hover:scale-105"
               style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#ffffff" }}>
               {d.ctaText ?? "Get Started"}
@@ -221,8 +224,8 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
       return (
         <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa", textAlign: d.align ?? "center" }}>
           <div className="max-w-3xl mx-auto">
-            <h2 className="text-2xl font-bold mb-3 text-gray-900">{d.headline}</h2>
-            {d.subtext && <p className="text-gray-600 mb-6">{d.subtext}</p>}
+            <h2 className="text-2xl font-bold mb-3 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />
+            {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
             <a href={d.ctaLink || "#"} className="inline-block px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-transform hover:scale-105"
               style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#ffffff" }}>
               {d.ctaText ?? "Get Started"}
@@ -236,7 +239,7 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
       return (
         <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
           <div className="max-w-3xl mx-auto">
-            {d.headline && <h2 className="text-2xl font-bold mb-8 text-gray-900">{d.headline}</h2>}
+            {d.headline && <h2 className="text-2xl font-bold mb-8 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <div className="space-y-4">
               {(d.items ?? []).map((item: { q: string; a: string }, i: number) => (
                 <details key={i} className="group border border-gray-200 rounded-lg">
@@ -314,7 +317,7 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
       return (
         <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
           <div className="max-w-4xl mx-auto">
-            {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900">{d.headline}</h2>}
+            {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <div className={`grid gap-6 ${d.columns === 2 ? "grid-cols-1 md:grid-cols-2" : d.columns === 4 ? "grid-cols-2 md:grid-cols-4" : "grid-cols-1 md:grid-cols-3"}`}>
               {(d.items ?? []).map((item: { icon: string; title: string; text: string }, i: number) => (
                 <div key={i} className="text-center p-4">
@@ -331,7 +334,7 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
       return (
         <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
           <div className="max-w-3xl mx-auto">
-            {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900">{d.headline}</h2>}
+            {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <ol className="space-y-4">
               {(d.items ?? []).map((item: string, i: number) => (
                 <li key={i} className="flex items-start gap-4">
@@ -348,7 +351,7 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
           <div className="max-w-4xl mx-auto text-center">
-            {d.headline && <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-6">{d.headline}</p>}
+            {d.headline && <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-6" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <div className="flex flex-wrap justify-center items-center gap-8">
               {(d.logos ?? []).map((logo: { url: string; alt: string }, i: number) => (
                 logo.url ? <img key={i} src={logo.url} alt={logo.alt} className="h-10 opacity-60 hover:opacity-100 transition-opacity" /> :
@@ -398,7 +401,7 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
       return (
         <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
           <div className="max-w-4xl mx-auto">
-            {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900">{d.headline}</h2>}
+            {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {(d.cards ?? []).map((card: { front: string; back: string }, i: number) => (
                 <div key={i} className="border rounded-xl p-6 hover:shadow-md transition-shadow" style={{ borderColor: d.accentColor ?? "#179ca3" }}>
@@ -412,6 +415,51 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
       );
     case "checkout_form":
       return <CheckoutFormBlock data={d} funnelId={funnelId} pageId={pageId} funnelSlug={funnelSlug} />;
+    case "logo_strip": {
+      const logoAlign = d.align ?? "center";
+      return (
+        <div style={{ backgroundColor: d.bgColor ?? "#ffffff", padding: d.padding ?? "16px 0" }}>
+          <div className={`flex ${logoAlign === "left" ? "justify-start" : logoAlign === "right" ? "justify-end" : "justify-center"} px-6`}>
+            {d.logoUrl ? (
+              d.link ? (
+                <a href={d.link}><img src={d.logoUrl} alt="Logo" style={{ maxWidth: d.maxWidth ?? "200px", height: "auto" }} className="object-contain" /></a>
+              ) : (
+                <img src={d.logoUrl} alt="Logo" style={{ maxWidth: d.maxWidth ?? "200px", height: "auto" }} className="object-contain" />
+              )
+            ) : null}
+          </div>
+        </div>
+      );
+    }
+    case "footer": {
+      const footerLinks: Array<{ text: string; url: string }> = d.links ?? [];
+      const socialLinks = d.socialLinks ?? {};
+      return (
+        <footer style={{ backgroundColor: d.bgColor ?? "#0e1e2e", color: d.textColor ?? "#ffffff" }} className="px-6 py-8">
+          {d.logoUrl && (
+            <div className="flex justify-center mb-4">
+              <img src={d.logoUrl} alt="Logo" style={{ maxWidth: d.logoMaxWidth ?? "120px" }} className="object-contain" />
+            </div>
+          )}
+          {footerLinks.length > 0 && (
+            <div className="flex flex-wrap justify-center gap-4 mb-4">
+              {footerLinks.map((l, i) => (
+                <a key={i} href={l.url} className="text-sm opacity-80 hover:opacity-100 underline" style={{ color: d.textColor ?? "#ffffff" }}>{l.text}</a>
+              ))}
+            </div>
+          )}
+          {d.showSocial && (socialLinks.facebook || socialLinks.instagram || socialLinks.youtube || socialLinks.linkedin) && (
+            <div className="flex justify-center gap-4 mb-4">
+              {socialLinks.facebook && <a href={socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="opacity-70 hover:opacity-100"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></a>}
+              {socialLinks.instagram && <a href={socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="opacity-70 hover:opacity-100"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg></a>}
+              {socialLinks.youtube && <a href={socialLinks.youtube} target="_blank" rel="noopener noreferrer" className="opacity-70 hover:opacity-100"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></a>}
+              {socialLinks.linkedin && <a href={socialLinks.linkedin} target="_blank" rel="noopener noreferrer" className="opacity-70 hover:opacity-100"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg></a>}
+            </div>
+          )}
+          <p className="text-xs text-center opacity-60">{d.copyrightText ?? "\u00a9 2026 All rights reserved."}</p>
+        </footer>
+      );
+    }
     default:
       return null;
   }
@@ -426,7 +474,7 @@ function PriceStackBlock({ data: d }: { data: Record<string, any> }) {
       style={{ backgroundColor: d.bgColor ?? "#ffffff", color: d.textColor ?? "#0e1e2e", borderColor: d.showBorder ? (d.borderColor ?? "#1a5f7a") : undefined }}>
       <div className="max-w-2xl mx-auto">
         {d.imageUrl && <img src={d.imageUrl} alt="" className="w-full max-w-lg mx-auto rounded-lg mb-8 object-cover" />}
-        {d.headline && <h2 className="text-2xl md:text-3xl font-black uppercase mb-8 whitespace-pre-line leading-tight">{d.headline}</h2>}
+        {d.headline && <h2 className="text-2xl md:text-3xl font-black uppercase mb-8 whitespace-pre-line leading-tight" dangerouslySetInnerHTML={{ __html: d.headline }} />}
         {items.length > 0 && (
           <div className="space-y-3 mb-10 max-w-md mx-auto text-left">
             {items.map((item, i) => (
@@ -491,7 +539,7 @@ function UrgencyOfferBlock({ data: d }: { data: Record<string, any> }) {
           </div>
         </div>
         {/* Content section */}
-        {d.headline && <h2 className="text-2xl md:text-3xl font-black text-center mb-6 whitespace-pre-line leading-tight">{d.headline}</h2>}
+        {d.headline && <h2 className="text-2xl md:text-3xl font-black text-center mb-6 whitespace-pre-line leading-tight" dangerouslySetInnerHTML={{ __html: d.headline }} />}
         {d.description && <p className="italic text-lg mb-4" style={{ color: d.accentColor ?? "#179ca3" }}>{d.description}</p>}
         {d.bodyHtml && <div className="prose prose-lg max-w-none mb-6" dangerouslySetInnerHTML={{ __html: d.bodyHtml }} />}
         {d.ctaText && (

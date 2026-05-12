@@ -36,7 +36,7 @@ import {
   AlignCenter, AlignRight, HelpCircle, Users, Star, Globe, Timer,
   AlertTriangle, CheckSquare, LayoutGrid, Layers, BookOpen, Tag,
   ChevronDown, ChevronUp, Copy, FolderOpen, BookMarked, Upload, Code,
-  ShoppingCart, Package,
+  ShoppingCart, Package, Link, Mail, Phone, MapPin,
 } from "lucide-react";
 
 // ─── Block Types ──────────────────────────────────────────────────────────────
@@ -49,7 +49,8 @@ export type BlockType =
   | "lead_capture" | "numbered_list" | "alert" | "flip_cards"
   | "curriculum_auto" | "pricing_options_auto"
   | "funnel_workflow" | "product_offer_stack" | "order_bump_checkout"
-  | "price_stack" | "urgency_offer" | "checkout_form";
+  | "price_stack" | "urgency_offer" | "checkout_form"
+  | "footer" | "logo_strip";
 
 export interface Block {
   id: string;
@@ -191,6 +192,17 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
       submitText: "Submit",
       successRedirect: "",
     } },
+  // ── Layout extras
+  { type: "logo_strip", label: "Logo / Brand", icon: <Image size={14} />, category: "Layout",
+    defaultData: { logoUrl: "", maxWidth: "200px", align: "center", link: "/", bgColor: "#ffffff", padding: "16px 0" } },
+  { type: "footer", label: "Footer", icon: <Columns size={14} />, category: "Layout",
+    defaultData: {
+      bgColor: "#0e1e2e", textColor: "#ffffff", align: "center",
+      copyrightText: "© 2026 All About Ultrasound. All rights reserved.",
+      links: [{ text: "Privacy Policy", url: "/privacy" }, { text: "Terms of Service", url: "/terms" }, { text: "Contact", url: "/contact" }],
+      showSocial: true, socialLinks: { facebook: "", instagram: "", youtube: "", linkedin: "" },
+      logoUrl: "", logoMaxWidth: "120px",
+    } },
   // ── Smart Sections
   { type: "curriculum_auto", label: "Curriculum (Auto)", icon: <BookOpen size={14} />, category: "Smart",
     defaultData: { headline: "Course Curriculum", bgColor: "#ffffff", showLocked: true } },
@@ -221,16 +233,19 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
             <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
           )}
           <div className="relative max-w-3xl">
-            <h1 className="text-4xl font-bold mb-4 leading-tight">{d.headline}{d.headline2 && <><br />{d.headline2}</>}</h1>
-            {d.subheadline && <p className="text-xl opacity-90 mb-8">{d.subheadline}</p>}
-            <div className="flex flex-wrap gap-3" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
+            <h1 className="text-4xl font-bold mb-4 leading-tight">
+              <span style={d.headlineColor ? { color: d.headlineColor } : undefined} dangerouslySetInnerHTML={{ __html: d.headline ?? '' }} />
+              {d.headline2 && <><br /><span style={d.headline2Color ? { color: d.headline2Color } : undefined} dangerouslySetInnerHTML={{ __html: d.headline2 }} /></>}
+            </h1>
+            {d.subheadline && <p className="text-xl opacity-90 mb-8" dangerouslySetInnerHTML={{ __html: d.subheadline }} />}
+            {!d.hideButtons && <div className="flex flex-wrap gap-3" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
               {heroButtons.map((btn, i) => (
                 <button key={i} className="px-8 py-3 rounded-lg font-semibold text-lg shadow-lg"
                   style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
                   {btn.text}
                 </button>
               ))}
-            </div>
+            </div>}
           </div>
         </div>
       );
@@ -284,7 +299,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
     case "bullets":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
-          {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900">{d.headline}</h2>}
+          {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-3xl">
             {(d.items ?? []).map((item: string, i: number) => (
               <div key={i} className="flex items-start gap-3">
@@ -298,7 +313,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
     case "numbered_list":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900">{d.headline}</h2>}
+          {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="space-y-4 max-w-2xl">
             {(d.items ?? []).map((item: string, i: number) => (
               <div key={i} className="flex items-start gap-4">
@@ -312,7 +327,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
     case "icon_grid":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900">{d.headline}</h2>}
+          {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="grid gap-6" style={{ gridTemplateColumns: `repeat(${d.columns ?? 3}, 1fr)` }}>
             {(d.items ?? []).map((item: any, i: number) => (
               <div key={i} className="text-center p-4">
@@ -340,7 +355,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
     case "reviews":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900">{d.headline}</h2>}
+          {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
             {(d.reviews ?? []).map((r: any, i: number) => (
               <div key={i} className="bg-gray-50 rounded-xl p-5 shadow-sm">
@@ -357,7 +372,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
     case "logos":
       return (
         <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
-          {d.headline && <p className="text-center text-sm font-semibold text-gray-500 uppercase tracking-wider mb-6">{d.headline}</p>}
+          {d.headline && <p className="text-center text-sm font-semibold text-gray-500 uppercase tracking-wider mb-6" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="flex flex-wrap items-center justify-center gap-8">
             {(d.logos ?? []).map((logo: any, i: number) => (
               logo.url ? <img key={i} src={logo.url} alt={logo.alt ?? ""} className="h-10 object-contain opacity-70 hover:opacity-100 transition-opacity" />
@@ -383,7 +398,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
     case "faq":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          {d.headline && <h2 className="text-2xl font-bold mb-8 text-gray-900">{d.headline}</h2>}
+          {d.headline && <h2 className="text-2xl font-bold mb-8 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="max-w-3xl space-y-3">
             {(d.items ?? []).map((item: any, i: number) => (
               <details key={i} className="border border-gray-200 rounded-lg overflow-hidden">
@@ -402,7 +417,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       const placeholders = mode === "event" ? ["00", "00", "00", "00"] : [String(Math.floor((d.durationMinutes ?? 90) / 60)).padStart(2, "0"), String((d.durationMinutes ?? 90) % 60).padStart(2, "0"), "00"];
       return (
         <div className={`px-8 py-10 text-center ${d.showBorder ? "border-2 rounded-2xl mx-4 my-4" : ""}`} style={{ backgroundColor: d.bgColor ?? "#ffffff", color: d.textColor ?? "#0e1e2e", borderColor: d.showBorder ? (d.accentColor ?? "#179ca3") : undefined }}>
-          {d.headline && <h2 className="text-lg font-bold uppercase tracking-wide mb-4" style={{ color: d.accentColor ?? "#179ca3" }}>{d.headline}</h2>}
+          {d.headline && <h2 className="text-lg font-bold uppercase tracking-wide mb-4" style={{ color: d.accentColor ?? "#179ca3" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="flex justify-center items-center gap-2">
             {units.map((unit, i) => (
               <div key={unit} className="flex items-center gap-2">
@@ -430,7 +445,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
     case "flip_cards":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
-          {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900">{d.headline}</h2>}
+          {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
             {(d.cards ?? []).map((card: any, i: number) => (
               <div key={i} className="rounded-xl overflow-hidden shadow-sm border border-gray-200 group cursor-pointer">
@@ -444,8 +459,8 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
     case "pricing_cta":
       return (
         <div className="px-8 py-12 text-center" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          {d.headline && <h2 className="text-3xl font-bold text-gray-900 mb-3">{d.headline}</h2>}
-          {d.subtext && <p className="text-gray-600 mb-6 max-w-xl mx-auto">{d.subtext}</p>}
+          {d.headline && <h2 className="text-3xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          {d.subtext && <p className="text-gray-600 mb-6 max-w-xl mx-auto" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           {d.showPrice && coursePrice !== undefined && <p className="text-4xl font-bold mb-6" style={{ color: d.ctaColor ?? "#179ca3" }}>{coursePrice === 0 ? "Free" : `$${(coursePrice / 100).toFixed(2)}`}</p>}
           <button className="px-10 py-4 rounded-xl font-bold text-lg shadow-lg" style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>{d.ctaText ?? "Enroll Now"}</button>
         </div>
@@ -453,16 +468,16 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
     case "cta_standalone":
       return (
         <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa", textAlign: d.align ?? "center" }}>
-          {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3">{d.headline}</h2>}
-          {d.subtext && <p className="text-gray-600 mb-6">{d.subtext}</p>}
+          {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           <a href={d.ctaLink ?? "#"} className="inline-block px-8 py-3 rounded-lg font-semibold shadow" style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>{d.ctaText ?? "Get Started"}</a>
         </div>
       );
     case "lead_capture":
       return (
         <div className="px-8 py-12 text-center" style={{ backgroundColor: d.bgColor ?? "#179ca3", color: d.textColor ?? "#fff" }}>
-          {d.headline && <h2 className="text-2xl font-bold mb-3">{d.headline}</h2>}
-          {d.subtext && <p className="opacity-90 mb-6">{d.subtext}</p>}
+          {d.headline && <h2 className="text-2xl font-bold mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          {d.subtext && <p className="opacity-90 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           <div className="flex max-w-md mx-auto gap-2">
             <input type="email" placeholder="Your email address" className="flex-1 px-4 py-3 rounded-lg text-gray-900 border-0 focus:ring-2 focus:ring-white/50" />
             <button className="px-6 py-3 bg-white font-semibold rounded-lg" style={{ color: d.bgColor ?? "#179ca3" }}>{d.ctaText ?? "Send Me Access"}</button>
@@ -480,7 +495,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       return (
         <div className={`px-8 py-10 text-center ${d.showBorder ? "border-2 rounded-2xl mx-4 my-4" : ""}`} style={{ backgroundColor: d.bgColor ?? "#ffffff", color: d.textColor ?? "#0e1e2e", borderColor: d.showBorder ? (d.borderColor ?? "#1a5f7a") : undefined }}>
           {d.imageUrl && <img src={d.imageUrl} alt="" className="w-full max-w-lg mx-auto rounded-lg mb-6 object-cover" />}
-          {d.headline && <h2 className="text-2xl md:text-3xl font-black uppercase mb-6 whitespace-pre-line">{d.headline}</h2>}
+          {d.headline && <h2 className="text-2xl md:text-3xl font-black uppercase mb-6 whitespace-pre-line" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {items.length > 0 && (
             <div className="space-y-2 mb-8 max-w-md mx-auto text-left">
               {items.map((item, i) => (
@@ -526,7 +541,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
             </div>
           </div>
           {/* Content section */}
-          {d.headline && <h2 className="text-2xl md:text-3xl font-black text-center mb-4 whitespace-pre-line">{d.headline}</h2>}
+          {d.headline && <h2 className="text-2xl md:text-3xl font-black text-center mb-4 whitespace-pre-line" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.description && <p className="italic mb-4" style={{ color: d.accentColor ?? "#179ca3" }}>{d.description}</p>}
           {d.bodyHtml && <div className="prose max-w-none mb-6" dangerouslySetInnerHTML={{ __html: d.bodyHtml }} />}
           {d.ctaText && (
@@ -610,7 +625,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
     case "curriculum_auto":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900">{d.headline}</h2>}
+          {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="border border-gray-200 rounded-xl overflow-hidden max-w-3xl">
             {["Section 1", "Section 2", "Section 3"].map((s, i) => (
               <div key={i} className="border-b border-gray-100 last:border-0">
@@ -626,7 +641,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
     case "pricing_options_auto":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
-          {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900">{d.headline}</h2>}
+          {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="flex justify-center gap-6 max-w-3xl mx-auto">
             {["Basic", "Pro", "Enterprise"].map((plan, i) => (
               <div key={i} className={`flex-1 rounded-xl border-2 p-6 text-center ${i === 1 ? "border-teal-500 shadow-lg" : "border-gray-200"}`}>
@@ -668,14 +683,56 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
     }
     case "spacer":
       return <div style={{ height: d.height ?? 48 }} className="bg-transparent" />;
+    case "logo_strip": {
+      const align = d.align ?? "center";
+      return (
+        <div className="py-4 px-6" style={{ backgroundColor: d.bgColor ?? "#ffffff", padding: d.padding ?? "16px 0" }}>
+          <div className={`flex ${align === "left" ? "justify-start" : align === "right" ? "justify-end" : "justify-center"}`}>
+            {d.logoUrl ? (
+              <img src={d.logoUrl} alt="Logo" style={{ maxWidth: d.maxWidth ?? "200px", height: "auto" }} className="object-contain" />
+            ) : (
+              <div className="border-2 border-dashed border-gray-300 rounded-lg px-8 py-4 text-gray-400 text-sm flex items-center gap-2">
+                <Image size={16} /> Add your logo
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+    case "footer": {
+      const links: Array<{ text: string; url: string }> = d.links ?? [];
+      const socialLinks = d.socialLinks ?? {};
+      return (
+        <div className="px-8 py-6" style={{ backgroundColor: d.bgColor ?? "#0e1e2e", color: d.textColor ?? "#ffffff" }}>
+          {d.logoUrl && (
+            <div className="flex justify-center mb-4">
+              <img src={d.logoUrl} alt="Logo" style={{ maxWidth: d.logoMaxWidth ?? "120px" }} className="object-contain" />
+            </div>
+          )}
+          {links.length > 0 && (
+            <div className="flex flex-wrap justify-center gap-4 mb-3">
+              {links.map((l, i) => (
+                <span key={i} className="text-sm opacity-80 hover:opacity-100 cursor-pointer underline">{l.text}</span>
+              ))}
+            </div>
+          )}
+          {d.showSocial && (socialLinks.facebook || socialLinks.instagram || socialLinks.youtube || socialLinks.linkedin) && (
+            <div className="flex justify-center gap-3 mb-3">
+              {socialLinks.facebook && <Globe size={16} className="opacity-70" />}
+              {socialLinks.instagram && <Globe size={16} className="opacity-70" />}
+              {socialLinks.youtube && <Globe size={16} className="opacity-70" />}
+              {socialLinks.linkedin && <Globe size={16} className="opacity-70" />}
+            </div>
+          )}
+          <p className="text-xs text-center opacity-60">{d.copyrightText ?? "© 2026 All rights reserved."}</p>
+        </div>
+      );
+    }
     default:
       return <div className="px-8 py-4 text-gray-400 text-sm text-center">Block preview not available</div>;
   }
 }
-
-// ─── Block Settings ────────────────────────────────────────────────────────────
-
-// ─── Stable sub-components for BlockSettings (defined outside to avoid remount on re-render) ───
+// ─── Block Settings ──────────────────────────────────────────────────────────────────────────────ub-components for BlockSettings (defined outside to avoid remount on re-render) ───
 function BSTextField({ label, field, multiline = false, placeholder = "", data, onSet }: { label: string; field: string; multiline?: boolean; placeholder?: string; data: Record<string, any>; onSet: (key: string, value: any) => void }) {
   return (
     <div>
@@ -822,7 +879,8 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
             </div>
           </div>
           <BSAlignField data={d} onSet={set} />
-          <div>
+          <div className="flex items-center gap-2 mb-1"><input type="checkbox" checked={d.hideButtons ?? false} onChange={e => set("hideButtons", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Hide buttons on page</label></div>
+          {!d.hideButtons && <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs text-gray-500 font-medium">CTA Buttons</label>
               <button onClick={addBtn} className="text-xs text-teal-600 hover:text-teal-700 flex items-center gap-1"><Plus size={12} /> Add</button>
@@ -839,7 +897,7 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
                 </div>
               ))}
             </div>
-          </div>
+          </div>}
         </div>
       );
     }
@@ -1150,6 +1208,72 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
     }
     case "spacer":
       return (<div><label className="text-xs text-gray-500 block mb-1">Height (px)</label><Input type="number" value={d.height ?? 48} onChange={e => set("height", Number(e.target.value))} className="h-8 text-sm" min={8} max={400} /></div>);
+    case "logo_strip":
+      return (
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Logo URL</label>
+            <div className="flex items-center gap-2">
+              <DebouncedInput value={d.logoUrl ?? ""} onChange={v => set("logoUrl", v)} className="h-8 text-sm flex-1" placeholder="Logo image URL or upload" />
+              <button onClick={() => bgImageRef.current?.click()} className="px-2 py-1.5 text-xs bg-teal-50 text-teal-700 rounded border border-teal-200 hover:bg-teal-100 flex items-center gap-1" disabled={uploading === "logoUrl"}>{uploading === "logoUrl" ? "..." : <><Upload size={12} /> Upload</>}</button>
+              <input ref={bgImageRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, "logoUrl", "logo-strip"); e.target.value = ""; }} />
+            </div>
+            {d.logoUrl && <img src={d.logoUrl} className="w-full h-12 object-contain rounded border mt-1" />}
+          </div>
+          <BSTextField data={d} onSet={set} label="Link URL" field="link" placeholder="/ or https://..." />
+          <BSTextField data={d} onSet={set} label="Max Width" field="maxWidth" placeholder="200px" />
+          <BSTextField data={d} onSet={set} label="Padding" field="padding" placeholder="16px 0" />
+          <BSAlignField data={d} onSet={set} />
+          <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
+        </div>
+      );
+    case "footer": {
+      const footerLinks: Array<{ text: string; url: string }> = d.links ?? [];
+      const socialLinks = d.socialLinks ?? {};
+      return (
+        <div className="space-y-3">
+          {/* Logo */}
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Footer Logo URL</label>
+            <div className="flex items-center gap-2">
+              <DebouncedInput value={d.logoUrl ?? ""} onChange={v => set("logoUrl", v)} className="h-8 text-sm flex-1" placeholder="Logo URL or upload" />
+              <button onClick={() => inlineMediaRef.current?.click()} className="px-2 py-1.5 text-xs bg-teal-50 text-teal-700 rounded border border-teal-200 hover:bg-teal-100 flex items-center gap-1" disabled={uploading === "logoUrl"}>{uploading === "logoUrl" ? "..." : <><Upload size={12} /> Upload</>}</button>
+              <input ref={inlineMediaRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, "logoUrl", "footer-logo"); e.target.value = ""; }} />
+            </div>
+            {d.logoUrl && <img src={d.logoUrl} className="w-full h-10 object-contain rounded border mt-1" />}
+          </div>
+          <BSTextField data={d} onSet={set} label="Logo Max Width" field="logoMaxWidth" placeholder="120px" />
+          {/* Copyright */}
+          <BSTextField data={d} onSet={set} label="Copyright Text" field="copyrightText" placeholder="\u00a9 2026 Company. All rights reserved." />
+          {/* Links */}
+          <div className="border border-gray-200 rounded p-3 space-y-2">
+            <div className="flex items-center justify-between"><span className="text-xs font-semibold text-gray-700">Links ({footerLinks.length})</span><button onClick={() => set("links", [...footerLinks, { text: "New Link", url: "/" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div>
+            {footerLinks.map((l, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <DebouncedInput value={l.text} onChange={v => { const next = [...footerLinks]; next[i] = { ...next[i], text: v }; set("links", next); }} className="h-7 text-xs flex-1" placeholder="Label" />
+                <DebouncedInput value={l.url} onChange={v => { const next = [...footerLinks]; next[i] = { ...next[i], url: v }; set("links", next); }} className="h-7 text-xs flex-1" placeholder="URL" />
+                <button onClick={() => set("links", footerLinks.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button>
+              </div>
+            ))}
+          </div>
+          {/* Social Links */}
+          <div className="border border-gray-200 rounded p-3 space-y-2">
+            <div className="flex items-center gap-2 mb-1"><input type="checkbox" checked={d.showSocial ?? true} onChange={e => set("showSocial", e.target.checked)} className="rounded" /><label className="text-xs font-semibold text-gray-700">Social Links</label></div>
+            {d.showSocial && (
+              <div className="space-y-1">
+                <DebouncedInput value={socialLinks.facebook ?? ""} onChange={v => set("socialLinks", { ...socialLinks, facebook: v })} className="h-7 text-xs" placeholder="Facebook URL" />
+                <DebouncedInput value={socialLinks.instagram ?? ""} onChange={v => set("socialLinks", { ...socialLinks, instagram: v })} className="h-7 text-xs" placeholder="Instagram URL" />
+                <DebouncedInput value={socialLinks.youtube ?? ""} onChange={v => set("socialLinks", { ...socialLinks, youtube: v })} className="h-7 text-xs" placeholder="YouTube URL" />
+                <DebouncedInput value={socialLinks.linkedin ?? ""} onChange={v => set("socialLinks", { ...socialLinks, linkedin: v })} className="h-7 text-xs" placeholder="LinkedIn URL" />
+              </div>
+            )}
+          </div>
+          {/* Colors */}
+          <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
+          <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
+        </div>
+      );
+    }
     default:
       return <p className="text-xs text-gray-400">No settings for this block type.</p>;
   }

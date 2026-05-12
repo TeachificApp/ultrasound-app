@@ -1478,3 +1478,12 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 ## Bug Fixes — Block Editor Input Focus
 - [x] Fix input fields in BlockSettings losing focus after each keystroke (DebouncedInput component with internal state + debounce)
 - [x] Fix Textarea/Input onChange type mismatch bugs (replaced with DebouncedTextarea, fixed event handlers)
+## Funnel Builder — Footer & Logo Blocks
+- [x] Add "footer" block type (links, copyright text, social icons, background color)
+- [x] Add "logo_strip" block type (logo image URL, max width, alignment, link, background color)
+- [x] Add both to BLOCK_CATALOG with icons and category
+- [x] Add BlockPreview for footer and logo_strip
+- [x] Add BlockSettings for footer and logo_strip
+- [x] Add public renderer for footer and logo_strip in PublicFunnelPage, CourseLanding, DownloadLanding
+- [x] Add "hide buttons" toggle to hero/banner BlockSettings and respect it in preview + public renderer
+- [x] Allow HTML (br, p) in banner/CTA headlines, subtitles, and block titles across all renderers (dangerouslySetInnerHTML with color picker still working)
