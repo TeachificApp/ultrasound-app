@@ -1463,10 +1463,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Update checkout form submission to also store rich contact data
 - [ ] Build admin Contacts/Leads list page (/admin/contacts)
 - [ ] Build admin Contact Detail view (name, email, phone, tags, timezone, source, activity, orders)
-- [ ] Add checkout_form BlockSettings to admin editor (products, order bumps, display mode, terms)
+- [x] Add checkout_form BlockSettings to admin editor (products, order bumps, display mode, terms)
 
 ## Bug Fixes — Funnel Builder
-- [ ] Fix image/video upload to banner not working
+- [x] Fix image/video upload to banner not working (moved hooks out of switch case, added upload buttons to image/instructor blocks)
 - [x] Fix page publication not working (removed active status requirement — pages always viewable)
 
 ## Funnel Builder — Performance & Features
@@ -1474,3 +1474,7 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Edit page name and slug in funnel editor (Rename button on page cards)
 - [x] Duplicate individual funnel pages (Duplicate button on page cards)
 - [x] Save funnel as template (Save as Template button + listTemplates in create dialog)
+
+## Bug Fixes — Block Editor Input Focus
+- [x] Fix input fields in BlockSettings losing focus after each keystroke (DebouncedInput component with internal state + debounce)
+- [x] Fix Textarea/Input onChange type mismatch bugs (replaced with DebouncedTextarea, fixed event handlers)
