@@ -229,6 +229,11 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price }: {
           <div className="max-w-2xl mx-auto text-center">
             <div className="text-4xl mb-4" style={{ color: d.accentColor ?? "#179ca3" }}>"</div>
             <p className="text-xl text-gray-700 italic mb-6">{d.quote}</p>
+            {(d.rating ?? 0) > 0 && (
+              <div className="flex items-center justify-center gap-0.5 mb-4">
+                {Array.from({ length: d.rating }).map((_: any, i: number) => <span key={i} className="text-yellow-400 text-xl">★</span>)}
+              </div>
+            )}
             <div className="flex items-center justify-center gap-3">
               {d.avatarUrl && <img src={d.avatarUrl} alt={d.author} className="w-10 h-10 rounded-full object-cover" />}
               <span className="font-semibold text-gray-900">{d.author}</span>

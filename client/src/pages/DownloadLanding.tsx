@@ -143,6 +143,11 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug }: {
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f0fdfa" }}>
           <div className="max-w-2xl mx-auto text-center">
             <blockquote className="text-xl italic text-gray-700 mb-4">"{d.quote}"</blockquote>
+            {(d.rating ?? 0) > 0 && (
+              <div className="flex items-center justify-center gap-0.5 mb-4">
+                {Array.from({ length: d.rating }).map((_: any, i: number) => <span key={i} className="text-yellow-400 text-xl">★</span>)}
+              </div>
+            )}
             <div className="flex items-center justify-center gap-3">
               {d.avatarUrl && <img src={d.avatarUrl} alt="" className="w-10 h-10 rounded-full object-cover" />}
               <div>

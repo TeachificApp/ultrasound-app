@@ -182,6 +182,11 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
           <div className="max-w-3xl mx-auto text-center">
             <div className="text-4xl mb-4" style={{ color: d.accentColor ?? "#179ca3" }}>"</div>
             <blockquote className="text-xl italic text-gray-700 mb-4">{d.quote}</blockquote>
+            {(d.rating ?? 0) > 0 && (
+              <div className="flex items-center justify-center gap-0.5 mb-4">
+                {Array.from({ length: d.rating }).map((_: any, i: number) => <span key={i} className="text-yellow-400 text-xl">★</span>)}
+              </div>
+            )}
             <p className="font-semibold text-gray-900">— {d.author}</p>
           </div>
         </div>
