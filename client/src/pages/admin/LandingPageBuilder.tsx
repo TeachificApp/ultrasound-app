@@ -56,11 +56,11 @@ export interface Block {
   data: Record<string, any>;
 }
 
-function uid() { return Math.random().toString(36).slice(2, 10); }
+export function uid() { return Math.random().toString(36).slice(2, 10); }
 
 // ─── Block Catalog ────────────────────────────────────────────────────────────
 
-const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactNode; category: string; defaultData: Record<string, any> }[] = [
+export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactNode; category: string; defaultData: Record<string, any> }[] = [
   // ── Layout & Structure
   {
     type: "hero", label: "Hero / Banner", icon: <Image size={14} />, category: "Layout",
@@ -156,11 +156,11 @@ const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactNode; ca
     defaultData: { headline: "Choose Your Plan", bgColor: "#f9fafb" } },
 ];
 
-const CATALOG_CATEGORIES = ["Layout", "Content", "Marketing", "Conversion", "Funnel", "Smart"];
+export const CATALOG_CATEGORIES = ["Layout", "Content", "Marketing", "Conversion", "Funnel", "Smart"];
 
 // ─── Block Preview ─────────────────────────────────────────────────────────────
 
-function BlockPreview({ block, coursePrice, courseTitle }: { block: Block; coursePrice?: number; courseTitle?: string }) {
+export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block; coursePrice?: number; courseTitle?: string }) {
   const d = block.data;
 
   switch (block.type) {
@@ -493,7 +493,7 @@ function BlockPreview({ block, coursePrice, courseTitle }: { block: Block; cours
 
 // ─── Block Settings ────────────────────────────────────────────────────────────
 
-function BlockSettings({ block, onChange }: { block: Block; onChange: (data: Record<string, any>) => void }) {
+export function BlockSettings({ block, onChange }: { block: Block; onChange: (data: Record<string, any>) => void }) {
   const d = block.data;
   const set = (key: string, value: any) => onChange({ ...d, [key]: value });
 
@@ -836,7 +836,7 @@ function BlockSettings({ block, onChange }: { block: Block; onChange: (data: Rec
 
 // ─── Sortable Block Card ──────────────────────────────────────────────────────
 
-function SortableBlock({ block, isSelected, onSelect, onDelete, onDuplicate, coursePrice, courseTitle }: {
+export function SortableBlock({ block, isSelected, onSelect, onDelete, onDuplicate, coursePrice, courseTitle }: {
   block: Block; isSelected: boolean; onSelect: () => void; onDelete: () => void; onDuplicate: () => void; coursePrice?: number; courseTitle?: string;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });

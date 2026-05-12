@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Gift, Package, ShoppingCart, Truck } from "lucide-react";
+import { CheckCircle, Gift, Package, ShoppingCart, Truck, Plus } from "lucide-react";
 
 export type FunnelStep = {
   name: string;
@@ -102,57 +102,116 @@ export function ProductOfferStackBlock({ data, onPrimaryCta }: { data: Record<st
   );
 }
 
+/**
+ * InlineOrderBumpBlock
+ * Matches the allaboutultrasound.net checkout order bump design:
+ * - Product image on left
+ * - Shipping/delivery notice at top
+ * - Product title + description in center
+ * - Price on top-right
+ * - "+ Add" button on right
+ * - Persuasive CTA text at bottom
+ */
 export function InlineOrderBumpBlock({ data, onPrimaryCta }: { data: Record<string, any>; onPrimaryCta?: () => void }) {
-  const [selected, setSelected] = useState(Boolean(data.defaultSelected));
-  const accentColor = data.accentColor ?? "#f59e0b";
-  const features: string[] = data.features?.length ? data.features : [];
+  const [added, setAdded] = useState(Boolean(data.defaultSelected));
+  const accentColor = data.accentColor ?? "#179ca3";
   const productType: InlineOrderBumpProductType = data.productType ?? "digital";
 
+  function handleAdd() {
+    setAdded(true);
+    onPrimaryCta?.();
+  }
+
+  function handleRemove() {
+    setAdded(false);
+  }
+
   return (
-    <section id={data.anchorId ?? "order-bump"} className="px-8 py-10" style={{ backgroundColor: data.bgColor ?? "#fff7ed" }}>
-      <div className="max-w-3xl mx-auto rounded-2xl border-2 border-dashed bg-white p-6 shadow-sm" style={{ borderColor: accentColor }}>
-        <div className="flex flex-col md:flex-row gap-5">
-          {data.imageUrl && <img src={data.imageUrl} alt="" className="w-full md:w-40 h-40 object-cover rounded-xl" />}
-          <div className="flex-1">
-            {data.discountLabel && <span className="inline-flex px-3 py-1 rounded-full text-xs font-bold text-white mb-3" style={{ backgroundColor: accentColor }}>{data.discountLabel}</span>}
-            <div className="flex items-center gap-2 text-sm font-bold mb-2" style={{ color: accentColor }}>
-              <Gift size={16} /> Order bump
-              <span className="text-gray-400">|</span>
-              <span>{productType === "physical" ? "Physical shipment" : "Digital delivery"}</span>
+    <section id={data.anchorId ?? "order-bump"} className="px-4 py-6" style={{ backgroundColor: data.bgColor ?? "#ffffff" }}>
+      <div className="max-w-3xl mx-auto rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col sm:flex-row gap-4">
+          {/* Product Image */}
+          {data.imageUrl && (
+            <div className="flex-shrink-0">
+              <img
+                src={data.imageUrl}
+                alt={data.headline ?? "Order bump product"}
+                className="w-full sm:w-28 h-28 object-cover rounded-lg"
+              />
             </div>
-            <h3 className="text-2xl font-bold text-gray-900">{data.headline}</h3>
-            {data.subheadline && <p className="text-gray-600 mt-2">{data.subheadline}</p>}
-            {data.description && <p className="text-sm text-gray-700 mt-4">{data.description}</p>}
-            {features.length > 0 && (
-              <ul className="grid md:grid-cols-2 gap-2 mt-4 text-sm text-gray-700">
-                {features.map((feature, i) => (
-                  <li key={`${feature}-${i}`} className="flex items-start gap-2">
-                    <CheckCircle size={15} className="mt-0.5 flex-shrink-0" style={{ color: accentColor }} />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
+          )}
+
+          {/* Content */}
+          <div className="flex-1 min-w-0">
+            {/* Shipping/delivery notice */}
+            {data.shippingNote && (
+              <p className="text-sm font-semibold text-gray-900 mb-1">
+                {data.shippingNote}
+              </p>
             )}
-            <label className="flex items-start gap-3 mt-5 p-4 rounded-xl border bg-amber-50 cursor-pointer">
-              <input type="checkbox" checked={selected} onChange={(e) => setSelected(e.target.checked)} className="mt-1" />
-              <span className="text-sm text-gray-800">
-                <strong>{data.checkboxLabel ?? "Yes, add this to my order"}</strong>
-                <span className="block text-gray-600 mt-0.5">
-                  {data.compareAtPrice && <span className="line-through mr-2">{data.compareAtPrice}</span>}
-                  <span className="font-bold" style={{ color: accentColor }}>{data.price}</span>
-                  {productType === "physical" && data.shippingNote ? ` - ${data.shippingNote}` : ""}
-                </span>
+
+            {/* Product title */}
+            <h3 className="text-base font-bold text-gray-900">
+              {data.headline}
+            </h3>
+
+            {/* Description */}
+            {data.description && (
+              <p className="text-sm text-gray-600 mt-1.5 leading-relaxed">
+                {data.description}
+              </p>
+            )}
+
+            {/* Persuasive CTA line */}
+            {data.subheadline && (
+              <p className="text-sm mt-2" style={{ color: accentColor }}>
+                👉 {data.subheadline}
+              </p>
+            )}
+          </div>
+
+          {/* Price + Add Button */}
+          <div className="flex-shrink-0 flex flex-col items-end justify-between gap-3 sm:min-w-[120px]">
+            {/* Price */}
+            <div className="text-right">
+              {data.compareAtPrice && (
+                <span className="text-sm text-gray-400 line-through mr-2">{data.compareAtPrice}</span>
+              )}
+              <span className="text-lg font-bold" style={{ color: accentColor }}>
+                {data.price}
               </span>
-            </label>
-            <Button
-              onClick={onPrimaryCta}
-              className="w-full mt-4 text-white"
-              style={{ backgroundColor: selected ? accentColor : data.ctaColor ?? "#179ca3" }}
-            >
-              {selected ? data.ctaText ?? "Add bump and continue" : data.skipText ?? "Continue without bump"}
-            </Button>
+            </div>
+
+            {/* Add/Remove Button */}
+            {!added ? (
+              <Button
+                onClick={handleAdd}
+                variant="outline"
+                className="whitespace-nowrap border-2 font-semibold"
+                style={{ borderColor: accentColor, color: accentColor }}
+              >
+                <Plus size={16} className="mr-1" /> Add
+              </Button>
+            ) : (
+              <Button
+                onClick={handleRemove}
+                className="whitespace-nowrap text-white font-semibold"
+                style={{ backgroundColor: accentColor }}
+              >
+                <CheckCircle size={16} className="mr-1" /> Added
+              </Button>
+            )}
           </div>
         </div>
+
+        {/* Discount badge if present */}
+        {data.discountLabel && (
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold text-white" style={{ backgroundColor: "#ef4444" }}>
+              <Gift size={12} /> {data.discountLabel}
+            </span>
+          </div>
+        )}
       </div>
     </section>
   );

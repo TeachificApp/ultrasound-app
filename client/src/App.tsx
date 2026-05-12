@@ -38,6 +38,9 @@ import CourseLanding from "./pages/CourseLanding";
 import CoursePlayer from "./pages/CoursePlayer";
 import LMSAdmin from "./pages/admin/LMSAdmin";
 import LandingPageBuilder from "./pages/admin/LandingPageBuilder";
+import FunnelBuilder from "./pages/admin/FunnelBuilder";
+import FunnelPageEditor from "./pages/admin/FunnelPageEditor";
+import PublicFunnelPage from "./pages/PublicFunnelPage";
 // ── Digital Downloads ──────────────────────────────────────────────────────────
 import DownloadsBrowse from "./pages/DownloadsBrowse";
 import DownloadLanding from "./pages/DownloadLanding";
@@ -322,6 +325,9 @@ function Router() {
         <Route path="/admin/quickfire">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuickFireAdmin /></RoleGuard>}</Route>
         <Route path="/admin/challenge-cards">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ChallengeCardGenerator /></RoleGuard>}</Route>
         <Route path="/admin/social-content">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SocialContentGenerator /></RoleGuard>}</Route>
+        <Route path="/admin/funnels">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FunnelBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/funnels/:funnelId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FunnelBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/funnels/:funnelId/pages/:pageId/edit">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FunnelPageEditor /></RoleGuard>}</Route>
         <Route path="/admin/scancoach">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ScanCoachEditor /></RoleGuard>}</Route>
         <Route path="/admin/navigator">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><NavigatorEditor /></RoleGuard>}</Route>
         <Route path="/admin/media-repository">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MediaRepository /></RoleGuard>}</Route>
@@ -345,6 +351,9 @@ function Router() {
         <Route path="/accreditation">{() => <RoleGuard roles={["diy_user", "diy_admin"]} allowAdmin={false}><AccreditationTool /></RoleGuard>}</Route>
         <Route path="/lab-admin">{() => <RoleGuard roles={["diy_user", "diy_admin"]} allowAdmin={false}><AccreditationTool /></RoleGuard>}</Route>
         <Route path="/accreditation-manager">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AccreditationManager /></RoleGuard>}</Route>
+
+        {/* ── Public Funnel Pages ────────────────────────────────────── */}
+        <Route path="/f/:slug/:pageSlug" component={PublicFunnelPage} />
 
         {/* ── Physician Over-Read (public, token-based) ─────────────────── */}
         <Route path="/physician-review/:token" component={PhysicianOverReadForm} />

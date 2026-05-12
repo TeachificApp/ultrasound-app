@@ -1416,3 +1416,21 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 
 ## Funnel Builder in Platform Admin
 - [x] Add funnel/landing page builders to Platform Admin navigation (Funnel Builder card → /admin/lms?tab=orderbumps)
+
+## Standalone Funnel Builder (/admin/funnels)
+- [x] Database schema: funnels table (name, slug, status, settings)
+- [x] Database schema: funnel_pages table (funnel_id, page_type, title, blocks JSON, sort_order)
+- [x] Backend: tRPC router for funnel CRUD (create, list, update, delete, duplicate)
+- [x] Backend: tRPC procedures for funnel page management (add/edit/reorder/delete pages)
+- [x] Backend: Public funnel router (getBySlug, getPage) for visitor rendering
+- [x] Frontend: /admin/funnels list page with funnel cards (name, status, pages, link)
+- [x] Frontend: Funnel editor page with step-by-step page management
+- [x] Frontend: Create funnel dialog with template selection
+- [x] Update Platform Admin card to link to /admin/funnels
+- [x] Update InlineOrderBumpBlock to match reference design (image left, title center, +Add button right)
+- [x] Frontend: FunnelPageEditor — WYSIWYG block editor for funnel pages
+- [x] Frontend: Public funnel page renderer at /f/:slug/:pageSlug
+- [x] Backend: Lead capture form submission storage (funnel_leads table + submitLead procedure)
+- [x] Backend: Checkout session creation for standalone funnel products (createCheckout procedure)
+- [x] Frontend: Funnel checkout page with Stripe integration and order bumps
+- [x] Write tests for funnel builder features (21 tests passing)

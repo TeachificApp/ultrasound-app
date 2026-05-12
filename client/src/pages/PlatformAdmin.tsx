@@ -1097,7 +1097,7 @@ export default function PlatformAdmin() {
                 color: "#0891b2",
               },
               {
-                href: "/admin/lms?tab=orderbumps",
+                href: "/admin/funnels",
                 icon: LayoutTemplate,
                 label: "Funnel Builder",
                 description: "Landing pages, order bumps, and sales funnels for courses and downloads",

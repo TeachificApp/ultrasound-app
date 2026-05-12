@@ -3124,3 +3124,77 @@ export const orderBumpConversions = mysqlTable("order_bump_conversions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 export type OrderBumpConversion = typeof orderBumpConversions.$inferSelect;
+
+
+// ─── Standalone Funnels (ClickFunnels-style) ─────────────────────────────────
+
+export const funnels = mysqlTable("funnels", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 255 }).notNull().unique(),
+  description: text("description"),
+  status: mysqlEnum("status", ["draft", "active", "archived"]).default("draft").notNull(),
+  // Template used to create this funnel
+  templateName: varchar("template_name", { length: 100 }),
+  // Global settings
+  accentColor: varchar("accent_color", { length: 20 }).default("#179ca3"),
+  bgColor: varchar("bg_color", { length: 20 }).default("#ffffff"),
+  logoUrl: text("logo_url"),
+  // Analytics
+  totalViews: int("total_views").default(0).notNull(),
+  totalConversions: int("total_conversions").default(0).notNull(),
+  totalRevenue: int("total_revenue").default(0).notNull(), // cents
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type Funnel = typeof funnels.$inferSelect;
+export type InsertFunnel = typeof funnels.$inferInsert;
+
+export const funnelPages = mysqlTable("funnel_pages", {
+  id: int("id").autoincrement().primaryKey(),
+  funnelId: int("funnel_id").notNull(),
+  // Page type determines behavior
+  pageType: mysqlEnum("page_type", ["landing", "checkout", "upsell", "downsell", "thank_you", "custom"]).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 255 }).notNull(), // e.g. "main", "checkout", "thank-you"
+  // Page builder blocks (same format as LandingPageBuilder)
+  blocks: longtext("blocks"), // JSON array of Block[]
+  // Page connections (ClickFunnels-style linking)
+  nextPageId: int("next_page_id"), // the next page in the funnel flow
+  // Product attachment (optional — for checkout/upsell pages)
+  productType: mysqlEnum("product_type", ["course", "download", "bundle", "physical", "custom"]),
+  productId: int("product_id"),
+  customPrice: int("custom_price"), // cents — override product price
+  customPriceLabel: varchar("custom_price_label", { length: 100 }),
+  // Order bump attachment (optional — for checkout pages)
+  orderBumpId: int("order_bump_id"),
+  // Sort order within funnel
+  sortOrder: int("sort_order").default(0).notNull(),
+  // Status
+  isActive: boolean("is_active").default(true).notNull(),
+  // Analytics
+  views: int("views").default(0).notNull(),
+  conversions: int("conversions").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type FunnelPage = typeof funnelPages.$inferSelect;
+export type InsertFunnelPage = typeof funnelPages.$inferInsert;
+
+// ─── Funnel Leads (Lead Capture) ──────────────────────────────────────────────
+export const funnelLeads = mysqlTable("funnel_leads", {
+  id: int("id").autoincrement().primaryKey(),
+  funnelId: int("funnel_id").notNull(),
+  funnelPageId: int("funnel_page_id").notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  name: varchar("name", { length: 255 }),
+  phone: varchar("phone", { length: 50 }),
+  customFields: longtext("custom_fields"), // JSON for any extra form fields
+  userId: int("user_id"), // if the lead is a logged-in user
+  source: varchar("source", { length: 100 }), // e.g. "funnel", "landing_page"
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type FunnelLead = typeof funnelLeads.$inferSelect;
+export type InsertFunnelLead = typeof funnelLeads.$inferInsert;
