@@ -235,14 +235,18 @@ export const lmsPublicRouter = router({
 
   /** Get a single course by slug (public or preview) */
   getCourse: publicProcedure
-    .input(z.object({ slug: z.string() }))
-    .query(async ({ input }) => {
+    .input(z.object({ slug: z.string(), preview: z.boolean().optional() }))
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.slug)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
       // draft, archived, and private are not publicly accessible; hidden is accessible by direct URL
-      if (course.status === "draft" || course.status === "archived" || course.status === "private") throw new TRPCError({ code: "NOT_FOUND" });
+      // Allow preview for admin users
+      const isAdmin = ctx.user?.role === "admin";
+      if (!input.preview || !isAdmin) {
+        if (course.status === "draft" || course.status === "archived" || course.status === "private") throw new TRPCError({ code: "NOT_FOUND" });
+      }
 
       // Sections + preview lessons
       const sections = await db.select().from(lmsSections).where(eq(lmsSections.courseId, course.id)).orderBy(asc(lmsSections.position));
@@ -1543,6 +1547,7 @@ Rules:
         slug: lmsCourses.slug,
         coverImageUrl: lmsCourses.coverImageUrl,
         subtitle: lmsCourses.subtitle,
+        price: lmsCourses.price,
       }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
       return {
         blocks: lp?.blocks ? JSON.parse(lp.blocks) : null,
@@ -1552,6 +1557,7 @@ Rules:
         ctaText: lp?.ctaText ?? "Enroll Now",
         courseTitle: course?.title ?? "",
         courseSlug: course?.slug ?? "",
+        coursePrice: course?.price ?? 0,
       };
     }),
   saveLandingPageBlocks: protectedProcedure

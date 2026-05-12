@@ -126,7 +126,7 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
               {d.subheadline && <p className="text-xl opacity-90 mb-8 max-w-2xl" dangerouslySetInnerHTML={{ __html: d.subheadline }} />}
               {!d.hideButtons && <div className="flex flex-wrap gap-3" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
                 {heroButtons.map((btn, i) => (
-                  <a key={i} href={btn.link || "#"} className={`px-8 py-3 rounded-lg font-semibold text-lg shadow-lg inline-block transition-transform hover:scale-105 ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
+                  <a key={i} href={btn.link || (nextPage ? `/f/${funnelSlug}/${nextPage.slug}` : "#")} className={`px-8 py-3 rounded-lg font-semibold text-lg shadow-lg inline-block transition-transform hover:scale-105 ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
                     style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
                     {btn.text}
                   </a>
@@ -245,7 +245,7 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
           <div className="max-w-3xl mx-auto">
             <h2 className="text-2xl font-bold mb-3 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />
             {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
-            <a href={d.ctaLink || "#"} className={`inline-block px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-transform hover:scale-105 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
+            <a href={d.ctaLink || (nextPage ? `/f/${funnelSlug}/${nextPage.slug}` : "#")} className={`inline-block px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-transform hover:scale-105 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
               style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#ffffff" }}>
               {d.ctaText ?? "Get Started"}
             </a>
@@ -412,9 +412,9 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
     case "order_bump_checkout":
       return <InlineOrderBumpBlock data={d} />;
     case "price_stack":
-      return <PriceStackBlock data={d} />;
+      return <PriceStackBlock data={d} funnelSlug={funnelSlug} nextPage={nextPage} />;
     case "urgency_offer":
-      return <UrgencyOfferBlock data={d} />;
+      return <UrgencyOfferBlock data={d} funnelSlug={funnelSlug} nextPage={nextPage} />;
     case "embed":
       return (
         <div className="px-8 py-8">
@@ -511,7 +511,7 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
 
 // ─── Price Stack CTA Block ──────────────────────────────────────────────────
 
-function PriceStackBlock({ data: d }: { data: Record<string, any> }) {
+function PriceStackBlock({ data: d, funnelSlug, nextPage }: { data: Record<string, any>; funnelSlug: string; nextPage?: { slug: string; title: string; pageType: string } | null }) {
   const items: Array<{ text: string; price: string }> = d.items ?? [];
   return (
     <div className={`px-8 py-12 text-center ${d.showBorder ? "border-2 rounded-2xl mx-4 my-4" : ""}`}
@@ -539,7 +539,7 @@ function PriceStackBlock({ data: d }: { data: Record<string, any> }) {
           </p>
         )}
         {d.ctaText && (
-          <a href={d.ctaLink || "#"}
+          <a href={d.ctaLink || (nextPage ? `/f/${funnelSlug}/${nextPage.slug}` : "#")}
             className="inline-block px-12 py-5 rounded-xl font-bold text-xl shadow-lg transition-transform hover:scale-105"
             style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#ffffff" }}>
             {d.ctaText}
@@ -552,7 +552,7 @@ function PriceStackBlock({ data: d }: { data: Record<string, any> }) {
 
 // ─── Urgency Offer Block ────────────────────────────────────────────────────
 
-function UrgencyOfferBlock({ data: d }: { data: Record<string, any> }) {
+function UrgencyOfferBlock({ data: d, funnelSlug, nextPage }: { data: Record<string, any>; funnelSlug: string; nextPage?: { slug: string; title: string; pageType: string } | null }) {
   const { days, hours, minutes, seconds } = useCountdown(
     d.countdownMode ?? "on_load",
     d.countdownMinutes ?? 90,
@@ -587,7 +587,7 @@ function UrgencyOfferBlock({ data: d }: { data: Record<string, any> }) {
         {d.description && <p className="italic text-lg mb-4" style={{ color: d.accentColor ?? "#179ca3" }}>{d.description}</p>}
         {d.bodyHtml && <div className="prose prose-lg max-w-none mb-6" dangerouslySetInnerHTML={{ __html: d.bodyHtml }} />}
         {d.ctaText && (
-          <a href={d.ctaLink || "#"} className="inline-flex items-center gap-2 font-bold text-lg transition-opacity hover:opacity-80" style={{ color: d.accentColor ?? "#179ca3" }}>
+          <a href={d.ctaLink || (nextPage ? `/f/${funnelSlug}/${nextPage.slug}` : "#")} className="inline-flex items-center gap-2 font-bold text-lg transition-opacity hover:opacity-80" style={{ color: d.accentColor ?? "#179ca3" }}>
             {d.ctaEmoji && <span>{d.ctaEmoji}</span>}
             {d.ctaText}
           </a>

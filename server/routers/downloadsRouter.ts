@@ -51,14 +51,16 @@ export const downloadsPublicRouter = router({
 
   /** Get single product by slug (public landing page) */
   getBySlug: publicProcedure
-    .input(z.object({ slug: z.string() }))
-    .query(async ({ input }) => {
+    .input(z.object({ slug: z.string(), preview: z.boolean().optional() }))
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [product] = await db.select().from(digitalProducts)
         .where(eq(digitalProducts.slug, input.slug)).limit(1);
       // 'published' and 'hidden' are accessible by direct URL; draft/archived/private are not
-      if (!product || product.status === "draft" || product.status === "archived" || product.status === "private") {
+      // Allow preview for admin users
+      const isAdmin = ctx.user?.role === "admin";
+      if (!product || ((!input.preview || !isAdmin) && (product.status === "draft" || product.status === "archived" || product.status === "private"))) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Product not found" });
       }
       // Get file count (not full URLs — those are only for purchasers)

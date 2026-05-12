@@ -1513,3 +1513,8 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Redesign course player to match reference: dark teal/navy sidebar with numbered modules, large video area, "In This Module" panel, progress bar, "Mark Complete" button
 - [x] Fix "Add Instructor" button not working in course Instructors tab
 - [x] Implement global instructor profiles that can be saved and reused across courses
+- [x] Auto-populate CTA buttons on course/download/product landing pages with Stripe checkout link (empty = auto checkout for courses/downloads, auto next-page for funnels)
+- [x] Fix "Show Course Price" checkbox in pricing_cta block not displaying the price
+- [x] Add strikethrough discount pricing option to CTA/pricing blocks
+- [x] Replace limited preset color grid in rich text editor with full color picker (hex input + color wheel)
+- [x] Add landing page preview button for courses and digital downloads (preview before publish via ?preview=admin)

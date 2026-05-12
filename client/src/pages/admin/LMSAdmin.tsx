@@ -631,9 +631,9 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
         >
           <LinkIcon className="w-3 h-3 mr-1" /> Edit Landing Page
         </Button>
-        <a href={`/learn/${course.slug}`} target="_blank" rel="noopener noreferrer">
+        <a href={`/learn/${course.slug}?preview=admin`} target="_blank" rel="noopener noreferrer">
           <Button size="sm" variant="ghost" className="h-8 text-xs text-gray-400 hover:text-gray-600">
-            <Eye className="w-3 h-3 mr-1" /> View Landing Page
+            <Eye className="w-3 h-3 mr-1" /> Preview Landing Page
           </Button>
         </a>
         <a href={`/learn/${course.slug}/player?preview=student`} target="_blank" rel="noopener noreferrer">

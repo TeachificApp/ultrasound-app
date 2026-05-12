@@ -163,7 +163,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug }: {
         <div className="px-8 py-12 text-center" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           {d.headline && <h2 className="text-3xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6 max-w-xl mx-auto" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
-          {d.showPrice && <p className="text-4xl font-bold mb-6" style={{ color: d.ctaColor ?? "#179ca3" }}>{price}</p>}
+          {d.showPrice && <div className="mb-6">{d.showOriginalPrice && d.originalPrice && <p className="text-xl text-gray-400 line-through mb-1">${d.originalPrice}</p>}<p className="text-4xl font-bold" style={{ color: d.ctaColor ?? "#179ca3" }}>{price}</p></div>}
           <button
             onClick={hasPurchased ? () => { window.location.href = `/downloads/${slug}/files`; } : onBuy}
             disabled={buying}
@@ -358,7 +358,8 @@ export default function DownloadLanding() {
   const { slug } = useParams<{ slug: string }>();
   const { user } = useAuth();
   const [selectedOrderBumpId, setSelectedOrderBumpId] = useState<number | undefined>();
-  const { data: product, isLoading, error } = trpc.downloads.getBySlug.useQuery({ slug: slug! });
+  const isPreview = new URLSearchParams(window.location.search).get("preview") === "admin";
+  const { data: product, isLoading, error } = trpc.downloads.getBySlug.useQuery({ slug: slug!, preview: isPreview || undefined });
 
   // Check if user has purchased (only if logged in and product loaded)
   const { data: purchaseStatus } = trpc.downloadsLearner.hasPurchased.useQuery(

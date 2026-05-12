@@ -147,6 +147,7 @@ export default function RichTextEditor({
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
+  const [customColor, setCustomColor] = useState("#179ca3");
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -290,22 +291,54 @@ export default function RichTextEditor({
               <Palette className="w-3.5 h-3.5" />
             </ToolbarBtn>
             {colorPickerOpen && (
-              <div className="absolute top-8 left-0 z-50 p-2 bg-white border border-gray-200 rounded-xl shadow-lg flex flex-wrap gap-1 w-36">
-                {TEXT_COLORS.map(color => (
+              <div className="absolute top-8 left-0 z-50 p-3 bg-white border border-gray-200 rounded-xl shadow-lg w-48">
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {TEXT_COLORS.map(color => (
+                    <button
+                      key={color}
+                      type="button"
+                      title={color}
+                      className="w-6 h-6 rounded border border-gray-200 hover:scale-110 transition-transform"
+                      style={{ background: color }}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        editor.chain().focus().setColor(color).run();
+                        setColorPickerOpen(false);
+                      }}
+                    />
+                  ))}
+                </div>
+                <div className="border-t border-gray-100 pt-2 mt-1">
+                  <label className="text-xs text-gray-500 block mb-1">Custom color</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={customColor}
+                      onChange={(e) => setCustomColor(e.target.value)}
+                      className="w-8 h-8 rounded border border-gray-200 cursor-pointer p-0"
+                    />
+                    <input
+                      type="text"
+                      value={customColor}
+                      onChange={(e) => setCustomColor(e.target.value)}
+                      className="flex-1 h-7 text-xs border border-gray-200 rounded px-2 font-mono"
+                      placeholder="#179ca3"
+                    />
+                  </div>
                   <button
-                    key={color}
                     type="button"
-                    title={color}
-                    className="w-6 h-6 rounded border border-gray-200 hover:scale-110 transition-transform"
-                    style={{ background: color }}
+                    className="w-full mt-2 h-7 text-xs font-medium rounded text-white"
+                    style={{ backgroundColor: customColor }}
                     onMouseDown={(e) => {
                       e.preventDefault();
-                      editor.chain().focus().setColor(color).run();
+                      editor.chain().focus().setColor(customColor).run();
                       setColorPickerOpen(false);
                     }}
-                  />
-                ))}
-                <button type="button" className="w-full text-xs text-gray-400 hover:text-gray-600 mt-1"
+                  >
+                    Apply
+                  </button>
+                </div>
+                <button type="button" className="w-full text-xs text-gray-400 hover:text-gray-600 mt-2"
                   onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().unsetColor().run(); setColorPickerOpen(false); }}>
                   Reset color
                 </button>

@@ -7,12 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 type FlagStatus = "flagged" | "confirmed" | "dismissed" | "warned" | "all";
 
 export default function SharingMonitor() {
-  const { toast } = useToast();
+
   const [statusFilter, setStatusFilter] = useState<FlagStatus>("all");
   const [selectedFlag, setSelectedFlag] = useState<any | null>(null);
   const [ipDetailUserId, setIpDetailUserId] = useState<number | null>(null);
@@ -31,12 +31,12 @@ export default function SharingMonitor() {
       stats.refetch();
       setActionDialog(null);
       setNotes("");
-      toast({ title: "Status updated", description: "Flag status has been updated successfully." });
+      toast.success("Flag status has been updated successfully.");
     },
   });
   const triggerScan = trpc.sharingMonitor.triggerScan.useMutation({
     onSuccess: () => {
-      toast({ title: "Scan triggered", description: "Account sharing scan has been started. Check back in a few minutes." });
+      toast.info("Account sharing scan has been started. Check back in a few minutes.");
     },
   });
 

@@ -340,7 +340,7 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price }: {
         <div className="px-8 py-12 text-center" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           {d.headline && <h2 className="text-3xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6 max-w-xl mx-auto" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
-          {d.showPrice && <p className="text-4xl font-bold mb-6" style={{ color: d.ctaColor ?? "#179ca3" }}>{price}</p>}
+          {d.showPrice && <div className="mb-6">{d.showOriginalPrice && d.originalPrice && <p className="text-xl text-gray-400 line-through mb-1">${d.originalPrice}</p>}<p className="text-4xl font-bold" style={{ color: d.ctaColor ?? "#179ca3" }}>{price}</p></div>}
           <button onClick={onEnroll} disabled={enrolling} className="px-10 py-4 rounded-xl font-bold text-lg shadow-lg disabled:opacity-60 transition-opacity hover:opacity-90" style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
             {enrolling ? "Processing…" : (d.ctaText ?? ctaText)}
           </button>
@@ -500,8 +500,9 @@ export default function CourseLanding() {
   const { user } = useAuth();
   const [enrolling, setEnrolling] = useState(false);
   const [selectedOrderBumpId, setSelectedOrderBumpId] = useState<number | undefined>();
+  const isPreview = new URLSearchParams(window.location.search).get("preview") === "admin";
 
-  const { data: course, isLoading } = trpc.lms.getCourse.useQuery({ slug: slug! }, { enabled: !!slug });
+  const { data: course, isLoading } = trpc.lms.getCourse.useQuery({ slug: slug!, preview: isPreview || undefined }, { enabled: !!slug });
   const { data: myCourses } = trpc.lmsLearner.getMyCourses.useQuery(undefined, { enabled: !!user });
   const enrollment = myCourses?.find((e: any) => e.courseId === course?.id);
 
