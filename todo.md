@@ -1518,3 +1518,5 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add strikethrough discount pricing option to CTA/pricing blocks
 - [x] Replace limited preset color grid in rich text editor with full color picker (hex input + color wheel)
 - [x] Add landing page preview button for courses and digital downloads (preview before publish via ?preview=admin)
+- [x] Create Instructor block type in landing page builder (pulls from saved profiles or allows creating new inline)
+- [x] Fix mobile PDF viewing: /api/media/:key/view endpoint — mobile-aware PDF viewer with Open/Download fallback for iOS/Android

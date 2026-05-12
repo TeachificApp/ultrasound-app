@@ -25,6 +25,8 @@ import { CSS } from "@dnd-kit/utilities";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DebouncedInput, DebouncedTextarea } from "@/components/DebouncedInput";
 import { toast } from "sonner";
@@ -111,7 +113,7 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
   { type: "logos", label: "Logos / Social Proof", icon: <Tag size={14} />, category: "Marketing",
     defaultData: { headline: "Trusted By", logos: [{ url: "", alt: "Organization 1" }, { url: "", alt: "Organization 2" }], bgColor: "#f9fafb" } },
   { type: "instructor", label: "Instructor Profile", icon: <Users size={14} />, category: "Marketing",
-    defaultData: { name: "Instructor Name", title: "Credentials & Title", bio: "Brief instructor biography...", avatarUrl: "", bgColor: "#ffffff" } },
+    defaultData: { instructorId: null, mode: "profile", layout: "horizontal", name: "Instructor Name", title: "Credentials & Title", bio: "Brief instructor biography...", avatarUrl: "", website: "", bgColor: "#ffffff", showBio: true, showWebsite: true, headlineColor: "#111827", titleColor: "#179ca3" } },
   { type: "faq", label: "FAQ / Accordion", icon: <HelpCircle size={14} />, category: "Marketing",
     defaultData: { headline: "Frequently Asked Questions", items: [{ q: "Who is this course for?", a: "This course is designed for..." }, { q: "How long do I have access?", a: "You get lifetime access." }], bgColor: "#ffffff", accentColor: "#179ca3" } },
   { type: "countdown", label: "Countdown Timer", icon: <Timer size={14} />, category: "Marketing",
@@ -404,19 +406,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
         </div>
       );
     case "instructor":
-      return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          <div className="max-w-3xl mx-auto flex gap-6 items-start">
-            {d.avatarUrl ? <img src={d.avatarUrl} alt={d.name} className="w-24 h-24 rounded-full object-cover flex-shrink-0" />
-              : <div className="w-24 h-24 rounded-full bg-teal-100 flex items-center justify-center flex-shrink-0"><Users size={32} className="text-teal-600" /></div>}
-            <div>
-              <h3 className="text-xl font-bold text-gray-900">{d.name}</h3>
-              <p className="text-teal-600 font-medium mb-3">{d.title}</p>
-              <p className="text-gray-600">{d.bio}</p>
-            </div>
-          </div>
-        </div>
-      );
+      return <InstructorBlockPreview d={d} />;
     case "faq":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
@@ -816,6 +806,236 @@ function BSAlignField({ data, onSet }: { data: Record<string, any>; onSet: (key:
   );
 }
 
+// ─── Instructor Block Preview (fetches from saved profile or uses manual data) ──
+function InstructorBlockPreview({ d }: { d: Record<string, any> }) {
+  const instructorId = d.instructorId ? Number(d.instructorId) : null;
+  const { data: instructors } = trpc.lms.listInstructors.useQuery();
+  const instructor = instructorId ? instructors?.find((i: any) => i.id === instructorId) : null;
+  const name = instructor?.name ?? d.name ?? "Instructor Name";
+  const title = instructor?.title ?? d.title ?? "";
+  const bio = instructor?.bio ?? d.bio ?? "";
+  const avatarUrl = instructor?.avatarUrl ?? d.avatarUrl ?? "";
+  const website = instructor?.website ?? d.website ?? "";
+  const layout = d.layout ?? "horizontal";
+  const showBio = d.showBio !== false;
+  const showWebsite = d.showWebsite !== false;
+  const headlineColor = d.headlineColor ?? "#111827";
+  const titleColor = d.titleColor ?? "#179ca3";
+
+  if (layout === "centered") {
+    return (
+      <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="max-w-2xl mx-auto text-center">
+          {avatarUrl
+            ? <img src={avatarUrl} alt={name} className="w-28 h-28 rounded-full object-cover mx-auto mb-4 border-4 border-teal-100" />
+            : <div className="w-28 h-28 rounded-full bg-teal-100 flex items-center justify-center mx-auto mb-4"><Users size={40} className="text-teal-600" /></div>}
+          <h3 className="text-2xl font-bold mb-1" style={{ color: headlineColor }}>{name}</h3>
+          {title && <p className="font-semibold mb-3" style={{ color: titleColor }}>{title}</p>}
+          {showBio && bio && <div className="text-gray-600 leading-relaxed" dangerouslySetInnerHTML={{ __html: bio }} />}
+          {showWebsite && website && <a href={website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-3 text-sm font-medium" style={{ color: titleColor }}><Globe size={14} /> {website.replace(/^https?:\/\//, "")}</a>}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+      <div className="max-w-3xl mx-auto flex gap-6 items-start">
+        {avatarUrl
+          ? <img src={avatarUrl} alt={name} className="w-24 h-24 rounded-full object-cover flex-shrink-0 border-4 border-teal-100" />
+          : <div className="w-24 h-24 rounded-full bg-teal-100 flex items-center justify-center flex-shrink-0"><Users size={32} className="text-teal-600" /></div>}
+        <div className="min-w-0">
+          <h3 className="text-xl font-bold" style={{ color: headlineColor }}>{name}</h3>
+          {title && <p className="font-semibold mb-2" style={{ color: titleColor }}>{title}</p>}
+          {showBio && bio && <div className="text-gray-600 leading-relaxed" dangerouslySetInnerHTML={{ __html: bio }} />}
+          {showWebsite && website && <a href={website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-2 text-sm font-medium" style={{ color: titleColor }}><Globe size={14} /> {website.replace(/^https?:\/\//, "")}</a>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Instructor Block Settings (select from saved profiles or manual entry) ──
+function InstructorBlockSettings({ d, set, inlineMediaRef, uploading, handleFileUpload, onChange }: {
+  d: Record<string, any>;
+  set: (key: string, value: any) => void;
+  inlineMediaRef: React.RefObject<HTMLInputElement | null>;
+  uploading: string | null;
+  handleFileUpload: (file: File, targetField: string, context: string) => void;
+  onChange: (data: Record<string, any>) => void;
+}) {
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const { data: instructors, refetch: refetchInstructors } = trpc.lmsAdmin.listInstructors.useQuery();
+  const createInstructor = trpc.lmsAdmin.createInstructor.useMutation({
+    onSuccess: (result) => {
+      refetchInstructors();
+      toast.success("Instructor profile created!");
+      // Auto-select the newly created instructor
+      onChange({ ...d, instructorId: result.id, mode: "profile" });
+      setShowCreateDialog(false);
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const mode = d.mode ?? "profile";
+  const selectedInstructor = d.instructorId ? instructors?.find((i: any) => i.id === Number(d.instructorId)) : null;
+
+  return (
+    <div className="space-y-3">
+      {/* Mode toggle */}
+      <div>
+        <label className="text-xs text-gray-500 block mb-1">Source</label>
+        <div className="grid grid-cols-2 gap-1">
+          <button onClick={() => set("mode", "profile")} className={`py-1.5 text-xs rounded border ${mode === "profile" ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>Saved Profile</button>
+          <button onClick={() => set("mode", "manual")} className={`py-1.5 text-xs rounded border ${mode === "manual" ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>Manual Entry</button>
+        </div>
+      </div>
+
+      {mode === "profile" ? (
+        <>
+          {/* Profile selector */}
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Select Instructor</label>
+            <Select value={d.instructorId ? String(d.instructorId) : "_none"} onValueChange={v => set("instructorId", v === "_none" ? null : Number(v))}>
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="Choose an instructor..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_none">— Select —</SelectItem>
+                {(instructors ?? []).map((inst: any) => (
+                  <SelectItem key={inst.id} value={String(inst.id)}>
+                    {inst.name}{inst.title ? ` — ${inst.title}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {/* Selected instructor preview */}
+          {selectedInstructor && (
+            <div className="bg-teal-50 border border-teal-200 rounded-lg p-3">
+              <div className="flex items-center gap-3">
+                {selectedInstructor.avatarUrl
+                  ? <img src={selectedInstructor.avatarUrl} className="w-10 h-10 rounded-full object-cover" />
+                  : <div className="w-10 h-10 rounded-full bg-teal-200 flex items-center justify-center"><Users size={16} className="text-teal-700" /></div>}
+                <div>
+                  <p className="text-sm font-semibold text-teal-900">{selectedInstructor.name}</p>
+                  {selectedInstructor.title && <p className="text-xs text-teal-700">{selectedInstructor.title}</p>}
+                </div>
+              </div>
+            </div>
+          )}
+          {/* Create new button */}
+          <button onClick={() => setShowCreateDialog(true)} className="w-full py-2 text-xs text-teal-700 bg-teal-50 border border-dashed border-teal-300 rounded-lg hover:bg-teal-100 flex items-center justify-center gap-1">
+            <Plus size={12} /> Create New Instructor Profile
+          </button>
+        </>
+      ) : (
+        <>
+          {/* Manual fields */}
+          <BSTextField data={d} onSet={set} label="Name" field="name" />
+          <BSTextField data={d} onSet={set} label="Title / Credentials" field="title" />
+          <BSTextField data={d} onSet={set} label="Bio" field="bio" multiline />
+          <BSTextField data={d} onSet={set} label="Website" field="website" placeholder="https://..." />
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Avatar</label>
+            <div className="flex items-center gap-2">
+              <DebouncedInput value={d.avatarUrl ?? ""} onChange={v => set("avatarUrl", v)} className="h-8 text-sm flex-1" placeholder="Avatar URL or upload" />
+              <button onClick={() => inlineMediaRef.current?.click()} className="px-2 py-1.5 text-xs bg-teal-50 text-teal-700 rounded border border-teal-200 hover:bg-teal-100 flex items-center gap-1" disabled={uploading === "avatarUrl"}>{uploading === "avatarUrl" ? "..." : <><Upload size={12} /> Upload</>}</button>
+              <input ref={inlineMediaRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, "avatarUrl", "instructor-avatar"); e.target.value = ""; }} />
+            </div>
+            {d.avatarUrl && <img src={d.avatarUrl} className="w-12 h-12 rounded-full object-cover border mt-1" />}
+          </div>
+        </>
+      )}
+
+      {/* Layout */}
+      <div>
+        <label className="text-xs text-gray-500 block mb-1">Layout</label>
+        <div className="grid grid-cols-2 gap-1">
+          <button onClick={() => set("layout", "horizontal")} className={`py-1.5 text-xs rounded border ${(d.layout ?? "horizontal") === "horizontal" ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>Horizontal</button>
+          <button onClick={() => set("layout", "centered")} className={`py-1.5 text-xs rounded border ${d.layout === "centered" ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>Centered</button>
+        </div>
+      </div>
+
+      {/* Display toggles */}
+      <div className="flex items-center gap-2">
+        <input type="checkbox" checked={d.showBio !== false} onChange={e => set("showBio", e.target.checked)} className="rounded" />
+        <label className="text-xs text-gray-600">Show bio</label>
+      </div>
+      <div className="flex items-center gap-2">
+        <input type="checkbox" checked={d.showWebsite !== false} onChange={e => set("showWebsite", e.target.checked)} className="rounded" />
+        <label className="text-xs text-gray-600">Show website</label>
+      </div>
+
+      {/* Colors */}
+      <BSColorField data={d} onSet={set} label="Name Color" field="headlineColor" />
+      <BSColorField data={d} onSet={set} label="Title Color" field="titleColor" />
+      <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
+
+      {/* Create Instructor Dialog */}
+      {showCreateDialog && (
+        <InlineInstructorFormDialog
+          onClose={() => setShowCreateDialog(false)}
+          onSave={(data) => createInstructor.mutate(data)}
+          saving={createInstructor.isPending}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Inline Instructor Form Dialog (for creating new profiles from the builder) ──
+function InlineInstructorFormDialog({ onClose, onSave, saving }: {
+  onClose: () => void;
+  onSave: (data: { name: string; title?: string; bio?: string; avatarUrl?: string; website?: string }) => void;
+  saving: boolean;
+}) {
+  const [name, setName] = useState("");
+  const [instrTitle, setInstrTitle] = useState("");
+  const [bio, setBio] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [website, setWebsite] = useState("");
+
+  return (
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader><DialogTitle>New Instructor Profile</DialogTitle></DialogHeader>
+        <div className="space-y-3 py-2">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-sm">Name *</Label>
+              <Input value={name} onChange={e => setName(e.target.value)} className="mt-1" placeholder="Full name" />
+            </div>
+            <div>
+              <Label className="text-sm">Title / Credentials</Label>
+              <Input value={instrTitle} onChange={e => setInstrTitle(e.target.value)} placeholder="RDCS, FASE" className="mt-1" />
+            </div>
+          </div>
+          <div>
+            <Label className="text-sm">Avatar URL</Label>
+            <Input value={avatarUrl} onChange={e => setAvatarUrl(e.target.value)} placeholder="https://..." className="mt-1" />
+          </div>
+          <div>
+            <Label className="text-sm">Website</Label>
+            <Input value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://..." className="mt-1" />
+          </div>
+          <div>
+            <Label className="text-sm">Bio</Label>
+            <div className="mt-1"><RichTextEditor value={bio} onChange={setBio} /></div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button className="bg-teal-600 hover:bg-teal-700 text-white" disabled={!name.trim() || saving}
+            onClick={() => onSave({ name: name.trim(), title: instrTitle.trim() || undefined, bio: bio || undefined, avatarUrl: avatarUrl.trim() || undefined, website: website.trim() || undefined })}>
+            {saving ? "Saving..." : "Create Profile"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function BlockSettings({ block, onChange }: { block: Block; onChange: (data: Record<string, any>) => void }) {
   const d = block.data;
   // Use refs to avoid stale closures with debounced inputs
@@ -984,7 +1204,7 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
       return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Headline" field="headline" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div><div className="flex items-center justify-between mb-2"><label className="text-xs text-gray-500 font-medium">Logos</label><button onClick={() => set("logos", [...logos, { url: "", alt: "" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div><div className="space-y-2">{logos.map((logo, i) => (<div key={i} className="flex gap-1 items-center"><DebouncedInput value={logo.url} onChange={v => { const next = logos.map((l, j) => j === i ? { ...l, url: v } : l); set("logos", next); }} className="h-7 text-xs flex-1" placeholder="Logo URL" /><DebouncedInput value={logo.alt} onChange={v => { const next = logos.map((l, j) => j === i ? { ...l, alt: v } : l); set("logos", next); }} className="h-7 text-xs w-24" placeholder="Alt" /><button onClick={() => set("logos", logos.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 flex-shrink-0"><X size={12} /></button></div>))}</div></div></div>);
     }
     case "instructor":
-      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Name" field="name" /><BSTextField data={d} onSet={set} label="Title / Credentials" field="title" /><BSTextField data={d} onSet={set} label="Bio" field="bio" multiline /><div><label className="text-xs text-gray-500 block mb-1">Avatar</label><div className="flex items-center gap-2"><DebouncedInput value={d.avatarUrl ?? ""} onChange={v => set("avatarUrl", v)} className="h-8 text-sm flex-1" placeholder="Avatar URL or upload" /><button onClick={() => inlineMediaRef.current?.click()} className="px-2 py-1.5 text-xs bg-teal-50 text-teal-700 rounded border border-teal-200 hover:bg-teal-100 flex items-center gap-1" disabled={uploading === "avatarUrl"}>{uploading === "avatarUrl" ? "..." : <><Upload size={12} /> Upload</>}</button><input ref={inlineMediaRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, "avatarUrl", "instructor-avatar"); e.target.value = ""; }} /></div>{d.avatarUrl && <img src={d.avatarUrl} className="w-12 h-12 rounded-full object-cover border mt-1" />}</div><BSColorField data={d} onSet={set} label="Background" field="bgColor" /></div>);
+      return <InstructorBlockSettings d={d} set={set} inlineMediaRef={inlineMediaRef} uploading={uploading} handleFileUpload={handleFileUpload} onChange={onChange} />;
     case "faq": {
       const items: Array<{ q: string; a: string }> = d.items ?? [];
       return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Section Headline" field="headline" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" /><div><div className="flex items-center justify-between mb-2"><label className="text-xs text-gray-500 font-medium">FAQ Items</label><button onClick={() => set("items", [...items, { q: "Question?", a: "Answer." }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div><div className="space-y-2">{items.map((item, i) => (<div key={i} className="border border-gray-200 rounded p-2 space-y-1"><div className="flex justify-between items-center mb-1"><span className="text-xs text-gray-500">Q{i + 1}</span><button onClick={() => set("items", items.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div><DebouncedInput value={item.q} onChange={v => { const next = items.map((it, j) => j === i ? { ...it, q: v } : it); set("items", next); }} className="h-7 text-xs" placeholder="Question" /><DebouncedTextarea value={item.a} onChange={v => { const next = items.map((it, j) => j === i ? { ...it, a: v } : it); set("items", next); }} className="text-xs min-h-[60px]" placeholder="Answer" /></div>))}</div></div></div>);

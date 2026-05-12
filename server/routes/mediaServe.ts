@@ -384,9 +384,49 @@ function buildEmbedPage(opts: EmbedPageOptions): string {
              style="max-width:100%;max-height:100%;object-fit:contain;display:block;" />
       </div>`;
   } else if (mediaType === "document" && mimeType === "application/pdf") {
+    // Mobile browsers (iOS Safari, Android WebView) cannot render PDFs in iframes.
+    // We use a JS-detected approach: show the iframe on desktop, and a friendly
+    // open/download panel on mobile. A persistent download button is always shown.
     contentHtml = `
-      <iframe src="${escHtml(fileUrl)}" style="width:100%;height:100%;border:none;"
-              title="${escHtml(asset.title)}"></iframe>`;
+      <div id="pdf-container" style="width:100%;height:100%;position:relative;">
+        <!-- Desktop: native PDF iframe -->
+        <iframe id="pdf-frame" src="${escHtml(fileUrl)}" style="width:100%;height:100%;border:none;display:block;"
+                title="${escHtml(asset.title)}"></iframe>
+        <!-- Mobile fallback overlay (hidden by default, shown via JS) -->
+        <div id="pdf-mobile" style="display:none;flex-direction:column;align-items:center;justify-content:center;
+             height:100%;gap:20px;padding:clamp(20px,6vw,48px);background:#fff;text-align:center;">
+          <div style="font-size:56px;">📄</div>
+          <div>
+            <p style="font-size:18px;font-weight:700;color:#111827;margin:0 0 6px;">${escHtml(asset.title)}</p>
+            <p style="font-size:13px;color:#6b7280;margin:0 0 20px;">PDF Document</p>
+          </div>
+          <div class="action-group">
+            <a href="${escHtml(fileUrl)}" target="_blank" rel="noopener" class="action-btn action-btn-primary">
+              &#x1F4C4; Open PDF
+            </a>
+            <a href="${escHtml(fileUrl)}" download class="action-btn action-btn-secondary">
+              &#x2B07; Download
+            </a>
+          </div>
+          <p style="font-size:12px;color:#9ca3af;max-width:320px;margin:0;">
+            Tap &ldquo;Open PDF&rdquo; to view in your browser&rsquo;s PDF reader.
+          </p>
+        </div>
+      </div>
+      <script>
+        (function() {
+          var ua = navigator.userAgent || '';
+          var isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+          var isAndroid = /Android/.test(ua);
+          var isMobile = isIOS || isAndroid || window.innerWidth < 768;
+          if (isMobile) {
+            var frame = document.getElementById('pdf-frame');
+            var mobile = document.getElementById('pdf-mobile');
+            if (frame) frame.style.display = 'none';
+            if (mobile) mobile.style.display = 'flex';
+          }
+        })();
+      </script>`;
   } else if (mediaType === "html" || mimeType === "text/html") {
     // Serve HTML content in a sandboxed iframe
     contentHtml = `

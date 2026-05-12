@@ -269,19 +269,7 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price }: {
         </div>
       );
     case "instructor":
-      return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          <div className="max-w-3xl mx-auto flex gap-6 items-start">
-            {d.avatarUrl ? <img src={d.avatarUrl} alt={d.name} className="w-24 h-24 rounded-full object-cover flex-shrink-0" />
-              : <div className="w-24 h-24 rounded-full bg-teal-100 flex items-center justify-center flex-shrink-0"><Users size={32} className="text-teal-600" /></div>}
-            <div>
-              <h3 className="text-xl font-bold text-gray-900">{d.name}</h3>
-              <p className="text-teal-600 font-medium mb-3">{d.title}</p>
-              <p className="text-gray-600">{d.bio}</p>
-            </div>
-          </div>
-        </div>
-      );
+      return <InstructorPublicBlock d={d} />;
     case "faq":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
@@ -745,6 +733,65 @@ export default function CourseLanding() {
               <li className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-teal-500" />{accessLabel(course)}</li>
             </ul>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Instructor Public Block (fetches from saved profile or uses manual data) ──
+function InstructorPublicBlock({ d }: { d: Record<string, any> }) {
+  const instructorId = d.instructorId ? Number(d.instructorId) : null;
+  const { data: instructors } = trpc.lms.listInstructors.useQuery();
+  const instructor = instructorId ? instructors?.find((i: any) => i.id === instructorId) : null;
+  const name = instructor?.name ?? d.name ?? "";
+  const title = instructor?.title ?? d.title ?? "";
+  const bio = instructor?.bio ?? d.bio ?? "";
+  const avatarUrl = instructor?.avatarUrl ?? d.avatarUrl ?? "";
+  const website = instructor?.website ?? d.website ?? "";
+  const layout = d.layout ?? "horizontal";
+  const showBio = d.showBio !== false;
+  const showWebsite = d.showWebsite !== false;
+  const headlineColor = d.headlineColor ?? "#111827";
+  const titleColor = d.titleColor ?? "#179ca3";
+
+  if (layout === "centered") {
+    return (
+      <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
+        <div className="max-w-2xl mx-auto text-center">
+          {avatarUrl
+            ? <img src={avatarUrl} alt={name} className="w-28 h-28 rounded-full object-cover mx-auto mb-4 border-4 border-teal-100 shadow-md" />
+            : <div className="w-28 h-28 rounded-full bg-teal-100 flex items-center justify-center mx-auto mb-4"><Users size={40} className="text-teal-600" /></div>}
+          <h3 className="text-2xl font-bold mb-1" style={{ color: headlineColor }}>{name}</h3>
+          {title && <p className="font-semibold mb-3" style={{ color: titleColor }}>{title}</p>}
+          {showBio && bio && <div className="text-gray-600 leading-relaxed" dangerouslySetInnerHTML={{ __html: bio }} />}
+          {showWebsite && website && (
+            <a href={website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-3 text-sm font-medium" style={{ color: titleColor }}>
+              <Globe size={14} /> {website.replace(/^https?:\/\//, "")}
+            </a>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
+      <div className="max-w-3xl mx-auto flex flex-col md:flex-row gap-6 items-start">
+        <div className="flex-shrink-0">
+          {avatarUrl
+            ? <img src={avatarUrl} alt={name} className="w-24 h-24 rounded-full object-cover border-4 border-teal-100 shadow-md" />
+            : <div className="w-24 h-24 rounded-full bg-teal-100 flex items-center justify-center"><Users size={32} className="text-teal-600" /></div>}
+        </div>
+        <div className="min-w-0">
+          <h3 className="text-xl font-bold" style={{ color: headlineColor }}>{name}</h3>
+          {title && <p className="font-semibold mb-2" style={{ color: titleColor }}>{title}</p>}
+          {showBio && bio && <div className="text-gray-600 leading-relaxed" dangerouslySetInnerHTML={{ __html: bio }} />}
+          {showWebsite && website && (
+            <a href={website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-2 text-sm font-medium" style={{ color: titleColor }}>
+              <Globe size={14} /> {website.replace(/^https?:\/\//, "")}
+            </a>
+          )}
         </div>
       </div>
     </div>
