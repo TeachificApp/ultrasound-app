@@ -61,11 +61,7 @@ export function serveStatic(app: Express) {
   app.use(express.static(distPath));
 
   // fall through to index.html if the file doesn't exist
-  // Skip SPA fallback for server-side routes like /media/:slug
-  app.use("*", (req, res, next) => {
-    if (req.path.startsWith("/media/")) {
-      return next();
-    }
+  app.use("*", (_req, res) => {
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }

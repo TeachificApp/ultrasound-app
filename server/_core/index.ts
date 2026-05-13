@@ -177,8 +177,6 @@ async function startServer() {
   registerUnsubscribeRoute(app);
   // Server-side login/magic-verify routes (bypasses Cloudflare fetch-response cookie stripping)
   registerAuthLoginRoute(app);
-  // Media repository public serve/embed routes (cookieless, token-based access)
-  registerMediaServeRoutes(app);
   // Media repository multipart upload endpoint (admin only)
   registerUploadMediaRepoRoute(app);
   // Course/landing-page image upload (multipart, bypasses JSON body limit)
@@ -199,6 +197,9 @@ async function startServer() {
   } else {
     serveStatic(app);
   }
+  // Media repository public serve/embed routes (cookieless, token-based access)
+  // MUST be registered AFTER serveStatic so the SPA wildcard doesn't intercept /media/:slug
+  registerMediaServeRoutes(app);
 
   const preferredPort = parseInt(process.env.PORT || "3000");
   // In production (Railway), bind directly to PORT without scanning
