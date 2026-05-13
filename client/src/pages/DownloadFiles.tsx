@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { Download, Eye, FileDown, ArrowLeft, CheckCircle, Lock } from "lucide-react";
 import { Link } from "wouter";
 import { getLoginUrl } from "@/const";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import OrderBumpOffer from "@/components/OrderBumpOffer";
 
 export default function DownloadFiles() {
@@ -40,6 +40,7 @@ export default function DownloadFiles() {
       toast.success("Purchase successful! Your files are ready to download.");
     }
   }, [isSuccess]);
+  const [pdfViewerUrl, setPdfViewerUrl] = useState<string | null>(null);
   const trackDownload = trpc.downloadsLearner.trackDownload.useMutation();
 
   if (authLoading || productLoading) {
@@ -102,7 +103,6 @@ export default function DownloadFiles() {
   }
 
   const files = downloadData?.files ?? [];
-  const [pdfViewerUrl, setPdfViewerUrl] = React.useState<string | null>(null);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -157,7 +157,8 @@ export default function DownloadFiles() {
           <div className="space-y-3">
             <p className="text-sm text-gray-500 mb-4">{files.length} file{files.length !== 1 ? "s" : ""} available for download</p>
             {files.map((file: any) => (
-              <Card key={file.id} className="hover:border-teal-400 transition-colors">
+              <div key={file.id} className="space-y-0">
+              <Card className="hover:border-teal-400 transition-colors">
                 <CardContent className="p-4 flex items-center gap-4">
                   <div className="w-10 h-10 rounded-lg bg-teal-50 flex items-center justify-center flex-shrink-0">
                     <FileDown className="w-5 h-5 text-teal-600" />
@@ -198,6 +199,7 @@ export default function DownloadFiles() {
                   <iframe src={`${file.fileUrl}#toolbar=1`} className="w-full" style={{ height: "75vh" }} title={file.fileName} />
                 </div>
               )}
+              </div>
             ))}
           </div>
         )}
