@@ -50,6 +50,8 @@ import { getThinkificPremiumMonthlyUrl } from "@/const";
 import { formatDistanceToNow } from "date-fns";
 import { formatViewCount, getDisplayViewCount } from "@/lib/caseViewCount";
 import CaseLibraryBanner from "@/components/CaseLibraryBanner";
+import { isIHeartEchoDomain } from "@/hooks/useSubdomain";
+const isIHE = isIHeartEchoDomain();
 
 const MODALITY_COLORS: Record<string, string> = {
   Abdominal: "bg-blue-100 text-blue-700",
@@ -61,6 +63,12 @@ const MODALITY_COLORS: Record<string, string> = {
   Breast: "bg-rose-100 text-rose-700",
   Renal: "bg-cyan-100 text-cyan-700",
   "Fetal Echo": "bg-emerald-100 text-emerald-700",
+  "Adult TTE": "bg-blue-100 text-blue-700",
+  "TEE": "bg-violet-100 text-violet-700",
+  "Pediatric Echo": "bg-pink-100 text-pink-700",
+  "Valvular Disease": "bg-red-100 text-red-700",
+  "Cardiomyopathy": "bg-orange-100 text-orange-700",
+  "Structural Heart": "bg-indigo-100 text-indigo-700",
   Other: "bg-gray-100 text-gray-600",
 };
 
@@ -82,7 +90,9 @@ const STATUS_ICONS: Record<string, React.ElementType> = {
   rejected: XCircle,
 };
 
-const MODALITIES = ["All", "Abdominal", "Vascular", "OB/Gyn", "MSK", "POCUS", "Thyroid", "Breast", "Renal", "Fetal Echo", "Other"];
+const AAUS_MODALITIES = ["All", "Abdominal", "Vascular", "OB/Gyn", "MSK", "POCUS", "Thyroid", "Breast", "Renal", "Fetal Echo", "Other"];
+const IHE_MODALITIES = ["All", "Adult TTE", "TEE", "Pediatric Echo", "Fetal Echo", "Valvular Disease", "Cardiomyopathy", "Structural Heart", "POCUS", "Other"];
+const MODALITIES = isIHE ? IHE_MODALITIES : AAUS_MODALITIES;
 const DIFFICULTIES = ["All", "beginner", "intermediate", "advanced"];
 
 type TabType = "browse" | "mySubmissions";
@@ -164,11 +174,11 @@ export default function CaseLibrary() {
                 <BookOpen className="w-5 h-5 text-white" />
               </div>
               <h1 className="text-2xl font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>
-                Ultrasound Case Library
+                {isIHE ? "Echo Case Library" : "Ultrasound Case Library"}
               </h1>
             </div>
             <p className="text-sm text-gray-500 ml-11">
-              Our Ultrasound Case Library has image, video, and non-image cases. Cases are intended to encourage critical thinking — not just in image review, but also in clinical history, clinical scenarios, and outcomes.
+              {isIHE ? "Our Echo Case Library has image, video, and non-image echo cases. Cases are intended to encourage critical thinking — not just in image review, but also in clinical history, clinical scenarios, and outcomes." : "Our Ultrasound Case Library has image, video, and non-image cases. Cases are intended to encourage critical thinking — not just in image review, but also in clinical history, clinical scenarios, and outcomes."}
             </p>
           </div>
           {isAuthenticated ? (
@@ -250,7 +260,7 @@ export default function CaseLibrary() {
 
         {/* ── Browse Tab ─────────────────────────────────────────────────────── */}
         {activeTab === "browse" && (
-          <PremiumPearlGate type="login" featureName="Ultrasound Case Library">
+          <PremiumPearlGate type="login" featureName={isIHE ? "Echo Case Library" : "Ultrasound Case Library"}>
             {/* Filters */}
             <div className="flex flex-col sm:flex-row gap-3 mb-6">
               <div className="relative flex-1">
@@ -572,7 +582,7 @@ export default function CaseLibrary() {
               Sign In to View Cases
             </h2>
             <p className="text-white/60 text-sm mb-5 leading-relaxed">
-              Create a free All About Ultrasound™ account to access the Ultrasound Case Library. Free members can view cases and submit their own. Upgrade to Premium for the full clinical suite.
+              {isIHE ? "Create a free iHeartEcho™ account to access the Echo Case Library. Free members can view cases and submit their own. Upgrade to Premium for the full clinical suite." : "Create a free All About Ultrasound™ account to access the Ultrasound Case Library. Free members can view cases and submit their own. Upgrade to Premium for the full clinical suite."}
             </p>
             <div className="flex flex-col gap-2">
               <a href={getLoginUrl()} className="block">

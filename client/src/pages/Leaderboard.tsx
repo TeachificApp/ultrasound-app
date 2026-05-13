@@ -64,19 +64,19 @@ export default function Leaderboard() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">
-                        {entry.name ?? "Anonymous"}
-                        {entry.userId === user?.id && (
+                        {entry.displayName ?? "Anonymous"}
+                        {(entry.isCurrentUser || String(entry.userId) === String(user?.id)) && (
                           <Badge variant="outline" className="ml-1.5 text-[10px]">You</Badge>
                         )}
                       </div>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <div className="text-sm font-bold">{entry.score}</div>
-                      <div className="text-[10px] text-muted-foreground">points</div>
+                      <div className="text-sm font-bold">{entry.correct}</div>
+                      <div className="text-[10px] text-muted-foreground">correct</div>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <div className="text-sm font-bold text-amber-500">{entry.streak ?? 0}</div>
-                      <div className="text-[10px] text-muted-foreground">streak</div>
+                      <div className="text-sm font-bold text-teal-500">{entry.accuracy ?? 0}%</div>
+                      <div className="text-[10px] text-muted-foreground">accuracy</div>
                     </div>
                   </div>
                 ))}

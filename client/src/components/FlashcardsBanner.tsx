@@ -4,9 +4,12 @@
  */
 import { Link } from "wouter";
 import { Zap } from "lucide-react";
+import { isIHeartEchoDomain } from "@/hooks/useSubdomain";
 
-const BANNER_IMG =
-  "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/flashcards-banner-final_AAUS_94ef5d55.webp";
+const isIHE = isIHeartEchoDomain();
+const BANNER_IMG = isIHE
+  ? "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/ihe-hero-MNscA4NaWNyxrdkewtLGLG.webp"
+  : "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/flashcards-banner-final_AAUS_94ef5d55.webp";
 
 interface FlashcardsBannerProps {
   streak?: number;
@@ -41,14 +44,15 @@ export default function FlashcardsBanner({ streak = 0, isPremium = false }: Flas
             className="text-3xl md:text-4xl font-black text-white leading-tight mb-2"
             style={{ fontFamily: "Merriweather, serif" }}
           >
-            Ultrasound Flashcards
+            {isIHE ? "Echo Flashcards" : "Ultrasound Flashcards"}
           </h1>
           <p className="text-[#4ad9e0] font-semibold text-base mb-3">
-            Rapid-Fire Clinical Knowledge Review from All About Ultrasound™
+            {isIHE ? "Rapid-Fire Echo Knowledge Review from iHeartEcho™" : "Rapid-Fire Clinical Knowledge Review from All About Ultrasound™"}
           </p>
           <p className="text-white/70 text-sm leading-relaxed mb-6 max-w-lg">
-            Reinforce your ultrasound knowledge with quick-review cards covering Abdominal, OB/Gyn,
-            Vascular, Breast, Thyroid, POCUS, and Physics. Spaced repetition surfaces the cards you need most.
+            {isIHE
+              ? "Reinforce your echo knowledge with quick-review cards covering Adult TTE, TEE, Pediatric Echo, Fetal Echo, Valvular Disease, Cardiomyopathy, and more. Spaced repetition surfaces the cards you need most."
+              : "Reinforce your ultrasound knowledge with quick-review cards covering Abdominal, OB/Gyn, Vascular, Breast, Thyroid, POCUS, and Physics. Spaced repetition surfaces the cards you need most."}
           </p>
 
           {/* Access row — iHeartEcho style: streak + free/premium info only, no card count */}

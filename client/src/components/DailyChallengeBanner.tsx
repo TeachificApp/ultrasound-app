@@ -1,17 +1,14 @@
 /**
  * DailyChallengeBanner — Hero banner for the Daily Challenge page.
- * Matches the dashboard hero style: navy-to-teal gradient, same typography.
- *
- * Features:
- * - "Start Today's Challenge" scrolls to the challenge cards section
- * - "View Archive" switches to the Archive tab
- * - Shows streak count dynamically
- * - Swaps CTA to "Completed Today ✓" when challenge is done
+ * Brand-aware: shows iHeartEcho copy/image on app.iheartecho.com.
  */
 import { Trophy, Archive, CheckCircle2, Flame } from "lucide-react";
+import { isIHeartEchoDomain } from "@/hooks/useSubdomain";
 
-const BANNER_IMG =
-  "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/daily-challenge-banner-v3_AAUS_ccb55bf0.webp";
+const AAUS_BANNER_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/daily-challenge-banner-v3_AAUS_ccb55bf0.webp";
+const IHE_BANNER_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/ihe-hero-MNscA4NaWNyxrdkewtLGLG.webp";
+const isIHE = isIHeartEchoDomain();
+const BANNER_IMG = isIHE ? IHE_BANNER_IMG : AAUS_BANNER_IMG;
 
 interface DailyChallengeBannerProps {
   streak?: number;
@@ -45,7 +42,9 @@ export default function DailyChallengeBanner({
           {/* Live pill */}
           <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-3 py-1 mb-4">
             <div className="w-2 h-2 rounded-full bg-[#4ad9e0] animate-pulse" />
-            <span className="text-xs text-white/80 font-medium">One Question · Daily · All Categories</span>
+            <span className="text-xs text-white/80 font-medium">
+              {isIHE ? "One Question · Daily · All Echo Categories" : "One Question · Daily · All Categories"}
+            </span>
           </div>
 
           {/* Title */}
@@ -53,14 +52,15 @@ export default function DailyChallengeBanner({
             className="text-3xl md:text-4xl font-black text-white leading-tight mb-2"
             style={{ fontFamily: "Merriweather, serif" }}
           >
-            Daily Challenge
+            {isIHE ? "Echo Daily Challenge" : "Daily Challenge"}
           </h1>
           <p className="text-[#4ad9e0] font-semibold text-base mb-3">
-            Sharpen Your Ultrasound Knowledge Every Day
+            {isIHE ? "Sharpen Your Echo Knowledge Every Day" : "Sharpen Your Ultrasound Knowledge Every Day"}
           </p>
           <p className="text-white/70 text-sm leading-relaxed mb-4 max-w-lg">
-            One question per category — Abdominal, Vascular, OB/Gyn, Breast, and POCUS. Complete all
-            five to finish today's challenge. Maintain your streak and climb the leaderboard.
+            {isIHE
+              ? "One question per echo category — TTE, TEE, Valvular Disease, Cardiomyopathy, and more. Complete all to finish today's challenge. Maintain your streak and climb the leaderboard."
+              : "One question per category — Abdominal, Vascular, OB/Gyn, Breast, and POCUS. Complete all five to finish today's challenge. Maintain your streak and climb the leaderboard."}
           </p>
 
           {/* Streak badge */}

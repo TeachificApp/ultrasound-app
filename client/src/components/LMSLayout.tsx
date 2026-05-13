@@ -18,7 +18,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 
 const AAUS_LOGO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp";
-const IHE_LOGO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/iheartecho_logo_ring_01cc7ccd.webp";
+const IHE_LOGO = "/manus-storage/iheartecho-logo_f9d91cd4.webp";
 
 const LMS_NAV_GROUPS = [
   {

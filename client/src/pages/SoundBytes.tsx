@@ -10,6 +10,7 @@
 import { useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
+import { isIHeartEchoDomain } from "@/hooks/useSubdomain";
 import { Link } from "wouter";
 import {
   Crown, ExternalLink, Lock, Music, Play, Search, Zap, BookOpen, Clock,
@@ -17,11 +18,13 @@ import {
 import { CATEGORY_LABELS, CATEGORY_COLORS, THINKIFIC_LINKS } from "@shared/appConstants";
 import Layout from "@/components/Layout";
 
-const BANNER_IMG =
-  "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/soundbytes-banner-AAUS_8880afff.png";
+const isIHE = isIHeartEchoDomain();
+const BANNER_IMG = isIHE
+  ? "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/ihe-hero-MNscA4NaWNyxrdkewtLGLG.webp"
+  : "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/soundbytes-banner-AAUS_8880afff.png";
 
 // Sample soundbytes — replaced by DB content once available
-const sampleSoundBytes = [
+const aausSoundBytes = [
   { id: 1,  title: "Abdominal Aorta Measurement Tips",          category: "abdominal",            duration: "3:42", isPremium: false, description: "Key tips for accurate AAA measurement including outer-to-outer technique and pitfalls to avoid." },
   { id: 2,  title: "DVT Compression Technique",                 category: "venous",               duration: "4:15", isPremium: false, description: "Step-by-step guide to proper vein compression technique for DVT evaluation." },
   { id: 3,  title: "Thyroid TIRADS Scoring",                    category: "thyroid",              duration: "5:20", isPremium: false, description: "Quick review of ACR TIRADS scoring system and FNA thresholds." },
@@ -38,6 +41,24 @@ const sampleSoundBytes = [
   { id: 14, title: "Breast SWE: Benign vs. Malignant",          category: "breast",               duration: "5:15", isPremium: true,  description: "Stiffness thresholds in kPa and m/s for breast lesion characterization." },
   { id: 15, title: "Fetal Biometry: BPD & HC",                  category: "obstetric_2nd_3rd",    duration: "4:45", isPremium: false, description: "Correct measurement planes and calipers for BPD and head circumference." },
 ];
+const iheSoundBytes = [
+  { id: 1,  title: "Parasternal Long Axis: Key Measurements",   category: "adult_echo",           duration: "4:10", isPremium: false, description: "PLAX view optimization, LV dimensions, and aortic root measurement technique." },
+  { id: 2,  title: "Apical 4-Chamber: Pitfalls & Tips",         category: "adult_echo",           duration: "3:55", isPremium: false, description: "Common foreshortening errors, LV apex visualization, and RV assessment." },
+  { id: 3,  title: "Mitral Stenosis: MVA by PHT",               category: "valvular",             duration: "5:20", isPremium: false, description: "Pressure half-time method for mitral valve area calculation with pitfalls." },
+  { id: 4,  title: "Aortic Stenosis Grading",                   category: "valvular",             duration: "6:00", isPremium: false, description: "AVA by continuity equation, mean gradient, and low-flow low-gradient AS." },
+  { id: 5,  title: "LVEF: Simpson’s Biplane Method",            category: "adult_echo",           duration: "4:30", isPremium: false, description: "Step-by-step guide to accurate LVEF measurement using Simpson’s biplane." },
+  { id: 6,  title: "Diastolic Dysfunction Grading",             category: "adult_echo",           duration: "7:15", isPremium: true,  description: "ASE 2016 guidelines: E/A, e’, E/e’, LA volume index, TR velocity grading." },
+  { id: 7,  title: "TEE: Mid-Esophageal 4-Chamber View",        category: "tee",                  duration: "5:45", isPremium: true,  description: "Probe positioning, depth, and rotation for optimal ME 4-chamber acquisition." },
+  { id: 8,  title: "HCM: LVOTO Gradient Assessment",            category: "cardiomyopathy",       duration: "6:30", isPremium: true,  description: "CW Doppler technique, provocation maneuvers, and SAM identification." },
+  { id: 9,  title: "Fetal Echo: 4-Chamber Screening View",      category: "fetal_echo",           duration: "4:00", isPremium: false, description: "Normal 4-chamber anatomy, cardiac axis, and common abnormalities to recognize." },
+  { id: 10, title: "POCUS: Cardiac Tamponade Signs",            category: "pocus",                duration: "3:30", isPremium: false, description: "Pericardial effusion, RV collapse, IVC plethora — bedside diagnosis." },
+  { id: 11, title: "Pediatric Echo: Z-Scores Explained",        category: "pediatric_echo",       duration: "5:00", isPremium: true,  description: "How to use Z-scores for chamber and vessel sizing in pediatric patients." },
+  { id: 12, title: "TAVR: Pre-Procedural Echo Assessment",      category: "structural_heart",     duration: "7:00", isPremium: true,  description: "Annular sizing, LVOT measurements, and aortic root anatomy for TAVR planning." },
+  { id: 13, title: "MR Severity: Quantitative Methods",         category: "valvular",             duration: "6:30", isPremium: true,  description: "PISA method, EROA, regurgitant volume — step-by-step with normal values." },
+  { id: 14, title: "RV Function: TAPSE & FAC",                  category: "adult_echo",           duration: "4:20", isPremium: false, description: "TAPSE measurement technique, FAC calculation, and RV dysfunction thresholds." },
+  { id: 15, title: "Echo Physics: Harmonic Imaging",            category: "echo_physics",         duration: "4:45", isPremium: false, description: "How tissue harmonic imaging improves image quality and reduces artifact." },
+];
+const sampleSoundBytes = isIHE ? iheSoundBytes : aausSoundBytes;
 
 export default function SoundBytes() {
   const { user, isAuthenticated } = useAuth();
@@ -86,10 +107,12 @@ export default function SoundBytes() {
               SoundBytes
             </h1>
             <p className="text-[#4ad9e0] font-semibold text-base mb-3">
-              Bite-Sized Ultrasound Education from All About Ultrasound™
+              {isIHE ? "Bite-Sized Echo Education from iHeartEcho™" : "Bite-Sized Ultrasound Education from All About Ultrasound™"}
             </p>
             <p className="text-white/70 text-sm leading-relaxed mb-6 max-w-lg">
-              Short audio and video clips designed to sharpen your ultrasound knowledge — covering technique, protocols, Doppler, pathology, and clinical pearls across every modality.
+              {isIHE
+                ? "Short audio and video clips designed to sharpen your echo knowledge — covering TTE technique, TEE views, Doppler, valvular disease, cardiomyopathy, and clinical pearls."
+                : "Short audio and video clips designed to sharpen your ultrasound knowledge — covering technique, protocols, Doppler, pathology, and clinical pearls across every modality."}
             </p>
             <div className="flex flex-wrap gap-3 items-center">
               {!isPremium && (
@@ -103,15 +126,17 @@ export default function SoundBytes() {
                   </button>
                 </a>
               )}
-              <a
-                href="https://member.allaboutultrasound.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all"
-              >
-                <BookOpen className="w-4 h-4" />
-                All About Ultrasound
-              </a>
+              {!isIHE && (
+                <a
+                  href="https://member.allaboutultrasound.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all"
+                >
+                  <BookOpen className="w-4 h-4" />
+                  {isIHE ? "iHeartEcho" : "All About Ultrasound"}
+                </a>
+              )}
             </div>
           </div>
         </div>
@@ -170,7 +195,9 @@ export default function SoundBytes() {
                   Sign In to Listen
                 </h2>
                 <p className="text-white/60 text-sm mb-5 leading-relaxed">
-                  Create a free All About Ultrasound™ account to access SoundBytes. Free members get the first 3 clips per category. Upgrade to Premium for unlimited access.
+                  {isIHE
+                    ? "Create a free iHeartEcho™ account to access SoundBytes. Free members get the first 3 clips per category. Upgrade to Premium for unlimited access."
+                    : "Create a free All About Ultrasound™ account to access SoundBytes. Free members get the first 3 clips per category. Upgrade to Premium for unlimited access."}
                 </p>
                 <div className="flex flex-col gap-2">
                   <a href={getLoginUrl()} className="block">
@@ -352,7 +379,7 @@ export default function SoundBytes() {
                                 rel="noopener noreferrer"
                                 className="inline-flex items-center gap-1 text-xs font-semibold text-amber-600 hover:underline"
                               >
-                                <Crown size={11} /> Upgrade to All About Ultrasound™ Premium to access
+                                <Crown size={11} /> {isIHE ? "Upgrade to iHeartEcho™ Premium to access" : "Upgrade to All About Ultrasound™ Premium to access"}
                               </a>
                             )}
                           </div>
@@ -366,7 +393,7 @@ export default function SoundBytes() {
 
             {/* Footer */}
             <p className="text-xs text-gray-400 text-center pb-2">
-              SoundBytes are curated by the <strong>All About Ultrasound™</strong> education team. New clips added regularly.
+              {isIHE ? <>SoundBytes are curated by the <strong>iHeartEcho™</strong> education team. New clips added regularly.</> : <>SoundBytes are curated by the <strong>All About Ultrasound™</strong> education team. New clips added regularly.</>}
             </p>
           </>
         )}

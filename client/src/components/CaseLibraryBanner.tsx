@@ -1,12 +1,15 @@
 /**
- * CaseLibraryBanner — Hero banner for the Echo Case Library page.
- * Matches the dashboard hero style: navy-to-teal gradient, same typography.
+ * CaseLibraryBanner — Hero banner for the Case Library page.
+ * Brand-aware: shows iHeartEcho copy/image on app.iheartecho.com.
  */
 import { Link } from "wouter";
 import { Plus, BookOpen, LogIn } from "lucide-react";
+import { isIHeartEchoDomain } from "@/hooks/useSubdomain";
 
-const BANNER_IMG =
-  "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/caselibrary-banner-final_AAUS_4bee1eff.webp";
+const isIHE = isIHeartEchoDomain();
+const BANNER_IMG = isIHE
+  ? "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/ihe-hero-MNscA4NaWNyxrdkewtLGLG.webp"
+  : "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/caselibrary-banner-final_AAUS_4bee1eff.webp";
 
 interface CaseLibraryBannerProps {
   isAuthenticated: boolean;
@@ -40,14 +43,17 @@ export default function CaseLibraryBanner({ isAuthenticated }: CaseLibraryBanner
             className="text-3xl md:text-4xl font-black text-white leading-tight mb-2"
             style={{ fontFamily: "Merriweather, serif" }}
           >
-            Ultrasound Case Library
+            {isIHE ? "Echo Case Library" : "Ultrasound Case Library"}
           </h1>
           <p className="text-[#4ad9e0] font-semibold text-base mb-3">
-            Clinical Reasoning Through Real Ultrasound Cases
+            {isIHE
+              ? "Clinical Reasoning Through Real Echo Cases"
+              : "Clinical Reasoning Through Real Ultrasound Cases"}
           </p>
           <p className="text-white/70 text-sm leading-relaxed mb-6 max-w-lg">
-            Browse image, video, and scenario-based ultrasound cases designed to sharpen your clinical
-            thinking — not just image interpretation, but history, decision-making, and outcomes.
+            {isIHE
+              ? "Browse image, video, and scenario-based echocardiography cases designed to sharpen your clinical thinking — TTE, TEE, Pediatric Echo, Fetal Echo, Valvular Disease, and more."
+              : "Browse image, video, and scenario-based ultrasound cases designed to sharpen your clinical thinking — not just image interpretation, but history, decision-making, and outcomes."}
           </p>
 
           {/* CTAs */}
@@ -72,15 +78,17 @@ export default function CaseLibraryBanner({ isAuthenticated }: CaseLibraryBanner
                 </button>
               </a>
             )}
-            <a
-              href="https://member.allaboutultrasound.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all"
-            >
-              <BookOpen className="w-4 h-4" />
-              All About Ultrasound
-            </a>
+            {!isIHE && (
+              <a
+                href="https://member.allaboutultrasound.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all"
+              >
+                <BookOpen className="w-4 h-4" />
+                All About Ultrasound
+              </a>
+            )}
           </div>
         </div>
       </div>

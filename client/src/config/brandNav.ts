@@ -253,7 +253,7 @@ export function getBrandNavConfig(brand: Brand): BrandNavConfig {
     return {
       navGroups: IHE_NAV_GROUPS,
       hiddenNavItems: IHE_HIDDEN_NAV,
-      logoUrl: "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/iheartecho_logo_ring_01cc7ccd.webp",
+      logoUrl: "/manus-storage/iheartecho-logo_f9d91cd4.webp",
       logoAlt: "iHeartEcho\u2122",
       title: "iHeartEcho\u2122",
       subtitle: "EchoAssist\u2122 Clinical Intelligence",

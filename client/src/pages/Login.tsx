@@ -14,22 +14,36 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Mail, Loader2, Stethoscope, Activity, BookOpen, Shield, CheckCircle2, Zap, ArrowLeft } from "lucide-react";
-import { isCombinedBrandingDomain } from "@/hooks/useSubdomain";
+import { isCombinedBrandingDomain, isIHeartEchoDomain } from "@/hooks/useSubdomain";
 
 const LOGO = import.meta.env.VITE_APP_LOGO as string;
-const IHE_LOGO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/iheartecho_logo_ring_01cc7ccd.webp";
+const IHE_LOGO = "/manus-storage/iheartecho-logo_f9d91cd4.webp";
 const isCombined = isCombinedBrandingDomain();
-const BRAND_NAME = isCombined ? "All About Ultrasound\u2122 | iHeartEcho" : "All About Ultrasound\u2122";
-const BRAND_SUBTITLE = isCombined
+const isIHE = isIHeartEchoDomain();
+const BRAND_NAME = isIHE
+  ? "iHeartEcho™"
+  : isCombined
+  ? "All About Ultrasound™ | iHeartEcho"
+  : "All About Ultrasound™";
+const BRAND_SUBTITLE = isIHE
+  ? "EchoAssist™ Clinical Intelligence"
+  : isCombined
   ? "General, Vascular & Cardiac Ultrasound Clinical Intelligence"
-  : "UltrasoundAssist\u2122 Clinical Intelligence";
+  : "UltrasoundAssist™ Clinical Intelligence";
 
-const FEATURES = [
-  { icon: Stethoscope, title: "Clinical Navigators", desc: "Abdomen, Pelvic/Gyn, OB, Vascular, POCUS & more" },
-  { icon: Activity, title: "Ultrasound-Assist\u2122 Calculators", desc: "Guideline-based interpretation across all modalities" },
-  { icon: BookOpen, title: "CME & Registry Review", desc: "Accredited courses, registry prep, 500+ ultrasound cases" },
-  { icon: Shield, title: "ScanCoach\u2122 & Reference Values", desc: "Protocol guidance, guideline-based normal values and reference ranges" },
-];
+const FEATURES = isIHE
+  ? [
+    { icon: Stethoscope, title: "EchoNavigators™", desc: "Adult TTE, TEE, Pediatric, Fetal Echo, Structural Heart & more" },
+    { icon: Activity, title: "EchoAssist™ Calculators", desc: "Guideline-based echo interpretation across all modalities" },
+    { icon: BookOpen, title: "Echo Case Library", desc: "Image, video, and scenario-based echocardiography cases" },
+    { icon: Shield, title: "ScanCoach™ & Reference Values", desc: "Protocol guidance, guideline-based normal echo values" },
+  ]
+  : [
+    { icon: Stethoscope, title: "Clinical Navigators", desc: "Abdomen, Pelvic/Gyn, OB, Vascular, POCUS & more" },
+    { icon: Activity, title: "Ultrasound-Assist™ Calculators", desc: "Guideline-based interpretation across all modalities" },
+    { icon: BookOpen, title: "CME & Registry Review", desc: "Accredited courses, registry prep, 500+ ultrasound cases" },
+    { icon: Shield, title: "ScanCoach™ & Reference Values", desc: "Protocol guidance, guideline-based normal values and reference ranges" },
+  ];
 
 export default function Login() {
   const { isAuthenticated, loading } = useAuth();
@@ -82,9 +96,14 @@ export default function Login() {
         {/* Logo */}
         <div className="relative flex items-center gap-3">
           <div className="flex items-center gap-1">
-            {LOGO && <img src={LOGO} alt="All About Ultrasound\u2122" className="w-16 h-16 object-contain drop-shadow-lg" />}
-            {isCombined && <img src={IHE_LOGO} alt="iHeartEcho" className="w-16 h-16 object-contain drop-shadow-lg" />}
-            {!LOGO && !isCombined && (
+              {isIHE
+              ? <img src={IHE_LOGO} alt="iHeartEcho™" className="w-16 h-16 object-contain drop-shadow-lg" />
+              : LOGO
+              ? <img src={LOGO} alt="All About Ultrasound™" className="w-16 h-16 object-contain drop-shadow-lg" />
+              : null
+            }
+            {isCombined && !isIHE && <img src={IHE_LOGO} alt="iHeartEcho" className="w-16 h-16 object-contain drop-shadow-lg" />}
+            {!LOGO && !isCombined && !isIHE && (
               <div className="w-20 h-20 rounded-full flex items-center justify-center" style={{ background: "rgba(24,154,161,0.3)" }}>
                 <Stethoscope className="w-10 h-10 text-white" />
               </div>
@@ -102,10 +121,12 @@ export default function Login() {
             <span className="text-xs text-white/80 font-medium">Real-time Clinical Decision Support</span>
           </div>
           <h1 className="text-3xl lg:text-4xl font-black text-white leading-tight mb-4" style={{ fontFamily: "Merriweather, serif" }}>
-            The Complete Ultrasound<br /><span style={{ color: "#4ad9e0" }}>Clinical Intelligence Guide</span>
+            {isIHE ? <>The Complete Echo<br /><span style={{ color: "#4ad9e0" }}>Clinical Intelligence Guide</span></> : <>The Complete Ultrasound<br /><span style={{ color: "#4ad9e0" }}>Clinical Intelligence Guide</span></>}
           </h1>
           <p className="text-white/70 text-sm leading-relaxed max-w-sm">
-            Advanced, guideline-based clinical intelligence for sonographers, physicians, and ultrasound learners — the ultimate pocket reference for real-time scanning and clinical decision support.
+            {isIHE
+              ? "Advanced, guideline-based echocardiography intelligence for sonographers, cardiologists, and echo learners — the ultimate pocket reference for real-time echo scanning and clinical decision support."
+              : "Advanced, guideline-based clinical intelligence for sonographers, physicians, and ultrasound learners — the ultimate pocket reference for real-time scanning and clinical decision support."}
           </p>
         </div>
         {/* Features */}
@@ -130,14 +151,13 @@ export default function Login() {
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="flex items-center gap-3 mb-8 lg:hidden">
-            {LOGO ? (
-              <img src={LOGO} alt="All About Ultrasound\u2122" className="w-10 h-10 object-contain" />
-            ) : (
-              <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#189aa1" }}>
-                <Stethoscope className="w-5 h-5 text-white" />
-              </div>
-            )}
-            {isCombined && <img src={IHE_LOGO} alt="iHeartEcho" className="w-10 h-10 object-contain" />}
+            {isIHE
+              ? <img src={IHE_LOGO} alt="iHeartEcho™" className="w-10 h-10 object-contain" />
+              : LOGO
+              ? <img src={LOGO} alt="All About Ultrasound™" className="w-10 h-10 object-contain" />
+              : <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#189aa1" }}><Stethoscope className="w-5 h-5 text-white" /></div>
+            }
+            {isCombined && !isIHE && <img src={IHE_LOGO} alt="iHeartEcho" className="w-10 h-10 object-contain" />}
             <div className="text-xl font-black" style={{ fontFamily: "Merriweather, serif", color: "#0e1e2e" }}>{BRAND_NAME}</div>
           </div>
 

@@ -1683,3 +1683,9 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Migrate iHeartEcho SoundBytes with brand=iheartecho
 - [ ] Migrate iHeartEcho leaderboard/user activity data
 - [ ] Verify brand filtering works for all migrated content
+
+## Bugs (May 13)
+- [x] Fix iHeartEcho logo broken (CloudFront 403) - upload new logo and update all references
+- [ ] Fix EchoFlashcards showing AAUS categories instead of echo-specific categories on iHeartEcho brand
+- [ ] Fix iHeartEcho case library showing AAUS modality filters instead of echo modalities
+- [ ] Fix leaderboard not working on iHeartEcho

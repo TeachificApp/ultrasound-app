@@ -30,11 +30,13 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Link } from "wouter";
 import { Lock, Zap } from "lucide-react";
 import FlashcardsBanner from "@/components/FlashcardsBanner";
+import { isIHeartEchoDomain } from "@/hooks/useSubdomain";
 
+const isIHE = isIHeartEchoDomain();
 type StudyMode = "sequential" | "spaced";
-type EchoCategory = "all" | "abdominal" | "pelvic_gyn" | "obstetric_1st" | "obstetric_2nd_3rd" | "fetal_echo" | "venous" | "arterial" | "abdominal_vascular" | "extracranial_carotid" | "intracranial_tcd" | "pocus" | "physics" | "thyroid" | "scrotum" | "breast" | "msk";
+type EchoCategory = "all" | "abdominal" | "pelvic_gyn" | "obstetric_1st" | "obstetric_2nd_3rd" | "fetal_echo" | "venous" | "arterial" | "abdominal_vascular" | "extracranial_carotid" | "intracranial_tcd" | "pocus" | "physics" | "thyroid" | "scrotum" | "breast" | "msk" | "adult_echo" | "pediatric_echo" | "tee" | "valvular" | "cardiomyopathy" | "structural_heart" | "echo_physics";
 
-const CATEGORIES: { value: EchoCategory; label: string }[] = [
+const AAUS_CATEGORIES: { value: EchoCategory; label: string }[] = [
   { value: "all", label: "All" },
   { value: "abdominal", label: "Abdominal" },
   { value: "pelvic_gyn", label: "Pelvic/Gyn" },
@@ -53,6 +55,19 @@ const CATEGORIES: { value: EchoCategory; label: string }[] = [
   { value: "breast", label: "Breast" },
   { value: "msk", label: "MSK" },
 ];
+const IHE_CATEGORIES: { value: EchoCategory; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "adult_echo", label: "Adult TTE" },
+  { value: "tee", label: "TEE" },
+  { value: "pediatric_echo", label: "Pediatric Echo" },
+  { value: "fetal_echo", label: "Fetal Echo" },
+  { value: "valvular", label: "Valvular Disease" },
+  { value: "cardiomyopathy", label: "Cardiomyopathy" },
+  { value: "structural_heart", label: "Structural Heart" },
+  { value: "pocus", label: "POCUS Echo" },
+  { value: "echo_physics", label: "Echo Physics" },
+];
+const CATEGORIES = isIHE ? IHE_CATEGORIES : AAUS_CATEGORIES;
 
 export default function FlashcardDeck() {
   const { isAuthenticated } = useAuth();
@@ -306,8 +321,8 @@ export default function FlashcardDeck() {
                 <Zap className="w-4 h-4 text-[#4ad9e0]" />
                 <span className="text-xs font-bold text-[#4ad9e0] uppercase tracking-wider">Premium Membership</span>
               </div>
-              <p className="text-white font-bold text-sm mb-1">Unlimited Ultrasound Flashcards</p>
-              <p className="text-white/60 text-xs">Study as many flashcards as you want, every day — plus spaced repetition, all categories, and the full All About Ultrasound™ clinical suite.</p>
+              <p className="text-white font-bold text-sm mb-1">{isIHE ? "Unlimited Echo Flashcards" : "Unlimited Ultrasound Flashcards"}</p>
+              <p className="text-white/60 text-xs">{isIHE ? "Study as many echo flashcards as you want, every day — plus spaced repetition, all categories, and the full iHeartEcho™ clinical suite." : "Study as many flashcards as you want, every day — plus spaced repetition, all categories, and the full All About Ultrasound™ clinical suite."}</p>
             </div>
             <Link href="/premium">
               <Button className="w-full text-white font-bold mb-3" style={{ background: "#189aa1" }}>
@@ -339,7 +354,7 @@ export default function FlashcardDeck() {
           <div className="flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-[#189aa1]" />
             <h1 className="text-lg font-black text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>
-              Ultrasound Flashcards
+              {isIHE ? "Echo Flashcards" : "Ultrasound Flashcards"}
             </h1>
           </div>
           {/* Daily usage indicator for free users */}

@@ -4,6 +4,7 @@ import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
+import { registerStorageProxy } from "./storageProxy";
 import { registerChatRoutes } from "./chat";
 import { registerThinkificWebhook } from "../webhooks/thinkific";
 import { registerStripeWebhook } from "../webhooks/stripe";
@@ -152,6 +153,8 @@ async function startServer() {
     });
     res.json({ sent: result, to, timestamp: new Date().toISOString() });
   });
+  // Storage proxy for /manus-storage/* assets
+  registerStorageProxy(app);
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // Chat API with streaming and tool calling
