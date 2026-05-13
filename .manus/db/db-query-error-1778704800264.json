@@ -1,0 +1,10 @@
+{
+  "query": "SELECT COUNT(*) as total_quizzes FROM lms_quizzes; SELECT course_id, title FROM lms_quizzes LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT COUNT(*) as total_quizzes FROM lms_quizzes; SELECT course_id, title FROM lms_quizzes LIMIT 10;",
+  "returncode": 1,
+  "logs": [
+    "total_quizzes",
+    "1",
+    "ERROR 1054 (42S22) at line 1: Unknown column 'course_id' in 'field list'"
+  ]
+}

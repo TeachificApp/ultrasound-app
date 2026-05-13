@@ -1,0 +1,31 @@
+{
+  "query": "SHOW TABLES LIKE 'digital%';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SHOW TABLES LIKE 'digital%';",
+  "rows": [
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (digital%)": "digital_bundle_items"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (digital%)": "digital_bundle_purchases"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (digital%)": "digital_bundles"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (digital%)": "digital_download_events"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (digital%)": "digital_product_files"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (digital%)": "digital_products"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (digital%)": "digital_purchases"
+    }
+  ],
+  "messages": [],
+  "stdout": "Tables_in_UrcfdRVE8J6mpMNR48QuFe (digital%)\ndigital_bundle_items\ndigital_bundle_purchases\ndigital_bundles\ndigital_download_events\ndigital_product_files\ndigital_products\ndigital_purchases\n",
+  "stderr": "",
+  "execution_time_ms": 266
+}

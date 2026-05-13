@@ -1697,3 +1697,9 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] LMSLayout.tsx sidebar footer hardcoded to www.allaboutultrasound.com
 - [ ] Leaderboard shows blank for unauthenticated users (needs login prompt)
 - [ ] Case library brand filter verification
+
+## Bugs (May 13 - Session 3)
+- [x] User-created courses lost from LMS — FIXED: missing bundle_only column in lms_courses caused all queries to crash
+- [ ] Quiz questions lost (SPI quiz has 0 questions)
+- [x] PDF file 404 in media repository — FIXED in code (isServerRoute fix), needs production re-deploy
+- [x] Investigate MirrorSync overwriting production data — MirrorSync is one-way TiDB→Railway, not the cause; root cause was missing DB column

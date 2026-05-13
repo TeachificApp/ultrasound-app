@@ -1,0 +1,30 @@
+{
+  "query": "SELECT 'lms_lessons' as tbl, COUNT(*) as cnt FROM lms_lessons UNION ALL SELECT 'lms_quizzes', COUNT(*) FROM lms_quizzes UNION ALL SELECT 'lms_quiz_questions', COUNT(*) FROM lms_quiz_questions UNION ALL SELECT 'lms_enrollments', COUNT(*) FROM lms_enrollments UNION ALL SELECT 'lms_quiz_attempts', COUNT(*) FROM lms_quiz_attempts;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT 'lms_lessons' as tbl, COUNT(*) as cnt FROM lms_lessons UNION ALL SELECT 'lms_quizzes', COUNT(*) FROM lms_quizzes UNION ALL SELECT 'lms_quiz_questions', COUNT(*) FROM lms_quiz_questions UNION ALL SELECT 'lms_enrollments', COUNT(*) FROM lms_enrollments UNION ALL SELECT 'lms_quiz_attempts', COUNT(*) FROM lms_quiz_attempts;",
+  "rows": [
+    {
+      "tbl": "lms_quizzes",
+      "cnt": "1"
+    },
+    {
+      "tbl": "lms_lessons",
+      "cnt": "13"
+    },
+    {
+      "tbl": "lms_quiz_questions",
+      "cnt": "0"
+    },
+    {
+      "tbl": "lms_quiz_attempts",
+      "cnt": "0"
+    },
+    {
+      "tbl": "lms_enrollments",
+      "cnt": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "tbl\tcnt\nlms_quizzes\t1\nlms_lessons\t13\nlms_quiz_questions\t0\nlms_quiz_attempts\t0\nlms_enrollments\t0\n",
+  "stderr": "",
+  "execution_time_ms": 275
+}

@@ -1,0 +1,15 @@
+{
+  "query": "SELECT brand, COUNT(*) as count, GROUP_CONCAT(DISTINCT status) as statuses FROM lms_courses GROUP BY brand;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT brand, COUNT(*) as count, GROUP_CONCAT(DISTINCT status) as statuses FROM lms_courses GROUP BY brand;",
+  "rows": [
+    {
+      "brand": "aaus",
+      "count": "3",
+      "statuses": "public,draft"
+    }
+  ],
+  "messages": [],
+  "stdout": "brand\tcount\tstatuses\naaus\t3\tpublic,draft\n",
+  "stderr": "",
+  "execution_time_ms": 274
+}

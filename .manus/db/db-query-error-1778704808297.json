@@ -1,0 +1,12 @@
+{
+  "query": "SELECT COUNT(*) as total_quizzes FROM lms_quizzes; SELECT COUNT(*) as total_lessons FROM lms_lessons; SELECT COUNT(*) as total_chapters FROM lms_chapters; SELECT COUNT(*) as total_quiz_questions FROM lms_quiz_questions;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT COUNT(*) as total_quizzes FROM lms_quizzes; SELECT COUNT(*) as total_lessons FROM lms_lessons; SELECT COUNT(*) as total_chapters FROM lms_chapters; SELECT COUNT(*) as total_quiz_questions FROM lms_quiz_questions;",
+  "returncode": 1,
+  "logs": [
+    "total_quizzes",
+    "1",
+    "total_lessons",
+    "13",
+    "ERROR 1146 (42S02) at line 1: Table 'urcfdrve8j6mpmnr48qufe.lms_chapters' doesn't exist"
+  ]
+}

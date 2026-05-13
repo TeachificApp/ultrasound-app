@@ -1,0 +1,88 @@
+{
+  "query": "SELECT id, title, course_id, type FROM lms_lessons ORDER BY course_id, position;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT id, title, course_id, type FROM lms_lessons ORDER BY course_id, position;",
+  "rows": [
+    {
+      "id": "1",
+      "title": "Quiz",
+      "course_id": "NULL",
+      "type": "quiz"
+    },
+    {
+      "id": "30009",
+      "title": "Navigating Insurance & Medicare Reimbursement",
+      "course_id": "60001",
+      "type": "text"
+    },
+    {
+      "id": "30003",
+      "title": "Business Formation and Legal Structures",
+      "course_id": "60001",
+      "type": "text"
+    },
+    {
+      "id": "30005",
+      "title": "Choosing Ultrasound Equipment for Your Specialty",
+      "course_id": "60001",
+      "type": "text"
+    },
+    {
+      "id": "30007",
+      "title": "The Importance of Accreditation for Ultrasound Labs",
+      "course_id": "60001",
+      "type": "text"
+    },
+    {
+      "id": "30001",
+      "title": "Understanding the Ultrasound Business Landscape",
+      "course_id": "60001",
+      "type": "text"
+    },
+    {
+      "id": "30011",
+      "title": "Building Your Brand & Marketing Strategies",
+      "course_id": "60001",
+      "type": "text"
+    },
+    {
+      "id": "30002",
+      "title": "Choosing the Right Business Model",
+      "course_id": "60001",
+      "type": "text"
+    },
+    {
+      "id": "30004",
+      "title": "Legal & Regulatory Compliance for Ultrasound Practices",
+      "course_id": "60001",
+      "type": "text"
+    },
+    {
+      "id": "30006",
+      "title": "Technology & Workflow Systems Integration",
+      "course_id": "60001",
+      "type": "text"
+    },
+    {
+      "id": "30008",
+      "title": "Implementing Quality Assurance & Policies",
+      "course_id": "60001",
+      "type": "text"
+    },
+    {
+      "id": "30010",
+      "title": "Ultrasound Coding, Documentation & Revenue Models",
+      "course_id": "60001",
+      "type": "text"
+    },
+    {
+      "id": "30012",
+      "title": "Scaling Your Ultrasound Business for Long-Term Growth",
+      "course_id": "60001",
+      "type": "text"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttitle\tcourse_id\ttype\n1\tQuiz\tNULL\tquiz\n30009\tNavigating Insurance & Medicare Reimbursement\t60001\ttext\n30003\tBusiness Formation and Legal Structures\t60001\ttext\n30005\tChoosing Ultrasound Equipment for Your Specialty\t60001\ttext\n30007\tThe Importance of Accreditation for Ultrasound Labs\t60001\ttext\n30001\tUnderstanding the Ultrasound Business Landscape\t60001\ttext\n30011\tBuilding Your Brand & Marketing Strategies\t60001\ttext\n30002\tChoosing the Right Business Model\t60001\ttext\n30004\tLegal & Regulatory Compliance for Ultrasound Practices\t60001\ttext\n30006\tTechnology & Workflow Systems Integration\t60001\ttext\n30008\tImplementing Quality Assurance & Policies\t60001\ttext\n30010\tUltrasound Coding, Documentation & Revenue Models\t60001\ttext\n30012\tScaling Your Ultrasound Business for Long-Term Growth\t60001\ttext\n",
+  "stderr": "",
+  "execution_time_ms": 266
+}

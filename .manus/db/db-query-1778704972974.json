@@ -1,0 +1,19 @@
+{
+  "query": "SELECT COUNT(*) as total FROM mediaAssets WHERE deletedAt IS NULL; SELECT id, slug, title, access, deletedAt FROM mediaAssets WHERE slug LIKE '%jumpstart%' OR slug LIKE '%quick-guide%';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT COUNT(*) as total FROM mediaAssets WHERE deletedAt IS NULL; SELECT id, slug, title, access, deletedAt FROM mediaAssets WHERE slug LIKE '%jumpstart%' OR slug LIKE '%quick-guide%';",
+  "rows": [
+    {
+      "total": "3"
+    },
+    {
+      "total": "id\tslug\ttitle\taccess\tdeletedAt"
+    },
+    {
+      "total": "60001\tjumpstart-business-quick-guide-a03dbc0f\tJumpstart Business Quick Guide\tpublic\tNULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "total\n3\nid\tslug\ttitle\taccess\tdeletedAt\n60001\tjumpstart-business-quick-guide-a03dbc0f\tJumpstart Business Quick Guide\tpublic\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 276
+}

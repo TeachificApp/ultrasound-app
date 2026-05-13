@@ -1,0 +1,22 @@
+{
+  "query": "SELECT * FROM lms_quizzes WHERE lesson_id = 1; SELECT COUNT(*) as cnt FROM lms_quiz_questions;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT * FROM lms_quizzes WHERE lesson_id = 1; SELECT COUNT(*) as cnt FROM lms_quiz_questions;",
+  "rows": [
+    {
+      "id": "1",
+      "lesson_id": "1",
+      "title": "Quiz",
+      "passing_score": "70",
+      "allow_retakes": "1",
+      "show_correct_answers": "1",
+      "created_at": "2026-04-24 01:18:12"
+    }
+  ],
+  "messages": [
+    "cnt",
+    "0"
+  ],
+  "stdout": "id\tlesson_id\ttitle\tpassing_score\tallow_retakes\tshow_correct_answers\tcreated_at\n1\t1\tQuiz\t70\t1\t1\t2026-04-24 01:18:12\ncnt\n0\n",
+  "stderr": "",
+  "execution_time_ms": 269
+}

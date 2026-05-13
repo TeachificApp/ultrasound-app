@@ -1,0 +1,13 @@
+{
+  "query": "SELECT GROUP_CONCAT(COLUMN_NAME ORDER BY ORDINAL_POSITION) as cols FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'digital_downloads';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT GROUP_CONCAT(COLUMN_NAME ORDER BY ORDINAL_POSITION) as cols FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'digital_downloads';",
+  "rows": [
+    {
+      "cols": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "cols\nNULL\n",
+  "stderr": "",
+  "execution_time_ms": 272
+}

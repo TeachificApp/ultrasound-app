@@ -1,0 +1,100 @@
+{
+  "query": "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'lms_courses' ORDER BY ORDINAL_POSITION;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'lms_courses' ORDER BY ORDINAL_POSITION;",
+  "rows": [
+    {
+      "COLUMN_NAME": "id"
+    },
+    {
+      "COLUMN_NAME": "slug"
+    },
+    {
+      "COLUMN_NAME": "title"
+    },
+    {
+      "COLUMN_NAME": "subtitle"
+    },
+    {
+      "COLUMN_NAME": "description"
+    },
+    {
+      "COLUMN_NAME": "cover_image_url"
+    },
+    {
+      "COLUMN_NAME": "status"
+    },
+    {
+      "COLUMN_NAME": "type"
+    },
+    {
+      "COLUMN_NAME": "brand"
+    },
+    {
+      "COLUMN_NAME": "price"
+    },
+    {
+      "COLUMN_NAME": "is_free"
+    },
+    {
+      "COLUMN_NAME": "currency"
+    },
+    {
+      "COLUMN_NAME": "meta_title"
+    },
+    {
+      "COLUMN_NAME": "meta_description"
+    },
+    {
+      "COLUMN_NAME": "has_certificate"
+    },
+    {
+      "COLUMN_NAME": "is_drip"
+    },
+    {
+      "COLUMN_NAME": "created_by_user_id"
+    },
+    {
+      "COLUMN_NAME": "created_at"
+    },
+    {
+      "COLUMN_NAME": "updated_at"
+    },
+    {
+      "COLUMN_NAME": "pricing_type"
+    },
+    {
+      "COLUMN_NAME": "subscription_interval"
+    },
+    {
+      "COLUMN_NAME": "down_payment"
+    },
+    {
+      "COLUMN_NAME": "installment_count"
+    },
+    {
+      "COLUMN_NAME": "installment_amount"
+    },
+    {
+      "COLUMN_NAME": "installment_interval_days"
+    },
+    {
+      "COLUMN_NAME": "stripe_price_id"
+    },
+    {
+      "COLUMN_NAME": "accessDurationDays"
+    },
+    {
+      "COLUMN_NAME": "trialDays"
+    },
+    {
+      "COLUMN_NAME": "pricingType"
+    },
+    {
+      "COLUMN_NAME": "is_featured"
+    }
+  ],
+  "messages": [],
+  "stdout": "COLUMN_NAME\nid\nslug\ntitle\nsubtitle\ndescription\ncover_image_url\nstatus\ntype\nbrand\nprice\nis_free\ncurrency\nmeta_title\nmeta_description\nhas_certificate\nis_drip\ncreated_by_user_id\ncreated_at\nupdated_at\npricing_type\nsubscription_interval\ndown_payment\ninstallment_count\ninstallment_amount\ninstallment_interval_days\nstripe_price_id\naccessDurationDays\ntrialDays\npricingType\nis_featured\n",
+  "stderr": "",
+  "execution_time_ms": 264
+}

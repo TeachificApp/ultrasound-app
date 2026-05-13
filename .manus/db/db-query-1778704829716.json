@@ -1,0 +1,234 @@
+{
+  "query": "DESCRIBE lms_lessons;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute DESCRIBE lms_lessons;",
+  "rows": [
+    {
+      "Field": "id",
+      "Type": "int",
+      "Null": "NO",
+      "Key": "PRI",
+      "Default": "NULL",
+      "Extra": "auto_increment"
+    },
+    {
+      "Field": "course_id",
+      "Type": "int",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "section_id",
+      "Type": "int",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "title",
+      "Type": "varchar(255)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "type",
+      "Type": "enum('video','text','quiz','download','embed','video_text')",
+      "Null": "NO",
+      "Key": "",
+      "Default": "text",
+      "Extra": ""
+    },
+    {
+      "Field": "content",
+      "Type": "longtext",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "media_asset_id",
+      "Type": "int",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "position",
+      "Type": "int",
+      "Null": "NO",
+      "Key": "",
+      "Default": "0",
+      "Extra": ""
+    },
+    {
+      "Field": "is_preview",
+      "Type": "tinyint(1)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "0",
+      "Extra": ""
+    },
+    {
+      "Field": "drip_days",
+      "Type": "int",
+      "Null": "NO",
+      "Key": "",
+      "Default": "0",
+      "Extra": ""
+    },
+    {
+      "Field": "duration_minutes",
+      "Type": "int",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "created_at",
+      "Type": "timestamp",
+      "Null": "NO",
+      "Key": "",
+      "Default": "CURRENT_TIMESTAMP",
+      "Extra": ""
+    },
+    {
+      "Field": "updated_at",
+      "Type": "timestamp",
+      "Null": "NO",
+      "Key": "",
+      "Default": "CURRENT_TIMESTAMP",
+      "Extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+    },
+    {
+      "Field": "video_content",
+      "Type": "longtext",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "embed_url",
+      "Type": "varchar(500)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "require_video_completion",
+      "Type": "tinyint(1)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "0",
+      "Extra": ""
+    },
+    {
+      "Field": "require_manual_complete",
+      "Type": "tinyint(1)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "0",
+      "Extra": ""
+    },
+    {
+      "Field": "effect_enabled",
+      "Type": "tinyint(1)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "0",
+      "Extra": ""
+    },
+    {
+      "Field": "effect_trigger",
+      "Type": "varchar(20)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "lesson_start",
+      "Extra": ""
+    },
+    {
+      "Field": "effect_banner_text",
+      "Type": "varchar(500)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "effect_banner_bg_color",
+      "Type": "varchar(20)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "effect_banner_text_color",
+      "Type": "varchar(20)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "effect_sound",
+      "Type": "varchar(50)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "effect_sound_url",
+      "Type": "varchar(500)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "effect_confetti",
+      "Type": "tinyint(1)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "0",
+      "Extra": ""
+    },
+    {
+      "Field": "effect_confetti_colors",
+      "Type": "varchar(500)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "content_blocks",
+      "Type": "longtext",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "learning_objectives",
+      "Type": "longtext",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    }
+  ],
+  "messages": [],
+  "stdout": "Field\tType\tNull\tKey\tDefault\tExtra\nid\tint\tNO\tPRI\tNULL\tauto_increment\ncourse_id\tint\tYES\t\tNULL\t\nsection_id\tint\tYES\t\tNULL\t\ntitle\tvarchar(255)\tNO\t\tNULL\t\ntype\tenum('video','text','quiz','download','embed','video_text')\tNO\t\ttext\t\ncontent\tlongtext\tYES\t\tNULL\t\nmedia_asset_id\tint\tYES\t\tNULL\t\nposition\tint\tNO\t\t0\t\nis_preview\ttinyint(1)\tNO\t\t0\t\ndrip_days\tint\tNO\t\t0\t\nduration_minutes\tint\tYES\t\tNULL\t\ncreated_at\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\t\nupdated_at\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\tDEFAULT_GENERATED on update CURRENT_TIMESTAMP\nvideo_content\tlongtext\tYES\t\tNULL\t\nembed_url\tvarchar(500)\tYES\t\tNULL\t\nrequire_video_completion\ttinyint(1)\tNO\t\t0\t\nrequire_manual_complete\ttinyint(1)\tNO\t\t0\t\neffect_enabled\ttinyint(1)\tNO\t\t0\t\neffect_trigger\tvarchar(20)\tNO\t\tlesson_start\t\neffect_banner_text\tvarchar(500)\tYES\t\tNULL\t\neffect_banner_bg_color\tvarchar(20)\tYES\t\tNULL\t\neffect_banner_text_color\tvarchar(20)\tYES\t\tNULL\t\neffect_sound\tvarchar(50)\tYES\t\tNULL\t\neffect_sound_url\tvarchar(500)\tYES\t\tNULL\t\neffect_confetti\ttinyint(1)\tNO\t\t0\t\neffect_confetti_colors\tvarchar(500)\tYES\t\tNULL\t\ncontent_blocks\tlongtext\tYES\t\tNULL\t\nlearning_objectives\tlongtext\tYES\t\tNULL\t\n",
+  "stderr": "",
+  "execution_time_ms": 269
+}

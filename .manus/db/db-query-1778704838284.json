@@ -1,0 +1,42 @@
+{
+  "query": "SELECT * FROM lms_courses WHERE id = 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT * FROM lms_courses WHERE id = 1;",
+  "rows": [
+    {
+      "id": "1",
+      "slug": "ultrasound-physics-spi-review-quiz",
+      "title": "Ultrasound Physics SPI Review Quiz",
+      "subtitle": "Registry Review Test & Learn Quiz",
+      "description": "NULL",
+      "cover_image_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/media-repo/lms-cover-1-1c5910bf/cover-1c5910bf.png",
+      "status": "public",
+      "type": "quiz",
+      "brand": "aaus",
+      "price": "0",
+      "is_free": "0",
+      "currency": "usd",
+      "meta_title": "NULL",
+      "meta_description": "NULL",
+      "has_certificate": "0",
+      "is_drip": "0",
+      "created_by_user_id": "1",
+      "created_at": "2026-04-24 00:07:58",
+      "updated_at": "2026-04-24 13:39:08",
+      "pricing_type": "one_time",
+      "subscription_interval": "NULL",
+      "down_payment": "NULL",
+      "installment_count": "NULL",
+      "installment_amount": "NULL",
+      "installment_interval_days": "NULL",
+      "stripe_price_id": "NULL",
+      "accessDurationDays": "NULL",
+      "trialDays": "NULL",
+      "pricingType": "one_time",
+      "is_featured": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tslug\ttitle\tsubtitle\tdescription\tcover_image_url\tstatus\ttype\tbrand\tprice\tis_free\tcurrency\tmeta_title\tmeta_description\thas_certificate\tis_drip\tcreated_by_user_id\tcreated_at\tupdated_at\tpricing_type\tsubscription_interval\tdown_payment\tinstallment_count\tinstallment_amount\tinstallment_interval_days\tstripe_price_id\taccessDurationDays\ttrialDays\tpricingType\tis_featured\n1\tultrasound-physics-spi-review-quiz\tUltrasound Physics SPI Review Quiz\tRegistry Review Test & Learn Quiz\tNULL\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/media-repo/lms-cover-1-1c5910bf/cover-1c5910bf.png\tpublic\tquiz\taaus\t0\t0\tusd\tNULL\tNULL\t0\t0\t1\t2026-04-24 00:07:58\t2026-04-24 13:39:08\tone_time\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tone_time\t0\n",
+  "stderr": "",
+  "execution_time_ms": 260
+}

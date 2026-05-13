@@ -1,0 +1,13 @@
+{
+  "query": "SELECT GROUP_CONCAT(COLUMN_NAME ORDER BY ORDINAL_POSITION) as all_columns FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'lms_courses';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT GROUP_CONCAT(COLUMN_NAME ORDER BY ORDINAL_POSITION) as all_columns FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'lms_courses';",
+  "rows": [
+    {
+      "all_columns": "id,slug,title,subtitle,description,cover_image_url,status,type,brand,price,is_free,currency,meta_title,meta_description,has_certificate,is_drip,created_by_user_id,created_at,updated_at,pricing_type,subscription_interval,down_payment,installment_count,installment_amount,installment_interval_days,stripe_price_id,accessDurationDays,trialDays,pricingType,is_featured"
+    }
+  ],
+  "messages": [],
+  "stdout": "all_columns\nid,slug,title,subtitle,description,cover_image_url,status,type,brand,price,is_free,currency,meta_title,meta_description,has_certificate,is_drip,created_by_user_id,created_at,updated_at,pricing_type,subscription_interval,down_payment,installment_count,installment_amount,installment_interval_days,stripe_price_id,accessDurationDays,trialDays,pricingType,is_featured\n",
+  "stderr": "",
+  "execution_time_ms": 264
+}

@@ -1,0 +1,8 @@
+{
+  "query": "SELECT id, title, course_id, sort_order FROM lms_lessons ORDER BY course_id, sort_order;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT id, title, course_id, sort_order FROM lms_lessons ORDER BY course_id, sort_order;",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 1: Unknown column 'sort_order' in 'field list'"
+  ]
+}

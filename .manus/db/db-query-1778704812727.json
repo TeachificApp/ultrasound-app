@@ -1,0 +1,79 @@
+{
+  "query": "SHOW TABLES LIKE 'lms%';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SHOW TABLES LIKE 'lms%';",
+  "rows": [
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (lms%)": "lms_affiliate_conversions"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (lms%)": "lms_affiliates"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (lms%)": "lms_certificates"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (lms%)": "lms_collection_courses"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (lms%)": "lms_collections"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (lms%)": "lms_course_instructors"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (lms%)": "lms_courses"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (lms%)": "lms_enrollments"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (lms%)": "lms_group_seats"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (lms%)": "lms_groups"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (lms%)": "lms_instructors"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (lms%)": "lms_landing_pages"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (lms%)": "lms_lesson_bookmarks"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (lms%)": "lms_lesson_notes"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (lms%)": "lms_lesson_progress"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (lms%)": "lms_lessons"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (lms%)": "lms_orders"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (lms%)": "lms_page_templates"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (lms%)": "lms_quiz_attempts"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (lms%)": "lms_quiz_questions"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (lms%)": "lms_quizzes"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (lms%)": "lms_sections"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (lms%)": "lms_video_events"
+    }
+  ],
+  "messages": [],
+  "stdout": "Tables_in_UrcfdRVE8J6mpMNR48QuFe (lms%)\nlms_affiliate_conversions\nlms_affiliates\nlms_certificates\nlms_collection_courses\nlms_collections\nlms_course_instructors\nlms_courses\nlms_enrollments\nlms_group_seats\nlms_groups\nlms_instructors\nlms_landing_pages\nlms_lesson_bookmarks\nlms_lesson_notes\nlms_lesson_progress\nlms_lessons\nlms_orders\nlms_page_templates\nlms_quiz_attempts\nlms_quiz_questions\nlms_quizzes\nlms_sections\nlms_video_events\n",
+  "stderr": "",
+  "execution_time_ms": 264
+}
