@@ -34,6 +34,8 @@ import { Link, useLocation } from "wouter";
 import LessonEffectEditor from "@/components/LessonEffectEditor";
 import DigitalDownloadsAdmin from "./DigitalDownloadsAdmin";
 import OrderBumpsAdmin from "./OrderBumpsAdmin";
+import LessonBlockEditor from "@/components/LessonBlockEditor";
+import { Block } from "@/pages/admin/LandingPageBuilder";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -684,9 +686,6 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
                   <Button size="sm" variant="ghost" className="h-7 text-xs text-teal-600" onClick={() => setAddLessonSection(section.id)}>
                     <Plus className="w-3 h-3 mr-1" /> Add Lesson
                   </Button>
-                  <Button size="sm" variant="ghost" className="h-7 text-xs text-blue-600 hover:bg-blue-50" onClick={() => setImportMediaSection(section.id)}>
-                    <FolderOpen className="w-3 h-3 mr-1" /> Import Media
-                  </Button>
                   <Button size="sm" variant="ghost" className="h-7 text-xs text-gray-500 hover:bg-gray-100" title="Drip schedule" onClick={() => setEditSectionDrip({ id: section.id, title: section.title, dripDays: section.dripDays ?? 0 })}>
                     <Clock className="w-3 h-3 mr-1" />{(section.dripDays ?? 0) > 0 ? `+${section.dripDays}d` : "Drip"}
                   </Button>
@@ -740,7 +739,7 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
         <ImportMediaAsLessonDialog sectionId={importMediaSection} courseId={courseId} onClose={() => setImportMediaSection(null)} onCreated={() => { setImportMediaSection(null); refetch(); }} />
       )}
       {editLesson && (
-        <EditLessonDialog lesson={editLesson} onClose={() => setEditLesson(null)} onSaved={() => { setEditLesson(null); refetch(); }} />
+        <LessonEditorPage lesson={editLesson} onClose={() => setEditLesson(null)} onSaved={() => { setEditLesson(null); refetch(); }} />
       )}
       {quizLesson && (
         <QuizBuilderDialog lesson={quizLesson} onClose={() => setQuizLesson(null)} />
@@ -1605,9 +1604,10 @@ function AddLessonDialog({ courseId, sectionId, onClose, onCreated }: {
   );
 }
 
-// ─── Edit Lesson Dialog ───────────────────────────────────────────────────────
+// ─── Full-Screen Lesson Editor Page ─────────────────────────────────────────
 
-function EditLessonDialog({ lesson, onClose, onSaved }: { lesson: any; onClose: () => void; onSaved: () => void }) {
+function LessonEditorPage({ lesson, onClose, onSaved }: { lesson: any; onClose: () => void; onSaved: () => void }) {
+  const [activeTab, setActiveTab] = useState<"settings" | "content">("settings");
   const [title, setTitle] = useState(lesson.title);
   const [content, setContent] = useState(lesson.content ?? "");
   const [videoContent, setVideoContent] = useState(lesson.videoContent ?? "");
@@ -1640,14 +1640,41 @@ function EditLessonDialog({ lesson, onClose, onSaved }: { lesson: any; onClose: 
   };
 
   return (
-    <>
-    <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Edit Lesson</DialogTitle>
-          <p className="text-xs text-gray-500 mt-1">Type: <span className="font-medium">{LESSON_TYPE_LABELS[lesson.type] ?? lesson.type}</span></p>
-        </DialogHeader>
-        <div className="space-y-4 py-2">
+    <div className="fixed inset-0 z-50 flex flex-col bg-white overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-3 px-5 py-3 bg-[#0a2a2f] border-b border-teal-900/50 shrink-0">
+        <button onClick={onClose} className="text-gray-400 hover:text-white mr-1">
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <div className="flex-1">
+          <span className="text-teal-300 font-bold text-sm uppercase tracking-wide">Edit Lesson</span>
+          <span className="ml-3 text-gray-500 text-xs">{LESSON_TYPE_LABELS[lesson.type] ?? lesson.type}</span>
+        </div>
+        <div className="flex gap-1">
+          <button
+            onClick={() => setActiveTab("settings")}
+            className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+              activeTab === "settings" ? "bg-teal-600 text-white" : "text-gray-400 hover:text-white"
+            }`}
+          >
+            Settings
+          </button>
+          <button
+            onClick={() => setActiveTab("content")}
+            className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+              activeTab === "content" ? "bg-teal-600 text-white" : "text-gray-400 hover:text-white"
+            }`}
+          >
+            Content Blocks
+          </button>
+        </div>
+      </div>
+
+      {/* Settings Tab */}
+      {activeTab === "settings" && (
+      <div className="flex-1 overflow-y-auto">
+      <div className="max-w-2xl mx-auto px-6 py-6">
+        <div className="space-y-4">
           <div>
             <Label className="text-sm">Title</Label>
             <Input value={title} onChange={e => setTitle(e.target.value)} className="mt-1" />
@@ -1759,20 +1786,36 @@ function EditLessonDialog({ lesson, onClose, onSaved }: { lesson: any; onClose: 
             />
           </div>
         </div>
-        <DialogFooter>
+        <div className="flex justify-end gap-2 pt-2 border-t">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button
             className="bg-teal-600 hover:bg-teal-700 text-white"
             disabled={update.isPending}
             onClick={handleSave}
           >
-            {update.isPending ? "Saving..." : "Save"}
+            {update.isPending ? "Saving..." : "Save Lesson"}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-    <MediaPickerDialog open={mediaPickerOpen} onClose={() => setMediaPickerOpen(false)} onSelect={asset => { setSelectedAsset(asset); setContent(asset.s3Url); }} />
-    </>
+        </div>
+        </div>
+      </div>
+      </div>
+      )}
+
+      {/* Content Blocks Tab */}
+      {activeTab === "content" && (
+        <div className="flex-1 overflow-hidden flex flex-col">
+          <LessonBlockEditor
+            lessonId={lesson.id}
+            courseSlug={""}
+            initialBlocks={lesson.contentBlocks ? (typeof lesson.contentBlocks === "string" ? JSON.parse(lesson.contentBlocks) : lesson.contentBlocks) as Block[] : []}
+            initialObjectives={lesson.learningObjectives ? (typeof lesson.learningObjectives === "string" ? JSON.parse(lesson.learningObjectives) : lesson.learningObjectives) as string[] : []}
+            onClose={() => setActiveTab("settings")}
+            onSaved={() => { onSaved(); }}
+          />
+        </div>
+      )}
+      <MediaPickerDialog open={mediaPickerOpen} onClose={() => setMediaPickerOpen(false)} onSelect={asset => { setSelectedAsset(asset); setContent(asset.s3Url); }} />
+    </div>
   );
 }
 

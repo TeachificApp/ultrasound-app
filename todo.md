@@ -1550,3 +1550,8 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add student preview toggle for admins in course player
 - [x] Render contentBlocks in CoursePlayer public view
 - [x] Render learningObjectives in "In This Lesson" right panel
+
+## Lesson Editor Improvements (2026-05-13)
+- [x] Replace EditLessonDialog modal with full-screen LessonEditorPage (Settings + Content Blocks tabs)
+- [x] Remove Import Media button from curriculum section headers
+- [x] LessonBlockEditor WYSIWYG accessible from Content Blocks tab in lesson editor
