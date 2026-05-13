@@ -1592,3 +1592,16 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Wire Duplicate (Copy icon) button in OrderBumpsAdmin
 - [x] Funnels already had duplicate for both funnel and page — confirmed wired
 - [x] All 854 tests passing, vite build clean
+
+## User Analytics Reporting
+- [x] Create 4 new analytics tables: userLoginEvents, userPageViewEvents, userVideoEvents, userQuizAttempts
+- [x] Apply migration SQL for all 4 tables
+- [x] Wire login event tracking in OAuth callback (fire-and-forget, non-blocking)
+- [x] Create useAnalytics.ts hook: usePageViewTracker (auto page view on route change) + useLmsAnalytics (video + quiz events)
+- [x] Mount usePageViewTracker in Router and LMSRouter in App.tsx
+- [x] Create analyticsRouter.ts with analyticsTrackRouter (pageView, videoEvent, quizAttempt) and analyticsAdminRouter (overview, dailySeries, topPages, topCourses, userList, userDetail)
+- [x] Register analyticsTrackRouter and analyticsAdminRouter in routers.ts
+- [x] Build UserAnalytics.tsx admin page: Overview tab (stat cards + daily trend chart + top pages + top courses), Users tab (searchable/sortable paginated table), User drill-down (Courses, Videos, Quizzes, Pages, Logins, Downloads tabs)
+- [x] Add /admin/user-analytics route in App.tsx (platform_admin only)
+- [x] Add "User Analytics" card to PlatformAdmin tools grid
+- [x] All 854 tests passing, vite build clean

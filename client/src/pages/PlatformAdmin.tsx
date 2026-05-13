@@ -1117,6 +1117,13 @@ export default function PlatformAdmin() {
                 description: "Detect account sharing abuse via multi-IP monitoring for paid content",
                 color: "#dc2626",
               },
+              {
+                href: "/admin/user-analytics",
+                icon: BarChart2,
+                label: "User Analytics",
+                description: "Per-user reporting: logins, page views, course progress, videos, quizzes, and downloads",
+                color: "#7c3aed",
+              },
             ].map(({ href, icon: Icon, label, description, color }) => (
               <Link key={href} href={href}>
                 <div className="group flex flex-col gap-3 p-4 rounded-xl border border-gray-100 bg-white shadow-sm hover:shadow-md hover:border-gray-200 cursor-pointer transition-all h-full">

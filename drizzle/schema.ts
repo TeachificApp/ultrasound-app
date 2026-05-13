@@ -3251,3 +3251,62 @@ export const sharingAbuseFlags = mysqlTable("sharing_abuse_flags", {
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
 export type SharingAbuseFlag = typeof sharingAbuseFlags.$inferSelect;
+
+// ─── User Analytics Events ──────────────────────────────────────────────────
+
+/** One row per login session */
+export const userLoginEvents = mysqlTable("user_login_events", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  ipAddress: varchar("ip_address", { length: 64 }),
+  userAgent: text("user_agent"),
+  country: varchar("country", { length: 64 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type UserLoginEvent = typeof userLoginEvents.$inferSelect;
+export type InsertUserLoginEvent = typeof userLoginEvents.$inferInsert;
+
+/** One row per page navigation (route change) */
+export const userPageViewEvents = mysqlTable("user_page_view_events", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id"),           // null = anonymous
+  sessionId: varchar("session_id", { length: 64 }),
+  path: varchar("path", { length: 512 }).notNull(),
+  referrer: varchar("referrer", { length: 512 }),
+  durationMs: int("duration_ms"),   // time on page before next navigation
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type UserPageViewEvent = typeof userPageViewEvents.$inferSelect;
+export type InsertUserPageViewEvent = typeof userPageViewEvents.$inferInsert;
+
+/** One row per LMS lesson video play / progress milestone */
+export const lmsVideoEvents = mysqlTable("lms_video_events", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  lessonId: int("lesson_id").notNull(),
+  courseId: int("course_id").notNull(),
+  eventType: varchar("event_type", { length: 32 }).notNull(), // 'play'|'pause'|'complete'|'seek'|'progress'
+  positionSec: int("position_sec").default(0).notNull(),      // playback position
+  durationSec: int("duration_sec").default(0).notNull(),      // total video length
+  percentWatched: int("percent_watched").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type LmsVideoEvent = typeof lmsVideoEvents.$inferSelect;
+export type InsertLmsVideoEvent = typeof lmsVideoEvents.$inferInsert;
+
+/** One row per quiz attempt (full attempt record with answers) */
+export const lmsQuizAttempts = mysqlTable("lms_quiz_attempts", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  lessonId: int("lesson_id").notNull(),
+  courseId: int("course_id").notNull(),
+  score: int("score").notNull(),          // percentage 0-100
+  passed: boolean("passed").notNull(),
+  totalQuestions: int("total_questions").notNull(),
+  correctAnswers: int("correct_answers").notNull(),
+  timeTakenSec: int("time_taken_sec"),
+  answersJson: longtext("answers_json"),  // JSON array of {questionId, selectedAnswer, correct}
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type LmsQuizAttempt = typeof lmsQuizAttempts.$inferSelect;
+export type InsertLmsQuizAttempt = typeof lmsQuizAttempts.$inferInsert;

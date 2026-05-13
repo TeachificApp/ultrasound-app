@@ -3,6 +3,8 @@ import type { Express, Request, Response } from "express";
 import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
 import { sdk } from "./sdk";
+import { getDb } from "../db";
+import { userLoginEvents } from "../../drizzle/schema";
 
 function getQueryParam(req: Request, key: string): string | undefined {
   const value = req.query[key];
@@ -43,6 +45,20 @@ export function registerOAuthRoutes(app: Express) {
 
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+
+      // Track login event (fire-and-forget, non-blocking)
+      db.getUserByOpenId(userInfo.openId).then(async (user) => {
+        if (!user) return;
+        const dbConn = await getDb();
+        if (!dbConn) return;
+        const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+                   req.socket.remoteAddress || null;
+        await dbConn.insert(userLoginEvents).values({
+          userId: user.id,
+          ipAddress: ip ? ip.substring(0, 64) : null,
+          userAgent: req.headers["user-agent"]?.substring(0, 500) ?? null,
+        });
+      }).catch(() => { /* silent */ });
 
       res.redirect(302, "/");
     } catch (error) {
