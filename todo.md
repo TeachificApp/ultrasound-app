@@ -1522,3 +1522,9 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix mobile PDF viewing: /api/media/:key/view endpoint — mobile-aware PDF viewer with Open/Download fallback for iOS/Android
 - [x] Fix SCORM/HTML iframe: remove sandbox attribute that blocks cross-origin CDN content (e.g. CloudFront)
 - [x] Add mobile Desktop Site banner at top of SCORM/HTML embed pages (dismissible, doesn't cover bottom controls)
+
+## Page Builder Unification (May 13 2026)
+- [x] Rewrite DownloadLandingPageBuilder.tsx as thin wrapper importing shared components from LandingPageBuilder.tsx
+- [x] Add all missing block cases to DownloadLanding.tsx public renderer (logos, countdown, flip_cards, lead_capture, urgency_offer, price_stack, checkout_form, pricing_options_auto, curriculum_auto, course, digital, physical)
+- [x] Add CountdownTimer component to DownloadLanding.tsx
+- [x] All three builders (Funnel, Course, Download) now share same BLOCK_CATALOG, BlockPreview, BlockSettings, SortableBlock

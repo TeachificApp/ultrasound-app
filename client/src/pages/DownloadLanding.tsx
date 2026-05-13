@@ -17,10 +17,36 @@ import { Link } from "wouter";
 import { getLoginUrl } from "@/const";
 import OrderBumpOffer from "@/components/OrderBumpOffer";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 // ─── Block type (matches builder) ─────────────────────────────────────────────
 interface Block { id: string; type: string; data: Record<string, any>; }
+
+// ─── Countdown Timer ─────────────────────────────────────────────────────────
+function CountdownTimer({ targetDate, textColor }: { targetDate?: string; textColor: string }) {
+  const [time, setTime] = useState({ days: 0, hours: 0, mins: 0, secs: 0 });
+  useEffect(() => {
+    if (!targetDate) return;
+    const target = new Date(targetDate).getTime();
+    const tick = () => {
+      const diff = Math.max(0, target - Date.now());
+      setTime({ days: Math.floor(diff / 86400000), hours: Math.floor((diff % 86400000) / 3600000), mins: Math.floor((diff % 3600000) / 60000), secs: Math.floor((diff % 60000) / 1000) });
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [targetDate]);
+  return (
+    <div className="flex justify-center gap-4">
+      {([["Days", time.days], ["Hours", time.hours], ["Mins", time.mins], ["Secs", time.secs]] as const).map(([label, val]) => (
+        <div key={label} className="bg-white/20 rounded-xl px-6 py-4 min-w-[80px] text-center">
+          <div className="text-4xl font-bold" style={{ color: textColor }}>{String(val).padStart(2, "0")}</div>
+          <div className="text-sm opacity-80 mt-1" style={{ color: textColor }}>{label}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 // ─── Block Renderer ───────────────────────────────────────────────────────────
 function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug }: {
@@ -350,6 +376,108 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug }: {
     }
     case "instructor":
       return <InstructorPublicBlock d={d} />;
+    case "logos":
+      return (
+        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
+          {d.headline && <p className="text-center text-sm font-semibold text-gray-500 uppercase tracking-wider mb-6" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          <div className="flex flex-wrap items-center justify-center gap-8">
+            {(d.logos ?? []).map((logo: any, i: number) => (
+              logo.url ? <img key={i} src={logo.url} alt={logo.alt ?? ""} className="h-10 object-contain opacity-70 hover:opacity-100 transition-opacity" />
+                : <div key={i} className="h-10 w-24 bg-gray-200 rounded flex items-center justify-center text-xs text-gray-400">{logo.alt || "Logo"}</div>
+            ))}
+          </div>
+        </div>
+      );
+    case "countdown":
+      return (
+        <div className="px-8 py-10 text-center" style={{ backgroundColor: d.bgColor ?? "#179ca3" }}>
+          {d.headline && <h2 className="text-2xl font-bold mb-6" style={{ color: d.textColor ?? "#fff" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          <CountdownTimer targetDate={d.targetDate} textColor={d.textColor ?? "#fff"} />
+        </div>
+      );
+    case "flip_cards":
+      return (
+        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
+          {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
+            {(d.cards ?? []).map((card: any, i: number) => (
+              <div key={i} className="rounded-xl overflow-hidden shadow-sm border border-gray-200">
+                <div className="p-5 font-semibold text-white text-center" style={{ backgroundColor: d.accentColor ?? "#179ca3" }}>{card.front}</div>
+                <div className="p-5 text-sm text-gray-600 text-center bg-white">{card.back}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    case "lead_capture":
+      return (
+        <div className="px-8 py-12 text-center" style={{ backgroundColor: d.bgColor ?? "#179ca3", color: d.textColor ?? "#fff" }}>
+          {d.headline && <h2 className="text-2xl font-bold mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          {d.subtext && <p className="opacity-90 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
+          <div className="flex max-w-md mx-auto gap-2">
+            <input type="email" placeholder="Your email address" className="flex-1 px-4 py-3 rounded-lg text-gray-900 border-0 focus:ring-2 focus:ring-white/50" />
+            <button className="px-6 py-3 bg-white font-semibold rounded-lg" style={{ color: d.bgColor ?? "#179ca3" }}>{d.ctaText ?? "Send Me Access"}</button>
+          </div>
+        </div>
+      );
+    case "urgency_offer":
+      return (
+        <div className="px-8 py-8 text-center" style={{ backgroundColor: d.bgColor ?? "#fff7ed" }}>
+          {d.headline && <h2 className="text-2xl font-bold mb-3" style={{ color: d.headlineColor ?? "#92400e" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          {d.subtext && <p className="mb-4" style={{ color: d.textColor ?? "#78350f" }} dangerouslySetInnerHTML={{ __html: d.subtext }} />}
+          {d.ctaText && (
+            <button onClick={onBuy} disabled={buying}
+              className="px-8 py-3 rounded-lg font-semibold shadow disabled:opacity-60 transition-opacity hover:opacity-90"
+              style={{ backgroundColor: d.ctaColor ?? "#f59e0b", color: d.ctaTextColor ?? "#fff" }}>
+              {buying ? "Processing…" : d.ctaText}
+            </button>
+          )}
+        </div>
+      );
+    case "price_stack":
+      return (
+        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
+          {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          <div className="flex flex-col gap-4 max-w-2xl mx-auto">
+            {(d.items ?? []).map((item: any, i: number) => (
+              <div key={i} className="flex items-center justify-between p-4 rounded-xl border border-gray-200 bg-white shadow-sm">
+                <div>
+                  <p className="font-semibold text-gray-900">{item.title}</p>
+                  {item.description && <p className="text-sm text-gray-500">{item.description}</p>}
+                </div>
+                <div className="text-right flex-shrink-0 ml-4">
+                  {item.originalPrice && <p className="text-sm text-gray-400 line-through">{item.originalPrice}</p>}
+                  <p className="font-bold text-teal-600">{item.price}</p>
+                </div>
+              </div>
+            ))}
+            {d.totalLabel && (
+              <div className="flex items-center justify-between p-4 rounded-xl bg-teal-600 text-white">
+                <p className="font-bold text-lg">{d.totalLabel}</p>
+                <p className="font-bold text-xl">{d.totalPrice ?? price}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    case "checkout_form":
+    case "pricing_options_auto":
+    case "curriculum_auto":
+    case "course":
+    case "digital":
+    case "physical":
+      // These blocks are course/LMS-specific; render a generic CTA for download pages
+      return (
+        <div className="px-8 py-12 text-center" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
+          <button onClick={onBuy} disabled={buying}
+            className="px-10 py-4 rounded-xl font-bold text-lg shadow-lg disabled:opacity-60 transition-opacity hover:opacity-90"
+            style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
+            {buying ? "Processing…" : (d.ctaText ?? "Buy Now")}
+          </button>
+        </div>
+      );
     default:
       return null;
   }
