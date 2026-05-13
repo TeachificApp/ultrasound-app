@@ -13,6 +13,7 @@ import { Loader2, ArrowRight, CheckCircle, Globe, Users } from "lucide-react";
 import type { Block } from "./admin/LandingPageBuilder";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import CheckoutFormBlock from "@/components/CheckoutFormBlock";
+import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 
 // ─── Live Countdown Hook ─────────────────────────────────────────────────────
 
@@ -330,6 +331,8 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
     }
     case "instructor":
       return <InstructorPublicBlock d={d} />;
+    case "related_products":
+      return <RelatedProductsBlock data={d} />;
     case "alert":
       return (
         <div className="px-8 py-4">

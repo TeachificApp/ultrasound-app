@@ -1535,3 +1535,8 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add BSLinkField smart CTA link picker (Auto Checkout / Pick Product / Custom URL)
 - [x] Replace raw link inputs in hero buttons, cta_standalone, price_stack, urgency_offer, product_offer_stack, funnel_workflow with BSLinkField
 - [x] Add ?checkout=1 auto-trigger to CourseLanding and DownloadLanding for direct checkout from cross-product links
+
+## Related Products Cross-Sell Block
+- [x] Add related_products block type to BLOCK_CATALOG, BlockPreview, BlockSettings
+- [x] Build RelatedProductsBlock public component (auto-fetches published courses/downloads)
+- [x] Add related_products case to CourseLanding, DownloadLanding, PublicFunnelPage renderers

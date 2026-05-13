@@ -17,6 +17,7 @@ import { Link } from "wouter";
 import { getLoginUrl } from "@/const";
 import OrderBumpOffer from "@/components/OrderBumpOffer";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
+import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import { useState, useEffect } from "react";
 
 // ─── Block type (matches builder) ─────────────────────────────────────────────
@@ -376,6 +377,8 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug }: {
     }
     case "instructor":
       return <InstructorPublicBlock d={d} />;
+    case "related_products":
+      return <RelatedProductsBlock data={d} currentSlug={slug} currentType="download" />;
     case "logos":
       return (
         <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>

@@ -53,7 +53,8 @@ export type BlockType =
   | "curriculum_auto" | "pricing_options_auto"
   | "funnel_workflow" | "product_offer_stack" | "order_bump_checkout"
   | "price_stack" | "urgency_offer" | "checkout_form"
-  | "footer" | "logo_strip" | "three_column";
+  | "footer" | "logo_strip" | "three_column"
+  | "related_products";
 
 export interface Block {
   id: string;
@@ -213,6 +214,22 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
     defaultData: { headline: "Course Curriculum", bgColor: "#ffffff", showLocked: true } },
   { type: "pricing_options_auto", label: "Pricing Options (Auto)", icon: <CreditCard size={14} />, category: "Smart",
     defaultData: { headline: "Choose Your Plan", bgColor: "#f9fafb" } },
+  { type: "related_products", label: "Related Products", icon: <Package size={14} />, category: "Smart",
+    defaultData: {
+      headline: "You Might Also Like",
+      subtext: "Explore more resources to advance your skills.",
+      productType: "both",  // "course" | "download" | "both"
+      maxItems: 3,
+      layout: "grid",       // "grid" | "list"
+      showPrice: true,
+      showDescription: true,
+      ctaText: "Learn More",
+      bgColor: "#f9fafb",
+      cardBgColor: "#ffffff",
+      accentColor: "#179ca3",
+      textColor: "#111827",
+      excludeCurrentSlug: true,
+    } },
 ];
 
 export const CATALOG_CATEGORIES = ["Layout", "Content", "Marketing", "Conversion", "Funnel", "Smart"];
@@ -762,6 +779,41 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
             </div>
           )}
           <p className="text-xs text-center opacity-60">{d.copyrightText ?? "© 2026 All rights reserved."}</p>
+        </div>
+      );
+    }
+    case "related_products": {
+      const maxItems = d.maxItems ?? 3;
+      const layout = d.layout ?? "grid";
+      const mockCards = Array.from({ length: maxItems }, (_, i) => ({
+        title: ["Advanced Vascular Ultrasound", "Fetal Echo Essentials", "POCUS Fundamentals"][i] ?? `Product ${i + 1}`,
+        type: i % 2 === 0 ? "Course" : "Download",
+        price: i === 0 ? "$149" : i === 1 ? "$79" : "Free",
+        description: "Comprehensive training resource for sonographers and clinicians.",
+      }));
+      return (
+        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
+          {d.headline && <h2 className="text-2xl font-bold text-center mb-2" style={{ color: d.textColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          {d.subtext && <p className="text-center text-sm mb-6 opacity-70" style={{ color: d.textColor ?? "#111827" }}>{d.subtext}</p>}
+          <div className={layout === "grid" ? `grid grid-cols-${Math.min(maxItems, 3)} gap-4` : "space-y-3"}>
+            {mockCards.map((card, i) => (
+              <div key={i} className="rounded-xl border border-gray-200 overflow-hidden" style={{ backgroundColor: d.cardBgColor ?? "#ffffff" }}>
+                <div className="h-24 flex items-center justify-center" style={{ backgroundColor: d.accentColor ?? "#179ca3", opacity: 0.15 + i * 0.05 }}>
+                  <Package size={28} style={{ color: d.accentColor ?? "#179ca3", opacity: 0.7 }} />
+                </div>
+                <div className="p-4">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: d.accentColor ?? "#179ca3" }}>{card.type}</span>
+                  <h3 className="font-bold text-sm mt-0.5 mb-1" style={{ color: d.textColor ?? "#111827" }}>{card.title}</h3>
+                  {d.showDescription && <p className="text-xs text-gray-500 mb-2 line-clamp-2">{card.description}</p>}
+                  <div className="flex items-center justify-between">
+                    {d.showPrice && <span className="text-sm font-bold" style={{ color: d.accentColor ?? "#179ca3" }}>{card.price}</span>}
+                    <button className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white" style={{ backgroundColor: d.accentColor ?? "#179ca3" }}>{d.ctaText ?? "Learn More"}</button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-gray-400 mt-3 text-center">Auto-populated from published products</p>
         </div>
       );
     }
@@ -1578,6 +1630,46 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
       return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Section Headline" field="headline" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div className="flex items-center gap-2"><input type="checkbox" checked={d.showLocked ?? true} onChange={e => set("showLocked", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show locked lessons</label></div></div>);
     case "pricing_options_auto":
       return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Section Headline" field="headline" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /></div>);
+    case "related_products":
+      return (
+        <div className="space-y-3">
+          <BSTextField data={d} onSet={set} label="Headline" field="headline" />
+          <BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline />
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Product Type</label>
+            <Select value={d.productType ?? "both"} onValueChange={v => set("productType", v)}>
+              <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="both">Courses &amp; Downloads</SelectItem>
+                <SelectItem value="course">Courses Only</SelectItem>
+                <SelectItem value="download">Downloads Only</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Layout</label>
+            <div className="flex gap-1">
+              {(["grid", "list"] as const).map(l => (
+                <button key={l} onClick={() => set("layout", l)} className={`flex-1 py-1 text-xs rounded border capitalize ${(d.layout ?? "grid") === l ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>{l}</button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Max Items (1–6)</label>
+            <Input type="number" value={d.maxItems ?? 3} onChange={e => set("maxItems", Math.min(6, Math.max(1, Number(e.target.value))))} className="h-8 text-sm" min={1} max={6} />
+          </div>
+          <BSTextField data={d} onSet={set} label="CTA Button Text" field="ctaText" placeholder="Learn More" />
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2"><input type="checkbox" checked={d.showPrice ?? true} onChange={e => set("showPrice", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show price</label></div>
+            <div className="flex items-center gap-2"><input type="checkbox" checked={d.showDescription ?? true} onChange={e => set("showDescription", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show description</label></div>
+            <div className="flex items-center gap-2"><input type="checkbox" checked={d.excludeCurrentSlug ?? true} onChange={e => set("excludeCurrentSlug", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Exclude current product</label></div>
+          </div>
+          <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
+          <BSColorField data={d} onSet={set} label="Card Background" field="cardBgColor" />
+          <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />
+          <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
+        </div>
+      );
     case "divider":
       return (<div className="space-y-3"><div><label className="text-xs text-gray-500 block mb-1">Style</label><div className="flex gap-1">{(["solid", "dashed", "dotted"] as const).map(s => <button key={s} onClick={() => set("style", s)} className={`flex-1 py-1 text-xs rounded border capitalize ${(d.style ?? "solid") === s ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>{s}</button>)}</div></div><BSColorField data={d} onSet={set} label="Color" field="color" /><div><label className="text-xs text-gray-500 block mb-1">Thickness (px)</label><Input type="number" value={d.thickness ?? 1} onChange={e => set("thickness", Number(e.target.value))} className="h-8 text-sm" min={1} max={10} /></div><div><label className="text-xs text-gray-500 block mb-1">Rounding (px)</label><Input type="number" value={d.borderRadius ?? 0} onChange={e => set("borderRadius", Number(e.target.value))} className="h-8 text-sm" min={0} max={20} /></div><div><label className="text-xs text-gray-500 block mb-1">Vertical Spacing (px)</label><Input type="number" value={d.spacing ?? 32} onChange={e => set("spacing", Number(e.target.value))} className="h-8 text-sm" min={0} max={200} /></div></div>);
     case "two_column": {

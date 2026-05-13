@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { BookOpen, CheckCircle, ChevronRight, Clock, Download, HelpCircle, Lock, PlayCircle, Star, Users, AlertTriangle, Globe, LayoutGrid, Layers, BookMarked, Timer, Tag, CreditCard, List } from "lucide-react";
 import OrderBumpOffer from "@/components/OrderBumpOffer";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
+import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import type { Block } from "./admin/LandingPageBuilder";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -270,6 +271,8 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price }: {
       );
     case "instructor":
       return <InstructorPublicBlock d={d} />;
+    case "related_products":
+      return <RelatedProductsBlock data={d} currentSlug={slug} currentType="course" />;
     case "faq":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
