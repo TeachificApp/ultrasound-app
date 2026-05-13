@@ -358,10 +358,63 @@ interface EmbedPageOptions {
   tokenParam: string;
 }
 
+// Mobile "Desktop Site" banner for SCORM/HTML content.
+// Shown at the TOP of the screen so it doesn't cover navigation controls at the bottom.
+// Dismissed by clicking the × button. Detection script is injected at page bottom.
+const mobileBanner = `
+  <div id="mobile-banner" style="
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    background: #1e3a5f;
+    color: #fff;
+    padding: 10px 40px 10px 16px;
+    font-size: 13px;
+    font-family: system-ui, -apple-system, sans-serif;
+    line-height: 1.4;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  ">
+    <strong>&#x1F4F1; Mobile tip:</strong> For the best experience, enable <strong>Desktop Site</strong> mode in your browser settings.
+    <button onclick="document.getElementById('mobile-banner').style.display='none';" style="
+      position: absolute;
+      top: 50%;
+      right: 10px;
+      transform: translateY(-50%);
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-size: 18px;
+      cursor: pointer;
+      line-height: 1;
+      padding: 4px 6px;
+      min-height: unset;
+      min-width: unset;
+    ">&times;</button>
+  </div>`;
+
+// Script that detects mobile and shows the banner — injected at page bottom
+const mobileBannerScript = `
+  <script>
+    (function() {
+      var ua = navigator.userAgent || '';
+      var isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+      var isAndroid = /Android/.test(ua);
+      var isMobile = isIOS || isAndroid || window.innerWidth < 768;
+      if (isMobile) {
+        var banner = document.getElementById('mobile-banner');
+        if (banner) banner.style.display = 'block';
+      }
+    })();
+  <\/script>`;
+
 function buildEmbedPage(opts: EmbedPageOptions): string {
   const { asset, fileUrl, mimeType, mediaType } = opts;
 
   let contentHtml = "";
+  let needsMobileBanner = false;
 
   if (mediaType === "video" || mimeType.startsWith("video/")) {
     contentHtml = `
@@ -428,35 +481,50 @@ function buildEmbedPage(opts: EmbedPageOptions): string {
         })();
       </script>`;
   } else if (mediaType === "html" || mimeType === "text/html") {
-    // Serve HTML content in a sandboxed iframe
+    needsMobileBanner = true;
+    // Serve HTML content in an iframe WITHOUT sandbox — sandbox with allow-same-origin
+    // blocks cross-origin content (e.g. CloudFront CDN assets) even with allow-same-origin.
+    // Cross-origin iframes already can't navigate the parent by default, so sandbox is
+    // not needed for security here.
     contentHtml = `
+      ${mobileBanner}
       <iframe src="${escHtml(fileUrl)}" style="width:100%;height:100%;border:none;"
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+              allow="autoplay; fullscreen"
               title="${escHtml(asset.title)}"></iframe>`;
   } else if (mediaType === "scorm" || mediaType === "lms") {
-    // SCORM/LMS ZIP package: show a launch page with an open-in-new-tab button
-    // and a download option. The ZIP itself cannot be iframed directly — the LMS
-    // host must extract and serve it. We provide the download link so the admin
-    // can deploy it to their LMS, and an "Open" button for direct inspection.
-    contentHtml = `
-      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:16px;padding:clamp(20px,5vw,40px);background:#f0fdf4;">
-        <div style="font-size:56px;">🎓</div>
-        <div style="text-align:center;">
-          <p style="font-size:18px;font-weight:700;color:#111827;margin:0 0 6px;">${escHtml(asset.title)}</p>
-          <p style="font-size:13px;color:#6b7280;margin:0;">SCORM / LMS Package</p>
-        </div>
-        <div class="action-group">
-          <a href="${escHtml(fileUrl)}" target="_blank" rel="noopener" class="action-btn action-btn-primary">
-            &#x1F517; Open Package
-          </a>
-          <a href="${escHtml(fileUrl)}" download class="action-btn action-btn-secondary">
-            &#x2B07; Download ZIP
-          </a>
-        </div>
-        <p style="font-size:12px;color:#9ca3af;text-align:center;max-width:400px;margin:0;">
-          To run this SCORM package in your LMS, download the ZIP and upload it to your learning management system.
-        </p>
-      </div>`;
+    needsMobileBanner = true;
+    // SCORM/LMS content: if the fileUrl points to an HTML entry point (extracted SCORM),
+    // embed it directly in an iframe WITHOUT sandbox (sandbox blocks cross-origin CDN assets).
+    // If it's a raw ZIP, show a download/open panel instead.
+    const isZip = fileUrl.endsWith('.zip') || fileUrl.includes('.zip?');
+    if (!isZip) {
+      contentHtml = `
+        ${mobileBanner}
+        <iframe src="${escHtml(fileUrl)}" style="width:100%;height:100%;border:none;"
+                allow="autoplay; fullscreen"
+                title="${escHtml(asset.title)}"></iframe>`;
+    } else {
+      contentHtml = `
+        ${mobileBanner}
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:16px;padding:clamp(20px,5vw,40px);background:#f0fdf4;">
+          <div style="font-size:56px;">🎓</div>
+          <div style="text-align:center;">
+            <p style="font-size:18px;font-weight:700;color:#111827;margin:0 0 6px;">${escHtml(asset.title)}</p>
+            <p style="font-size:13px;color:#6b7280;margin:0;">SCORM / LMS Package</p>
+          </div>
+          <div class="action-group">
+            <a href="${escHtml(fileUrl)}" target="_blank" rel="noopener" class="action-btn action-btn-primary">
+              &#x1F517; Open Package
+            </a>
+            <a href="${escHtml(fileUrl)}" download class="action-btn action-btn-secondary">
+              &#x2B07; Download ZIP
+            </a>
+          </div>
+          <p style="font-size:12px;color:#9ca3af;text-align:center;max-width:400px;margin:0;">
+            To run this SCORM package in your LMS, download the ZIP and upload it to your learning management system.
+          </p>
+        </div>`;
+    }
   } else if (mediaType === "zip") {
     // Generic ZIP: show a viewer page with open and download options
     contentHtml = `
@@ -551,6 +619,7 @@ function buildEmbedPage(opts: EmbedPageOptions): string {
       } catch(e) {}
     });
   </script>
+  ${needsMobileBanner ? mobileBannerScript : ''}
 </body>
 </html>`;
 }
