@@ -1528,3 +1528,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add all missing block cases to DownloadLanding.tsx public renderer (logos, countdown, flip_cards, lead_capture, urgency_offer, price_stack, checkout_form, pricing_options_auto, curriculum_auto, course, digital, physical)
 - [x] Add CountdownTimer component to DownloadLanding.tsx
 - [x] All three builders (Funnel, Course, Download) now share same BLOCK_CATALOG, BlockPreview, BlockSettings, SortableBlock
+
+## Funnel/Builder Unification (May 2026)
+- [x] Rewrite DownloadLandingPageBuilder as thin wrapper using shared LandingPageBuilder components
+- [x] Add all missing block cases to DownloadLanding public renderer
+- [x] Add BSLinkField smart CTA link picker (Auto Checkout / Pick Product / Custom URL)
+- [x] Replace raw link inputs in hero buttons, cta_standalone, price_stack, urgency_offer, product_offer_stack, funnel_workflow with BSLinkField
+- [x] Add ?checkout=1 auto-trigger to CourseLanding and DownloadLanding for direct checkout from cross-product links

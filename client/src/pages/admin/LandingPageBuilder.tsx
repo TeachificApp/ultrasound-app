@@ -806,6 +806,118 @@ function BSAlignField({ data, onSet }: { data: Record<string, any>; onSet: (key:
   );
 }
 
+// ─── BSLinkField: Smart CTA link picker (auto checkout / product / custom URL) ──
+function BSLinkField({ label = "Button Link", value, onChange }: { label?: string; value: string; onChange: (v: string) => void }) {
+  // Determine current mode from value
+  const isAutoCheckout = !value || value === "";
+  const isCourseLink = value.startsWith("/courses/");
+  const isDownloadLink = value.startsWith("/downloads/");
+  const isProductLink = isCourseLink || isDownloadLink;
+
+  const [mode, setMode] = useState<"auto" | "product" | "custom">(
+    isAutoCheckout ? "auto" : isProductLink ? "product" : "custom"
+  );
+  const [productType, setProductType] = useState<"course" | "download">(isDownloadLink ? "download" : "course");
+
+  const { data: coursesData } = trpc.lms.listCourses.useQuery(
+    { type: productType === "course" ? "course" : "download", pageSize: 50 },
+    { enabled: mode === "product" }
+  );
+  const products = coursesData?.courses ?? [];
+
+  // Derive selected slug from current value (strip ?checkout=1 suffix)
+  const selectedSlug = isCourseLink
+    ? value.replace("/courses/", "").replace("?checkout=1", "")
+    : isDownloadLink
+    ? value.replace("/downloads/", "").replace("?checkout=1", "")
+    : "";
+
+  const handleModeChange = (m: "auto" | "product" | "custom") => {
+    setMode(m);
+    if (m === "auto") onChange("");
+    if (m === "product") onChange(""); // will be set when product is picked
+  };
+
+  const handleProductPick = (slug: string) => {
+    const prefix = productType === "course" ? "/courses/" : "/downloads/";
+    onChange(prefix + slug + "?checkout=1");
+  };
+
+  const handleProductTypeChange = (t: "course" | "download") => {
+    setProductType(t);
+    onChange(""); // reset link when switching type
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <label className="text-xs text-gray-500 block">{label}</label>
+      {/* Mode selector */}
+      <div className="flex gap-1">
+        {(["auto", "product", "custom"] as const).map(m => (
+          <button
+            key={m}
+            onClick={() => handleModeChange(m)}
+            className={`flex-1 py-1 text-[10px] rounded border capitalize ${
+              mode === m ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600 hover:border-teal-400"
+            }`}
+          >
+            {m === "auto" ? "Auto Checkout" : m === "product" ? "Pick Product" : "Custom URL"}
+          </button>
+        ))}
+      </div>
+      {mode === "auto" && (
+        <p className="text-[10px] text-teal-600">Triggers Stripe checkout for the current product automatically.</p>
+      )}
+      {mode === "product" && (
+        <div className="space-y-1.5">
+          <div className="flex gap-1">
+            {(["course", "download"] as const).map(t => (
+              <button
+                key={t}
+                onClick={() => handleProductTypeChange(t)}
+                className={`flex-1 py-1 text-[10px] rounded border capitalize ${
+                  productType === t ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"
+                }`}
+              >
+                {t === "course" ? "Course / Quiz" : "Download"}
+              </button>
+            ))}
+          </div>
+          <Select
+            value={selectedSlug || ""}
+            onValueChange={handleProductPick}
+          >
+            <SelectTrigger className="h-7 text-xs">
+              <SelectValue placeholder={products.length === 0 ? "Loading..." : "Select a product"} />
+            </SelectTrigger>
+            <SelectContent>
+              {products.map((p: any) => (
+                <SelectItem key={p.slug} value={p.slug}>
+                  {p.title}{p.isFree ? " (Free)" : p.price > 0 ? ` ($${(p.price / 100).toFixed(2)})` : ""}
+                </SelectItem>
+              ))}
+              {products.length === 0 && (
+                <SelectItem value="__none__" disabled>No published {productType}s found</SelectItem>
+              )}
+            </SelectContent>
+          </Select>
+          {value && (
+            <p className="text-[10px] text-teal-600 break-all">→ {value}</p>
+          )}
+        </div>
+      )}
+      {mode === "custom" && (
+        <DebouncedInput
+          value={value}
+          onChange={onChange}
+          className="h-7 text-xs"
+          placeholder="https://... or /page-path"
+        />
+      )}
+    </div>
+  );
+}
+
 // ─── Instructor Block Preview (fetches from saved profile or uses manual data) ──
 function InstructorBlockPreview({ d }: { d: Record<string, any> }) {
   const instructorId = d.instructorId ? Number(d.instructorId) : null;
@@ -1157,7 +1269,7 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
                 <div key={idx} className="border border-gray-200 rounded-lg p-2 space-y-2">
                   <div className="flex items-center justify-between"><span className="text-xs font-medium text-gray-600">Button {idx + 1}</span>{buttons.length > 1 && <button onClick={() => removeBtn(idx)} className="text-red-400 hover:text-red-600"><X size={12} /></button>}</div>
                   <div><label className="text-xs text-gray-400 block mb-0.5">Label</label><DebouncedInput value={btn.text} onChange={v => setBtn(idx, "text", v)} className="h-7 text-xs" /></div>
-                  <div><label className="text-xs text-gray-400 block mb-0.5">Link URL</label><DebouncedInput value={btn.link} onChange={v => setBtn(idx, "link", v)} className="h-7 text-xs" placeholder="Leave empty = auto Stripe checkout" />{!btn.link && <p className="text-[10px] text-teal-600 mt-0.5">Auto: triggers Stripe checkout for this product</p>}</div>
+                  <BSLinkField label="Link" value={btn.link ?? ""} onChange={v => setBtn(idx, "link", v)} />
                   <div><label className="text-xs text-gray-400 block mb-0.5">Style</label><div className="flex gap-1">{(["filled", "outline"] as const).map(s => <button key={s} onClick={() => setBtn(idx, "style", s)} className={`flex-1 py-1 text-xs rounded border capitalize ${btn.style === s ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>{s}</button>)}</div></div>
                   <div className="flex items-center gap-2"><label className="text-xs text-gray-400 w-16 flex-shrink-0">Color</label><input type="color" value={btn.color} onChange={e => setBtn(idx, "color", e.target.value)} className="w-7 h-7 rounded cursor-pointer border border-gray-200" /><DebouncedInput value={btn.color} onChange={v => setBtn(idx, "color", v)} className="h-7 text-xs flex-1" /></div>
                   {btn.style !== "outline" && <div className="flex items-center gap-2"><label className="text-xs text-gray-400 w-16 flex-shrink-0">Text</label><input type="color" value={btn.textColor} onChange={e => setBtn(idx, "textColor", e.target.value)} className="w-7 h-7 rounded cursor-pointer border border-gray-200" /><DebouncedInput value={btn.textColor} onChange={v => setBtn(idx, "textColor", v)} className="h-7 text-xs flex-1" /></div>}
@@ -1220,7 +1332,7 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
     case "pricing_cta":
       return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Headline" field="headline" /><BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline /><BSTextField data={d} onSet={set} label="CTA Button Text" field="ctaText" /><BSColorField data={d} onSet={set} label="CTA Color" field="ctaColor" /><BSColorField data={d} onSet={set} label="CTA Text Color" field="ctaTextColor" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div><label className="text-xs text-gray-500 block mb-1">Button Animation</label><Select value={d.ctaAnimation ?? "none"} onValueChange={v => set("ctaAnimation", v)}><SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem><SelectItem value="pulse">Pulse</SelectItem><SelectItem value="bounce">Bounce</SelectItem><SelectItem value="shake">Shake</SelectItem><SelectItem value="glow">Glow</SelectItem></SelectContent></Select></div><div className="flex items-center gap-2"><input type="checkbox" checked={d.showPrice ?? true} onChange={e => set("showPrice", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show course price</label></div><div className="flex items-center gap-2"><input type="checkbox" checked={d.showOriginalPrice ?? false} onChange={e => set("showOriginalPrice", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show strikethrough original price</label></div>{d.showOriginalPrice && <BSTextField data={d} onSet={set} label="Original Price (e.g. 299.00)" field="originalPrice" placeholder="299.00" />}</div>);
     case "cta_standalone":
-      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Headline" field="headline" /><BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline /><BSTextField data={d} onSet={set} label="Button Text" field="ctaText" /><BSTextField data={d} onSet={set} label="Button Link" field="ctaLink" placeholder="Leave empty = auto Stripe checkout" />{!d.ctaLink && <p className="text-[10px] text-teal-600 -mt-2">Auto: triggers Stripe checkout for this product</p>}<BSColorField data={d} onSet={set} label="Button Color" field="ctaColor" /><BSColorField data={d} onSet={set} label="Button Text Color" field="ctaTextColor" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div><label className="text-xs text-gray-500 block mb-1">Button Animation</label><Select value={d.ctaAnimation ?? "none"} onValueChange={v => set("ctaAnimation", v)}><SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem><SelectItem value="pulse">Pulse</SelectItem><SelectItem value="bounce">Bounce</SelectItem><SelectItem value="shake">Shake</SelectItem><SelectItem value="glow">Glow</SelectItem></SelectContent></Select></div><BSAlignField data={d} onSet={set} /></div>);
+      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Headline" field="headline" /><BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline /><BSTextField data={d} onSet={set} label="Button Text" field="ctaText" /><BSLinkField label="Button Link" value={d.ctaLink ?? ""} onChange={v => set("ctaLink", v)} /><BSColorField data={d} onSet={set} label="Button Color" field="ctaColor" /><BSColorField data={d} onSet={set} label="Button Text Color" field="ctaTextColor" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div><label className="text-xs text-gray-500 block mb-1">Button Animation</label><Select value={d.ctaAnimation ?? "none"} onValueChange={v => set("ctaAnimation", v)}><SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem><SelectItem value="pulse">Pulse</SelectItem><SelectItem value="bounce">Bounce</SelectItem><SelectItem value="shake">Shake</SelectItem><SelectItem value="glow">Glow</SelectItem></SelectContent></Select></div><BSAlignField data={d} onSet={set} /></div>);
     case "lead_capture":
       return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Headline" field="headline" /><BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline /><BSTextField data={d} onSet={set} label="Button Text" field="ctaText" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><BSColorField data={d} onSet={set} label="Text Color" field="textColor" /></div>);
     case "funnel_workflow": {
@@ -1246,7 +1358,7 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
                   </div>
                   <DebouncedInput value={step.name} onChange={v => set("steps", steps.map((s, j) => j === i ? { ...s, name: v } : s))} className="h-7 text-xs" placeholder="Step name" />
                   <DebouncedTextarea value={step.role} onChange={v => set("steps", steps.map((s, j) => j === i ? { ...s, role: v } : s))} className="text-xs min-h-[52px]" placeholder="Role in the sales workflow" />
-                  <DebouncedInput value={step.url} onChange={v => set("steps", steps.map((s, j) => j === i ? { ...s, url: v } : s))} className="h-7 text-xs" placeholder="/checkout or #order-bump" />
+                  <BSLinkField label="Step URL" value={step.url ?? ""} onChange={v => set("steps", steps.map((s, j) => j === i ? { ...s, url: v } : s))} />
                   <DebouncedInput value={step.cta} onChange={v => set("steps", steps.map((s, j) => j === i ? { ...s, cta: v } : s))} className="h-7 text-xs" placeholder="CTA label" />
                 </div>
               ))}
@@ -1285,7 +1397,7 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
                     <DebouncedInput value={product.price} onChange={v => set("products", products.map((p, j) => j === i ? { ...p, price: v } : p))} className="h-7 text-xs" placeholder="$49" />
                     <DebouncedInput value={product.ctaText} onChange={v => set("products", products.map((p, j) => j === i ? { ...p, ctaText: v } : p))} className="h-7 text-xs" placeholder="CTA" />
                   </div>
-                  <DebouncedInput value={product.ctaLink ?? ""} onChange={v => set("products", products.map((p, j) => j === i ? { ...p, ctaLink: v } : p))} className="h-7 text-xs" placeholder="CTA link" />
+                  <BSLinkField label="CTA Link" value={product.ctaLink ?? ""} onChange={v => set("products", products.map((p, j) => j === i ? { ...p, ctaLink: v } : p))} />
                   <DebouncedInput value={product.fulfillment ?? ""} onChange={v => set("products", products.map((p, j) => j === i ? { ...p, fulfillment: v } : p))} className="h-7 text-xs" placeholder="Fulfillment note" />
                   <DebouncedInput value={product.imageUrl ?? ""} onChange={v => set("products", products.map((p, j) => j === i ? { ...p, imageUrl: v } : p))} className="h-7 text-xs" placeholder="Image URL" />
                 </div>
@@ -1367,7 +1479,7 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
             <BSTextField data={d} onSet={set} label="Final Price" field="finalPrice" placeholder="$2497" />
           </div>
           <BSTextField data={d} onSet={set} label="CTA Button Text" field="ctaText" />
-          <BSTextField data={d} onSet={set} label="CTA Link" field="ctaLink" placeholder="/checkout or https://..." />
+          <BSLinkField label="CTA Link" value={d.ctaLink ?? ""} onChange={v => set("ctaLink", v)} />
           <BSColorField data={d} onSet={set} label="CTA Color" field="ctaColor" />
           <BSColorField data={d} onSet={set} label="CTA Text Color" field="ctaTextColor" />
           <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
@@ -1390,7 +1502,7 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
             <BSTextField data={d} onSet={set} label="CTA Emoji" field="ctaEmoji" placeholder="\uD83D\uDC4D" />
             <div className="col-span-2"><BSTextField data={d} onSet={set} label="CTA Text" field="ctaText" placeholder="Add on now for $X" /></div>
           </div>
-          <BSTextField data={d} onSet={set} label="CTA Link" field="ctaLink" placeholder="/checkout or https://..." />
+          <BSLinkField label="CTA Link" value={d.ctaLink ?? ""} onChange={v => set("ctaLink", v)} />
           <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
           <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
           <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />

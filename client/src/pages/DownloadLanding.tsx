@@ -548,6 +548,7 @@ export default function DownloadLanding() {
   const { user } = useAuth();
   const [selectedOrderBumpId, setSelectedOrderBumpId] = useState<number | undefined>();
   const isPreview = new URLSearchParams(window.location.search).get("preview") === "admin";
+  const autoCheckout = new URLSearchParams(window.location.search).get("checkout") === "1";
   const { data: product, isLoading, error } = trpc.downloads.getBySlug.useQuery({ slug: slug!, preview: isPreview || undefined });
 
   // Check if user has purchased (only if logged in and product loaded)
@@ -603,6 +604,14 @@ export default function DownloadLanding() {
     }
     checkoutMut.mutate({ productId: product.id, orderBumpId: selectedOrderBumpId });
   };
+
+  // Auto-trigger checkout when ?checkout=1 is in the URL (used by BSLinkField product links)
+  useEffect(() => {
+    if (autoCheckout && product && !isLoading) {
+      handleBuy();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoCheckout, !!product, isLoading]);
 
   // ── Parse landing page blocks ──
   let blocks: Block[] = [];

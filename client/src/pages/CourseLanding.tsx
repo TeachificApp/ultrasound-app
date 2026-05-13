@@ -489,6 +489,7 @@ export default function CourseLanding() {
   const [enrolling, setEnrolling] = useState(false);
   const [selectedOrderBumpId, setSelectedOrderBumpId] = useState<number | undefined>();
   const isPreview = new URLSearchParams(window.location.search).get("preview") === "admin";
+  const autoCheckout = new URLSearchParams(window.location.search).get("checkout") === "1";
 
   const { data: course, isLoading } = trpc.lms.getCourse.useQuery({ slug: slug!, preview: isPreview || undefined }, { enabled: !!slug });
   const { data: myCourses } = trpc.lmsLearner.getMyCourses.useQuery(undefined, { enabled: !!user });
@@ -513,6 +514,14 @@ export default function CourseLanding() {
       else await createCheckout.mutateAsync({ courseSlug: slug!, seats: 1, origin: window.location.origin, orderBumpId: selectedOrderBumpId });
     } finally { setEnrolling(false); }
   };
+
+  // Auto-trigger checkout when ?checkout=1 is in the URL (used by BSLinkField product links)
+  useEffect(() => {
+    if (autoCheckout && course && !isLoading) {
+      handleEnroll();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoCheckout, !!course, isLoading]);
 
   if (isLoading) {
     return (
