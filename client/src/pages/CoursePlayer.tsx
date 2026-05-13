@@ -56,17 +56,17 @@ function QuizRunner({ lesson, courseSlug, onComplete }: { lesson: any; courseSlu
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <HelpCircle className="w-5 h-5 text-teal-400" />
-        <h2 className="text-lg font-semibold text-white">{quiz.title}</h2>
-        <Badge variant="outline" className="text-xs border-teal-500 text-teal-300">Passing: {quiz.passingScore}%</Badge>
+        <HelpCircle className="w-5 h-5 text-teal-600" />
+        <h2 className="text-lg font-semibold text-gray-900">{quiz.title}</h2>
+        <Badge variant="outline" className="text-xs border-teal-400 text-teal-700">Passing: {quiz.passingScore}%</Badge>
       </div>
       {submitted && result && (
-        <div className={cn("rounded-xl p-4 border", result.passed ? "bg-green-900/30 border-green-600" : "bg-red-900/30 border-red-600")}>
-          <p className={cn("font-semibold text-lg", result.passed ? "text-green-400" : "text-red-400")}>
+        <div className={cn("rounded-xl p-4 border", result.passed ? "bg-green-50 border-green-400" : "bg-red-50 border-red-400")}>
+          <p className={cn("font-semibold text-lg", result.passed ? "text-green-700" : "text-red-700")}>
             {result.passed ? "✓ Passed!" : "✗ Not passed"} — Score: {result.score}%
           </p>
           {!result.passed && quiz.allowRetakes && (
-            <Button size="sm" variant="outline" className="mt-3 border-white/30 text-white hover:bg-white/10 bg-transparent" onClick={handleRetake}>Retake Quiz</Button>
+            <Button size="sm" variant="outline" className="mt-3 border-gray-300 text-gray-700 hover:bg-gray-50" onClick={handleRetake}>Retake Quiz</Button>
           )}
         </div>
       )}
@@ -75,8 +75,8 @@ function QuizRunner({ lesson, courseSlug, onComplete }: { lesson: any; courseSlu
           const options: string[] = q.options ? JSON.parse(q.options) : q.type === "truefalse" ? ["True", "False"] : [];
           const resultItem = result?.results?.find((r: any) => r.questionId === q.id);
           return (
-            <div key={q.id} className="bg-white/5 rounded-xl border border-white/10 p-5">
-              <p className="font-medium text-white mb-3">{qi + 1}. {q.question}</p>
+            <div key={q.id} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+              <p className="font-medium text-gray-900 mb-3">{qi + 1}. {q.question}</p>
               <div className="space-y-2">
                 {options.map((opt: string) => {
                   const selected = answers[String(q.id)] === opt;
@@ -89,9 +89,9 @@ function QuizRunner({ lesson, courseSlug, onComplete }: { lesson: any; courseSlu
                       onClick={() => !submitted && setAnswers(a => ({ ...a, [String(q.id)]: opt }))}
                       className={cn(
                         "w-full text-left px-4 py-2.5 rounded-lg border text-sm transition-colors",
-                        selected && !submitted ? "border-teal-400 bg-teal-900/40 text-white" : "border-white/20 hover:border-teal-400 hover:bg-teal-900/20 text-gray-200",
-                        submitted && isCorrect ? "border-green-500 bg-green-900/30 text-green-300" : "",
-                        submitted && isWrong ? "border-red-400 bg-red-900/30 text-red-300" : "",
+                        selected && !submitted ? "border-teal-500 bg-teal-50 text-teal-900" : "border-gray-200 hover:border-teal-400 hover:bg-teal-50 text-gray-700",
+                        submitted && isCorrect ? "border-green-500 bg-green-50 text-green-800" : "",
+                        submitted && isWrong ? "border-red-400 bg-red-50 text-red-800" : "",
                       )}
                     >
                       {opt}
@@ -100,7 +100,7 @@ function QuizRunner({ lesson, courseSlug, onComplete }: { lesson: any; courseSlu
                 })}
               </div>
               {submitted && resultItem?.explanation && (
-                <p className="mt-3 text-xs text-gray-400 bg-white/5 rounded p-2">{resultItem.explanation}</p>
+                <p className="mt-3 text-xs text-gray-500 bg-gray-50 rounded p-2 border border-gray-100">{resultItem.explanation}</p>
               )}
             </div>
           );
@@ -122,7 +122,7 @@ function QuizRunner({ lesson, courseSlug, onComplete }: { lesson: any; courseSlu
 // ─── Lesson icon helper ───────────────────────────────────────────────────────
 function LessonIcon({ type, done, locked }: { type: string; done: boolean; locked?: boolean }) {
   if (locked) return <Lock className="w-4 h-4 text-gray-500" />;
-  if (done) return <CheckCircle className="w-4 h-4 text-teal-400" />;
+  if (done) return <CheckCircle className="w-4 h-4 text-teal-500" />;
   if (type === "quiz") return <HelpCircle className="w-4 h-4 text-gray-400" />;
   if (type === "download") return <Download className="w-4 h-4 text-gray-400" />;
   if (type === "embed") return <Monitor className="w-4 h-4 text-gray-400" />;
@@ -144,7 +144,7 @@ function LessonNoteEditor({ lessonId, courseSlug, initialNote }: { lessonId: num
         value={note}
         onChange={e => setNote(e.target.value)}
         placeholder="Add a note for this lesson..."
-        className="text-sm min-h-[80px] resize-none bg-white/5 border-white/20 text-white placeholder:text-gray-500"
+        className="text-sm min-h-[80px] resize-none bg-white border-gray-200 text-gray-900 placeholder:text-gray-400"
       />
       <Button
         size="sm"
@@ -279,13 +279,13 @@ export default function CoursePlayer() {
 
   if (isLoading) {
     return (
-      <div className="flex h-screen bg-[#0a2a2f]">
-        <div className="w-72 border-r border-teal-900/50 p-4 space-y-3">
-          {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-10 w-full bg-teal-900/30" />)}
+      <div className="flex h-screen bg-gray-50">
+        <div className="w-72 border-r border-gray-200 p-4 space-y-3">
+          {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
         </div>
         <div className="flex-1 p-8 space-y-4">
-          <Skeleton className="h-8 w-1/2 bg-teal-900/30" />
-          <Skeleton className="h-96 w-full bg-teal-900/30" />
+          <Skeleton className="h-8 w-1/2" />
+          <Skeleton className="h-96 w-full" />
         </div>
       </div>
     );
@@ -293,10 +293,10 @@ export default function CoursePlayer() {
 
   if (!data?.enrollment && !isPreviewMode && !adminPreviewStudent) {
     return (
-      <div className="text-center py-20 bg-[#0a2a2f] min-h-screen">
-        <Lock className="w-12 h-12 mx-auto mb-3 text-teal-600" />
-        <p className="text-lg font-medium text-white">You are not enrolled in this course</p>
-        <Button className="mt-4 bg-teal-500 hover:bg-teal-400 text-white" onClick={() => navigate(`/learn/${slug}`)}>View Course</Button>
+      <div className="text-center py-20 bg-gray-50 min-h-screen">
+        <Lock className="w-12 h-12 mx-auto mb-3 text-teal-500" />
+        <p className="text-lg font-medium text-gray-800">You are not enrolled in this course</p>
+        <Button className="mt-4 bg-teal-600 hover:bg-teal-700 text-white" onClick={() => navigate(`/learn/${slug}`)}>View Course</Button>
       </div>
     );
   }
@@ -345,12 +345,12 @@ export default function CoursePlayer() {
   const showStudentView = adminPreviewStudent || !isAdmin;
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-[#0c2e33]">
+    <div className="flex flex-col h-screen overflow-hidden bg-gray-50">
       {/* Admin Preview Banner */}
       {(isPreviewMode || adminPreviewStudent) && (
         <div className="bg-purple-700 text-white text-center py-2 px-4 text-sm font-medium flex items-center justify-center gap-2 shrink-0 z-50">
           <Eye className="w-4 h-4" />
-          <span>Student Preview — you are viewing this course as a student would see it</span>
+          <span>Student Preview — viewing as a student</span>
           {isAdmin && !isPreviewMode && (
             <button onClick={() => setAdminPreviewStudent(false)} className="ml-4 px-2 py-0.5 bg-purple-800 hover:bg-purple-900 rounded text-xs">
               Exit Preview
@@ -365,24 +365,24 @@ export default function CoursePlayer() {
       )}
 
       {/* Top Header Bar */}
-      <div className="flex items-center justify-between px-5 py-2.5 bg-[#071e22] border-b border-teal-900/50 shrink-0">
+      <div className="flex items-center justify-between px-5 py-2.5 bg-white border-b border-gray-200 shrink-0 shadow-sm">
         <div className="flex items-center gap-3">
           {LOGO
             ? <img src={LOGO} alt="Logo" className="h-8 w-auto" />
-            : <span className="text-white font-bold text-base">All About Ultrasound</span>
+            : <span className="text-teal-800 font-bold text-base">All About Ultrasound</span>
           }
         </div>
         <div className="flex items-center gap-5">
           {/* Progress bar */}
           <div className="flex items-center gap-2.5">
-            <span className="text-gray-400 text-xs">Your Progress</span>
-            <div className="w-36 bg-teal-900/50 rounded-full h-2 overflow-hidden">
+            <span className="text-gray-500 text-xs">Your Progress</span>
+            <div className="w-36 bg-gray-200 rounded-full h-2 overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-teal-500 to-teal-400 rounded-full transition-all duration-500"
                 style={{ width: `${data.enrollment?.progressPct ?? 0}%` }}
               />
             </div>
-            <span className="text-teal-400 font-bold text-xs">{data.enrollment?.progressPct ?? 0}%</span>
+            <span className="text-teal-600 font-bold text-xs">{data.enrollment?.progressPct ?? 0}%</span>
           </div>
           {/* Admin controls */}
           {isAdmin && !isPreviewMode && (
@@ -392,8 +392,8 @@ export default function CoursePlayer() {
               className={cn(
                 "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors border",
                 adminPreviewStudent
-                  ? "bg-purple-700/30 border-purple-600 text-purple-300"
-                  : "border-teal-800 text-gray-400 hover:text-teal-300 hover:border-teal-600"
+                  ? "bg-purple-100 border-purple-400 text-purple-700"
+                  : "border-gray-300 text-gray-500 hover:text-teal-700 hover:border-teal-400"
               )}
             >
               <Eye className="w-3.5 h-3.5" />
@@ -401,11 +401,11 @@ export default function CoursePlayer() {
             </button>
           )}
           {/* Welcome */}
-          <div className="flex items-center gap-2 text-gray-300">
-            <div className="w-7 h-7 rounded-full bg-teal-700/60 flex items-center justify-center">
-              <User className="w-3.5 h-3.5 text-teal-300" />
+          <div className="flex items-center gap-2 text-gray-600">
+            <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center">
+              <User className="w-3.5 h-3.5 text-teal-600" />
             </div>
-            <span className="text-xs">Welcome, <span className="font-medium text-white">{user?.name?.split(" ")[0] || "Student"}</span></span>
+            <span className="text-xs">Welcome, <span className="font-medium text-gray-900">{user?.name?.split(" ")[0] || "Student"}</span></span>
           </div>
         </div>
       </div>
@@ -420,18 +420,18 @@ export default function CoursePlayer() {
 
         {/* ── Left Sidebar — Course Modules ── */}
         <aside className={cn(
-          "flex flex-col bg-[#071e22] border-r border-teal-900/50 transition-all duration-300 shrink-0",
+          "flex flex-col bg-white border-r border-gray-200 transition-all duration-300 shrink-0",
           sidebarOpen ? "w-[17rem]" : "w-0 overflow-hidden"
         )}>
           {/* Sidebar Header */}
-          <div className="px-4 py-3 border-b border-teal-900/40 shrink-0">
+          <div className="px-4 py-3 border-b border-gray-200 shrink-0">
             <button
-              className="text-teal-500 text-[10px] font-medium flex items-center gap-1 mb-2 hover:text-teal-300 transition-colors"
+              className="text-teal-600 text-[10px] font-medium flex items-center gap-1 mb-2 hover:text-teal-800 transition-colors"
               onClick={() => navigate("/education-library")}
             >
               <ChevronLeft className="w-3 h-3" /> Back to Library
             </button>
-            <h3 className="text-teal-300 text-[11px] font-extrabold uppercase tracking-widest">Course Modules</h3>
+            <h3 className="text-teal-700 text-[11px] font-extrabold uppercase tracking-widest">Course Modules</h3>
           </div>
 
           {/* Module List */}
@@ -447,15 +447,15 @@ export default function CoursePlayer() {
                   className={cn(
                     "w-full text-left px-3 py-2.5 flex items-center gap-3 text-xs transition-all border-l-4",
                     active
-                      ? "bg-teal-600/25 text-white border-teal-400"
+                      ? "bg-teal-50 text-teal-900 border-teal-500"
                       : done
-                        ? "text-teal-400/70 hover:bg-teal-900/20 border-transparent"
-                        : "text-gray-300 hover:bg-teal-900/20 border-transparent",
+                        ? "text-gray-500 hover:bg-gray-50 border-transparent"
+                        : "text-gray-700 hover:bg-gray-50 border-transparent",
                   )}
                 >
                   <span className={cn(
                     "w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-extrabold shrink-0",
-                    active ? "bg-teal-400 text-[#071e22]" : done ? "bg-teal-700/70 text-teal-200" : "bg-teal-900/60 text-gray-400"
+                    active ? "bg-teal-500 text-white" : done ? "bg-teal-100 text-teal-700" : "bg-gray-100 text-gray-500"
                   )}>
                     {done ? "✓" : String(idx + 1).padStart(2, "0")}
                   </span>
@@ -483,17 +483,17 @@ export default function CoursePlayer() {
                     className={cn(
                       "w-full text-left px-3 py-2.5 flex items-center gap-3 text-xs transition-all border-l-4",
                       isSectionActive
-                        ? "bg-teal-600/25 text-white border-teal-400"
+                        ? "bg-teal-50 text-teal-900 border-teal-500"
                         : allSectionDone
-                          ? "text-teal-400/70 hover:bg-teal-900/20 border-transparent"
+                          ? "text-gray-500 hover:bg-gray-50 border-transparent"
                           : sectionLocked
-                            ? "text-gray-500 cursor-not-allowed border-transparent"
-                            : "text-gray-300 hover:bg-teal-900/20 border-transparent",
+                            ? "text-gray-400 cursor-not-allowed border-transparent"
+                            : "text-gray-700 hover:bg-gray-50 border-transparent",
                     )}
                   >
                     <span className={cn(
                       "w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-extrabold shrink-0",
-                      isSectionActive ? "bg-teal-400 text-[#071e22]" : allSectionDone ? "bg-teal-700/70 text-teal-200" : sectionLocked ? "bg-gray-700 text-gray-500" : "bg-teal-900/60 text-gray-400"
+                      isSectionActive ? "bg-teal-500 text-white" : allSectionDone ? "bg-teal-100 text-teal-700" : sectionLocked ? "bg-gray-100 text-gray-400" : "bg-gray-100 text-gray-500"
                     )}>
                       {sectionLocked ? <Lock className="w-3 h-3" /> : allSectionDone ? "✓" : String(sectionNum).padStart(2, "0")}
                     </span>
@@ -504,13 +504,13 @@ export default function CoursePlayer() {
                       )}
                     </div>
                     {isSectionActive && !sectionLocked && (
-                      <ChevronDown className="w-3 h-3 text-teal-400 shrink-0" />
+                      <ChevronDown className="w-3 h-3 text-teal-500 shrink-0" />
                     )}
                   </button>
 
                   {/* Expanded lessons within active section */}
                   {isSectionActive && !sectionLocked && (
-                    <div className="ml-10 border-l border-teal-800/40 pl-3 py-1">
+                    <div className="ml-10 border-l border-gray-200 pl-3 py-1">
                       {section.lessons.map((lesson: any) => {
                         const done = completedIds.has(lesson.id);
                         const active = lesson.id === selectedLessonId;
@@ -520,12 +520,12 @@ export default function CoursePlayer() {
                             onClick={() => setSelectedLessonId(lesson.id)}
                             className={cn(
                               "w-full text-left px-2 py-1.5 flex items-center gap-2 text-[11px] transition-colors rounded",
-                              active ? "text-teal-300 bg-teal-900/40" : done ? "text-teal-500/60" : "text-gray-400 hover:text-gray-200 hover:bg-teal-900/20",
+                              active ? "text-teal-700 bg-teal-50 font-semibold" : done ? "text-gray-400" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50",
                             )}
                           >
                             <LessonIcon type={lesson.type} done={done} />
                             <span className="truncate flex-1">{lesson.title}</span>
-                            {lesson.durationMinutes && <span className="text-[10px] text-gray-600 shrink-0">{lesson.durationMinutes}m</span>}
+                            {lesson.durationMinutes && <span className="text-[10px] text-gray-400 shrink-0">{lesson.durationMinutes}m</span>}
                           </button>
                         );
                       })}
@@ -537,7 +537,7 @@ export default function CoursePlayer() {
           </div>
 
           {/* Sidebar Footer Tabs */}
-          <div className="flex border-t border-teal-900/40 shrink-0">
+          <div className="flex border-t border-gray-200 shrink-0">
             {([
               { key: "lessons", icon: BookOpen, label: "Modules" },
               { key: "notes", icon: StickyNote, label: "Notes" },
@@ -548,7 +548,7 @@ export default function CoursePlayer() {
                 onClick={() => setSidebarTab(key)}
                 className={cn(
                   "flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[10px] transition-colors",
-                  sidebarTab === key ? "text-teal-400 border-t-2 border-teal-400 bg-teal-900/20" : "text-gray-500 hover:text-gray-300"
+                  sidebarTab === key ? "text-teal-600 border-t-2 border-teal-500 bg-teal-50" : "text-gray-500 hover:text-gray-700"
                 )}
               >
                 <Icon className="w-3.5 h-3.5" />
@@ -561,17 +561,17 @@ export default function CoursePlayer() {
         {/* ── Main Content Area ── */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Content Header */}
-          <div className="bg-[#0c2e33] border-b border-teal-900/40 px-5 py-2.5 flex items-center gap-3 shrink-0">
-            <button onClick={() => setSidebarOpen(o => !o)} className="text-gray-400 hover:text-white transition-colors shrink-0">
+          <div className="bg-white border-b border-gray-200 px-5 py-2.5 flex items-center gap-3 shrink-0">
+            <button onClick={() => setSidebarOpen(o => !o)} className="text-gray-400 hover:text-gray-700 transition-colors shrink-0">
               {sidebarOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
             </button>
             {moduleNum > 0 && (
-              <span className="text-teal-400 text-xs font-bold uppercase tracking-widest shrink-0">
+              <span className="text-teal-600 text-xs font-bold uppercase tracking-widest shrink-0">
                 Module {String(moduleNum).padStart(2, "0")}
               </span>
             )}
             {lessonData && (
-              <h1 className="font-extrabold text-white text-base tracking-tight truncate flex-1">{currentSection?.title || lessonData.title}</h1>
+              <h1 className="font-extrabold text-gray-900 text-base tracking-tight truncate flex-1">{currentSection?.title || lessonData.title}</h1>
             )}
             <div className="ml-auto flex items-center gap-2 shrink-0">
               {/* Admin: Edit content blocks */}
@@ -579,7 +579,7 @@ export default function CoursePlayer() {
                 <button
                   onClick={() => setShowBlockEditor(true)}
                   title="Edit lesson content blocks"
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border border-teal-700 text-teal-300 hover:bg-teal-900/30 transition-colors"
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border border-teal-400 text-teal-700 hover:bg-teal-50 transition-colors"
                 >
                   <Pencil className="w-3 h-3" /> Edit Content
                 </button>
@@ -588,7 +588,7 @@ export default function CoursePlayer() {
                 <button
                   onClick={() => toggleBookmark.mutate({ lessonId: selectedLessonId, courseSlug: slug! })}
                   title={isBookmarked ? "Remove bookmark" : "Bookmark this lesson"}
-                  className={cn("p-1.5 rounded-lg transition-colors", isBookmarked ? "text-teal-400 bg-teal-900/40" : "text-gray-500 hover:text-teal-400 hover:bg-teal-900/30")}
+                  className={cn("p-1.5 rounded-lg transition-colors", isBookmarked ? "text-teal-600 bg-teal-100" : "text-gray-400 hover:text-teal-600 hover:bg-teal-50")}
                 >
                   {isBookmarked ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
                 </button>
@@ -597,18 +597,18 @@ export default function CoursePlayer() {
                 <button
                   onClick={() => setSidebarTab("notes")}
                   title="View notes"
-                  className={cn("p-1.5 rounded-lg transition-colors", currentNote ? "text-amber-400 bg-amber-900/30" : "text-gray-500 hover:text-amber-400 hover:bg-amber-900/20")}
+                  className={cn("p-1.5 rounded-lg transition-colors", currentNote ? "text-amber-600 bg-amber-100" : "text-gray-400 hover:text-amber-600 hover:bg-amber-50")}
                 >
                   <StickyNote className="w-4 h-4" />
                 </button>
               )}
               {prevLesson && (
-                <Button size="sm" variant="outline" onClick={() => setSelectedLessonId(prevLesson.id)} className="text-xs h-7 border-teal-700 text-teal-300 hover:bg-teal-900/40 bg-transparent">
+                <Button size="sm" variant="outline" onClick={() => setSelectedLessonId(prevLesson.id)} className="text-xs h-7 border-teal-400 text-teal-700 hover:bg-teal-50">
                   <ChevronLeft className="w-3 h-3 mr-1" /> Prev
                 </Button>
               )}
               {nextLesson && (
-                <Button size="sm" variant="outline" onClick={() => setSelectedLessonId(nextLesson.id)} className="text-xs h-7 border-teal-700 text-teal-300 hover:bg-teal-900/40 bg-transparent">
+                <Button size="sm" variant="outline" onClick={() => setSelectedLessonId(nextLesson.id)} className="text-xs h-7 border-teal-400 text-teal-700 hover:bg-teal-50">
                   Next <ChevronRight className="w-3 h-3 ml-1" />
                 </Button>
               )}
@@ -619,8 +619,8 @@ export default function CoursePlayer() {
           <div className="flex-1 overflow-y-auto">
             {lessonLoading ? (
               <div className="p-8 space-y-4">
-                <Skeleton className="h-8 w-1/2 bg-teal-900/30" />
-                <Skeleton className="h-64 w-full bg-teal-900/30" />
+                <Skeleton className="h-8 w-1/2" />
+                <Skeleton className="h-64 w-full" />
               </div>
             ) : lessonData ? (
               <div className="flex flex-col lg:flex-row h-full">
@@ -635,7 +635,7 @@ export default function CoursePlayer() {
                     ) : (
                       <FileText className="w-6 h-6 text-teal-400 shrink-0 mt-1" />
                     )}
-                    <h2 className="text-2xl lg:text-3xl font-extrabold text-white uppercase tracking-tight leading-tight">
+                    <h2 className="text-2xl lg:text-3xl font-extrabold text-gray-900 uppercase tracking-tight leading-tight">
                       {lessonData.title}
                     </h2>
                   </div>
@@ -643,7 +643,7 @@ export default function CoursePlayer() {
                   {/* ── Video lesson ── */}
                   {(lessonData.type === "video" || lessonData.type === "video_text") && lessonData.content && (
                     <div className="mb-5">
-                      <div className="aspect-video bg-black rounded-xl overflow-hidden shadow-2xl ring-1 ring-teal-900/50">
+                      <div className="aspect-video bg-black rounded-xl overflow-hidden shadow-lg ring-1 ring-gray-200">
                         <video
                           ref={videoRef}
                           src={lessonData.content}
@@ -653,29 +653,29 @@ export default function CoursePlayer() {
                         />
                       </div>
                       {requireVideoCompletion && !videoWatched && (
-                        <p className="text-xs text-amber-400 mt-2">Watch the full video to mark this lesson complete.</p>
+                        <p className="text-xs text-amber-600 mt-2">Watch the full video to mark this lesson complete.</p>
                       )}
                     </div>
                   )}
 
                   {/* ── Text below video (video_text) ── */}
                   {lessonData.type === "video_text" && lessonData.videoContent && (
-                    <div className="bg-white/5 rounded-xl border border-white/10 p-5 mb-5">
-                      <div className="prose prose-sm prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: lessonData.videoContent }} />
+                    <div className="bg-gray-50 rounded-xl border border-gray-200 p-5 mb-5">
+                      <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: lessonData.videoContent }} />
                     </div>
                   )}
 
                   {/* ── Text lesson ── */}
                   {lessonData.type === "text" && lessonData.content && (
-                    <div className="bg-white/5 rounded-xl border border-white/10 p-5 mb-5">
-                      <div className="prose prose-sm prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: lessonData.content }} />
+                    <div className="bg-gray-50 rounded-xl border border-gray-200 p-5 mb-5">
+                      <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: lessonData.content }} />
                     </div>
                   )}
 
                   {/* ── Embed lesson ── */}
                   {lessonData.type === "embed" && lessonData.embedUrl && (
                     <div className="mb-5">
-                      <div className="aspect-video bg-black rounded-xl overflow-hidden shadow-2xl ring-1 ring-teal-900/50">
+                      <div className="aspect-video bg-black rounded-xl overflow-hidden shadow-lg ring-1 ring-gray-200">
                         <iframe
                           src={lessonData.embedUrl}
                           className="w-full h-full"
@@ -689,11 +689,11 @@ export default function CoursePlayer() {
 
                   {/* ── Download lesson ── */}
                   {lessonData.type === "download" && lessonData.content && (
-                    <div className="bg-white/5 rounded-xl border border-white/10 p-5 mb-5 flex items-center gap-4">
-                      <Download className="w-8 h-8 text-teal-400" />
+                    <div className="bg-gray-50 rounded-xl border border-gray-200 p-5 mb-5 flex items-center gap-4">
+                      <Download className="w-8 h-8 text-teal-600" />
                       <div>
-                        <p className="font-medium text-white">{lessonData.title}</p>
-                        <a href={lessonData.content} target="_blank" rel="noreferrer" className="text-teal-400 text-sm underline hover:text-teal-300">Download file</a>
+                        <p className="font-medium text-gray-900">{lessonData.title}</p>
+                        <a href={lessonData.content} target="_blank" rel="noreferrer" className="text-teal-600 text-sm underline hover:text-teal-800">Download file</a>
                       </div>
                     </div>
                   )}
@@ -726,18 +726,18 @@ export default function CoursePlayer() {
 
                   {/* ── Lesson Overview ── */}
                   {lessonData.description && contentBlocks.length === 0 && (
-                    <div className="mt-4 bg-white/5 rounded-xl border border-white/10 p-5">
-                      <h3 className="text-xs font-bold text-teal-300 uppercase tracking-wide mb-2">Lesson Overview</h3>
-                      <p className="text-gray-300 text-sm leading-relaxed">{lessonData.description}</p>
+                    <div className="mt-4 bg-gray-50 rounded-xl border border-gray-200 p-5">
+                      <h3 className="text-xs font-bold text-teal-700 uppercase tracking-wide mb-2">Lesson Overview</h3>
+                      <p className="text-gray-600 text-sm leading-relaxed">{lessonData.description}</p>
                     </div>
                   )}
 
                   {/* ── Inline note editor ── */}
                   {selectedLessonId && sidebarTab === "notes" && (
-                    <div className="mt-5 bg-amber-900/20 border border-amber-700/30 rounded-xl p-4">
+                    <div className="mt-5 bg-amber-50 border border-amber-200 rounded-xl p-4">
                       <div className="flex items-center gap-2 mb-2">
-                        <StickyNote className="w-4 h-4 text-amber-400" />
-                        <p className="text-sm font-medium text-amber-300">My Notes</p>
+                        <StickyNote className="w-4 h-4 text-amber-600" />
+                        <p className="text-sm font-medium text-amber-800">My Notes</p>
                       </div>
                       <LessonNoteEditor key={selectedLessonId} lessonId={selectedLessonId} courseSlug={slug!} initialNote={currentNote?.note ?? ""} />
                     </div>
@@ -747,12 +747,12 @@ export default function CoursePlayer() {
                   {lessonData.type !== "quiz" && (
                     <div className="mt-auto pt-5 pb-4 flex items-center justify-end gap-3 flex-wrap">
                       {nextLesson && (
-                        <Button variant="outline" onClick={() => setSelectedLessonId(nextLesson.id)} className="border-teal-700 text-teal-300 hover:bg-teal-900/40 bg-transparent text-sm">
+                        <Button variant="outline" onClick={() => setSelectedLessonId(nextLesson.id)} className="border-teal-400 text-teal-700 hover:bg-teal-50 text-sm">
                           Next Lesson <ChevronRight className="w-4 h-4 ml-1" />
                         </Button>
                       )}
                       {isCompleted ? (
-                        <div className="flex items-center gap-2 text-teal-400 text-sm font-semibold bg-teal-900/30 px-4 py-2 rounded-full">
+                        <div className="flex items-center gap-2 text-teal-700 text-sm font-semibold bg-teal-100 px-4 py-2 rounded-full">
                           <CheckCircle className="w-4 h-4" /> Completed
                         </div>
                       ) : (requireManualComplete || lessonData.type === "text" || lessonData.type === "video" || lessonData.type === "video_text" || lessonData.type === "embed" || lessonData.type === "download") ? (
@@ -771,17 +771,17 @@ export default function CoursePlayer() {
                 </div>
 
                 {/* ── Right Panel — "In This Lesson" ── */}
-                <div className="w-64 shrink-0 border-l border-teal-900/40 p-4 hidden lg:flex flex-col gap-4">
+                <div className="w-64 shrink-0 border-l border-gray-200 bg-gray-50 p-4 hidden lg:flex flex-col gap-4">
                   {learningObjectives.length > 0 && (
                     <div>
-                      <h3 className="text-xs font-bold text-teal-300 uppercase tracking-widest mb-3 flex items-center gap-2">
+                      <h3 className="text-xs font-bold text-teal-700 uppercase tracking-widest mb-3 flex items-center gap-2">
                         <ListChecks className="w-3.5 h-3.5" /> In This Lesson:
                       </h3>
                       <div className="space-y-2">
                         {learningObjectives.map((obj: string, i: number) => (
                           <div key={i} className="flex items-start gap-2">
-                            <CheckCircle className="w-3.5 h-3.5 text-teal-400 shrink-0 mt-0.5" />
-                            <span className="text-gray-300 text-xs leading-snug">{obj}</span>
+                            <CheckCircle className="w-3.5 h-3.5 text-teal-500 shrink-0 mt-0.5" />
+                            <span className="text-gray-600 text-xs leading-snug">{obj}</span>
                           </div>
                         ))}
                       </div>
@@ -790,8 +790,8 @@ export default function CoursePlayer() {
 
                   {/* Section lessons checklist */}
                   {currentSection && currentSection.lessons.length > 1 && (
-                    <div className="border-t border-teal-900/40 pt-4">
-                      <h3 className="text-xs font-bold text-teal-300 uppercase tracking-widest mb-3">In This Module:</h3>
+                    <div className="border-t border-gray-200 pt-4">
+                      <h3 className="text-xs font-bold text-teal-700 uppercase tracking-widest mb-3">In This Module:</h3>
                       <div className="space-y-1.5">
                         {currentSection.lessons.map((lesson: any) => {
                           const done = completedIds.has(lesson.id);
@@ -802,11 +802,11 @@ export default function CoursePlayer() {
                               onClick={() => setSelectedLessonId(lesson.id)}
                               className={cn(
                                 "w-full text-left flex items-start gap-2 py-1 text-[11px] transition-colors",
-                                active ? "text-teal-300" : done ? "text-gray-600 line-through" : "text-gray-400 hover:text-gray-200"
+                                active ? "text-teal-700 font-semibold" : done ? "text-gray-400 line-through" : "text-gray-600 hover:text-gray-900"
                               )}
                             >
                               <span className="mt-0.5 shrink-0">
-                                {done ? <CheckCircle className="w-3.5 h-3.5 text-teal-500" /> : active ? <PlayCircle className="w-3.5 h-3.5 text-teal-400" /> : <span className="w-3.5 h-3.5 rounded-full border border-gray-600 block" />}
+                                {done ? <CheckCircle className="w-3.5 h-3.5 text-teal-500" /> : active ? <PlayCircle className="w-3.5 h-3.5 text-teal-500" /> : <span className="w-3.5 h-3.5 rounded-full border border-gray-300 block" />}
                               </span>
                               <span className="leading-snug">{lesson.title}</span>
                             </button>
@@ -818,18 +818,18 @@ export default function CoursePlayer() {
 
                   {/* Duration */}
                   {lessonData.durationMinutes && (
-                    <div className="border-t border-teal-900/40 pt-3">
+                    <div className="border-t border-gray-200 pt-3">
                       <p className="text-[10px] text-gray-500 uppercase tracking-wide">Estimated duration</p>
-                      <p className="text-sm text-teal-300 font-semibold mt-0.5">{lessonData.durationMinutes} min</p>
+                      <p className="text-sm text-teal-700 font-semibold mt-0.5">{lessonData.durationMinutes} min</p>
                     </div>
                   )}
 
                   {/* Certificate */}
                   {certData && (
-                    <div className="border-t border-teal-900/40 pt-3">
+                    <div className="border-t border-gray-200 pt-3">
                       <button
                         onClick={() => setShowCertDialog(true)}
-                        className="text-xs text-teal-400 font-medium flex items-center gap-1 hover:text-teal-300"
+                        className="text-xs text-teal-600 font-medium flex items-center gap-1 hover:text-teal-800"
                       >
                         <Award className="w-3.5 h-3.5" /> View Certificate
                       </button>
@@ -839,8 +839,8 @@ export default function CoursePlayer() {
               </div>
             ) : (
               <div className="text-center text-gray-500 py-20">
-                <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                <p className="text-gray-400">Select a lesson to begin</p>
+                <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                <p className="text-gray-500">Select a lesson to begin</p>
               </div>
             )}
           </div>
@@ -849,7 +849,7 @@ export default function CoursePlayer() {
 
       {/* WYSIWYG Lesson Block Editor (admin only) */}
       {showBlockEditor && selectedLessonId && lessonData && (
-        <Suspense fallback={<div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center"><div className="text-white">Loading editor...</div></div>}>
+        <Suspense fallback={<div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center"><div className="bg-white text-gray-700 px-6 py-4 rounded-xl shadow-xl">Loading editor...</div></div>}>
           <LessonBlockEditor
             lessonId={selectedLessonId}
             courseSlug={slug!}

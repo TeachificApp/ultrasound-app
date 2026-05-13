@@ -1555,3 +1555,13 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Replace EditLessonDialog modal with full-screen LessonEditorPage (Settings + Content Blocks tabs)
 - [x] Remove Import Media button from curriculum section headers
 - [x] LessonBlockEditor WYSIWYG accessible from Content Blocks tab in lesson editor
+
+## Course Player & Lesson Editor Light Theme Conversion
+- [x] Convert CoursePlayer.tsx sidebar from dark teal (bg-[#0a2a2f]) to light (bg-white, border-gray-200)
+- [x] Convert CoursePlayer.tsx top header bar to light theme
+- [x] Convert CoursePlayer.tsx sidebar header, module list, section headers to light
+- [x] Convert CoursePlayer.tsx expanded lesson rows and sidebar footer tabs to light
+- [x] Convert CoursePlayer.tsx main content area, right panel, QuizRunner, notes/bookmarks to light
+- [x] Fix syntax error in CoursePlayer.tsx (missing opening paren in JSX conditional)
+- [x] Convert LMSAdmin.tsx LessonEditorPage header from dark teal to light (bg-white, text-teal-700)
+- [x] Local vite build passes cleanly after all light theme changes

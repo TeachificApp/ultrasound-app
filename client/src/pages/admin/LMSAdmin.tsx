@@ -1642,19 +1642,19 @@ function LessonEditorPage({ lesson, onClose, onSaved }: { lesson: any; onClose: 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-white overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-3 px-5 py-3 bg-[#0a2a2f] border-b border-teal-900/50 shrink-0">
-        <button onClick={onClose} className="text-gray-400 hover:text-white mr-1">
+      <div className="flex items-center gap-3 px-5 py-3 bg-white border-b border-gray-200 shrink-0">
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-700 mr-1">
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div className="flex-1">
-          <span className="text-teal-300 font-bold text-sm uppercase tracking-wide">Edit Lesson</span>
+          <span className="text-teal-700 font-bold text-sm uppercase tracking-wide">Edit Lesson</span>
           <span className="ml-3 text-gray-500 text-xs">{LESSON_TYPE_LABELS[lesson.type] ?? lesson.type}</span>
         </div>
         <div className="flex gap-1">
           <button
             onClick={() => setActiveTab("settings")}
             className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-colors ${
-              activeTab === "settings" ? "bg-teal-600 text-white" : "text-gray-400 hover:text-white"
+              activeTab === "settings" ? "bg-teal-600 text-white" : "text-gray-500 hover:text-gray-800"
             }`}
           >
             Settings
@@ -1662,7 +1662,7 @@ function LessonEditorPage({ lesson, onClose, onSaved }: { lesson: any; onClose: 
           <button
             onClick={() => setActiveTab("content")}
             className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-colors ${
-              activeTab === "content" ? "bg-teal-600 text-white" : "text-gray-400 hover:text-white"
+              activeTab === "content" ? "bg-teal-600 text-white" : "text-gray-500 hover:text-gray-800"
             }`}
           >
             Content Blocks
@@ -1670,7 +1670,8 @@ function LessonEditorPage({ lesson, onClose, onSaved }: { lesson: any; onClose: 
         </div>
       </div>
 
-      {/* Settings Tab */}
+      {/* Tab Content */}
+      <>
       {activeTab === "settings" && (
       <div className="flex-1 overflow-y-auto">
       <div className="max-w-2xl mx-auto px-6 py-6">
@@ -1796,7 +1797,7 @@ function LessonEditorPage({ lesson, onClose, onSaved }: { lesson: any; onClose: 
             {update.isPending ? "Saving..." : "Save Lesson"}
           </Button>
         </div>
-        </div>
+      </div>
       </div>
       )}
 
@@ -1813,6 +1814,7 @@ function LessonEditorPage({ lesson, onClose, onSaved }: { lesson: any; onClose: 
           />
         </div>
       )}
+      </>
       <MediaPickerDialog open={mediaPickerOpen} onClose={() => setMediaPickerOpen(false)} onSelect={asset => { setSelectedAsset(asset); setContent(asset.s3Url); }} />
     </div>
   );
