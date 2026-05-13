@@ -1607,7 +1607,7 @@ function AddLessonDialog({ courseId, sectionId, onClose, onCreated }: {
 // ─── Full-Screen Lesson Editor Page ─────────────────────────────────────────
 
 function LessonEditorPage({ lesson, onClose, onSaved }: { lesson: any; onClose: () => void; onSaved: () => void }) {
-  const [activeTab, setActiveTab] = useState<"settings" | "content">("settings");
+  const [activeTab, setActiveTab] = useState<"settings" | "content" | "quiz">("settings");
   const [title, setTitle] = useState(lesson.title);
   const [content, setContent] = useState(lesson.content ?? "");
   const [videoContent, setVideoContent] = useState(lesson.videoContent ?? "");
@@ -1667,6 +1667,16 @@ function LessonEditorPage({ lesson, onClose, onSaved }: { lesson: any; onClose: 
           >
             Content Blocks
           </button>
+          {lesson.type === "quiz" && (
+            <button
+              onClick={() => setActiveTab("quiz")}
+              className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                activeTab === "quiz" ? "bg-purple-600 text-white" : "text-gray-500 hover:text-gray-800"
+              }`}
+            >
+              <HelpCircle className="w-3 h-3" /> Quiz Builder
+            </button>
+          )}
         </div>
       </div>
 
@@ -1814,8 +1824,284 @@ function LessonEditorPage({ lesson, onClose, onSaved }: { lesson: any; onClose: 
           />
         </div>
       )}
+
+      {/* Quiz Builder Tab (quiz-type lessons only) */}
+      {activeTab === "quiz" && lesson.type === "quiz" && (
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-2xl mx-auto px-6 py-6">
+            <QuizBuilderInline lesson={lesson} courseId={lesson.courseId} />
+          </div>
+        </div>
+      )}
       </>
       <MediaPickerDialog open={mediaPickerOpen} onClose={() => setMediaPickerOpen(false)} onSelect={asset => { setSelectedAsset(asset); setContent(asset.s3Url); }} />
+    </div>
+  );
+}
+
+// ─── Quiz Builder Inline (embedded in LessonEditorPage Quiz tab) ─────────────
+
+function QuizBuilderInline({ lesson, courseId }: { lesson: any; courseId?: number }) {
+  const { data: quiz, refetch } = trpc.lmsAdmin.getQuiz.useQuery({ lessonId: lesson.id });
+  const [addingQuestion, setAddingQuestion] = useState(false);
+  const [newQ, setNewQ] = useState({ question: "", type: "mcq" as "mcq" | "truefalse", options: ["", "", "", ""], correctAnswer: "", explanation: "" });
+
+  // AI Generate state
+  const [showAIPanel, setShowAIPanel] = useState(false);
+  const [aiTopic, setAITopic] = useState("");
+  const [aiCount, setAICount] = useState(10);
+  const [aiDifficulty, setAIDifficulty] = useState<"beginner" | "intermediate" | "advanced">("intermediate");
+  const [aiQType, setAIQType] = useState<"mcq" | "truefalse" | "mixed">("mcq");
+  const [aiPreview, setAIPreview] = useState<Array<{ question: string; type: string; options: string[]; correctAnswer: string; explanation: string; selected: boolean }> | null>(null);
+
+  const updateQuiz = trpc.lmsAdmin.updateQuiz.useMutation({ onSuccess: () => { toast.success("Quiz settings saved"); refetch(); } });
+  const addQuestion = trpc.lmsAdmin.addQuestion.useMutation({
+    onSuccess: () => { toast.success("Question added"); setAddingQuestion(false); setNewQ({ question: "", type: "mcq", options: ["", "", "", ""], correctAnswer: "", explanation: "" }); refetch(); },
+    onError: e => toast.error(`Error: ${e.message}`),
+  });
+  const deleteQuestion = trpc.lmsAdmin.deleteQuestion.useMutation({ onSuccess: () => refetch() });
+  const aiGenerate = trpc.lmsAdmin.aiGenerateQuizQuestions.useMutation({
+    onSuccess: (data) => { setAIPreview(data.questions.map(q => ({ ...q, selected: true }))); },
+    onError: e => toast.error(`AI error: ${e.message}`),
+  });
+  const bulkInsert = trpc.lmsAdmin.bulkInsertQuizQuestions.useMutation({
+    onSuccess: (data) => {
+      toast.success(`${data.inserted} question${data.inserted === 1 ? "" : "s"} added`);
+      setShowAIPanel(false);
+      setAIPreview(null);
+      setAITopic("");
+      refetch();
+    },
+    onError: e => toast.error(`Error: ${e.message}`),
+  });
+
+  if (!quiz) return <div className="text-gray-400 text-sm py-8 text-center">Loading quiz...</div>;
+
+  return (
+    <div className="space-y-5">
+      {/* Quiz settings */}
+      <div className="flex flex-wrap gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+        <div className="flex items-center gap-2">
+          <Label className="text-sm whitespace-nowrap">Passing score:</Label>
+          <Input type="number" min="0" max="100" defaultValue={quiz.passingScore} className="w-16 h-7 text-sm text-center"
+            onBlur={e => updateQuiz.mutate({ lessonId: lesson.id, passingScore: parseInt(e.target.value) })} />
+          <span className="text-sm text-gray-500">%</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch defaultChecked={quiz.allowRetakes} onCheckedChange={v => updateQuiz.mutate({ lessonId: lesson.id, allowRetakes: v })} id="inline-retakes" />
+          <Label htmlFor="inline-retakes" className="text-sm">Allow retakes</Label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch defaultChecked={quiz.showCorrectAnswers} onCheckedChange={v => updateQuiz.mutate({ lessonId: lesson.id, showCorrectAnswers: v })} id="inline-show-answers" />
+          <Label htmlFor="inline-show-answers" className="text-sm">Show correct answers</Label>
+        </div>
+        <div className="ml-auto">
+          <Button size="sm" variant="outline" className="border-teal-300 text-teal-700 hover:bg-teal-50 gap-1.5" onClick={() => { setAIPreview(null); setShowAIPanel(p => !p); }}>
+            <Sparkles className="w-3.5 h-3.5" /> AI Generate
+          </Button>
+        </div>
+      </div>
+
+      {/* AI Generate Panel */}
+      {showAIPanel && (
+        <div className="border border-purple-200 rounded-xl p-5 bg-purple-50 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-purple-800 flex items-center gap-2"><Sparkles className="w-4 h-4" /> AI Question Generator</h3>
+            {courseId && <span className="text-xs text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">Course context enabled</span>}
+          </div>
+
+          {!aiPreview ? (
+            <div className="space-y-4">
+              <div>
+                <Label className="text-sm font-medium">Topic *</Label>
+                <Input value={aiTopic} onChange={e => setAITopic(e.target.value)} placeholder="e.g. Doppler physics, DVT diagnosis criteria, Normal fetal echo anatomy" className="mt-1" />
+                <p className="text-xs text-gray-500 mt-1">{courseId ? "The AI will use this course's content as context to generate relevant questions." : "Be specific — the AI will generate clinically accurate questions tailored to your topic."}</p>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <Label className="text-sm font-medium">Number of Questions</Label>
+                  <Select value={String(aiCount)} onValueChange={v => setAICount(Number(v))}>
+                    <SelectTrigger className="mt-1 h-9 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {[5, 10, 15, 20, 25, 30, 40, 50].map(n => (
+                        <SelectItem key={n} value={String(n)}>{n} questions</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Difficulty</Label>
+                  <Select value={aiDifficulty} onValueChange={v => setAIDifficulty(v as any)}>
+                    <SelectTrigger className="mt-1 h-9 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="beginner">Beginner</SelectItem>
+                      <SelectItem value="intermediate">Intermediate</SelectItem>
+                      <SelectItem value="advanced">Advanced</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Question Type</Label>
+                  <Select value={aiQType} onValueChange={v => setAIQType(v as any)}>
+                    <SelectTrigger className="mt-1 h-9 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="mcq">Multiple Choice</SelectItem>
+                      <SelectItem value="truefalse">True / False</SelectItem>
+                      <SelectItem value="mixed">Mixed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setShowAIPanel(false)}>Cancel</Button>
+                <Button
+                  className="bg-purple-600 hover:bg-purple-700 text-white gap-2"
+                  size="sm"
+                  disabled={!aiTopic.trim() || aiGenerate.isPending}
+                  onClick={() => aiGenerate.mutate({ quizId: quiz.id, topic: aiTopic.trim(), count: aiCount, difficulty: aiDifficulty, questionType: aiQType, courseId })}
+                >
+                  {aiGenerate.isPending ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</> : <><Sparkles className="w-4 h-4" /> Generate {aiCount} Questions</>}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-gray-600">{aiPreview.filter(q => q.selected).length} of {aiPreview.length} questions selected</p>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="ghost" className="text-xs h-7" onClick={() => setAIPreview(p => p!.map(q => ({ ...q, selected: true })))}>Select All</Button>
+                  <Button size="sm" variant="ghost" className="text-xs h-7" onClick={() => setAIPreview(p => p!.map(q => ({ ...q, selected: false })))}>Deselect All</Button>
+                  <Button size="sm" variant="ghost" className="text-xs h-7 text-purple-600" onClick={() => setAIPreview(null)}>← Back</Button>
+                </div>
+              </div>
+              <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-1">
+                {aiPreview.map((q, qi) => (
+                  <div key={qi} className={`border rounded-lg p-3 cursor-pointer transition-colors ${q.selected ? "border-purple-400 bg-purple-50" : "border-gray-200 bg-white opacity-60"}`}
+                    onClick={() => setAIPreview(p => p!.map((item, i) => i === qi ? { ...item, selected: !item.selected } : item))}>
+                    <div className="flex items-start gap-2">
+                      <div className={`mt-0.5 w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center text-xs ${q.selected ? "bg-purple-600 border-purple-600 text-white" : "border-gray-300"}`}>{q.selected ? "✓" : ""}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-800">{qi + 1}. {q.question}</p>
+                        <div className="mt-1.5 space-y-0.5">
+                          {(q.options ?? []).map((opt: string) => (
+                            <p key={opt} className={`text-xs px-2 py-0.5 rounded ${opt === q.correctAnswer ? "bg-green-100 text-green-700 font-medium" : "text-gray-500"}`}>{opt === q.correctAnswer ? "✓ " : "○ "}{opt}</p>
+                          ))}
+                        </div>
+                        {q.explanation && <p className="text-xs text-gray-400 mt-1 italic">{q.explanation}</p>}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => { setShowAIPanel(false); setAIPreview(null); }}>Cancel</Button>
+                <Button
+                  className="bg-purple-600 hover:bg-purple-700 text-white gap-2"
+                  size="sm"
+                  disabled={aiPreview.filter(q => q.selected).length === 0 || bulkInsert.isPending}
+                  onClick={() => bulkInsert.mutate({
+                    quizId: quiz.id,
+                    questions: aiPreview.filter(q => q.selected).map(({ selected: _s, ...q }) => ({
+                      question: q.question, type: q.type as "mcq" | "truefalse", options: q.options, correctAnswer: q.correctAnswer, explanation: q.explanation,
+                    })),
+                  })}
+                >
+                  {bulkInsert.isPending ? <><Loader2 className="w-4 h-4 animate-spin" /> Inserting...</> : <>Add {aiPreview.filter(q => q.selected).length} Questions to Quiz</>}
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Questions list */}
+      <div className="space-y-3">
+        {(quiz.questions ?? []).map((q: any, qi: number) => {
+          const options = q.options ? JSON.parse(q.options) : [];
+          return (
+            <div key={q.id} className="border border-gray-200 rounded-lg p-4">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm font-medium text-gray-800">{qi + 1}. {q.question}</p>
+                <Button size="sm" variant="ghost" className="h-6 text-red-400 flex-shrink-0" onClick={() => deleteQuestion.mutate({ id: q.id })}>
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </div>
+              {options.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {options.map((opt: string) => (
+                    <li key={opt} className={`text-xs px-2 py-1 rounded ${opt === q.correctAnswer ? "bg-green-50 text-green-700 font-medium" : "text-gray-500"}`}>
+                      {opt === q.correctAnswer ? "✓ " : "○ "}{opt}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {q.explanation && <p className="text-xs text-gray-400 mt-1 italic">{q.explanation}</p>}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Add question */}
+      {addingQuestion ? (
+        <div className="border border-teal-200 rounded-lg p-4 space-y-3 bg-teal-50">
+          <div>
+            <Label className="text-sm">Question *</Label>
+            <Input value={newQ.question} onChange={e => setNewQ(q => ({ ...q, question: e.target.value }))} className="mt-1" />
+          </div>
+          <div>
+            <Label className="text-sm">Type</Label>
+            <Select value={newQ.type} onValueChange={v => setNewQ(q => ({ ...q, type: v as any }))}>
+              <SelectTrigger className="mt-1 w-36 h-8 text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="mcq">Multiple Choice</SelectItem>
+                <SelectItem value="truefalse">True / False</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {newQ.type === "mcq" && (
+            <div className="space-y-2">
+              <Label className="text-sm">Options</Label>
+              {newQ.options.map((opt, oi) => (
+                <Input key={oi} value={opt} onChange={e => setNewQ(q => { const o = [...q.options]; o[oi] = e.target.value; return { ...q, options: o }; })} placeholder={`Option ${oi + 1}`} className="h-8 text-sm" />
+              ))}
+            </div>
+          )}
+          <div>
+            <Label className="text-sm">Correct Answer *</Label>
+            {newQ.type === "truefalse" ? (
+              <Select value={newQ.correctAnswer} onValueChange={v => setNewQ(q => ({ ...q, correctAnswer: v }))}>
+                <SelectTrigger className="mt-1 w-32 h-8 text-sm"><SelectValue placeholder="Select" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="True">True</SelectItem>
+                  <SelectItem value="False">False</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input value={newQ.correctAnswer} onChange={e => setNewQ(q => ({ ...q, correctAnswer: e.target.value }))} placeholder="Must match one of the options exactly" className="mt-1" />
+            )}
+          </div>
+          <div>
+            <Label className="text-sm">Explanation (optional)</Label>
+            <Input value={newQ.explanation} onChange={e => setNewQ(q => ({ ...q, explanation: e.target.value }))} className="mt-1" />
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => setAddingQuestion(false)}>Cancel</Button>
+            <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" disabled={!newQ.question.trim() || !newQ.correctAnswer.trim() || addQuestion.isPending}
+              onClick={() => addQuestion.mutate({
+                quizId: quiz.id, question: newQ.question.trim(), type: newQ.type,
+                options: newQ.type === "mcq" ? newQ.options.filter(o => o.trim()) : undefined,
+                correctAnswer: newQ.correctAnswer.trim(), explanation: newQ.explanation.trim() || undefined,
+                position: (quiz.questions?.length ?? 0),
+              })}>
+              {addQuestion.isPending ? "Adding..." : "Add Question"}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button size="sm" variant="outline" className="border-dashed border-teal-300 text-teal-600 hover:bg-teal-50" onClick={() => setAddingQuestion(true)}>
+          <Plus className="w-4 h-4 mr-1" /> Add Question
+        </Button>
+      )}
     </div>
   );
 }

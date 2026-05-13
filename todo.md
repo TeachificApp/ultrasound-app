@@ -1556,6 +1556,12 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Remove Import Media button from curriculum section headers
 - [x] LessonBlockEditor WYSIWYG accessible from Content Blocks tab in lesson editor
 
+## Quiz Builder Enhancements
+- [x] Add optional courseId parameter to aiGenerateQuizQuestions — injects course title, modules, and lesson list as AI context
+- [x] Add Quiz Builder tab to LessonEditorPage for quiz-type lessons (QuizBuilderInline component)
+- [x] AI Generate panel in QuizBuilderInline shows "Course context enabled" badge when courseId is present
+- [x] All 854 tests passing after quiz builder changes
+
 ## Course Player & Lesson Editor Light Theme Conversion
 - [x] Convert CoursePlayer.tsx sidebar from dark teal (bg-[#0a2a2f]) to light (bg-white, border-gray-200)
 - [x] Convert CoursePlayer.tsx top header bar to light theme

@@ -1380,11 +1380,39 @@ export const lmsAdminRouter = router({
       count: z.number().int().min(1).max(50).default(10),
       difficulty: z.enum(["beginner", "intermediate", "advanced"]).default("intermediate"),
       questionType: z.enum(["mcq", "truefalse", "mixed"]).default("mcq"),
+      courseId: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Optionally inject course content as context
+      let courseContext = "";
+      if (input.courseId) {
+        try {
+          const [course] = await db
+            .select({ title: lmsCourses.title, description: lmsCourses.description })
+            .from(lmsCourses)
+            .where(eq(lmsCourses.id, input.courseId))
+            .limit(1);
+          if (course) {
+            const sections = await db
+              .select({ title: lmsSections.title })
+              .from(lmsSections)
+              .where(eq(lmsSections.courseId, input.courseId))
+              .orderBy(asc(lmsSections.position));
+            const lessons = await db
+              .select({ title: lmsLessons.title, description: lmsLessons.description })
+              .from(lmsLessons)
+              .where(eq(lmsLessons.courseId, input.courseId))
+              .orderBy(asc(lmsLessons.position));
+            courseContext = `\n\nCourse context for question generation:\nCourse: "${course.title}"\nDescription: ${course.description ?? "N/A"}\nModules: ${sections.map(s => s.title).join(", ") || "N/A"}\nLessons: ${lessons.map(l => l.title).join(", ") || "N/A"}\n\nUse this course content to make questions directly relevant to what students are learning.`;
+          }
+        } catch {
+          // Ignore context fetch errors — proceed without course context
+        }
+      }
 
       const typeInstruction =
         input.questionType === "mcq"
@@ -1397,7 +1425,7 @@ export const lmsAdminRouter = router({
 
       const userPrompt = `Generate exactly ${input.count} quiz questions about: "${input.topic}".
 Difficulty: ${input.difficulty}.
-${typeInstruction}
+${typeInstruction}${courseContext}
 
 Return a JSON array of objects with this exact shape:
 [
