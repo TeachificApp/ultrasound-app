@@ -15,6 +15,42 @@ import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } fro
 import CheckoutFormBlock from "@/components/CheckoutFormBlock";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 
+// ─── Opt-Out Link Component ─────────────────────────────────────────────────
+
+function OptOutLink({ d }: { d: Record<string, any> }) {
+  const enabled = !!d.optOutEnabled;
+  const text = d.optOutText || "No thanks, I don't want this offer";
+  const linkType: string = d.optOutLinkType ?? "custom";
+
+  // Hooks must always be called unconditionally — early return moved below
+  const { data: courseSlug } = trpc.lms.getSlugById.useQuery(
+    { id: Number(d.optOutCourseId) || 0 },
+    { enabled: enabled && linkType === "course" && !!d.optOutCourseId }
+  );
+  const { data: downloadSlug } = trpc.downloads.getSlugById.useQuery(
+    { id: Number(d.optOutDownloadId) || 0 },
+    { enabled: enabled && linkType === "download" && !!d.optOutDownloadId }
+  );
+
+  if (!enabled) return null;
+
+  let href = "#";
+  if (linkType === "course" && courseSlug) href = `/courses/${courseSlug}`;
+  else if (linkType === "download" && downloadSlug) href = `/downloads/${downloadSlug}`;
+  else if (linkType === "custom" && d.optOutCustomUrl) href = d.optOutCustomUrl;
+
+  return (
+    <div className="mt-4 text-center">
+      <a
+        href={href}
+        className="text-sm text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors"
+      >
+        {text}
+      </a>
+    </div>
+  );
+}
+
 // ─── Live Countdown Hook ─────────────────────────────────────────────────────
 
 function useCountdown(mode: "on_load" | "event", durationMinutes: number, targetDate?: string) {
@@ -237,6 +273,7 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
               style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#ffffff" }}>
               {d.ctaText ?? "Get Started"}
             </button>
+            <OptOutLink d={d} />
           </div>
         </div>
       );
@@ -250,6 +287,7 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
               style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#ffffff" }}>
               {d.ctaText ?? "Get Started"}
             </a>
+            <OptOutLink d={d} />
           </div>
         </div>
       );
@@ -537,6 +575,7 @@ function PriceStackBlock({ data: d, funnelSlug, nextPage }: { data: Record<strin
             {d.ctaText}
           </a>
         )}
+        <OptOutLink d={d} />
       </div>
     </div>
   );
@@ -584,6 +623,7 @@ function UrgencyOfferBlock({ data: d, funnelSlug, nextPage }: { data: Record<str
             {d.ctaText}
           </a>
         )}
+        <OptOutLink d={d} />
       </div>
     </div>
   );

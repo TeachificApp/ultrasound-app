@@ -138,6 +138,13 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
   const initialized = useRef(false);
   const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
   const thumbnailInputRef = useRef<HTMLInputElement>(null);
+  const [slug, setSlug] = useState("");
+  const [metaTitle, setMetaTitle] = useState("");
+  const [metaDescription, setMetaDescription] = useState("");
+  const updateSettingsMut = trpc.downloadsAdmin.updateDownloadSettings.useMutation({
+    onSuccess: () => toast.success("URL & SEO settings saved"),
+    onError: (e) => toast.error(e.message),
+  });
 
   if (isLoading) return <div className="text-center py-8 text-muted-foreground">Loading...</div>;
   if (!product) return <div className="text-center py-8 text-muted-foreground">Product not found</div>;
@@ -157,6 +164,9 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
       landingBody: product.landingBody ?? "",
       landingFeatures: product.landingFeatures ?? "",
     });
+    setSlug(product.slug ?? "");
+    setMetaTitle((product as any).metaTitle ?? "");
+    setMetaDescription((product as any).metaDescription ?? "");
   }
 
   const handleSave = () => {
@@ -349,6 +359,35 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
 
       {/* Files */}
       <FileManager productId={productId} files={product.files} />
+
+      {/* URL & SEO Settings */}
+      <Card>
+        <CardHeader><CardTitle className="text-sm flex items-center gap-2"><LinkIcon className="w-4 h-4 text-teal-600" /> URL &amp; SEO Settings</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label className="text-sm">URL Slug</Label>
+            <div className="mt-1 flex items-center gap-2">
+              <span className="text-xs text-muted-foreground whitespace-nowrap">/downloads/</span>
+              <Input value={slug} onChange={e => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-"))} placeholder="product-url-slug" className="flex-1" />
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Lowercase letters, numbers, and hyphens only. Changing this will break existing links.</p>
+          </div>
+          <div>
+            <Label className="text-sm">Meta Title (SEO)</Label>
+            <Input value={metaTitle} onChange={e => setMetaTitle(e.target.value)} placeholder="Leave blank to use product title" className="mt-1" maxLength={255} />
+          </div>
+          <div>
+            <Label className="text-sm">Meta Description (SEO)</Label>
+            <Textarea value={metaDescription} onChange={e => setMetaDescription(e.target.value)} placeholder="Brief description for search engines (150-160 characters)" className="mt-1 resize-none h-20" maxLength={500} />
+          </div>
+          <Button size="sm" variant="outline" className="border-teal-300 text-teal-600 hover:bg-teal-50"
+            disabled={updateSettingsMut.isPending}
+            onClick={() => updateSettingsMut.mutate({ id: productId, slug: slug.trim() || product.slug, metaTitle: metaTitle.trim() || undefined, metaDescription: metaDescription.trim() || undefined })}
+          >
+            {updateSettingsMut.isPending ? "Saving..." : "Save URL & SEO"}
+          </Button>
+        </CardContent>
+      </Card>
 
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={onBack}>Cancel</Button>

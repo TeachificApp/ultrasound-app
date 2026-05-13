@@ -392,6 +392,76 @@ function CreateFunnelDialog({ onClose, onCreated }: { onClose: () => void; onCre
   );
 }
 
+// ─── Funnel Settings Panel ──────────────────────────────────────────────────
+
+function FunnelSettingsPanel({ funnel, funnelId, onUpdate }: { funnel: any; funnelId: number; onUpdate: any }) {
+  const [slug, setSlug] = useState(funnel.slug ?? "");
+  const [metaTitle, setMetaTitle] = useState(funnel.metaTitle ?? "");
+  const [metaDescription, setMetaDescription] = useState(funnel.metaDescription ?? "");
+  const [thankYouUrl, setThankYouUrl] = useState(funnel.thankYouUrl ?? "");
+  const updateFunnelSettings = trpc.funnel.updateFunnelSettings.useMutation({
+    onSuccess: () => toast.success("Funnel settings saved"),
+    onError: (e: any) => toast.error(e.message),
+  });
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6 space-y-5">
+      <h3 className="font-semibold text-gray-900 text-sm">Funnel Settings</h3>
+      {/* Colors & Description */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Accent Color</label>
+          <div className="flex items-center gap-2">
+            <input type="color" value={funnel.accentColor} onChange={e => onUpdate.mutate({ id: funnelId, accentColor: e.target.value })} className="w-8 h-8 rounded cursor-pointer border border-gray-200" />
+            <span className="text-xs text-gray-500">{funnel.accentColor}</span>
+          </div>
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Background Color</label>
+          <div className="flex items-center gap-2">
+            <input type="color" value={funnel.bgColor} onChange={e => onUpdate.mutate({ id: funnelId, bgColor: e.target.value })} className="w-8 h-8 rounded cursor-pointer border border-gray-200" />
+            <span className="text-xs text-gray-500">{funnel.bgColor}</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <label className="text-xs text-gray-500 block mb-1">Description</label>
+        <Textarea defaultValue={funnel.description || ""} onBlur={e => onUpdate.mutate({ id: funnelId, description: e.target.value || null })} className="text-sm min-h-[60px]" />
+      </div>
+      {/* URL & SEO */}
+      <div className="border-t border-gray-100 pt-4 space-y-3">
+        <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">URL &amp; SEO</h4>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">URL Slug</label>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400 whitespace-nowrap">/f/</span>
+            <Input value={slug} onChange={e => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-"))} placeholder="funnel-slug" className="flex-1 h-8 text-sm" />
+          </div>
+          <p className="text-xs text-gray-400 mt-1">Changing this will break existing links to this funnel.</p>
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Meta Title (SEO)</label>
+          <Input value={metaTitle} onChange={e => setMetaTitle(e.target.value)} placeholder="Leave blank to use funnel name" className="h-8 text-sm" maxLength={255} />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Meta Description (SEO)</label>
+          <Textarea value={metaDescription} onChange={e => setMetaDescription(e.target.value)} placeholder="Brief description for search engines" className="text-sm min-h-[60px] resize-none" maxLength={500} />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Thank-You / Post-Purchase Redirect URL</label>
+          <Input value={thankYouUrl} onChange={e => setThankYouUrl(e.target.value)} placeholder="https://example.com/thank-you (leave blank to use thank-you page)" className="h-8 text-sm" />
+          <p className="text-xs text-gray-400 mt-1">Override the default thank-you page with a custom redirect URL after purchase.</p>
+        </div>
+        <Button size="sm" variant="outline" className="border-teal-300 text-teal-600 hover:bg-teal-50"
+          disabled={updateFunnelSettings.isPending}
+          onClick={() => updateFunnelSettings.mutate({ funnelId, slug: slug.trim() || funnel.slug, name: funnel.name, metaTitle: metaTitle.trim() || undefined, metaDescription: metaDescription.trim() || undefined, thankYouUrl: thankYouUrl.trim() || undefined, status: funnel.status })}
+        >
+          {updateFunnelSettings.isPending ? "Saving..." : "Save URL & SEO"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Funnel Detail / Editor View ──────────────────────────────────────────────
 
 function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; onBack: () => void; onEditPage: (funnelId: number, pageId: number) => void }) {
@@ -522,29 +592,7 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
 
       {/* Settings Panel (collapsible) */}
       {showSettings && (
-        <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6 space-y-4">
-          <h3 className="font-semibold text-gray-900 text-sm">Funnel Settings</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Accent Color</label>
-              <div className="flex items-center gap-2">
-                <input type="color" value={funnel.accentColor} onChange={e => updateFunnel.mutate({ id: funnelId, accentColor: e.target.value })} className="w-8 h-8 rounded cursor-pointer border border-gray-200" />
-                <span className="text-xs text-gray-500">{funnel.accentColor}</span>
-              </div>
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Background Color</label>
-              <div className="flex items-center gap-2">
-                <input type="color" value={funnel.bgColor} onChange={e => updateFunnel.mutate({ id: funnelId, bgColor: e.target.value })} className="w-8 h-8 rounded cursor-pointer border border-gray-200" />
-                <span className="text-xs text-gray-500">{funnel.bgColor}</span>
-              </div>
-            </div>
-          </div>
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">Description</label>
-            <Textarea defaultValue={funnel.description || ""} onBlur={e => updateFunnel.mutate({ id: funnelId, description: e.target.value || null })} className="text-sm min-h-[60px]" />
-          </div>
-        </div>
+        <FunnelSettingsPanel funnel={funnel} funnelId={funnelId} onUpdate={updateFunnel} />
       )}
 
       {/* Page Flow Visualization */}

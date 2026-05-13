@@ -125,9 +125,11 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
     defaultData: { headline: "Course Modules", cards: [{ front: "Module 1", back: "Description of module 1 content" }, { front: "Module 2", back: "Description of module 2 content" }], accentColor: "#179ca3", bgColor: "#f8fffe" } },
   // ── Conversion
   { type: "pricing_cta", label: "Pricing / Enroll CTA", icon: <CreditCard size={14} />, category: "Conversion",
-    defaultData: { headline: "Ready to Get Started?", subtext: "Join thousands of sonographers improving their skills.", ctaText: "Enroll Now", ctaColor: "#179ca3", ctaTextColor: "#ffffff", bgColor: "#ffffff", showPrice: true, originalPrice: "", showOriginalPrice: false } },
+    defaultData: { headline: "Ready to Get Started?", subtext: "Join thousands of sonographers improving their skills.", ctaText: "Enroll Now", ctaColor: "#179ca3", ctaTextColor: "#ffffff", bgColor: "#ffffff", showPrice: true, originalPrice: "", showOriginalPrice: false,
+      optOutEnabled: false, optOutText: "No thanks, I don't want this offer", optOutLinkType: "custom", optOutCourseId: null, optOutDownloadId: null, optOutCustomUrl: "" } },
   { type: "cta_standalone", label: "Call to Action", icon: <CheckSquare size={14} />, category: "Conversion",
-    defaultData: { headline: "Start Learning Today", subtext: "", ctaText: "Get Started", ctaLink: "", ctaColor: "#179ca3", ctaTextColor: "#ffffff", bgColor: "#f0fafa", align: "center" } },
+    defaultData: { headline: "Start Learning Today", subtext: "", ctaText: "Get Started", ctaLink: "", ctaColor: "#179ca3", ctaTextColor: "#ffffff", bgColor: "#f0fafa", align: "center",
+      optOutEnabled: false, optOutText: "No thanks, take me to my course", optOutLinkType: "custom", optOutCourseId: null, optOutDownloadId: null, optOutCustomUrl: "" } },
   { type: "lead_capture", label: "Lead Capture Form", icon: <BookMarked size={14} />, category: "Conversion",
     defaultData: { headline: "Get a Free Preview", subtext: "Enter your email to get instant access.", ctaText: "Send Me Access", bgColor: "#179ca3", textColor: "#ffffff" } },
   { type: "funnel_workflow", label: "Funnel Workflow", icon: <Layers size={14} />, category: "Funnel",
@@ -164,6 +166,7 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
       totalValueText: "TOTAL VALUE: Over $5000", originalPrice: "NORMALLY $3497", finalPrice: "$2497", finalPriceLabel: "Today Only:",
       ctaText: "ENROLL NOW", ctaLink: "", ctaColor: "#179ca3", ctaTextColor: "#ffffff",
       bgColor: "#ffffff", textColor: "#0e1e2e", borderColor: "#1a5f7a", showBorder: true,
+      optOutEnabled: false, optOutText: "No thanks, I'll pass on this offer", optOutLinkType: "custom", optOutCourseId: null, optOutDownloadId: null, optOutCustomUrl: "",
     } },
   { type: "urgency_offer", label: "Urgency Offer", icon: <Timer size={14} />, category: "Funnel",
     defaultData: {
@@ -171,6 +174,7 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
       description: "Upgrade your experience with an exclusive hands-on workshop",
       bodyHtml: "<p>You can understand ultrasound...</p><p>But confidence comes from putting your hands on the probe. <strong>This is where everything clicks.</strong></p>",
       ctaText: "Add on now for $2497", ctaEmoji: "\uD83D\uDC4D", ctaLink: "",
+      optOutEnabled: false, optOutText: "No thanks, I don't want this upgrade", optOutLinkType: "custom", optOutCourseId: null, optOutDownloadId: null, optOutCustomUrl: "",
       countdownMode: "on_load", countdownMinutes: 90, countdownTargetDate: "",
       countdownHeadline: "LIMITED TIME OFFER!",
       bgColor: "#ffffff", textColor: "#0e1e2e", accentColor: "#179ca3", showBorder: true,
@@ -970,6 +974,111 @@ function BSLinkField({ label = "Button Link", value, onChange }: { label?: strin
   );
 }
 
+// ─── Opt-Out Link Settings panel (shared across CTA blocks) ──────────────────
+function OptOutSettings({ d, set }: { d: Record<string, any>; set: (key: string, value: any) => void }) {
+  const enabled = d.optOutEnabled ?? false;
+  const linkType: "course" | "download" | "custom" = d.optOutLinkType ?? "custom";
+
+  const { data: coursesData } = trpc.lms.listCourses.useQuery(
+    { pageSize: 50 },
+    { enabled: enabled && linkType === "course" }
+  );
+  const { data: downloadsData } = trpc.downloads.list.useQuery(
+    { limit: 50 },
+    { enabled: enabled && linkType === "download" }
+  );
+
+  const courses = coursesData?.courses ?? [];
+  const downloads = downloadsData?.products ?? [];
+
+  return (
+    <div className="border border-dashed border-gray-200 rounded p-3 space-y-2 mt-2">
+      <div className="flex items-center justify-between">
+        <label className="text-xs font-medium text-gray-700">Opt-Out Link</label>
+        <button
+          onClick={() => set("optOutEnabled", !enabled)}
+          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+            enabled ? "bg-teal-600" : "bg-gray-200"
+          }`}
+        >
+          <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+            enabled ? "translate-x-5" : "translate-x-1"
+          }`} />
+        </button>
+      </div>
+      {enabled && (
+        <>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">"No thanks" text</label>
+            <DebouncedInput
+              value={d.optOutText ?? "No thanks, I don't want this offer"}
+              onChange={v => set("optOutText", v)}
+              className="h-7 text-xs"
+              placeholder="No thanks, take me to my course"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Redirect to</label>
+            <div className="flex gap-1 mb-1.5">
+              {(["course", "download", "custom"] as const).map(t => (
+                <button
+                  key={t}
+                  onClick={() => { set("optOutLinkType", t); set("optOutCourseId", null); set("optOutDownloadId", null); set("optOutCustomUrl", ""); }}
+                  className={`flex-1 py-1 text-[10px] rounded border capitalize ${
+                    linkType === t ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600 hover:border-teal-400"
+                  }`}
+                >
+                  {t === "course" ? "Course" : t === "download" ? "Download" : "Custom URL"}
+                </button>
+              ))}
+            </div>
+            {linkType === "course" && (
+              <Select
+                value={d.optOutCourseId ? String(d.optOutCourseId) : ""}
+                onValueChange={v => set("optOutCourseId", v ? Number(v) : null)}
+              >
+                <SelectTrigger className="h-7 text-xs">
+                  <SelectValue placeholder={courses.length === 0 ? "Loading..." : "Select a course"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {courses.map((c: any) => (
+                    <SelectItem key={c.id} value={String(c.id)}>{c.title}</SelectItem>
+                  ))}
+                  {courses.length === 0 && <SelectItem value="__none__" disabled>No published courses found</SelectItem>}
+                </SelectContent>
+              </Select>
+            )}
+            {linkType === "download" && (
+              <Select
+                value={d.optOutDownloadId ? String(d.optOutDownloadId) : ""}
+                onValueChange={v => set("optOutDownloadId", v ? Number(v) : null)}
+              >
+                <SelectTrigger className="h-7 text-xs">
+                  <SelectValue placeholder={downloads.length === 0 ? "Loading..." : "Select a download"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {downloads.map((p: any) => (
+                    <SelectItem key={p.id} value={String(p.id)}>{p.title}</SelectItem>
+                  ))}
+                  {downloads.length === 0 && <SelectItem value="__none__" disabled>No published downloads found</SelectItem>}
+                </SelectContent>
+              </Select>
+            )}
+            {linkType === "custom" && (
+              <DebouncedInput
+                value={d.optOutCustomUrl ?? ""}
+                onChange={v => set("optOutCustomUrl", v)}
+                className="h-7 text-xs"
+                placeholder="https://... or /page-path"
+              />
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── Instructor Block Preview (fetches from saved profile or uses manual data) ──
 function InstructorBlockPreview({ d }: { d: Record<string, any> }) {
   const instructorId = d.instructorId ? Number(d.instructorId) : null;
@@ -1382,9 +1491,9 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
       return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Section Headline" field="headline" /><BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div><div className="flex items-center justify-between mb-2"><label className="text-xs text-gray-500 font-medium">Cards</label><button onClick={() => set("cards", [...cards, { front: "Card Title", back: "Card description" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div><div className="space-y-2">{cards.map((card, i) => (<div key={i} className="border border-gray-200 rounded p-2 space-y-1"><div className="flex justify-between items-center mb-1"><span className="text-xs text-gray-500">Card {i + 1}</span><button onClick={() => set("cards", cards.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div><DebouncedInput value={card.front} onChange={v => { const next = cards.map((c, j) => j === i ? { ...c, front: v } : c); set("cards", next); }} className="h-7 text-xs" placeholder="Front (title)" /><DebouncedTextarea value={card.back} onChange={v => { const next = cards.map((c, j) => j === i ? { ...c, back: v } : c); set("cards", next); }} className="text-xs min-h-[60px]" placeholder="Back (description)" /></div>))}</div></div></div>);
     }
     case "pricing_cta":
-      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Headline" field="headline" /><BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline /><BSTextField data={d} onSet={set} label="CTA Button Text" field="ctaText" /><BSColorField data={d} onSet={set} label="CTA Color" field="ctaColor" /><BSColorField data={d} onSet={set} label="CTA Text Color" field="ctaTextColor" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div><label className="text-xs text-gray-500 block mb-1">Button Animation</label><Select value={d.ctaAnimation ?? "none"} onValueChange={v => set("ctaAnimation", v)}><SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem><SelectItem value="pulse">Pulse</SelectItem><SelectItem value="bounce">Bounce</SelectItem><SelectItem value="shake">Shake</SelectItem><SelectItem value="glow">Glow</SelectItem></SelectContent></Select></div><div className="flex items-center gap-2"><input type="checkbox" checked={d.showPrice ?? true} onChange={e => set("showPrice", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show course price</label></div><div className="flex items-center gap-2"><input type="checkbox" checked={d.showOriginalPrice ?? false} onChange={e => set("showOriginalPrice", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show strikethrough original price</label></div>{d.showOriginalPrice && <BSTextField data={d} onSet={set} label="Original Price (e.g. 299.00)" field="originalPrice" placeholder="299.00" />}</div>);
+      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Headline" field="headline" /><BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline /><BSTextField data={d} onSet={set} label="CTA Button Text" field="ctaText" /><BSColorField data={d} onSet={set} label="CTA Color" field="ctaColor" /><BSColorField data={d} onSet={set} label="CTA Text Color" field="ctaTextColor" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div><label className="text-xs text-gray-500 block mb-1">Button Animation</label><Select value={d.ctaAnimation ?? "none"} onValueChange={v => set("ctaAnimation", v)}><SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem><SelectItem value="pulse">Pulse</SelectItem><SelectItem value="bounce">Bounce</SelectItem><SelectItem value="shake">Shake</SelectItem><SelectItem value="glow">Glow</SelectItem></SelectContent></Select></div><div className="flex items-center gap-2"><input type="checkbox" checked={d.showPrice ?? true} onChange={e => set("showPrice", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show course price</label></div><div className="flex items-center gap-2"><input type="checkbox" checked={d.showOriginalPrice ?? false} onChange={e => set("showOriginalPrice", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show strikethrough original price</label></div>{d.showOriginalPrice && <BSTextField data={d} onSet={set} label="Original Price (e.g. 299.00)" field="originalPrice" placeholder="299.00" />}<OptOutSettings d={d} set={set} /></div>);
     case "cta_standalone":
-      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Headline" field="headline" /><BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline /><BSTextField data={d} onSet={set} label="Button Text" field="ctaText" /><BSLinkField label="Button Link" value={d.ctaLink ?? ""} onChange={v => set("ctaLink", v)} /><BSColorField data={d} onSet={set} label="Button Color" field="ctaColor" /><BSColorField data={d} onSet={set} label="Button Text Color" field="ctaTextColor" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div><label className="text-xs text-gray-500 block mb-1">Button Animation</label><Select value={d.ctaAnimation ?? "none"} onValueChange={v => set("ctaAnimation", v)}><SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem><SelectItem value="pulse">Pulse</SelectItem><SelectItem value="bounce">Bounce</SelectItem><SelectItem value="shake">Shake</SelectItem><SelectItem value="glow">Glow</SelectItem></SelectContent></Select></div><BSAlignField data={d} onSet={set} /></div>);
+      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Headline" field="headline" /><BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline /><BSTextField data={d} onSet={set} label="Button Text" field="ctaText" /><BSLinkField label="Button Link" value={d.ctaLink ?? ""} onChange={v => set("ctaLink", v)} /><BSColorField data={d} onSet={set} label="Button Color" field="ctaColor" /><BSColorField data={d} onSet={set} label="Button Text Color" field="ctaTextColor" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div><label className="text-xs text-gray-500 block mb-1">Button Animation</label><Select value={d.ctaAnimation ?? "none"} onValueChange={v => set("ctaAnimation", v)}><SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem><SelectItem value="pulse">Pulse</SelectItem><SelectItem value="bounce">Bounce</SelectItem><SelectItem value="shake">Shake</SelectItem><SelectItem value="glow">Glow</SelectItem></SelectContent></Select></div><BSAlignField data={d} onSet={set} /><OptOutSettings d={d} set={set} /></div>);
     case "lead_capture":
       return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Headline" field="headline" /><BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline /><BSTextField data={d} onSet={set} label="Button Text" field="ctaText" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><BSColorField data={d} onSet={set} label="Text Color" field="textColor" /></div>);
     case "funnel_workflow": {
@@ -1538,6 +1647,7 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
           <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
           <BSColorField data={d} onSet={set} label="Border Color" field="borderColor" />
           <div className="flex items-center gap-2"><input type="checkbox" checked={d.showBorder ?? true} onChange={e => set("showBorder", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show border</label></div>
+          <OptOutSettings d={d} set={set} />
         </div>
       );
     }
@@ -1559,6 +1669,7 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
           <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
           <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />
           <div className="flex items-center gap-2"><input type="checkbox" checked={d.showBorder ?? true} onChange={e => set("showBorder", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show border</label></div>
+          <OptOutSettings d={d} set={set} />
         </div>
       );
     case "checkout_form": {

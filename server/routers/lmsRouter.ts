@@ -328,6 +328,17 @@ export const lmsPublicRouter = router({
       }));
       return { ...col, courses: courses.filter(Boolean) };
     }),
+
+  /** Resolve a course/download ID to its slug (used for opt-out link redirect) */
+  getSlugById: publicProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return null;
+      const [c] = await db.select({ slug: lmsCourses.slug }).from(lmsCourses)
+        .where(eq(lmsCourses.id, input.id)).limit(1);
+      return c?.slug ?? null;
+    }),
 });
 
 // ─── Learner Router ───────────────────────────────────────────────────────────
@@ -2369,6 +2380,32 @@ export const lmsGroupRouter = router({
       const [group] = await db.select().from(lmsGroups).where(and(eq(lmsGroups.id, seat.groupId), eq(lmsGroups.managerId, ctx.user.id))).limit(1);
       if (!group) throw new TRPCError({ code: "FORBIDDEN" });
       await db.delete(lmsGroupSeats).where(eq(lmsGroupSeats.id, input.seatId));
+      return { success: true };
+    }),
+
+  /** Update course settings (slug, SEO, visibility, enrollment, certificate) */
+  updateCourseSettings: protectedProcedure
+    .input(z.object({
+      courseId: z.number().int().positive(),
+      slug: z.string().min(1).max(255).regex(/^[a-z0-9-]+$/, "Slug must be lowercase letters, numbers, and hyphens only"),
+      metaTitle: z.string().max(255).optional(),
+      metaDescription: z.string().max(500).optional(),
+      status: z.enum(["draft", "public", "hidden", "private", "archived"]).optional(),
+      hasCertificate: z.boolean().optional(),
+      isFeatured: z.boolean().optional(),
+      isDrip: z.boolean().optional(),
+      accessDurationDays: z.number().int().positive().nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Check slug uniqueness (excluding current course)
+      const [existing] = await db.select({ id: lmsCourses.id }).from(lmsCourses)
+        .where(and(eq(lmsCourses.slug, input.slug), sql`${lmsCourses.id} != ${input.courseId}`)).limit(1);
+      if (existing) throw new TRPCError({ code: "CONFLICT", message: "A course with this slug already exists" });
+      const { courseId, ...fields } = input;
+      await db.update(lmsCourses).set(fields).where(eq(lmsCourses.id, courseId));
       return { success: true };
     }),
 });

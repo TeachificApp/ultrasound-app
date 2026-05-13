@@ -1605,3 +1605,25 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add /admin/user-analytics route in App.tsx (platform_admin only)
 - [x] Add "User Analytics" card to PlatformAdmin tools grid
 - [x] All 854 tests passing, vite build clean
+
+## CTA Opt-Out Link Feature
+- [ ] Audit CTA block schema in funnel pages to understand current fields
+- [ ] Extend CTA block JSON schema with optOutEnabled, optOutText, optOutLinkType (course/download/product/custom), optOutCourseId, optOutDownloadId, optOutCustomUrl
+- [ ] Add opt-out link editor panel in FunnelPageEditor CTA block settings
+- [ ] Render opt-out link below CTA button on public funnel pages
+- [ ] Resolve redirect URL at render time (course slug, download slug, or custom URL)
+- [ ] All tests passing, build clean
+
+## CTA Opt-Out Link Rendering (Public Pages)
+- [ ] Render opt-out link below CTA button on public funnel pages (pricing_cta, cta_standalone, price_stack, urgency_offer)
+- [ ] resolveOptOutUrl helper: course→/courses/slug, download→/downloads/slug, custom→raw url
+
+## URL/Slug Editing & Settings Tabs
+- [ ] Backend: updateCourseSlug/settings procedure (validate uniqueness, sanitize)
+- [ ] Backend: updateDownloadSlug/settings procedure
+- [ ] Backend: updateFunnelSlug/settings procedure
+- [ ] Backend: updateOrderBumpSlug/settings procedure
+- [ ] LMSAdmin course editor: Settings tab (slug, SEO title/desc, visibility, enrollment cap, certificate toggle)
+- [ ] DigitalDownloadsAdmin product editor: Settings tab (slug, SEO title/desc, visibility, file access expiry)
+- [ ] FunnelBuilder funnel editor: Settings tab (slug, SEO title/desc, custom redirect after checkout)
+- [ ] OrderBumpsAdmin: Settings tab (slug, display position, expiry date)

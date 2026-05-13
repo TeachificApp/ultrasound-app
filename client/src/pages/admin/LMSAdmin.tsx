@@ -797,6 +797,13 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
   const [hasCertificate, setHasCertificate] = useState(course.hasCertificate);
   const [isFeatured, setIsFeatured] = useState(course.isFeatured ?? false);
   const [coverImageUrl, setCoverImageUrl] = useState(course.coverImageUrl ?? "");
+  const [slug, setSlug] = useState(course.slug ?? "");
+  const [metaTitle, setMetaTitle] = useState(course.metaTitle ?? "");
+  const [metaDescription, setMetaDescription] = useState(course.metaDescription ?? "");
+  const updateCourseSettings = trpc.lmsAdmin.updateCourseSettings.useMutation({
+    onSuccess: () => toast.success("URL & SEO settings saved"),
+    onError: (e) => toast.error(e.message),
+  });
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
@@ -1023,6 +1030,33 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
         <div className="mt-1">
           <RichTextEditor value={description} onChange={setDescription} />
         </div>
+      </div>
+
+      {/* URL & SEO Section */}
+      <div className="border border-gray-200 rounded-lg p-4 space-y-4 bg-gray-50">
+        <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2"><LinkIcon className="w-4 h-4 text-teal-600" /> URL &amp; SEO Settings</h3>
+        <div>
+          <Label className="text-sm">URL Slug</Label>
+          <div className="mt-1 flex items-center gap-2">
+            <span className="text-xs text-gray-400 whitespace-nowrap">/learn/</span>
+            <Input value={slug} onChange={e => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-"))} placeholder="course-url-slug" className="flex-1" />
+          </div>
+          <p className="text-xs text-gray-400 mt-1">Lowercase letters, numbers, and hyphens only. Changing this will break existing links.</p>
+        </div>
+        <div>
+          <Label className="text-sm">Meta Title (SEO)</Label>
+          <Input value={metaTitle} onChange={e => setMetaTitle(e.target.value)} placeholder="Leave blank to use course title" className="mt-1" maxLength={255} />
+        </div>
+        <div>
+          <Label className="text-sm">Meta Description (SEO)</Label>
+          <textarea value={metaDescription} onChange={e => setMetaDescription(e.target.value)} placeholder="Brief description for search engines (150–160 characters)" className="mt-1 w-full text-sm border border-gray-200 rounded-md p-2 resize-none h-20 focus:outline-none focus:ring-2 focus:ring-teal-500" maxLength={500} />
+        </div>
+        <Button size="sm" variant="outline" className="border-teal-300 text-teal-600 hover:bg-teal-50"
+          disabled={updateCourseSettings.isPending}
+          onClick={() => updateCourseSettings.mutate({ courseId: course.id, slug: slug.trim() || course.slug, metaTitle: metaTitle.trim() || undefined, metaDescription: metaDescription.trim() || undefined, status, hasCertificate, isFeatured })}
+        >
+          {updateCourseSettings.isPending ? "Saving..." : "Save URL & SEO"}
+        </Button>
       </div>
 
       <Button

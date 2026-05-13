@@ -75,6 +75,17 @@ export const downloadsPublicRouter = router({
 
       return { ...product, files };
     }),
+
+  /** Resolve a download product ID to its slug (used for opt-out link redirect) */
+  getSlugById: publicProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return null;
+      const [p] = await db.select({ slug: digitalProducts.slug }).from(digitalProducts)
+        .where(eq(digitalProducts.id, input.id)).limit(1);
+      return p?.slug ?? null;
+    }),
 });
 
 // ─── Learner Router (authenticated) ─────────────────────────────────────────
@@ -767,6 +778,27 @@ export const downloadsAdminRouter = router({
       }
 
       return { id: result.id, slug: newSlug, title: newTitle };
+    }),
+
+  /** Update download product settings (slug, SEO, visibility) */
+  updateDownloadSettings: protectedProcedure
+    .input(z.object({
+      productId: z.number().int().positive(),
+      slug: z.string().min(1).max(255).regex(/^[a-z0-9-]+$/, "Slug must be lowercase letters, numbers, and hyphens only"),
+      metaTitle: z.string().max(255).optional(),
+      metaDescription: z.string().max(500).optional(),
+      status: z.enum(["draft", "published", "hidden", "private", "archived"]).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [existing] = await db.select({ id: digitalProducts.id }).from(digitalProducts)
+        .where(and(eq(digitalProducts.slug, input.slug), sql`${digitalProducts.id} != ${input.productId}`)).limit(1);
+      if (existing) throw new TRPCError({ code: "CONFLICT", message: "A product with this slug already exists" });
+      const { productId, ...fields } = input;
+      await db.update(digitalProducts).set(fields).where(eq(digitalProducts.id, productId));
+      return { success: true };
     }),
 });
 

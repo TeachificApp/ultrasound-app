@@ -822,4 +822,27 @@ export const funnelPublicRouter = router({
       await db.execute(sql`UPDATE funnel_pages SET conversions = conversions + 1 WHERE id = ${input.funnelPageId}`);
       return { success: true };
     }),
+
+  /** Update funnel settings (slug, SEO, status, custom redirect) */
+  updateFunnelSettings: protectedProcedure
+    .input(z.object({
+      funnelId: z.number().int().positive(),
+      slug: z.string().min(1).max(255).regex(/^[a-z0-9-]+$/, "Slug must be lowercase letters, numbers, and hyphens only"),
+      name: z.string().min(1).max(255).optional(),
+      metaTitle: z.string().max(255).optional(),
+      metaDescription: z.string().max(500).optional(),
+      status: z.enum(["draft", "active", "archived", "paused"]).optional(),
+      thankYouUrl: z.string().max(500).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [existing] = await db.select({ id: funnels.id }).from(funnels)
+        .where(and(eq(funnels.slug, input.slug), sql`${funnels.id} != ${input.funnelId}`)).limit(1);
+      if (existing) throw new TRPCError({ code: "CONFLICT", message: "A funnel with this slug already exists" });
+      const { funnelId, ...fields } = input;
+      await db.update(funnels).set(fields).where(eq(funnels.id, funnelId));
+      return { success: true };
+    }),
 });

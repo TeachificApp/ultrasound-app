@@ -3137,7 +3137,11 @@ export const funnels = mysqlTable("funnels", {
   name: varchar("name", { length: 255 }).notNull(),
   slug: varchar("slug", { length: 255 }).notNull().unique(),
   description: text("description"),
-  status: mysqlEnum("status", ["draft", "active", "archived"]).default("draft").notNull(),
+  status: mysqlEnum("status", ["draft", "active", "archived", "paused"]).default("draft").notNull(),
+  // SEO / Settings
+  metaTitle: varchar("meta_title", { length: 255 }),
+  metaDescription: text("meta_description"),
+  thankYouUrl: text("thank_you_url"),
   // Template used to create this funnel
   templateName: varchar("template_name", { length: 100 }),
   // Global settings
