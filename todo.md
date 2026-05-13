@@ -1540,3 +1540,13 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add related_products block type to BLOCK_CATALOG, BlockPreview, BlockSettings
 - [x] Build RelatedProductsBlock public component (auto-fetches published courses/downloads)
 - [x] Add related_products case to CourseLanding, DownloadLanding, PublicFunnelPage renderers
+
+## Course Player Redesign (2026-05-13)
+- [x] Redesign CoursePlayer to match mockup: dark teal sidebar, numbered modules, video area, In This Lesson panel, Mark Complete bottom-right
+- [x] Add contentBlocks and learningObjectives fields to lms_lessons table
+- [x] Add contentBlocks and learningObjectives to updateLesson procedure
+- [x] Build LessonBlockEditor WYSIWYG component (reuses LandingPageBuilder blocks)
+- [x] Add "Edit Content" admin button in course player header
+- [x] Add student preview toggle for admins in course player
+- [x] Render contentBlocks in CoursePlayer public view
+- [x] Render learningObjectives in "In This Lesson" right panel

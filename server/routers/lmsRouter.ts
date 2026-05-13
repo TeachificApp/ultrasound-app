@@ -1231,6 +1231,8 @@ export const lmsAdminRouter = router({
       durationMinutes: z.number().int().nullable().optional(),
       requireVideoCompletion: z.boolean().optional(),
       requireManualComplete: z.boolean().optional(),
+      contentBlocks: z.string().nullable().optional(), // JSON array of Block objects
+      learningObjectives: z.string().nullable().optional(), // JSON array of strings
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);

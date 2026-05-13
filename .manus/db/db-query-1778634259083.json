@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE lms_lessons ADD COLUMN content_blocks LONGTEXT NULL AFTER effect_confetti_colors; ALTER TABLE lms_lessons ADD COLUMN learning_objectives LONGTEXT NULL AFTER content_blocks;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute ALTER TABLE lms_lessons ADD COLUMN content_blocks LONGTEXT NULL AFTER effect_confetti_colors; ALTER TABLE lms_lessons ADD COLUMN learning_objectives LONGTEXT NULL AFTER content_blocks;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1162
+}

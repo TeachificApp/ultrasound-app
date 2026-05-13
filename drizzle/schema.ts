@@ -2747,6 +2747,10 @@ export const lmsLessons = mysqlTable("lms_lessons", {
   effectSoundUrl: varchar("effect_sound_url", { length: 500 }),
   effectConfetti: boolean("effect_confetti").default(false),
   effectConfettiColors: varchar("effect_confetti_colors", { length: 500 }),
+  // Page builder blocks for rich lesson content (JSON array of Block objects)
+  contentBlocks: longtext("content_blocks"),
+  // Lesson learning objectives shown in "In This Lesson" panel (JSON array of strings)
+  learningObjectives: longtext("learning_objectives"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
