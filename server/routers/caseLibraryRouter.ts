@@ -131,7 +131,7 @@ export const caseLibraryRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
       const offset = (input.page - 1) * input.limit;
-      const conditions: any[] = [eq(echoLibraryCases.status, "approved")];
+      const conditions: any[] = [eq(echoLibraryCases.status, "approved"), eq(echoLibraryCases.brand, ctx.brand)];
 
       if (input.modality) conditions.push(eq(echoLibraryCases.modality, input.modality));
       if (input.difficulty) conditions.push(eq(echoLibraryCases.difficulty, input.difficulty));
@@ -998,7 +998,7 @@ export const caseLibraryRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
       const offset = (input.page - 1) * input.limit;
-      const conditions: any[] = [];
+      const conditions: any[] = [eq(echoLibraryCases.brand, ctx.brand)];
 
       if (input.status) conditions.push(eq(echoLibraryCases.status, input.status));
       if (input.modality) conditions.push(eq(echoLibraryCases.modality, input.modality));

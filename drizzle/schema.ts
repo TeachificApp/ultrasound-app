@@ -928,10 +928,25 @@ export const quickfireQuestions = mysqlTable("quickfireQuestions", {
   difficulty: mysqlEnum("difficulty", ["beginner", "intermediate", "advanced"]).default("intermediate").notNull(),
   // JSON: string[] — topic tags (e.g. ["AS", "LV function", "TEE"])
   tags: text("tags"),
-  // AAUS specialty category for flashcard filtering
-  echoCategory: mysqlEnum("echoCategory", ["abdominal", "pelvic_gyn", "obstetric_1st", "obstetric_2nd_3rd", "fetal_echo", "venous", "arterial", "abdominal_vascular", "extracranial_carotid", "intracranial_tcd", "pocus", "physics", "thyroid", "scrotum", "breast", "msk"]).default("abdominal"),
-  // Broad clinical category for admin filtering (AAUS categories)
-  category: mysqlEnum("category", ["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics"]).default("Abdominal"),
+  // Brand this question belongs to (aaus = general ultrasound, iheartecho = echo-specific)
+  brand: mysqlEnum("brand", ["aaus", "iheartecho"]).default("aaus").notNull(),
+  // Specialty category for flashcard filtering (AAUS + iHE values combined)
+  echoCategory: mysqlEnum("echoCategory", [
+    // AAUS categories
+    "abdominal", "pelvic_gyn", "obstetric_1st", "obstetric_2nd_3rd", "fetal_echo",
+    "venous", "arterial", "abdominal_vascular", "extracranial_carotid", "intracranial_tcd",
+    "pocus", "physics", "thyroid", "scrotum", "breast", "msk",
+    // iHeartEcho categories
+    "acs", "adult", "pediatric_congenital", "fetal", "general"
+  ]).default("abdominal"),
+  // Broad clinical category for admin filtering (AAUS + iHE categories combined)
+  category: mysqlEnum("category", [
+    // AAUS categories
+    "Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester",
+    "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics",
+    // iHeartEcho categories
+    "ACS", "Adult Echo", "Pediatric Echo", "General"
+  ]).default("Abdominal"),
   // Whether this question is active and eligible for daily sets
   isActive: boolean("isActive").default(true).notNull(),
   // Soft-delete: set when question is deleted from the bank. Permanently purged after 30 days.
@@ -958,7 +973,9 @@ export type InsertQuickfireQuestion = typeof quickfireQuestions.$inferInsert;
 export const quickfireDailySets = mysqlTable("quickfireDailySets", {
   id: int("id").primaryKey().autoincrement(),
   // YYYY-MM-DD date string (UTC)
-  setDate: varchar("setDate", { length: 10 }).notNull().unique(),
+  setDate: varchar("setDate", { length: 10 }).notNull(),
+  // Brand this daily set belongs to
+  brand: mysqlEnum("brand", ["aaus", "iheartecho"]).default("aaus").notNull(),
   // JSON: number[] — ordered list of quickfireQuestion IDs
   questionIds: text("questionIds").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -999,7 +1016,14 @@ export const echoLibraryCases = mysqlTable("echoLibraryCases", {
   diagnosis: varchar("diagnosis", { length: 300 }),
   // Teaching points (JSON: string[])
   teachingPoints: text("teachingPoints"),
-  modality: mysqlEnum("modality", ["Abdominal", "Vascular", "OB/Gyn", "MSK", "POCUS", "Thyroid", "Breast", "Renal", "Fetal Echo", "Other"]).notNull(),
+  // Brand this case belongs to
+  brand: mysqlEnum("brand", ["aaus", "iheartecho"]).default("aaus").notNull(),
+  modality: mysqlEnum("modality", [
+    // AAUS modalities
+    "Abdominal", "Vascular", "OB/Gyn", "MSK", "POCUS", "Thyroid", "Breast", "Renal", "Fetal Echo", "Other",
+    // iHeartEcho modalities
+    "TTE", "TEE", "ICE", "Stress", "Pediatric", "Fetal", "HOCM", "ECG"
+  ]).notNull(),
   difficulty: mysqlEnum("difficulty", ["beginner", "intermediate", "advanced"]).default("intermediate").notNull(),
   // JSON: string[] — topic tags
   tags: text("tags"),
@@ -1085,8 +1109,16 @@ export const quickfireChallenges = mysqlTable("quickfireChallenges", {
   questionIds: text("questionIds").notNull(),
   // Admin-assigned priority — lower number = published first (1 = highest)
   priority: int("priority").default(100).notNull(),
+  // Brand this challenge belongs to
+  brand: mysqlEnum("brand", ["aaus", "iheartecho"]).default("aaus").notNull(),
   // Category tag for filtering — determines which daily slot this challenge fills
-  category: mysqlEnum("category", ["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics"]).default("Abdominal").notNull(),
+  category: mysqlEnum("category", [
+    // AAUS categories
+    "Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester",
+    "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics",
+    // iHeartEcho categories
+    "ACS", "Adult Echo", "Pediatric Echo", "General"
+  ]).default("Abdominal").notNull(),
   difficulty: mysqlEnum("difficulty", ["beginner", "intermediate", "advanced"]).default("intermediate"),
   // Lifecycle status — queued = in the auto-publish queue, waiting for its turn; trash = soft-deleted (purged after 30 days)
   status: mysqlEnum("status", ["draft", "queued", "scheduled", "live", "archived", "trash"]).default("draft").notNull(),
@@ -2679,6 +2711,7 @@ export const lmsCourses = mysqlTable("lms_courses", {
   brand: mysqlEnum("brand", ["aaus", "iheartecho"]).default("aaus").notNull(),
   price: int("price").default(0).notNull(), // cents — used for one_time and payment_plan total
   isFree: boolean("is_free").default(false).notNull(),
+  bundleOnly: boolean("bundle_only").default(false).notNull(), // if true, cannot be purchased standalone
   currency: varchar("currency", { length: 8 }).default("usd").notNull(),
   // Extended pricing model
   pricingType: mysqlEnum("pricing_type", ["free", "one_time", "subscription", "payment_plan", "trial_then_subscription"]).default("one_time").notNull(),
@@ -2996,6 +3029,7 @@ export const digitalProducts = mysqlTable("digital_products", {
   thumbnailUrl: text("thumbnail_url"),
   price: int("price").default(0).notNull(), // cents
   isFree: boolean("is_free").default(false).notNull(),
+  bundleOnly: boolean("bundle_only").default(false).notNull(), // if true, cannot be purchased standalone
   currency: varchar("currency", { length: 8 }).default("usd").notNull(),
   status: mysqlEnum("status", ["draft", "published", "hidden", "private", "archived"]).default("draft").notNull(),
   // Landing page content
@@ -3382,6 +3416,8 @@ export type InsertAccreditationChecklist = typeof accreditationChecklist.$inferI
 // ─── SoundBytes Micro-Lessons ─────────────────────────────────────────────────
 export const soundBytes = mysqlTable("soundBytes", {
   id: int("id").autoincrement().primaryKey(),
+  // Brand this SoundByte belongs to
+  brand: mysqlEnum("brand", ["aaus", "iheartecho"]).default("iheartecho").notNull(),
   title: varchar("title", { length: 255 }).notNull(),
   body: longtext("body"),
   videoUrl: text("videoUrl").notNull(),

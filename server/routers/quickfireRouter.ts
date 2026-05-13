@@ -161,7 +161,7 @@ function parseDailySetIds(raw: string): Record<string, number | null> {
 }
 
 /**
- * Ensure a daily set exists for the given date.
+ * Ensure a daily set exists for the given date and brand.
  * Stores one question per category:
    *   questionIds = JSON object: { abdominal: id|null, vascular: id|null, ob2nd3rd: id|null, pocus: id|null }
  *
@@ -169,11 +169,11 @@ function parseDailySetIds(raw: string): Record<string, number | null> {
  *   1. Next queued challenge with matching category (draft/scheduled)
  *   2. Fallback: random active non-flashcard question from that category
  */
-async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>, date: string) {
+async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>, date: string, brand: "aaus" | "iheartecho" = "aaus") {
   const existing = await db
     .select()
     .from(quickfireDailySets)
-    .where(eq(quickfireDailySets.setDate, date))
+    .where(and(eq(quickfireDailySets.setDate, date), eq(quickfireDailySets.brand, brand)))
     .limit(1);
   if (existing.length > 0) return existing[0];
 
@@ -186,7 +186,7 @@ async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>
   const liveChallenges = await db
     .select()
     .from(quickfireChallenges)
-    .where(eq(quickfireChallenges.status, "live" as any));
+    .where(and(eq(quickfireChallenges.status, "live" as any), eq(quickfireChallenges.brand, brand)));
 
   for (const liveC of liveChallenges) {
     if (!liveC.category) continue;
@@ -202,7 +202,7 @@ async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>
   const queuedChallenges = await db
     .select()
     .from(quickfireChallenges)
-    .where(inArray(quickfireChallenges.status, ["draft", "scheduled"] as any[]))
+    .where(and(inArray(quickfireChallenges.status, ["draft", "scheduled"] as any[]), eq(quickfireChallenges.brand, brand)))
     .orderBy(quickfireChallenges.priority, quickfireChallenges.createdAt)
     .limit(50);
 
@@ -242,7 +242,7 @@ async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>
     const liveRows = await db
       .select({ id: quickfireChallenges.id, category: quickfireChallenges.category })
       .from(quickfireChallenges)
-      .where(eq(quickfireChallenges.status, "live"));
+      .where(and(eq(quickfireChallenges.status, "live"), eq(quickfireChallenges.brand, brand)));
     for (const row of liveRows) {
       // Archive only if: this category got a new challenge today AND this row wasn't the one just published
       if (!usedChallengeIds.includes(row.id) && row.category && categoriesPublishedToday.includes(row.category)) {
@@ -263,6 +263,7 @@ async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>
     .from(quickfireChallenges)
     .where(and(
       inArray(quickfireChallenges.status, ["archived", "live"] as any[]),
+      eq(quickfireChallenges.brand, brand),
       sql`${quickfireChallenges.publishedAt} >= ${recentCutoff}` as any
     ));
 
@@ -374,7 +375,7 @@ async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>
   }
 
   const questionIds = JSON.stringify(questionMap);
-  await db.insert(quickfireDailySets).values({ setDate: date, questionIds });
+  await db.insert(quickfireDailySets).values({ setDate: date, brand, questionIds });
   return { setDate: date, questionIds };
 }
 
@@ -394,14 +395,14 @@ export const quickfireRouter = router({
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const date = todayDateStr();
-    const set = await ensureTodaySet(db, date);
+    const set = await ensureTodaySet(db, date, ctx.brand);
     const questionMap = parseDailySetIds(set.questionIds);
     // Always sync questionMap from current live challenges — overrides stale stored IDs.
     // This ensures mid-day challenge swaps (trash/promote) are immediately reflected.
     const liveChallengesNow = await db
       .select({ category: quickfireChallenges.category, questionIds: quickfireChallenges.questionIds })
       .from(quickfireChallenges)
-      .where(eq(quickfireChallenges.status, "live" as any));
+      .where(and(eq(quickfireChallenges.status, "live" as any), eq(quickfireChallenges.brand, ctx.brand)));
     let mapChanged = false;
     // Build a set of keys that have a live challenge
     const liveKeys = new Set<string>();
@@ -428,7 +429,7 @@ export const quickfireRouter = router({
       await db
         .update(quickfireDailySets)
         .set({ questionIds: JSON.stringify(questionMap) })
-        .where(eq(quickfireDailySets.setDate, date))
+        .where(and(eq(quickfireDailySets.setDate, date), eq(quickfireDailySets.brand, ctx.brand)))
         .catch(() => { /* non-blocking — stale row is fine */ });
     }
     // Determine which categories the user has opted into (default: all)
@@ -1029,7 +1030,7 @@ getUserStats: protectedProcedure.query(async ({ ctx }) => {
         ids: z.array(z.number().int().positive()).max(50).optional(),
       })
     )
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const offset = (input.page - 1) * input.limit;
@@ -1037,6 +1038,8 @@ getUserStats: protectedProcedure.query(async ({ ctx }) => {
       const conditions: any[] = [];
       // Always exclude trashed questions from the bank (they live in the Trash tab only)
       conditions.push(sql`${quickfireQuestions.deletedAt} IS NULL`);
+      // Filter by brand
+      conditions.push(eq(quickfireQuestions.brand, ctx.brand));
       // When fetching by specific IDs, skip the active filter so inactive questions are included
       if (!input.includeInactive && !input.ids?.length) {
         conditions.push(eq(quickfireQuestions.isActive, true));
@@ -1588,9 +1591,9 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
       // Delete existing set for this date if any
       await db
         .delete(quickfireDailySets)
-        .where(eq(quickfireDailySets.setDate, date));
+        .where(and(eq(quickfireDailySets.setDate, date), eq(quickfireDailySets.brand, ctx.brand)));
 
-      const set = await ensureTodaySet(db, date);
+      const set = await ensureTodaySet(db, date, ctx.brand);
       const ids: number[] = JSON.parse(set.questionIds || "[]");
       return { date, questionCount: ids.length };
     }),
@@ -1710,11 +1713,11 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
-    // Fetch ALL live challenges (one per category)
+    // Fetch ALL live challenges (one per category) for this brand
     const liveChallenges = await db
       .select()
       .from(quickfireChallenges)
-      .where(eq(quickfireChallenges.status, "live"))
+      .where(and(eq(quickfireChallenges.status, "live"), eq(quickfireChallenges.brand, ctx.brand)))
       .orderBy(quickfireChallenges.category, desc(quickfireChallenges.publishedAt));
 
     if (liveChallenges.length === 0) return null;
@@ -1807,7 +1810,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
         return { challenges: [], total: 0, isPremium: false, page: input.page, limit: input.limit };
       }
       const offset = (input.page - 1) * input.limit;
-      const conditions: any[] = [eq(quickfireChallenges.status, "archived")];
+      const conditions: any[] = [eq(quickfireChallenges.status, "archived"), eq(quickfireChallenges.brand, ctx.brand)];
       // Category filter
       if (input.category) {
         conditions.push(eq(quickfireChallenges.category, input.category as any));
@@ -1886,7 +1889,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
         : ["draft", "scheduled", "live"];
 
       const rows = await db.select().from(quickfireChallenges)
-        .where(inArray(quickfireChallenges.status, statuses as any[]))
+        .where(and(inArray(quickfireChallenges.status, statuses as any[]), eq(quickfireChallenges.brand, ctx.brand)))
         .orderBy(quickfireChallenges.priority, desc(quickfireChallenges.createdAt));
 
       // Enrich with linked question difficulty
@@ -1937,6 +1940,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
         description: input.description ?? null,
         questionIds: JSON.stringify(input.questionIds),
         priority: input.priority,
+        brand: ctx.brand,
         category: (input.category as any) ?? "Abdominal",
         status: "scheduled",
         queuePosition: input.queuePosition ?? null,
@@ -2261,6 +2265,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
       const conditions: any[] = [
         eq(quickfireQuestions.isActive, true),
         eq(quickfireQuestions.type, "quickReview"),
+        eq(quickfireQuestions.brand, ctx.brand),
       ];
       if (input.echoCategory) {
         conditions.push(eq(quickfireQuestions.echoCategory, input.echoCategory));
@@ -2668,11 +2673,11 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
 
   /** List only archived challenges for the archive tab */
   adminListArchivedChallenges: adminProcedure
-    .query(async () => {
+    .query(async ({ ctx }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const rows = await db.select().from(quickfireChallenges)
-        .where(eq(quickfireChallenges.status, "archived"))
+        .where(and(eq(quickfireChallenges.status, "archived"), eq(quickfireChallenges.brand, ctx.brand)))
         .orderBy(desc(quickfireChallenges.archivedAt));
       const parsed = rows.map((r) => ({ ...r, questionIds: JSON.parse(r.questionIds || "[]") as number[] }));
       const allQIds = Array.from(new Set(parsed.flatMap((r) => r.questionIds)));

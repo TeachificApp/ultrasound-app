@@ -1659,3 +1659,27 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Update frontend header/sidebar to show "All About Ultrasound | iHeartEcho" on learn/member subdomains
 - [x] Update login page messaging for learn/member subdomains with combined branding
 - [x] Ensure platform admin works independently on each app (AAUS, iHeartEcho, learn/members) — already correct via separate routers with RoleGuard
+
+## Media Repository & Digital Downloads Improvements
+- [x] Fix 404 on /media/jumpstart-business-quick-guide-a03dbc0f — works on dev server (200 OK), needs publish to deploy
+- [x] Digital downloads: add bundle-only flag so they are listed but cannot be purchased standalone
+- [x] In-browser PDF viewer: display PDF content in browser for media repo and digital download PDFs
+- [ ] Allow direct linking to PDF viewer for embedding
+
+## Bug Fixes - Auth & Content
+- [x] Fix navigator auth gating - navigators accessible without login (should require auth)
+- [x] Fix iHeartEcho daily challenges showing general ultrasound content instead of echo-specific challenges
+- [x] Fix iHeartEcho flashcards showing AAUS content instead of echo-specific flashcards
+- [x] Fix iHeartEcho case library showing AAUS cases instead of echo-specific cases
+- [ ] Fix iHeartEcho leaderboard showing no entries (brand filtering or data issue)
+- [ ] Fix iHeartEcho SoundBytes showing AAUS content instead of echo-specific SoundBytes
+
+## iHeartEcho Database Migration
+- [ ] Locate iHeartEcho source database connection string
+- [ ] Audit all iHeartEcho content tables: challenges, flashcards, cases, SoundBytes, leaderboard
+- [ ] Migrate iHeartEcho challenges with brand=iheartecho
+- [ ] Migrate iHeartEcho flashcards with brand=iheartecho
+- [ ] Migrate iHeartEcho cases with brand=iheartecho
+- [ ] Migrate iHeartEcho SoundBytes with brand=iheartecho
+- [ ] Migrate iHeartEcho leaderboard/user activity data
+- [ ] Verify brand filtering works for all migrated content

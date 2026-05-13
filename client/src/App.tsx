@@ -256,39 +256,39 @@ function Router() {
         <Route path="/clinical-intelligence" component={ClinicalInterpretationEngine} />
 
         {/* ── Abdominal ─────────────────────────────────────────────────── */}
-        <Route path="/abdominal-navigator" component={AbdominalNavigator} />
+        <Route path="/abdominal-navigator">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><AbdominalNavigator /></RoleGuard>}</Route>
         <Route path="/abdominal-scan-coach">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><AbdominalScanCoach /></RoleGuard>}</Route>
 
         {/* ── Pelvic/Gyn ────────────────────────────────────────────────── */}
-        <Route path="/pelvic-gyn-navigator" component={PelvicGynNavigator} />
+        <Route path="/pelvic-gyn-navigator">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><PelvicGynNavigator /></RoleGuard>}</Route>
         <Route path="/pelvic-gyn-scan-coach">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><PelvicGynScanCoach /></RoleGuard>}</Route>
 
         {/* ── OB 1st Trimester ──────────────────────────────────────────── */}
-        <Route path="/ob1-navigator" component={OB1Navigator} />
+        <Route path="/ob1-navigator">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><OB1Navigator /></RoleGuard>}</Route>
         <Route path="/ob1-scan-coach">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><OB1ScanCoach /></RoleGuard>}</Route>
 
         {/* ── OB 2nd/3rd Trimester ──────────────────────────────────────── */}
-        <Route path="/ob23-navigator" component={OB23Navigator} />
+        <Route path="/ob23-navigator">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><OB23Navigator /></RoleGuard>}</Route>
         <Route path="/ob23-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><OB23ScanCoach /></RoleGuard>}</Route>
 
         {/* ── Thyroid ───────────────────────────────────────────────────── */}
-        <Route path="/thyroid-navigator" component={ThyroidNavigator} />
+        <Route path="/thyroid-navigator">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><ThyroidNavigator /></RoleGuard>}</Route>
         <Route path="/thyroid-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><ThyroidScanCoach /></RoleGuard>}</Route>
 
         {/* ── Scrotum ───────────────────────────────────────────────────── */}
-        <Route path="/scrotum-navigator" component={ScrotumNavigator} />
+        <Route path="/scrotum-navigator">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><ScrotumNavigator /></RoleGuard>}</Route>
         <Route path="/scrotum-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><ScrotumScanCoach /></RoleGuard>}</Route>
 
         {/* ── Breast ────────────────────────────────────────────────────── */}
-        <Route path="/breast-navigator" component={BreastNavigator} />
+        <Route path="/breast-navigator">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><BreastNavigator /></RoleGuard>}</Route>
         <Route path="/breast-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><BreastScanCoach /></RoleGuard>}</Route>
 
         {/* Appendix */}
-        <Route path="/appendix-navigator" component={AppendixNavigator} />
+        <Route path="/appendix-navigator">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><AppendixNavigator /></RoleGuard>}</Route>
         <Route path="/appendix-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><AppendixScanCoach /></RoleGuard>}</Route>
 
         {/* Invasive Procedures */}
-        <Route path="/invasive-procedures-navigator" component={InvasiveProceduresNavigator} />
+        <Route path="/invasive-procedures-navigator">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><InvasiveProceduresNavigator /></RoleGuard>}</Route>
         <Route path="/invasive-procedures-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><InvasiveProceduresScanCoach /></RoleGuard>}</Route>
         {/* ── PediatricAssist™ ──────────────────────────────────────────── */}
         <Route path="/pediatric-navigator">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><PediatricNavigator /></RoleGuard>}</Route>
@@ -296,40 +296,40 @@ function Router() {
         <Route path="/pediatric-calculators" component={PediatricCalculators} />
 
         {/* ── Vascular — Venous ─────────────────────────────────────────── */}
-        <Route path="/venous-navigator" component={VenousNavigator} />
+        <Route path="/venous-navigator">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><VenousNavigator /></RoleGuard>}</Route>
         <Route path="/venous-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><VenousScanCoach /></RoleGuard>}</Route>
 
         {/* ── Vascular — Arterial ───────────────────────────────────────── */}
-        <Route path="/arterial-navigator" component={ArterialNavigator} />
+        <Route path="/arterial-navigator">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><ArterialNavigator /></RoleGuard>}</Route>
         <Route path="/arterial-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><ArterialScanCoach /></RoleGuard>}</Route>
 
         {/* ── Vascular — Abdominal/Renal/Mesenteric ─────────────────────── */}
-        <Route path="/abdominal-vascular-navigator" component={AbdominalVascularNavigator} />
+        <Route path="/abdominal-vascular-navigator">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><AbdominalVascularNavigator /></RoleGuard>}</Route>
         <Route path="/abdominal-vascular-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><AbdominalVascularScanCoach /></RoleGuard>}</Route>
 
         {/* ── Vascular — Aorta/EndoLeak ─────────────────────────────────── */}
-        <Route path="/aorta-navigator" component={AortaNavigator} />
+        <Route path="/aorta-navigator">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><AortaNavigator /></RoleGuard>}</Route>
         <Route path="/aorta-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><AortaScanCoach /></RoleGuard>}</Route>
 
         {/* ── Vascular — Carotid ────────────────────────────────────────── */}
-        <Route path="/carotid-navigator" component={CarotidNavigator} />
+        <Route path="/carotid-navigator">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><CarotidNavigator /></RoleGuard>}</Route>
         <Route path="/carotid-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><CarotidScanCoach /></RoleGuard>}</Route>
 
         {/* ── Vascular — TCD ────────────────────────────────────────────── */}
-        <Route path="/tcd-navigator" component={TCDNavigator} />
+        <Route path="/tcd-navigator">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><TCDNavigator /></RoleGuard>}</Route>
         <Route path="/tcd-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><TCDScanCoach /></RoleGuard>}</Route>
 
         {/* ── MSK ───────────────────────────────────────────────────────── */}
-        <Route path="/msk-navigator" component={MSKNavigator} />
+        <Route path="/msk-navigator">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><MSKNavigator /></RoleGuard>}</Route>
         <Route path="/msk-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><MSKScanCoach /></RoleGuard>}</Route>
 
         {/* ── POCUS-Assist™ ─────────────────────────────────────────────── */}
         <Route path="/pocus-assist" component={POCUSAssistHub} />
         <Route path="/pocus-assist-hub" component={POCUSAssistHub} />
-        <Route path="/pocus-efast-navigator" component={POCUSEfastNavigator} />
-        <Route path="/pocus-rush-navigator" component={POCUSRushNavigator} />
-        <Route path="/pocus-cardiac-navigator" component={POCUSCardiacNavigator} />
-        <Route path="/pocus-lung-navigator" component={POCUSLungNavigator} />
+        <Route path="/pocus-efast-navigator">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><POCUSEfastNavigator /></RoleGuard>}</Route>
+        <Route path="/pocus-rush-navigator">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><POCUSRushNavigator /></RoleGuard>}</Route>
+        <Route path="/pocus-cardiac-navigator">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><POCUSCardiacNavigator /></RoleGuard>}</Route>
+        <Route path="/pocus-lung-navigator">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><POCUSLungNavigator /></RoleGuard>}</Route>
         <Route path="/pocus-efast-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><POCUSEfastScanCoach /></RoleGuard>}</Route>
         <Route path="/pocus-rush-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><POCUSRushScanCoach /></RoleGuard>}</Route>
         <Route path="/pocus-cardiac-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><POCUSCardiacScanCoach /></RoleGuard>}</Route>
@@ -337,7 +337,7 @@ function Router() {
 
         {/* ── Fetal EchoAssist™ ─────────────────────────────────────────── */}
         <Route path="/fetal-echo-assist" component={FetalEchoAssist} />
-        <Route path="/fetal-navigator" component={FetalNavigator} />
+        <Route path="/fetal-navigator">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><FetalNavigator /></RoleGuard>}</Route>
         <Route path="/fetal-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><FetalScanCoach /></RoleGuard>}</Route>
 
         {/* ── Learn Fetal Echo ──────────────────────────────────────────── */}
@@ -399,7 +399,7 @@ function Router() {
         <Route path="/diy-accreditation-plans" component={DIYAccreditationPlans} />
         <Route path="/diy-register" component={DIYRegister} />
         <Route path="/diy-member">{() => <RoleGuard roles={["diy_user", "diy_admin"]} allowAdmin={false}><DIYMemberPortal /></RoleGuard>}</Route>
-        <Route path="/accreditation-navigator" component={AccreditationNavigator} />
+        <Route path="/accreditation-navigator">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><AccreditationNavigator /></RoleGuard>}</Route>
         <Route path="/accreditation">{() => <RoleGuard roles={["diy_user", "diy_admin"]} allowAdmin={false}><AccreditationTool /></RoleGuard>}</Route>
         <Route path="/lab-admin">{() => <RoleGuard roles={["diy_user", "diy_admin"]} allowAdmin={false}><AccreditationTool /></RoleGuard>}</Route>
         <Route path="/accreditation-manager">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AccreditationManager /></RoleGuard>}</Route>
@@ -492,19 +492,19 @@ function IHeartEchoRouter() {
         <Route path="/guidelines-assist" component={GuidelinesAssist} />
 
         {/* ── Echo Navigators ────────────────────────────────────────── */}
-        <Route path="/tte" component={TTENavigator} />
-        <Route path="/tee" component={TEENavigator} />
-        <Route path="/ice" component={ICENavigator} />
-        <Route path="/device" component={DeviceNavigator} />
+        <Route path="/tte">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><TTENavigator /></RoleGuard>}</Route>
+        <Route path="/tee">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><TEENavigator /></RoleGuard>}</Route>
+        <Route path="/ice">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><ICENavigator /></RoleGuard>}</Route>
+        <Route path="/device">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><DeviceNavigator /></RoleGuard>}</Route>
         <Route path="/achd">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><ACHDNavigator /></RoleGuard>}</Route>
         <Route path="/achd-echo-assist" component={ACHDEchoAssist} />
-        <Route path="/stress" component={StressNavigator} />
+        <Route path="/stress">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><StressNavigator /></RoleGuard>}</Route>
         <Route path="/strain">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><StrainNavigator /></RoleGuard>}</Route>
-        <Route path="/fetal" component={FetalNavigator} />
+        <Route path="/fetal">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><FetalNavigator /></RoleGuard>}</Route>
         <Route path="/fetal-echo-assist" component={FetalEchoAssist} />
-        <Route path="/pediatric" component={PediatricNavigator} />
+        <Route path="/pediatric">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><PediatricNavigator /></RoleGuard>}</Route>
         <Route path="/pediatric-echo-assist" component={PediatricEchoAssist} />
-        <Route path="/pulm-htn" component={PulmHTNNavigator} />
+        <Route path="/pulm-htn">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><PulmHTNNavigator /></RoleGuard>}</Route>
         <Route path="/diastolic">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><DiastolicNavigator /></RoleGuard>}</Route>
         <Route path="/mechanical-support-navigator">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><MechanicalSupportNavigator /></RoleGuard>}</Route>
         <Route path="/mechanical-support-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><MechanicalSupportScanCoach /></RoleGuard>}</Route>
@@ -534,7 +534,7 @@ function IHeartEchoRouter() {
         <Route path="/pocus-lung-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><POCUSLungScanCoach /></RoleGuard>}</Route>
 
         {/* ── ECG-Assist™ ────────────────────────────────────────────── */}
-        <Route path="/ecg-navigator" component={ECGNavigator} />
+        <Route path="/ecg-navigator">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><ECGNavigator /></RoleGuard>}</Route>
         <Route path="/ecg-coach" component={ECGCoach} />
         <Route path="/ecg-assist" component={ECGAssist} />
 

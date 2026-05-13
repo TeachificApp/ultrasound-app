@@ -102,6 +102,7 @@ export default function DownloadFiles() {
   }
 
   const files = downloadData?.files ?? [];
+  const [pdfViewerUrl, setPdfViewerUrl] = React.useState<string | null>(null);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -172,14 +173,31 @@ export default function DownloadFiles() {
                       {file.mimeType && <Badge variant="outline" className="text-xs">{file.mimeType.split("/")[1]?.toUpperCase()}</Badge>}
                     </div>
                   </div>
-                  <a href={file.fileUrl} target="_blank" rel="noopener noreferrer" download={file.fileName}
-                    onClick={() => trackDownload.mutate({ productId: product!.id, fileId: file.id })}>
-                    <Button size="sm" variant="outline" className="gap-1">
-                      <Download className="w-4 h-4" /> Download
-                    </Button>
-                  </a>
+                  <div className="flex items-center gap-2">
+                    {(file.mimeType === "application/pdf" || file.fileName?.toLowerCase().endsWith(".pdf")) && (
+                      <Button size="sm" variant="outline" className="gap-1 text-teal-600 border-teal-300 hover:bg-teal-50"
+                        onClick={() => setPdfViewerUrl(pdfViewerUrl === file.fileUrl ? null : file.fileUrl)}>
+                        {pdfViewerUrl === file.fileUrl ? "Close" : "View"}
+                      </Button>
+                    )}
+                    <a href={file.fileUrl} target="_blank" rel="noopener noreferrer" download={file.fileName}
+                      onClick={() => trackDownload.mutate({ productId: product!.id, fileId: file.id })}>
+                      <Button size="sm" variant="outline" className="gap-1">
+                        <Download className="w-4 h-4" /> Download
+                      </Button>
+                    </a>
+                  </div>
                 </CardContent>
               </Card>
+              {pdfViewerUrl === file.fileUrl && (
+                <div className="rounded-lg overflow-hidden border border-teal-200 bg-gray-50">
+                  <div className="flex items-center justify-between px-3 py-2 bg-teal-50 border-b border-teal-200">
+                    <span className="text-xs font-medium text-teal-700">{file.fileName}</span>
+                    <button className="text-xs text-teal-600 hover:text-teal-800" onClick={() => setPdfViewerUrl(null)}>✕ Close</button>
+                  </div>
+                  <iframe src={`${file.fileUrl}#toolbar=1`} className="w-full" style={{ height: "75vh" }} title={file.fileName} />
+                </div>
+              )}
             ))}
           </div>
         )}

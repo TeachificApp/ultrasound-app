@@ -49,10 +49,13 @@ export const soundBytesRouter = router({
         category: z.enum(CATEGORY_VALUES).optional(),
       })
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) return [];
-      const conditions: ReturnType<typeof eq>[] = [eq(soundBytes.status, "published")];
+      const conditions: ReturnType<typeof eq>[] = [
+        eq(soundBytes.isActive, true),
+        eq(soundBytes.brand, ctx.brand as "aaus" | "iheartecho"),
+      ];
       if (input.category) {
         conditions.push(eq(soundBytes.category, input.category));
       }
@@ -98,13 +101,14 @@ export const soundBytesRouter = router({
   /** Get a single published SoundByte by ID (includes body + videoUrl) */
   getById: publicProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const brand = ctx.brand as "aaus" | "iheartecho";
       const [row] = await db
         .select()
         .from(soundBytes)
-        .where(and(eq(soundBytes.id, input.id), eq(soundBytes.status, "published")))
+        .where(and(eq(soundBytes.id, input.id), eq(soundBytes.isActive, true), eq(soundBytes.brand, brand)))
         .limit(1);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "SoundByte not found" });
 
@@ -113,7 +117,7 @@ export const soundBytesRouter = router({
       const allPublished = await db
         .select({ id: soundBytes.id })
         .from(soundBytes)
-        .where(eq(soundBytes.status, "published"))
+        .where(and(eq(soundBytes.isActive, true), eq(soundBytes.brand, brand)))
         .orderBy(soundBytes.sortOrder, desc(soundBytes.publishedAt));
       const freeIds = new Set(allPublished.slice(0, FREE_ITEM_COUNT).map((r) => r.id));
       const isFree = freeIds.has(row.id);
@@ -180,6 +184,7 @@ export const soundBytesRouter = router({
     }
     const db = await getDb();
     if (!db) return [];
+    const brand = ctx.brand as "aaus" | "iheartecho";
     const rows = await db
       .select({
         id: soundBytes.id,
@@ -193,6 +198,7 @@ export const soundBytesRouter = router({
         updatedAt: soundBytes.updatedAt,
       })
       .from(soundBytes)
+      .where(eq(soundBytes.brand, brand))
       .orderBy(soundBytes.sortOrder, desc(soundBytes.createdAt));
 
     // Attach true view counts from soundByteViews

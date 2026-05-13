@@ -1,0 +1,9 @@
+{
+  "query": "\n-- Add brand column to quickfireChallenges\nALTER TABLE quickfireChallenges \n  ADD COLUMN brand ENUM('aaus', 'iheartecho') NOT NULL DEFAULT 'aaus';\n\n-- Expand quickfireChallenges category enum\nALTER TABLE quickfireChallenges \n  MODIFY COLUMN category ENUM(\n    'Abdominal','Small Parts','Pelvic/Gyn','OB 1st Trimester','OB 2nd/3rd Trimester',\n    'Fetal Echo','Breast','Vascular','MSK','POCUS','Physics',\n    'ACS','Adult Echo','Pediatric Echo','General'\n  ) NOT NULL DEFAULT 'Abdominal';\n\n-- Add brand column to quickfireDailySets\nALTER TABLE quickfireDailySets \n  ADD COLUMN brand ENUM('aaus', 'iheartecho') NOT NULL DEFAULT 'aaus';\n\n-- Add brand column to soundBytes\nALTER TABLE soundBytes \n  ADD COLUMN brand ENUM('aaus', 'iheartecho') NOT NULL DEFAULT 'iheartecho';\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \n-- Add brand column to quickfireChallenges\nALTER TABLE quickfireChallenges \n  ADD COLUMN brand ENUM('aaus', 'iheartecho') NOT NULL DEFAULT 'aaus';\n\n-- Expand quickfireChallenges category enum\nALTER TABLE quickfireChallenges \n  MODIFY COLUMN category ENUM(\n    'Abdominal','Small Parts','Pelvic/Gyn','OB 1st Trimester','OB 2nd/3rd Trimester',\n    'Fetal Echo','Breast','Vascular','MSK','POCUS','Physics',\n    'ACS','Adult Echo','Pediatric Echo','General'\n  ) NOT NULL DEFAULT 'Abdominal';\n\n-- Add brand column to quickfireDailySets\nALTER TABLE quickfireDailySets \n  ADD COLUMN brand ENUM('aaus', 'iheartecho') NOT NULL DEFAULT 'aaus';\n\n-- Add brand column to soundBytes\nALTER TABLE soundBytes \n  ADD COLUMN brand ENUM('aaus', 'iheartecho') NOT NULL DEFAULT 'iheartecho';\n",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1082
+}

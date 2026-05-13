@@ -1,0 +1,98 @@
+{
+  "query": "SHOW COLUMNS FROM soundBytes;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SHOW COLUMNS FROM soundBytes;",
+  "rows": [
+    {
+      "Field": "id",
+      "Type": "int",
+      "Null": "NO",
+      "Key": "PRI",
+      "Default": "NULL",
+      "Extra": "auto_increment"
+    },
+    {
+      "Field": "title",
+      "Type": "text",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "description",
+      "Type": "text",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "category",
+      "Type": "enum('abdominal','pelvic_gyn','obstetric_1st','obstetric_2nd_3rd','thyroid','scrotum','breast','venous','arterial','abdominal_vascular','extracranial_carotid','intracranial_tcd','msk','pocus','physics','fetal_echo')",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "videoUrl",
+      "Type": "text",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "thumbnailUrl",
+      "Type": "text",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "durationSeconds",
+      "Type": "int",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "isActive",
+      "Type": "tinyint(1)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "1",
+      "Extra": ""
+    },
+    {
+      "Field": "sortOrder",
+      "Type": "int",
+      "Null": "NO",
+      "Key": "",
+      "Default": "0",
+      "Extra": ""
+    },
+    {
+      "Field": "createdAt",
+      "Type": "timestamp",
+      "Null": "NO",
+      "Key": "",
+      "Default": "CURRENT_TIMESTAMP",
+      "Extra": ""
+    },
+    {
+      "Field": "brand",
+      "Type": "enum('aaus','iheartecho')",
+      "Null": "NO",
+      "Key": "",
+      "Default": "iheartecho",
+      "Extra": ""
+    }
+  ],
+  "messages": [],
+  "stdout": "Field\tType\tNull\tKey\tDefault\tExtra\nid\tint\tNO\tPRI\tNULL\tauto_increment\ntitle\ttext\tNO\t\tNULL\t\ndescription\ttext\tYES\t\tNULL\t\ncategory\tenum('abdominal','pelvic_gyn','obstetric_1st','obstetric_2nd_3rd','thyroid','scrotum','breast','venous','arterial','abdominal_vascular','extracranial_carotid','intracranial_tcd','msk','pocus','physics','fetal_echo')\tNO\t\tNULL\t\nvideoUrl\ttext\tYES\t\tNULL\t\nthumbnailUrl\ttext\tYES\t\tNULL\t\ndurationSeconds\tint\tYES\t\tNULL\t\nisActive\ttinyint(1)\tNO\t\t1\t\nsortOrder\tint\tNO\t\t0\t\ncreatedAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\t\nbrand\tenum('aaus','iheartecho')\tNO\t\tiheartecho\t\n",
+  "stderr": "",
+  "execution_time_ms": 264
+}

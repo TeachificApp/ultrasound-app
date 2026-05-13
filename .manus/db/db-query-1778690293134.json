@@ -1,0 +1,30 @@
+{
+  "query": "\nSELECT TABLE_NAME, COLUMN_NAME \nFROM INFORMATION_SCHEMA.COLUMNS \nWHERE TABLE_SCHEMA = DATABASE() \n  AND COLUMN_NAME = 'brand'\n  AND TABLE_NAME IN ('quickfireQuestions','quickfireChallenges','quickfireDailySets','echoLibraryCases','soundBytes');\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \nSELECT TABLE_NAME, COLUMN_NAME \nFROM INFORMATION_SCHEMA.COLUMNS \nWHERE TABLE_SCHEMA = DATABASE() \n  AND COLUMN_NAME = 'brand'\n  AND TABLE_NAME IN ('quickfireQuestions','quickfireChallenges','quickfireDailySets','echoLibraryCases','soundBytes');\n",
+  "rows": [
+    {
+      "TABLE_NAME": "echoLibraryCases",
+      "COLUMN_NAME": "brand"
+    },
+    {
+      "TABLE_NAME": "quickfireChallenges",
+      "COLUMN_NAME": "brand"
+    },
+    {
+      "TABLE_NAME": "quickfireDailySets",
+      "COLUMN_NAME": "brand"
+    },
+    {
+      "TABLE_NAME": "quickfireQuestions",
+      "COLUMN_NAME": "brand"
+    },
+    {
+      "TABLE_NAME": "soundbytes",
+      "COLUMN_NAME": "brand"
+    }
+  ],
+  "messages": [],
+  "stdout": "TABLE_NAME\tCOLUMN_NAME\nechoLibraryCases\tbrand\nquickfireChallenges\tbrand\nquickfireDailySets\tbrand\nquickfireQuestions\tbrand\nsoundbytes\tbrand\n",
+  "stderr": "",
+  "execution_time_ms": 270
+}

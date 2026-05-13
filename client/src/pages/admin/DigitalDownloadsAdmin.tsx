@@ -158,6 +158,7 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
       description: product.description ?? "",
       price: (product.price / 100).toFixed(2),
       isFree: product.isFree,
+      bundleOnly: (product as any).bundleOnly ?? false,
       status: product.status,
       thumbnailUrl: product.thumbnailUrl ?? "",
       landingHeadline: product.landingHeadline ?? "",
@@ -177,6 +178,7 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
       description: form.description || null,
       price: Math.round(parseFloat(form.price || "0") * 100),
       isFree: form.isFree,
+      bundleOnly: form.bundleOnly ?? false,
       status: form.status,
       thumbnailUrl: form.thumbnailUrl || null,
       landingHeadline: form.landingHeadline || null,
@@ -268,6 +270,11 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
             </div>
             <div className="flex items-center gap-2 pt-6">
               <Switch checked={form.isFree ?? false} onCheckedChange={(v) => setForm({ ...form, isFree: v, price: v ? "0.00" : form.price })} />
+            </div>
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-medium">Bundle Only</label>
+              <Switch checked={(form as any).bundleOnly ?? false} onCheckedChange={(v) => setForm({ ...form, bundleOnly: v } as any)} />
+              <span className="text-xs text-muted-foreground">If enabled, this product cannot be purchased standalone</span>
               <Label>Free product</Label>
             </div>
           </div>

@@ -672,6 +672,7 @@ export default function DownloadLanding() {
               <div className="flex items-center gap-3 mt-6">
                 <span className="text-3xl font-bold">{price}</span>
                 {product.isFree && <Badge className="bg-teal-500 text-white">Free</Badge>}
+                {(product as any).bundleOnly && <Badge className="bg-amber-500 text-white">Bundle Only</Badge>}
               </div>
               <div className="mt-6">
                 {hasPurchased ? (
@@ -680,6 +681,10 @@ export default function DownloadLanding() {
                       <Download className="w-5 h-5 mr-2" /> Access Your Files
                     </Button>
                   </Link>
+                ) : (product as any).bundleOnly ? (
+                  <div className="inline-flex items-center gap-2 bg-white/20 text-white px-4 py-3 rounded-lg text-sm font-medium">
+                    <span>🎁</span> Available as part of a bundle only
+                  </div>
                 ) : (
                   <Button size="lg" className="bg-white text-teal-700 hover:bg-teal-50" onClick={handleBuy} disabled={checkoutMut.isPending}>
                     <ShoppingCart className="w-5 h-5 mr-2" /> {checkoutMut.isPending ? "Processing..." : product.isFree ? "Get It Free" : `Buy Now — ${price}`}

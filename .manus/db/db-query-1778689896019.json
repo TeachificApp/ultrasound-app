@@ -1,0 +1,9 @@
+{
+  "query": "\n-- Add brand column to echoLibraryCases\nALTER TABLE echoLibraryCases \n  ADD COLUMN brand ENUM('aaus', 'iheartecho') NOT NULL DEFAULT 'aaus';\n\n-- Expand modality enum to include iHE modalities\nALTER TABLE echoLibraryCases \n  MODIFY COLUMN modality ENUM(\n    'Abdominal','Vascular','OB/Gyn','MSK','POCUS','Thyroid','Breast','Renal','Fetal Echo','Other',\n    'TTE','TEE','ICE','Stress','Pediatric','Fetal','HOCM','ECG'\n  ) NOT NULL;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \n-- Add brand column to echoLibraryCases\nALTER TABLE echoLibraryCases \n  ADD COLUMN brand ENUM('aaus', 'iheartecho') NOT NULL DEFAULT 'aaus';\n\n-- Expand modality enum to include iHE modalities\nALTER TABLE echoLibraryCases \n  MODIFY COLUMN modality ENUM(\n    'Abdominal','Vascular','OB/Gyn','MSK','POCUS','Thyroid','Breast','Renal','Fetal Echo','Other',\n    'TTE','TEE','ICE','Stress','Pediatric','Fetal','HOCM','ECG'\n  ) NOT NULL;\n",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 621
+}

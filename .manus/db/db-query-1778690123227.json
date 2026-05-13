@@ -1,0 +1,9 @@
+{
+  "query": "\nALTER TABLE soundBytes \n  MODIFY COLUMN category ENUM(\n    'abdominal','pelvic_gyn','obstetric_1st','obstetric_2nd_3rd','thyroid','scrotum',\n    'breast','venous','arterial','abdominal_vascular','extracranial_carotid',\n    'intracranial_tcd','msk','pocus','physics','fetal_echo',\n    'acs','adult_echo','pediatric_echo','ecg','general'\n  ) NOT NULL;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute \nALTER TABLE soundBytes \n  MODIFY COLUMN category ENUM(\n    'abdominal','pelvic_gyn','obstetric_1st','obstetric_2nd_3rd','thyroid','scrotum',\n    'breast','venous','arterial','abdominal_vascular','extracranial_carotid',\n    'intracranial_tcd','msk','pocus','physics','fetal_echo',\n    'acs','adult_echo','pediatric_echo','ecg','general'\n  ) NOT NULL;\n",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 328
+}

@@ -1,0 +1,8 @@
+{
+  "query": "ALTER TABLE quickfireDailySets ADD COLUMN brand ENUM('aaus', 'iheartecho') NOT NULL DEFAULT 'aaus';\nALTER TABLE quickfireDailySets DROP INDEX setDate;\nALTER TABLE quickfireDailySets ADD UNIQUE INDEX setDate_brand (setDate, brand);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute ALTER TABLE quickfireDailySets ADD COLUMN brand ENUM('aaus', 'iheartecho') NOT NULL DEFAULT 'aaus';\nALTER TABLE quickfireDailySets DROP INDEX setDate;\nALTER TABLE quickfireDailySets ADD UNIQUE INDEX setDate_brand (setDate, brand);",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1060 (42S21) at line 1: Duplicate column name 'brand'"
+  ]
+}

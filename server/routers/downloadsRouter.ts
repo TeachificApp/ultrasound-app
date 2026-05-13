@@ -164,6 +164,7 @@ export const downloadsLearnerRouter = router({
       const [product] = await db.select().from(digitalProducts)
         .where(eq(digitalProducts.id, input.productId)).limit(1);
       if (!product) throw new TRPCError({ code: "NOT_FOUND" });
+      if ((product as any).bundleOnly) throw new TRPCError({ code: "FORBIDDEN", message: "This product is only available as part of a bundle." });
       const orderBumpCheckout = await buildOrderBumpCheckoutLine(db, {
         orderBumpId: input.orderBumpId,
         triggerType: "download",
@@ -404,6 +405,7 @@ export const downloadsAdminRouter = router({
       description: z.string().optional(),
       price: z.number().min(0).default(0),
       isFree: z.boolean().default(false),
+      bundleOnly: z.boolean().default(false),
       thumbnailUrl: z.string().optional(),
       status: z.enum(["draft", "published", "hidden", "private", "archived"]).default("draft"),
       landingHeadline: z.string().optional(),
@@ -437,6 +439,7 @@ export const downloadsAdminRouter = router({
       description: z.string().nullable().optional(),
       price: z.number().min(0).optional(),
       isFree: z.boolean().optional(),
+      bundleOnly: z.boolean().optional(),
       thumbnailUrl: z.string().nullable().optional(),
       status: z.enum(["draft", "published", "hidden", "private", "archived"]).optional(),
       landingHeadline: z.string().nullable().optional(),

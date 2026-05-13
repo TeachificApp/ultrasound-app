@@ -1,0 +1,19 @@
+{
+  "query": "SELECT id, slug, title, access, mediaType, mimeType, deletedAt FROM mediaAssets WHERE slug LIKE '%jumpstart%' OR slug LIKE '%quick-guide%' LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT id, slug, title, access, mediaType, mimeType, deletedAt FROM mediaAssets WHERE slug LIKE '%jumpstart%' OR slug LIKE '%quick-guide%' LIMIT 10;",
+  "rows": [
+    {
+      "id": "60001",
+      "slug": "jumpstart-business-quick-guide-a03dbc0f",
+      "title": "Jumpstart Business Quick Guide",
+      "access": "public",
+      "mediaType": "document",
+      "mimeType": "application/pdf",
+      "deletedAt": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tslug\ttitle\taccess\tmediaType\tmimeType\tdeletedAt\n60001\tjumpstart-business-quick-guide-a03dbc0f\tJumpstart Business Quick Guide\tpublic\tdocument\tapplication/pdf\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 263
+}

@@ -113,103 +113,76 @@ export async function runChallengeCron() {
     }
 
     // ── Step 2: Check if we're past 6 AM ET (publish window: 6 AM onward) ──────
-    // We publish any time after 6 AM ET if today's challenges haven't been published yet.
-    // This ensures catch-up if the server was down during the 6 AM window.
     const currentHourET = hourET();
     const isPastPublishTime = currentHourET >= 6;
-
     if (!isPastPublishTime) return;
 
-    // ── Step 3: Check if we already published today (any live challenge today) ─
-    const alreadyPublishedToday = await db
-      .select({ id: quickfireChallenges.id })
-      .from(quickfireChallenges)
-      .where(
-        and(
-          eq(quickfireChallenges.status, "live"),
-          eq(quickfireChallenges.publishDate, todayStr)
-        )
-      )
-      .limit(1);
+    // ── Step 3–7: Run per-brand ──────────────────────────────────────────────
+    const BRANDS = ["aaus", "iheartecho"] as const;
+    const BRAND_CATEGORIES: Record<string, readonly string[]> = {
+      aaus: ["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics"],
+      iheartecho: ["ACS", "Adult Echo", "Pediatric Echo", "General"],
+    };
 
-    // Also check archived challenges published today (in case they already expired)
-    const archivedToday = await db
-      .select({ id: quickfireChallenges.id })
-      .from(quickfireChallenges)
-      .where(
-        and(
-          eq(quickfireChallenges.status, "archived"),
-          eq(quickfireChallenges.publishDate, todayStr)
-        )
-      )
-      .limit(1);
+    for (const brand of BRANDS) {
+      const categories = BRAND_CATEGORIES[brand];
 
-    if (alreadyPublishedToday.length > 0 || archivedToday.length > 0) {
-      console.log(`[ChallengeCron] Already published challenges for ${todayStr}, skipping.`);
-      return;
-    }
-
-    // ── Step 4: Pick the next challenge per category ────────────────────────────
-    // Pool: status="queued" OR status="scheduled" (covers bulk-imported challenges
-    // that were created with "scheduled" status but no explicit publishDate).
-    const categories = ["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics"] as const;
-    const toPublish: typeof quickfireChallenges.$inferSelect[] = [];
-
-    for (const category of categories) {
-      const [next] = await db
-        .select()
+      // Check if already published today for this brand
+      const alreadyPublishedToday = await db
+        .select({ id: quickfireChallenges.id })
         .from(quickfireChallenges)
-        .where(
-          and(
-            // Accept both "queued" and "scheduled" (with no future publishDate)
-            or(
-              eq(quickfireChallenges.status, "queued"),
-              and(
-                eq(quickfireChallenges.status, "scheduled"),
-                or(
-                  isNull(quickfireChallenges.publishDate),
-                  lte(quickfireChallenges.publishDate, todayStr)
-                )
-              )
-            ),
-            eq(quickfireChallenges.category, category)
-          )
-        )
-        // Explicit queuePosition first; null positions fall back to createdAt
-        .orderBy(asc(quickfireChallenges.queuePosition), asc(quickfireChallenges.createdAt))
+        .where(and(eq(quickfireChallenges.status, "live"), eq(quickfireChallenges.publishDate, todayStr), eq(quickfireChallenges.brand, brand)))
+        .limit(1);
+      const archivedToday = await db
+        .select({ id: quickfireChallenges.id })
+        .from(quickfireChallenges)
+        .where(and(eq(quickfireChallenges.status, "archived"), eq(quickfireChallenges.publishDate, todayStr), eq(quickfireChallenges.brand, brand)))
         .limit(1);
 
-      if (next) {
-        toPublish.push(next);
+      if (alreadyPublishedToday.length > 0 || archivedToday.length > 0) {
+        console.log(`[ChallengeCron][${brand}] Already published challenges for ${todayStr}, skipping.`);
+        continue;
       }
+
+      const toPublish: typeof quickfireChallenges.$inferSelect[] = [];
+      for (const category of categories) {
+        const [next] = await db
+          .select()
+          .from(quickfireChallenges)
+          .where(
+            and(
+              or(
+                eq(quickfireChallenges.status, "queued"),
+                and(
+                  eq(quickfireChallenges.status, "scheduled"),
+                  or(isNull(quickfireChallenges.publishDate), lte(quickfireChallenges.publishDate, todayStr))
+                )
+              ),
+              eq(quickfireChallenges.category, category as any),
+              eq(quickfireChallenges.brand, brand)
+            )
+          )
+          .orderBy(asc(quickfireChallenges.queuePosition), asc(quickfireChallenges.createdAt))
+          .limit(1);
+        if (next) toPublish.push(next);
+      }
+
+      if (toPublish.length === 0) {
+        console.log(`[ChallengeCron][${brand}] No queued challenges found for ${todayStr}.`);
+        continue;
+      }
+
+      for (const challenge of toPublish) {
+        await db
+          .update(quickfireChallenges)
+          .set({ status: "live", publishedAt: now, publishDate: todayStr, queuePosition: null })
+          .where(eq(quickfireChallenges.id, challenge.id));
+        console.log(`[ChallengeCron][${brand}] Published #${challenge.id}: "${challenge.title}" (${challenge.category})`);
+      }
+
+      await syncIheUnsubscribes();
+      await sendChallengeNotifications(db, toPublish, todayStr, brand);
     }
-
-    if (toPublish.length === 0) {
-      console.log(`[ChallengeCron] No queued challenges found for ${todayStr}.`);
-      return;
-    }
-
-    // ── Step 5: Publish all selected challenges ───────────────────────────────
-    for (const challenge of toPublish) {
-      await db
-        .update(quickfireChallenges)
-        .set({
-          status: "live",
-          publishedAt: now,
-          publishDate: todayStr,
-          queuePosition: null, // remove from queue
-        })
-        .where(eq(quickfireChallenges.id, challenge.id));
-
-      console.log(`[ChallengeCron] Published challenge #${challenge.id}: "${challenge.title}" (${challenge.category})`);
-    }
-
-    // ── Step 6: Sync iHeartEcho unsubscribes before sending emails ─────────────
-    // Ensures anyone who opted out of iHeartEcho emails is also excluded here.
-    await syncIheUnsubscribes();
-
-    // ── Step 7: Send notification emails ─────────────────────────────────────
-    await sendChallengeNotifications(db, toPublish, todayStr);
 
   } catch (err) {
     console.error("[ChallengeCron] Error:", err);
@@ -223,7 +196,8 @@ export async function runChallengeCron() {
 async function sendChallengeNotifications(
   db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
   publishedChallenges: typeof quickfireChallenges.$inferSelect[],
-  todayStr: string
+  todayStr: string,
+  brand: "aaus" | "iheartecho" = "aaus"
 ) {
   if (!SENDGRID_API_KEY) {
     console.log("[ChallengeCron] SendGrid not configured, skipping notifications.");
