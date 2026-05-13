@@ -301,6 +301,7 @@ export const appRouter = router({
     requestEmailChange: protectedProcedure
       .input(z.object({
         newEmail: z.string().email().max(320),
+        origin: z.string().url().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const { setPendingEmail, getUserById } = await import('./db');
@@ -335,12 +336,14 @@ export const appRouter = router({
         await setPendingEmail(ctx.user.id, newEmail, token, expiry);
 
         // Build verification URL
-        const appUrl = process.env.VITE_APP_URL || 'https://app.allaboutultrasound.com';
+        // Use origin from frontend to build correct redirect URL per domain
+        const appUrl = input.origin || process.env.VITE_APP_URL || 'https://app.allaboutultrasound.com';
         const verificationUrl = `${appUrl}/verify-email?token=${token}&type=change`;
-
         const firstName = (currentUser.displayName || currentUser.name || 'there').split(' ')[0];
-         const { detectBrandMode: dbm } = await import('@shared/brands');
-        const brandMode = dbm(ctx.req.hostname || "");
+        // Detect brand from the origin URL hostname (more reliable than proxy hostname)
+        const { detectBrandMode: dbm } = await import('@shared/brands');
+        const originHostname = input.origin ? new URL(input.origin).hostname : (ctx.req.hostname || "");
+        const brandMode = dbm(originHostname);
         const emailPayload = buildEmailChangeVerificationEmail({
           firstName,
           newEmail,
@@ -388,36 +391,34 @@ export const appRouter = router({
 
     // ─── Forgot / Reset Password ──────────────────────────────────────────────
 
-    requestPasswordReset: publicProcedure
+       requestPasswordReset: publicProcedure
       .input(z.object({
         email: z.string().email().max(320),
+        origin: z.string().url().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const { getUserByEmail, setPasswordResetToken } = await import('./db');
         const { sendEmail, buildPasswordResetEmail } = await import('./_core/email');
         const crypto = await import('crypto');
-
         const email = input.email.trim().toLowerCase();
         const user = await getUserByEmail(email);
-
         // Always return success to prevent email enumeration
         // Send reset email to any registered account (including OAuth-only accounts without a passwordHash)
         // — this allows OAuth users to set a password for the first time via the reset flow
         if (!user) {
           return { success: true };
         }
-
         const token = crypto.randomBytes(48).toString('hex');
         const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-
         await setPasswordResetToken(user.id, token, expiry);
-
-        const appUrl = process.env.VITE_APP_URL || 'https://app.allaboutultrasound.com';
+        // Use origin from frontend to build correct redirect URL per domain
+        const appUrl = input.origin || process.env.VITE_APP_URL || 'https://app.allaboutultrasound.com';
         const resetUrl = `${appUrl}/reset-password?token=${token}`;
-
         const firstName = (user.displayName || user.name || 'there').split(' ')[0];
+        // Detect brand from the origin URL hostname (more reliable than proxy hostname)
         const { detectBrandMode: dbm2 } = await import('@shared/brands');
-        const brandMode = dbm2(ctx.req.hostname || "");
+        const originHostname = input.origin ? new URL(input.origin).hostname : (ctx.req.hostname || "");
+        const brandMode = dbm2(originHostname);
         const emailPayload = buildPasswordResetEmail({ firstName, resetUrl, brandMode });
         await sendEmail({
           to: { name: firstName, email: user.email! },
@@ -426,7 +427,6 @@ export const appRouter = router({
           previewText: emailPayload.previewText,
           brandMode,
         });
-
         return { success: true };
       }),
 
@@ -459,6 +459,7 @@ export const appRouter = router({
     requestMagicLink: publicProcedure
       .input(z.object({
         email: z.string().email().max(320),
+        origin: z.string().url().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const { getUserByEmail, setMagicLinkToken } = await import('./db');
@@ -478,12 +479,15 @@ export const appRouter = router({
 
         await setMagicLinkToken(user.id, token, expiry);
 
-        const appUrl = process.env.VITE_APP_URL || 'https://app.allaboutultrasound.com';
+        // Use origin from frontend to build correct redirect URL per domain
+        const appUrl = input.origin || process.env.VITE_APP_URL || 'https://app.allaboutultrasound.com';
         const magicUrl = `${appUrl}/auth/magic?token=${token}`;
 
         const firstName = (user.displayName || user.name || 'there').split(' ')[0];
-         const { detectBrandMode: dbm3 } = await import('@shared/brands');
-        const brandMode = dbm3(ctx.req.hostname || "");
+        // Detect brand from the origin URL hostname (more reliable than proxy hostname)
+        const { detectBrandMode: dbm3 } = await import('@shared/brands');
+        const originHostname = input.origin ? new URL(input.origin).hostname : (ctx.req.hostname || "");
+        const brandMode = dbm3(originHostname);
         const emailPayload = buildMagicLinkEmail({ firstName, magicUrl, brandMode });
         await sendEmail({
           to: { name: firstName, email: user.email! },

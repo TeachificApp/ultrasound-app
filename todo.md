@@ -1689,3 +1689,11 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Fix EchoFlashcards showing AAUS categories instead of echo-specific categories on iHeartEcho brand
 - [ ] Fix iHeartEcho case library showing AAUS modality filters instead of echo modalities
 - [ ] Fix leaderboard not working on iHeartEcho
+
+## iHeartEcho Branding Fixes (Session 2)
+- [x] Magic link email sends from "All About Ultrasound" and redirects to app.allaboutultrasound.com instead of iHeartEcho — FIXED: frontend passes origin, server uses it for URL + brand detection
+- [ ] QuickFire.tsx shows AAUS categories instead of echo categories on iHeartEcho
+- [ ] Layout.tsx sidebar footer hardcoded to www.allaboutultrasound.com / © All About Ultrasound™
+- [ ] LMSLayout.tsx sidebar footer hardcoded to www.allaboutultrasound.com
+- [ ] Leaderboard shows blank for unauthenticated users (needs login prompt)
+- [ ] Case library brand filter verification

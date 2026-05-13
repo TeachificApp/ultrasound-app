@@ -67,7 +67,7 @@ export default function Login() {
     e.preventDefault();
     const trimmed = email.trim().toLowerCase();
     if (!trimmed || requestMutation.isPending) return;
-    requestMutation.mutate({ email: trimmed });
+    requestMutation.mutate({ email: trimmed, origin: window.location.origin });
   };
 
   // Show redirect spinner when already authenticated

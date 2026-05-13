@@ -28,7 +28,7 @@ export default function ForgotPassword() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
-    forgotMutation.mutate({ email: email.trim().toLowerCase() });
+    forgotMutation.mutate({ email: email.trim().toLowerCase(), origin: window.location.origin });
   };
 
   return (

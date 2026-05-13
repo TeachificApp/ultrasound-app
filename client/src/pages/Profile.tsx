@@ -282,7 +282,7 @@ export default function Profile() {
 
     // If email changed, separately trigger the verification email
     if (emailChanged) {
-      requestEmailChange.mutate({ newEmail: emailTrimmed });
+      requestEmailChange.mutate({ newEmail: emailTrimmed, origin: window.location.origin });
     }
   };
 
@@ -682,7 +682,7 @@ export default function Profile() {
                             </p>
                             <div className="flex items-center gap-2 mt-1.5">
                               <button
-                                onClick={() => requestEmailChange.mutate({ newEmail: pendingEmail })}
+                                onClick={() => requestEmailChange.mutate({ newEmail: pendingEmail, origin: window.location.origin })}
                                 disabled={requestEmailChange.isPending}
                                 className="flex items-center gap-1 text-[10px] font-semibold text-amber-700 hover:text-amber-900 disabled:opacity-60"
                               >

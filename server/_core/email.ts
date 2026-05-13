@@ -183,7 +183,7 @@ export function buildStreakReminderEmail(opts: {
     <p style="margin:0;font-size:12px;color:#94a3b8;text-align:center;line-height:1.5;">
       <a href="${opts.unsubscribeUrl}" style="color:#94a3b8;" target="_blank" rel="noopener noreferrer">Unsubscribe from Daily Challenge reminders</a>
     </p>
-  `);
+  `, opts.brandMode);
   return { subject, htmlBody, previewText };
 }
 
@@ -215,7 +215,7 @@ export function buildVerificationEmail(opts: {
       Or copy and paste this URL into your browser:<br/>
       <a href="${opts.verificationUrl}" style="color:${brandColor};word-break:break-all;" target="_blank" rel="noopener noreferrer">${opts.verificationUrl}</a>
     </p>
-  `);
+  `, opts.brandMode);
   return { subject, htmlBody, previewText };
 }
 
@@ -247,7 +247,7 @@ export function buildPasswordResetEmail(opts: {
       Or copy and paste this URL into your browser:<br/>
       <a href="${opts.resetUrl}" style="color:${brandColor};word-break:break-all;" target="_blank" rel="noopener noreferrer">${opts.resetUrl}</a>
     </p>
-  `);
+  `, opts.brandMode);
   return { subject, htmlBody, previewText };
 }
 
@@ -320,7 +320,7 @@ export function buildMagicLinkEmail(opts: {
       Or copy and paste this URL into your browser:<br/>
       <a href="${opts.magicUrl}" style="color:${brandColor};word-break:break-all;" target="_blank" rel="noopener noreferrer">${opts.magicUrl}</a>
     </p>
-  `);
+  `, opts.brandMode);
   return { subject, htmlBody, previewText };
 }
 
@@ -453,7 +453,7 @@ export function buildCaseRejectedEmail(opts: {
       If you have questions about this decision, please contact us at
       <a href="mailto:support@allaboutultrasound.com" style="color:${brandColor};" target="_blank" rel="noopener noreferrer">support@allaboutultrasound.com</a>.
     </p>
-  `);
+  `, opts.brandMode);
   return { subject, htmlBody, previewText };
 }
 
@@ -499,12 +499,11 @@ export function buildWelcomeEmail(opts: {
     </div>
     <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.5;">
       If you have any questions, please contact us at
-      <a href="mailto:${bc.supportEmail}" style="color:${brandColor};" target="_blank" rel="noopener noreferrer">${bc.supportEmail}</a>.
+       <a href="mailto:${bc.supportEmail}" style="color:${brandColor};" target="_blank" rel="noopener noreferrer">${bc.supportEmail}</a>.
     </p>
-  `);
+  `, opts.brandMode);
   return { subject, htmlBody, previewText };
 }
-
 // ─── Physician Over-Read Invitation Email ─────────────────────────────────────
 
 export function buildPhysicianOverReadInvitationEmail(opts: {

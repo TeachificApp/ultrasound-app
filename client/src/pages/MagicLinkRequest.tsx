@@ -24,7 +24,7 @@ export default function MagicLinkRequest() {
     e.preventDefault();
     const trimmed = email.trim().toLowerCase();
     if (!trimmed) return;
-    requestMutation.mutate({ email: trimmed });
+    requestMutation.mutate({ email: trimmed, origin: window.location.origin });
   };
 
   return (
