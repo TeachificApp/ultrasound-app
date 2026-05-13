@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Upload, FileIcon, GripVertical, ArrowLeft, ExternalLink, Eye, EyeOff, Image as ImageIcon, Link as LinkIcon, Users } from "lucide-react";
+import { Plus, Pencil, Trash2, Copy, Upload, FileIcon, GripVertical, ArrowLeft, ExternalLink, Eye, EyeOff, Image as ImageIcon, Link as LinkIcon, Users } from "lucide-react";
 import RichTextEditor from "@/components/RichTextEditor";
 
 // ─── Product List View ──────────────────────────────────────────────────────
@@ -19,6 +19,10 @@ function ProductList({ onEdit }: { onEdit: (id: number) => void }) {
   const utils = trpc.useUtils();
   const deleteMut = trpc.downloadsAdmin.delete.useMutation({
     onSuccess: () => { utils.downloadsAdmin.list.invalidate(); toast.success("Product deleted"); },
+  });
+  const duplicateMut = trpc.downloadsAdmin.duplicate.useMutation({
+    onSuccess: (data) => { utils.downloadsAdmin.list.invalidate(); toast.success(`Duplicated as "${data.title}"`); },
+    onError: e => toast.error(`Error: ${e.message}`),
   });
   const [showCreate, setShowCreate] = useState(false);
 
@@ -69,6 +73,9 @@ function ProductList({ onEdit }: { onEdit: (id: number) => void }) {
                 <div className="flex items-center gap-1">
                   <Button variant="ghost" size="sm" onClick={() => onEdit(p.id)}>
                     <Pencil className="w-4 h-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="text-blue-500 hover:bg-blue-50" title="Duplicate" onClick={() => duplicateMut.mutate({ id: p.id })} disabled={duplicateMut.isPending}>
+                    <Copy className="w-4 h-4" />
                   </Button>
                   <Button variant="ghost" size="sm" className="text-destructive" onClick={() => {
                     if (confirm("Delete this product and all its files?")) deleteMut.mutate({ id: p.id });

@@ -25,7 +25,7 @@ import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import RichTextEditor from "@/components/RichTextEditor";
 import {
-  BookOpen, ChevronLeft, ChevronRight, Clock, Download, Edit2, HelpCircle, Plus, Trash2,
+  BookOpen, ChevronLeft, ChevronRight, Clock, Copy, Download, Edit2, HelpCircle, Plus, Trash2,
   Users, DollarSign, BarChart2, GripVertical, CheckCircle, AlertCircle,
   Link as LinkIcon, UserCheck, ArrowLeft, Upload, ImageIcon,
   Sparkles, Loader2, Eye, FolderOpen, Monitor, Video, FileText, CheckSquare, Settings2,
@@ -83,6 +83,10 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
     onSuccess: () => { toast.success("Course deleted"); refetch(); },
     onError: e => toast.error(`Error: ${e.message}`),
   });
+  const duplicateCourse = trpc.lmsAdmin.duplicateCourse.useMutation({
+    onSuccess: (data) => { toast.success(`Duplicated as "${data.title}"`); refetch(); },
+    onError: e => toast.error(`Error: ${e.message}`),
+  });
 
   return (
     <div className="space-y-4">
@@ -128,6 +132,9 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
                   <LinkIcon className="w-3 h-3" />
                 </Button>
               </Link>
+              <Button size="sm" variant="ghost" className="h-7 text-xs text-blue-500 hover:bg-blue-50" title="Duplicate" onClick={() => duplicateCourse.mutate({ id: c.id })} disabled={duplicateCourse.isPending}>
+                <Copy className="w-3 h-3" />
+              </Button>
               <Button size="sm" variant="ghost" className="h-7 text-red-400 hover:bg-red-50" onClick={() => {
                 if (confirm(`Delete "${c.title}"?`)) deleteCourse.mutate({ id: c.id });
               }}>

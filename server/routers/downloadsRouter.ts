@@ -693,6 +693,81 @@ export const downloadsAdminRouter = router({
       await db.delete(digitalBundles).where(eq(digitalBundles.id, input.id));
       return { success: true };
     }),
+
+  /** Duplicate a digital product (copies metadata + file list, status = draft) */
+  duplicate: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const [src] = await db.select().from(digitalProducts).where(eq(digitalProducts.id, input.id)).limit(1);
+      if (!src) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const newTitle = `${src.title} [Copy]`;
+      let newSlug = newTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      const [existing] = await db.select({ id: digitalProducts.id }).from(digitalProducts)
+        .where(eq(digitalProducts.slug, newSlug)).limit(1);
+      if (existing) newSlug += `-${Date.now().toString(36)}`;
+
+      const { id: _srcId, slug: _srcSlug, downloadCount: _dc, createdAt: _ca, updatedAt: _ua, ...srcRest } = src;
+      const [result] = await db.insert(digitalProducts).values({
+        ...srcRest,
+        title: newTitle,
+        slug: newSlug,
+        status: "draft",
+        downloadCount: 0,
+      }).$returningId();
+
+      // Copy file references (same S3 URLs — no re-upload needed)
+      const files = await db.select().from(digitalProductFiles)
+        .where(eq(digitalProductFiles.productId, input.id))
+        .orderBy(asc(digitalProductFiles.sortOrder));
+      for (const f of files) {
+        const { id: _fid, productId: _fpid, ...fRest } = f;
+        await db.insert(digitalProductFiles).values({ ...fRest, productId: result.id });
+      }
+
+      return { id: result.id, slug: newSlug, title: newTitle };
+    }),
+
+  /** Duplicate a bundle (copies metadata + item list, status = draft) */
+  duplicateBundle: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const [src] = await db.select().from(digitalBundles).where(eq(digitalBundles.id, input.id)).limit(1);
+      if (!src) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const newTitle = `${src.title} [Copy]`;
+      let newSlug = newTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      const [existing] = await db.select({ id: digitalBundles.id }).from(digitalBundles)
+        .where(eq(digitalBundles.slug, newSlug)).limit(1);
+      if (existing) newSlug += `-${Date.now().toString(36)}`;
+
+      const { id: _bid, slug: _bslug, createdAt: _bca, updatedAt: _bua, ...srcRest } = src;
+      const [result] = await db.insert(digitalBundles).values({
+        ...srcRest,
+        title: newTitle,
+        slug: newSlug,
+        status: "draft",
+      }).$returningId();
+
+      const items = await db.select().from(digitalBundleItems)
+        .where(eq(digitalBundleItems.bundleId, input.id))
+        .orderBy(asc(digitalBundleItems.sortOrder));
+      if (items.length > 0) {
+        await db.insert(digitalBundleItems).values(
+          items.map(item => ({ bundleId: result.id, productId: item.productId, sortOrder: item.sortOrder }))
+        );
+      }
+
+      return { id: result.id, slug: newSlug, title: newTitle };
+    }),
 });
 
 // ─── Email Helper ───────────────────────────────────────────────────────────

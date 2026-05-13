@@ -130,6 +130,25 @@ export const orderBumpsAdminRouter = router({
         revenue: bump.conversions * bump.bumpPrice,
       };
     }),
+
+  /** Duplicate an order bump (resets impressions/conversions, marks inactive) */
+  duplicate: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      const [src] = await db.select().from(orderBumps).where(eq(orderBumps.id, input.id)).limit(1);
+      if (!src) throw new TRPCError({ code: "NOT_FOUND" });
+      const { id: _id, impressions: _imp, conversions: _conv, createdAt: _ca, updatedAt: _ua, ...rest } = src;
+      const [result] = await db.insert(orderBumps).values({
+        ...rest,
+        headline: rest.headline ? `${rest.headline} [Copy]` : null,
+        isActive: false,
+        impressions: 0,
+        conversions: 0,
+      });
+      return { id: result.insertId };
+    }),
 });
 
 // ─── Public Router (for checkout flow) ───────────────────────────────────────

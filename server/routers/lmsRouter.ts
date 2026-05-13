@@ -2239,6 +2239,92 @@ Generate 3-6 sections with 2-5 lessons each. Lesson types can be: text, video (f
       }
       return { success: true };
     }),
+
+  // ─── Duplicate Course ─────────────────────────────────────────────────────
+
+  duplicateCourse: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Fetch the source course
+      const [src] = await db.select().from(lmsCourses).where(eq(lmsCourses.id, input.id)).limit(1);
+      if (!src) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });
+
+      // Create new course with "[Copy]" suffix, draft status
+      const newTitle = `${src.title} [Copy]`;
+      const base = generateSlug(newTitle);
+      const newSlug = await uniqueSlug(db, base);
+      const [newCourse] = await db.insert(lmsCourses).values({
+        slug: newSlug,
+        title: newTitle,
+        subtitle: src.subtitle,
+        description: src.description,
+        coverImageUrl: src.coverImageUrl,
+        status: "draft",
+        type: src.type,
+        brand: src.brand,
+        price: src.price,
+        isFree: src.isFree,
+        pricingType: src.pricingType,
+        subscriptionInterval: src.subscriptionInterval,
+        trialDays: src.trialDays,
+        accessDurationDays: src.accessDurationDays,
+        downPayment: src.downPayment,
+        installmentCount: src.installmentCount,
+        installmentAmount: src.installmentAmount,
+        installmentIntervalDays: src.installmentIntervalDays,
+        hasCertificate: src.hasCertificate,
+        isDrip: src.isDrip,
+        metaTitle: src.metaTitle,
+        metaDescription: src.metaDescription,
+        createdByUserId: ctx.user.id,
+      }).$returningId();
+      const newCourseId = newCourse.id;
+
+      // Copy landing page
+      const [lp] = await db.select().from(lmsLandingPages).where(eq(lmsLandingPages.courseId, input.id)).limit(1);
+      if (lp) {
+        const { id: _lpId, courseId: _lpCid, ...lpRest } = lp;
+        await db.insert(lmsLandingPages).values({ ...lpRest, courseId: newCourseId });
+      } else {
+        await db.insert(lmsLandingPages).values({ courseId: newCourseId, heroTitle: newTitle, ctaText: "Enroll Now" });
+      }
+
+      // Copy sections and lessons
+      const sections = await db.select().from(lmsSections).where(eq(lmsSections.courseId, input.id)).orderBy(asc(lmsSections.position));
+      const sectionIdMap: Record<number, number> = {};
+      for (const sec of sections) {
+        const { id: _sid, courseId: _scid, ...secRest } = sec;
+        const [newSec] = await db.insert(lmsSections).values({ ...secRest, courseId: newCourseId }).$returningId();
+        sectionIdMap[sec.id] = newSec.id;
+      }
+
+      const lessons = await db.select().from(lmsLessons).where(eq(lmsLessons.courseId, input.id)).orderBy(asc(lmsLessons.position));
+      const lessonIdMap: Record<number, number> = {};
+      for (const les of lessons) {
+        const { id: _lid, courseId: _lcid, ...lesRest } = les;
+        const newSectionId = les.sectionId ? (sectionIdMap[les.sectionId] ?? null) : null;
+        const [newLes] = await db.insert(lmsLessons).values({ ...lesRest, courseId: newCourseId, sectionId: newSectionId }).$returningId();
+        lessonIdMap[les.id] = newLes.id;
+
+        // Copy quiz questions for this lesson
+        const [quiz] = await db.select().from(lmsQuizzes).where(eq(lmsQuizzes.lessonId, les.id)).limit(1);
+        if (quiz) {
+          const { id: _qid, lessonId: _qlid, ...quizRest } = quiz;
+          const [newQuiz] = await db.insert(lmsQuizzes).values({ ...quizRest, lessonId: newLes.id }).$returningId();
+          const questions = await db.select().from(lmsQuizQuestions).where(eq(lmsQuizQuestions.quizId, quiz.id)).orderBy(asc(lmsQuizQuestions.position));
+          for (const q of questions) {
+            const { id: _qqid, quizId: _qqzid, ...qRest } = q;
+            await db.insert(lmsQuizQuestions).values({ ...qRest, quizId: newQuiz.id });
+          }
+        }
+      }
+
+      return { id: newCourseId, slug: newSlug, title: newTitle };
+    }),
 });
 
 // ─── Group Manager Router ─────────────────────────────────────────────────────

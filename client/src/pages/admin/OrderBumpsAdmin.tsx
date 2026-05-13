@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import RichTextEditor from "@/components/RichTextEditor";
 import {
-  Plus, Trash2, Edit, ToggleLeft, ToggleRight, TrendingUp,
+  Plus, Trash2, Edit, Copy, ToggleLeft, ToggleRight, TrendingUp,
   ArrowRight, Package, BookOpen, Download, Layers, X,
 } from "lucide-react";
 
@@ -58,6 +58,10 @@ export default function OrderBumpsAdmin() {
 
   const deleteMutation = trpc.orderBumpsAdmin.delete.useMutation({
     onSuccess: () => { toast.success("Order bump deleted"); utils.orderBumpsAdmin.list.invalidate(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const duplicateMutation = trpc.orderBumpsAdmin.duplicate.useMutation({
+    onSuccess: () => { toast.success("Order bump duplicated"); utils.orderBumpsAdmin.list.invalidate(); },
     onError: (e) => toast.error(e.message),
   });
 
@@ -143,6 +147,7 @@ export default function OrderBumpsAdmin() {
                     {bump.isActive ? <ToggleRight size={18} className="text-teal-600" /> : <ToggleLeft size={18} className="text-gray-400" />}
                   </button>
                   <button onClick={() => setEditingBump(bump)} className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-teal-600" title="Edit"><Edit size={14} /></button>
+                  <button onClick={() => duplicateMutation.mutate({ id: bump.id })} className="p-1.5 rounded hover:bg-blue-50 text-gray-400 hover:text-blue-500" title="Duplicate" disabled={duplicateMutation.isPending}><Copy size={14} /></button>
                   <button onClick={() => { if (confirm("Delete this order bump?")) deleteMutation.mutate({ id: bump.id }); }} className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500" title="Delete"><Trash2 size={14} /></button>
                 </div>
               </div>

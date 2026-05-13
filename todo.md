@@ -1581,3 +1581,14 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Implement drag-and-drop for funnel cards in FunnelListView (SortableFunnelCard)
 - [x] Optimistic updates for instant reorder feedback (arrayMove + rollback on error)
 - [x] All 854 tests passing, vite build clean
+
+## Duplicate Support for Courses, Downloads, Products, Funnels
+- [x] Add duplicateCourse backend procedure in lmsRouter (copies course, modules, lessons, quiz questions)
+- [x] Add duplicateDownload backend procedure in downloadsRouter (copies download record + files list)
+- [x] Add duplicateBundle backend procedure in downloadsRouter (copies bundle + item list)
+- [x] Add duplicateOrderBump backend procedure in orderBumpsRouter (copies order bump, resets stats, marks inactive)
+- [x] Wire Duplicate (Copy icon) button in LMSAdmin course list
+- [x] Wire Duplicate (Copy icon) button in DigitalDownloadsAdmin
+- [x] Wire Duplicate (Copy icon) button in OrderBumpsAdmin
+- [x] Funnels already had duplicate for both funnel and page — confirmed wired
+- [x] All 854 tests passing, vite build clean
