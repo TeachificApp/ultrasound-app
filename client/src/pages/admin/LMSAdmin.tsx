@@ -1798,7 +1798,6 @@ function LessonEditorPage({ lesson, onClose, onSaved }: { lesson: any; onClose: 
         </div>
         </div>
       </div>
-      </div>
       )}
 
       {/* Content Blocks Tab */}
