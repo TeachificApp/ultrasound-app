@@ -1,0 +1,9 @@
+{
+  "query": "SET @row_num = -1;\nUPDATE funnels f\nJOIN (SELECT id, (@row_num := @row_num + 1) AS rn FROM funnels ORDER BY created_at ASC, id ASC) ranked\nON f.id = ranked.id\nSET f.sort_order = ranked.rn;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SET @row_num = -1;\nUPDATE funnels f\nJOIN (SELECT id, (@row_num := @row_num + 1) AS rn FROM funnels ORDER BY created_at ASC, id ASC) ranked\nON f.id = ranked.id\nSET f.sort_order = ranked.rn;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 274
+}

@@ -17,8 +17,23 @@ import {
   ArrowLeft, Plus, Trash2, Copy, Eye, Settings, MoreHorizontal,
   Globe, FileText, CreditCard, Gift, ThumbsUp, Layers, ArrowRight,
   ExternalLink, BarChart3, Pencil, Check, X, ChevronDown, ChevronLeft, Zap,
-  LayoutTemplate, ShoppingCart, Download, BookOpen, Package,
+  LayoutTemplate, ShoppingCart, Download, BookOpen, Package, GripVertical,
 } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 type FunnelStatus = "draft" | "active" | "archived";
 type PageType = "landing" | "checkout" | "upsell" | "downsell" | "thank_you" | "custom";
@@ -72,7 +87,26 @@ const PAGE_TYPE_META: Record<PageType, { label: string; icon: React.ReactNode; c
 // ─── Funnel List View ─────────────────────────────────────────────────────────
 
 function FunnelListView({ onSelect, onCreate }: { onSelect: (id: number) => void; onCreate: () => void }) {
-  const { data: funnelList, isLoading } = trpc.funnel.list.useQuery();
+  const { data: funnelList, isLoading, refetch } = trpc.funnel.list.useQuery();
+  const [localFunnels, setLocalFunnels] = useState<Funnel[]>([]);
+  const reorderFunnels = trpc.funnel.reorderFunnels.useMutation({ onError: () => { refetch(); toast.error("Failed to save order"); } });
+  const listSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  useEffect(() => {
+    if (funnelList) setLocalFunnels(funnelList as Funnel[]);
+  }, [funnelList]);
+
+  const handleFunnelDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setLocalFunnels(prev => {
+      const oldIdx = prev.findIndex(f => f.id === active.id);
+      const newIdx = prev.findIndex(f => f.id === over.id);
+      const reordered = arrayMove(prev, oldIdx, newIdx);
+      reorderFunnels.mutate({ funnelIds: reordered.map(f => f.id) });
+      return reordered;
+    });
+  };
 
   if (isLoading) {
     return (
@@ -104,7 +138,7 @@ function FunnelListView({ onSelect, onCreate }: { onSelect: (id: number) => void
       </div>
 
       {/* Funnel Grid */}
-      {!funnelList || funnelList.length === 0 ? (
+      {!localFunnels || localFunnels.length === 0 ? (
         <div className="text-center py-20 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
           <Layers size={48} className="mx-auto text-gray-300 mb-4" />
           <h3 className="text-lg font-semibold text-gray-700 mb-2">No funnels yet</h3>
@@ -114,17 +148,31 @@ function FunnelListView({ onSelect, onCreate }: { onSelect: (id: number) => void
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {funnelList.map((funnel: Funnel) => (
-            <FunnelCard key={funnel.id} funnel={funnel} onClick={() => onSelect(funnel.id)} />
-          ))}
-        </div>
+        <>
+          <p className="text-xs text-gray-400 mb-3">Drag cards to reorder your funnels</p>
+          <DndContext sensors={listSensors} collisionDetection={closestCenter} onDragEnd={handleFunnelDragEnd}>
+            <SortableContext items={localFunnels.map(f => f.id)} strategy={verticalListSortingStrategy}>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {localFunnels.map((funnel: Funnel) => (
+                  <SortableFunnelCard key={funnel.id} funnel={funnel} onClick={() => onSelect(funnel.id)} />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+        </>
       )}
     </div>
   );
 }
 
-function FunnelCard({ funnel, onClick }: { funnel: Funnel; onClick: () => void }) {
+function SortableFunnelCard({ funnel, onClick }: { funnel: Funnel; onClick: () => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: funnel.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
   const statusColors: Record<FunnelStatus, string> = {
     draft: "bg-yellow-100 text-yellow-700",
     active: "bg-green-100 text-green-700",
@@ -132,9 +180,21 @@ function FunnelCard({ funnel, onClick }: { funnel: Funnel; onClick: () => void }
   };
 
   return (
-    <div onClick={onClick} className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md hover:border-teal-200 transition-all cursor-pointer group">
+    <div ref={setNodeRef} style={style} className={`bg-white rounded-xl border p-5 transition-all group ${
+      isDragging ? "border-teal-400 shadow-xl" : "border-gray-200 hover:shadow-md hover:border-teal-200"
+    }`}>
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2">
+          {/* Drag handle */}
+          <button
+            {...attributes}
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 transition-colors p-0.5 rounded -ml-1"
+            title="Drag to reorder"
+            onClick={e => e.stopPropagation()}
+          >
+            <GripVertical size={14} />
+          </button>
           <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: funnel.accentColor + "20", color: funnel.accentColor }}>
             <Layers size={16} />
           </div>
@@ -142,14 +202,18 @@ function FunnelCard({ funnel, onClick }: { funnel: Funnel; onClick: () => void }
             {funnel.status}
           </span>
         </div>
-        <ArrowRight size={16} className="text-gray-300 group-hover:text-teal-500 transition-colors" />
+        <button onClick={onClick} className="text-gray-300 group-hover:text-teal-500 transition-colors hover:text-teal-600" title="Open funnel">
+          <ArrowRight size={16} />
+        </button>
       </div>
-      <h3 className="font-semibold text-gray-900 mb-1 truncate">{funnel.name}</h3>
-      {funnel.description && <p className="text-sm text-gray-500 mb-3 line-clamp-2">{funnel.description}</p>}
-      <div className="flex items-center gap-4 text-xs text-gray-400">
-        <span className="flex items-center gap-1"><FileText size={12} /> {funnel.pages.length} pages</span>
-        <span className="flex items-center gap-1"><Eye size={12} /> {funnel.totalViews} views</span>
-        <span className="flex items-center gap-1"><BarChart3 size={12} /> {funnel.totalConversions} conversions</span>
+      <div onClick={onClick} className="cursor-pointer">
+        <h3 className="font-semibold text-gray-900 mb-1 truncate">{funnel.name}</h3>
+        {funnel.description && <p className="text-sm text-gray-500 mb-3 line-clamp-2">{funnel.description}</p>}
+        <div className="flex items-center gap-4 text-xs text-gray-400">
+          <span className="flex items-center gap-1"><FileText size={12} /> {funnel.pages.length} pages</span>
+          <span className="flex items-center gap-1"><Eye size={12} /> {funnel.totalViews} views</span>
+          <span className="flex items-center gap-1"><BarChart3 size={12} /> {funnel.totalConversions} conversions</span>
+        </div>
       </div>
     </div>
   );
@@ -336,6 +400,7 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
   const [nameValue, setNameValue] = useState("");
   const [showAddPage, setShowAddPage] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [localPages, setLocalPages] = useState<FunnelPage[]>([]);
 
   const updateFunnel = trpc.funnel.update.useMutation({ onSuccess: () => { refetch(); toast.success("Updated"); } });
   const deleteFunnel = trpc.funnel.delete.useMutation({ onSuccess: () => { toast.success("Funnel deleted"); onBack(); } });
@@ -346,10 +411,28 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
   const connectPages = trpc.funnel.connectPages.useMutation({ onSuccess: () => { refetch(); } });
   const updatePage = trpc.funnel.updatePage.useMutation({ onSuccess: () => { refetch(); toast.success("Page updated"); } });
   const saveAsTemplate = trpc.funnel.saveAsTemplate.useMutation({ onSuccess: () => { toast.success("Saved as template! It will appear in the template list when creating new funnels."); } });
+  const reorderPages = trpc.funnel.reorderPages.useMutation({ onError: () => { refetch(); toast.error("Failed to save order"); } });
+
+  const pageSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   useEffect(() => {
-    if (funnel) setNameValue(funnel.name);
+    if (funnel) {
+      setNameValue(funnel.name);
+      setLocalPages(funnel.pages as FunnelPage[]);
+    }
   }, [funnel]);
+
+  const handlePageDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setLocalPages(prev => {
+      const oldIdx = prev.findIndex(p => p.id === active.id);
+      const newIdx = prev.findIndex(p => p.id === over.id);
+      const reordered = arrayMove(prev, oldIdx, newIdx);
+      reorderPages.mutate({ funnelId, pageIds: reordered.map(p => p.id) });
+      return reordered;
+    });
+  };
 
   if (isLoading || !funnel) {
     return <div className="flex items-center justify-center h-64 text-gray-400">Loading funnel...</div>;
@@ -466,67 +549,41 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
 
       {/* Page Flow Visualization */}
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Funnel Pages</h2>
+        <div>
+          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Funnel Pages</h2>
+          <p className="text-xs text-gray-400 mt-0.5">Drag the handle to reorder steps</p>
+        </div>
         <Button onClick={() => setShowAddPage(true)} variant="outline" size="sm" className="gap-1.5 text-xs">
           <Plus size={14} /> Add Page
         </Button>
       </div>
 
-      {/* Pages as connected flow */}
-      <div className="space-y-3">
-        {funnel.pages.map((page, idx) => {
-          const meta = PAGE_TYPE_META[page.pageType as PageType] || PAGE_TYPE_META.custom;
-          const nextPage = page.nextPageId ? funnel.pages.find(p => p.id === page.nextPageId) : null;
-          return (
-            <div key={page.id}>
-              <div className="bg-white border border-gray-200 rounded-xl p-4 hover:border-teal-200 hover:shadow-sm transition-all group">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center w-7 h-7 rounded-full bg-gray-100 text-xs font-bold text-gray-500">
-                      {idx + 1}
-                    </div>
-                    <div className={`px-2 py-0.5 rounded-full text-xs font-medium ${meta.color}`}>
-                      {meta.label}
-                    </div>
-                    <h3 className="font-medium text-gray-900">{page.title}</h3>
-                    <span className="text-xs text-gray-400">/{page.slug}</span>
-                  </div>
-                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => onEditPage(funnelId, page.id)} className="text-xs text-teal-600 hover:text-teal-700 flex items-center gap-1 bg-teal-50 px-2 py-1 rounded-lg">
-                      <Pencil size={12} /> Edit Page
-                    </button>
-                    <button onClick={() => duplicatePage.mutate({ id: page.id })} className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 bg-blue-50 px-2 py-1 rounded-lg">
-                      <Copy size={12} /> Duplicate
-                    </button>
-                    <button onClick={() => { const newTitle = prompt("Page title:", page.title); if (newTitle && newTitle !== page.title) updatePage.mutate({ id: page.id, title: newTitle }); }} className="text-xs text-gray-600 hover:text-gray-700 flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-lg">
-                      <Settings size={12} /> Rename
-                    </button>
-                    <button onClick={() => { if (confirm("Delete this page?")) deletePage.mutate({ id: page.id }); }} className="text-xs text-red-500 hover:text-red-600 px-2 py-1 rounded-lg hover:bg-red-50">
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4 mt-2 text-xs text-gray-400">
-                  <span>{page.views} views</span>
-                  <span>{page.conversions} conversions</span>
-                  {page.productType && <span className="flex items-center gap-1"><Package size={11} /> {page.productType}</span>}
-                  {page.orderBumpId && <span className="flex items-center gap-1"><ShoppingCart size={11} /> Order bump attached</span>}
-                </div>
-              </div>
-              {/* Connection arrow */}
-              {idx < funnel.pages.length - 1 && (
-                <div className="flex items-center justify-center py-1">
-                  <div className="flex flex-col items-center">
-                    <div className="w-px h-3 bg-gray-300" />
-                    <ArrowRight size={12} className="text-gray-300 rotate-90" />
-                    {nextPage && <span className="text-[10px] text-gray-400">→ {nextPage.title}</span>}
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+      {/* Pages as sortable connected flow */}
+      <DndContext sensors={pageSensors} collisionDetection={closestCenter} onDragEnd={handlePageDragEnd}>
+        <SortableContext items={localPages.map(p => p.id)} strategy={verticalListSortingStrategy}>
+          <div className="space-y-3">
+            {localPages.map((page, idx) => {
+              const meta = PAGE_TYPE_META[page.pageType as PageType] || PAGE_TYPE_META.custom;
+              const nextPage = page.nextPageId ? localPages.find(p => p.id === page.nextPageId) : null;
+              return (
+                <SortableFunnelPageRow
+                  key={page.id}
+                  page={page}
+                  idx={idx}
+                  meta={meta}
+                  nextPage={nextPage}
+                  isLast={idx === localPages.length - 1}
+                  funnelId={funnelId}
+                  onEditPage={onEditPage}
+                  onDuplicate={() => duplicatePage.mutate({ id: page.id })}
+                  onRename={() => { const newTitle = prompt("Page title:", page.title); if (newTitle && newTitle !== page.title) updatePage.mutate({ id: page.id, title: newTitle }); }}
+                  onDelete={() => { if (confirm("Delete this page?")) deletePage.mutate({ id: page.id }); }}
+                />
+              );
+            })}
+          </div>
+        </SortableContext>
+      </DndContext>
 
       {/* Add Page Dialog */}
       {showAddPage && (
@@ -551,6 +608,91 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Sortable Funnel Page Row ────────────────────────────────────────────────
+
+function SortableFunnelPageRow({
+  page, idx, meta, nextPage, isLast, funnelId, onEditPage, onDuplicate, onRename, onDelete,
+}: {
+  page: FunnelPage;
+  idx: number;
+  meta: { label: string; icon: React.ReactNode; color: string; description: string };
+  nextPage: FunnelPage | null | undefined;
+  isLast: boolean;
+  funnelId: number;
+  onEditPage: (funnelId: number, pageId: number) => void;
+  onDuplicate: () => void;
+  onRename: () => void;
+  onDelete: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: page.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <div className={`bg-white border rounded-xl p-4 transition-all group ${
+        isDragging ? "border-teal-400 shadow-lg" : "border-gray-200 hover:border-teal-200 hover:shadow-sm"
+      }`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {/* Drag handle */}
+            <button
+              {...attributes}
+              {...listeners}
+              className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 transition-colors p-0.5 rounded"
+              title="Drag to reorder"
+            >
+              <GripVertical size={16} />
+            </button>
+            <div className="flex items-center justify-center w-7 h-7 rounded-full bg-gray-100 text-xs font-bold text-gray-500">
+              {idx + 1}
+            </div>
+            <div className={`px-2 py-0.5 rounded-full text-xs font-medium ${meta.color}`}>
+              {meta.label}
+            </div>
+            <h3 className="font-medium text-gray-900">{page.title}</h3>
+            <span className="text-xs text-gray-400">/{page.slug}</span>
+          </div>
+          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button onClick={() => onEditPage(funnelId, page.id)} className="text-xs text-teal-600 hover:text-teal-700 flex items-center gap-1 bg-teal-50 px-2 py-1 rounded-lg">
+              <Pencil size={12} /> Edit Page
+            </button>
+            <button onClick={onDuplicate} className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 bg-blue-50 px-2 py-1 rounded-lg">
+              <Copy size={12} /> Duplicate
+            </button>
+            <button onClick={onRename} className="text-xs text-gray-600 hover:text-gray-700 flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-lg">
+              <Settings size={12} /> Rename
+            </button>
+            <button onClick={onDelete} className="text-xs text-red-500 hover:text-red-600 px-2 py-1 rounded-lg hover:bg-red-50">
+              <Trash2 size={12} />
+            </button>
+          </div>
+        </div>
+        <div className="flex items-center gap-4 mt-2 text-xs text-gray-400 pl-8">
+          <span>{page.views} views</span>
+          <span>{page.conversions} conversions</span>
+          {page.productType && <span className="flex items-center gap-1"><Package size={11} /> {page.productType}</span>}
+          {page.orderBumpId && <span className="flex items-center gap-1"><ShoppingCart size={11} /> Order bump attached</span>}
+        </div>
+      </div>
+      {/* Connection arrow */}
+      {!isLast && (
+        <div className="flex items-center justify-center py-1">
+          <div className="flex flex-col items-center">
+            <div className="w-px h-3 bg-gray-300" />
+            <ArrowRight size={12} className="text-gray-300 rotate-90" />
+            {nextPage && <span className="text-[10px] text-gray-400">→ {nextPage.title}</span>}
           </div>
         </div>
       )}

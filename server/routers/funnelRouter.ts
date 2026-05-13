@@ -28,7 +28,7 @@ export const funnelRouter = router({
     const rows = await db
       .select()
       .from(funnels)
-      .orderBy(desc(funnels.updatedAt));
+      .orderBy(asc(funnels.sortOrder), desc(funnels.updatedAt));
     // Get page counts for each funnel
     const result = [];
     for (const funnel of rows) {
@@ -41,6 +41,21 @@ export const funnelRouter = router({
     }
     return result;
   }),
+
+  /** Reorder funnels by updating sortOrder */
+  reorderFunnels: protectedProcedure
+    .input(z.object({ funnelIds: z.array(z.number()) }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      for (let i = 0; i < input.funnelIds.length; i++) {
+        await db
+          .update(funnels)
+          .set({ sortOrder: i })
+          .where(eq(funnels.id, input.funnelIds[i]));
+      }
+      return { success: true };
+    }),
 
   /** Get a single funnel with all its pages */
   get: protectedProcedure

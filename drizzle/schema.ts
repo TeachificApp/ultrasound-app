@@ -3148,6 +3148,7 @@ export const funnels = mysqlTable("funnels", {
   totalViews: int("total_views").default(0).notNull(),
   totalConversions: int("total_conversions").default(0).notNull(),
   totalRevenue: int("total_revenue").default(0).notNull(), // cents
+  sortOrder: int("sort_order").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });

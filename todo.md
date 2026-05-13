@@ -1571,3 +1571,13 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix syntax error in CoursePlayer.tsx (missing opening paren in JSX conditional)
 - [x] Convert LMSAdmin.tsx LessonEditorPage header from dark teal to light (bg-white, text-teal-700)
 - [x] Local vite build passes cleanly after all light theme changes
+
+## Funnel Builder Drag-and-Drop Reordering
+- [x] Add reorderPages backend procedure (accepts funnelId + ordered page IDs, updates sortOrder)
+- [x] Add reorderFunnels backend procedure (accepts ordered funnel IDs, updates sortOrder)
+- [x] Add sort_order column to funnels table (migration applied)
+- [x] Install @dnd-kit/core and @dnd-kit/sortable for drag-and-drop
+- [x] Implement drag-and-drop for funnel steps (pages) in FunnelDetailView (SortableFunnelPageRow)
+- [x] Implement drag-and-drop for funnel cards in FunnelListView (SortableFunnelCard)
+- [x] Optimistic updates for instant reorder feedback (arrayMove + rollback on error)
+- [x] All 854 tests passing, vite build clean
