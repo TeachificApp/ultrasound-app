@@ -17,6 +17,9 @@ import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 
+const AAUS_LOGO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp";
+const IHE_LOGO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/iheartecho_logo_ring_01cc7ccd.webp";
+
 const LMS_NAV_GROUPS = [
   {
     label: "Overview",
@@ -94,15 +97,14 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
         }`}
         style={{ background: "linear-gradient(180deg, #0e1e2e 0%, #0e4a50 60%, #189aa1 100%)" }}
       >
-        {/* Header */}
-        <div className="px-4 py-5 flex items-center gap-3 border-b border-white/10">
-          <img
-            src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp"
-            alt="All About Ultrasound"
-            className="w-10 h-10 rounded-full"
-          />
+        {/* Header — combined "All About Ultrasound | iHeartEcho" branding */}
+        <div className="px-4 py-5 flex items-center gap-2.5 border-b border-white/10">
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <img src={AAUS_LOGO} alt="All About Ultrasound" className="w-9 h-9 rounded-full" />
+            <img src={IHE_LOGO} alt="iHeartEcho" className="w-9 h-9 rounded-full" />
+          </div>
           <div className="flex flex-col min-w-0">
-            <span className="text-white text-xs font-medium leading-tight">All About Ultrasound</span>
+            <span className="text-white text-[11px] font-medium leading-tight">All About Ultrasound <span className="text-white/50">|</span> iHeartEcho</span>
             <span className="text-[#4ad9e0] text-sm font-bold leading-tight">Learning Platform</span>
           </div>
           <button
@@ -168,7 +170,7 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
             <ExternalLink className="w-3 h-3" />
             www.allaboutultrasound.com
           </a>
-          <div className="text-xs text-white/30">© All About Ultrasound™</div>
+          <div className="text-xs text-white/30">© All About Ultrasound™ | iHeartEcho</div>
         </div>
       </aside>
 

@@ -1,0 +1,253 @@
+{
+  "query": "SELECT bm.id, bm.userId, bm.brand, bm.tier, bm.status, bm.source, u.email FROM brandMemberships bm JOIN users u ON u.id = bm.userId ORDER BY bm.userId LIMIT 30;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT bm.id, bm.userId, bm.brand, bm.tier, bm.status, bm.source, u.email FROM brandMemberships bm JOIN users u ON u.id = bm.userId ORDER BY bm.userId LIMIT 30;",
+  "rows": [
+    {
+      "id": "1",
+      "userId": "1",
+      "brand": "iheartecho",
+      "tier": "premium",
+      "status": "active",
+      "source": "admin",
+      "email": "larawilliams0501@gmail.com"
+    },
+    {
+      "id": "2",
+      "userId": "178",
+      "brand": "iheartecho",
+      "tier": "premium",
+      "status": "active",
+      "source": "thinkific",
+      "email": "test-premium@example.com"
+    },
+    {
+      "id": "3",
+      "userId": "179",
+      "brand": "iheartecho",
+      "tier": "premium",
+      "status": "active",
+      "source": "thinkific",
+      "email": "test-webhook-log@example.com"
+    },
+    {
+      "id": "4",
+      "userId": "180",
+      "brand": "iheartecho",
+      "tier": "premium",
+      "status": "active",
+      "source": "thinkific",
+      "email": "admin@sonamedicalsolutions.com"
+    },
+    {
+      "id": "5",
+      "userId": "197",
+      "brand": "iheartecho",
+      "tier": "premium",
+      "status": "active",
+      "source": "admin",
+      "email": "admin@allaboutultrasound.com"
+    },
+    {
+      "id": "6",
+      "userId": "11869",
+      "brand": "iheartecho",
+      "tier": "premium",
+      "status": "active",
+      "source": "admin",
+      "email": "dr.sarah.chen@heartlandcardio.com"
+    },
+    {
+      "id": "7",
+      "userId": "11870",
+      "brand": "iheartecho",
+      "tier": "premium",
+      "status": "active",
+      "source": "admin",
+      "email": "m.webb@heartlandcardio.com"
+    },
+    {
+      "id": "8",
+      "userId": "11871",
+      "brand": "iheartecho",
+      "tier": "premium",
+      "status": "active",
+      "source": "admin",
+      "email": "j.okafor@heartlandcardio.com"
+    },
+    {
+      "id": "9",
+      "userId": "11872",
+      "brand": "iheartecho",
+      "tier": "premium",
+      "status": "active",
+      "source": "admin",
+      "email": "p.nair@heartlandcardio.com"
+    },
+    {
+      "id": "10",
+      "userId": "11873",
+      "brand": "iheartecho",
+      "tier": "premium",
+      "status": "active",
+      "source": "admin",
+      "email": "l.fernandez@heartlandcardio.com"
+    },
+    {
+      "id": "11",
+      "userId": "11874",
+      "brand": "iheartecho",
+      "tier": "premium",
+      "status": "active",
+      "source": "admin",
+      "email": "a.thompson@heartlandcardio.com"
+    },
+    {
+      "id": "12",
+      "userId": "11875",
+      "brand": "iheartecho",
+      "tier": "premium",
+      "status": "active",
+      "source": "admin",
+      "email": "k.park@heartlandcardio.com"
+    },
+    {
+      "id": "13",
+      "userId": "11876",
+      "brand": "iheartecho",
+      "tier": "premium",
+      "status": "active",
+      "source": "admin",
+      "email": "n.russo@heartlandcardio.com"
+    },
+    {
+      "id": "14",
+      "userId": "11877",
+      "brand": "iheartecho",
+      "tier": "premium",
+      "status": "active",
+      "source": "admin",
+      "email": "dr.emily.walsh@pcpecho.com"
+    },
+    {
+      "id": "15",
+      "userId": "11878",
+      "brand": "iheartecho",
+      "tier": "premium",
+      "status": "active",
+      "source": "admin",
+      "email": "s.martinez@pcpecho.com"
+    },
+    {
+      "id": "16",
+      "userId": "11879",
+      "brand": "iheartecho",
+      "tier": "premium",
+      "status": "active",
+      "source": "admin",
+      "email": "d.kim@pcpecho.com"
+    },
+    {
+      "id": "17",
+      "userId": "11880",
+      "brand": "iheartecho",
+      "tier": "premium",
+      "status": "active",
+      "source": "admin",
+      "email": "a.osei@pcpecho.com"
+    },
+    {
+      "id": "18",
+      "userId": "11881",
+      "brand": "iheartecho",
+      "tier": "premium",
+      "status": "active",
+      "source": "admin",
+      "email": "r.goldstein@pcpecho.com"
+    },
+    {
+      "id": "19",
+      "userId": "11882",
+      "brand": "iheartecho",
+      "tier": "premium",
+      "status": "active",
+      "source": "admin",
+      "email": "t.brooks@pcpecho.com"
+    },
+    {
+      "id": "20",
+      "userId": "11883",
+      "brand": "iheartecho",
+      "tier": "premium",
+      "status": "active",
+      "source": "admin",
+      "email": "h.nguyen@pcpecho.com"
+    },
+    {
+      "id": "21",
+      "userId": "11884",
+      "brand": "iheartecho",
+      "tier": "premium",
+      "status": "active",
+      "source": "admin",
+      "email": "j.ellis@pcpecho.com"
+    },
+    {
+      "id": "22",
+      "userId": "11893",
+      "brand": "iheartecho",
+      "tier": "premium",
+      "status": "active",
+      "source": "admin",
+      "email": "sarah.mitchell@demo.iheartecho.com"
+    },
+    {
+      "id": "23",
+      "userId": "11895",
+      "brand": "iheartecho",
+      "tier": "premium",
+      "status": "active",
+      "source": "admin",
+      "email": "priya.nair@demo.iheartecho.com"
+    },
+    {
+      "id": "24",
+      "userId": "11897",
+      "brand": "iheartecho",
+      "tier": "premium",
+      "status": "active",
+      "source": "admin",
+      "email": "elena.vasquez@demo.iheartecho.com"
+    },
+    {
+      "id": "25",
+      "userId": "11899",
+      "brand": "iheartecho",
+      "tier": "premium",
+      "status": "active",
+      "source": "admin",
+      "email": "aisha.thompson@demo.iheartecho.com"
+    },
+    {
+      "id": "26",
+      "userId": "11901",
+      "brand": "iheartecho",
+      "tier": "premium",
+      "status": "active",
+      "source": "admin",
+      "email": "fatima.alrashid@demo.iheartecho.com"
+    },
+    {
+      "id": "27",
+      "userId": "11903",
+      "brand": "iheartecho",
+      "tier": "premium",
+      "status": "active",
+      "source": "admin",
+      "email": "meiling.zhang@demo.iheartecho.com"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tuserId\tbrand\ttier\tstatus\tsource\temail\n1\t1\tiheartecho\tpremium\tactive\tadmin\tlarawilliams0501@gmail.com\n2\t178\tiheartecho\tpremium\tactive\tthinkific\ttest-premium@example.com\n3\t179\tiheartecho\tpremium\tactive\tthinkific\ttest-webhook-log@example.com\n4\t180\tiheartecho\tpremium\tactive\tthinkific\tadmin@sonamedicalsolutions.com\n5\t197\tiheartecho\tpremium\tactive\tadmin\tadmin@allaboutultrasound.com\n6\t11869\tiheartecho\tpremium\tactive\tadmin\tdr.sarah.chen@heartlandcardio.com\n7\t11870\tiheartecho\tpremium\tactive\tadmin\tm.webb@heartlandcardio.com\n8\t11871\tiheartecho\tpremium\tactive\tadmin\tj.okafor@heartlandcardio.com\n9\t11872\tiheartecho\tpremium\tactive\tadmin\tp.nair@heartlandcardio.com\n10\t11873\tiheartecho\tpremium\tactive\tadmin\tl.fernandez@heartlandcardio.com\n11\t11874\tiheartecho\tpremium\tactive\tadmin\ta.thompson@heartlandcardio.com\n12\t11875\tiheartecho\tpremium\tactive\tadmin\tk.park@heartlandcardio.com\n13\t11876\tiheartecho\tpremium\tactive\tadmin\tn.russo@heartlandcardio.com\n14\t11877\tiheartecho\tpremium\tactive\tadmin\tdr.emily.walsh@pcpecho.com\n15\t11878\tiheartecho\tpremium\tactive\tadmin\ts.martinez@pcpecho.com\n16\t11879\tiheartecho\tpremium\tactive\tadmin\td.kim@pcpecho.com\n17\t11880\tiheartecho\tpremium\tactive\tadmin\ta.osei@pcpecho.com\n18\t11881\tiheartecho\tpremium\tactive\tadmin\tr.goldstein@pcpecho.com\n19\t11882\tiheartecho\tpremium\tactive\tadmin\tt.brooks@pcpecho.com\n20\t11883\tiheartecho\tpremium\tactive\tadmin\th.nguyen@pcpecho.com\n21\t11884\tiheartecho\tpremium\tactive\tadmin\tj.ellis@pcpecho.com\n22\t11893\tiheartecho\tpremium\tactive\tadmin\tsarah.mitchell@demo.iheartecho.com\n23\t11895\tiheartecho\tpremium\tactive\tadmin\tpriya.nair@demo.iheartecho.com\n24\t11897\tiheartecho\tpremium\tactive\tadmin\telena.vasquez@demo.iheartecho.com\n25\t11899\tiheartecho\tpremium\tactive\tadmin\taisha.thompson@demo.iheartecho.com\n26\t11901\tiheartecho\tpremium\tactive\tadmin\tfatima.alrashid@demo.iheartecho.com\n27\t11903\tiheartecho\tpremium\tactive\tadmin\tmeiling.zhang@demo.iheartecho.com\n",
+  "stderr": "",
+  "execution_time_ms": 280
+}

@@ -23,6 +23,35 @@
     <meta name="apple-mobile-web-app-title" content="UltrasoundAssist™" />
     <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json" />
+    <!-- Brand-aware meta swap (runs before React mount) -->
+    <script>
+      (function(){
+        var h=location.hostname;
+        var isIHE=h.indexOf('iheartecho')!==-1;
+        var isCombo=h.indexOf('learn.')!==-1||h.indexOf('members.')!==-1||h.indexOf('member.')!==-1;
+        if(!isIHE&&!isCombo) return;
+        var d=document;
+        function setAttr(sel,attr,val){var el=d.querySelector(sel);if(el)el.setAttribute(attr,val);}
+        function setContent(sel,val){var el=d.querySelector(sel);if(el)el.setAttribute('content',val);}
+        if(isIHE){
+          d.title='iHeartEcho \u2014 Echocardiography Clinical Intelligence';
+          setAttr('link[rel="icon"]','href','https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/icon-192_df958e9b.png');
+          setAttr('link[rel="apple-touch-icon"]','href','https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/icon-192_df958e9b.png');
+          setContent('meta[property="og:title"]','iHeartEcho \u2014 Echocardiography Clinical Intelligence');
+          setContent('meta[property="og:description"]','Real-time echo interpretation and measurement assistant for cardiac ultrasound professionals.');
+          setContent('meta[property="og:image"]','https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/icon-512_79ee0572.png');
+          setContent('meta[name="description"]','iHeartEcho \u2014 Echocardiography clinical intelligence for cardiac ultrasound students, sonographers, echocardiographers, and cardiologists.');
+          setContent('meta[name="apple-mobile-web-app-title"]','iHeartEcho');
+          setContent('meta[name="theme-color"]','#0e1e2e');
+        } else if(isCombo){
+          d.title='All About Ultrasound | iHeartEcho';
+          setContent('meta[property="og:title"]','All About Ultrasound | iHeartEcho');
+          setContent('meta[property="og:description"]','General, Vascular & Cardiac Ultrasound Clinical Intelligence learning platform.');
+          setContent('meta[name="description"]','All About Ultrasound | iHeartEcho \u2014 General, Vascular & Cardiac Ultrasound Clinical Intelligence.');
+          setContent('meta[name="apple-mobile-web-app-title"]','AAUS | iHeartEcho');
+        }
+      })();
+    </script>
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

@@ -8,9 +8,10 @@
  * - Dismissed with ✕ for that session only (no persistent storage — reappears on next load)
  * - Never shown if app is already running in standalone mode (already installed)
  */
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { X, Download, Share } from "lucide-react";
+import { isIHeartEchoDomain } from "@/hooks/useSubdomain";
 
 function isStandalone() {
   return (
@@ -27,11 +28,17 @@ function isIOS() {
   return /iphone|ipad|ipod/i.test(navigator.userAgent) && !(window as any).MSStream;
 }
 
+const AAUS_ICON = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_icon_192_2af50158.png";
+const IHE_ICON = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/icon-192_df958e9b.png";
+
 export default function GetAppBanner() {
   const [visible, setVisible] = useState(false);
   const [showIosInstructions, setShowIosInstructions] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [location] = useLocation();
+  const isIHE = useMemo(() => isIHeartEchoDomain(), []);
+  const appName = isIHE ? "iHeartEcho" : "UltrasoundAssist\u2122";
+  const appIcon = isIHE ? IHE_ICON : AAUS_ICON;
 
   useEffect(() => {
     // Only show on dashboard route
@@ -110,13 +117,13 @@ export default function GetAppBanner() {
         {/* Left: icon + text */}
         <div className="flex items-center gap-3 min-w-0">
           <img
-            src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_icon_192_2af50158.png"
-            alt="UltrasoundAssist"
+            src={appIcon}
+            alt={appName}
             className="w-10 h-10 rounded-xl flex-shrink-0"
           />
           <div className="min-w-0">
             <p className="text-white font-bold text-sm leading-tight truncate">
-              UltrasoundAssist™
+              {appName}
             </p>
             <p className="text-[#4ad9e0] text-xs leading-tight truncate">
               Add to your home screen for quick access
@@ -160,13 +167,13 @@ export default function GetAppBanner() {
             onClick={(e) => e.stopPropagation()}
           >
             <img
-              src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_icon_192_2af50158.png"
-              alt="UltrasoundAssist"
+              src={appIcon}
+              alt={appName}
               className="w-16 h-16 rounded-2xl mx-auto mb-4"
             />
             <h3 className="text-white font-bold text-lg mb-2">Add to Home Screen</h3>
             <p className="text-white/70 text-sm mb-4 leading-relaxed">
-              Install <strong className="text-white">UltrasoundAssist™</strong> for quick access from your home screen.
+              Install <strong className="text-white">{appName}</strong> for quick access from your home screen.
             </p>
             <ol className="text-left text-sm text-white/80 space-y-3 mb-6">
               <li className="flex items-start gap-2">

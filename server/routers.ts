@@ -30,6 +30,11 @@ import { socialContentRouter } from "./routers/socialContentRouter";
 import { funnelRouter, funnelPublicRouter } from "./routers/funnelRouter";
 import { sharingMonitorRouter } from "./routers/sharingMonitorRouter";
 import { analyticsTrackRouter, analyticsAdminRouter } from "./routers/analyticsRouter";
+import { soundBytesRouter } from "./routers/soundBytesRouter";
+import { leaderboardRouter } from "./routers/leaderboardRouter";
+import { abTestRouter } from "./routers/abTestRouter";
+import { engagementRouter } from "./routers/engagementRouter";
+import { brandMembershipRouter } from "./routers/brandMembershipRouter";
 import {
   getUserById,
   getUsersByIds,
@@ -159,6 +164,36 @@ export const appRouter = router({
       const PREMIUM_ROLES = new Set(["premium_user", "diy_user", "diy_admin", "platform_admin"]);
       const isPremiumByRole = roles.some(r => PREMIUM_ROLES.has(r));
       const isPremium = (fullUser?.isPremium ?? false) || isPremiumByRole;
+      // Check brand-specific premium membership
+      let brandPremium = false;
+      try {
+        const { brandMemberships } = await import("../drizzle/schema");
+        const { and, eq } = await import("drizzle-orm");
+        const brandDb = await (await import("./db")).getDb();
+        if (brandDb) {
+          const brand = opts.ctx.brand;
+          const [membership] = await brandDb.select().from(brandMemberships)
+            .where(and(eq(brandMemberships.userId, opts.ctx.user.id), eq(brandMemberships.brand, brand), eq(brandMemberships.tier, "premium"), eq(brandMemberships.status, "active")))
+            .limit(1);
+          brandPremium = !!membership;
+          // Auto-backfill: if user has legacy isPremium but no brandMembership for this brand, create one
+          if (!membership && isPremium) {
+            const [anyExisting] = await brandDb.select().from(brandMemberships)
+              .where(and(eq(brandMemberships.userId, opts.ctx.user.id), eq(brandMemberships.brand, brand)))
+              .limit(1);
+            if (!anyExisting) {
+              await brandDb.insert(brandMemberships).values({
+                userId: opts.ctx.user.id,
+                brand,
+                tier: "premium",
+                status: "active",
+                source: "backfill",
+              });
+              brandPremium = true;
+            }
+          }
+        }
+      } catch { /* ignore brand membership check failures */ }
       // Include demo mode metadata if active
       let demoModeInfo: { demoMode: true; realAdminId: number; realAdminName: string | null } | { demoMode: false } = { demoMode: false };
       if (opts.ctx.demoMode && opts.ctx.realAdminId) {
@@ -169,7 +204,9 @@ export const appRouter = router({
         ...opts.ctx.user,
         pendingEmail: fullUser?.pendingEmail ?? null,
         appRoles: roles,
-        isPremium,
+        isPremium: isPremium || brandPremium,
+        brandPremium,
+        brand: opts.ctx.brand,
         ...demoModeInfo,
       };
     }),
@@ -302,17 +339,20 @@ export const appRouter = router({
         const verificationUrl = `${appUrl}/verify-email?token=${token}&type=change`;
 
         const firstName = (currentUser.displayName || currentUser.name || 'there').split(' ')[0];
+         const { detectBrandMode: dbm } = await import('@shared/brands');
+        const brandMode = dbm(ctx.req.hostname || "");
         const emailPayload = buildEmailChangeVerificationEmail({
           firstName,
           newEmail,
           verificationUrl,
+          brandMode,
         });
-
         await sendEmail({
           to: { name: firstName, email: newEmail },
           subject: emailPayload.subject,
           htmlBody: emailPayload.htmlBody,
           previewText: emailPayload.previewText,
+          brandMode,
         });
 
         return { success: true, pendingEmail: newEmail };
@@ -352,7 +392,7 @@ export const appRouter = router({
       .input(z.object({
         email: z.string().email().max(320),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { getUserByEmail, setPasswordResetToken } = await import('./db');
         const { sendEmail, buildPasswordResetEmail } = await import('./_core/email');
         const crypto = await import('crypto');
@@ -376,13 +416,15 @@ export const appRouter = router({
         const resetUrl = `${appUrl}/reset-password?token=${token}`;
 
         const firstName = (user.displayName || user.name || 'there').split(' ')[0];
-        const emailPayload = buildPasswordResetEmail({ firstName, resetUrl });
-
+        const { detectBrandMode: dbm2 } = await import('@shared/brands');
+        const brandMode = dbm2(ctx.req.hostname || "");
+        const emailPayload = buildPasswordResetEmail({ firstName, resetUrl, brandMode });
         await sendEmail({
           to: { name: firstName, email: user.email! },
           subject: emailPayload.subject,
           htmlBody: emailPayload.htmlBody,
           previewText: emailPayload.previewText,
+          brandMode,
         });
 
         return { success: true };
@@ -418,7 +460,7 @@ export const appRouter = router({
       .input(z.object({
         email: z.string().email().max(320),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { getUserByEmail, setMagicLinkToken } = await import('./db');
         const { sendEmail, buildMagicLinkEmail } = await import('./_core/email');
         const crypto = await import('crypto');
@@ -440,13 +482,15 @@ export const appRouter = router({
         const magicUrl = `${appUrl}/auth/magic?token=${token}`;
 
         const firstName = (user.displayName || user.name || 'there').split(' ')[0];
-        const emailPayload = buildMagicLinkEmail({ firstName, magicUrl });
-
+         const { detectBrandMode: dbm3 } = await import('@shared/brands');
+        const brandMode = dbm3(ctx.req.hostname || "");
+        const emailPayload = buildMagicLinkEmail({ firstName, magicUrl, brandMode });
         await sendEmail({
           to: { name: firstName, email: user.email! },
           subject: emailPayload.subject,
           htmlBody: emailPayload.htmlBody,
           previewText: emailPayload.previewText,
+          brandMode,
         });
 
         return { success: true };
@@ -1818,6 +1862,14 @@ export const appRouter = router({
   sharingMonitor: sharingMonitorRouter,
   analyticsTrack: analyticsTrackRouter,
   analyticsAdmin: analyticsAdminRouter,
+
+  // ─── iHeartEcho Routers ──────────────────────────────────────────────────────
+  soundBytes: soundBytesRouter,
+  leaderboard: leaderboardRouter,
+  abTest: abTestRouter,
+  engagement: engagementRouter,
+  // ─── Brand Membership (multi-tenant premium) ─────────────────────────────────
+  brandMembership: brandMembershipRouter,
 
   // ─── Physician Over-Read Workflow (Step 1 & Step 2) ──────────────────────────
   physicianOverRead: router({

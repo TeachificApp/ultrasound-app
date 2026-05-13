@@ -5,16 +5,30 @@ import { parse as parseCookieHeader } from "cookie";
 import { jwtVerify } from "jose";
 import { ENV } from "./env";
 import { DEMO_COOKIE_NAME } from "@shared/const";
+import { type Brand, type BrandMode, detectBrandMode } from "@shared/brands";
+
+export type { Brand, BrandMode };
 
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
   res: CreateExpressContextOptions["res"];
   user: User | null;
+  /** Detected brand based on request hostname (for data/auth: aaus or iheartecho) */
+  brand: Brand;
+  /** Detected brand mode based on request hostname (for visual branding: aaus, iheartecho, or combined) */
+  brandMode: BrandMode;
   /** True when the current request is running under a demo impersonation session */
   demoMode: boolean;
   /** The real admin's user ID when demoMode is true */
   realAdminId: number | null;
 };
+
+/** Detect brand from request hostname */
+function detectBrand(hostname: string): Brand {
+  const h = hostname.toLowerCase();
+  if (h.includes("iheartecho")) return "iheartecho";
+  return "aaus";
+}
 
 export async function createContext(
   opts: CreateExpressContextOptions
@@ -55,10 +69,16 @@ export async function createContext(
     }
   }
 
+  const hostname = opts.req.hostname || opts.req.headers.host || "";
+  const brand = detectBrand(hostname);
+  const brandMode = detectBrandMode(hostname);
+
   return {
     req: opts.req,
     res: opts.res,
     user,
+    brand,
+    brandMode,
     demoMode,
     realAdminId,
   };

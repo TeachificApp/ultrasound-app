@@ -2,16 +2,10 @@
  * leaderboardSeed.ts
  *
  * Generates a deterministic but daily-rotating virtual leaderboard of 1,200+
- * ultrasound professionals. The seed is derived from the current UTC date, so the
+ * echo professionals. The seed is derived from the current UTC date, so the
  * rankings shift every day while remaining stable within a single day.
  *
  * Used by getLeaderboard to pad the board when real users are sparse.
- *
- * Credential distribution reflects the All About Ultrasound™ user base:
- *  ~40% non-credentialed (students, residents, sonographers-in-training)
- *  ~35% general/vascular ultrasound (RDMS, RVT, RVS)
- *  ~15% cardiac (RDCS, RCS)
- *  ~10% physicians / advanced practice (MD, DO, NP, PA)
  */
 
 // ─── Name pools ──────────────────────────────────────────────────────────────
@@ -31,7 +25,7 @@ const FIRST_NAMES = [
   "Olivia","Martha","Cheryl","Megan","Andrea","Ann","Alice","Jean","Doris","Gloria",
   "Hannah","Kathryn","Teresa","Sara","Janice","Julia","Marie","Madison","Grace","Judy",
   "Theresa","Beverly","Denise","Marilyn","Amber","Danielle","Brittany","Diana","Abigail","Jane",
-  "Lara","Priya","Aisha","Sofia","Mei","Yuki","Fatima","Nadia","Leila","Amara",
+  "Priya","Aisha","Sofia","Mei","Yuki","Fatima","Nadia","Leila","Amara","Zara",
   "Zoe","Chloe","Isabelle","Camille","Elise","Margot","Vivienne","Celeste","Simone","Renee",
   "Carlos","Miguel","Diego","Alejandro","Rafael","Luis","Eduardo","Fernando","Pablo","Javier",
   "Ahmed","Omar","Hassan","Ali","Khalid","Tariq","Yusuf","Ibrahim","Samir","Karim",
@@ -71,87 +65,48 @@ const LAST_NAMES = [
   "Andersen","Hansen","Petersen","Nielsen","Jensen","Larsen","Christensen","Rasmussen","Pedersen","Madsen",
 ];
 
-// ─── Credential pools — weighted to reflect AAUS user base ──────────────────
-// Each sub-array is sampled with a weighted probability in generateVirtualLeaderboard.
-
-/** General & vascular ultrasound credentials (~35% of credentialed users) */
-const CREDENTIALS_GV = [
-  // RDMS specialties
-  "RDMS",
-  "RDMS (AB)",
-  "RDMS (OB/GYN)",
-  "RDMS (AB, OB/GYN)",
-  "RDMS (BR)",
-  "RDMS (MS)",
-  "RDMS (NE)",
-  "RDMS (AB, OB/GYN, BR)",
-  // RVT / RVS
-  "RVT",
-  "RVS",
-  "RVT, RDMS",
-  "RVT, RDMS (AB)",
-  "RVT, RDMS (AB, OB/GYN)",
-  "RVS, RDMS",
-  // Vascular interpretation & phlebology
-  "RPVI",
-  "RPhS",
-  "RPVI, RVT",
-  "RPVI, RDMS",
-  "RPhS, RVT",
-  "RPhS, RDMS",
-  "RPVI, RPhS",
-  "RPVI, RVT, RDMS",
-  // MSK sonography
-  "RMSK",
-  "RMSK, RDMS",
-  "RMSK, RDMS (MS)",
-  "RMSK, RDMS (AB, MS)",
-  // Multi-specialty combos
-  "RDMS (AB, OB/GYN), RVT",
-  "RDMS (AB), RVT",
-  "RDMS (AB, OB/GYN), RVS",
-  "RDMS (AB, BR), RVT",
-  "RDMS (AB, OB/GYN, BR), RVT",
-  "RDMS (AB), RPVI",
-  "RDMS (AB, OB/GYN), RPVI",
-  "RVT, RPhS",
-  "RVT, RPVI, RPhS",
-];
-
-/** Cardiac ultrasound credentials (~15% of credentialed users) */
-const CREDENTIALS_CARDIAC = [
+const CREDENTIALS = [
+  // Single credentials (ultrasound/echo specific)
   "RDCS",
   "RDCS (AE)",
   "RDCS (PE)",
   "RDCS (FE)",
+  "RCS",
+  "RCCS",
+  "MD",
+  "DO",
+  "RN",
+  "RT(R)",
+  // RCES only in combination with a primary echo credential (RDCS or RCS)
+  "RDCS, RCES",
+  "RDCS (AE), RCES",
+  "RCS, RCES",
+  // Multi-credential combos — ACS always first when present
+  "ACS, RDCS",
+  "ACS, RDCS (AE)",
+  "ACS, RDCS (PE)",
+  "ACS, RDCS (FE)",
+  "ACS, RDCS (AE, PE)",
+  "ACS, RDCS (AE, FE)",
+  "ACS, RDCS (PE, FE)",
+  "ACS, RCS",
+  "ACS, RCCS",
   "RDCS (AE, PE)",
   "RDCS (AE, FE)",
   "RDCS (PE, FE)",
   "RDCS (AE, PE, FE)",
-  "RCS",
-  "RDCS (AE), RDMS",
-  "RDCS (FE), RDMS (OB/GYN)",
-  "RCS, RDMS",
+  "RDCS (AE), FASE",
+  "RDCS, FASE",
+  "RCS, FASE",
+  "MD, FASE",
+  "MD, FACC",
+  "DO, FACC",
+  "MD, FASE, FACC",
+  "RN, RDCS",
+  "RN, RDCS (AE)",
+  "RT(R), RDCS",
+  "RT(R), RDCS (AE)",
 ];
-
-/** Physician / advanced practice credentials (~10% of credentialed users) */
-const CREDENTIALS_MD = [
-  "MD",
-  "DO",
-  "MD, RDMS",
-  "MD, RVT",
-  "DO, RDMS",
-  "NP",
-  "PA-C",
-  "NP, RDMS",
-  "PA-C, RDMS",
-  "RN, RDMS",
-  "RN, RVT",
-  "RT(R), RDMS",
-];
-
-// Legacy flat list kept for backward-compat (not used directly)
-const CREDENTIALS = [...CREDENTIALS_GV, ...CREDENTIALS_CARDIAC, ...CREDENTIALS_MD];
 
 const CITIES = [
   "New York","Los Angeles","Chicago","Houston","Phoenix","Philadelphia","San Antonio","San Diego",
@@ -213,6 +168,14 @@ export interface VirtualEntry {
   correct: number;
   total: number;
   accuracy: number;
+  /** Pre-computed realistic non-rounded total points for this entry */
+  points: number;
+  /** Pre-computed challenge-only points (no flashcard 1-pt inflation) */
+  challengePoints: number;
+  /** Pre-computed case-only points (no flashcard 1-pt inflation) */
+  casePoints: number;
+  /** Pre-computed flashcard points (includes 1-pt card-view events) */
+  flashcardPoints: number;
   isCurrentUser: false;
   city: string;
   credentials: string | null; // null = uncredentialed learner
@@ -222,7 +185,13 @@ export interface VirtualEntry {
 /**
  * Generate `count` virtual leaderboard entries for the given period.
  * Scores are seeded by today's date so they change daily.
- * Credential mix: ~40% non-credentialed, ~35% RDMS/RVT/RVS, ~15% RDCS/RCS, ~10% MD/DO/NP/PA.
+ *
+ * Points are realistic non-rounded values:
+ * - Top entry is always exactly 4952 total points
+ * - Others scale naturally below that with noise added so values
+ *   are never round multiples (e.g. 3563, 4587, 2891)
+ * - Challenge and case points are computed independently from flashcard
+ *   points so single-point card-view events don't inflate those categories
  *
  * @param count  Number of virtual entries to generate (default 1200)
  * @param period "7d" | "30d" | "allTime" — affects score ranges
@@ -236,9 +205,12 @@ export function generateVirtualLeaderboard(
 
   // Score ranges vary by period
   const maxCorrect =
-    period === "7d" ? 35 : period === "30d" ? 120 : 500;
+    period === "7d" ? 35 : period === "30d" ? 120 : 480;
   const minCorrect =
     period === "7d" ? 1 : period === "30d" ? 3 : 10;
+
+  // Top total points cap — real users can exceed this to bypass all placeholders
+  const TOP_POINTS = 4952;
 
   const entries: VirtualEntry[] = [];
 
@@ -247,18 +219,9 @@ export function generateVirtualLeaderboard(
     const lastName = pick(LAST_NAMES, rand);
     const city = pick(CITIES, rand);
 
-    // ~40% of entries are non-credentialed (students, residents, sonographers-in-training)
-    const credRoll = rand();
-    let cred: string | null;
-    if (credRoll < 0.40) {
-      cred = null; // non-credentialed
-    } else if (credRoll < 0.75) {
-      cred = pick(CREDENTIALS_GV, rand);      // ~35% general/vascular
-    } else if (credRoll < 0.90) {
-      cred = pick(CREDENTIALS_CARDIAC, rand); // ~15% cardiac
-    } else {
-      cred = pick(CREDENTIALS_MD, rand);      // ~10% physician/AP
-    }
+    // ~28% of entries are uncredentialed learners (students, residents, enthusiasts)
+    const isLearner = rand() < 0.28;
+    const cred = isLearner ? null : pick(CREDENTIALS, rand);
 
     // Correct answers: exponential-ish distribution — most users cluster in the middle
     const u = rand();
@@ -270,15 +233,47 @@ export function generateVirtualLeaderboard(
     const accuracy = 40 + Math.floor(rand() * 55); // 40–94%
     const total = Math.round((correct / accuracy) * 100);
 
+    // ── Realistic non-rounded point values ──────────────────────────────────
+    // Base ratio: how far this entry is from the top (0 = bottom, 1 = top)
+    const ratio = Math.pow(u, 1.8); // same distribution as correct answers
+
+    // Challenge points: 10 pts per correct + streak bonuses (5 pts each)
+    // Add noise (±7%) so values are never round multiples of 10
+    const challengeBase = Math.round(correct * 10 + correct * 0.3 * 5); // ~30% streak rate
+    const challengeNoise = Math.round((rand() - 0.5) * challengeBase * 0.14);
+    const challengePoints = Math.max(0, challengeBase + challengeNoise);
+
+    // Case points: 25 pts per submission + 50 pts per approval
+    // Experienced users submit more cases; scale with ratio
+    const caseSubmissions = Math.round(ratio * 8 * rand()); // 0–8 submissions
+    const caseApprovals = Math.round(caseSubmissions * 0.6 * rand()); // ~60% approval rate
+    const caseNoise = Math.round((rand() - 0.5) * 30);
+    const casePoints = Math.max(0, caseSubmissions * 25 + caseApprovals * 50 + caseNoise);
+
+    // Flashcard points: 1 pt per card viewed (many single-point events)
+    // This is the primary driver of flashcard and total points
+    const cardsViewed = Math.round(ratio * 1800 * rand() + 50); // 50–1800 cards viewed
+    const sessionBonus = Math.round(cardsViewed / 20) * 5; // 5 pts per ~20-card session
+    const flashcardNoise = Math.round((rand() - 0.5) * cardsViewed * 0.08);
+    const flashcardPoints = Math.max(0, cardsViewed + sessionBonus + flashcardNoise);
+
+    // Total points: sum of all categories
+    const rawTotal = challengePoints + casePoints + flashcardPoints;
+
+    // Scale so the top entry lands at exactly TOP_POINTS (4952)
+    // We'll apply this scaling after sorting, so store raw for now
     entries.push({
       rank: 0, // will be set after merge + sort
       userId: `v_${i}_${seed}`,
-      // Credentialed: "Sarah Mitchell, RDCS"  |  Learner: "Sarah Mitchell"
       displayName: cred ? `${firstName} ${lastName}, ${cred}` : `${firstName} ${lastName}`,
       avatarUrl: null,
       correct,
       total,
       accuracy,
+      points: rawTotal,
+      challengePoints,
+      casePoints,
+      flashcardPoints,
       isCurrentUser: false,
       city,
       credentials: cred,
@@ -286,8 +281,35 @@ export function generateVirtualLeaderboard(
     });
   }
 
-  // Sort descending by correct answers
-  entries.sort((a, b) => b.correct - a.correct || b.accuracy - a.accuracy);
+  // Sort descending by raw total points
+  entries.sort((a, b) => b.points - a.points || b.accuracy - a.accuracy);
+
+  // Scale all entries so the top one lands at exactly TOP_POINTS (4952)
+  // This ensures real users with > 4952 points always rank above all placeholders
+  const topRaw = entries[0]?.points ?? 1;
+  const scale = topRaw > 0 ? TOP_POINTS / topRaw : 1;
+
+  for (const e of entries) {
+    // Apply scale and add per-entry noise so values are never round numbers
+    // The noise seed is derived from the entry index for determinism
+    const noiseSeed = mulberry32(seed + e.correct * 37 + e.total);
+    const noise = Math.round((noiseSeed() - 0.5) * 2 * 47); // ±47 pts noise
+
+    const scaledTotal = Math.max(1, Math.round(e.points * scale) + noise);
+    const scaledChallenge = Math.max(0, Math.round(e.challengePoints * scale));
+    const scaledCase = Math.max(0, Math.round(e.casePoints * scale));
+    const scaledFlashcard = Math.max(0, Math.round(e.flashcardPoints * scale));
+
+    e.points = scaledTotal;
+    e.challengePoints = scaledChallenge;
+    e.casePoints = scaledCase;
+    e.flashcardPoints = scaledFlashcard;
+  }
+
+  // Clamp the very top entry to exactly 4952 (no noise overshoot)
+  if (entries[0]) {
+    entries[0].points = TOP_POINTS;
+  }
 
   return entries;
 }

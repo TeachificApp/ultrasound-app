@@ -16,7 +16,7 @@
  */
 import type { Express, Request, Response } from "express";
 import { getDb, getUserByEmail } from "../db";
-import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems } from "../../drizzle/schema";
+import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships } from "../../drizzle/schema";
 import { and, eq } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
@@ -275,6 +275,112 @@ async function handleDigitalBundleCheckoutCompleted(session: Record<string, unkn
   console.log(`[Stripe] Digital bundle purchase recorded: user ${userId}, bundle ${bundleId}`);
 }
 
+/**
+ * Handle brand membership upgrade checkout completion.
+ * Triggered when a user completes a Stripe checkout for brand premium.
+ */
+async function handleBrandMembershipCheckoutCompleted(session: Record<string, unknown>) {
+  const meta = (session.metadata ?? {}) as Record<string, string>;
+  if (meta.type !== "brand_membership_upgrade") return; // Not a brand membership checkout
+
+  const userId = parseInt(meta.user_id, 10);
+  const brand = meta.brand as "aaus" | "iheartecho";
+  const subscriptionId = session.subscription as string | undefined;
+  const customerId = session.customer as string | undefined;
+
+  if (!userId || !brand) {
+    console.warn("[Stripe] Brand membership checkout missing userId or brand in metadata");
+    return;
+  }
+
+  const db = await getDb();
+  if (!db) return;
+
+  // Check if membership already exists
+  const [existing] = await db
+    .select()
+    .from(brandMemberships)
+    .where(and(eq(brandMemberships.userId, userId), eq(brandMemberships.brand, brand)))
+    .limit(1);
+
+  if (existing) {
+    // Update existing membership to premium
+    await db.update(brandMemberships)
+      .set({
+        tier: "premium",
+        status: "active",
+        source: "stripe",
+        stripeSubscriptionId: subscriptionId ?? null,
+        stripeCustomerId: customerId ?? null,
+        grantedAt: new Date(),
+      })
+      .where(eq(brandMemberships.id, existing.id));
+  } else {
+    // Create new premium membership
+    await db.insert(brandMemberships).values({
+      userId,
+      brand,
+      tier: "premium",
+      status: "active",
+      source: "stripe",
+      stripeSubscriptionId: subscriptionId ?? null,
+      stripeCustomerId: customerId ?? null,
+    });
+  }
+
+  await notifyOwner({
+    title: `\u2B50 New ${brand === "iheartecho" ? "EchoAssist" : "UltrasoundAssist"} Premium Subscription`,
+    content: `User ID ${userId} (${meta.customer_email}) upgraded to ${brand} premium via Stripe. Subscription: ${subscriptionId ?? "N/A"}.`,
+  });
+
+  console.log(`[Stripe] Brand membership upgrade recorded: user ${userId}, brand ${brand}, subscription ${subscriptionId}`);
+}
+
+/**
+ * Handle subscription lifecycle events (cancellation, updates).
+ * Updates the brandMemberships table when a subscription is cancelled or changes status.
+ */
+async function handleBrandSubscriptionLifecycle(subscription: Record<string, unknown>, eventType: string) {
+  const subscriptionId = subscription.id as string;
+  if (!subscriptionId) return;
+
+  const db = await getDb();
+  if (!db) return;
+
+  // Find the brand membership by stripeSubscriptionId
+  const [membership] = await db
+    .select()
+    .from(brandMemberships)
+    .where(eq(brandMemberships.stripeSubscriptionId, subscriptionId))
+    .limit(1);
+
+  if (!membership) {
+    // Not a brand membership subscription — ignore
+    return;
+  }
+
+  const status = subscription.status as string;
+
+  if (eventType === "customer.subscription.deleted" || status === "canceled" || status === "unpaid") {
+    await db.update(brandMemberships)
+      .set({ status: "cancelled", tier: "free" })
+      .where(eq(brandMemberships.id, membership.id));
+    console.log(`[Stripe] Brand membership cancelled: user ${membership.userId}, brand ${membership.brand}`);
+  } else if (status === "past_due") {
+    // Keep premium but mark as past_due for grace period
+    await db.update(brandMemberships)
+      .set({ status: "expired" })
+      .where(eq(brandMemberships.id, membership.id));
+    console.log(`[Stripe] Brand membership past_due: user ${membership.userId}, brand ${membership.brand}`);
+  } else if (status === "active") {
+    // Reactivated
+    await db.update(brandMemberships)
+      .set({ status: "active", tier: "premium" })
+      .where(eq(brandMemberships.id, membership.id));
+    console.log(`[Stripe] Brand membership reactivated: user ${membership.userId}, brand ${membership.brand}`);
+  }
+}
+
 export function registerStripeWebhook(app: Express) {
   // Raw body needed for Stripe signature verification
   app.post(
@@ -357,6 +463,9 @@ export function registerStripeWebhook(app: Express) {
           await handleLmsCheckoutCompleted(sessionObj);
           await handleDigitalDownloadCheckoutCompleted(sessionObj);
           await handleDigitalBundleCheckoutCompleted(sessionObj);
+          await handleBrandMembershipCheckoutCompleted(sessionObj);
+        } else if (eventType === "customer.subscription.deleted" || eventType === "customer.subscription.updated") {
+          await handleBrandSubscriptionLifecycle(sessionObj, eventType);
         } else {
           console.log(`[Stripe] Unhandled event type: ${eventType}`);
         }
@@ -369,5 +478,12 @@ export function registerStripeWebhook(app: Express) {
     }
   );
 
-  console.log("[Stripe] Webhook registered at /api/webhooks/stripe");
+  // Also register at /api/stripe/webhook (production webhook URL)
+  app.post("/api/stripe/webhook", (req: Request, res: Response) => {
+    // Forward to the main webhook handler by re-emitting the request
+    req.url = "/api/webhooks/stripe";
+    app.handle(req, res);
+  });
+
+  console.log("[Stripe] Webhook registered at /api/webhooks/stripe and /api/stripe/webhook");
 }

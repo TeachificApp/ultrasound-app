@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE IF NOT EXISTS `brandMemberships` (\n  `id` int AUTO_INCREMENT PRIMARY KEY,\n  `userId` int NOT NULL,\n  `brand` varchar(32) NOT NULL,\n  `tier` varchar(32) NOT NULL DEFAULT 'free',\n  `status` varchar(32) NOT NULL DEFAULT 'active',\n  `stripeCustomerId` varchar(128),\n  `stripeSubscriptionId` varchar(128),\n  `grantedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  `expiresAt` timestamp NULL,\n  `source` varchar(64),\n  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n  INDEX `idx_brand_user` (`userId`, `brand`),\n  INDEX `idx_brand_status` (`brand`, `status`)\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute CREATE TABLE IF NOT EXISTS `brandMemberships` (\n  `id` int AUTO_INCREMENT PRIMARY KEY,\n  `userId` int NOT NULL,\n  `brand` varchar(32) NOT NULL,\n  `tier` varchar(32) NOT NULL DEFAULT 'free',\n  `status` varchar(32) NOT NULL DEFAULT 'active',\n  `stripeCustomerId` varchar(128),\n  `stripeSubscriptionId` varchar(128),\n  `grantedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  `expiresAt` timestamp NULL,\n  `source` varchar(64),\n  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n  INDEX `idx_brand_user` (`userId`, `brand`),\n  INDEX `idx_brand_status` (`brand`, `status`)\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 351
+}

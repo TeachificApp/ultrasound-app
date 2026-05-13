@@ -1,0 +1,218 @@
+{
+  "query": "SELECT id, email, name, isPremium, premiumSource, premiumGrantedAt FROM users WHERE isPremium = true ORDER BY premiumGrantedAt DESC LIMIT 50;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT id, email, name, isPremium, premiumSource, premiumGrantedAt FROM users WHERE isPremium = true ORDER BY premiumGrantedAt DESC LIMIT 50;",
+  "rows": [
+    {
+      "id": "180",
+      "email": "admin@sonamedicalsolutions.com",
+      "name": "Admin Sona",
+      "isPremium": "1",
+      "premiumSource": "thinkific",
+      "premiumGrantedAt": "2026-03-09 14:59:58"
+    },
+    {
+      "id": "179",
+      "email": "test-webhook-log@example.com",
+      "name": "test-webhook-log@example.com",
+      "isPremium": "1",
+      "premiumSource": "thinkific",
+      "premiumGrantedAt": "2026-03-07 21:52:29"
+    },
+    {
+      "id": "178",
+      "email": "test-premium@example.com",
+      "name": "test-premium@example.com",
+      "isPremium": "1",
+      "premiumSource": "thinkific",
+      "premiumGrantedAt": "2026-03-07 21:41:46"
+    },
+    {
+      "id": "11876",
+      "email": "n.russo@heartlandcardio.com",
+      "name": "Natalie Russo",
+      "isPremium": "1",
+      "premiumSource": "NULL",
+      "premiumGrantedAt": "NULL"
+    },
+    {
+      "id": "11879",
+      "email": "d.kim@pcpecho.com",
+      "name": "Dr. David Kim",
+      "isPremium": "1",
+      "premiumSource": "NULL",
+      "premiumGrantedAt": "NULL"
+    },
+    {
+      "id": "11877",
+      "email": "dr.emily.walsh@pcpecho.com",
+      "name": "Dr. Emily Walsh",
+      "isPremium": "1",
+      "premiumSource": "NULL",
+      "premiumGrantedAt": "NULL"
+    },
+    {
+      "id": "11880",
+      "email": "a.osei@pcpecho.com",
+      "name": "Dr. Amara Osei",
+      "isPremium": "1",
+      "premiumSource": "NULL",
+      "premiumGrantedAt": "NULL"
+    },
+    {
+      "id": "11882",
+      "email": "t.brooks@pcpecho.com",
+      "name": "Tyler Brooks",
+      "isPremium": "1",
+      "premiumSource": "NULL",
+      "premiumGrantedAt": "NULL"
+    },
+    {
+      "id": "11884",
+      "email": "j.ellis@pcpecho.com",
+      "name": "Jordan Ellis",
+      "isPremium": "1",
+      "premiumSource": "NULL",
+      "premiumGrantedAt": "NULL"
+    },
+    {
+      "id": "11875",
+      "email": "k.park@heartlandcardio.com",
+      "name": "Kevin Park",
+      "isPremium": "1",
+      "premiumSource": "NULL",
+      "premiumGrantedAt": "NULL"
+    },
+    {
+      "id": "11899",
+      "email": "aisha.thompson@demo.iheartecho.com",
+      "name": "Aisha Thompson",
+      "isPremium": "1",
+      "premiumSource": "NULL",
+      "premiumGrantedAt": "NULL"
+    },
+    {
+      "id": "11901",
+      "email": "fatima.alrashid@demo.iheartecho.com",
+      "name": "Fatima Al-Rashid",
+      "isPremium": "1",
+      "premiumSource": "NULL",
+      "premiumGrantedAt": "NULL"
+    },
+    {
+      "id": "11872",
+      "email": "p.nair@heartlandcardio.com",
+      "name": "Dr. Priya Nair",
+      "isPremium": "1",
+      "premiumSource": "NULL",
+      "premiumGrantedAt": "NULL"
+    },
+    {
+      "id": "11878",
+      "email": "s.martinez@pcpecho.com",
+      "name": "Sofia Martinez",
+      "isPremium": "1",
+      "premiumSource": "NULL",
+      "premiumGrantedAt": "NULL"
+    },
+    {
+      "id": "11874",
+      "email": "a.thompson@heartlandcardio.com",
+      "name": "Aisha Thompson",
+      "isPremium": "1",
+      "premiumSource": "NULL",
+      "premiumGrantedAt": "NULL"
+    },
+    {
+      "id": "11881",
+      "email": "r.goldstein@pcpecho.com",
+      "name": "Dr. Rachel Goldstein",
+      "isPremium": "1",
+      "premiumSource": "NULL",
+      "premiumGrantedAt": "NULL"
+    },
+    {
+      "id": "11869",
+      "email": "dr.sarah.chen@heartlandcardio.com",
+      "name": "Dr. Sarah Chen",
+      "isPremium": "1",
+      "premiumSource": "NULL",
+      "premiumGrantedAt": "NULL"
+    },
+    {
+      "id": "11883",
+      "email": "h.nguyen@pcpecho.com",
+      "name": "Hannah Nguyen",
+      "isPremium": "1",
+      "premiumSource": "NULL",
+      "premiumGrantedAt": "NULL"
+    },
+    {
+      "id": "11871",
+      "email": "j.okafor@heartlandcardio.com",
+      "name": "Dr. James Okafor",
+      "isPremium": "1",
+      "premiumSource": "NULL",
+      "premiumGrantedAt": "NULL"
+    },
+    {
+      "id": "11893",
+      "email": "sarah.mitchell@demo.iheartecho.com",
+      "name": "Sarah Mitchell",
+      "isPremium": "1",
+      "premiumSource": "NULL",
+      "premiumGrantedAt": "NULL"
+    },
+    {
+      "id": "11895",
+      "email": "priya.nair@demo.iheartecho.com",
+      "name": "Priya Nair",
+      "isPremium": "1",
+      "premiumSource": "NULL",
+      "premiumGrantedAt": "NULL"
+    },
+    {
+      "id": "11897",
+      "email": "elena.vasquez@demo.iheartecho.com",
+      "name": "Elena Vasquez",
+      "isPremium": "1",
+      "premiumSource": "NULL",
+      "premiumGrantedAt": "NULL"
+    },
+    {
+      "id": "11870",
+      "email": "m.webb@heartlandcardio.com",
+      "name": "Marcus Webb",
+      "isPremium": "1",
+      "premiumSource": "NULL",
+      "premiumGrantedAt": "NULL"
+    },
+    {
+      "id": "11873",
+      "email": "l.fernandez@heartlandcardio.com",
+      "name": "Dr. Luis Fernandez",
+      "isPremium": "1",
+      "premiumSource": "NULL",
+      "premiumGrantedAt": "NULL"
+    },
+    {
+      "id": "11903",
+      "email": "meiling.zhang@demo.iheartecho.com",
+      "name": "Mei-Ling Zhang",
+      "isPremium": "1",
+      "premiumSource": "NULL",
+      "premiumGrantedAt": "NULL"
+    },
+    {
+      "id": "197",
+      "email": "admin@allaboutultrasound.com",
+      "name": "All About Ultrasound Admin",
+      "isPremium": "1",
+      "premiumSource": "NULL",
+      "premiumGrantedAt": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\temail\tname\tisPremium\tpremiumSource\tpremiumGrantedAt\n180\tadmin@sonamedicalsolutions.com\tAdmin Sona\t1\tthinkific\t2026-03-09 14:59:58\n179\ttest-webhook-log@example.com\ttest-webhook-log@example.com\t1\tthinkific\t2026-03-07 21:52:29\n178\ttest-premium@example.com\ttest-premium@example.com\t1\tthinkific\t2026-03-07 21:41:46\n11876\tn.russo@heartlandcardio.com\tNatalie Russo\t1\tNULL\tNULL\n11879\td.kim@pcpecho.com\tDr. David Kim\t1\tNULL\tNULL\n11877\tdr.emily.walsh@pcpecho.com\tDr. Emily Walsh\t1\tNULL\tNULL\n11880\ta.osei@pcpecho.com\tDr. Amara Osei\t1\tNULL\tNULL\n11882\tt.brooks@pcpecho.com\tTyler Brooks\t1\tNULL\tNULL\n11884\tj.ellis@pcpecho.com\tJordan Ellis\t1\tNULL\tNULL\n11875\tk.park@heartlandcardio.com\tKevin Park\t1\tNULL\tNULL\n11899\taisha.thompson@demo.iheartecho.com\tAisha Thompson\t1\tNULL\tNULL\n11901\tfatima.alrashid@demo.iheartecho.com\tFatima Al-Rashid\t1\tNULL\tNULL\n11872\tp.nair@heartlandcardio.com\tDr. Priya Nair\t1\tNULL\tNULL\n11878\ts.martinez@pcpecho.com\tSofia Martinez\t1\tNULL\tNULL\n11874\ta.thompson@heartlandcardio.com\tAisha Thompson\t1\tNULL\tNULL\n11881\tr.goldstein@pcpecho.com\tDr. Rachel Goldstein\t1\tNULL\tNULL\n11869\tdr.sarah.chen@heartlandcardio.com\tDr. Sarah Chen\t1\tNULL\tNULL\n11883\th.nguyen@pcpecho.com\tHannah Nguyen\t1\tNULL\tNULL\n11871\tj.okafor@heartlandcardio.com\tDr. James Okafor\t1\tNULL\tNULL\n11893\tsarah.mitchell@demo.iheartecho.com\tSarah Mitchell\t1\tNULL\tNULL\n11895\tpriya.nair@demo.iheartecho.com\tPriya Nair\t1\tNULL\tNULL\n11897\telena.vasquez@demo.iheartecho.com\tElena Vasquez\t1\tNULL\tNULL\n11870\tm.webb@heartlandcardio.com\tMarcus Webb\t1\tNULL\tNULL\n11873\tl.fernandez@heartlandcardio.com\tDr. Luis Fernandez\t1\tNULL\tNULL\n11903\tmeiling.zhang@demo.iheartecho.com\tMei-Ling Zhang\t1\tNULL\tNULL\n197\tadmin@allaboutultrasound.com\tAll About Ultrasound Admin\t1\tNULL\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 279
+}

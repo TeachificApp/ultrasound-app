@@ -40,7 +40,7 @@ export default function LMSHome() {
             <div className="flex items-center gap-2 mb-4">
               <GraduationCap className="w-6 h-6 text-[#4ad9e0]" />
               <span className="text-sm font-medium text-white/80 uppercase tracking-wider">
-                All About Ultrasound Learning Platform
+                All About Ultrasound | iHeartEcho Learning Platform
               </span>
             </div>
             <h1 className="text-3xl lg:text-5xl font-bold text-white leading-tight mb-4">
@@ -295,7 +295,7 @@ export default function LMSHome() {
         <div className="max-w-6xl mx-auto px-6 py-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="text-sm text-gray-500">
-              © {new Date().getFullYear()} All About Ultrasound™. All rights reserved.
+              © {new Date().getFullYear()} All About Ultrasound™ | iHeartEcho. All rights reserved.
             </div>
             <div className="flex items-center gap-6">
               <a href={import.meta.env.VITE_APP_URL || "https://app.allaboutultrasound.com"} className="text-sm text-[#189aa1] hover:text-[#0e6b70] font-medium">

@@ -17,6 +17,8 @@ import { trpc } from "@/lib/trpc";
 import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl, getThinkificFreeEnrollUrl } from "@/const";
+import { useBrand } from "@/hooks/useBrand";
+import { getBrandNavConfig } from "@/config/brandNav";
 
 /** Badge showing the count of echo cases pending admin review */
 function CasePendingBadge() {
@@ -173,8 +175,7 @@ const hiddenNavItems = [
   { path: "/soundbytes", label: "SoundBytes™" },
   { path: "/educator-assist", label: "EducatorAssist™" },
 ];
-// navItems is built inside the Layout component after navGroups is resolved dynamically
-const staticNavItems = [...BASE_NAV_GROUPS.flatMap((g: { label: string; items: { path: string; label: string; icon: React.ElementType; external?: boolean }[] }) => g.items), ...hiddenNavItems];
+// staticNavItems is now resolved inside the Layout function body (brand-aware)
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [rawLocation] = useLocation();
@@ -205,16 +206,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const hasDiyAdmin = appRoles.includes("diy_admin");
   const isDemoMode = !!(user as any)?.demoMode;
 
+  // Brand-aware navigation
+  const brandConfig = useBrand();
+  const brandNav = getBrandNavConfig(brandConfig.brand);
+  const allNavItems = [...brandNav.navGroups.flatMap(g => g.items), ...brandNav.hiddenNavItems];
+
   // Fetch dynamic Learn link URLs from DB
   const { data: learnLinks } = trpc.menuLinks.getLearnLinks.useQuery(undefined, {
     staleTime: 5 * 60_000,
     retry: false,
   });
 
-  // Build navGroups with resolved Learn link URLs
-  const navGroups = BASE_NAV_GROUPS.map(group => ({
+  // Build navGroups with resolved Learn link URLs (works for both brands)
+  const navGroups = brandNav.navGroups.map(group => ({
     ...group,
-    items: group.items.map((item: { path: string; label: string; icon: React.ElementType; external?: boolean }) => {
+    items: group.items.map((item: { path: string; label: string; icon?: any; external?: boolean }) => {
       if (item.path === "__LEARN_FETAL_ECHO_URL__")
         return { ...item, path: learnLinks?.learnFetalEchoUrl || "https://www.allaboutultrasound.net/fetal-echo-preview-access-pass" };
       if (item.path === "__LEARN_ECHO_URL__")
@@ -223,9 +229,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         return { ...item, path: learnLinks?.learnPocusUrl || "" };
       if (item.path === "__LEARN_VASCULAR_URL__")
         return { ...item, path: learnLinks?.learnVascularUrl || "" };
+      if (item.path === "__LEARN_ACS_URL__")
+        return { ...item, path: learnLinks?.learnAcsUrl || "https://www.allaboutultrasound.net/acs-preview-pass-access" };
+      if (item.path === "__LEARN_PEDS_ECHO_URL__")
+        return { ...item, path: learnLinks?.learnPedsEchoUrl || "https://www.allaboutultrasound.net/pediatric-echo-cross-training-2cfdb" };
       return item;
-    // Hide Learn Echo / Learn POCUS if no URL is configured yet
-    }).filter((item: { path: string; label: string; icon: React.ElementType; external?: boolean }) =>
+    // Hide Learn links if no URL is configured yet
+    }).filter((item: { path: string; label: string; icon?: any; external?: boolean }) =>
       !item.path.startsWith("__") && !(item.external && !item.path)
     ),
   }));
@@ -249,15 +259,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {/* Logo */}
         <div className="flex items-center gap-2 px-4 py-4 border-b border-white/10">
           <img
-            src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp"
-            alt="All About Ultrasound™"
+            src={brandNav.logoUrl}
+            alt={brandNav.logoAlt}
             className="w-12 h-12 object-contain flex-shrink-0"
           />
           <div className="flex-1 min-w-0">
             <div className="font-bold text-white text-sm leading-tight" style={{ fontFamily: "Merriweather, serif" }}>
-              All About Ultrasound™
+              {brandNav.title}
             </div>
-            <div className="text-xs text-[#4ad9e0] leading-tight font-medium">UltrasoundAssist™ Clinical Intelligence</div>
+            <div className="text-xs leading-tight font-medium" style={{ color: brandNav.accentColor }}>{brandNav.subtitle}</div>
           </div>
           <button
             className="ml-auto lg:hidden text-white/60 hover:text-white flex-shrink-0"
@@ -361,11 +371,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-[#4ad9e0] animate-pulse" />
             <span className="text-sm font-semibold text-[#189aa1]" style={{ fontFamily: "Merriweather, serif" }}>
-              {staticNavItems.find((n: { path: string; label: string }) => n.path === location)?.label ?? "All About Ultrasound™"}
+              {allNavItems.find((n: { path: string; label: string }) => n.path === location)?.label ?? brandNav.title}
             </span>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <span className="text-xs text-gray-400 hidden sm:block">All About Ultrasound™ Clinical Intelligence</span>
+            <span className="text-xs text-gray-400 hidden sm:block">{brandNav.subtitle}</span>
             {isAuthenticated && <NotificationBell />}
             {/* Account / Login in header */}
             {authLoading ? null : isAuthenticated ? (

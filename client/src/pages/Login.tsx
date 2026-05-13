@@ -1,5 +1,6 @@
 /**
- * Login.tsx — All About Ultrasound™ magic-link sign-in (passwordless)
+ * Login.tsx — Magic-link sign-in (passwordless)
+ * Brand-aware: detects AAUS-only vs combined (AAUS | iHeartEcho) on learn/members subdomains.
  * Brand: Teal #189aa1, Aqua #4ad9e0, Dark navy #0e1e2e
  *
  * Flow: Enter email → receive magic link → click link → authenticated
@@ -13,14 +14,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Mail, Loader2, Stethoscope, Activity, BookOpen, Shield, CheckCircle2, Zap, ArrowLeft } from "lucide-react";
+import { isCombinedBrandingDomain } from "@/hooks/useSubdomain";
 
 const LOGO = import.meta.env.VITE_APP_LOGO as string;
+const IHE_LOGO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/iheartecho_logo_ring_01cc7ccd.webp";
+const isCombined = isCombinedBrandingDomain();
+const BRAND_NAME = isCombined ? "All About Ultrasound\u2122 | iHeartEcho" : "All About Ultrasound\u2122";
+const BRAND_SUBTITLE = isCombined
+  ? "General, Vascular & Cardiac Ultrasound Clinical Intelligence"
+  : "UltrasoundAssist\u2122 Clinical Intelligence";
 
 const FEATURES = [
   { icon: Stethoscope, title: "Clinical Navigators", desc: "Abdomen, Pelvic/Gyn, OB, Vascular, POCUS & more" },
-  { icon: Activity, title: "Ultrasound-Assist™ Calculators", desc: "Guideline-based interpretation across all modalities" },
+  { icon: Activity, title: "Ultrasound-Assist\u2122 Calculators", desc: "Guideline-based interpretation across all modalities" },
   { icon: BookOpen, title: "CME & Registry Review", desc: "Accredited courses, registry prep, 500+ ultrasound cases" },
-  { icon: Shield, title: "ScanCoach™ & Reference Values", desc: "Protocol guidance, guideline-based normal values and reference ranges" },
+  { icon: Shield, title: "ScanCoach\u2122 & Reference Values", desc: "Protocol guidance, guideline-based normal values and reference ranges" },
 ];
 
 export default function Login() {
@@ -73,16 +81,18 @@ export default function Login() {
         />
         {/* Logo */}
         <div className="relative flex items-center gap-3">
-          {LOGO ? (
-            <img src={LOGO} alt="All About Ultrasound™" className="w-20 h-20 object-contain drop-shadow-lg" />
-          ) : (
-            <div className="w-20 h-20 rounded-full flex items-center justify-center" style={{ background: "rgba(24,154,161,0.3)" }}>
-              <Stethoscope className="w-10 h-10 text-white" />
-            </div>
-          )}
+          <div className="flex items-center gap-1">
+            {LOGO && <img src={LOGO} alt="All About Ultrasound\u2122" className="w-16 h-16 object-contain drop-shadow-lg" />}
+            {isCombined && <img src={IHE_LOGO} alt="iHeartEcho" className="w-16 h-16 object-contain drop-shadow-lg" />}
+            {!LOGO && !isCombined && (
+              <div className="w-20 h-20 rounded-full flex items-center justify-center" style={{ background: "rgba(24,154,161,0.3)" }}>
+                <Stethoscope className="w-10 h-10 text-white" />
+              </div>
+            )}
+          </div>
           <div>
-            <div className="text-2xl font-black text-white" style={{ fontFamily: "Merriweather, serif" }}>All About Ultrasound™</div>
-            <div className="text-xs font-medium" style={{ color: "#4ad9e0" }}>UltrasoundAssist™ Clinical Intelligence</div>
+            <div className="text-2xl font-black text-white" style={{ fontFamily: "Merriweather, serif" }}>{BRAND_NAME}</div>
+            <div className="text-xs font-medium" style={{ color: "#4ad9e0" }}>{BRAND_SUBTITLE}</div>
           </div>
         </div>
         {/* Hero */}
@@ -112,7 +122,7 @@ export default function Login() {
             </div>
           ))}
         </div>
-        <div className="relative mt-8 lg:mt-0 text-white/30 text-xs">© {new Date().getFullYear()} All About Ultrasound™</div>
+        <div className="relative mt-8 lg:mt-0 text-white/30 text-xs">&copy; {new Date().getFullYear()} {BRAND_NAME}</div>
       </div>
 
       {/* ── Right panel: magic link form ── */}
@@ -121,13 +131,14 @@ export default function Login() {
           {/* Mobile logo */}
           <div className="flex items-center gap-3 mb-8 lg:hidden">
             {LOGO ? (
-              <img src={LOGO} alt="All About Ultrasound™" className="w-10 h-10 object-contain" />
+              <img src={LOGO} alt="All About Ultrasound\u2122" className="w-10 h-10 object-contain" />
             ) : (
               <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#189aa1" }}>
                 <Stethoscope className="w-5 h-5 text-white" />
               </div>
             )}
-            <div className="text-xl font-black" style={{ fontFamily: "Merriweather, serif", color: "#0e1e2e" }}>All About Ultrasound™</div>
+            {isCombined && <img src={IHE_LOGO} alt="iHeartEcho" className="w-10 h-10 object-contain" />}
+            <div className="text-xl font-black" style={{ fontFamily: "Merriweather, serif", color: "#0e1e2e" }}>{BRAND_NAME}</div>
           </div>
 
           {!sent ? (
@@ -138,7 +149,7 @@ export default function Login() {
                   <Mail className="w-7 h-7" style={{ color: "#189aa1" }} />
                 </div>
                 <h2 className="text-2xl font-black mb-2" style={{ fontFamily: "Merriweather, serif", color: "#0e1e2e" }}>
-                  Sign in to All About Ultrasound™ — UltrasoundAssist™
+                  Sign in to {BRAND_NAME}
                 </h2>
                 <p className="text-sm text-gray-500 leading-relaxed">
                   Enter your email address and we'll send you a one-click sign-in link. No password required.
@@ -175,7 +186,7 @@ export default function Login() {
                   style={{ background: "linear-gradient(135deg, #189aa1 0%, #0e7a80 100%)" }}
                 >
                   {requestMutation.isPending ? (
-                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Sending link…</>
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Sending link&hellip;</>
                   ) : (
                     <><Mail className="w-4 h-4 mr-2" />Send Magic Link</>
                   )}
@@ -187,7 +198,7 @@ export default function Login() {
                 <Zap className="w-4 h-4 text-[#189aa1] flex-shrink-0 mt-0.5" />
                 <div className="text-xs text-gray-600 leading-relaxed space-y-1">
                   <p>The link expires in <strong>15 minutes</strong> and can only be used once.</p>
-                  <p>📬 <strong>Don't see it?</strong> Check your <strong>spam</strong> or <strong>junk</strong> folder — the email comes from <span className="font-medium">All About Ultrasound™</span>.
+                  <p>{"\ud83d\udcec"} <strong>Don't see it?</strong> Check your <strong>spam</strong> or <strong>junk</strong> folder &mdash; the email comes from <span className="font-medium">{BRAND_NAME}</span>.
                   </p>
                 </div>
               </div>
@@ -195,7 +206,7 @@ export default function Login() {
               {/* Divider + enroll CTA */}
               <div className="flex items-center gap-3 my-6">
                 <div className="flex-1 h-px bg-gray-100" />
-                <span className="text-xs text-gray-400">New to All About Ultrasound™?</span>
+                <span className="text-xs text-gray-400">New to {BRAND_NAME}?</span>
                 <div className="flex-1 h-px bg-gray-100" />
               </div>
 
@@ -236,7 +247,7 @@ export default function Login() {
                 <Zap className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                 <div className="text-xs text-amber-700 leading-relaxed space-y-1">
                   <p>The link expires in <strong>15 minutes</strong> and can only be used once.</p>
-                  <p>📬 <strong>Don't see it?</strong> Check your <strong>spam</strong> or <strong>junk</strong> folder — the email comes from <span className="font-medium">All About Ultrasound™</span>.</p>
+                  <p>{"\ud83d\udcec"} <strong>Don't see it?</strong> Check your <strong>spam</strong> or <strong>junk</strong> folder &mdash; the email comes from <span className="font-medium">{BRAND_NAME}</span>.</p>
                 </div>
               </div>
 

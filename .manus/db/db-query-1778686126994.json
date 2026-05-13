@@ -1,0 +1,13 @@
+{
+  "query": "SELECT COUNT(*) as total FROM brandMemberships WHERE brand = 'iheartecho' AND tier = 'premium' AND status = 'active';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT COUNT(*) as total FROM brandMemberships WHERE brand = 'iheartecho' AND tier = 'premium' AND status = 'active';",
+  "rows": [
+    {
+      "total": "27"
+    }
+  ],
+  "messages": [],
+  "stdout": "total\n27\n",
+  "stderr": "",
+  "execution_time_ms": 267
+}

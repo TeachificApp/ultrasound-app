@@ -13,7 +13,7 @@ import GetAppBanner from "./components/GetAppBanner";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { RoleGuard } from "@/components/RoleGuard";
 import LMSLayout from "./components/LMSLayout";
-import { isLearnDomain } from "./hooks/useSubdomain";
+import { isLearnDomain, isIHeartEchoDomain, isMembersDomain } from "./hooks/useSubdomain";
 import { usePageViewTracker } from "./hooks/useAnalytics";
 
 // ── Core pages ────────────────────────────────────────────────────────────────
@@ -175,6 +175,48 @@ import AccreditationManager from "./pages/AccreditationManager";
 
 // ── Learn Fetal Echo ────────────────────────────────────────────
 import LearnFetalEcho from "./pages/LearnFetalEcho";
+
+// ── iHeartEcho™ EchoAssist Pages ────────────────────────────────────────────
+import IHeartEchoHome from "./pages/iheartecho/IHeartEchoHome";
+import EchoAssist from "./pages/iheartecho/EchoAssist";
+import EchoAssistHub from "./pages/iheartecho/EchoAssistHub";
+import TTENavigator from "./pages/iheartecho/TTENavigator";
+import TEENavigator from "./pages/iheartecho/TEENavigator";
+import ICENavigator from "./pages/iheartecho/ICENavigator";
+import DeviceNavigator from "./pages/iheartecho/DeviceNavigator";
+import ACHDNavigator from "./pages/iheartecho/ACHDNavigator";
+import ACHDEchoAssist from "./pages/iheartecho/ACHDEchoAssist";
+import StressNavigator from "./pages/iheartecho/StressNavigator";
+import StrainNavigator from "./pages/iheartecho/StrainNavigator";
+import StrainScanCoach from "./pages/iheartecho/StrainScanCoach";
+import TEEScanCoach from "./pages/iheartecho/TEEScanCoach";
+import ICEScanCoach from "./pages/iheartecho/ICEScanCoach";
+import UEANavigator from "./pages/iheartecho/UEANavigator";
+import UEAScanCoach from "./pages/iheartecho/UEAScanCoach";
+import HOCMNavigator from "./pages/iheartecho/HOCMNavigator";
+import HOCMScanCoach from "./pages/iheartecho/HOCMScanCoach";
+import StressScanCoach from "./pages/iheartecho/StressScanCoach";
+import StressEchoAssistPage from "./pages/iheartecho/StressEchoAssist";
+import StructuralHeartScanCoach from "./pages/iheartecho/StructuralHeartScanCoach";
+import PulmHTNNavigator from "./pages/iheartecho/PulmHTNNavigator";
+import DiastolicNavigator from "./pages/iheartecho/DiastolicNavigator";
+import MechanicalSupportNavigator from "./pages/iheartecho/MechanicalSupportNavigator";
+import MechanicalSupportScanCoach from "./pages/iheartecho/MechanicalSupportScanCoach";
+import ECGNavigator from "./pages/iheartecho/ECGNavigator";
+import ECGCoach from "./pages/iheartecho/ECGCoach";
+import ECGAssist from "./pages/iheartecho/ECGAssist";
+import HemodynamicsLab from "./pages/iheartecho/HemodynamicsLab";
+import ReportBuilder from "./pages/iheartecho/ReportBuilder";
+import GuidelinesAssist from "./pages/iheartecho/GuidelinesAssist";
+import PediatricEchoAssist from "./pages/iheartecho/PediatricEchoAssist";
+import ScanCoachIHE from "./pages/iheartecho/ScanCoach";
+import EngagementDashboard from "./pages/iheartecho/EngagementDashboard";
+import SoundBytesAdmin from "./pages/iheartecho/SoundBytesAdmin";
+import Leaderboard from "./pages/Leaderboard";
+import LabAdmin from "./pages/iheartecho/LabAdmin";
+import EducatorAdmin from "./pages/iheartecho/EducatorAdmin";
+import StudentDashboard from "./pages/iheartecho/StudentDashboard";
+import SoundBytesPage from "./pages/SoundBytes";
 
 // ── CME Hub ─────────────────────────────────────────────────────────────────────────
 import CMEHub from "./pages/CMEHub";
@@ -416,15 +458,148 @@ function LMSRouter() {
   );
 }
 
+/**
+ * IHeartEchoRouter — Routes shown only on the iHeartEcho subdomain.
+ * Wraps all pages in Layout (which auto-detects iHeartEcho brand).
+ */
+function IHeartEchoRouter() {
+  usePageViewTracker();
+  return (
+    <>
+      <Switch>
+        {/* ── Public ────────────────────────────────────────────────────── */}
+        <Route path="/" component={IHeartEchoHome} />
+        <Route path="/login" component={Login} />
+        <Route path="/register" component={Register} />
+        <Route path="/verify-email" component={VerifyEmail} />
+        <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/reset-password" component={ResetPassword} />
+        <Route path="/magic-link" component={MagicLinkRequest} />
+        <Route path="/auth/magic" component={MagicLinkCallback} />
+        <Route path="/enrolled" component={Enrolled} />
+        <Route path="/unsubscribe" component={Unsubscribe} />
+        <Route path="/upgrade-success" component={UpgradeSuccess} />
+        <Route path="/premium" component={Premium} />
+        <Route path="/profile" component={Profile} />
+
+        {/* ── EchoAssist™ Hub ────────────────────────────────────────── */}
+        <Route path="/echo-assist-hub" component={EchoAssistHub} />
+        <Route path="/echoassist" component={EchoAssist} />
+        <Route path="/scan-coach" component={ScanCoachIHE} />
+        <Route path="/scan-coach-hub" component={ScanCoachHub} />
+        <Route path="/hemodynamics" component={HemodynamicsLab} />
+        <Route path="/report" component={ReportBuilder} />
+        <Route path="/guidelines-assist" component={GuidelinesAssist} />
+
+        {/* ── Echo Navigators ────────────────────────────────────────── */}
+        <Route path="/tte" component={TTENavigator} />
+        <Route path="/tee" component={TEENavigator} />
+        <Route path="/ice" component={ICENavigator} />
+        <Route path="/device" component={DeviceNavigator} />
+        <Route path="/achd">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><ACHDNavigator /></RoleGuard>}</Route>
+        <Route path="/achd-echo-assist" component={ACHDEchoAssist} />
+        <Route path="/stress" component={StressNavigator} />
+        <Route path="/strain">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><StrainNavigator /></RoleGuard>}</Route>
+        <Route path="/fetal" component={FetalNavigator} />
+        <Route path="/fetal-echo-assist" component={FetalEchoAssist} />
+        <Route path="/pediatric" component={PediatricNavigator} />
+        <Route path="/pediatric-echo-assist" component={PediatricEchoAssist} />
+        <Route path="/pulm-htn" component={PulmHTNNavigator} />
+        <Route path="/diastolic">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><DiastolicNavigator /></RoleGuard>}</Route>
+        <Route path="/mechanical-support-navigator">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><MechanicalSupportNavigator /></RoleGuard>}</Route>
+        <Route path="/mechanical-support-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><MechanicalSupportScanCoach /></RoleGuard>}</Route>
+
+        {/* ── Echo Scan Coaches ──────────────────────────────────────── */}
+        <Route path="/strain-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><StrainScanCoach /></RoleGuard>}</Route>
+        <Route path="/tee-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><TEEScanCoach /></RoleGuard>}</Route>
+        <Route path="/ice-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><ICEScanCoach /></RoleGuard>}</Route>
+        <Route path="/uea-navigator">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><UEANavigator /></RoleGuard>}</Route>
+        <Route path="/uea-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><UEAScanCoach /></RoleGuard>}</Route>
+        <Route path="/hocm-navigator">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><HOCMNavigator /></RoleGuard>}</Route>
+        <Route path="/hocm-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><HOCMScanCoach /></RoleGuard>}</Route>
+        <Route path="/stress-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><StressScanCoach /></RoleGuard>}</Route>
+        <Route path="/stress-echo-assist">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><StressEchoAssistPage /></RoleGuard>}</Route>
+        <Route path="/structural-heart-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><StructuralHeartScanCoach /></RoleGuard>}</Route>
+        <Route path="/fetal-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><FetalScanCoach /></RoleGuard>}</Route>
+
+        {/* ── POCUS-Assist™ ──────────────────────────────────────────── */}
+        <Route path="/pocus-assist-hub" component={POCUSAssistHub} />
+        <Route path="/pocus-efast" component={POCUSEfastNavigator} />
+        <Route path="/pocus-rush">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><POCUSRushNavigator /></RoleGuard>}</Route>
+        <Route path="/pocus-cardiac" component={POCUSCardiacNavigator} />
+        <Route path="/pocus-lung">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><POCUSLungNavigator /></RoleGuard>}</Route>
+        <Route path="/pocus-efast-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><POCUSEfastScanCoach /></RoleGuard>}</Route>
+        <Route path="/pocus-rush-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><POCUSRushScanCoach /></RoleGuard>}</Route>
+        <Route path="/pocus-cardiac-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><POCUSCardiacScanCoach /></RoleGuard>}</Route>
+        <Route path="/pocus-lung-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><POCUSLungScanCoach /></RoleGuard>}</Route>
+
+        {/* ── ECG-Assist™ ────────────────────────────────────────────── */}
+        <Route path="/ecg-navigator" component={ECGNavigator} />
+        <Route path="/ecg-coach" component={ECGCoach} />
+        <Route path="/ecg-assist" component={ECGAssist} />
+
+        {/* ── LMS Engines ────────────────────────────────────────────── */}
+        <Route path="/quickfire" component={QuickFire} />
+        <Route path="/leaderboard" component={Leaderboard} />
+        <Route path="/flashcards" component={FlashcardDeck} />
+        <Route path="/case-library" component={CaseLibrary} />
+        <Route path="/case-library/submit" component={SubmitCase} />
+        <Route path="/case-library/edit/:id" component={SubmitCase} />
+        <Route path="/case-library/:id" component={CaseDetail} />
+        <Route path="/soundbytes" component={SoundBytesPage} />
+        <Route path="/registry-review" component={RegistryReviewHub} />
+        <Route path="/cme" component={CMEHub} />
+
+        {/* ── DIY Accreditation™ ─────────────────────────────────────── */}
+        <Route path="/diy-accreditation-plans" component={DIYAccreditationPlans} />
+        <Route path="/diy-register" component={DIYRegister} />
+        <Route path="/diy-member">{() => <RoleGuard roles={["diy_user", "diy_admin"]} allowAdmin={false}><DIYMemberPortal /></RoleGuard>}</Route>
+        <Route path="/accreditation-navigator">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><AccreditationNavigator /></RoleGuard>}</Route>
+        <Route path="/accreditation">{() => <RoleGuard roles={["diy_user", "diy_admin"]} allowAdmin={false}><AccreditationTool /></RoleGuard>}</Route>
+        <Route path="/lab-admin">{() => <RoleGuard roles={["diy_admin"]} allowAdmin={false}><LabAdmin /></RoleGuard>}</Route>
+
+        {/* ── Admin ──────────────────────────────────────────────────── */}
+        <Route path="/admin/cases">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminCaseManagement /></RoleGuard>}</Route>
+        <Route path="/admin/quickfire">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuickFireAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/scancoach">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ScanCoachEditor /></RoleGuard>}</Route>
+        <Route path="/admin/navigator">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><NavigatorEditor /></RoleGuard>}</Route>
+        <Route path="/admin/soundbytes">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SoundBytesAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/media-repository">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MediaRepository /></RoleGuard>}</Route>
+        <Route path="/admin/thinkific-webhook">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ThinkificWebhookAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/form-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/form-builder/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/email">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><EmailAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/engagement">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><EngagementDashboard /></RoleGuard>}</Route>
+        <Route path="/admin/challenge-cards">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ChallengeCardGenerator /></RoleGuard>}</Route>
+        <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
+        <Route path="/educator-assist">{() => <RoleGuard roles={["education_manager", "education_admin", "education_student"]} allowAdmin={true}><EducatorAssist /></RoleGuard>}</Route>
+        <Route path="/educator-admin">{() => <RoleGuard roles={["education_admin", "education_manager"]} allowAdmin={true}><EducatorAdmin /></RoleGuard>}</Route>
+        <Route path="/student-dashboard">{() => <RoleGuard roles={["education_student", "education_admin", "education_manager"]} allowAdmin={true}><StudentDashboard /></RoleGuard>}</Route>
+        <Route path="/image-quality-review">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ImageQualityReview /></RoleGuard>}</Route>
+
+        {/* ── Physician Over-Read (public, token-based) ──────────────── */}
+        <Route path="/physician-review/:token" component={PhysicianOverReadForm} />
+
+        <Route path="/404" component={NotFound} />
+        <Route component={NotFound} />
+      </Switch>
+    </>
+  );
+}
+
 function App() {
   const onLearnSubdomain = isLearnDomain();
+  const onMembersSubdomain = isMembersDomain();
+  const onIHeartEchoSubdomain = isIHeartEchoDomain();
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster />
-          {onLearnSubdomain ? (
+          {(onLearnSubdomain || onMembersSubdomain) ? (
             <LMSRouter />
+          ) : onIHeartEchoSubdomain ? (
+            <IHeartEchoRouter />
           ) : (
             <>
               <DemoModeBanner />

@@ -1,0 +1,9 @@
+{
+  "query": "INSERT INTO brandMemberships (userId, brand, tier, status, source, grantedAt)\nSELECT id, 'iheartecho', 'premium', 'active', \n  CASE WHEN premiumSource IS NOT NULL AND premiumSource != 'NULL' THEN premiumSource ELSE 'admin' END,\n  COALESCE(premiumGrantedAt, NOW())\nFROM users \nWHERE isPremium = true \n  OR id IN (SELECT userId FROM userRoles WHERE role = 'premium_user')\nON DUPLICATE KEY UPDATE tier = 'premium', status = 'active';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute INSERT INTO brandMemberships (userId, brand, tier, status, source, grantedAt)\nSELECT id, 'iheartecho', 'premium', 'active', \n  CASE WHEN premiumSource IS NOT NULL AND premiumSource != 'NULL' THEN premiumSource ELSE 'admin' END,\n  COALESCE(premiumGrantedAt, NOW())\nFROM users \nWHERE isPremium = true \n  OR id IN (SELECT userId FROM userRoles WHERE role = 'premium_user')\nON DUPLICATE KEY UPDATE tier = 'premium', status = 'active';",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 311
+}

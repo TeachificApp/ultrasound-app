@@ -1,0 +1,45 @@
+{
+  "query": "SELECT id, email, name FROM users WHERE (isPremium = true OR id IN (SELECT userId FROM userRoles WHERE role = 'premium_user')) AND id > 11883 ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT id, email, name FROM users WHERE (isPremium = true OR id IN (SELECT userId FROM userRoles WHERE role = 'premium_user')) AND id > 11883 ORDER BY id;",
+  "rows": [
+    {
+      "id": "11884",
+      "email": "j.ellis@pcpecho.com",
+      "name": "Jordan Ellis"
+    },
+    {
+      "id": "11893",
+      "email": "sarah.mitchell@demo.iheartecho.com",
+      "name": "Sarah Mitchell"
+    },
+    {
+      "id": "11895",
+      "email": "priya.nair@demo.iheartecho.com",
+      "name": "Priya Nair"
+    },
+    {
+      "id": "11897",
+      "email": "elena.vasquez@demo.iheartecho.com",
+      "name": "Elena Vasquez"
+    },
+    {
+      "id": "11899",
+      "email": "aisha.thompson@demo.iheartecho.com",
+      "name": "Aisha Thompson"
+    },
+    {
+      "id": "11901",
+      "email": "fatima.alrashid@demo.iheartecho.com",
+      "name": "Fatima Al-Rashid"
+    },
+    {
+      "id": "11903",
+      "email": "meiling.zhang@demo.iheartecho.com",
+      "name": "Mei-Ling Zhang"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\temail\tname\n11884\tj.ellis@pcpecho.com\tJordan Ellis\n11893\tsarah.mitchell@demo.iheartecho.com\tSarah Mitchell\n11895\tpriya.nair@demo.iheartecho.com\tPriya Nair\n11897\telena.vasquez@demo.iheartecho.com\tElena Vasquez\n11899\taisha.thompson@demo.iheartecho.com\tAisha Thompson\n11901\tfatima.alrashid@demo.iheartecho.com\tFatima Al-Rashid\n11903\tmeiling.zhang@demo.iheartecho.com\tMei-Ling Zhang\n",
+  "stderr": "",
+  "execution_time_ms": 272
+}

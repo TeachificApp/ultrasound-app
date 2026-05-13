@@ -1371,7 +1371,7 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add railway.toml deployment config
 - [x] Centralize domain into VITE_APP_URL env var
 - [ ] Replace hardcoded app.allaboutultrasound.com fallbacks with VITE_APP_URL
-- [ ] Fix manifest.json hardcoded URLs
+- [x] Fix manifest.json hardcoded URLs — dynamic server-side manifest per brand
 - [ ] Fix media invite link construction in mediaRepoRouter.ts
 - [ ] Clean up Manus-specific dev tooling for production build
 - [x] Document required Railway env vars
@@ -1627,3 +1627,35 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] DigitalDownloadsAdmin product editor: Settings tab (slug, SEO title/desc, visibility, file access expiry)
 - [ ] FunnelBuilder funnel editor: Settings tab (slug, SEO title/desc, custom redirect after checkout)
 - [ ] OrderBumpsAdmin: Settings tab (slug, display position, expiry date)
+
+## iHeartEcho Multi-Tenant Migration
+- [ ] Add brand infrastructure: brand detection middleware (server + client), brandMemberships table
+- [ ] Migrate iHeartEcho-only schema tables (soundBytes, userPoints, abTestEvents, menuLinkConfig, navigatorProtocolOverrides, uploadJobs, educatorTemplates, accreditationChecklist)
+- [ ] Migrate iHeartEcho inline server routers (accreditation, lab, strain, iqr, echoCorrelation, physicianPeerReview, notification, caseMix, cme, physicianOverRead, caseStudies, stats, demo, menuLinks)
+- [ ] Copy iHeartEcho page components into client/src/pages/iheartecho/ namespace
+- [ ] Create IHeartEchoLayout.tsx (sidebar nav, branding, role-based menu)
+- [ ] Create IHeartEchoApp shell with all iHeartEcho routes
+- [ ] Wire brand-aware App.tsx routing (subdomain detection → correct app shell)
+- [ ] Add iHeartEcho-specific Stripe products and premium gating (separate from AAUS premium)
+- [ ] Ensure shared auth: one login works across both subdomains
+- [x] PWA manifests: dynamic server-side manifest per brand (AAUS, iHeartEcho, combined AAUS|iHE)
+- [x] Brand-aware index.html meta tags (favicon, apple-touch-icon, theme-color, og:image, title)
+- [x] Brand-aware service worker with isolated cache per domain
+- [x] Brand-aware GetAppBanner (icon, name) for PWA install prompt
+## Brand Membership Backfill for Existing Premium Users
+- [x] Query all existing premium users (isPremium=true or premium_user role) and backfill brandMemberships records for iHeartEcho (27 users)
+- [x] Ensure iHeartEcho premium users (from Thinkific) also get iheartecho brandMembership records
+- [x] Add server-side auto-backfill logic so auth.me automatically creates brandMembership if user has legacy isPremium flag
+
+## Brand-Aware Email Sending
+- [x] Create brand email config: iheartecho.com → iHeartEcho sender; allaboutultrasound.com → AAUS sender; learn/member.allaboutultrasound.com → AAUS sender with combined "All About Ultrasound | iHeartEcho" branding
+- [x] Update sendEmail to accept optional brand parameter for sender override
+- [x] Update emailWrapper to render brand-specific header (logo, name, tagline, colors)
+- [x] Update magic link, password reset, email change, welcome templates with brand-aware copy
+- [x] Pass brand/ctx through auth procedures (magic link, password reset) to email builders
+
+## Combined Branding for learn/member Subdomains
+- [x] Update shared/brands.ts to add a "brandMode" concept: app-only (aaus/iheartecho) vs combined (learn/member)
+- [x] Update frontend header/sidebar to show "All About Ultrasound | iHeartEcho" on learn/member subdomains
+- [x] Update login page messaging for learn/member subdomains with combined branding
+- [x] Ensure platform admin works independently on each app (AAUS, iHeartEcho, learn/members) — already correct via separate routers with RoleGuard

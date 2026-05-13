@@ -22,6 +22,7 @@ import { ENV } from "../_core/env";
 import { publicProcedure, router } from "../_core/trpc";
 import { getDb, ensureUserRole, markThinkificEnrolled } from "../db";
 import { sendEmail, buildWelcomeEmail, buildVerificationEmail, buildPasswordResetEmail } from "../_core/email";
+import { type BrandMode, detectBrandMode } from "@shared/brands";
 import { enrollInFreeMembership } from "../thinkific";
 import { users } from "../../drizzle/schema";
 import { eq, or } from "drizzle-orm";
@@ -66,23 +67,23 @@ export type EmailPayload = {
   html: string;
 };
 
-async function sendVerificationEmail(to: string, token: string, name: string) {
+async function sendVerificationEmail(to: string, token: string, name: string, brandMode?: BrandMode) {
   const appUrl = process.env.VITE_APP_URL ?? "https://app.allaboutultrasound.com";
   const verificationUrl = `${appUrl}/verify-email?token=${token}`;
   const firstName = name || "there";
-  const { subject, htmlBody, previewText } = buildVerificationEmail({ firstName, verificationUrl });
-  const sent = await sendEmail({ to: { name: firstName, email: to }, subject, htmlBody, previewText });
+  const { subject, htmlBody, previewText } = buildVerificationEmail({ firstName, verificationUrl, brandMode });
+  const sent = await sendEmail({ to: { name: firstName, email: to }, subject, htmlBody, previewText, brandMode });
   if (!sent) {
     console.warn(`[EmailAuth] Verification email to ${to} could not be sent (SendGrid unavailable)`);
   }
 }
 
-async function sendPasswordResetEmail(to: string, token: string, name: string) {
+async function sendPasswordResetEmail(to: string, token: string, name: string, brandMode?: BrandMode) {
   const appUrl = process.env.VITE_APP_URL ?? "https://app.allaboutultrasound.com";
   const resetUrl = `${appUrl}/reset-password?token=${token}`;
   const firstName = name || "there";
-  const { subject, htmlBody, previewText } = buildPasswordResetEmail({ firstName, resetUrl });
-  const sent = await sendEmail({ to: { name: firstName, email: to }, subject, htmlBody, previewText });
+  const { subject, htmlBody, previewText } = buildPasswordResetEmail({ firstName, resetUrl, brandMode });
+  const sent = await sendEmail({ to: { name: firstName, email: to }, subject, htmlBody, previewText, brandMode });
   if (!sent) {
     console.warn(`[EmailAuth] Password reset email to ${to} could not be sent (SendGrid unavailable)`);
   }
@@ -141,19 +142,22 @@ export const emailAuthRouter = router({
               lastSignedIn: new Date(),
             })
             .where(eq(users.id, existingUser.id));
-          await sendVerificationEmail(email, verificationToken, input.firstName);
+          const brandMode = detectBrandMode(ctx.req.hostname || "");
+          await sendVerificationEmail(email, verificationToken, input.firstName, brandMode);
           // Send welcome email asynchronously (don't block activation)
           const appUrlActivate = process.env.VITE_APP_URL ?? "https://app.allaboutultrasound.com";
           const welcomeActivate = buildWelcomeEmail({
             firstName: input.firstName,
             loginUrl: `${appUrlActivate}/login`,
             roles: [],
+            brandMode,
           });
           sendEmail({
             to: { name: fullName, email },
             subject: welcomeActivate.subject,
             htmlBody: welcomeActivate.htmlBody,
             previewText: welcomeActivate.previewText,
+            brandMode,
           }).catch((err: unknown) => {
             console.error(`[EmailAuth] Failed to send welcome email to ${email}:`, err);
           });
@@ -203,7 +207,8 @@ export const emailAuthRouter = router({
       }
 
       // Send verification email
-      await sendVerificationEmail(email, verificationToken, input.firstName);
+      const brandModeReg = detectBrandMode(ctx.req.hostname || "");
+      await sendVerificationEmail(email, verificationToken, input.firstName, brandModeReg);
 
       // Send welcome email asynchronously (don't block registration)
       const appUrl = process.env.VITE_APP_URL ?? "https://app.allaboutultrasound.com";
@@ -211,12 +216,14 @@ export const emailAuthRouter = router({
         firstName: input.firstName,
         loginUrl: `${appUrl}/login`,
         roles: [],
+        brandMode: brandModeReg,
       });
       sendEmail({
         to: { name: fullName, email },
         subject: welcomePayload.subject,
         htmlBody: welcomePayload.htmlBody,
         previewText: welcomePayload.previewText,
+        brandMode: brandModeReg,
       }).catch((err: unknown) => {
         console.error(`[EmailAuth] Failed to send welcome email to ${email}:`, err);
       });
@@ -358,7 +365,8 @@ export const emailAuthRouter = router({
           .set({ emailVerificationToken: verificationToken, emailVerificationExpiry: verificationExpiry })
           .where(eq(users.id, user.id));
         const firstName = (user.name ?? "").split(" ")[0] ?? "there";
-        await sendVerificationEmail(email, verificationToken, firstName);
+        const bm = detectBrandMode(ctx.req.hostname || "");
+        await sendVerificationEmail(email, verificationToken, firstName, bm);
       }
 
       return { success: true };
@@ -392,7 +400,8 @@ export const emailAuthRouter = router({
           .set({ passwordResetToken: resetToken, passwordResetExpiry: resetExpiry })
           .where(eq(users.id, user.id));
         const firstName = (user.name ?? "").split(" ")[0] ?? "there";
-        await sendPasswordResetEmail(email, resetToken, firstName);
+        const bm = detectBrandMode(ctx.req.hostname || "");
+        await sendPasswordResetEmail(email, resetToken, firstName, bm);
       }
 
       return { success: true };

@@ -1,9 +1,12 @@
 /**
- * UltrasoundAssist™ Service Worker
+ * UltrasoundAssist™ / iHeartEcho Service Worker
  * Minimal SW required for PWA installability (beforeinstallprompt).
  * Caches the app shell for offline-capable home screen launch.
+ * Brand-aware: uses different cache names per domain so each PWA install is isolated.
  */
-const CACHE_NAME = "ultrasound-assist-v1";
+const host = self.location.hostname;
+const isIHE = host.indexOf("iheartecho") !== -1;
+const CACHE_NAME = isIHE ? "iheartecho-v1" : "ultrasound-assist-v1";
 const SHELL_URLS = ["/", "/manifest.json"];
 
 self.addEventListener("install", (event) => {

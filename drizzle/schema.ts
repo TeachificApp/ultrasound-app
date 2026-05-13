@@ -3314,3 +3314,234 @@ export const lmsQuizAttempts = mysqlTable("lms_quiz_attempts", {
 });
 export type LmsQuizAttempt = typeof lmsQuizAttempts.$inferSelect;
 export type InsertLmsQuizAttempt = typeof lmsQuizAttempts.$inferInsert;
+
+// ─── Brand Memberships (Multi-Tenant Premium) ────────────────────────────────
+// Tracks per-brand premium subscriptions. A user can have separate premium status
+// for AAUS (UltrasoundAssist) and iHeartEcho (EchoAssist).
+export const brandMemberships = mysqlTable("brandMemberships", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  brand: varchar("brand", { length: 32 }).notNull(), // "aaus" | "iheartecho"
+  tier: varchar("tier", { length: 32 }).notNull().default("free"), // "free" | "premium"
+  status: varchar("status", { length: 32 }).notNull().default("active"), // "active" | "cancelled" | "expired"
+  stripeCustomerId: varchar("stripeCustomerId", { length: 128 }),
+  stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 128 }),
+  grantedAt: timestamp("grantedAt").defaultNow().notNull(),
+  expiresAt: timestamp("expiresAt"),
+  source: varchar("source", { length: 64 }), // "stripe" | "admin" | "thinkific" | "promo"
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type BrandMembership = typeof brandMemberships.$inferSelect;
+export type InsertBrandMembership = typeof brandMemberships.$inferInsert;
+
+// ─── Leaderboard & Points ─────────────────────────────────────────────────────
+export const userPointsLog = mysqlTable("userPointsLog", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  points: int("points").notNull(),
+  activityType: mysqlEnum("activityType", [
+    "daily_challenge_correct",
+    "daily_challenge_streak",
+    "case_submission",
+    "case_approved",
+    "flashcard_session",
+    "flashcard_card_viewed",
+    "admin_adjustment",
+  ]).notNull(),
+  referenceId: int("referenceId"),
+  referenceType: varchar("referenceType", { length: 64 }),
+  note: text("note"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type UserPointsLog = typeof userPointsLog.$inferSelect;
+export type InsertUserPointsLog = typeof userPointsLog.$inferInsert;
+
+export const userPointsTotals = mysqlTable("userPointsTotals", {
+  userId: int("userId").primaryKey(),
+  totalPoints: int("totalPoints").default(0).notNull(),
+  challengePoints: int("challengePoints").default(0).notNull(),
+  casePoints: int("casePoints").default(0).notNull(),
+  flashcardPoints: int("flashcardPoints").default(0).notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type UserPointsTotals = typeof userPointsTotals.$inferSelect;
+
+// ─── Accreditation Navigator Checklist ────────────────────────────────────────
+export const accreditationChecklist = mysqlTable("accreditationChecklist", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  accreditationType: varchar("accreditationType", { length: 32 }).notNull(),
+  sectionKey: varchar("sectionKey", { length: 128 }).notNull(),
+  checked: boolean("checked").default(false).notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type AccreditationChecklist = typeof accreditationChecklist.$inferSelect;
+export type InsertAccreditationChecklist = typeof accreditationChecklist.$inferInsert;
+
+// ─── SoundBytes Micro-Lessons ─────────────────────────────────────────────────
+export const soundBytes = mysqlTable("soundBytes", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  body: longtext("body"),
+  videoUrl: text("videoUrl").notNull(),
+  thumbnailUrl: text("thumbnailUrl"),
+  category: mysqlEnum("category", [
+    "acs", "adult_echo", "pediatric_echo", "fetal_echo", "pocus", "physics", "ecg",
+  ]).notNull(),
+  status: mysqlEnum("status", ["draft", "published"]).default("draft").notNull(),
+  sortOrder: int("sortOrder").default(0).notNull(),
+  displayViews: int("displayViews").default(0).notNull(),
+  createdByUserId: int("createdByUserId"),
+  publishedAt: timestamp("publishedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type SoundByte = typeof soundBytes.$inferSelect;
+export type InsertSoundByte = typeof soundBytes.$inferInsert;
+
+export const soundByteViews = mysqlTable("soundByteViews", {
+  id: int("id").autoincrement().primaryKey(),
+  soundByteId: int("soundByteId").notNull(),
+  userId: int("userId"),
+  watchedSeconds: int("watchedSeconds").default(0).notNull(),
+  completed: boolean("completed").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type SoundByteView = typeof soundByteViews.$inferSelect;
+export type InsertSoundByteView = typeof soundByteViews.$inferInsert;
+
+export const soundByteDiscussions = mysqlTable("soundByteDiscussions", {
+  id: int("id").autoincrement().primaryKey(),
+  soundByteId: int("soundByteId").notNull(),
+  userId: int("userId").notNull(),
+  body: text("body").notNull(),
+  status: mysqlEnum("status", ["pending", "approved", "rejected"]).notNull().default("pending"),
+  createdAt: bigint("createdAt", { mode: "number" }).notNull(),
+  updatedAt: bigint("updatedAt", { mode: "number" }).notNull(),
+});
+export type SoundByteDiscussion = typeof soundByteDiscussions.$inferSelect;
+export type InsertSoundByteDiscussion = typeof soundByteDiscussions.$inferInsert;
+
+export const soundByteDiscussionReplies = mysqlTable("soundByteDiscussionReplies", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  discussionId: int("discussionId").notNull(),
+  userId: int("userId").notNull(),
+  userName: varchar("userName", { length: 255 }).notNull(),
+  body: text("body").notNull(),
+  createdAt: bigint("createdAt", { mode: "number" }).notNull(),
+});
+export type SoundByteDiscussionReply = typeof soundByteDiscussionReplies.$inferSelect;
+export type InsertSoundByteDiscussionReply = typeof soundByteDiscussionReplies.$inferInsert;
+
+// ─── A/B Test Events ──────────────────────────────────────────────────────────
+export const abTestEvents = mysqlTable("abTestEvents", {
+  id: int("id").autoincrement().primaryKey(),
+  testId: varchar("testId", { length: 64 }).notNull(),
+  variant: varchar("variant", { length: 16 }).notNull(),
+  event: mysqlEnum("event", ["impression", "click"]).notNull(),
+  userId: int("userId"),
+  sessionId: varchar("sessionId", { length: 64 }),
+  meta: text("meta"),
+  createdAt: bigint("createdAt", { mode: "number" }).notNull(),
+});
+export type AbTestEvent = typeof abTestEvents.$inferSelect;
+export type InsertAbTestEvent = typeof abTestEvents.$inferInsert;
+
+// ─── Menu Link Config ─────────────────────────────────────────────────────────
+export const menuLinkConfig = mysqlTable("menuLinkConfig", {
+  key: varchar("key", { length: 64 }).primaryKey(),
+  url: text("url").notNull(),
+  label: varchar("label", { length: 128 }).notNull(),
+  updatedByUserId: int("updatedByUserId"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type MenuLinkConfig = typeof menuLinkConfig.$inferSelect;
+export type InsertMenuLinkConfig = typeof menuLinkConfig.$inferInsert;
+
+// ─── Navigator Protocol Overrides ─────────────────────────────────────────────
+export const navigatorProtocolOverrides = mysqlTable("navigatorProtocolOverrides", {
+  id: int("id").autoincrement().primaryKey(),
+  module: varchar("module", { length: 64 }).notNull(),
+  sectionId: varchar("sectionId", { length: 128 }).notNull(),
+  sectionTitle: varchar("sectionTitle", { length: 256 }).notNull(),
+  probeNote: text("probeNote"),
+  items: text("items").notNull(),
+  sortOrder: int("sortOrder").notNull().default(0),
+  updatedByUserId: int("updatedByUserId"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type NavigatorProtocolOverride = typeof navigatorProtocolOverrides.$inferSelect;
+export type InsertNavigatorProtocolOverride = typeof navigatorProtocolOverrides.$inferInsert;
+
+// ─── Media Access Rules (iHeartEcho) ──────────────────────────────────────────
+export const mediaAccessRules = mysqlTable("mediaAccessRules", {
+  id: int("id").autoincrement().primaryKey(),
+  assetId: int("assetId").notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  accessToken: varchar("accessToken", { length: 128 }).notNull(),
+  grantedByUserId: int("grantedByUserId").notNull(),
+  expiresAt: timestamp("expiresAt"),
+  revokedAt: timestamp("revokedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type MediaAccessRule = typeof mediaAccessRules.$inferSelect;
+export type InsertMediaAccessRule = typeof mediaAccessRules.$inferInsert;
+
+export const mediaAccessLogs = mysqlTable("mediaAccessLogs", {
+  id: int("id").autoincrement().primaryKey(),
+  assetId: int("assetId").notNull(),
+  versionId: int("versionId"),
+  accessType: mysqlEnum("accessType", ["serve", "embed"]).notNull(),
+  accessRuleId: int("accessRuleId"),
+  userId: int("userId"),
+  ipAddress: varchar("ipAddress", { length: 64 }),
+  userAgent: text("userAgent"),
+  referer: text("referer"),
+  accessedAt: timestamp("accessedAt").defaultNow().notNull(),
+});
+export type MediaAccessLog = typeof mediaAccessLogs.$inferSelect;
+export type InsertMediaAccessLog = typeof mediaAccessLogs.$inferInsert;
+
+// ─── Upload Jobs (async chunked upload assembly) ──────────────────────────────
+export const uploadJobs = mysqlTable("uploadJobs", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  status: mysqlEnum("status", ["pending", "processing", "done", "error"]).default("pending").notNull(),
+  resultUrl: text("resultUrl"),
+  resultFileKey: text("resultFileKey"),
+  resultFileName: text("resultFileName"),
+  resultMimeType: text("resultMimeType"),
+  resultSizeBytes: bigint("resultSizeBytes", { mode: "number" }),
+  errorMessage: text("errorMessage"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type UploadJob = typeof uploadJobs.$inferSelect;
+export type InsertUploadJob = typeof uploadJobs.$inferInsert;
+
+// ─── Educator Templates ───────────────────────────────────────────────────────
+export const educatorTemplates = mysqlTable("educatorTemplates", {
+  id: int("id").autoincrement().primaryKey(),
+  uploadedByUserId: int("uploadedByUserId").notNull(),
+  title: varchar("title", { length: 300 }).notNull(),
+  description: text("description"),
+  ardmsCategory: mysqlEnum("ardmsCategory", ["Adult Echo", "Pediatric Echo", "Fetal Echo", "General Ultrasound", "Vascular Ultrasound", "General"]).notNull().default("Adult Echo"),
+  contentType: mysqlEnum("contentType", ["presentation", "quiz", "flashcard_deck", "case_study", "protocol_guide", "study_guide"]).notNull().default("presentation"),
+  fileUrl: text("fileUrl"),
+  fileKey: text("fileKey"),
+  mimeType: varchar("mimeType", { length: 100 }),
+  slidesData: longtext("slidesData"),
+  contentData: longtext("contentData"),
+  coverImageUrl: text("coverImageUrl"),
+  tags: text("tags"),
+  estimatedMinutes: int("estimatedMinutes"),
+  viewCount: int("viewCount").default(0).notNull(),
+  isPublished: boolean("isPublished").default(false).notNull(),
+  isViewOnly: boolean("isViewOnly").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type EducatorTemplate = typeof educatorTemplates.$inferSelect;
+export type InsertEducatorTemplate = typeof educatorTemplates.$inferInsert;

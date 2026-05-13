@@ -2,7 +2,11 @@
  * SendGrid transactional email helper
  * API: POST https://api.sendgrid.com/v3/mail/send
  * Auth: Authorization: Bearer <SENDGRID_API_KEY>
+ *
+ * Brand-aware: pass brandMode to use brand-specific sender and templates.
  */
+
+import { type BrandMode, getBrandDisplayConfig } from "@shared/brands";
 
 const SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send";
 
@@ -16,15 +20,19 @@ interface SendEmailOptions {
   subject: string;
   htmlBody: string;
   previewText?: string;
+  /** Brand mode for sender override. Defaults to "aaus" if not provided. */
+  brandMode?: BrandMode;
 }
 
 export async function sendEmail(opts: SendEmailOptions): Promise<boolean> {
   const apiKey = process.env.SENDGRID_API_KEY;
-  const senderEmail = process.env.SENDGRID_FROM_EMAIL || "noreply@allaboutultrasound.com";
-  const senderName = process.env.SENDGRID_FROM_NAME || "All About Ultrasound™";
+  const brandConfig = getBrandDisplayConfig(opts.brandMode || "aaus");
+  // Use brand-specific sender, but allow env override for verified domain constraints
+  const senderEmail = process.env.SENDGRID_FROM_EMAIL || brandConfig.senderEmail;
+  const senderName = brandConfig.senderName;
 
   if (!apiKey) {
-    console.warn("[email] SENDGRID_API_KEY not set — skipping email send");
+    console.warn("[email] SENDGRID_API_KEY not set \u2014 skipping email send");
     return false;
   }
 
@@ -65,7 +73,7 @@ export async function sendEmail(opts: SendEmailOptions): Promise<boolean> {
       return false;
     }
 
-    console.log(`[email] Sent "${opts.subject}" to ${opts.to.email}`);
+    console.log(`[email] Sent "${opts.subject}" to ${opts.to.email} [brand=${opts.brandMode || "aaus"}]`);
     return true;
   } catch (err) {
     console.error("[email] Failed to send email:", err);
@@ -73,12 +81,19 @@ export async function sendEmail(opts: SendEmailOptions): Promise<boolean> {
   }
 }
 
-// ─── Email Templates ──────────────────────────────────────────────────────────
+// \u2500\u2500\u2500 Email Templates \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
 const brandColor = "#189aa1";
 const brandDark = "#0e1e2e";
 
-function emailWrapper(content: string): string {
+/** Brand-aware email wrapper. Pass brandMode to customize header/footer. */
+export function emailWrapper(content: string, brandMode?: BrandMode): string {
+  const bc = getBrandDisplayConfig(brandMode || "aaus");
+  // For combined mode, show both logos side by side
+  const logoHtml = bc.brandMode === "combined"
+    ? `<img src="${bc.logoUrl}" alt="All About Ultrasound" width="60" height="60" style="border-radius:50%;display:inline-block;margin:0 6px 12px;" /><img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/iheartecho_logo_ring_01cc7ccd.webp" alt="iHeartEcho" width="60" height="60" style="border-radius:50%;display:inline-block;margin:0 6px 12px;" />`
+    : `<img src="${bc.logoUrl}" alt="${bc.displayName}" width="80" height="80" style="border-radius:50%;display:block;margin:0 auto 12px;" />`;
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -86,7 +101,7 @@ function emailWrapper(content: string): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="x-apple-disable-message-reformatting" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-  <title>All About Ultrasound™</title>
+  <title>${bc.displayName}</title>
 </head>
 <body style="margin:0;padding:0;background:#f0fbfc;font-family:Arial,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0fbfc;padding:32px 16px;">
@@ -95,12 +110,10 @@ function emailWrapper(content: string): string {
         <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
           <!-- Header -->
           <tr>
-            <td style="background:linear-gradient(135deg,${brandDark} 0%,#0e4a50 60%,${brandColor} 100%);padding:28px 32px;text-align:center;">
-              <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp"
-                alt="All About Ultrasound™" width="80" height="80"
-                style="border-radius:50%;display:block;margin:0 auto 12px;" />
-              <div style="font-size:22px;font-weight:700;color:#ffffff;font-family:Georgia,serif;">All About Ultrasound™</div>
-              <div style="font-size:12px;color:#4ad9e0;margin-top:4px;">General & Vascular Ultrasound Clinical Intelligence</div>
+            <td style="background:linear-gradient(135deg,${bc.darkColor} 0%,#0e4a50 60%,${bc.primaryColor} 100%);padding:28px 32px;text-align:center;">
+              ${logoHtml}
+              <div style="font-size:22px;font-weight:700;color:#ffffff;font-family:Georgia,serif;">${bc.displayName}</div>
+              <div style="font-size:12px;color:${bc.accentColor};margin-top:4px;">${bc.tagline}</div>
             </td>
           </tr>
           <!-- Body -->
@@ -113,10 +126,10 @@ function emailWrapper(content: string): string {
           <tr>
             <td style="background:#f8fffe;border-top:1px solid #e5f7f8;padding:20px 32px;text-align:center;">
               <p style="margin:0;font-size:12px;color:#94a3b8;">
-                © All About Ultrasound™ · <a href="https://www.allaboutultrasound.com" style="color:${brandColor};text-decoration:none;" target="_blank" rel="noopener noreferrer">www.allaboutultrasound.com</a>
+                \u00a9 ${bc.displayName} \u00b7 <a href="${bc.websiteUrl}" style="color:${bc.primaryColor};text-decoration:none;" target="_blank" rel="noopener noreferrer">${bc.websiteUrl.replace("https://", "")}</a>
               </p>
               <p style="margin:8px 0 0;font-size:11px;color:#cbd5e1;">
-                You received this email because an account was created for you on All About Ultrasound™.
+                You received this email because an account was created for you on ${bc.displayName}.
               </p>
             </td>
           </tr>
@@ -177,12 +190,14 @@ export function buildStreakReminderEmail(opts: {
 export function buildVerificationEmail(opts: {
   firstName: string;
   verificationUrl: string;
+  brandMode?: BrandMode;
 }): { subject: string; htmlBody: string; previewText: string } {
-  const subject = "Verify your All About Ultrasound™ account";
-  const previewText = "Click to verify your email and activate your account";
+  const bc = getBrandDisplayConfig(opts.brandMode || "aaus");
+  const subject = `Verify your ${bc.displayName} account`;
+  const previewText = `Click to verify your email and activate your ${bc.displayName} account`;
   const htmlBody = emailWrapper(`
     <h2 style="margin:0 0 8px;font-size:20px;color:${brandDark};font-family:Georgia,serif;">
-      Welcome to All About Ultrasound™, ${opts.firstName}!
+      Welcome to ${bc.displayName}, ${opts.firstName}!
     </h2>
     <p style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.6;">
       Thank you for registering. Please verify your email address to activate your account and access all clinical tools.
@@ -207,16 +222,17 @@ export function buildVerificationEmail(opts: {
 export function buildPasswordResetEmail(opts: {
   firstName: string;
   resetUrl: string;
+  brandMode?: BrandMode;
 }): { subject: string; htmlBody: string; previewText: string } {
-  const subject = "Reset your All About Ultrasound™ password";
-  const previewText = "Click to reset your password — link expires in 1 hour";
+  const bc = getBrandDisplayConfig(opts.brandMode || "aaus");
+  const subject = `Reset your ${bc.displayName} password`;
+  const previewText = "Click to reset your password \u2014 link expires in 1 hour";
   const htmlBody = emailWrapper(`
     <h2 style="margin:0 0 8px;font-size:20px;color:${brandDark};font-family:Georgia,serif;">
       Password Reset Request
     </h2>
     <p style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.6;">
-      Hi ${opts.firstName}, we received a request to reset your All About Ultrasound™ password.
-      Click the button below to choose a new password.
+      Hi ${opts.firstName}, we received a request to reset your ${bc.displayName} password.  Click the button below to choose a new password.
     </p>
     <div style="text-align:center;margin:28px 0;">
       <a href="${opts.resetUrl}"
@@ -239,16 +255,17 @@ export function buildEmailChangeVerificationEmail(opts: {
   firstName: string;
   newEmail: string;
   verificationUrl: string;
+  brandMode?: BrandMode;
 }): { subject: string; htmlBody: string; previewText: string } {
-  const subject = "Confirm your new email address — All About Ultrasound™";
-  const previewText = "Click to confirm your new email address for All About Ultrasound™";
+  const bc = getBrandDisplayConfig(opts.brandMode || "aaus");
+  const subject = `Confirm your new email address \u2014 ${bc.displayName}`;
+  const previewText = `Click to confirm your new email address for ${bc.displayName}`;
   const htmlBody = emailWrapper(`
     <h2 style="margin:0 0 8px;font-size:20px;color:${brandDark};font-family:Georgia,serif;">
       Confirm Your New Email Address
     </h2>
     <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
-      Hi ${opts.firstName}, you recently requested to change your All About Ultrasound™ email address to:
-    </p>
+      Hi ${opts.firstName}, you recently requested to change your ${bc.displayName} email address to:   </p>
     <div style="background:#f0fbfc;border-left:3px solid ${brandColor};padding:12px 16px;border-radius:0 8px 8px 0;margin:0 0 20px;">
       <p style="margin:0;font-size:15px;font-weight:700;color:${brandColor};">${opts.newEmail}</p>
     </div>
@@ -275,12 +292,14 @@ export function buildEmailChangeVerificationEmail(opts: {
 export function buildMagicLinkEmail(opts: {
   firstName: string;
   magicUrl: string;
+  brandMode?: BrandMode;
 }): { subject: string; htmlBody: string; previewText: string } {
-  const subject = "Your All About Ultrasound™ sign-in link";
-  const previewText = "Click to sign in to All About Ultrasound™ — link expires in 15 minutes";
+  const bc = getBrandDisplayConfig(opts.brandMode || "aaus");
+  const subject = `Your ${bc.displayName} sign-in link`;
+  const previewText = `Click to sign in to ${bc.displayName} \u2014 link expires in 15 minutes`;
   const htmlBody = emailWrapper(`
     <h2 style="margin:0 0 8px;font-size:20px;color:${brandDark};font-family:Georgia,serif;">
-      Sign in to All About Ultrasound™
+      Sign in to ${bc.displayName}
     </h2>
     <p style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.6;">
       Hi ${opts.firstName}, click the button below to sign in instantly — no password needed.
@@ -288,7 +307,7 @@ export function buildMagicLinkEmail(opts: {
     <div style="text-align:center;margin:28px 0;">
       <a href="${opts.magicUrl}"
         style="display:inline-block;background:linear-gradient(135deg,${brandColor},#4ad9e0);color:#ffffff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;" target="_blank" rel="noopener noreferrer">
-        Sign In to All About Ultrasound™
+        Sign In to ${bc.displayName}
       </a>
     </div>
     <div style="background:#fff8ed;border-left:3px solid #f59e0b;padding:12px 16px;border-radius:0 8px 8px 0;margin:0 0 20px;">
@@ -442,9 +461,11 @@ export function buildWelcomeEmail(opts: {
   firstName: string;
   loginUrl: string;
   roles: string[];
+  brandMode?: BrandMode;
 }): { subject: string; htmlBody: string; previewText: string } {
-  const subject = "Your All About Ultrasound™ account is ready";
-  const previewText = "Your account has been set up — sign in to get started";
+  const bc = getBrandDisplayConfig(opts.brandMode || "aaus");
+  const subject = `Your ${bc.displayName} account is ready`;
+  const previewText = `Your account has been set up — sign in to get started`;
   const roleLabels: Record<string, string> = {
     premium_user: "Premium Access",
     diy_user: "DIY Accreditation",
@@ -458,10 +479,10 @@ export function buildWelcomeEmail(opts: {
 
   const htmlBody = emailWrapper(`
     <h2 style="margin:0 0 8px;font-size:20px;color:${brandDark};font-family:Georgia,serif;">
-      Welcome to All About Ultrasound™, ${opts.firstName}!
+      Welcome to ${bc.displayName}, ${opts.firstName}!
     </h2>
     <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
-      Your account has been set up by an administrator. You now have access to the All About Ultrasound™ clinical platform.
+      Your account has been set up by an administrator. You now have access to the ${bc.displayName} clinical platform.
     </p>
     ${roleList ? `
     <div style="background:#f0fbfc;border-left:3px solid ${brandColor};padding:12px 16px;border-radius:0 8px 8px 0;margin:0 0 20px;">
@@ -473,12 +494,12 @@ export function buildWelcomeEmail(opts: {
     <div style="text-align:center;margin:28px 0;">
       <a href="${opts.loginUrl}"
         style="display:inline-block;background:linear-gradient(135deg,${brandColor},#4ad9e0);color:#ffffff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;" target="_blank" rel="noopener noreferrer">
-        Sign In to All About Ultrasound™
+        Sign In to ${bc.displayName}
       </a>
     </div>
     <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.5;">
       If you have any questions, please contact us at
-      <a href="mailto:support@allaboutultrasound.com" style="color:${brandColor};" target="_blank" rel="noopener noreferrer">support@allaboutultrasound.com</a>.
+      <a href="mailto:${bc.supportEmail}" style="color:${brandColor};" target="_blank" rel="noopener noreferrer">${bc.supportEmail}</a>.
     </p>
   `);
   return { subject, htmlBody, previewText };

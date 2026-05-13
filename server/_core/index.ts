@@ -21,6 +21,7 @@ import { registerUploadSocialImageRoute } from "../routes/uploadSocialImage";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { detectBrandFromHostname, detectBrandMode } from "../../shared/brands";
 import { startChallengeCron } from "../jobs/challengeCron";
 import { startMediaPurgeCron } from "../jobs/mediaPurgeCron";
 import { startEmailCampaignScheduler } from "../routers/emailCampaignRouter";
@@ -57,6 +58,72 @@ async function startServer() {
   // No body-parser limit for chunked media uploads — multer handles streaming directly
   app.use(express.json({ limit: "100mb" }));
   app.use(express.urlencoded({ limit: "100mb", extended: true }));
+  // ── Dynamic PWA manifest (brand-aware) ─────────────────────────────────────
+  app.get("/manifest.json", (req, res) => {
+    const hostname = req.hostname || req.headers.host?.split(":")[0] || "";
+    const brand = detectBrandFromHostname(hostname);
+    const brandMode = detectBrandMode(hostname);
+
+    const AAUS_MANIFEST = {
+      id: "https://app.allaboutultrasound.com/",
+      name: "UltrasoundAssist\u2122",
+      short_name: "UltrasoundAssist",
+      description: "General & Vascular Ultrasound Clinical Intelligence \u2014 real-time ultrasound interpretation and measurement assistant for sonographers, radiologists, OB/Gyn, vascular surgeons, and ultrasound educators from All About Ultrasound\u2122.",
+      start_url: "/",
+      scope: "/",
+      display: "standalone" as const,
+      background_color: "#189aa1",
+      theme_color: "#189aa1",
+      orientation: "portrait-primary" as const,
+      icons: [
+        { src: "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_icon_192_teal_f0c966ce.png", sizes: "192x192", type: "image/png", purpose: "any" },
+        { src: "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_icon_512_teal_840494a6.png", sizes: "512x512", type: "image/png", purpose: "any maskable" },
+      ],
+      categories: ["medical", "health", "education"],
+      lang: "en-US",
+    };
+
+    const IHE_MANIFEST = {
+      id: "https://app.iheartecho.com/",
+      name: "iHeartEcho",
+      short_name: "iHeartEcho",
+      description: "Echocardiography Clinical Intelligence \u2014 real-time echo interpretation and measurement assistant for cardiac ultrasound students, sonographers, echocardiographers, cardiologists, physicians, residents, ACS professionals, and echo educators.",
+      start_url: "/",
+      scope: "/",
+      display: "standalone" as const,
+      background_color: "#0e1e2e",
+      theme_color: "#189aa1",
+      orientation: "portrait-primary" as const,
+      icons: [
+        { src: "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/icon-192_df958e9b.png", sizes: "192x192", type: "image/png", purpose: "any" },
+        { src: "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/icon-512_79ee0572.png", sizes: "512x512", type: "image/png", purpose: "any maskable" },
+      ],
+      categories: ["medical", "health", "education"],
+      lang: "en-US",
+    };
+
+    const COMBINED_MANIFEST = {
+      ...AAUS_MANIFEST,
+      id: "https://members.allaboutultrasound.com/",
+      name: "All About Ultrasound | iHeartEcho",
+      short_name: "AAUS | iHE",
+      description: "General, Vascular & Cardiac Ultrasound Clinical Intelligence \u2014 learning platform for sonographers, physicians, and ultrasound educators.",
+    };
+
+    let manifest;
+    if (brand === "iheartecho") {
+      manifest = IHE_MANIFEST;
+    } else if (brandMode === "combined") {
+      manifest = COMBINED_MANIFEST;
+    } else {
+      manifest = AAUS_MANIFEST;
+    }
+
+    res.setHeader("Content-Type", "application/manifest+json");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.json(manifest);
+  });
+
   // Temporary debug endpoint to diagnose Railway DB connection
   app.get("/api/debug/db-status", async (_req, res) => {
     const { getDb } = await import("../db");

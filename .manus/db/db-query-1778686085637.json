@@ -1,0 +1,17 @@
+{
+  "query": "SELECT u.id, u.email, u.name, u.isPremium, u.premiumSource FROM users u INNER JOIN userRoles ur ON u.id = ur.userId WHERE ur.role = 'premium_user' ORDER BY u.id LIMIT 30;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT u.id, u.email, u.name, u.isPremium, u.premiumSource FROM users u INNER JOIN userRoles ur ON u.id = ur.userId WHERE ur.role = 'premium_user' ORDER BY u.id LIMIT 30;",
+  "rows": [
+    {
+      "id": "1",
+      "email": "larawilliams0501@gmail.com",
+      "name": "larawilliams0501",
+      "isPremium": "0",
+      "premiumSource": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\temail\tname\tisPremium\tpremiumSource\n1\tlarawilliams0501@gmail.com\tlarawilliams0501\t0\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 271
+}

@@ -1,999 +1,2914 @@
 /**
  * scanCoachStaticContent.ts
- * Pre-computed static content for all general/vascular ScanCoach modules.
- * Used by the ScanCoach Editor to pre-populate text fields when no DB override exists.
- * Auto-generated from the static ScanCoach page data.
+ *
+ * Static text content for all ScanCoach views, keyed by "module:viewId".
+ * Used by the ScanCoach editor to pre-populate fields when no DB override
+ * exists yet — so admins can see and edit the current default content.
+ *
+ * Only text fields are stored here (description, howToGet, tips, pitfalls,
+ * structures, measurements, criticalFindings). Image URLs and SVG probe
+ * diagrams remain in the original ScanCoach page files.
  */
 
-export interface ScanCoachStaticViewContent {
-  description: string;
-  howToGet: string;
-  tips: string;
-  pitfalls: string;
+export interface StaticViewContent {
+  description?: string;
+  probePosition?: string;
+  howToGet?: string[];
+  structures?: string[];
+  tips?: string[];
+  pitfalls?: string[];
+  measurements?: string[];
+  criticalFindings?: string[];
 }
 
-export type ScanCoachStaticContent = Record<string, Record<string, ScanCoachStaticViewContent>>;
+/** Map key: "${module}:${viewId}" */
+const STATIC_CONTENT: Record<string, StaticViewContent> = {
+  // ─── Adult TTE ──────────────────────────────────────────────────────────────
+  "tte:plax": {
+    description: "The standard starting view for a TTE exam. Obtained from the left parasternal window with the probe in the 3rd–4th intercostal space, left sternal border. The long axis of the heart is displayed with the aortic root on the right and the LV apex pointing to the left.",
+    structures: ["Aortic valve", "Mitral valve", "LV", "LA", "LVOT", "Descending aorta (posterior)"],
+    howToGet: ["Position probe at 3rd–4th ICS, left sternal border", "Marker dot toward right shoulder (2 o'clock)", "Tilt probe to open up LVOT — IVS should be horizontal", "Adjust depth to include descending aorta posteriorly"],
+    tips: ["Tilt probe to open up LVOT — IVS should be horizontal", "Descending aorta posterior to MV confirms true PLAX"],
+    pitfalls: ["Foreshortening underestimates LV size", "Descending aorta mistaken for LA"],
+    measurements: ["LVID (d/s)", "IVS (d)", "PW (d)", "Ao root", "LA diameter", "LVOT diameter"],
+  },
+  "tte:psax_av": {
+    description: "Obtained by rotating the probe 90° clockwise from PLAX. Shows the aortic valve in cross-section ('Mercedes-Benz' sign for tricuspid AV), RVOT, pulmonary valve, and interatrial septum.",
+    structures: ["Aortic valve (3 cusps)", "RVOT", "Pulmonary valve", "LA", "RA", "Tricuspid valve", "Interatrial septum"],
+    howToGet: ["From PLAX, rotate probe 90° clockwise", "Marker dot toward left shoulder", "Tilt slightly to bring AV into circular cross-section"],
+    tips: ["'Mercedes-Benz' sign = normal tricuspid AV", "Bicuspid AV: 2 cusps, fish-mouth opening", "Assess for ASD at this level"],
+    pitfalls: ["Bicuspid AV may appear tricuspid if not fully open", "RVOT foreshortening"],
+    measurements: ["RVOT diameter", "Pulmonary valve annulus", "AV planimetry (AVA)"],
+  },
+  "tte:psax_mv": {
+    description: "Obtained by tilting the probe slightly inferiorly from PSAX AV level. Shows the mitral valve in cross-section ('fish-mouth' appearance). Used for MV planimetry in mitral stenosis and regional wall motion assessment.",
+    structures: ["Mitral valve (fish-mouth)", "LV (circular)", "Papillary muscles"],
+    howToGet: ["From PSAX AV, tilt probe inferiorly", "Mitral valve should appear as 'fish-mouth' opening", "Both leaflets should open symmetrically"],
+    tips: ["Fish-mouth opening of MV — both leaflets should open symmetrically", "Identify A1/A2/A3 and P1/P2/P3 scallops for MR localization", "Planimetry of MVA in mitral stenosis"],
+    pitfalls: ["Oblique cut gives oval LV — reposition for true circle", "Papillary muscle level vs MV level"],
+    measurements: ["MVA planimetry", "LV short-axis dimensions"],
+  },
+  "tte:psax_pm": {
+    description: "Obtained by tilting the probe further inferiorly from PSAX MV level. Shows both papillary muscles and 6 LV wall segments. Best view for regional wall motion assessment.",
+    structures: ["LV (circular)", "Anterolateral papillary muscle", "Posteromedial papillary muscle"],
+    howToGet: ["From PSAX MV, tilt probe further inferiorly", "Both papillary muscles should be visible", "LV should appear circular"],
+    tips: ["Best level for regional wall motion assessment (6 segments visible)", "Anterolateral PM: LAD + LCx territory; Posteromedial PM: RCA territory", "Compare systolic thickening anterior vs inferior walls for ischemia"],
+    pitfalls: ["Foreshortening makes LV appear oval", "Near-field artifact from ribs"],
+    measurements: ["LV EF (visual)", "Wall motion score"],
+  },
+  "tte:a4c": {
+    description: "The most comprehensive single view in TTE. Obtained from the cardiac apex with the probe marker pointing toward the left shoulder. Shows all four chambers, both AV valves, and the IVS simultaneously.",
+    structures: ["LV", "RV", "LA", "RA", "Mitral valve", "Tricuspid valve", "Interatrial septum", "IVS"],
+    howToGet: ["Position probe at cardiac apex (5th ICS, MCL)", "Marker dot toward left shoulder (3 o'clock)", "Rotate patient to left lateral decubitus", "Apex must be at TOP of image"],
+    tips: ["Apex must be at TOP of image — rotate patient to left lateral decubitus", "Foreshortening: LV appears round — move probe laterally and/or use lower ICS", "RV should be smaller than LV; RV:LV ratio >0.6 suggests RV dilation"],
+    pitfalls: ["Foreshortening is the most common error", "Apex not at top → incorrect volumes"],
+    measurements: ["LV volumes (biplane Simpson)", "EF", "GLS", "E, A, DT", "e' septal/lateral", "TAPSE", "RV FAC"],
+  },
+  "tte:a5c": {
+    description: "Obtained by tilting the probe anteriorly from A4C. Brings the LVOT and aortic valve into view. Essential for LVOT VTI measurement and aortic valve assessment.",
+    structures: ["LV", "RV", "LA", "RA", "LVOT", "Aortic valve", "Mitral valve", "Tricuspid valve"],
+    howToGet: ["From A4C, tilt probe anteriorly (toward sternum)", "LVOT and AV come into view between the two ventricles", "Align PW Doppler cursor parallel to LVOT flow"],
+    tips: ["Tilt probe anteriorly from A4C until LVOT and AV come into view", "Ideal for PW Doppler in LVOT — align cursor parallel to LVOT flow", "CW through AV for peak and mean gradients", "Color Doppler to assess AR and AS"],
+    pitfalls: ["Over-tilting anteriorly loses the 4-chamber view — find the balance", "Underalignment of Doppler cursor underestimates VTI"],
+    measurements: ["LVOT VTI", "AV peak/mean gradient", "AVA (continuity equation)"],
+  },
+  "tte:a2c": {
+    description: "Obtained by rotating the probe ~60° counterclockwise from A4C. Shows only the LV and LA (no RV). Provides the anterior and inferior LV walls for biplane EF calculation.",
+    structures: ["LV (anterior and inferior walls)", "LA", "Mitral valve", "LAA"],
+    howToGet: ["From A4C, rotate probe ~60° counterclockwise", "RV should disappear — only LV and LA visible", "Anterior wall at top, inferior wall at bottom"],
+    tips: ["Rotate CCW from A4C until RV disappears — only LV and LA visible", "Anterior wall (top) and inferior wall (bottom) in this view", "LAA best seen with slight posterior tilt"],
+    pitfalls: ["Oblique cut includes RV — rotate further CCW", "Inferior wall foreshortening"],
+    measurements: ["LV volume (biplane Simpson)", "LAA assessment"],
+  },
+  "tte:a3c": {
+    description: "Also called Apical Long Axis (APLAX). Obtained by rotating ~120° CCW from A4C. Shows LV, LA, LVOT, and aortic valve. Mirrors the PLAX view from the apex.",
+    structures: ["LV", "LA", "LVOT", "Aortic valve", "Mitral valve", "Aortic root"],
+    howToGet: ["From A4C, rotate probe ~120° counterclockwise", "LVOT and AV come into view", "Mirrors the PLAX view from the apex"],
+    tips: ["Mirrors PLAX — useful for confirming LVOT measurements", "Good for CW Doppler through AV when A5C is suboptimal", "Assess posterior and anteroseptal walls"],
+    pitfalls: ["Oblique cut may include RV — rotate further", "Foreshortening of LV apex"],
+    measurements: ["LVOT diameter (alternative)", "AV gradient (CW)", "LV volume (triplane)"],
+  },
+  "tte:subcostal": {
+    description: "Obtained from below the xiphoid process with the probe flat against the abdomen. Provides a unique view of the IAS, IVC, and hepatic veins. Often the only adequate view in patients with COPD or post-surgery.",
+    structures: ["RV", "LV", "RA", "LA", "IAS", "IVC", "Hepatic veins", "Liver"],
+    howToGet: ["Position probe below xiphoid, probe flat", "Marker dot toward patient's left", "Angle probe toward left shoulder", "Ask patient to take a deep breath to bring heart closer"],
+    tips: ["Best view for IAS assessment — ASD/PFO", "IVC assessment for RAP estimation", "Often best view in COPD/barrel chest patients"],
+    pitfalls: ["Hepatic vein mistaken for IVC", "Difficult in obese patients — try lateral decubitus"],
+    measurements: ["IVC diameter", "IVC collapsibility index", "RAP estimate"],
+  },
+  "tte:suprasternal": {
+    description: "Obtained from the suprasternal notch with the patient's neck extended. Shows the aortic arch and its branches. Used for aortic coarctation assessment and diastolic flow reversal in AR.",
+    structures: ["Aortic arch", "Innominate artery", "Left carotid artery", "Left subclavian artery", "Descending aorta", "RPA (cross-section)"],
+    howToGet: ["Position probe in suprasternal notch", "Extend patient's neck with shoulder roll", "Marker dot toward left", "Rotate to align with aortic arch"],
+    tips: ["Extend patient's neck with shoulder roll for better access", "Aortic arch visible as 'candy cane' shape", "Diastolic flow reversal in descending aorta = significant AR"],
+    pitfalls: ["Difficult in short necks or COPD", "Probe pressure may cause discomfort"],
+    measurements: ["Aortic arch diameter", "Descending aorta diastolic flow reversal"],
+  },
 
-export const SCANCOACH_STATIC_CONTENT: ScanCoachStaticContent = {
-  abdominal: {
-    liver: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine with the right arm extended above the head to widen the intercostal spaces. Left lateral decubitus positioning can improve visualization of the right lobe by moving the liver away from the ribs.
-Transducer Positioning: Begin with a subcostal sweep from the midline to the right lateral margin. Use intercostal windows (typically 8th–10th intercostal spaces) to visualize the right lobe. Fan through the entire liver systematically in both transverse and longitudinal planes.
-What to Assess: All hepatic lobes (right, left, caudate). Parenchymal echogenicity compared to the right renal cortex (normal: isoechoic or mildly hyperechoic). Surface contour (smooth vs. nodular). Focal lesions, masses, or cysts. Portal and hepatic veins, hepatic artery. Perihepatic spaces for free fluid.`,
-      tips: `Scanning Tip: Use both subcostal and intercostal windows to visualize all segments of the liver. Have the patient take a deep breath and hold to bring the liver inferiorly and improve subcostal access. The right lobe dome is best seen via intercostal windows with the patient in deep inspiration.
-Scanning Tip: Compare liver echogenicity to the right renal cortex on the same image. Liver echogenicity should be equal to or slightly greater than the kidney. Increased liver echogenicity relative to the kidney suggests hepatic steatosis (fatty liver).
-Doppler: Evaluate portal vein flow direction (hepatopetal = toward liver = normal) and velocity (normal 15–40 cm/s). Hepatic vein waveforms should be triphasic. Reversal of portal flow or loss of hepatic vein phasicity suggests portal hypertension or cardiac disease.`,
-      pitfalls: ``,
-    },
-    gallbladder: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine initially. Left lateral decubitus (LLD) positioning is essential — it causes gallstones to roll to the dependent portion of the gallbladder and sludge to layer, confirming mobility and gravity dependence. Erect positioning can also be used to confirm stone mobility.
-Transducer Positioning: Begin with a subcostal oblique approach along the long axis of the gallbladder. Rotate to obtain true long-axis and transverse views. Use intercostal windows if the gallbladder is high-lying. Always scan in at least two planes.
-What to Assess: Gallbladder size (normal length ≤10 cm, AP diameter ≤4 cm), wall thickness (normal ≤3 mm in a fasted patient), intraluminal contents (stones, sludge, polyps). Sonographic Murphy's sign (maximal tenderness with transducer pressure over the gallbladder). Common bile duct (CBD) diameter (normal ≤6 mm; up to 8 mm post-cholecystectomy). Intrahepatic bile ducts for dilatation.`,
-      tips: `Scanning Tip: Ensure the patient is fasted ≥8 hours before scanning. A contracted gallbladder from recent eating will be small, thick-walled, and filled with sludge — mimicking pathology. Fasting allows the gallbladder to distend and fill with bile, optimizing stone detection.
-Scanning Tip: Gallstones produce three classic signs: echogenic focus, posterior acoustic shadowing, and gravity dependence (roll patient to confirm movement). Polyps do not shadow and do not move. Sludge layers dependently but does not shadow. Adenomyomatosis shows comet-tail artifacts (ring-down).`,
-      pitfalls: ``,
-    },
-    pancreas: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine. Erect or semi-erect positioning may help displace bowel gas. Having the patient drink 8–16 oz of water immediately before scanning can act as an acoustic window to improve pancreatic visualization.
-Transducer Positioning: Begin with a transverse sweep from the xiphoid process inferiorly. Angle the transducer cephalad to bring the pancreas into view anterior to the splenic vein. Follow the splenic vein as a landmark — the pancreatic body lies directly anterior to it.
-What to Assess: Head, uncinate process, body, and tail. Parenchymal echotexture (normally isoechoic to slightly hyperechoic relative to liver), masses, calcifications, and ductal dilatation (normal main pancreatic duct ≤3 mm). Peripancreatic region for adenopathy or fluid collections.`,
-      tips: `Scanning Tip: Use the splenic vein as a reliable posterior landmark — the pancreatic body lies directly anterior to it. If bowel gas is obscuring the pancreas, try applying gentle graded compression to displace the gas, or reposition the patient erect.
-Scanning Tip: The pancreatic tail is the most difficult portion to visualize. Use the spleen as an acoustic window via a left lateral intercostal approach to image the tail. Color Doppler can help identify the splenic artery running along the superior border of the pancreas.`,
-      pitfalls: ``,
-    },
-    spleen: {
-      description: ``,
-      howToGet: `Patient Positioning: Right lateral decubitus (patient lying on right side) is the optimal position — it moves the spleen away from the ribs and improves intercostal access. Supine can be used initially but the spleen is often obscured by ribs and bowel gas.
-Transducer Positioning: Use the left posterior intercostal approach (typically 9th–11th intercostal spaces) with the transducer angled anteriorly. Obtain a true long-axis view for bipolar length measurement. Rotate 90° for transverse views. The left hemidiaphragm and left pleural space should be included in the survey.
-What to Assess: Bipolar length (normal ≤12 cm; splenomegaly >13 cm). Parenchymal echogenicity (normally homogeneous, similar to or slightly more echogenic than the left kidney). Focal lesions, infarcts, cysts, or masses. Splenic hilum and vasculature. Left hemidiaphragm and adjacent pleural space for effusion. Perisplenic free fluid.`,
-      tips: `Scanning Tip: The spleen is the most difficult abdominal organ to measure accurately due to its oblique orientation. Measure the maximum bipolar length in the true long axis — do not measure obliquely. Mild splenomegaly (13–15 cm) is a common incidental finding and may be normal in tall individuals.
-Scanning Tip: The spleen is highly vascular and prone to laceration — handle with care during scanning. If free fluid is seen in the perisplenic space (Morrison's pouch equivalent on the left = splenorenal recess), consider traumatic injury or ascites. Color Doppler can assess splenic vein patency (thrombosis causes splenomegaly and varices).`,
-      pitfalls: ``,
-    },
-    kidneys: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine for right kidney (use liver as acoustic window). Left lateral decubitus for right kidney if supine access is limited. Right lateral decubitus or prone for left kidney (use spleen as acoustic window). Prone positioning can be used for both kidneys when other approaches fail.
-Transducer Positioning: Right kidney: coronal approach from the right flank, using the liver as an acoustic window. Obtain long-axis (bipolar length) and transverse views. Left kidney: coronal approach from the left flank using the spleen. Both kidneys should be measured in the same plane for comparison.
-What to Assess: Long-axis bipolar length (normal adult 9–12 cm), cortical thickness (normal ≥1 cm), and echogenicity compared to liver (right) and spleen (left). Collecting system for hydronephrosis (graded 1–4). Calculi (echogenic foci with posterior shadowing). Masses, cysts (Bosniak classification). Perirenal spaces. Renal vascularity with color Doppler.`,
-      tips: `Scanning Tip: Compare right kidney echogenicity to the adjacent liver cortex — they should be equal or the kidney slightly hypoechoic. Compare left kidney to the spleen. Increased renal cortical echogenicity relative to the liver suggests medical renal disease (e.g., chronic kidney disease, glomerulonephritis).
-Scanning Tip: To distinguish a parapelvic cyst from hydronephrosis: parapelvic cysts are discrete, round, anechoic structures that do not communicate with the collecting system. Hydronephrosis shows a connected fluid-filled system that fans out from the renal pelvis. Color Doppler of the ureterovesical junction can help assess for ureteral jets (absent jets suggest obstruction).`,
-      pitfalls: ``,
-    },
-    aorta: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine. If bowel gas is limiting, try left lateral decubitus or semi-erect positioning. A fasting state of ≥8 hours significantly reduces bowel gas interference.
-Transducer Positioning: Begin with a transverse sweep from the xiphoid to the aortic bifurcation (approximately at the umbilicus). Then rotate 90° for longitudinal views. Measure the aorta in the anteroposterior dimension on transverse views (outer wall to outer wall).
-What to Assess: Proximal (suprarenal), mid (infrarenal), and distal aorta to the bifurcation. Measure maximum AP diameter. Assess for aneurysm (>3.0 cm), mural thrombus, intimal flap, or calcification. Evaluate the iliac arteries if the aorta is dilated.`,
-      tips: `Scanning Tip: Always measure the aorta in the true AP dimension on a transverse image — do not measure obliquely, as this overestimates diameter. The normal aorta tapers from approximately 2.0 cm at the diaphragm to 1.5 cm at the bifurcation.
-Scanning Tip: Color Doppler is useful to distinguish the aorta from the IVC and to identify the celiac axis and SMA origins. Apply gentle compression to displace bowel gas if needed — the aorta lies posterior and will not compress.`,
-      pitfalls: ``,
-    },
-    ivc: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine. The IVC is best assessed with the patient in quiet respiration. Avoid deep inspiration or Valsalva maneuver during diameter measurement, as these alter IVC size significantly.
-Transducer Positioning: Subcostal long-axis view: place the transducer just below the xiphoid, angled toward the right shoulder. The IVC is seen entering the right atrium. Parasagittal approach: transducer in the right parasagittal plane, just right of midline, to follow the IVC from the hepatic confluence to the right atrium.
-What to Assess: Patency, diameter (normal ≤2.1 cm), and respiratory variation (collapsibility index >50% suggests low CVP). Presence of thrombus, tumor extension (e.g., renal cell carcinoma), or IVC filters. Hepatic vein confluence and flow direction with Doppler.`,
-      tips: `Scanning Tip: Measure IVC diameter 2 cm distal to the hepatic vein confluence in the subcostal long-axis view. Measure at end-expiration for consistency. A collapsibility index (CI) >50% with a diameter <2.1 cm suggests low right atrial pressure (<5 mmHg).
-Scanning Tip: Do not confuse the IVC with the aorta. The IVC is to the right of midline, has thin walls, is compressible, and shows triphasic flow with Doppler. The aorta is to the left, pulsatile, and non-compressible.`,
-      pitfalls: ``,
-    },
+  // ─── TEE ────────────────────────────────────────────────────────────────────
+  "tee:me4c": {
+    description: "The foundational TEE view. Provides simultaneous assessment of all four cardiac chambers, both AV valves, and the interatrial septum. Equivalent to the TTE apical 4-chamber but with superior resolution.",
+    structures: ["LV (all walls, apex)", "RV", "LA", "RA", "Mitral valve (A2/P2 segments)", "Tricuspid valve", "Interatrial septum", "Moderator band (RV)"],
+    howToGet: ["Advance probe to mid-esophagus (30–35 cm from incisors)", "Set multiplane angle to 0°", "Apply gentle anteflexion to bring all four chambers into view", "Optimize depth to include the apex — avoid foreshortening"],
+    tips: ["The RV should appear smaller than the LV — if equal or larger, suspect RV dilation", "Tilt the probe slightly posteriorly to visualise the coronary sinus", "Advance 1–2 cm to open up the LV apex and avoid foreshortening"],
+    pitfalls: ["Foreshortening of LV apex underestimates LV size and EF", "IAS dropout is common at 0° — use color Doppler to confirm ASD"],
+    measurements: ["LV biplane volumes/EF", "LA area", "MV E/A/DT", "TR Vmax/RVSP"],
+    criticalFindings: ["New LV wall motion abnormality (ischaemia)", "Severe MR or TR", "Large pericardial effusion"],
   },
-  pelvic_gyn: {
-    uterus_sag: {
-      description: ``,
-      howToGet: `Patient Positioning: Empty bladder (patient should void immediately before TVS). Lithotomy position (supine with hips flexed and abducted). A pillow or folded sheet under the buttocks improves access. The patient or sonographer may insert the probe. Explain the procedure to the patient before insertion.
-Transducer Positioning: Insert the probe gently into the vagina with the marker pointing anteriorly (toward the ceiling). Sagittal plane: sweep from right to left to survey the entire uterus. Transverse plane: rotate 90° and sweep from fundus to cervix. The probe handle is moved in the opposite direction to the transducer tip — move the handle to the right to angle the tip to the left.
-What to Assess: Uterine size (length × AP × width); orientation (anteverted, retroverted); myometrium (homogeneous, fibroids — location: submucosal, intramural, subserosal; size; vascularity); endometrium (DLET in sagittal plane; echogenicity; regularity; polyps; IUD location); cervix (length, nabothian cysts, polyps, cervical canal); lower uterine segment (adenomyosis signs: globular uterus, asymmetric myometrium, myometrial cysts, fan-shaped shadowing).`,
-      tips: `Scanning Tip: Endometrial polyp vs. submucosal fibroid: polyps are echogenic, pedunculated, and show a feeding vessel on color Doppler. Submucosal fibroids are hypoechoic, distort the endometrial cavity, and show peripheral vascularity. Saline infusion sonohysterography (SIS) improves differentiation. Adenomyosis: globular uterus, asymmetric myometrial thickening, myometrial cysts (>3 mm), and fan-shaped acoustic shadowing are the most specific TVS signs.
-Pearl: Endometrial thickness in postmenopausal women: a DLET <4 mm has a >99% negative predictive value for endometrial cancer in postmenopausal women with bleeding. If the endometrium is not adequately visualized on TVS (e.g., due to fibroids, adenomyosis, or poor visualization), SIS or hysteroscopy is recommended.`,
-      pitfalls: `Retroverted uterus: in a retroverted uterus, the fundus is posterior and the endometrium may be difficult to visualize in the sagittal plane. Rotate the probe to obtain a true sagittal plane aligned with the uterine axis. The probe handle may need to be angled posteriorly (toward the floor) to align with the uterine axis in a retroverted uterus.`,
-    },
-    adnexa: {
-      description: ``,
-      howToGet: `Patient Positioning: Empty bladder. Lithotomy position. TVS provides superior resolution for ovarian assessment compared to TA, especially in obese patients or when the ovaries are not well seen on TA.
-Transducer Positioning: From the sagittal plane, rotate the probe to the transverse plane and sweep laterally to identify each ovary. The ovary is typically located lateral to the uterus, medial to the iliac vessels. Angle the probe laterally (move the handle medially) to visualize the lateral adnexa. Color Doppler: assess ovarian and adnexal vascularity.
-What to Assess: Ovarian size and volume (normal: <10 mL premenopausal, <8 mL postmenopausal); follicles (antral follicle count — AFC — for fertility assessment; normal AFC 5–15 per ovary); dominant follicle (periovulatory: 18–25 mm); corpus luteum (thick-walled cyst with peripheral 'ring of fire' on color Doppler); ovarian cysts (O-RADS classification); fallopian tubes (normally not seen unless dilated — hydrosalpinx, pyosalpinx).`,
-      tips: `Scanning Tip: Antral follicle count (AFC): count all follicles 2–10 mm in diameter in each ovary in the early follicular phase (days 2–5 of the menstrual cycle). AFC is the best predictor of ovarian reserve. Low AFC (<5 per ovary) suggests diminished ovarian reserve (DOR). High AFC (>12 per ovary) suggests polycystic ovary morphology (PCOM) — assess in conjunction with serum AMH and clinical criteria.
-Pearl: Ovarian torsion: TVS signs include enlarged ovary (>4 cm), peripheral follicles displaced to the periphery (edematous stroma), absent or reduced Doppler flow (absent flow is specific but not sensitive — torsion can occur with preserved Doppler flow), free fluid, and a twisted vascular pedicle (whirlpool sign on color Doppler). Clinical suspicion is paramount — do not exclude torsion based on normal Doppler alone.`,
-      pitfalls: `Hemorrhagic corpus luteum cyst: appears as a complex cystic mass with internal echoes (reticular or lace-like pattern), thick wall, and peripheral vascularity on color Doppler (no internal flow). It can mimic an ectopic pregnancy or endometrioma. Correlate with beta-hCG and follow-up ultrasound in 6–8 weeks — hemorrhagic corpus luteum cysts typically resolve spontaneously.`,
-    },
-    cul_de_sac: {
-      description: ``,
-      howToGet: `Patient Positioning: Empty bladder. Lithotomy position. TVS provides superior visualization of the cul-de-sac compared to TA, especially for small amounts of free fluid and posterior DIE.
-Transducer Positioning: Sagittal plane: tilt the probe posteriorly (move the handle anteriorly) to visualize the cul-de-sac posterior to the uterus. Assess the rectovaginal septum and the anterior rectal wall. Transverse plane: sweep inferiorly to assess the entire cul-de-sac. Apply gentle pressure with the probe to assess mobility of pelvic structures (sliding sign).
-What to Assess: Free fluid (simple vs. complex; volume estimate); loculated fluid (endometrioma — 'ground glass' appearance, thick wall, no internal flow; pyosalpinx — tubular, thick-walled, internal echoes; hematoma); peritoneal implants; rectovaginal septum (thickening, nodularity — DIE); anterior rectal wall (thickening, tethering — DIE); 'kissing ovaries' (ovaries adherent to each other in the cul-de-sac — severe endometriosis).`,
-      tips: `Scanning Tip: Endometrioma identification: the classic TVS appearance is a unilocular cyst with homogeneous 'ground glass' low-level internal echoes, thick wall, and no internal vascularity on color Doppler. Multiple endometriomas, bilateral endometriomas, and associated DIE (rectovaginal nodule, uterosacral ligament thickening) suggest severe endometriosis (stage III–IV).
-Pearl: Sliding sign for posterior DIE: with the probe in the sagittal plane, gently push the uterus anteriorly with the probe tip while observing the posterior uterine wall and rectum. In normal women, the uterus slides freely over the rectum. In posterior DIE, the uterus and rectum are adherent and do not slide. This sign has >80% sensitivity and specificity for posterior DIE.`,
-      pitfalls: ``,
-    },
-    endometrium: {
-      description: ``,
-      howToGet: `Patient Positioning: Empty bladder. Lithotomy position. TVS is the gold standard for endometrial assessment. Obtain the sagittal plane of the uterus aligned with the uterine axis for accurate DLET measurement.
-Transducer Positioning: Sagittal plane aligned with the uterine long axis. The endometrium should appear as a central echogenic stripe. Measure the DLET at the thickest point, perpendicular to the midline, excluding any fluid in the cavity. If fluid is present, measure each layer separately and add them together.
-What to Assess: DLET (double-layer endometrial thickness): normal values by phase (proliferative 4–8 mm, secretory 8–14 mm, postmenopausal <4 mm without HRT, <8 mm with HRT); echogenicity (hypoechoic = proliferative; hyperechoic = secretory; heterogeneous = polyp, hyperplasia, cancer); regularity (smooth vs. irregular); endometrial cavity (fluid, polyps, IUD, synechiae); cervical canal (polyps, stenosis).`,
-      tips: `Scanning Tip: Endometrial polyp detection: polyps are best seen in the early proliferative phase (days 4–8) when the endometrium is thin and hypoechoic. Polyps appear as echogenic, well-defined lesions within the endometrial cavity with a feeding vessel on color Doppler. SIS (saline infusion sonohysterography) significantly improves polyp detection and characterization.
-Pearl: Postmenopausal endometrial assessment: a DLET <4 mm has a >99% NPV for endometrial cancer. If DLET \\u22654 mm or the endometrium is not adequately visualized, endometrial biopsy is recommended. If the endometrium is not visualized (e.g., due to cervical stenosis or poor visualization), SIS or hysteroscopy is recommended. Do not report the endometrium as 'normal' if it is not adequately visualized.`,
-      pitfalls: `Submucosal fibroids can distort the endometrial cavity and make DLET measurement inaccurate. In these cases, describe the fibroid location (FIGO classification: Type 0 = pedunculated intracavitary; Type 1 = <50% intramural; Type 2 = \\u226550% intramural) and note that DLET measurement is limited. SIS is recommended for further evaluation.`,
-    },
-    cervix: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
-    transvaginal_survey: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
-    ectopic_pregnancy: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
+  "tee:me2c": {
+    description: "Obtained by rotating the multiplane angle from 0° to 90° without moving the probe. Provides the only TEE view of the LV anterior wall (LAD territory) and is essential for LAA assessment.",
+    structures: ["LV (anterior and inferior walls)", "LA", "LAA", "Mitral valve (A1/P1 and A3/P3 segments)", "Left pulmonary veins"],
+    howToGet: ["From ME 4-chamber, rotate multiplane angle to 90°", "Do not advance or withdraw the probe", "Optimize to show LV anterior and inferior walls in full length"],
+    tips: ["Only TEE view of the LV anterior wall — critical for LAD ischaemia monitoring", "LAA is best seen at 90° with slight retroflexion", "Rotate slightly left/right to optimize LAA visualization"],
+    pitfalls: ["Oblique cut may show RV — rotate to true 90°", "LAA thrombus can be missed without dedicated LAA views"],
+    measurements: ["LV volumes (Simpson)", "LAA diameter/area", "LAA flow velocity"],
+    criticalFindings: ["LAA thrombus", "Anterior wall motion abnormality"],
   },
-  ob1: {
-    gest_sac: {
-      description: ``,
-      howToGet: `Patient Positioning: Transabdominal (TA): supine with a comfortably full bladder. Transvaginal (TVS): lithotomy position with the bladder emptied — a full bladder is not required and may impair TVS image quality. TVS is preferred for early first trimester (<7 weeks) due to superior resolution.
-Transducer Positioning: TA: midline sagittal and transverse planes through the lower uterus. TVS: insert probe gently into the anterior vaginal fornix; angle anteriorly for the uterus. Identify the uterine cavity and locate the gestational sac within the endometrium (not in the cervix or adnexa).
-What to Assess: Gestational sac (GS) location (intrauterine vs. ectopic); GS size (mean sac diameter = [length + width + height] / 3); shape (round/oval is normal); double decidual sac sign (two concentric echogenic rings — confirms IUP); yolk sac presence (confirms IUP when visible); number of GS (multiple gestation).`,
-      tips: `Scanning Tip: Mean Sac Diameter (MSD) thresholds: GS should be visible on TVS when β-hCG >1,500–2,000 mIU/mL (discriminatory zone). A GS >25 mm MSD without a yolk sac (empty sac) is diagnostic of failed pregnancy. A GS >25 mm MSD without an embryo is also diagnostic of failed pregnancy per SMFM/ACOG criteria.
-Pearl: The double decidual sac sign (DDSS) — two concentric echogenic rings around the GS — is the earliest reliable sign of an intrauterine pregnancy and helps distinguish IUP from a pseudogestational sac (seen in ectopic pregnancy). A pseudogestational sac is a single echogenic ring (decidual reaction) without a true choriodecidual interface.`,
-      pitfalls: `An interstitial (cornual) ectopic pregnancy is located in the intramural portion of the fallopian tube and may appear to be within the uterus. Key features: GS is eccentric (not central in the endometrium), surrounded by <5 mm of myometrium, and the 'interstitial line sign' may be present. Rupture risk is high — consult immediately.`,
-    },
-    yolk_sac: {
-      description: ``,
-      howToGet: `Patient Positioning: TVS with empty bladder. The yolk sac is the first structure visible within the gestational sac, appearing at approximately 5.5 weeks GA. It is the primary source of nutrition for the embryo before the placenta is established.
-Transducer Positioning: Center the gestational sac in the field of view. The yolk sac appears as a round, echogenic ring with an anechoic center within the gestational sac, adjacent to the embryo (when visible). Normal yolk sac diameter: 3–6 mm at 6–10 weeks.
-What to Assess: Yolk sac presence (confirms IUP); size (normal 3–6 mm; >6 mm or <3 mm at 6–10 weeks is abnormal); shape (round/oval is normal; irregular shape is associated with poor outcome); echogenicity (normal = thin echogenic ring; calcified or hyperechoic yolk sac is abnormal).`,
-      tips: `Scanning Tip: The yolk sac should be visible on TVS when the GS MSD is ≥10 mm. Absence of a yolk sac when the GS MSD is ≥10 mm is suspicious for failed pregnancy. An abnormal yolk sac (>6 mm, irregular, or calcified) is associated with increased risk of pregnancy loss even when cardiac activity is present.
-Pearl: The yolk sac is connected to the embryo by the vitelline duct. At 6–7 weeks, the embryo is visible adjacent to the yolk sac. The amnion (thin membrane surrounding the embryo) is separate from the yolk sac — the embryo is within the amnion, and the yolk sac is outside the amnion but inside the chorionic cavity.`,
-      pitfalls: ``,
-    },
-    embryo: {
-      description: ``,
-      howToGet: `Patient Positioning: TVS with empty bladder. The embryo is first visible at approximately 6 weeks GA as a small echogenic structure adjacent to the yolk sac. Cardiac activity (flickering motion) should be visible when the CRL is ≥7 mm on TVS.
-Transducer Positioning: Center the embryo in the field of view. Magnify the image so the embryo occupies at least 50–75% of the screen. Measure the CRL (crown-rump length) in the longest axis of the embryo, with the embryo in a neutral position (neither flexed nor extended).
-What to Assess: Embryo presence; cardiac activity (normal FHR at 6–7 weeks: 90–110 bpm; at 8–10 weeks: 150–175 bpm); CRL measurement (most accurate dating method in 1st trimester); embryo morphology (head, body, limb buds visible by 8–9 weeks); amnion (thin membrane surrounding embryo, separate from yolk sac).`,
-      tips: `Scanning Tip: CRL measurement technique: (1) Magnify so the embryo fills 50–75% of the screen; (2) Measure in the longest axis with the embryo in a neutral position; (3) Do not include the yolk sac in the measurement; (4) Take 3 measurements and use the largest; (5) CRL is the most accurate dating method — use it to establish EDD in the 1st trimester.
-Pearl: Cardiac activity thresholds: Absence of cardiac activity when CRL ≥7 mm on TVS is diagnostic of embryonic demise (per SMFM/ACOG 2012 criteria). A slow FHR (<90 bpm at 6–8 weeks) is associated with increased risk of miscarriage but is not immediately diagnostic of demise — follow-up in 7–10 days is recommended.`,
-      pitfalls: `The amnion is a thin membrane that surrounds the embryo and may be mistaken for a second gestational sac. The amnion is always smaller than the chorionic cavity and is closely applied to the embryo. The yolk sac is outside the amnion but inside the chorionic cavity — this 'double bubble' appearance is normal.`,
-    },
-    nt: {
-      description: ``,
-      howToGet: `Patient Positioning: TVS preferred for NT measurement. The NT measurement is performed between 11+0 and 13+6 weeks (CRL 45–84 mm). The fetus must be in a neutral position (not hyperflexed or hyperextended). Fetal movement may be needed to achieve the correct position — wait for the fetus to move or gently tap the maternal abdomen.
-Transducer Positioning: True midsagittal plane of the fetal face and neck — the nasal bone tip, palate, and posterior fossa should all be visible in the same plane. The NT is measured at the widest point of the translucent space between the skin and the cervical spine. Calipers are placed on the inner borders of the echogenic lines (skin and spine).
-What to Assess: NT thickness (normal <3.0 mm at any CRL; MoM-based risk calculation is preferred); nasal bone (present/absent — absent nasal bone increases T21 risk); ductus venosus waveform (reversed a-wave increases T21/T18 risk); tricuspid regurgitation (increases T21 risk); fetal anatomy survey (early anomaly scan).`,
-      tips: `Scanning Tip: NT measurement technique (FMF/NTQR standards): (1) True midsagittal plane — nasal bone tip, palate, and posterior fossa all visible; (2) Magnify so the fetal head and upper thorax fill the screen; (3) Neutral position — neither flexed nor extended; (4) Amnion must be separate from the fetal skin; (5) Measure the widest part of the NT; (6) Inner-to-inner caliper placement; (7) Take 3 measurements — use the largest.
-Pearl: Increased NT (≥3.0 mm or ≥95th percentile for CRL) is associated with: Down syndrome (T21), Turner syndrome (45,X), other chromosomal abnormalities, and structural cardiac defects even with normal karyotype. An NT ≥3.5 mm warrants detailed fetal echocardiography at 18–22 weeks regardless of karyotype result.`,
-      pitfalls: `The amnion can be mistaken for the fetal skin, leading to falsely elevated NT measurement. The amnion is a thin membrane that runs parallel to the fetal skin — if the amnion is adherent to the fetal neck, wait for fetal movement to separate it. The NT is measured between the fetal skin (not the amnion) and the cervical spine.`,
-    },
-    adnexa_1st: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
-    uterus_cervix_1st: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
+  "tee:melax": {
+    description: "Obtained at 120–135° multiplane angle. The TEE equivalent of the TTE PLAX view. Best view for LVOT, aortic valve, and mitral valve assessment in the long axis.",
+    structures: ["LV (posterior and anteroseptal walls)", "LA", "LVOT", "Aortic valve", "Mitral valve (A2/P2)", "Aortic root", "Ascending aorta"],
+    howToGet: ["From ME 2-chamber, continue rotating multiplane angle to 120–135°", "LVOT and AV come into view", "Optimize for LVOT diameter measurement"],
+    tips: ["Best TEE view for LVOT diameter measurement (for AVA calculation)", "Assess aortic root and proximal ascending aorta", "MV posterior leaflet (P2) is closest to probe"],
+    pitfalls: ["Angle variation (120° vs 135°) affects LVOT diameter — standardize", "Aortic root may be foreshortened if angle is not optimized"],
+    measurements: ["LVOT diameter", "Aortic root diameter", "Sinus of Valsalva", "Sinotubular junction"],
   },
-  ob23: {
-    head_brain: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine. Optimal brain views require the fetal head in an occiput-lateral position. If the fetal occiput is posterior (OP), the calvarium may shadow — reposition the patient (lateral decubitus) or wait for fetal movement.
-Transducer Positioning: Three axial planes: (1) Transventricular plane — for lateral ventricle atrial measurement; (2) Transthalamic plane — for BPD, HC, and cavum septi pellucidi; (3) Transcerebellar plane — for cerebellum, vermis, and cisterna magna.
-What to Assess: Lateral ventricles (atrial width ≤10 mm); choroid plexus (fills ventricle, no cysts >10 mm); midline falx (present, midline); cavum septi pellucidi (present 18–37 weeks); cerebellum (bilobed, normal diameter for GA); vermis (present); cisterna magna (2–10 mm); 3rd ventricle (<3 mm); posterior fossa (no fluid).`,
-      tips: `Scanning Tip: Lateral ventricle atrial measurement: measure at the level of the glomus of the choroid plexus, perpendicular to the long axis of the ventricle. Normal ≤10 mm at any GA. Ventriculomegaly: mild 10–12 mm, moderate 13–15 mm, severe >15 mm. Always measure the distal (far-field) ventricle — the near-field ventricle is often obscured by reverberation artifact.
-Pearl: The cisterna magna (CM) is measured in the transcerebellar plane from the posterior vermis to the inner occipital bone. Normal CM: 2–10 mm. A CM >10 mm (mega cisterna magna) or absent CM with a 'banana sign' (cerebellum pulled anteriorly) suggests Chiari II malformation associated with open spina bifida.`,
-      pitfalls: `The 'lemon sign' (frontal bone scalloping) is associated with open spina bifida (Chiari II) and is best seen at 16–24 weeks. It may be subtle or absent after 24 weeks. Always assess the posterior fossa and spine when a lemon sign is suspected.`,
-    },
-    face: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine. Fetal face assessment requires the fetal face to be anterior or in a lateral position. If the fetal face is posterior, wait for fetal movement or reposition the patient.
-Transducer Positioning: Coronal plane through the face: for upper lip assessment (cleft lip detection) and nasal bone. Sagittal (profile) plane: for facial profile, nasal bone, and prognathism/micrognathia. Axial plane: for orbits (binocular distance, lens).
-What to Assess: Upper lip (intact — no cleft lip); nasal bone (present/absent — absent nasal bone at 15–22 weeks increases T21 risk); facial profile (normal = flat/slightly convex); orbits (present, symmetric, binocular distance normal for GA); palate (hard and soft palate — cleft palate); ears (position and size).`,
-      tips: `Scanning Tip: Cleft lip detection: the coronal plane through the upper lip (nasal-labial plane) is the most sensitive view. A cleft lip appears as a defect in the echogenic line of the upper lip. Isolated cleft palate (without cleft lip) is very difficult to detect on routine ultrasound. 3D ultrasound improves cleft lip/palate detection.
-Pearl: Micrognathia (small mandible) is associated with Pierre Robin sequence, trisomy 18, and other syndromes. It is best assessed in the sagittal (profile) view — the chin appears recessed relative to the forehead. Polyhydramnios is commonly associated (impaired swallowing). Refer for fetal MRI and genetic counseling if micrognathia is suspected.`,
-      pitfalls: ``,
-    },
-    chest_heart: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine. The fetal heart is best assessed when the fetal spine is lateral (3 or 9 o'clock position) or posterior. If the spine is anterior, the ribs shadow the heart — reposition the patient or wait for fetal movement.
-Transducer Positioning: Axial planes through the fetal chest: (1) Four-chamber view (4CV); (2) LVOT view (tilt superiorly from 4CV); (3) RVOT/3-vessel view (tilt further superiorly); (4) 3-vessel and trachea view (3VT). Assess lungs for echogenicity and size.
-What to Assess: Cardiac activity (present); 4CV (heart <1/3 of chest area; apex points left at ~45°; two equal atria and ventricles; intact IVS; two AV valves); LVOT (aorta from LV, no VSD); RVOT (PA from RV, larger than Ao); 3VT (PA > Ao > SVC; normal alignment; no vascular ring); lungs (echogenic, symmetric, no masses).`,
-      tips: `Scanning Tip: Four-chamber view technique: (1) Axial plane through the fetal chest; (2) Heart should occupy <1/3 of the chest area; (3) Apex points left at ~45° (levocardia); (4) Two atria and two ventricles equal in size; (5) Foramen ovale flap opens into the left atrium; (6) Moderator band is in the right ventricle (RV identification).
-Pearl: The 3-vessel and trachea (3VT) view: normal PA > Ao > SVC, all in a straight line to the left of the trachea. Abnormalities: (1) Vascular ring (double aortic arch — vessels on both sides of trachea); (2) Right aortic arch (aorta to the right of trachea); (3) Absent PA or Ao; (4) Persistent left SVC (4 vessels instead of 3).`,
-      pitfalls: `VSDs are the most common congenital heart defect and may be missed on routine 4CV if small. The LVOT and RVOT views are essential for detecting outflow tract abnormalities (TGA, TOF, truncus arteriosus). Color Doppler improves sensitivity for VSD and outflow tract abnormalities.`,
-    },
-    abdomen: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine. The abdominal circumference (AC) measurement requires a true axial plane through the fetal abdomen at the level of the stomach and portal vein. Oblique planes will overestimate the AC.
-Transducer Positioning: Axial plane at the level of the stomach and portal vein (J-shaped portal vein) for AC measurement. Sagittal and transverse planes for kidneys. Axial plane for cord insertion. Color Doppler for umbilical cord vessels (2 arteries + 1 vein = normal).
-What to Assess: Stomach (present, normal size, left side — absence suggests esophageal atresia); kidneys (present, normal echogenicity, renal pelvis ≤10 mm AP diameter); urinary bladder (present); cord insertion (normal, no omphalocele/gastroschisis); umbilical cord (3 vessels — 2 arteries + 1 vein); bowel (non-dilated, non-echogenic).`,
-      tips: `Scanning Tip: AC measurement technique: (1) True axial plane at the level of the stomach and J-shaped portal vein; (2) Spine visible posteriorly; (3) Ribs symmetric; (4) Measure the outer perimeter of the abdomen (outer-to-outer); (5) Use the ellipse function or average of two perpendicular diameters. AC is the most sensitive biometric parameter for FGR.
-Pearl: Echogenic bowel (as echogenic as bone) is a soft marker for cystic fibrosis, T21, CMV infection, fetal swallowed blood, and FGR. Grade 1 (slightly echogenic) is a normal variant; Grade 2 (as echogenic as liver) warrants follow-up; Grade 3 (as echogenic as bone) requires further evaluation (amniocentesis, TORCH screen, CF testing).`,
-      pitfalls: `Pyelectasis ≥4 mm before 28 weeks and ≥7 mm after 28 weeks is a soft marker for T21 and warrants follow-up. Isolated pyelectasis <10 mm is usually physiological and resolves postnatally. Pyelectasis ≥10 mm (hydronephrosis) requires postnatal follow-up and urology referral.`,
-    },
-    spine: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine. The spine is best assessed when the fetal back is posterior (facing the transducer). If the fetal back is anterior, the spine is obscured by the ribs and vertebral bodies — wait for fetal movement or reposition the patient.
-Transducer Positioning: Three planes required: (1) Sagittal — longitudinal view of the entire spine from cervical to sacral; (2) Coronal — parallel lines of posterior elements; (3) Axial — each vertebral level shows three ossification centers (vertebral body + two posterior elements) forming a closed ring. Assess the overlying skin for integrity.
-What to Assess: Cervical, thoracic, lumbar, and sacral spine: intact posterior elements; closed skin overlying the spine; normal curvature (no kyphosis/scoliosis); conus medullaris (normally at L2–L3 level by 20 weeks); no mass or meningocele; sacrum (present — absent sacrum suggests sacral agenesis/caudal regression syndrome).`,
-      tips: `Scanning Tip: Open spina bifida (myelomeningocele) signs: (1) Lemon sign (frontal bone scalloping in axial head view); (2) Banana sign (cerebellum pulled anteriorly, obliterating the cisterna magna); (3) Posterior element defect with skin disruption in the sagittal view; (4) Ventriculomegaly (secondary to Chiari II). The lemon and banana signs are present in >95% of open spina bifida cases at 16–24 weeks.
-Pearl: Closed spina bifida (skin-covered) does not produce lemon/banana signs and is much harder to detect on routine ultrasound. Clues include: a skin-covered mass over the spine, tethered conus medullaris (below L3), and lower limb abnormalities. Fetal MRI is more sensitive for closed spinal dysraphism.`,
-      pitfalls: ``,
-    },
-    extremities: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine. Systematically assess all four limbs. Fetal movement may be needed to visualize all extremities.
-Transducer Positioning: Long-axis plane for femur length (FL) and humerus length (HL) measurement. Axial planes for hands and feet. Assess each limb: upper arm (humerus), forearm (radius/ulna), hand (digits); thigh (femur), lower leg (tibia/fibula), foot (digits).
-What to Assess: Four limbs present; long bone lengths (FL, HL normal for GA); bone echogenicity and shape (normal = straight, echogenic with acoustic shadow); hands (open/closed, digits present, polydactyly/syndactyly); feet (normal position — clubfoot = foot perpendicular to tibia in same plane); digits (count when possible).`,
-      tips: `Scanning Tip: Femur length (FL) measurement: (1) Long-axis plane with the femur horizontal; (2) Measure the ossified diaphysis only (not the epiphyseal cartilage); (3) Both ends of the femur should be visible; (4) The femur should be at a 45° angle to the ultrasound beam for best measurement. Short femur (<5th percentile for GA) is a soft marker for T21 and skeletal dysplasia.
-Pearl: Clubfoot (talipes equinovarus): the foot is seen in the same plane as the tibia/fibula (normally the foot is perpendicular and cannot be seen in the same plane as the lower leg). Isolated clubfoot has a good prognosis; clubfoot associated with other anomalies (spina bifida, trisomy 18) has a worse prognosis.`,
-      pitfalls: ``,
-    },
-    placenta: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine for TA assessment. TVS with empty bladder for cervical os assessment when placenta previa is suspected. TVS is more accurate than TA for measuring the distance from the placental edge to the internal os.
-Transducer Positioning: TA: sagittal and transverse planes through the uterus to map the entire placenta. TVS: sagittal plane with the probe in the anterior fornix, angled toward the cervix — measure the distance from the placental edge to the internal os.
-What to Assess: Placenta location (anterior, posterior, fundal, lateral); relationship to internal os (normal ≥20 mm from os; low-lying 1–19 mm; previa = covers os); appearance (normal = homogeneous; grade 0–III calcification; retroplacental clear zone); cord insertion (central, eccentric, marginal, velamentous); succenturiate lobe (risk of vasa previa); placental lakes (normal variant).`,
-      tips: `Scanning Tip: Placenta previa: if the placenta appears low-lying on TA, always confirm with TVS — TVS is more accurate and safe. A placental edge-to-os distance ≥20 mm on TVS at 18–23 weeks predicts resolution of apparent previa in >95% of cases. Repeat TVS at 32–34 weeks if low-lying at 18–23 weeks.
-Pearl: Vasa previa: fetal vessels run over the internal os (velamentous cord insertion or succenturiate lobe with connecting vessels). Risk of catastrophic fetal hemorrhage at membrane rupture. Color Doppler over the cervix is essential when a low-lying placenta, velamentous insertion, or succenturiate lobe is identified.`,
-      pitfalls: `Placenta accreta spectrum (PAS): suspect when there is a low anterior placenta overlying a uterine scar (prior cesarean). Ultrasound signs: loss of retroplacental clear zone, placental lacunae (Swiss cheese appearance), thinning of the myometrium overlying the placenta, and bridging vessels on color Doppler.`,
-    },
-    amniotic_fluid: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine. The amniotic fluid index (AFI) is measured with the patient supine and the uterus divided into four quadrants by the umbilicus (horizontal) and the linea nigra (vertical). The transducer is held perpendicular to the floor (not the maternal abdomen) for each measurement.
-Transducer Positioning: AFI: measure the deepest vertical pocket in each of the four quadrants, avoiding the umbilical cord and fetal parts. The transducer is held perpendicular to the floor. Sum the four measurements. MVP: measure the single deepest pocket free of cord and fetal parts.
-What to Assess: AFI: normal 8–24 cm (18–40 weeks); oligohydramnios <5 cm; borderline 5–8 cm; polyhydramnios >24 cm. MVP: normal 2–8 cm; oligohydramnios <2 cm; polyhydramnios >8 cm. MVP is preferred over AFI in many centers (lower false-positive rate for oligohydramnios).`,
-      tips: `Scanning Tip: Oligohydramnios causes: (1) Fetal renal anomalies (bilateral renal agenesis, obstructive uropathy); (2) PPROM; (3) Uteroplacental insufficiency (FGR, post-dates). Polyhydramnios causes: (1) Fetal swallowing abnormalities (esophageal atresia, duodenal atresia); (2) Fetal diabetes (macrosomia); (3) Fetal anemia (hydrops); (4) Idiopathic (50%).
-Pearl: The umbilical cord is often mistaken for a pocket of amniotic fluid. Always use color Doppler to confirm the absence of cord within the pocket being measured. A pocket containing cord should not be included in the AFI measurement.`,
-      pitfalls: ``,
-    },
-    cervix_23: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
-    biometry: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine. Biometric measurements require specific standard planes — each measurement has a defined plane and caliper placement. Fetal position may require repositioning or waiting for fetal movement to obtain the correct plane.
-Transducer Positioning: BPD/HC: axial plane at the level of the thalami and cavum septi pellucidi (transthalamic plane). AC: axial plane at the level of the stomach and J-shaped portal vein. FL: long-axis plane with the femur horizontal. HL: long-axis plane with the humerus horizontal.
-What to Assess: BPD (outer-to-inner, leading edge to leading edge); HC (outer perimeter of the skull); AC (outer perimeter at the level of the stomach and portal vein); FL (ossified diaphysis only); HL (ossified diaphysis only). Estimated fetal weight (EFW) from Hadlock formula (BPD + HC + AC + FL).`,
-      tips: `Scanning Tip: EFW calculation: the Hadlock formula using BPD + HC + AC + FL is the most widely used. EFW accuracy is ±15–20% (2 SD). SGA: EFW <10th percentile. FGR: EFW <10th percentile with abnormal Doppler (umbilical artery, MCA, ductus venosus) or AC <5th percentile. Serial biometry every 2–3 weeks is recommended for FGR surveillance.
-Pearl: The AC is the most sensitive biometric parameter for detecting FGR. An AC <5th percentile has a sensitivity of ~80% for FGR. The HC/AC ratio is useful for distinguishing symmetric FGR (head and body equally small — early onset, chromosomal, infectious) from asymmetric FGR (head sparing — late onset, uteroplacental insufficiency).`,
-      pitfalls: ``,
-    },
-    umbilical_cord: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
+  "tee:meavsax": {
+    description: "Obtained at 30–60° multiplane angle. Shows the aortic valve in cross-section. Essential for AV morphology assessment (bicuspid vs tricuspid), planimetry, and aortic root anatomy.",
+    structures: ["Aortic valve (3 cusps: RCC, LCC, NCC)", "RVOT", "Pulmonary valve", "LA", "RA", "Interatrial septum", "Tricuspid valve"],
+    howToGet: ["From ME 4-chamber, rotate multiplane angle to 30–60°", "AV appears in cross-section ('Mercedes-Benz')", "Optimize to show all three cusps symmetrically"],
+    tips: ["'Mercedes-Benz' sign = normal tricuspid AV", "Bicuspid AV: 2 cusps with raphe — fish-mouth opening", "Best view for AV planimetry in AS"],
+    pitfalls: ["Bicuspid AV may appear tricuspid if not fully open", "Oblique cut may make cusps appear unequal"],
+    measurements: ["AV planimetry (AVA)", "RVOT diameter", "Pulmonary valve annulus"],
   },
-  thyroid: {
-    thyroid_trans_right: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine with the neck hyperextended — place a pillow or rolled towel under the shoulders to extend the neck and bring the thyroid gland anteriorly. If the patient cannot tolerate full hyperextension (e.g., cervical arthritis), a semi-reclined position is acceptable.
-Transducer Positioning: Begin at the superior pole of the right lobe and sweep inferiorly in the transverse plane through the superior, mid, and inferior thirds. The right lobe lies lateral to the trachea and anterior to the right carotid artery and internal jugular vein.
-What to Assess: Lobe dimensions (AP × transverse at widest point); echogenicity (normal = homogeneous, isoechoic to adjacent strap muscle); any focal nodules (location, size, composition, echogenicity, margins, calcifications, vascularity); surrounding structures (carotid, IJV, strap muscles, trachea).`,
-      tips: `Scanning Tip: Measure the right lobe AP and transverse dimensions in the transverse plane at its widest point. Normal thyroid lobe: 4–6 cm long, 1.5–2 cm AP, 1.5–2 cm transverse. Volume = 0.479 × length × width × depth (each lobe). Normal total volume: men <25 mL, women <18 mL.
-Pearl: The right lobe is typically slightly larger than the left. The right inferior thyroid artery enters the posterior aspect of the right lobe and can be used to confirm the inferior pole. Always document the inferior pole — it may extend retrosternally.`,
-      pitfalls: `The esophagus lies posterior-medial to the left lobe (occasionally posterior to the right). On transverse views, it appears as a round structure with a hyperechoic center (air). Do not mistake it for a parathyroid adenoma or lymph node — have the patient swallow to confirm.`,
-    },
-    thyroid_long_right: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine with neck hyperextended. Rotate the transducer 90° from the transverse plane. Scan from the medial to lateral aspect of the right lobe in three sweeps: medial (near trachea), mid, and lateral.
-Transducer Positioning: Longitudinal plane, parallel to the long axis of the right lobe. The lobe appears as an oval/elongated structure with pointed superior and inferior poles. Measure the craniocaudal length in this plane.
-What to Assess: Craniocaudal length of the right lobe (normal 4–6 cm); superior and inferior pole definition; any nodules (measure in three planes in the view where the nodule is largest); pyramidal lobe (midline, superior to isthmus — present in ~50% of patients).`,
-      tips: `Scanning Tip: Always measure the craniocaudal length in the longitudinal plane — this is the most accurate dimension for volume calculation. Ensure both poles are visible in the same image. If the inferior pole extends below the clavicle, document substernal extension and note the depth.
-Pearl: The pyramidal lobe is a remnant of the thyroglossal duct and extends superiorly from the isthmus (usually to the left of midline). It is present in ~50% of patients and may be enlarged in Graves' disease. Do not mistake it for a midline neck mass.`,
-      pitfalls: ``,
-    },
-    thyroid_trans_left: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine with neck hyperextended. Mirror the right lobe technique. The left lobe lies lateral to the trachea and anterior to the left carotid artery and IJV. The esophagus is typically posterior-medial to the left lobe.
-Transducer Positioning: Transverse plane, sweeping from superior to inferior through the left lobe. Identify the left carotid artery and IJV as landmarks. The esophagus is posterior-medial to the left lobe.
-What to Assess: Same as right lobe: dimensions, echogenicity, nodules, vascularity. Compare symmetry with right lobe. Assess the posterior aspect carefully for parathyroid adenomas (oval, hypoechoic structures posterior to the lobe, <1 cm normally).`,
-      tips: `Scanning Tip: The left recurrent laryngeal nerve runs in the tracheoesophageal groove — a critical surgical landmark. Nodules in the posterior medial aspect of the left lobe are at higher risk for RLN involvement. Document the relationship of any posterior nodule to the tracheoesophageal groove.`,
-      pitfalls: `The esophagus posterior to the left lobe can be mistaken for a parathyroid adenoma or lymph node. Have the patient swallow — the esophagus will move and show peristalsis, confirming its identity. A true parathyroid adenoma will not move with swallowing.`,
-    },
-    thyroid_long_left: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine with neck hyperextended. Longitudinal plane through the left lobe, medial to lateral sweeps. Measure craniocaudal length at the longest dimension.
-Transducer Positioning: Longitudinal plane, parallel to the long axis of the left lobe. Three sweeps: medial (near trachea/esophagus), mid, and lateral. Identify the left carotid artery in the lateral sweep as a landmark.
-What to Assess: Craniocaudal length; superior and inferior pole definition; any nodules (measure in three planes); pyramidal lobe (if present, arises from the isthmus and extends superiorly, typically to the left of midline).`,
-      tips: `Scanning Tip: For any nodule identified, document: location (lobe, pole, isthmus), size in three planes, ACR TI-RADS category (composition, echogenicity, shape, margin, echogenic foci), and vascularity on color Doppler. Standardized reporting facilitates consistent follow-up recommendations.`,
-      pitfalls: ``,
-    },
-    thyroid_isthmus: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine with neck hyperextended. The isthmus is the bridge of thyroid tissue connecting the right and left lobes, lying anterior to the trachea at the level of the 2nd–4th tracheal rings.
-Transducer Positioning: Transverse plane at the midline, anterior to the trachea. Measure the AP thickness of the isthmus. Normal isthmus thickness: <3 mm. Scan in longitudinal plane to assess for pyramidal lobe extending superiorly.
-What to Assess: Isthmus thickness (AP dimension in transverse plane); any focal nodules; pyramidal lobe (extends superiorly from isthmus, present in ~50%); Delphian lymph node (prelaryngeal node — if enlarged, may indicate papillary thyroid cancer or Hashimoto's thyroiditis).`,
-      tips: `Pearl: Isthmus thickness >3 mm is considered enlarged. Diffuse isthmus enlargement is seen in Hashimoto's thyroiditis and Graves' disease. A focal isthmus nodule should be characterized with the same TI-RADS criteria as lobe nodules. Isthmus nodules may be more palpable than lobe nodules.`,
-      pitfalls: ``,
-    },
-    thyroid_nodule: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
-    parathyroid: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
-    thyroid_doppler: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
-    thyroid_lymph_nodes: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
+  "tee:mebicaval": {
+    description: "Obtained at 80–110° multiplane angle with slight rightward rotation. Shows the IAS, SVC, and IVC. Essential for ASD/PFO assessment, transseptal puncture guidance, and TAVR/TEER procedures.",
+    structures: ["RA", "LA", "IAS (fossa ovalis)", "SVC", "IVC", "Right pulmonary veins", "Eustachian valve"],
+    howToGet: ["From ME 4-chamber, rotate multiplane angle to 80–110°", "Turn probe rightward (clockwise) to bring SVC and IVC into view", "IAS should be perpendicular to beam for best resolution"],
+    tips: ["IAS is perpendicular to ultrasound beam — best view for ASD/PFO", "Agitated saline contrast: bubbles crossing IAS = PFO/ASD", "Eustachian valve may be mistaken for IAS thrombus"],
+    pitfalls: ["IAS dropout at 0° — always use bicaval view for IAS assessment", "Prominent Eustachian valve may be mistaken for RA mass"],
+    measurements: ["ASD diameter", "IAS length", "SVC diameter"],
+    criticalFindings: ["ASD/PFO with significant shunt", "RA mass or thrombus"],
   },
-  scrotum: {
-    scrotum_survey: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine with the scrotum supported on a towel draped between the thighs. The penis should be retracted superiorly and taped to the abdomen. This position stabilizes the scrotum and allows bilateral comparison. Use copious warm gel to minimize patient discomfort.
-Transducer Positioning: Begin with a split-screen transverse view of both testes simultaneously to compare size, echogenicity, and vascularity side-by-side. This bilateral comparison is essential for detecting subtle asymmetry in echogenicity or blood flow, particularly in torsion.
-What to Assess: Confirm presence of two testes; compare size, echogenicity, and vascularity bilaterally; identify any gross asymmetry in testicular size (>20% difference is significant); assess the epididymis bilaterally; identify any hydrocele, hematocele, or pyocele.`,
-      tips: `Scanning Tip: Always perform a bilateral comparison scan first, before focusing on the symptomatic side. In torsion, the affected testis may appear normal in echogenicity early — the key finding is absent or markedly reduced blood flow on color Doppler compared to the contralateral testis. A unilateral finding is more significant than an absolute measurement.
-Pearl: Normal testicular volume: 12–20 mL (length × width × depth × 0.71). Testicular atrophy is defined as volume <12 mL or >20% smaller than the contralateral testis. Prepubertal testes are smaller (1–2 mL) and have less vascularity — do not mistake reduced flow for torsion in a child.`,
-      pitfalls: ``,
-    },
-    right_testis_trans: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine with scrotum supported. Scan the right testis in the transverse plane from the superior pole to the inferior pole in a systematic sweep. Document superior, mid, and inferior thirds.
-Transducer Positioning: Transverse plane, sweeping from superior to inferior pole. The testis is an oval structure with homogeneous medium-level echogenicity. The mediastinum testis is a hyperechoic linear structure running along the posterior aspect of the testis in the longitudinal plane.
-What to Assess: Testicular size (measure AP and transverse in transverse plane); echogenicity (normal = homogeneous, medium-level); any focal lesions (location, size, echogenicity, vascularity, calcifications); tunica albuginea integrity; hydrocele; color Doppler vascularity (centripetal arteries from mediastinum testis).`,
-      tips: `Scanning Tip: Measure the testis in three dimensions: length (longitudinal), width (transverse), and AP (transverse plane). Calculate volume = L × W × AP × 0.71. Document any focal lesion in three planes. Use power Doppler for better sensitivity to low-flow states. Always compare vascularity to the contralateral testis.
-Pearl: The mediastinum testis is a hyperechoic band running along the posterior aspect of the testis. It contains the rete testis and efferent ductules. Cysts of the rete testis (tubular ectasia) appear as tubular anechoic structures in the mediastinum — a benign finding associated with prior vasectomy or epididymal obstruction.`,
-      pitfalls: `Testicular microlithiasis (TM) is defined as ≥5 echogenic foci per transducer field without acoustic shadowing. Classic TM (≥5 foci) is associated with a slightly increased risk of testicular germ cell tumor, but routine biopsy is not recommended. Annual ultrasound surveillance is recommended for classic TM with risk factors (personal/family history of testicular cancer, cryptorchidism, atrophy).`,
-    },
-    right_testis_long: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine with scrotum supported. Rotate the transducer 90° to the longitudinal plane. Scan from the medial to lateral aspect of the right testis in three sweeps: medial, mid, and lateral.
-Transducer Positioning: Longitudinal plane, parallel to the long axis of the testis. Measure the craniocaudal length in this plane. The mediastinum testis is visible as a hyperechoic linear structure along the posterior aspect.
-What to Assess: Craniocaudal length (normal 3–5 cm); mediastinum testis (posterior hyperechoic band); any focal lesions; testicular appendage (appendix testis — small oval structure at the superior pole, may be visible when surrounded by hydrocele); blood flow on color Doppler (centripetal arteries).`,
-      tips: `Scanning Tip: The appendix testis (hydatid of Morgagni) is a small oval structure at the superior pole of the testis, visible when surrounded by a hydrocele. Torsion of the appendix testis causes acute scrotal pain and a 'blue dot sign' clinically. On ultrasound, it appears as a small hyperechoic nodule with absent vascularity at the superior pole.`,
-      pitfalls: ``,
-    },
-    left_testis_trans: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine with scrotum supported. Mirror the right testis technique. Always compare the left testis to the right in terms of size, echogenicity, and vascularity.
-Transducer Positioning: Same as right testis. Transverse (superior to inferior) and longitudinal (medial to lateral) sweeps. Measure in three dimensions and calculate volume.
-What to Assess: Same parameters as right testis. The left testis is typically slightly lower than the right due to the longer left spermatic cord. The left pampiniform plexus is more prone to varicocele formation due to the perpendicular drainage into the left renal vein.`,
-      tips: `Pearl: Varicocele is more common on the left (85–95% of cases) due to the perpendicular drainage of the left gonadal vein into the left renal vein (vs. oblique drainage of the right into the IVC). A right-sided varicocele without a left-sided varicocele should raise suspicion for a retroperitoneal mass compressing the right gonadal vein — evaluate with abdominal ultrasound.`,
-      pitfalls: ``,
-    },
-    left_testis_long: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
-    epididymis: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine with scrotum supported. The epididymis lies along the posterolateral aspect of the testis. The head (caput) is at the superior pole, the body (corpus) runs along the posterior aspect, and the tail (cauda) is at the inferior pole.
-Transducer Positioning: Scan the epididymis in longitudinal and transverse planes. The head is the most easily identified — it is isoechoic to slightly hyperechoic relative to the testis, and measures 10–12 mm in the normal adult. The body and tail are smaller (2–4 mm) and may be difficult to visualize unless enlarged.
-What to Assess: Epididymal head size (normal ≤12 mm); echogenicity (normal = isoechoic to slightly hyperechoic vs. testis); any focal lesions (epididymal cysts, spermatoceles); vascularity on color Doppler; signs of epididymitis (enlargement, heterogeneous echogenicity, increased vascularity, reactive hydrocele, scrotal wall thickening).`,
-      tips: `Scanning Tip: Epididymitis is the most common cause of acute scrotal pain in adults. Key ultrasound findings: enlarged, heterogeneous epididymis (head >12 mm), increased vascularity on color Doppler, reactive hydrocele, and scrotal wall thickening. The epididymis is affected first — testicular involvement (epididymo-orchitis) indicates more severe infection.
-Pearl: Epididymal cysts and spermatoceles are the most common epididymal masses. Epididymal cysts are anechoic, thin-walled, and located anywhere in the epididymis. Spermatoceles are similar but contain low-level echoes (spermatozoa) and are typically located in the epididymal head. Both are benign and require no treatment unless symptomatic.`,
-      pitfalls: ``,
-    },
-    scrotum_doppler: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
+  "tee:mervio": {
+    description: "Obtained at 60–90° multiplane angle with slight rightward rotation. Shows the RV inflow and outflow tracts simultaneously. Essential for RVOT assessment and pulmonary valve evaluation.",
+    structures: ["RV", "RA", "Tricuspid valve", "RVOT", "Pulmonary valve", "MPA"],
+    howToGet: ["From ME 4-chamber, rotate multiplane angle to 60–90°", "Turn probe slightly rightward", "RVOT and TV should be visible simultaneously"],
+    tips: ["Best view for TV morphology and RVOT assessment", "Assess for RVOT obstruction in HOCM or post-repair ToF", "PW Doppler in RVOT for pulmonary stenosis gradient"],
+    pitfalls: ["Oblique cut may not show true RVOT — adjust angle", "TV regurgitation jet may be eccentric — use color Doppler"],
+    measurements: ["RVOT diameter", "TV annulus", "Pulmonary valve gradient"],
   },
-  breast: {
-    breast_survey: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine with ipsilateral arm elevated above the head. For large or pendulous breasts, a slight oblique position (30–45°) flattens the lateral breast tissue against the chest wall, reducing tissue thickness and improving visualization.
-Transducer Positioning: Begin at the nipple and scan in a systematic radial/anti-radial or transverse/longitudinal grid pattern. Cover all quadrants (UOQ, UIQ, LOQ, LIQ) and the retroareolar region. Extend coverage to the axillary tail.
-What to Assess: Breast tissue composition (homogeneous fat, scattered fibroglandular, heterogeneous, extremely dense); skin thickness (normal <2 mm); Cooper ligaments; ductal architecture; symmetry between sides; any focal mass, asymmetry, or architectural distortion.`,
-      tips: `Scanning Tip: Use light, consistent transducer pressure throughout — excessive pressure compresses lesions and reduces their apparent size. Apply enough gel to maintain full contact. Adjust focal zone to the depth of interest and use tissue harmonic imaging to improve contrast resolution.
-Pearl: Radial/anti-radial scanning (parallel to ductal anatomy) is preferred by many breast imagers because ducts run radially from the nipple. This approach is more sensitive for intraductal pathology (DCIS, papilloma) than a grid pattern.`,
-      pitfalls: `Fat lobules can mimic oval hypoechoic masses. Confirm by scanning in two orthogonal planes — fat lobules will be isoechoic to surrounding fat and show no posterior features. Compressibility and lack of internal vascularity also favor fat lobule.`,
-    },
-    breast_lesion: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine, ipsilateral arm elevated. For lesions in the lateral breast, slight oblique positioning brings the lesion closer to the transducer. Document clock position, distance from nipple, and depth (anterior/middle/posterior third).
-Transducer Positioning: Center the lesion in the field of view. Scan in two orthogonal planes (radial/anti-radial or transverse/sagittal). Measure in three orthogonal dimensions: longest diameter, perpendicular diameter, and depth.
-What to Assess: BI-RADS descriptors — Shape (oval, round, irregular); Orientation (parallel = wider than tall, not parallel = taller than wide); Margin (circumscribed vs. not circumscribed: indistinct, angular, microlobulated, spiculated); Echo pattern (anechoic, hyperechoic, complex, hypoechoic, isoechoic, heterogeneous); Posterior features (no features, enhancement, shadowing, combined); Associated features (architectural distortion, duct changes, skin changes, edema, vascularity, elasticity).`,
-      tips: `Scanning Tip: Taller-than-wide orientation (not parallel) is the single most suspicious BI-RADS feature on ultrasound — it indicates the lesion is growing across tissue planes rather than along them. Always measure orientation in the radial plane where the lesion appears largest.
-Pearl: Posterior acoustic shadowing is the most specific feature for malignancy (especially IDC). Posterior enhancement is most common in cysts and some fibroadenomas but can also occur in mucinous carcinoma. Combined pattern (mixed shadowing and enhancement) is indeterminate.`,
-      pitfalls: `Microlobulated margins (≥3 lobulations) are suspicious (BI-RADS 4B) and should not be confused with macrolobulated margins, which are a feature of fibroadenomas. Use high-frequency (≥15 MHz) to resolve margin detail accurately.`,
-    },
-    breast_cyst: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine, ipsilateral arm elevated. Cysts are most commonly found in the upper outer quadrant and retroareolar region.
-Transducer Positioning: Center the cyst in the field of view. Scan in two orthogonal planes. Apply light pressure — cysts are compressible.
-What to Assess: Simple cyst criteria (all must be met): anechoic, circumscribed margins, imperceptible wall, posterior acoustic enhancement. Complicated cyst: homogeneous low-level internal echoes, no solid component. Complex cystic and solid mass: thick wall (>0.5 mm), thick internal septations, solid component, intracystic mass.`,
-      tips: `Scanning Tip: Simple cysts are BI-RADS 2 (benign) — no follow-up needed. Complicated cysts are BI-RADS 3 (probably benign) — 6-month follow-up is appropriate. Complex cystic and solid masses are BI-RADS 4 and require tissue sampling. Use high-frequency and harmonic imaging to differentiate internal echoes from artifact.
-Pearl: Clustered microcysts (multiple anechoic foci <2–3 mm each in a cluster) are BI-RADS 3 if no solid component. Milk of calcium in microcysts shows dependent layering on decubitus views — this is a benign finding (BI-RADS 2).`,
-      pitfalls: `Echogenic debris in a cyst (from hemorrhage or infection) can mimic a solid mass. Use color Doppler — absence of internal vascularity supports a cystic diagnosis. Aspiration may be needed for definitive diagnosis in ambiguous cases.`,
-    },
-    breast_mass: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
-    breast_axilla: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine with ipsilateral arm abducted and externally rotated (hand behind head). This opens the axilla and brings lymph nodes into view. Scan from the anterior axillary fold to the apex of the axilla.
-Transducer Positioning: Longitudinal and transverse planes through the axilla. Follow the axillary vessels (axillary artery and vein) as a guide — lymph nodes cluster around these vessels at levels I, II, and III.
-What to Assess: Node size (short axis diameter); cortical thickness (normal ≤3 mm); cortical morphology (uniform vs. focal thickening); fatty hilum (present = normal); shape (oval/reniform = normal; round = suspicious); vascularity (hilar = normal; peripheral/cortical = suspicious).`,
-      tips: `Scanning Tip: The most reliable criterion for pathologic lymphadenopathy is cortical thickness >3 mm (focal or diffuse). Loss of the fatty hilum combined with a round shape and peripheral vascularity is highly suspicious for metastatic involvement. Always measure the short axis diameter and cortical thickness.
-Pearl: In breast cancer staging, axillary lymph node status is the most important prognostic factor. Ultrasound-guided FNA or core biopsy of suspicious nodes (cortex >3 mm, absent hilum) can upstage patients and change surgical management (sentinel node biopsy vs. axillary dissection).`,
-      pitfalls: `Reactive lymphadenopathy (from infection, vaccination, or inflammatory conditions) can mimic metastatic nodes. Clinical correlation is essential — recent ipsilateral COVID-19 vaccination is a common cause of axillary lymphadenopathy that should be documented and followed at 4–6 weeks.`,
-    },
-    breast_nipple: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
-    breast_implant: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
+  "tee:meaorta": {
+    description: "Obtained at 0° (SAX) and 90–120° (LAX) multiplane angles in the mid-esophagus. Shows the ascending aorta. Essential for aortic dissection assessment and pre-TAVR planning.",
+    structures: ["Ascending aorta", "Aortic root", "Sinotubular junction", "Pulmonary artery (adjacent)"],
+    howToGet: ["Withdraw probe slightly from ME 4-chamber position", "0° for SAX view of ascending aorta", "Rotate to 90–120° for LAX view"],
+    tips: ["Ascending aorta SAX: circular cross-section — measure diameter", "LAX: assess for dissection flap, intramural hematoma", "PA is adjacent to ascending aorta — do not confuse"],
+    pitfalls: ["Blind spot in distal ascending aorta (interposition of right bronchus)", "Artifact from calcified aorta may mimic dissection flap"],
+    measurements: ["Ascending aorta diameter (SAX and LAX)", "Sinotubular junction"],
+    criticalFindings: ["Aortic dissection flap", "Intramural hematoma", "Aortic aneurysm >5 cm"],
   },
-  venous: {
-    cfv: {
-      description: ``,
-      howToGet: `Transducer Positioning: Transverse plane at the inguinal ligament. The CFV lies medial to the common femoral artery. Identify the saphenofemoral junction where the great saphenous vein joins the CFV from the anteromedial aspect.
-What to Assess: Complete compressibility of the CFV in transverse plane. Obtain spectral Doppler waveform — normal shows spontaneous, phasic flow with respiration and augmentation with distal compression. Absent phasicity suggests proximal (iliac/IVC) obstruction.`,
-      tips: ``,
-      pitfalls: ``,
-    },
-    fv: {
-      description: ``,
-      howToGet: `Transducer Positioning: Transverse plane, tracing the femoral vein from the CFV distally through the thigh. The FV (previously called superficial femoral vein) runs with the superficial femoral artery in the adductor (Hunter's) canal. Apply compression every 2 cm throughout its length.
-What to Assess: Complete compressibility every 2 cm along the entire length of the FV. The FV is the most common site for DVT. Assess for echogenic thrombus, partial compressibility, or absent colour Doppler flow.`,
-      tips: ``,
-      pitfalls: ``,
-    },
-    dfv: {
-      description: ``,
-      howToGet: `Transducer Positioning: Transverse plane at the proximal thigh, where the DFV (profunda femoris vein) joins the FV. The DFV is typically only assessed at its proximal portion near the confluence. It is not routinely traced distally.
-What to Assess: Compressibility at the DFV origin. Isolated DFV DVT is uncommon but clinically significant. Assess for echogenic thrombus extending from the FV into the DFV at the confluence.`,
-      tips: ``,
-      pitfalls: ``,
-    },
-    popliteal: {
-      description: ``,
-      howToGet: `Patient Positioning: The patient may be positioned prone with the knee slightly flexed, or seated with the legs dependent. The prone or lateral decubitus position provides optimal access to the popliteal fossa.
-Transducer Positioning: Transverse plane in the popliteal fossa. The popliteal vein lies superficial (posterior) to the popliteal artery in this position. The small saphenous vein (SSV) joins the popliteal vein at the saphenopopliteal junction — assess this junction for SVT extension.
-What to Assess: Complete compressibility of the popliteal vein. Obtain spectral Doppler waveform — augment with calf squeeze. Assess the saphenopopliteal junction for SVT. The popliteal vein is the second most common site for DVT.`,
-      tips: ``,
-      pitfalls: ``,
-    },
-    posterior_tibial: {
-      description: ``,
-      howToGet: `Patient Positioning: The patient is seated with the legs dependent or in the reverse Trendelenburg position. Dependent positioning maximises venous filling in the calf veins and improves visualisation.
-Transducer Positioning: Transverse plane along the medial calf, posterior to the tibia. The posterior tibial veins (paired) run with the posterior tibial artery. Trace from the ankle to the popliteal fossa. Use a high-frequency linear transducer.
-What to Assess: Compressibility of the paired posterior tibial veins throughout their course. Calf DVT (isolated distal DVT) carries a 15–25% risk of proximal propagation if untreated. Current AIUM and SVU guidelines recommend documenting calf vein assessment.`,
-      tips: ``,
-      pitfalls: ``,
-    },
-    peroneal: {
-      description: ``,
-      howToGet: `Patient Positioning: The patient is seated with the legs dependent or in the reverse Trendelenburg position. Dependent positioning maximises venous filling in the calf veins and improves visualisation.
-Transducer Positioning: Transverse plane along the posterior/lateral calf, adjacent to the fibula. The peroneal veins (paired) run with the peroneal artery. They are the deepest of the calf veins and can be challenging to visualise in obese patients.
-What to Assess: Compressibility of the paired peroneal veins. The peroneal veins are a common site for isolated calf DVT. Use colour Doppler and augmentation to confirm patency when direct compression is difficult due to patient habitus.`,
-      tips: ``,
-      pitfalls: ``,
-    },
-    great_saphenous: {
-      description: ``,
-      howToGet: `Transducer Positioning: Transverse plane at the saphenofemoral junction (SFJ) in the groin. The GSV joins the CFV anteromedially. Assess the proximal 10 cm of the GSV for superficial vein thrombosis (SVT) that may extend to or through the SFJ.
-What to Assess: Compressibility at the SFJ and proximal GSV. SVT within 3 cm of the SFJ carries significant risk of DVT extension and may require anticoagulation per current AIUM and SVU guidelines. Document the distance of any thrombus from the SFJ.`,
-      tips: ``,
-      pitfalls: ``,
-    },
-    small_saphenous: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
+  "tee:tgsax": {
+    description: "Obtained by advancing the probe into the stomach and anteflexing. Shows the LV in short axis at the mid-papillary level. Essential for intraoperative monitoring and regional wall motion assessment.",
+    structures: ["LV (all 6 mid segments)", "Anterolateral papillary muscle", "Posteromedial papillary muscle", "RV (anterior)"],
+    howToGet: ["Advance probe into stomach (40–45 cm)", "Anteflex to bring LV into view", "Set multiplane angle to 0°", "Optimize for circular LV cross-section"],
+    tips: ["Best intraoperative view for continuous LV monitoring", "All 6 LV mid segments visible — ideal for RWMA detection", "Papillary muscles: anterolateral (LAD/LCx) vs posteromedial (RCA)"],
+    pitfalls: ["Oblique cut gives oval LV — adjust anteflexion", "Near-field artifact from stomach wall"],
+    measurements: ["LV EF (visual)", "Wall motion score", "LV dimensions"],
   },
-  arterial: {
-    segmental_pressures: {
-      description: ``,
-      howToGet: `Patient Positioning: The examination is best performed in a warm room to minimize the effects of peripheral vasoconstriction. The patient should be recumbent and ideally acclimatized for at least 10–15 minutes before testing begins.
-Transducer Positioning: Upper thigh, lower thigh, calf, ankle, metatarsals (lower extremity); Upper arm, upper forearm, above the wrist (upper extremity); Digits (toes and fingers). Place cuffs snugly — a loose cuff overestimates the pressure.
-What to Assess: Segmental or digital blood pressure readings, Doppler waveforms at each level, return of blood flow as cuff deflates. A pressure gradient >20 mmHg between adjacent segments indicates significant disease at that level.`,
-      tips: ``,
-      pitfalls: ``,
-    },
-    cw_doppler: {
-      description: ``,
-      howToGet: `Patient Positioning: The examination is best performed in a warm room to minimize the effects of peripheral vasoconstriction. The patient should be recumbent and ideally acclimatized for at least 10–15 minutes before testing begins.
-Transducer Positioning: Common femoral, superficial femoral, popliteal, posterior tibial, dorsalis pedis (lower extremity); Subclavian, axillary, brachial, radial, ulnar (upper extremity). Maintain a consistent Doppler angle throughout the examination.
-What to Assess: Arterial waveforms at each level — normal is triphasic (high-resistance). Biphasic waveforms indicate mild-moderate disease; monophasic indicates severe disease or proximal occlusion. Always compare bilaterally.`,
-      tips: ``,
-      pitfalls: ``,
-    },
-    pvr: {
-      description: ``,
-      howToGet: `Patient Positioning: The examination is best performed in a warm room to minimize the effects of peripheral vasoconstriction. The patient should be recumbent and ideally acclimatized for at least 10–15 minutes before testing begins.
-Transducer Positioning: Upper thigh, lower thigh, calf, ankle, metatarsals (lower extremity); Upper arm, upper forearm, above the wrist (upper extremity); Toes and digits. Cuffs are inflated to 65 mmHg for PVR recording.
-What to Assess: Global tissue perfusion at each level. Normal PVR shows a sharp upstroke, clear peak, and dicrotic notch. Flattened waveforms indicate reduced perfusion. PVRs are particularly useful when arteries are non-compressible due to calcification.`,
-      tips: ``,
-      pitfalls: ``,
-    },
-    abi: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
-    exercise_abi: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
+  "tee:tg2c": {
+    description: "Obtained at 90° multiplane angle from TG SAX position. Shows the LV anterior and inferior walls in long axis. Used for LV volume assessment and wall motion.",
+    structures: ["LV (anterior and inferior walls)", "LA", "Mitral valve", "Papillary muscles"],
+    howToGet: ["From TG SAX, rotate multiplane angle to 90°", "LV anterior and inferior walls visible", "Optimize depth to include apex"],
+    tips: ["Anterior wall (top) = LAD territory; inferior wall (bottom) = RCA territory", "Useful for LV volume assessment when apical views are suboptimal", "Advance probe slightly to optimize apex visualization"],
+    pitfalls: ["Foreshortening of LV apex is common", "Oblique cut may include RV"],
+    measurements: ["LV volume (Simpson)", "Wall motion score"],
   },
-  abdominal_vascular: {
-    portal_vein_main: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine; left lateral decubitus (LLD) position improves intercostal access. Ask patient to hold deep inspiration to move liver inferiorly for subcostal windows.
-Transducer Positioning: Transverse or oblique subcostal approach at the porta hepatis; angle superiorly toward the liver hilum. Intercostal approach (right 8th–10th ICS) if subcostal is limited.
-What to Assess: Main portal vein (MPV) diameter at the porta hepatis; color Doppler flow direction (hepatopetal = normal); spectral Doppler waveform and mean velocity (normal 15–40 cm/s); assess for portal vein thrombosis.`,
-      tips: `Scanning Tip: Measure MPV diameter in transverse at the porta hepatis, perpendicular to the vessel. A diameter >13 mm suggests portal hypertension. Always confirm flow direction with color Doppler before spectral sampling — color box orientation can be misleading.
-Pearl: Hepatofugal portal flow (away from liver) is pathognomonic of portal hypertension. A flat, non-phasic waveform or velocity <12 cm/s also indicates elevated portal pressure.`,
-      pitfalls: `Respiratory variation can cause the portal vein waveform to appear pulsatile in normal patients. True pathologic pulsatility (from right heart failure or tricuspid regurgitation) shows a more pronounced, synchronized pulsatile pattern.`,
-    },
-    hepatic_veins: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine or slight left lateral decubitus. Subcostal approach angled superiorly toward the IVC confluence, or intercostal approach from the right side.
-Transducer Positioning: Subcostal or intercostal, angled superiorly toward the diaphragm and IVC. All three hepatic veins (right, middle, left) converge at the IVC — use this as the landmark.
-What to Assess: Hepatic vein diameter and patency; spectral Doppler waveform morphology (normal = triphasic with S, D, and A waves); assess for Budd-Chiari syndrome (absent/reversed flow, thrombus); IVC patency at hepatic vein confluence.`,
-      tips: `Scanning Tip: The triphasic hepatic vein waveform reflects right heart phasicity. Loss of the A-wave reversal (biphasic) or a flat monophasic waveform suggests hepatic congestion, cirrhosis, or Budd-Chiari syndrome. Always obtain waveforms from all three hepatic veins.
-Pearl: Caudate lobe hypertrophy is a classic finding in Budd-Chiari syndrome — the caudate lobe has independent venous drainage directly into the IVC and is spared from congestion.`,
-      pitfalls: `The right hepatic vein can be mistaken for the right portal vein — confirm by tracing the vessel to the IVC (hepatic vein) vs. the portal hilum (portal vein). Color Doppler direction also differs: hepatic veins drain toward the IVC (away from liver parenchyma).`,
-    },
-    hepatic_artery: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine; oblique subcostal approach along the hepatoduodenal ligament. LLD position may improve visualization.
-Transducer Positioning: Transverse/oblique at the porta hepatis. The hepatic artery runs alongside the portal vein and common bile duct (portal triad). Use color Doppler to identify the pulsatile arterial signal within the triad.
-What to Assess: Hepatic artery patency; spectral Doppler waveform (low-resistance, continuous forward diastolic flow); resistive index (RI) 0.55–0.70; PSV 60–100 cm/s; post-transplant: assess for stenosis (PSV >200 cm/s) or thrombosis (absent flow).`,
-      tips: `Scanning Tip: In post-transplant patients, always document the hepatic artery RI. An RI >0.80 suggests rejection or stenosis; RI <0.50 suggests an AV fistula or post-stenotic dilation. Absent diastolic flow (RI approaching 1.0) is a surgical emergency.
-Pearl: The 'Mickey Mouse sign' in transverse at the porta hepatis shows the portal vein (large circle), hepatic artery (small left circle), and common bile duct (small right circle). This is the most reliable landmark for hepatic artery identification.`,
-      pitfalls: `The hepatic artery is tortuous and may be difficult to sample at a consistent angle. Use the highest PSV obtained along the accessible course and document the angle used. Avoid angles >60° for velocity measurements.`,
-    },
-    splenic_vein: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
-    smv: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
-    tips_bmode: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
-    tips_spectral: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
-    tips_portal: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine; subcostal or right intercostal approach. The main portal vein is best visualized in the porta hepatis.
-Transducer Positioning: Oblique subcostal approach along the long axis of the portal vein. Place the sample volume in the main portal vein proximal to the TIPS stent entry point.
-What to Assess: Main portal vein PSV (≥30 cm/s post-TIPS indicates adequate decompression); flow direction (hepatopetal or hepatofugal); portal vein diameter (should decrease post-TIPS if adequately decompressed); assess for portal vein thrombosis.`,
-      tips: `Scanning Tip: A main portal vein PSV <20 cm/s post-TIPS is a reliable indicator of shunt dysfunction. Compare to the patient's own post-procedure baseline — a decrease of >50 cm/s from baseline is more clinically significant than the absolute value alone.
-Pearl: Successful TIPS decompression typically results in: (1) increased portal vein velocity, (2) decreased portal vein diameter, (3) resolution of varices on follow-up imaging, and (4) decreased spleen size over weeks to months. These indirect signs support adequate shunt function even when direct stent velocities are borderline.`,
-      pitfalls: ``,
-    },
-    tips_hepatic: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine or slight left lateral decubitus. Subcostal approach angled superiorly toward the IVC confluence, or intercostal approach from the right side.
-Transducer Positioning: Subcostal or intercostal, angled superiorly toward the diaphragm and IVC. All three hepatic veins (right, middle, left) converge at the IVC — use this as the landmark.
-What to Assess: Hepatic vein diameter and patency; spectral Doppler waveform morphology (normal = triphasic with S, D, and A waves); assess for Budd-Chiari syndrome (absent/reversed flow, thrombus); IVC patency at hepatic vein confluence.`,
-      tips: `Scanning Tip: The triphasic hepatic vein waveform reflects right heart phasicity. Loss of the A-wave reversal (biphasic) or a flat monophasic waveform suggests hepatic congestion, cirrhosis, or Budd-Chiari syndrome. Always obtain waveforms from all three hepatic veins.
-Pearl: Caudate lobe hypertrophy is a classic finding in Budd-Chiari syndrome — the caudate lobe has independent venous drainage directly into the IVC and is spared from congestion.`,
-      pitfalls: `The right hepatic vein can be mistaken for the right portal vein — confirm by tracing the vessel to the IVC (hepatic vein) vs. the portal hilum (portal vein). Color Doppler direction also differs: hepatic veins drain toward the IVC (away from liver parenchyma).`,
-    },
-    sma: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine; right lateral decubitus position if bowel gas obscures the SMA origin. Gentle transducer pressure and deep inspiration can displace bowel gas.
-Transducer Positioning: Midline epigastric, transverse to identify the SMA in cross-section (round structure anterior to the aorta), then rotate to longitudinal. The SMA arises from the anterior aorta at approximately the L1 level, 1–2 cm below the celiac axis.
-What to Assess: SMA patency; fasting waveform (high-resistance triphasic); PSV at origin (normal <275 cm/s); EDV (normal <45 cm/s); PSV ratio SMA/aorta >3.0 suggests significant stenosis.`,
-      tips: `Scanning Tip: The fasting SMA has a high-resistance triphasic waveform (similar to peripheral arteries) with minimal or reversed diastolic flow. Obtain PSV within 1 cm of the aortic origin — this is the most sensitive site for detecting stenosis. Maintain Doppler angle ≤60°.
-Pearl: PSV >275 cm/s OR EDV >45 cm/s at the SMA origin (fasting) indicates ≥70% stenosis per SVU criteria. Both criteria must be evaluated — EDV elevation is particularly specific for high-grade stenosis.`,
-      pitfalls: `Bowel gas is the primary technical limitation for mesenteric duplex. If the SMA origin cannot be visualized, document this clearly and note the technical limitation. Do not estimate velocities from a suboptimal angle.`,
-    },
-    celiac: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine; deep inspiration moves the liver inferiorly and may improve celiac axis visualization. The celiac axis is best seen in the epigastric region.
-Transducer Positioning: Midline epigastric, transverse to identify the 'seagull sign' (celiac trifurcation), then rotate to longitudinal. The celiac axis arises from the anterior aorta at T12–L1, just above the SMA origin.
-What to Assess: Celiac axis patency; low-resistance waveform (continuous forward diastolic flow); PSV at origin (normal <200 cm/s); assess for median arcuate ligament compression (MALS) — PSV increases on expiration.`,
-      tips: `Scanning Tip: The 'seagull sign' in transverse view identifies the celiac trifurcation — the celiac body and its two main branches (splenic and common hepatic arteries) form the shape of a seagull in flight. This is the most reliable landmark for the celiac axis.
-Pearl: For MALS assessment, obtain celiac axis PSV in both deep inspiration and expiration. A PSV that is significantly higher on expiration (>200 cm/s) and normalizes on inspiration suggests MALS rather than atherosclerotic stenosis.`,
-      pitfalls: `The celiac axis is often calcified in older patients, causing acoustic shadowing that obscures the lumen. Use color Doppler to identify flow around calcified plaques and obtain spectral samples distal to the calcification.`,
-    },
-    ima: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
-    renal_artery_right: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
-    renal_artery_left: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
-    renal_parenchyma_right: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
-    renal_parenchyma_left: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
-    renal_vein_right: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
-    renal_vein_left: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
-    renal_resistive_index: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
-    intrarenal_doppler: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
+  "tee:tglax": {
+    description: "Obtained at 90–120° multiplane angle from TG position. Shows the LVOT, aortic valve, and LV in long axis. Best transgastric view for LVOT VTI measurement.",
+    structures: ["LV", "LVOT", "Aortic valve", "Mitral valve", "LA", "Aortic root"],
+    howToGet: ["From TG 2-chamber, rotate multiplane angle to 90–120°", "LVOT and AV come into view", "Align PW Doppler cursor parallel to LVOT flow"],
+    tips: ["Best TG view for LVOT VTI — Doppler beam parallel to flow", "Useful when apical views are unavailable (e.g., post-sternotomy)", "CW through AV for gradient measurement"],
+    pitfalls: ["Underalignment of Doppler cursor underestimates VTI", "Foreshortening of LVOT may affect diameter measurement"],
+    measurements: ["LVOT VTI", "AV gradient (CW)", "LVOT diameter"],
   },
-  aorta: {
-    proximal_aorta_long: {
-      description: ``,
-      howToGet: `Patient Positioning: The patient should be in a supine position. A left lateral decubitus (LLD) or right lateral decubitus (RLD) position may be used as needed to improve visualization by displacing overlying bowel gas away from the midline.
-Transducer Positioning: Subxiphoid, sagittal plane — angle superiorly to visualize the aorta as it passes through the diaphragmatic hiatus. The proximal aorta is identified just below the xiphoid process.
-What to Assess: Visualize the aorta as it passes through the diaphragm. Assess for plaque, thrombus, or dissection. Note the relationship to the celiac axis origin.`,
-      tips: ``,
-      pitfalls: ``,
-    },
-    proximal_aorta_trans: {
-      description: ``,
-      howToGet: `Patient Positioning: The patient should be in a supine position. A left lateral decubitus (LLD) or right lateral decubitus (RLD) position may be used as needed to improve visualization.
-Transducer Positioning: Subxiphoid, transverse plane — sweep inferiorly from the diaphragm to identify the celiac axis and superior mesenteric artery origins. The aorta appears as a round pulsatile structure anterior to the spine.
-What to Assess: Visualize the celiac and superior mesenteric arteries. Assess for plaque, thrombus, or dissection. Measure the anteroposterior and transverse diameters.`,
-      tips: ``,
-      pitfalls: ``,
-    },
-    mid_aorta_long: {
-      description: ``,
-      howToGet: `Patient Positioning: The patient should be in a supine position. A left lateral decubitus (LLD) or right lateral decubitus (RLD) position may be used as needed to improve visualization.
-Transducer Positioning: Mid-abdomen, sagittal plane — at the level of the umbilicus. The renal arteries arise from the lateral walls of the aorta at approximately L1–L2.
-What to Assess: Visualize the aorta at the level of the renal arteries. Assess for plaque, thrombus, or dissection. This is the most common level for AAA formation.`,
-      tips: ``,
-      pitfalls: ``,
-    },
-    mid_aorta_trans: {
-      description: ``,
-      howToGet: `Patient Positioning: The patient should be in a supine position. A left lateral decubitus (LLD) or right lateral decubitus (RLD) position may be used as needed to improve visualization.
-Transducer Positioning: Mid-abdomen, transverse plane — rotate 90° from the sagittal view. The left renal vein is a useful landmark, crossing anterior to the aorta at the level of the renal arteries.
-What to Assess: Visualize the renal arteries branching off the aorta. Assess for plaque, thrombus, or dissection. Measure the maximum transverse diameter.`,
-      tips: ``,
-      pitfalls: ``,
-    },
-    distal_aorta_long: {
-      description: ``,
-      howToGet: `Patient Positioning: The patient should be in a supine position. A left lateral decubitus (LLD) or right lateral decubitus (RLD) position may be used as needed to improve visualization.
-Transducer Positioning: Lower abdomen, sagittal plane — trace the aorta inferiorly from the mid-abdomen to the bifurcation. The bifurcation typically occurs at the L4 level, just below the umbilicus.
-What to Assess: Visualize the aorta to the bifurcation. Assess for plaque, thrombus, or dissection. The distal aorta is a common site for AAA extension.`,
-      tips: ``,
-      pitfalls: ``,
-    },
-    distal_aorta_trans: {
-      description: ``,
-      howToGet: `Patient Positioning: The patient should be in a supine position. A left lateral decubitus (LLD) or right lateral decubitus (RLD) position may be used as needed to improve visualization.
-Transducer Positioning: Lower abdomen, transverse plane — follow the aorta to where it divides into the two common iliac arteries. The bifurcation appears as a 'Y' shape in the transverse view.
-What to Assess: Visualize the aortic bifurcation into the common iliac arteries. Assess for plaque, thrombus, or dissection. Note any extension of AAA into the iliac arteries.`,
-      tips: ``,
-      pitfalls: ``,
-    },
-    iliac_arteries: {
-      description: ``,
-      howToGet: `Patient Positioning: The patient should be in a supine position. A left lateral decubitus (LLD) or right lateral decubitus (RLD) position may be used as needed to improve visualization.
-Transducer Positioning: Just inferior to the aortic bifurcation, sagittal oblique plane — angle obliquely to follow each common iliac artery laterally. Normal common iliac artery diameter is <1.5 cm.
-What to Assess: Visualize the proximal common iliac arteries. Assess for aneurysmal dilation (>1.5 cm is considered aneurysmal). Color Doppler confirms patency.`,
-      tips: ``,
-      pitfalls: ``,
-    },
-    aorta_doppler: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
+  "tee:tgrvio": {
+    description: "Obtained at 0–30° multiplane angle from TG position with rightward rotation. Shows the RV inflow. Used for TV assessment and RV function evaluation.",
+    structures: ["RV", "RA", "Tricuspid valve", "IVC", "Hepatic veins"],
+    howToGet: ["From TG SAX, rotate probe rightward (clockwise)", "Set multiplane angle to 0–30°", "TV and RV inflow should come into view"],
+    tips: ["Best TG view for TV assessment", "Assess for TV regurgitation with color Doppler", "RV inflow: assess for RA thrombus or mass"],
+    pitfalls: ["Difficult to obtain in all patients", "TV may be partially obscured by near-field artifact"],
+    measurements: ["TV annulus", "TR Vmax", "RV dimensions"],
   },
-  carotid: {
-    cca: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
-    carotid_bifurcation: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
-    ica: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
-    eca: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
-    vertebral: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
-    subclavian: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
+  "tee:ueaorticarch": {
+    description: "Obtained by withdrawing the probe to the upper esophagus (20–25 cm). Shows the aortic arch in long axis. Essential for aortic arch pathology assessment.",
+    structures: ["Aortic arch", "Innominate artery", "Left carotid artery", "Left subclavian artery", "Descending aorta"],
+    howToGet: ["Withdraw probe to upper esophagus (20–25 cm)", "Set multiplane angle to 0°", "Rotate probe leftward to bring arch into view"],
+    tips: ["Aortic arch visible as 'candy cane' — assess for dissection, atheroma", "Retrograde flow in descending aorta = significant AR", "Assess arch atheroma before cardiac surgery (embolic risk)"],
+    pitfalls: ["Blind spot in distal ascending aorta", "Arch atheroma may be underestimated"],
+    measurements: ["Aortic arch diameter", "Arch atheroma grade (1–5)"],
+    criticalFindings: ["Type A aortic dissection extending to arch", "Severe arch atheroma (Grade 4–5)", "Aortic arch aneurysm"],
   },
-  tcd: {
-    transtemporal: {
-      description: ``,
-      howToGet: `Patient Positioning: Patient supine with head in neutral position or slight contralateral rotation. The transtemporal window is located at the thinnest portion of the temporal bone (pterion), cephalad to the zygomatic arch and anterior to the ear. Scan bilaterally for comparison.
-Transducer Positioning: Place the transducer at the temporal window (just above the zygomatic arch, anterior to the ear). Angle slightly superiorly and medially. The ipsilateral cerebral peduncle (butterfly-shaped hyperechoic structure) is the key landmark for identifying the circle of Willis.
-What to Assess: Middle Cerebral Artery (MCA): depth 45–65 mm, flow toward probe (positive), normal mean velocity 55–80 cm/s. Anterior Cerebral Artery (ACA): depth 60–75 mm, flow away from probe (negative). Posterior Cerebral Artery (PCA): P1 segment toward probe, P2 away; depth 60–70 mm. Assess for asymmetry, elevated velocities (vasospasm), or absent flow.`,
-      tips: `Scanning Tip: The MCA is the most reliably insonated vessel via the transtemporal window. Start at depth 50–55 mm and optimize the signal before moving to other vessels. Use color Doppler to confirm vessel identity before spectral sampling. Always obtain bilateral MCA velocities for comparison.
-Pearl: MCA mean velocity >120 cm/s with Lindegaard ratio >3 indicates vasospasm after subarachnoid hemorrhage. Lindegaard ratio = MCA mean velocity ÷ extracranial ICA mean velocity; ratio >3 = mild vasospasm, >6 = severe vasospasm. This distinguishes true vasospasm from hyperemia.`,
-      pitfalls: `Up to 10–15% of adults (higher in elderly, women, and African Americans) have inadequate temporal bone windows. If no signal is obtained, try a more anterior or posterior position along the temporal squama. Document the window quality in the report.`,
-    },
-    transorbital: {
-      description: ``,
-      howToGet: `Patient Positioning: Patient supine with eyes closed. Apply gel to the closed eyelid. Use the minimum acoustic output necessary (MI <0.23 per AIUM guidelines) to minimize ocular exposure. Limit orbital scanning time to the minimum required.
-Transducer Positioning: Place the transducer gently on the closed eyelid. Angle slightly medially to insonate the ophthalmic artery (OA) at depth 40–60 mm. Increase depth to 60–80 mm for the ICA siphon (carotid siphon).
-What to Assess: Ophthalmic artery (OA): depth 40–60 mm, flow toward probe (positive), normal PSV 20–40 cm/s. ICA siphon: depth 60–80 mm, bidirectional flow. Reversed OA flow (away from probe) is a sign of ipsilateral severe ICA stenosis/occlusion with collateral flow reversal.`,
-      tips: `Scanning Tip: Reversed ophthalmic artery flow is a critical finding indicating severe ipsilateral ICA disease with collateral supply from the contralateral ICA via the anterior communicating artery. Always compare OA flow direction bilaterally.`,
-      pitfalls: `CRITICAL: Reduce acoustic output to MI <0.23 BEFORE placing the transducer on the eye. Do NOT use standard cardiac or abdominal presets for orbital scanning — these have much higher output levels that can cause thermal injury to the lens. Use a dedicated ophthalmic or TCD preset.`,
-    },
-    suboccipital: {
-      description: ``,
-      howToGet: `Patient Positioning: Patient seated with neck flexed (chin to chest), or lateral decubitus with neck flexed. The suboccipital window is located at the foramen magnum, between the occiput and C1 spinous process. This window provides access to the vertebral arteries (VA) and basilar artery (BA).
-Transducer Positioning: Place the transducer at the suboccipital midline, angled superiorly toward the foramen magnum. The basilar artery is at depth 80–120 mm (flow away from probe). The vertebral arteries are at depth 60–80 mm, lateral to midline (flow away from probe).
-What to Assess: Basilar artery (BA): depth 80–120 mm, flow away from probe, normal mean velocity 35–60 cm/s. Vertebral arteries (VA): depth 60–80 mm, flow away from probe, normal mean velocity 35–55 cm/s. Assess for asymmetry, absent flow (VA occlusion), or elevated velocities.`,
-      tips: `Scanning Tip: The basilar artery is identified by its midline position and depth >80 mm. The vertebral arteries are lateral to the midline. Absent or reversed VA flow on one side with normal contralateral VA suggests VA occlusion or subclavian steal syndrome.
-Pearl: Subclavian steal syndrome: reversed VA flow ipsilateral to a proximal subclavian artery stenosis/occlusion. The VA flow reversal may be intermittent (latent steal) or continuous (manifest steal). Provocative testing (arm exercise or reactive hyperemia) can unmask latent steal.`,
-      pitfalls: ``,
-    },
-    submandibular: {
-      description: ``,
-      howToGet: `Patient Positioning: Patient supine with neck slightly extended and head rotated contralaterally. The submandibular window is located beneath the angle of the mandible. This window provides access to the distal extracranial ICA and the proximal intracranial ICA.
-Transducer Positioning: Place the transducer beneath the angle of the mandible, angled superiorly and medially. The distal ICA is at depth 40–60 mm (flow toward probe). This window is used to obtain the extracranial ICA velocity for the Lindegaard ratio calculation.
-What to Assess: Distal extracranial ICA: depth 40–60 mm, flow toward probe, normal PSV 40–80 cm/s. Used to calculate the Lindegaard ratio (MCA/ICA mean velocity) for vasospasm assessment. Also used to assess ICA patency in patients with poor temporal windows.`,
-      tips: `Scanning Tip: The submandibular ICA velocity is required for accurate Lindegaard ratio calculation. Without the extracranial ICA velocity, elevated MCA velocities cannot be reliably distinguished from hyperemia vs. true vasospasm. Always obtain bilateral submandibular ICA velocities in SAH patients.
-Pearl: Lindegaard Ratio interpretation: <3 = normal or hyperemia; 3–6 = mild-moderate vasospasm; >6 = severe vasospasm. A ratio <3 with elevated MCA velocity indicates global hyperemia (e.g., from fever, anemia, or hyperdynamic state), NOT vasospasm.`,
-      pitfalls: ``,
-    },
-    tcd_emboli: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
+  "tee:uepv": {
+    description: "Obtained at 90° multiplane angle in the upper esophagus. Shows the pulmonary veins entering the LA. Used for pulmonary vein flow assessment and LAAO/TEER guidance.",
+    structures: ["Left superior pulmonary vein (LSPV)", "Left inferior pulmonary vein (LIPV)", "Right superior pulmonary vein (RSPV)", "LA", "LAA"],
+    howToGet: ["From UE aortic arch, rotate multiplane angle to 90°", "Rotate probe leftward for left PVs, rightward for right PVs", "PW Doppler in PV for flow assessment"],
+    tips: ["PV flow: S wave (systolic), D wave (diastolic), Ar wave (atrial reversal)", "Blunted S wave or dominant D wave suggests elevated LA pressure", "LSPV ridge ('warfarin ridge') may be mistaken for LAA thrombus"],
+    pitfalls: ["LSPV ridge mistaken for LAA thrombus — assess with color Doppler", "Ar wave >35 cm/s suggests elevated LVEDP"],
+    measurements: ["PV S/D ratio", "PV Ar velocity/duration", "PV diameter"],
   },
-  msk: {
-    shoulder: {
-      description: ``,
-      howToGet: `Patient Positioning: Seated on a stool or examination table with the arm at the side (neutral rotation). For the rotator cuff interval and long head of biceps: arm in neutral. For supraspinatus: arm in modified Crass position (hand on ipsilateral hip, elbow pointing posteriorly) to bring the tendon out from under the acromion. For infraspinatus/teres minor: arm across the chest (internal rotation). For subscapularis: arm externally rotated, then dynamically assess with internal/external rotation.
-Transducer Positioning: Biceps tendon (LHB): transverse at the bicipital groove, then longitudinal. Subscapularis: transverse with arm externally rotated. Supraspinatus: longitudinal (coronal oblique) and transverse in modified Crass position. Infraspinatus/teres minor: posterior approach, longitudinal and transverse. Subacromial-subdeltoid (SASD) bursa: longitudinal over the supraspinatus. AC joint: longitudinal over the AC joint.
-What to Assess: LHB tendon (tenosynovitis, subluxation, tear, rupture); subscapularis tendon (partial/full-thickness tear, calcific tendinopathy); supraspinatus tendon (partial/full-thickness tear — critical zone 1 cm from insertion; calcific tendinopathy); infraspinatus/teres minor (posterior cuff tear); SASD bursa (effusion >2 mm, thickening >2 mm, bursitis); AC joint (osteoarthritis, osteophytes, effusion); glenohumeral joint (posterior recess effusion >2 mm); dynamic impingement assessment.`,
-      tips: `Scanning Tip: Anisotropy: always scan with the transducer perpendicular to the tendon fibers. Tendons appear hyperechoic when perpendicular and falsely hypoechoic (mimicking a tear) when the beam is angled. Heel-toe the transducer to maintain perpendicularity as the tendon curves over the humeral head. This is the most common pitfall in shoulder ultrasound.
-Scanning Tip: Full-thickness rotator cuff tear: look for a focal defect (hypoechoic or anechoic gap) in the tendon extending from the articular to the bursal surface. The 'cartilage interface sign' (bare cartilage visible through the defect) confirms a full-thickness tear. Measure the tear size in two planes (AP and ML dimensions). Assess for retraction and muscle atrophy (fatty infiltration).
-Pearl: Dynamic assessment: assess for dynamic subacromial impingement by asking the patient to abduct the arm while scanning longitudinally over the supraspinatus. Impingement is confirmed if the SASD bursa bunches up under the acromion during abduction. Also assess LHB tendon stability dynamically by rotating the arm — subluxation of the LHB out of the bicipital groove is diagnostic of a subscapularis tear.`,
-      pitfalls: `Calcific tendinopathy: calcium deposits appear as hyperechoic foci with posterior acoustic shadowing. They can be focal (hard calcium) or diffuse (soft calcium — 'toothpaste' consistency). Soft calcium deposits may not shadow. Dynamic compression of soft calcium deposits with the transducer may cause them to move or extrude — this confirms soft calcium and predicts response to barbotage.`,
-    },
-    elbow: {
-      description: ``,
-      howToGet: `Patient Positioning: Anterior: elbow extended, forearm supinated (palm up). Medial: elbow flexed 90°, forearm supinated. Lateral: elbow flexed 90°, forearm pronated. Posterior: elbow flexed 90°, forearm pronated on the examination table.
-Transducer Positioning: Anterior: longitudinal and transverse over the distal biceps tendon and brachialis. Medial: longitudinal over the common flexor tendon (CFT) and ulnar collateral ligament (UCL); transverse over the ulnar nerve in the cubital tunnel. Lateral: longitudinal and transverse over the common extensor tendon (CET) and lateral collateral ligament complex. Posterior: longitudinal and transverse over the triceps tendon and olecranon bursa; transverse over the posterior joint recess.
-What to Assess: Common extensor tendon (CET): lateral epicondyle insertion — partial/full-thickness tear, calcific tendinopathy (lateral epicondylitis/'tennis elbow'); Common flexor tendon (CFT): medial epicondyle insertion — partial/full-thickness tear (medial epicondylitis/'golfer's elbow'); Ulnar nerve: cubital tunnel — thickening (>3.5 mm cross-sectional area), subluxation with elbow flexion; UCL: medial stability; Distal biceps tendon: distal insertion at radial tuberosity — tear, tendinopathy; Olecranon bursa: effusion, thickening, calcification; Joint recess: effusion, loose bodies, synovitis.`,
-      tips: `Scanning Tip: Lateral epicondylitis (tennis elbow): the CET origin at the lateral epicondyle is the most common site of pathology. Look for focal hypoechoic areas, tendon thickening, calcification, and cortical irregularity at the lateral epicondyle. Color Doppler shows neovascularity in active tendinopathy. The CET is best assessed with the elbow flexed 90° and the forearm pronated.
-Pearl: Ulnar nerve subluxation: assess the ulnar nerve in the cubital tunnel dynamically with elbow flexion. The nerve should remain in the groove. Subluxation (nerve moves anterior to the medial epicondyle with flexion) is seen in ~16% of the population and may cause ulnar neuropathy. Measure the nerve cross-sectional area (CSA) — >10 mm² suggests cubital tunnel syndrome.`,
-      pitfalls: `Distal biceps tendon: the tendon inserts on the radial tuberosity and is best seen with the elbow extended and forearm fully supinated. The 'cobra head' view (transverse at the radial tuberosity with forearm pronated) brings the insertion into view. A complete distal biceps tear causes the tendon to retract proximally — look for an empty bicipital tunnel and a 'clapper-in-bell' sign (retracted tendon within the bicipital aponeurosis).`,
-    },
-    wrist: {
-      description: ``,
-      howToGet: `Patient Positioning: Dorsal (posterior): wrist in neutral or slight flexion, palm down on the table. Volar (anterior): wrist in slight extension, palm up. Radial: wrist in neutral, thumb side up. Ulnar: wrist in neutral, little finger side up.
-Transducer Positioning: Volar: transverse (carpal tunnel view) and longitudinal over the median nerve, flexor tendons, and flexor retinaculum. Dorsal: transverse and longitudinal over the extensor compartments (1–6), DRUJ, and dorsal radiocarpal ligaments. Radial: longitudinal over the 1st extensor compartment (APL, EPB) for de Quervain's. Ulnar: longitudinal over the ECU tendon and TFCC region.
-What to Assess: Carpal tunnel: median nerve CSA (normal <10 mm² at the pisiform level; >15 mm² = CTS); flexor tendon tenosynovitis; Extensor compartments: 1st (APL/EPB — de Quervain's tenosynovitis), 2nd (ECRL/ECRB), 3rd (EPL — rupture in RA), 4th (EDC/EIP), 5th (EDM), 6th (ECU — subluxation, tendinopathy); TFCC region: DRUJ effusion, ECU tendon; Ganglion cysts: dorsal (scapholunate ligament origin) and volar (radioscaphoid joint origin).`,
-      tips: `Scanning Tip: Carpal tunnel syndrome (CTS): measure the median nerve CSA in the transverse plane at the level of the pisiform (proximal carpal tunnel). A CSA >10 mm² is abnormal; >15 mm² is diagnostic of CTS. Also assess the nerve echogenicity (hypoechoic in CTS), the wrist-to-forearm ratio (>1.4 is abnormal), and the presence of a bifid median nerve or persistent median artery (risk factors for CTS).
-Pearl: De Quervain's tenosynovitis: look for thickening and hypoechogenicity of the APL and EPB tendons within the 1st extensor compartment, tenosynovial fluid, and neovascularity on color Doppler. A septum between the APL and EPB subcompartments is present in ~34% of patients and is associated with higher failure rates with corticosteroid injection — identify it before injection and guide the needle into the correct subcompartment.`,
-      pitfalls: `Ganglion cysts: dorsal wrist ganglia arise from the scapholunate ligament and are the most common wrist mass. They appear as anechoic or hypoechoic cysts with posterior acoustic enhancement. They may be multilocular and have a neck connecting to the joint. Volar ganglia arise from the radioscaphoid joint and are adjacent to the radial artery — always identify the radial artery before aspiration to avoid inadvertent arterial puncture.`,
-    },
-    hip: {
-      description: ``,
-      howToGet: `Patient Positioning: Anterior hip (joint, iliopsoas): supine with leg in neutral rotation. For iliopsoas bursa: supine with hip slightly flexed and externally rotated. Lateral hip (greater trochanteric bursae, gluteal tendons): lateral decubitus with affected side up, hip slightly flexed. Posterior hip (sciatic nerve, hamstring origin): prone or lateral decubitus.
-Transducer Positioning: Anterior: longitudinal (parallel to femoral neck) and transverse over the anterior joint recess and iliopsoas tendon/bursa. Lateral: longitudinal and transverse over the greater trochanter, gluteus medius/minimus tendons, and trochanteric bursae. Posterior: longitudinal over the ischial tuberosity (hamstring origin) and sciatic nerve.
-What to Assess: Anterior joint recess: effusion (>7 mm depth or >2 mm difference from contralateral side); iliopsoas tendon: tendinopathy, bursitis (iliopsoas bursa — communicates with joint in ~15%); Greater trochanteric pain syndrome: gluteus medius/minimus tendinopathy (insertional thickening, hypoechogenicity, calcification), trochanteric bursitis (effusion in subgluteus medius or maximus bursa); Hamstring origin: proximal hamstring tendinopathy, partial/complete avulsion (ischial tuberosity); Sciatic nerve: neuritis, piriformis syndrome; Pediatric: developmental dysplasia (DDH) in infants <6 months (Graf method).`,
-      tips: `Scanning Tip: Hip joint effusion: in the anterior longitudinal plane, measure the distance from the anterior femoral neck cortex to the posterior surface of the iliopsoas muscle. An anterior recess depth >7 mm or >2 mm asymmetry compared to the contralateral hip is abnormal. In children, >2 mm asymmetry is significant. Ultrasound-guided hip aspiration is the gold standard for confirming septic arthritis.
-Pearl: Greater trochanteric pain syndrome (GTPS): the gluteus medius and minimus tendons insert on the greater trochanter and are the primary source of lateral hip pain (previously attributed to 'trochanteric bursitis'). Look for tendon thickening, hypoechogenicity, calcification, and partial tears at the insertion. True trochanteric bursitis (fluid in the subgluteus maximus bursa) is present in only ~20% of GTPS cases.`,
-      pitfalls: ``,
-    },
-    knee: {
-      description: ``,
-      howToGet: `Patient Positioning: Anterior (quadriceps/patellar tendon): supine with knee flexed 30° (place a pillow under the knee). For patellar tendon: knee flexed 30° or extended. Medial (MCL, medial meniscus): supine with knee slightly externally rotated. Lateral (LCL, iliotibial band): supine with knee slightly internally rotated. Posterior (Baker's cyst, popliteal vessels): prone or supine with knee slightly flexed.
-Transducer Positioning: Anterior: longitudinal and transverse over the quadriceps tendon (suprapatellar), patella, patellar tendon (infrapatellar), and Hoffa's fat pad. Medial: longitudinal over the MCL and medial joint line. Lateral: longitudinal over the LCL, popliteus tendon, and IT band. Posterior: transverse and longitudinal over the popliteal fossa (Baker's cyst, popliteal vessels, tibial nerve).
-What to Assess: Quadriceps tendon: partial/full-thickness tear (especially in patients >40 years with acute pain and inability to extend the knee); Patellar tendon: patellar tendinopathy (jumper's knee — focal hypoechoic area at the proximal patellar insertion), partial/full-thickness tear; Suprapatellar recess: effusion (>4 mm depth), synovitis, loose bodies; MCL: sprain, partial/full-thickness tear, Pellegrini-Stieda lesion (calcification); Baker's cyst: between medial head of gastrocnemius and semimembranosus tendons — size, septations, rupture; Iliotibial band syndrome: IT band thickening and hypoechogenicity at the lateral femoral epicondyle.`,
-      tips: `Scanning Tip: Quadriceps tendon tear: assess with the knee flexed 30°. A full-thickness tear appears as a complete hypoechoic/anechoic gap through the tendon with retraction of the quadriceps muscle proximally. Dynamic assessment (asking the patient to extend the knee) confirms the tear. The suprapatellar recess typically contains a large effusion. Partial tears appear as focal hypoechoic defects not extending through the full thickness.
-Pearl: Baker's cyst: arises from the posterior joint capsule between the medial head of gastrocnemius and semimembranosus tendons. It communicates with the joint via a one-way valve mechanism. A ruptured Baker's cyst causes acute calf pain and swelling mimicking DVT — look for fluid tracking down the calf between the gastrocnemius and soleus muscles ('crescent sign'). Always perform DVT assessment in patients with acute calf symptoms.`,
-      pitfalls: ``,
-    },
-    ankle_foot: {
-      description: ``,
-      howToGet: `Patient Positioning: Anterior (tibialis anterior, EHL, EDL, anterior ankle joint): supine with ankle in neutral or slight plantarflexion. Medial (tibialis posterior, FDL, FHL, deltoid ligament): supine with ankle in slight eversion. Lateral (peroneal tendons, ATFL, CFL): supine with ankle in slight inversion. Posterior (Achilles tendon, retrocalcaneal bursa): prone with foot hanging off the table.
-Transducer Positioning: Achilles: longitudinal (posterior) and transverse from the musculotendinous junction to the calcaneal insertion. Peroneal tendons: transverse behind the lateral malleolus (assess for subluxation dynamically with dorsiflexion/eversion), then longitudinal. Tibialis posterior: longitudinal and transverse behind the medial malleolus. ATFL: longitudinal from the anterior fibula to the talus. Anterior ankle joint: longitudinal for joint recess effusion.
-What to Assess: Achilles tendon: tendinopathy (midportion — 2–6 cm from insertion; insertional), partial/full-thickness tear, retrocalcaneal bursitis (>2 mm), Haglund deformity; Peroneal tendons: peroneus longus and brevis — tenosynovitis, longitudinal split tear (PB), subluxation (superior peroneal retinaculum tear); Tibialis posterior tendon: tendinopathy, partial/full-thickness tear (adult flatfoot deformity); ATFL: sprain, partial/full-thickness tear (most common ankle ligament injury); Ankle joint: effusion (anterior recess >3 mm), synovitis, loose bodies; Plantar fascia: plantar fasciitis (thickness >4 mm at calcaneal origin, hypoechogenicity).`,
-      tips: `Scanning Tip: Achilles tendon assessment: scan with the ankle in neutral or slight dorsiflexion to avoid anisotropy. Normal Achilles tendon is hyperechoic with a fibrillar pattern. Tendinopathy appears as fusiform thickening (>6 mm AP diameter), hypoechogenicity, and loss of fibrillar pattern. A full-thickness tear shows a complete gap with retraction — measure the gap size and assess for plantaris tendon integrity (may be used for repair). Dynamic assessment with plantarflexion confirms complete rupture (Thompson test equivalent).
-Pearl: Peroneal tendon subluxation: assess dynamically with the patient dorsiflexing and everting the ankle against resistance. The peroneal tendons should remain posterior to the lateral malleolus. Subluxation (tendons move anterior to the fibula) indicates a superior peroneal retinaculum (SPR) tear. Look for a 'flap' of the SPR on the fibular cortex (periosteal stripping sign) — this is pathognomonic of SPR avulsion.`,
-      pitfalls: ``,
-    },
-    soft_tissue: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
-    msk_guided: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
+
+  // ─── ICE ────────────────────────────────────────────────────────────────────
+  "ice:home": {
+    description: "The initial ICE view obtained when the catheter is in the right atrium. Shows the RA, TV, RV, and IAS. Starting point for all ICE-guided procedures.",
+    structures: ["RA", "RV", "Tricuspid valve", "IAS", "Eustachian valve", "Crista terminalis"],
+    howToGet: ["Advance ICE catheter to RA (via femoral vein)", "Neutral position — no flexion", "Rotate to bring TV and IAS into view"],
+    tips: ["Home view is the reference position for all ICE navigation", "Identify Eustachian valve — important landmark for transseptal puncture", "Crista terminalis: posterior RA ridge — do not confuse with thrombus"],
+    pitfalls: ["Eustachian valve mistaken for IAS thrombus", "Catheter artifact in RA"],
+    measurements: ["RA dimensions", "IAS thickness"],
   },
-  appendix: {
-    rlq_survey: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine. Ask the patient to point to the area of maximal tenderness — begin scanning there. The appendix arises from the cecum, typically at McBurney's point (one-third of the way from the right anterior superior iliac spine to the umbilicus).
-Transducer Positioning: Apply firm, gradual compression with the transducer to displace overlying bowel gas. Begin in the right iliac fossa and scan in a systematic grid pattern. Identify the psoas muscle, iliac vessels, and cecum as landmarks. Follow the cecum inferiorly to find the appendix.
-What to Assess: Identify the cecum (blind-ending saccular structure with haustra). The appendix arises from the posteromedial cecum, 2–3 cm below the ileocecal valve. Scan in longitudinal and transverse planes. Measure the outer-wall-to-outer-wall diameter in the transverse plane. Normal: ≤6 mm, compressible, no periappendiceal fat changes.`,
-      tips: `Scanning Tip: Graded compression is the key technique — apply slow, steady pressure to displace gas-filled bowel loops. If the appendix is not found in the RLQ, check retrocecal (posterior to the cecum), pelvic (in the pelvis, especially in women), and subhepatic (rare) positions. A retrocecal appendix requires the patient to roll to the left lateral decubitus position.
-Pearl: The appendix is identified as a blind-ending, non-peristalsing tubular structure arising from the cecum. It does not show peristalsis (unlike small bowel). The terminal ileum (identified by peristalsis and a valvulae conniventes pattern) is a useful landmark — the ileocecal valve is just above the cecum, and the appendix arises 2–3 cm below it.`,
-      pitfalls: `Failure to visualise the appendix does NOT exclude appendicitis — the appendix is not visualised in 10–30% of cases (due to gas, obesity, or retrocecal position). A non-visualised appendix with clinical suspicion should be reported as 'appendix not identified — CT recommended for further evaluation'. Never report a normal appendix if it was not directly visualised.`,
-    },
-    appendix_id: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine. Maintain graded compression throughout. If the appendix is not found in the standard RLQ position, ask the patient to roll to the left lateral decubitus position to assess for a retrocecal appendix.
-Transducer Positioning: Once the cecum is identified, trace the posteromedial wall inferiorly to find the appendix. Scan in both longitudinal (sausage-shaped) and transverse (target sign) planes. The transverse plane is used for diameter measurement.
-What to Assess: Outer-wall-to-outer-wall diameter (normal ≤6 mm); compressibility (normal appendix compresses with pressure); wall thickness (normal <3 mm); mural stratification (three layers: echogenic mucosa, hypoechoic muscularis, echogenic serosa); appendicolith (hyperechoic focus with posterior shadowing); periappendiceal fat echogenicity (normal = isoechoic).`,
-      tips: `Scanning Tip: Measure the outer-wall-to-outer-wall diameter in the transverse plane at the widest point. Do not measure the lumen — the outer wall measurement is the standard. A diameter >6 mm in a non-compressible appendix is diagnostic of appendicitis (sensitivity 86%, specificity 81%). A diameter of 6–7 mm is equivocal — correlate clinically and consider CT.
-Pearl: The 'target sign' in the transverse plane (concentric rings: hyperechoic mucosa, hypoechoic muscularis, hyperechoic serosa) confirms appendix identification. An appendicolith appears as a hyperechoic focus with posterior acoustic shadowing within the appendiceal lumen — its presence increases the risk of perforation and warrants urgent surgical consultation regardless of diameter.`,
-      pitfalls: `The terminal ileum can mimic the appendix — distinguish by peristalsis (ileum peristalsises; appendix does not) and by tracing the structure to confirm it is blind-ending. The right ureter can also mimic the appendix — it is tubular, posterior, and shows ureteral jets on Doppler. Always confirm the structure is truly blind-ending before diagnosing appendicitis.`,
-    },
-    periappendiceal: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine. Assess the periappendiceal fat and surrounding structures after identifying the appendix. Extend the survey to the right paracolic gutter and pelvis for free fluid.
-Transducer Positioning: After identifying the appendix, reduce compression slightly and assess the surrounding fat. Scan the right paracolic gutter (lateral to the ascending colon) and the pelvis (pouch of Douglas in women, rectovesical pouch in men) for free fluid.
-What to Assess: Periappendiceal fat echogenicity (hyperechoic fat = inflammation/phlegmon); free fluid (periappendiceal or pelvic — suggests perforation); loss of mural stratification (gangrenous appendicitis); appendiceal abscess (complex fluid collection adjacent to appendix); lymphadenopathy (mesenteric nodes >1 cm short axis); cecal wall thickening.`,
-      tips: `Scanning Tip: Hyperechoic periappendiceal fat (fat stranding) is a secondary sign of appendicitis and is often the first finding when the appendix itself is not clearly visualised. Free fluid adjacent to the appendix is highly suspicious for perforation. A complex fluid collection (abscess) indicates complicated appendicitis requiring urgent management.
-Pearl: Perforation signs: (1) loss of mural stratification (echogenic wall becomes indistinct); (2) periappendiceal fluid collection (abscess); (3) free intraperitoneal fluid; (4) appendicolith outside the appendix lumen. Perforated appendicitis has a higher complication rate — early identification changes management (non-operative vs. operative).`,
-      pitfalls: `A phlegmon (solid inflammatory mass) can obscure the appendix and mimic a soft tissue tumour. If a complex RLQ mass is identified without a clearly visualised normal appendix, appendicitis with perforation and phlegmon formation should be the primary diagnosis. CT is required for surgical planning in this scenario.`,
-    },
-    appendix_doppler: {
-      description: ``,
-      howToGet: ``,
-      tips: ``,
-      pitfalls: ``,
-    },
+  "ice:avview": {
+    description: "Obtained by advancing the ICE catheter and rotating anteriorly. Shows the aortic valve in short axis. Used for TAVR sizing and LAAO guidance.",
+    structures: ["Aortic valve (3 cusps)", "RVOT", "Pulmonary valve", "LA", "IAS"],
+    howToGet: ["From home view, advance catheter slightly", "Rotate anteriorly (clockwise)", "AV appears in cross-section"],
+    tips: ["Best ICE view for AV morphology", "Assess for bicuspid AV before TAVR", "Color Doppler for AR assessment"],
+    pitfalls: ["Oblique cut may make cusps appear unequal", "Near-field artifact from catheter"],
+    measurements: ["AV planimetry", "RVOT diameter"],
   },
-  invasive_procedures: {
-    thoracentesis_site: {
-      description: ``,
-      howToGet: `Patient Positioning: Seated upright, leaning forward with arms resting on a bedside table (tripod position). This position shifts the lung apex anteriorly and maximises the posterior pleural space. For patients who cannot sit, lateral decubitus (affected side up) is an acceptable alternative.
-Transducer Positioning: Begin with a curvilinear transducer in the longitudinal plane over the posterior chest wall. Identify the diaphragm (hyperechoic curvilinear structure with respiratory motion), the liver or spleen below it, and the pleural fluid above. Scan superiorly to find the optimal fluid pocket — deepest, most accessible, and furthest from the diaphragm and lung.
-What to Assess: Fluid depth (minimum ≥10 mm for safe thoracentesis); fluid echogenicity (anechoic = transudate; echogenic/septated = exudate/empyema); diaphragm position and excursion; lung position (confirm the lung is not in the needle path); rib position (needle should pass over the superior rib margin to avoid the neurovascular bundle).`,
-      tips: `Scanning Tip: Mark the optimal entry site with a skin marker during real-time ultrasound with the patient in the procedural position. The site should be: (1) ≥10 mm fluid depth; (2) above the superior rib margin (to avoid the neurovascular bundle); (3) below the lung; (4) above the diaphragm. Re-scan immediately before needle insertion to confirm the site is still optimal.
-Pearl: Ultrasound guidance reduces pneumothorax rates from 9–10% (landmark technique) to 1–2% (ultrasound-guided). Real-time ultrasound guidance (needle visualised during insertion) is preferred over site-marking alone. The 'bat sign' (rib shadows flanking the pleural line) confirms the intercostal space. Insert the needle just above the superior rib margin to avoid the neurovascular bundle.`,
-      pitfalls: `The diaphragm rises significantly with expiration — always mark the site during the same phase of respiration as the procedure. A site that appears safe during inspiration may be at the level of the diaphragm during expiration. Instruct the patient to hold their breath or breathe shallowly during needle insertion.`,
-    },
-    thoracentesis_guidance: {
-      description: ``,
-      howToGet: `Patient Positioning: Seated upright in tripod position. Maintain the position throughout the procedure. Ensure the patient is stable and can remain still during needle insertion.
-Transducer Positioning: Use a sterile transducer cover. Orient the transducer in the longitudinal plane over the intercostal space. The needle enters in-plane from the inferior aspect of the transducer, advancing toward the pleural fluid. Alternatively, use the transducer for site marking and perform the procedure freehand.
-What to Assess: Real-time needle tip position — confirm the tip is within the fluid before aspirating. Confirm the needle is above the superior rib margin (neurovascular bundle runs in the subcostal groove). Monitor for lung re-expansion during aspiration. Assess for pneumothorax immediately post-procedure (lung sliding on B-mode).`,
-      tips: `Scanning Tip: After the procedure, immediately assess for pneumothorax: place the transducer at the anterior chest wall (2nd intercostal space, midclavicular line) and confirm lung sliding (M-mode: 'seashore sign'). Absent lung sliding with a 'lung point' (transition from sliding to absent sliding) is diagnostic of pneumothorax. A chest X-ray is not required if lung sliding is confirmed on ultrasound.
-Pearl: Ultrasound can identify the 'lung point' — the exact location where the visceral and parietal pleura separate — which is pathognomonic for pneumothorax and can be used to estimate its size. The lung point is found by scanning laterally until lung sliding reappears; the transition point is the lung point.`,
-      pitfalls: `Absent lung sliding alone is not diagnostic of pneumothorax — it can also occur with pleural adhesions, main-stem intubation, or apnea. The 'lung point' is the only ultrasound finding pathognomonic for pneumothorax. Always correlate with clinical findings and consider chest X-ray if the diagnosis is uncertain.`,
-    },
-    paracentesis_site: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine or slight lateral decubitus (affected side down) to pool ascitic fluid. The traditional landmark site (left lower quadrant, lateral to the rectus sheath, 3 cm medial and 3 cm superior to the ASIS) is the starting point. Ultrasound confirms the optimal site and identifies the inferior epigastric artery.
-Transducer Positioning: Use a curvilinear transducer in the transverse and longitudinal planes over the planned entry site. Identify the fluid pocket depth, bowel position, and the inferior epigastric artery (use color Doppler). The inferior epigastric artery runs medially in the lateral rectus sheath — the needle should enter lateral to the rectus sheath to avoid it.
-What to Assess: Fluid pocket depth (minimum ≥3 cm for safe paracentesis); bowel proximity (confirm no bowel loops in the needle path — bowel shows peristalsis and a layered wall); inferior epigastric artery position (use color Doppler — avoid this vessel); skin-to-fluid distance; fluid echogenicity (anechoic = transudate; echogenic = exudate/haemoperitoneum).`,
-      tips: `Scanning Tip: Mark the optimal entry site with the patient in the procedural position. The optimal site has: (1) ≥3 cm fluid depth; (2) no bowel in the needle path; (3) lateral to the inferior epigastric artery; (4) avoids visible vessels on color Doppler. The left lower quadrant is preferred over the right (avoids the cecum and appendix). The midline (linea alba) is an alternative for large-volume ascites.
-Pearl: Ultrasound guidance reduces complication rates for paracentesis (bowel perforation, haematoma) from 1–2% (landmark) to <0.1% (ultrasound-guided). Color Doppler identification of the inferior epigastric artery is the most important step — inadvertent puncture causes significant haematoma. Always use color Doppler before marking the site.`,
-      pitfalls: `Bowel loops can be difficult to distinguish from ascitic fluid in patients with ileus or bowel wall oedema. Confirm bowel by identifying peristalsis, a layered wall (5 layers on high-frequency), and haustra (colon). If uncertain, reposition the transducer to find a clearer fluid pocket. Never proceed if bowel cannot be excluded from the needle path.`,
-    },
-    paracentesis_guidance: {
-      description: ``,
-      howToGet: `Patient Positioning: Supine or slight lateral decubitus. Maintain the position throughout the procedure. Ensure the patient is comfortable and can remain still during needle insertion.
-Transducer Positioning: Use a sterile transducer cover. Orient the transducer in the longitudinal plane over the fluid pocket. The needle enters in-plane from the inferior aspect of the transducer. Alternatively, use the transducer for site marking and perform the procedure freehand with the marked site.
-What to Assess: Real-time needle tip position — confirm the tip is within the fluid pocket before aspirating. Monitor for bowel injury (sudden loss of fluid, bowel contents in aspirate). Assess the fluid pocket size during drainage — reposition if the pocket becomes too small. Post-procedure: assess for haematoma at the entry site.`,
-      tips: `Scanning Tip: For large-volume paracentesis (LVP), drain up to 5–6 litres safely with albumin replacement (6–8 g/L drained). Monitor the fluid pocket throughout — if the pocket becomes <2 cm, stop and reposition. Use a Z-track technique (displace the skin laterally before inserting the needle) to reduce post-procedure fluid leak.
-Pearl: The Z-track technique (displace skin 2 cm laterally before needle insertion, then release after withdrawal) creates a non-linear tract that reduces post-procedure ascitic fluid leak — particularly important in patients with tense ascites and thin abdominal walls. This technique reduces the need for suturing the puncture site.`,
-      pitfalls: `Catheter blockage during large-volume paracentesis is common — it is usually caused by omentum or bowel occluding the catheter tip. Repositioning the patient (slight lateral decubitus, opposite side) or rotating the catheter 90–180° usually resolves the blockage. Avoid withdrawing the catheter and re-inserting — this increases infection risk.`,
-    },
+  "ice:mvlhview": {
+    description: "Obtained by advancing the ICE catheter to the right atrium and rotating posteriorly. Shows the mitral valve and left heart structures. Used for TEER and LAAO guidance.",
+    structures: ["Mitral valve", "LV", "LA", "LVOT", "Aortic valve"],
+    howToGet: ["From home view, rotate posteriorly (counterclockwise)", "MV and left heart come into view", "Advance slightly for better LV visualization"],
+    tips: ["Best ICE view for MV assessment during TEER", "Color Doppler for MR jet assessment", "Assess MV leaflet morphology and coaptation"],
+    pitfalls: ["Foreshortening of LV apex", "MV may be partially obscured by catheter"],
+    measurements: ["MV annulus", "MR vena contracta", "LV EF"],
+  },
+  "ice:transseptal": {
+    description: "ICE view used to guide transseptal puncture. Shows the IAS, fossa ovalis, and adjacent structures. Essential for safe transseptal access.",
+    structures: ["IAS", "Fossa ovalis", "LA", "RA", "Aortic root (anterior)", "Pulmonary veins (posterior)"],
+    howToGet: ["From home view, rotate to bring IAS perpendicular to beam", "Identify fossa ovalis — thin central portion of IAS", "Confirm needle tenting before puncture"],
+    tips: ["Fossa ovalis is the thinnest part of IAS — target for transseptal puncture", "Needle tenting confirms correct position before puncture", "Aorta is anterior — avoid anterior puncture"],
+    pitfalls: ["Anterior puncture risks aortic perforation", "Posterior puncture risks pericardial effusion", "Thick IAS (lipomatous hypertrophy) may require RF energy"],
+    measurements: ["IAS thickness", "Fossa ovalis diameter", "Distance from aorta"],
+    criticalFindings: ["Pericardial effusion after puncture", "Aortic perforation"],
+  },
+  "ice:laaview": {
+    description: "ICE view of the left atrial appendage. Used for LAAO device sizing and deployment guidance, and to exclude LAA thrombus before cardioversion.",
+    structures: ["LAA", "LA", "LSPV", "LSPV ridge", "Mitral valve"],
+    howToGet: ["From transseptal position in LA", "Rotate to bring LAA into view", "Multiple angles to assess LAA morphology"],
+    tips: ["Assess LAA in multiple planes — LAA morphology varies (chicken wing, cactus, windsock)", "LSPV ridge may be mistaken for thrombus — use color Doppler", "Measure LAA ostium diameter and depth for LAAO sizing"],
+    pitfalls: ["LSPV ridge mistaken for LAA thrombus", "LAA trabeculations may mimic thrombus — assess with color Doppler"],
+    measurements: ["LAA ostium diameter", "LAA depth", "LAA flow velocity"],
+    criticalFindings: ["LAA thrombus", "LAA spontaneous echo contrast (smoke)"],
+  },
+
+  // ─── UEA (Contrast Echo) ─────────────────────────────────────────────────
+  "uea:plax": {
+    description: "PLAX view optimized for contrast echocardiography. Used for LV opacification, endocardial border delineation, and myocardial perfusion assessment.",
+    structures: ["LV", "LA", "Aortic valve", "Mitral valve", "LVOT"],
+    howToGet: ["Standard PLAX position", "Reduce gain settings for contrast imaging", "Use low mechanical index (MI <0.2) to preserve microbubbles"],
+    tips: ["Reduce gain before contrast injection to avoid saturation", "Low MI imaging preserves microbubbles for longer", "Flash sequence (high MI pulse) destroys bubbles for replenishment assessment"],
+    pitfalls: ["Near-field attenuation from high bubble concentration", "Gain too high causes blooming artifact"],
+    measurements: ["LV dimensions", "Myocardial perfusion score"],
+  },
+  "uea:psax_mv": {
+    description: "PSAX MV level view for contrast echocardiography. Used for myocardial perfusion assessment in the mid-ventricular segments.",
+    structures: ["LV (6 mid segments)", "Mitral valve", "Papillary muscles"],
+    howToGet: ["Standard PSAX MV position", "Low MI contrast imaging", "Flash and replenishment for perfusion assessment"],
+    tips: ["All 6 mid-ventricular segments visible for perfusion assessment", "Compare perfusion in LAD vs RCA territories", "Perfusion defect = absent or delayed bubble replenishment"],
+    pitfalls: ["Near-field attenuation", "Acoustic shadowing from high bubble concentration"],
+    measurements: ["Myocardial perfusion score (0–2 per segment)", "Replenishment time constant"],
+  },
+  "uea:psax_pap": {
+    description: "PSAX papillary muscle level view for contrast echocardiography. Used for myocardial perfusion assessment in the mid-ventricular segments.",
+    structures: ["LV (6 mid segments)", "Anterolateral papillary muscle", "Posteromedial papillary muscle"],
+    howToGet: ["Standard PSAX papillary muscle position", "Low MI contrast imaging"],
+    tips: ["Best level for 6-segment perfusion assessment", "Anterolateral PM: LAD/LCx territory; Posteromedial PM: RCA territory"],
+    pitfalls: ["Near-field attenuation", "Papillary muscle level vs MV level confusion"],
+    measurements: ["Myocardial perfusion score", "Wall motion score"],
+  },
+  "uea:a4c": {
+    description: "Apical 4-chamber view for contrast echocardiography. Used for LV opacification, EF assessment, and myocardial perfusion in the apical segments.",
+    structures: ["LV (apical segments)", "RV", "LA", "RA", "Mitral valve", "Tricuspid valve"],
+    howToGet: ["Standard A4C position", "Low MI contrast imaging", "Optimize for endocardial border delineation"],
+    tips: ["LVO: endocardial borders clearly delineated — use for EF in poor acoustic windows", "Apical segments: LAD territory — assess for apical perfusion defects", "Apical thrombus: filling defect in LV apex"],
+    pitfalls: ["Foreshortening underestimates apical perfusion defects", "Apical thrombus may be obscured by near-field artifact"],
+    measurements: ["LV EF (Simpson biplane)", "Apical perfusion score", "LV volumes"],
+    criticalFindings: ["Apical thrombus", "Apical perfusion defect (LAD territory)"],
+  },
+  "uea:a2c": {
+    description: "Apical 2-chamber view for contrast echocardiography. Used for LV opacification and myocardial perfusion in the anterior and inferior walls.",
+    structures: ["LV (anterior and inferior walls)", "LA", "Mitral valve"],
+    howToGet: ["Standard A2C position", "Low MI contrast imaging"],
+    tips: ["Anterior wall: LAD territory; inferior wall: RCA territory", "Used with A4C for biplane EF calculation with contrast"],
+    pitfalls: ["Oblique cut may include RV", "Inferior wall near-field artifact"],
+    measurements: ["LV volume (biplane Simpson)", "Anterior/inferior perfusion score"],
+  },
+  "uea:a3c": {
+    description: "Apical 3-chamber (APLAX) view for contrast echocardiography. Used for LV opacification and assessment of the anteroseptal and posterior walls.",
+    structures: ["LV (anteroseptal and posterior walls)", "LA", "LVOT", "Aortic valve"],
+    howToGet: ["Standard A3C position", "Low MI contrast imaging"],
+    tips: ["Anteroseptal wall: LAD territory; posterior wall: LCx territory", "Used with A4C and A2C for triplane EF calculation"],
+    pitfalls: ["Foreshortening of LV apex", "LVOT may be obscured by contrast"],
+    measurements: ["LV volume (triplane)", "Anteroseptal/posterior perfusion score"],
+  },
+
+  // ─── HOCM ────────────────────────────────────────────────────────────────
+  "hocm:plax": {
+    description: "PLAX view in HOCM assessment. Key view for measuring IVS thickness, LVOT obstruction, and systolic anterior motion (SAM) of the mitral valve.",
+    structures: ["IVS (hypertrophied)", "LV posterior wall", "LVOT", "Mitral valve (SAM)", "Aortic valve (early closure)"],
+    howToGet: ["Standard PLAX position", "Optimize for IVS and LVOT visualization", "M-mode through MV for SAM assessment"],
+    tips: ["SAM of MV: anterior leaflet moves toward IVS in systole — classic HOCM sign", "Aortic valve early closure: mid-systolic notch on M-mode", "Measure IVS at end-diastole — maximum hypertrophy location"],
+    pitfalls: ["Oblique cut overestimates IVS thickness", "SAM may be absent at rest — provoke with Valsalva or amyl nitrite"],
+    measurements: ["IVS thickness (d)", "LVOT diameter", "LVOT gradient (CW Doppler)", "SAM severity"],
+    criticalFindings: ["Severe LVOT obstruction (gradient >50 mmHg)", "SAM with significant MR", "Extreme hypertrophy (IVS >30 mm)"],
+  },
+  "hocm:psax-mv": {
+    description: "PSAX MV level view in HOCM. Used to assess MV morphology, SAM mechanism, and regional hypertrophy pattern.",
+    structures: ["Mitral valve", "LV (circular)", "Hypertrophied IVS", "Papillary muscles"],
+    howToGet: ["Standard PSAX MV position", "Assess MV morphology and opening pattern"],
+    tips: ["Assess MV leaflet morphology — elongated anterior leaflet predisposes to SAM", "Regional hypertrophy: septal vs concentric vs apical pattern", "Papillary muscle hypertrophy and displacement contribute to SAM"],
+    pitfalls: ["Oblique cut overestimates septal thickness", "Papillary muscle hypertrophy may be mistaken for mass"],
+    measurements: ["IVS thickness", "LV dimensions", "MV leaflet length"],
+  },
+  "hocm:a4c": {
+    description: "Apical 4-chamber view in HOCM. Used for chamber size assessment, MR evaluation, and apical hypertrophy detection.",
+    structures: ["LV (hypertrophied)", "RV", "LA (dilated if MR present)", "RA", "Mitral valve", "Tricuspid valve"],
+    howToGet: ["Standard A4C position", "Assess for apical hypertrophy (apical variant HOCM)", "Color Doppler for MR assessment"],
+    tips: ["Apical variant HOCM: hypertrophy confined to apex — 'ace of spades' appearance", "MR in HOCM: typically posteriorly directed due to SAM", "LA dilation indicates significant MR or diastolic dysfunction"],
+    pitfalls: ["Apical hypertrophy may be missed without contrast", "MR jet direction may be confused with LVOT flow"],
+    measurements: ["LV EF", "LA volume", "MR vena contracta", "Apical wall thickness"],
+    criticalFindings: ["Severe MR", "Apical aneurysm (apical variant HOCM)"],
+  },
+  "hocm:a5c": {
+    description: "Apical 5-chamber view in HOCM. The primary view for LVOT gradient measurement with CW Doppler. Essential for HOCM severity assessment.",
+    structures: ["LV", "LVOT", "Aortic valve", "Mitral valve (SAM)"],
+    howToGet: ["From A4C, tilt probe anteriorly to bring LVOT into view", "Align CW Doppler cursor parallel to LVOT flow", "Measure peak and mean LVOT gradient"],
+    tips: ["CW Doppler: 'dagger-shaped' late-peaking signal = HOCM (vs AS: early-peaking)", "Measure gradient at rest AND with Valsalva/exercise provocation", "LVOT gradient >50 mmHg at rest = significant obstruction"],
+    pitfalls: ["Underalignment of CW cursor underestimates gradient", "'Dagger' shape may be confused with MR — use color Doppler to confirm LVOT flow"],
+    measurements: ["LVOT peak gradient (CW)", "LVOT mean gradient", "Provoked gradient (Valsalva)"],
+    criticalFindings: ["Resting LVOT gradient >50 mmHg", "Provoked gradient >50 mmHg"],
+  },
+  "hocm:a3c": {
+    description: "Apical 3-chamber (APLAX) view in HOCM. Used for LVOT assessment and confirmation of SAM mechanism.",
+    structures: ["LV (anteroseptal and posterior walls)", "LVOT", "Aortic valve", "Mitral valve (SAM)"],
+    howToGet: ["Standard A3C position", "Assess LVOT and SAM in long axis"],
+    tips: ["SAM clearly visible in this view — anterior MV leaflet moves toward IVS", "LVOT narrowing due to SAM and hypertrophied IVS", "Assess for MV leaflet elongation"],
+    pitfalls: ["Foreshortening of LVOT", "SAM may be intermittent"],
+    measurements: ["LVOT diameter", "SAM severity", "MV leaflet length"],
+  },
+
+  // ─── Stress Echo ─────────────────────────────────────────────────────────
+  "stress:rest-plax": {
+    description: "Resting PLAX view acquired before stress echo. Baseline for comparison with stress images. Assess LV function, wall motion, and valve morphology at rest.",
+    structures: ["LV", "LA", "Aortic valve", "Mitral valve", "LVOT"],
+    howToGet: ["Standard PLAX position", "Acquire at end-expiration", "Optimize for wall motion assessment"],
+    tips: ["Acquire all rest views before starting stress protocol", "Optimize image quality at rest — harder to obtain during stress", "Document any baseline wall motion abnormalities"],
+    pitfalls: ["Poor image quality at rest predicts poor stress images", "Baseline RWMA may be missed if gain is not optimized"],
+    measurements: ["LV dimensions", "EF (visual)", "Baseline wall motion score"],
+  },
+  "stress:rest-psax-mv": {
+    description: "Resting PSAX MV level view for stress echo. Baseline for 6-segment wall motion assessment.",
+    structures: ["LV (6 mid segments)", "Mitral valve", "Papillary muscles"],
+    howToGet: ["Standard PSAX MV position", "Acquire at end-expiration"],
+    tips: ["6 segments visible — best view for regional ischaemia detection", "Compare with stress images side-by-side"],
+    pitfalls: ["Oblique cut may miss regional RWMA"],
+    measurements: ["Wall motion score (6 segments)"],
+  },
+  "stress:rest-psax-pm": {
+    description: "Resting PSAX papillary muscle level view for stress echo. Baseline for mid-ventricular wall motion assessment.",
+    structures: ["LV (6 mid segments)", "Anterolateral PM", "Posteromedial PM"],
+    howToGet: ["Standard PSAX PM position", "Acquire at end-expiration"],
+    tips: ["PM level: best for RCA territory (inferior, inferolateral)"],
+    pitfalls: ["PM level vs MV level confusion"],
+    measurements: ["Wall motion score (6 segments)"],
+  },
+  "stress:rest-a4c": {
+    description: "Resting A4C view for stress echo. Baseline for apical and mid-ventricular wall motion assessment.",
+    structures: ["LV (apical segments)", "RV", "LA", "RA", "Mitral valve"],
+    howToGet: ["Standard A4C position", "Acquire at end-expiration"],
+    tips: ["Apical segments: LAD territory", "Assess for resting apical RWMA or LV dilation"],
+    pitfalls: ["Foreshortening underestimates apical segments"],
+    measurements: ["LV EF (visual)", "Wall motion score (apical segments)"],
+  },
+  "stress:rest-a2c": {
+    description: "Resting A2C view for stress echo. Baseline for anterior and inferior wall assessment.",
+    structures: ["LV (anterior and inferior walls)", "LA", "Mitral valve"],
+    howToGet: ["Standard A2C position", "Acquire at end-expiration"],
+    tips: ["Anterior wall: LAD territory; inferior wall: RCA territory"],
+    pitfalls: ["Oblique cut may include RV"],
+    measurements: ["Wall motion score (anterior/inferior)"],
+  },
+  "stress:rest-a3c": {
+    description: "Resting A3C (APLAX) view for stress echo. Baseline for anteroseptal and posterior wall assessment.",
+    structures: ["LV (anteroseptal and posterior walls)", "LA", "LVOT", "Aortic valve"],
+    howToGet: ["Standard A3C position", "Acquire at end-expiration"],
+    tips: ["Anteroseptal: LAD territory; posterior: LCx territory"],
+    pitfalls: ["Foreshortening of LV apex"],
+    measurements: ["Wall motion score (anteroseptal/posterior)"],
+  },
+
+  // ─── Structural Heart ─────────────────────────────────────────────────────
+  "structural:tavr-sizing": {
+    description: "TEE views used for TAVR annulus sizing. Multi-plane assessment of the aortic annulus, LVOT, and coronary ostia heights. Critical for device selection.",
+    structures: ["Aortic annulus", "LVOT", "Sinus of Valsalva", "Sinotubular junction", "Coronary ostia (LCA, RCA)", "Aortic cusps"],
+    howToGet: ["ME LAX (120–135°) for annulus diameter", "ME AV SAX (30–60°) for annulus area and perimeter", "Assess coronary ostia heights in ME LAX"],
+    tips: ["Annulus is D-shaped — measure in multiple planes", "CT is gold standard for sizing — TEE confirms and guides deployment", "Coronary ostia height <10 mm increases risk of coronary obstruction"],
+    pitfalls: ["Oblique cut overestimates annulus size", "Calcification may obscure annulus landmarks"],
+    measurements: ["Annulus diameter (LAX and SAX)", "Annulus area and perimeter (3D)", "Coronary ostia heights", "Sinus of Valsalva diameter", "Sinotubular junction diameter"],
+    criticalFindings: ["Coronary ostia height <10 mm (obstruction risk)", "Severe annular calcification", "Bicuspid AV (increased risk of paravalvular leak)"],
+  },
+  "structural:tavr-deployment": {
+    description: "Real-time TEE guidance during TAVR deployment. Monitors valve position, expansion, and immediate post-deployment assessment.",
+    structures: ["Aortic valve prosthesis", "LVOT", "Aortic root", "Coronary ostia", "Mitral valve (SAM risk)"],
+    howToGet: ["ME LAX (120–135°) for deployment guidance", "ME AV SAX for valve expansion assessment", "A5C equivalent for LVOT gradient post-deployment"],
+    tips: ["Valve depth: 3–6 mm below annulus is optimal", "Assess for paravalvular leak immediately after deployment", "Check coronary flow after deployment — color Doppler"],
+    pitfalls: ["Valve embolization: device moves toward ascending aorta — emergency", "Annular rupture: pericardial effusion, hemodynamic collapse"],
+    measurements: ["Valve depth (mm below annulus)", "Paravalvular leak grade", "LVOT gradient post-deployment", "Coronary flow velocity"],
+    criticalFindings: ["Paravalvular leak ≥ moderate", "Coronary obstruction", "Valve embolization", "Annular rupture with pericardial effusion"],
+  },
+  "structural:teer-iasn": {
+    description: "TEE guidance for transseptal puncture during TEER (MitraClip/PASCAL). Bicaval and short-axis views to guide needle position and confirm LA access.",
+    structures: ["IAS", "Fossa ovalis", "LA", "RA", "Aortic root (anterior)", "MV (posterior)"],
+    howToGet: ["ME Bicaval (90–110°) for anterior-posterior needle position", "ME AV SAX (30–60°) for superior-inferior needle position", "Confirm tenting and puncture with color Doppler"],
+    tips: ["Posterior and superior puncture is ideal for TEER — allows clip delivery to MV", "Tenting confirms correct needle position before puncture", "Target height: 3.5–4.5 cm above MV annulus"],
+    pitfalls: ["Anterior puncture risks aortic perforation", "Too inferior puncture limits maneuverability of clip delivery system"],
+    measurements: ["Puncture height above MV annulus", "IAS thickness", "Distance from aorta"],
+    criticalFindings: ["Pericardial effusion after puncture", "Aortic perforation"],
+  },
+  "structural:teer-guidance": {
+    description: "Real-time TEE guidance during TEER clip delivery and deployment. Multi-plane assessment of clip position, leaflet grasping, and MR reduction.",
+    structures: ["Mitral valve (A2/P2 segments)", "LV", "LA", "Clip delivery system", "MR jet"],
+    howToGet: ["ME 4-chamber (0°) for clip alignment", "ME Commissural (60°) for A2/P2 assessment", "ME LAX (120–135°) for clip depth", "3D TEE for en face MV view"],
+    tips: ["Clip should be perpendicular to MV coaptation line", "Assess leaflet insertion — both leaflets should be grasped", "MR should reduce by ≥50% after clip deployment"],
+    pitfalls: ["Single leaflet attachment: clip grasps only one leaflet — reposition", "Clip too anterior or posterior — use commissural view to confirm A2/P2"],
+    measurements: ["MR vena contracta pre/post", "MV gradient post-clip", "MV area post-clip", "Residual MR grade"],
+    criticalFindings: ["Single leaflet attachment", "Severe residual MR", "MV stenosis post-clip (MVA <1.5 cm²)"],
+  },
+  "structural:laao-sizing": {
+    description: "TEE guidance for LAAO device sizing and deployment (Watchman/Amulet). Multi-plane assessment of LAA ostium, depth, and morphology.",
+    structures: ["LAA", "LA", "LSPV", "LSPV ridge", "Mitral valve", "Left circumflex artery (adjacent)"],
+    howToGet: ["ME 0°, 45°, 90°, 135° for LAA assessment", "Measure LAA ostium diameter and depth in multiple planes", "3D TEE for comprehensive LAA morphology"],
+    tips: ["Measure LAA ostium at 4 angles — use maximum diameter for device sizing", "LAA depth must exceed device diameter for adequate seal", "Assess LSPV ridge — may affect device positioning"],
+    pitfalls: ["LSPV ridge mistaken for LAA thrombus — use color Doppler", "LAA thrombus: contraindication to LAAO — exclude with TEE before procedure"],
+    measurements: ["LAA ostium diameter (4 angles)", "LAA depth", "LSPV ridge width", "LAA flow velocity"],
+    criticalFindings: ["LAA thrombus (contraindication)", "Inadequate LAA depth for device", "Pericardial effusion after access"],
+  },
+
+  // ─── POCUS EFAST ────────────────────────────────────────────────────────
+  "pocus_efast:ruq": {
+    description: "Right upper quadrant (Morison's pouch) view for EFAST. Assesses for free fluid between the liver and right kidney. The most sensitive EFAST view for hemoperitoneum.",
+    structures: ["Liver", "Right kidney", "Morison's pouch (hepatorenal space)", "Diaphragm", "Right pleural space"],
+    howToGet: ["Position probe in right mid-axillary line, 8th–11th ICS", "Marker dot toward head", "Fan through liver-kidney interface"],
+    tips: ["Morison's pouch: most dependent space in right upper quadrant — fluid collects here first", "Assess diaphragm for hemothorax (fluid above diaphragm)", "Anechoic stripe between liver and kidney = free fluid"],
+    pitfalls: ["Fat between liver and kidney may mimic fluid — look for sharp borders", "Perinephric fat is echogenic — true fluid is anechoic"],
+    measurements: ["Free fluid depth (cm)", "Hemothorax depth"],
+    criticalFindings: ["Free fluid in Morison's pouch (hemoperitoneum)", "Hemothorax"],
+  },
+  "pocus_efast:luq": {
+    description: "Left upper quadrant (splenorenal space) view for EFAST. Assesses for free fluid between the spleen and left kidney. More difficult to obtain than RUQ due to rib interference.",
+    structures: ["Spleen", "Left kidney", "Splenorenal space", "Diaphragm", "Left pleural space"],
+    howToGet: ["Position probe in left posterior axillary line, 8th–11th ICS", "Marker dot toward head", "Fan through spleen-kidney interface"],
+    tips: ["More posterior and superior than RUQ — probe needs to be more posterior", "Spleen is smaller than liver — may need to fan widely", "Assess diaphragm for left hemothorax"],
+    pitfalls: ["Rib shadowing is common — slide probe between ribs", "Spleen may be small and difficult to identify"],
+    measurements: ["Free fluid depth (cm)", "Hemothorax depth"],
+    criticalFindings: ["Free fluid in splenorenal space", "Left hemothorax"],
+  },
+  "pocus_efast:pelvis": {
+    description: "Pelvic view for EFAST. Assesses for free fluid in the pouch of Douglas (females) or rectovesical pouch (males). Most dependent space in the supine patient.",
+    structures: ["Bladder", "Uterus (females)", "Pouch of Douglas (females)", "Rectovesical pouch (males)", "Bowel"],
+    howToGet: ["Position probe just superior to pubic symphysis", "Marker dot toward patient's right (transverse) or head (sagittal)", "Fan through bladder to assess posterior spaces"],
+    tips: ["Full bladder acts as acoustic window — assess before catheterization", "Pouch of Douglas: most dependent space in females — fluid collects here", "Transverse and sagittal views for complete assessment"],
+    pitfalls: ["Empty bladder limits visualization", "Bowel gas may obscure posterior spaces"],
+    measurements: ["Free fluid depth (cm)"],
+    criticalFindings: ["Free fluid in pouch of Douglas or rectovesical pouch"],
+  },
+  "pocus_efast:subxiphoid": {
+    description: "Subxiphoid cardiac view for EFAST. Assesses for pericardial effusion and cardiac tamponade. Also provides a quick assessment of cardiac function.",
+    structures: ["Heart (all 4 chambers)", "Pericardium", "Liver (acoustic window)", "IVC"],
+    howToGet: ["Position probe just below xiphoid, probe flat against abdomen", "Marker dot toward patient's left", "Angle probe toward left shoulder", "Use liver as acoustic window"],
+    tips: ["Pericardial effusion: anechoic stripe surrounding heart", "Tamponade: RV collapse in diastole, IVC plethora", "Cardiac activity confirms PEA vs asystole in arrest"],
+    pitfalls: ["Pericardial fat may mimic effusion — fat is anterior and echogenic", "Difficult in obese patients or post-abdominal surgery"],
+    measurements: ["Pericardial effusion size (cm)", "RV collapse timing"],
+    criticalFindings: ["Pericardial effusion with RV collapse (tamponade)", "Cardiac standstill (asystole)"],
+  },
+  "pocus_efast:rthorax": {
+    description: "Right thoracic view for EFAST. Assesses for right pneumothorax (lung sliding) and hemothorax.",
+    structures: ["Pleural line", "Ribs", "Lung (A-lines/B-lines)", "Diaphragm"],
+    howToGet: ["Position probe in 2nd–3rd ICS, midclavicular line", "Marker dot toward head", "Identify pleural line between two ribs ('bat sign')"],
+    tips: ["Lung sliding = normal (rules out pneumothorax at that point)", "Absent lung sliding + A-lines = pneumothorax", "M-mode: 'seashore sign' = normal; 'barcode sign' = pneumothorax"],
+    pitfalls: ["Absent lung sliding can also be seen in mainstem intubation, pleurodesis", "Lung point: transition from absent to present sliding = confirms pneumothorax"],
+    measurements: ["Lung sliding: present/absent"],
+    criticalFindings: ["Absent lung sliding (pneumothorax)", "Hemothorax"],
+  },
+  "pocus_efast:lthorax": {
+    description: "Left thoracic view for EFAST. Assesses for left pneumothorax (lung sliding) and hemothorax.",
+    structures: ["Pleural line", "Ribs", "Lung (A-lines/B-lines)", "Diaphragm"],
+    howToGet: ["Position probe in 2nd–3rd ICS, left midclavicular line", "Marker dot toward head", "Identify pleural line between two ribs"],
+    tips: ["Same technique as right thorax", "Lung sliding rules out pneumothorax at that point", "M-mode: 'seashore sign' = normal; 'barcode sign' = pneumothorax"],
+    pitfalls: ["Cardiac motion may cause false-positive lung sliding near apex"],
+    measurements: ["Lung sliding: present/absent"],
+    criticalFindings: ["Absent lung sliding (pneumothorax)", "Hemothorax"],
+  },
+
+  // ─── POCUS Cardiac ───────────────────────────────────────────────────────
+  "pocus_cardiac:plax": {
+    description: "PLAX view for cardiac POCUS. Quick assessment of LV function, pericardial effusion, and valve morphology.",
+    structures: ["LV", "LA", "Aortic valve", "Mitral valve", "Pericardium"],
+    howToGet: ["Standard PLAX position", "Optimize for LV wall motion and pericardium"],
+    tips: ["Hyperdynamic LV (EF >70%): small cavity, vigorous walls — consider sepsis, hypovolemia", "Severely reduced LV (EF <30%): large, poorly contracting — consider cardiogenic shock", "Pericardial effusion: anechoic stripe posterior to LV"],
+    pitfalls: ["Pericardial fat (anterior) vs effusion (posterior) — fat is echogenic", "Foreshortening underestimates LV size"],
+    measurements: ["LV EF (visual)", "Pericardial effusion size"],
+    criticalFindings: ["Severely reduced LV function", "Large pericardial effusion", "Cardiac tamponade"],
+  },
+  "pocus_cardiac:psax_mv": {
+    description: "PSAX MV level view for cardiac POCUS. Quick assessment of LV function and regional wall motion.",
+    structures: ["LV (6 mid segments)", "Mitral valve", "Papillary muscles"],
+    howToGet: ["Standard PSAX MV position"],
+    tips: ["Circular LV: equal wall thickening in systole = normal", "D-sign (flattened IVS): RV pressure/volume overload", "Regional RWMA: one or more segments not thickening"],
+    pitfalls: ["D-sign may be subtle — compare IVS shape in systole vs diastole"],
+    measurements: ["LV EF (visual)", "IVS shape (D-sign)"],
+    criticalFindings: ["D-sign (RV overload)", "Regional RWMA (ACS)", "Severely reduced LV function"],
+  },
+  "pocus_cardiac:psax_pm": {
+    description: "PSAX papillary muscle level view for cardiac POCUS. Assessment of LV function and RV size.",
+    structures: ["LV (6 mid segments)", "RV", "Papillary muscles"],
+    howToGet: ["Standard PSAX PM position"],
+    tips: ["RV:LV ratio >1 at PM level: severe RV dilation — consider PE", "D-sign at PM level: RV pressure overload"],
+    pitfalls: ["RV may be difficult to visualize at PM level"],
+    measurements: ["RV:LV ratio", "LV EF (visual)"],
+    criticalFindings: ["RV:LV ratio >1 (massive PE)", "D-sign"],
+  },
+  "pocus_cardiac:a4c": {
+    description: "A4C view for cardiac POCUS. Comprehensive assessment of all four chambers, biventricular function, and pericardial effusion.",
+    structures: ["LV", "RV", "LA", "RA", "Mitral valve", "Tricuspid valve", "Pericardium"],
+    howToGet: ["Standard A4C position"],
+    tips: ["RV:LV ratio >0.6: RV dilation — consider PE, RV infarct, cor pulmonale", "McConnell's sign: RV free wall akinesis with apical sparing — highly specific for PE", "Pericardial effusion: circumferential anechoic stripe"],
+    pitfalls: ["Foreshortening underestimates RV size", "Pericardial fat vs effusion"],
+    measurements: ["RV:LV ratio", "LV EF (visual)", "Pericardial effusion size"],
+    criticalFindings: ["McConnell's sign (PE)", "RV:LV ratio >1", "Cardiac tamponade"],
+  },
+  "pocus_cardiac:subcostal": {
+    description: "Subcostal view for cardiac POCUS. Assessment of pericardial effusion, IVC, and cardiac function when other windows are unavailable.",
+    structures: ["Heart (all chambers)", "Pericardium", "IVC", "Hepatic veins", "Liver"],
+    howToGet: ["Standard subcostal position", "Assess IVC in long axis by rotating probe 90°"],
+    tips: ["Best view for pericardial effusion assessment", "IVC >2.1 cm + <50% collapse = elevated RAP", "IVC <1.7 cm + >50% collapse = low RAP (hypovolemia)"],
+    pitfalls: ["Pericardial fat vs effusion", "Difficult in obese patients"],
+    measurements: ["Pericardial effusion size", "IVC diameter", "IVC collapsibility"],
+    criticalFindings: ["Cardiac tamponade (RV collapse)", "Plethoric IVC (RV failure, PE)"],
+  },
+  "pocus_cardiac:ivc": {
+    description: "IVC view for cardiac POCUS. Assessment of IVC diameter and collapsibility for RAP estimation and fluid responsiveness.",
+    structures: ["IVC", "Hepatic veins", "RA", "Liver"],
+    howToGet: ["From subcostal position, rotate probe 90° to bring IVC in long axis", "Measure IVC 2 cm from RA-IVC junction", "Assess collapsibility with sniff or spontaneous respiration"],
+    tips: ["IVC >2.1 cm + <50% collapse = RAP 10–20 mmHg", "IVC <1.7 cm + >50% collapse = RAP <5 mmHg", "Ventilated patients: IVC distensibility index for fluid responsiveness"],
+    pitfalls: ["Hepatic vein mistaken for IVC", "Ventilated patients: IVC behavior is opposite to spontaneous breathing"],
+    measurements: ["IVC max diameter (cm)", "IVC min diameter (cm)", "IVC collapsibility index (%)"],
+    criticalFindings: ["Plethoric IVC (>2.1 cm, non-collapsing): RV failure, PE, tamponade", "Flat IVC (<1 cm): severe hypovolemia"],
+  },
+
+  // ─── POCUS Lung ──────────────────────────────────────────────────────────
+  "pocus_lung:anterior_ptx": {
+    description: "Anterior lung POCUS for pneumothorax assessment. Lung sliding and A-lines assessment in the most anterior lung zones.",
+    structures: ["Pleural line", "Ribs", "A-lines", "Lung sliding"],
+    howToGet: ["Position probe in 2nd–3rd ICS, midclavicular line", "Identify bat sign (two ribs + pleural line)", "Assess for lung sliding in real-time"],
+    tips: ["Lung sliding = visceral and parietal pleura moving together = no pneumothorax", "Absent lung sliding + A-lines = pneumothorax (at that point)", "Lung point: transition from absent to present sliding = 100% specific for pneumothorax"],
+    pitfalls: ["Absent lung sliding also seen in: mainstem intubation, pleurodesis, severe consolidation", "Cardiac motion near apex may cause false-positive sliding"],
+    measurements: ["Lung sliding: present/absent", "Lung point: present/absent"],
+    criticalFindings: ["Absent lung sliding with A-lines (pneumothorax)", "Lung point (confirms pneumothorax)"],
+  },
+  "pocus_lung:anterior_blines": {
+    description: "Anterior lung POCUS for B-line assessment. B-lines indicate interstitial fluid (pulmonary edema, ILD). Bilateral anterior B-lines suggest cardiogenic pulmonary edema.",
+    structures: ["Pleural line", "B-lines (comet tails)", "Lung parenchyma"],
+    howToGet: ["Position probe in anterior chest, 2nd–5th ICS", "Assess multiple zones bilaterally", "Count B-lines per intercostal space"],
+    tips: ["B-lines: vertical, hyperechoic, arise from pleural line, extend to bottom of screen, erase A-lines", "≥3 B-lines per zone = significant interstitial syndrome", "Bilateral anterior B-lines: cardiogenic pulmonary edema (sensitivity >90%)"],
+    pitfalls: ["1–2 B-lines per zone can be normal (especially at bases)", "Unilateral B-lines suggest pneumonia, not pulmonary edema"],
+    measurements: ["B-line count per zone", "B-line distribution (bilateral/unilateral)"],
+    criticalFindings: ["Diffuse bilateral B-lines (pulmonary edema)", "Unilateral B-lines with consolidation (pneumonia)"],
+  },
+  "pocus_lung:plaps_right": {
+    description: "Right PLAPS (posterolateral alveolar and/or pleural syndrome) zone. Assessment for pleural effusion and consolidation at the right lung base.",
+    structures: ["Right lung base", "Diaphragm", "Liver", "Right pleural space", "Consolidation (if present)"],
+    howToGet: ["Position probe in right posterior axillary line, below the diaphragm level", "Fan superiorly to assess lung base", "Identify diaphragm and assess for fluid above it"],
+    tips: ["Pleural effusion: anechoic space above diaphragm", "Consolidation: tissue-like echogenicity with air bronchograms", "Spine sign: vertebrae visible through effusion = pleural fluid (not ascites)"],
+    pitfalls: ["Ascites vs pleural effusion: spine sign differentiates", "Consolidation may be mistaken for liver"],
+    measurements: ["Pleural effusion depth (cm)", "Consolidation size"],
+    criticalFindings: ["Large pleural effusion", "Consolidation with air bronchograms (pneumonia)"],
+  },
+  "pocus_lung:plaps_left": {
+    description: "Left PLAPS zone. Assessment for pleural effusion and consolidation at the left lung base.",
+    structures: ["Left lung base", "Diaphragm", "Spleen", "Left pleural space", "Consolidation (if present)"],
+    howToGet: ["Position probe in left posterior axillary line", "Fan superiorly to assess lung base", "Identify diaphragm and assess for fluid above it"],
+    tips: ["Same technique as right PLAPS", "Spleen is smaller than liver — may need to fan more superiorly", "Left pleural effusion: anechoic space above diaphragm, lateral to spleen"],
+    pitfalls: ["Spleen may be small and difficult to identify", "Gastric contents may mimic effusion"],
+    measurements: ["Pleural effusion depth (cm)", "Consolidation size"],
+    criticalFindings: ["Large left pleural effusion", "Left lower lobe consolidation"],
+  },
+  "pocus_lung:diaphragm": {
+    description: "Diaphragm POCUS for assessment of diaphragm function and excursion. Used in ICU for weaning assessment and phrenic nerve palsy.",
+    structures: ["Diaphragm", "Liver (right)", "Spleen (left)", "Pleural space", "Peritoneal space"],
+    howToGet: ["Position probe in subcostal or lower intercostal space", "M-mode through diaphragm for excursion measurement", "Assess bilateral diaphragm movement"],
+    tips: ["Normal diaphragm excursion: >1.8 cm (quiet breathing), >7 cm (deep breathing)", "Paradoxical motion (upward with inspiration) = diaphragm paralysis", "Thickening fraction >20% during inspiration = adequate diaphragm function"],
+    pitfalls: ["Rib shadowing may obscure diaphragm", "Patient cooperation required for accurate measurement"],
+    measurements: ["Diaphragm excursion (M-mode, cm)", "Diaphragm thickening fraction (%)"],
+    criticalFindings: ["Paradoxical diaphragm motion (paralysis)", "Absent diaphragm excursion"],
+  },
+
+  // ─── POCUS RUSH ──────────────────────────────────────────────────────────
+  "pocus_rush:pump_subcostal": {
+    description: "RUSH protocol — Pump assessment: Subcostal view. Evaluates cardiac function and pericardial effusion in the shocked patient.",
+    structures: ["Heart (all chambers)", "Pericardium", "IVC"],
+    howToGet: ["Standard subcostal position", "Assess cardiac function and pericardial effusion"],
+    tips: ["Hyperdynamic: septic/distributive shock", "Severely reduced: cardiogenic shock", "Pericardial effusion with tamponade physiology: obstructive shock"],
+    pitfalls: ["Difficult in obese patients — use A4C or PLAX as alternative"],
+    measurements: ["LV EF (visual)", "Pericardial effusion size", "IVC diameter"],
+    criticalFindings: ["Cardiac tamponade", "Severely reduced LV function (cardiogenic shock)"],
+  },
+  "pocus_rush:pump_plax": {
+    description: "RUSH protocol — Pump assessment: PLAX view. Evaluates LV function and pericardial effusion.",
+    structures: ["LV", "LA", "Aortic valve", "Mitral valve", "Pericardium"],
+    howToGet: ["Standard PLAX position"],
+    tips: ["Hyperdynamic LV: small cavity, vigorous walls — distributive shock", "Severely reduced LV: large, poorly contracting — cardiogenic shock"],
+    pitfalls: ["Foreshortening underestimates LV size"],
+    measurements: ["LV EF (visual)", "Pericardial effusion size"],
+    criticalFindings: ["Severely reduced LV function", "Large pericardial effusion"],
+  },
+  "pocus_rush:tank_ivc": {
+    description: "RUSH protocol — Tank assessment: IVC view. Evaluates volume status and fluid responsiveness.",
+    structures: ["IVC", "Hepatic veins", "RA"],
+    howToGet: ["From subcostal position, rotate probe 90° for IVC long axis", "Measure IVC 2 cm from RA junction", "Assess collapsibility"],
+    tips: ["Flat IVC (<1 cm, >50% collapse): hypovolemia — fill the tank", "Plethoric IVC (>2.1 cm, <50% collapse): RV failure, PE, tamponade — do not fill"],
+    pitfalls: ["Hepatic vein mistaken for IVC", "Ventilated patients: IVC behavior is opposite"],
+    measurements: ["IVC diameter (max/min)", "IVC collapsibility index"],
+    criticalFindings: ["Plethoric IVC (obstructive/cardiogenic shock)", "Flat IVC (hypovolemic shock)"],
+  },
+  "pocus_rush:tank_ruq": {
+    description: "RUSH protocol — Tank assessment: RUQ view. Assesses for free fluid (hemoperitoneum) in the shocked trauma patient.",
+    structures: ["Liver", "Right kidney", "Morison's pouch", "Diaphragm"],
+    howToGet: ["Standard RUQ EFAST position"],
+    tips: ["Free fluid in Morison's pouch = hemoperitoneum — surgical emergency", "Assess diaphragm for hemothorax"],
+    pitfalls: ["Fat between liver and kidney may mimic fluid"],
+    measurements: ["Free fluid depth (cm)"],
+    criticalFindings: ["Free fluid (hemoperitoneum)", "Hemothorax"],
+  },
+  "pocus_rush:pipes_aorta": {
+    description: "RUSH protocol — Pipes assessment: Abdominal aorta. Assesses for aortic aneurysm as a cause of shock.",
+    structures: ["Abdominal aorta", "Iliac arteries", "IVC", "Vertebral body"],
+    howToGet: ["Position probe in epigastrium, marker dot toward head", "Fan through aorta from diaphragm to bifurcation", "Measure aorta in transverse and longitudinal planes"],
+    tips: ["Normal aorta <3 cm — measure outer wall to outer wall", "AAA ≥3 cm: aneurysm; ≥5.5 cm: surgical threshold", "Periaortic hematoma: retroperitoneal fluid around aorta — ruptured AAA"],
+    pitfalls: ["IVC may be mistaken for aorta — aorta is pulsatile, left of midline", "Bowel gas may obscure aorta — apply gentle pressure"],
+    measurements: ["Aortic diameter (cm, outer wall to outer wall)", "Bifurcation level"],
+    criticalFindings: ["AAA ≥5.5 cm", "Periaortic hematoma (ruptured AAA)", "Aortic dissection flap"],
+  },
+
+  // ─── MCS — LVAD ─────────────────────────────────────────────────────────────
+  "mcs_lvad:lvad_plax": {
+    description: "PLAX view for LVAD inflow cannula assessment. The inflow cannula should be positioned 3.5–5 cm from the mitral valve plane, pointing toward the mitral valve, in the mid-LV cavity.",
+    structures: ["LV cavity", "Inflow cannula (echogenic structure)", "Mitral valve", "Aortic valve", "LVOT"],
+    howToGet: ["Obtain standard PLAX view", "Identify the inflow cannula as a bright echogenic structure in the LV cavity", "Measure cannula tip to mitral valve annulus distance", "Apply color Doppler over cannula inlet for flow assessment", "Use PW Doppler at cannula inlet for velocity measurement"],
+    tips: ["Patient positioning: left lateral decubitus 30–45° optimizes the PLAX window", "PLAX is the primary view for inflow cannula distance measurement", "Reduce depth to 12–14 cm to better visualize the cannula tip", "If cannula is not visible in PLAX, try slight probe rotation or lateral angulation"],
+    pitfalls: ["Cannula may be obscured by acoustic shadowing — use harmonic imaging", "Gain artifacts may mimic cannula thrombus — reduce gain", "Foreshortened PLAX underestimates cannula-to-MV distance"],
+    measurements: ["Cannula tip to MV annulus distance (target 3.5–5 cm)", "PW Doppler at cannula inlet (normal 1.0–2.0 m/s)"],
+    criticalFindings: ["Cannula too shallow (<3.5 cm from AV): suction risk", "Cannula too deep (>5 cm): mitral valve entrapment risk"],
+  },
+  "mcs_lvad:lvad_a5c": {
+    description: "Apical 5-Chamber view for LVAD inflow cannula confirmation in a second orthogonal plane. Confirms the cannula is in the central LV cavity, not impinging on the septum or lateral wall.",
+    structures: ["LV cavity", "Inflow cannula", "LVOT", "Aortic valve", "Mitral valve"],
+    howToGet: ["Obtain A4C view then tilt anteriorly to bring LVOT and aortic valve into view", "Identify the inflow cannula in the LV cavity", "Confirm the cannula is in the central LV cavity, not impinging on the septum or lateral wall", "Apply PW Doppler at the cannula inlet for velocity measurement"],
+    tips: ["Patient positioning: left lateral decubitus, steep (60–90°)", "A5C complements PLAX for confirming cannula position in two orthogonal planes", "Steep left lateral decubitus position improves apical window"],
+    pitfalls: ["Foreshortened apical view may make cannula appear closer to MV than it is — ensure true apex", "Gain artifacts may mimic cannula thrombus — reduce gain and use harmonic imaging"],
+    measurements: ["PW Doppler at inflow cannula: 1.0–2.0 m/s normal"],
+    criticalFindings: ["Cannula impinging on septum or lateral wall", "Cannula velocity >2.0 m/s: obstruction or malposition"],
+  },
+  "mcs_lvad:lvad_a4c": {
+    description: "Apical 4-Chamber view for LVAD RV assessment. LVAD increases RV preload and may cause RV failure. RV assessment is the most critical post-LVAD echo parameter.",
+    structures: ["RV", "LV", "RA", "LA", "Tricuspid valve", "Mitral valve", "IVS"],
+    howToGet: ["Obtain standard A4C view with all four chambers visible", "Focus on RV size and function", "Measure TAPSE with M-mode at the tricuspid annulus", "Apply PW TDI at tricuspid annulus for RV S'", "Assess TR severity with color Doppler and CW for RVSP estimation"],
+    tips: ["Patient positioning: left lateral decubitus, steep (60–90°)", "RV assessment is the most critical post-LVAD echo parameter", "Serial TAPSE and RVSP monitoring detects early RV decompensation"],
+    pitfalls: ["RV failure post-LVAD can be subtle — compare to pre-implant baseline", "Leftward septal shift with RV dilation = RV failure, not adequate LV unloading"],
+    measurements: ["RV basal diameter (normal ≤41 mm)", "TAPSE (normal ≥17 mm; <10 mm = severe RV dysfunction)", "RV S' (normal ≥9.5 cm/s)", "TR CW: RVSP = 4v² + RAP"],
+    criticalFindings: ["TAPSE <10 mm: severe RV dysfunction post-LVAD", "Leftward septal shift with RV dilation: RV failure", "New severe TR"],
+  },
+  "mcs_lvad:lvad_subcostal": {
+    description: "Subcostal view for LVAD IVC assessment and pericardial effusion detection. Post-LVAD pericardial effusion is common and any new effusion requires urgent assessment.",
+    structures: ["IVC", "RA", "Pericardium", "Hepatic veins"],
+    howToGet: ["Obtain subcostal 4-chamber view", "Rotate to IVC long axis view", "Measure IVC diameter at 1–2 cm from RA junction", "Assess IVC collapsibility with sniff test", "Assess for pericardial effusion"],
+    tips: ["Patient positioning: supine, knees flexed", "Post-LVAD pericardial effusion is common — always assess subcostal view", "Hepatic vein flow reversal in systole suggests elevated RAP/RV failure"],
+    pitfalls: ["Loculated pericardial effusion may be missed in standard views — sweep carefully", "Hepatic veins may be mistaken for IVC — follow vessel to RA junction"],
+    measurements: ["IVC diameter (≤21 mm normal)", "IVC collapse with sniff (>50% = RAP 0–5 mmHg)"],
+    criticalFindings: ["New pericardial effusion post-LVAD", "IVC >21 mm + <50% collapse: elevated RAP"],
+  },
+  "mcs_lvad:lvad_outflow_plax": {
+    description: "PLAX view for LVAD outflow graft cross-section. The outflow graft appears as a circular, echogenic structure anterior to the aortic root. Normal PW Doppler shows continuous, low-pulsatility flow at 1.5–2.5 m/s.",
+    structures: ["Outflow graft (circular, anterior to aortic root)", "Aortic root", "LV", "Mitral valve"],
+    howToGet: ["Obtain standard PLAX view", "Identify the outflow graft as a circular echogenic structure anterior to the aortic root", "Apply color Doppler over the graft lumen", "Use PW Doppler within the graft for velocity measurement", "If velocity >2.5 m/s, switch to CW Doppler"],
+    tips: ["Patient positioning: left lateral decubitus 30–45° optimizes the PLAX window", "The outflow graft is most consistently seen in PLAX as a circular structure anterior to the aortic root", "Color Doppler aliasing within the graft is the most sensitive sign of obstruction", "If not visible, move 1 interspace cranially"],
+    pitfalls: ["The outflow graft may be difficult to visualize in patients with poor acoustic windows", "Do not confuse the outflow graft with a pericardial effusion or pleural fluid anterior to the heart", "Graft thrombus may appear as echogenic material within the lumen"],
+    measurements: ["Outflow graft PW velocity (normal 1.5–2.5 m/s)"],
+    criticalFindings: ["Outflow graft velocity >2.5 m/s: obstruction (kink, thrombus, or anastomotic stenosis)", "Absent diastolic flow or flow reversal: pump malfunction or severe AR recirculation"],
+  },
+  "mcs_lvad:lvad_outflow_hpsl": {
+    description: "High Parasternal Long-Axis view for LVAD outflow graft anastomosis assessment. Shows the ascending aorta in long axis with the outflow graft anastomosis site. Preferred window for longitudinal graft evaluation.",
+    structures: ["Ascending aorta", "Outflow graft anastomosis", "Outflow graft (longitudinal course)"],
+    howToGet: ["Start from standard PLAX position", "Move transducer 1–2 interspaces superiorly (toward 1st–2nd ICS)", "Tilt the transducer slightly toward the right shoulder to bring the ascending aorta into long-axis view", "Identify the ascending aorta and the outflow graft anastomosis site", "Apply color Doppler across the anastomosis", "If turbulence detected, use CW Doppler to measure peak velocity", "Sweep along the longitudinal graft course to assess for kinking"],
+    tips: ["Patient positioning: left lateral decubitus 30–45°; slight right lateral tilt may improve the high parasternal window", "This view is preferred for outflow graft anastomotic assessment", "If the graft anastomosis is not visible, try moving 1 additional interspace superiorly", "TEE (ME Ascending Aorta Long-Axis, 0°) provides superior resolution when TTE windows are limited"],
+    pitfalls: ["The high parasternal window may be limited by lung interference — ask patient to exhale and hold breath", "The outflow graft anastomosis may not be in the same plane as the ascending aorta", "Rib shadowing in the high parasternal window is common"],
+    measurements: ["Anastomosis velocity (normal 1.5–2.5 m/s)"],
+    criticalFindings: ["Anastomotic velocity >2.5 m/s with turbulence: stenosis or kink", "Focal color Doppler aliasing at kink site"],
+  },
+  // ─── MCS — ECMO ─────────────────────────────────────────────────────────────
+  "mcs_ecmo:ecmo_plax": {
+    description: "PLAX view for VA-ECMO LV distension and AV opening assessment. LV distension is a critical complication of VA-ECMO — the LV cannot eject against the retrograde ECMO flow and may dilate acutely.",
+    structures: ["LV", "Aortic valve", "Mitral valve", "LVOT"],
+    howToGet: ["Obtain standard PLAX view", "Assess LV size — compare to pre-ECMO baseline", "Observe AV opening frequency — should open with each native beat", "Apply color Doppler over LVOT and AV for AR assessment", "Measure LVEDD if LV appears dilated"],
+    tips: ["Patient positioning: left lateral decubitus 30–45°", "AV opening frequency is the most important ECMO monitoring parameter in PLAX", "Any increase in LV size from baseline = early LV distension — escalate management"],
+    pitfalls: ["AV may not open at all at high ECMO flows — this is expected but requires LV venting consideration", "Mitral regurgitation may worsen with LV distension"],
+    measurements: ["LVEDD (compare to pre-ECMO baseline)", "AV opening frequency (beats per minute that AV opens)"],
+    criticalFindings: ["LV distension: LVEDD >pre-ECMO baseline", "Absent AV opening with LV dilation: urgent LV venting required", "New or worsening MR with LV distension"],
+  },
+  "mcs_ecmo:ecmo_a4c": {
+    description: "Apical 4-Chamber view for VA-ECMO RV and LV function monitoring. Serial assessment of biventricular function guides ECMO weaning decisions.",
+    structures: ["LV", "RV", "LA", "RA", "Mitral valve", "Tricuspid valve"],
+    howToGet: ["Obtain standard A4C view", "Assess LV and RV size and function", "Measure LVEF visually or by biplane Simpson's", "Measure TAPSE for RV function", "Assess TR severity"],
+    tips: ["Patient positioning: left lateral decubitus, steep (60–90°)", "Serial biventricular function assessment guides ECMO weaning", "Improving LVEF and TAPSE = recovery — consider weaning trial"],
+    pitfalls: ["LV function may appear better than native due to ECMO unloading — assess at reduced ECMO flow during weaning trial", "RV failure may be masked by ECMO support"],
+    measurements: ["LVEF (biplane Simpson's)", "TAPSE (normal ≥17 mm)", "RV/LV ratio"],
+    criticalFindings: ["LVEF <20% at reduced ECMO flow: weaning failure", "TAPSE <10 mm: severe RV dysfunction", "RV/LV ratio >1.0: RV dilation"],
+  },
+  "mcs_ecmo:ecmo_tee_cannula": {
+    description: "TEE Bicaval view for VA-ECMO venous drainage cannula positioning. The venous cannula tip should be at the RA/IVC junction, not in the RA body or RV.",
+    structures: ["RA", "IVC", "SVC", "Venous cannula", "Foramen ovale"],
+    howToGet: ["Advance TEE probe to mid-esophagus", "Rotate to bicaval view (90–110°)", "Identify the venous cannula entering from the IVC", "Confirm cannula tip position at RA/IVC junction", "Apply color Doppler to confirm drainage flow"],
+    tips: ["Patient positioning: supine (intubated)", "TEE bicaval view is the gold standard for venous cannula positioning", "Cannula tip should be at RA/IVC junction — not in RA body"],
+    pitfalls: ["Cannula too deep (in RA body): reduced drainage efficiency and arrhythmia risk", "Cannula too shallow (in IVC): inadequate drainage"],
+    measurements: ["Cannula tip position relative to RA/IVC junction"],
+    criticalFindings: ["Cannula in RV: urgent repositioning required", "Cannula tip in RA body causing arrhythmia"],
+  },
+  // ─── MCS — Impella (shared positioning views) ────────────────────────────────
+  "mcs_impella_cp:imp_plax_position": {
+    description: "PLAX view for Impella device positioning. The inlet area should be 3.5–4.5 cm below the aortic valve in the LV cavity. This is the primary view for Impella positioning assessment.",
+    structures: ["LV cavity", "Impella device", "Aortic valve", "LVOT", "Mitral valve"],
+    howToGet: ["Obtain PLAX view with AV and LVOT visible", "Identify the Impella device crossing the AV", "Measure distance from device inlet to AV annulus", "Apply color Doppler to confirm inlet in LV and outlet in aorta"],
+    tips: ["Patient positioning: left lateral decubitus 30–45°", "PLAX is the primary view for Impella positioning", "Reduce depth to 10–12 cm to better visualize the inlet-to-AV distance", "If device is too shallow, advance catheter; if too deep, withdraw slightly"],
+    pitfalls: ["Acoustic shadowing from device may obscure AV — use harmonic imaging", "Foreshortened PLAX underestimates inlet-to-AV distance"],
+    measurements: ["Inlet-to-AV distance (target 3.5–4.5 cm)"],
+    criticalFindings: ["Inlet-to-AV distance <3.5 cm: device too shallow — advance", "Inlet-to-AV distance >5 cm: device too deep — withdraw", "Device crossing MV: urgent repositioning"],
+  },
+  "mcs_impella_cp:imp_a5c_position": {
+    description: "Apical 5-Chamber view for Impella inlet confirmation in a second orthogonal plane. Confirms inlet area is in the LV cavity and outlet is in the ascending aorta.",
+    structures: ["LV cavity", "LVOT", "Aortic valve", "Impella device", "Mitral valve"],
+    howToGet: ["Obtain A4C view then tilt anteriorly to bring LVOT and AV into view", "Identify the Impella device in the LVOT crossing the AV", "Confirm inlet area is in the LV cavity (below AV)", "Confirm outlet area is in the ascending aorta (above AV)", "Assess for MV impingement"],
+    tips: ["Patient positioning: left lateral decubitus, steep (60–90°)", "A5C confirms inlet position in a second orthogonal plane to PLAX", "If new MR develops after Impella placement, check inlet depth immediately"],
+    pitfalls: ["Foreshortened apical view may give false impression of inlet position", "New MR in A4C with Impella = pigtail entanglement — urgent repositioning"],
+    measurements: ["Inlet position relative to AV"],
+    criticalFindings: ["New MR: pigtail entanglement — urgent repositioning", "Inlet above AV: device too shallow"],
+  },
+  "mcs_impella_cp:imp_tee_positioning": {
+    description: "TEE ME LAX view (120–135°) for Impella positioning — the gold standard in the cath lab. Equivalent to PLAX. Inlet should be 3.5–4.5 cm below the AV.",
+    structures: ["LV cavity", "Impella device", "Aortic valve", "LVOT", "Ascending aorta"],
+    howToGet: ["Advance probe to mid-esophagus", "Rotate to ME LAX view (120–135°)", "Identify Impella device crossing the AV", "Measure inlet-to-AV distance: 3.5–4.5 cm", "Confirm outlet in ascending aorta", "Assess AV leaflets for impingement"],
+    tips: ["Patient positioning: supine (intubated) or left lateral decubitus", "TEE ME LAX is the gold standard for Impella positioning in the cath lab", "Real-time TEE guidance during repositioning is preferred over fluoroscopy alone"],
+    pitfalls: ["TEE probe may be difficult to advance past the device in some patients", "Acoustic shadowing from device — use multiple imaging planes"],
+    measurements: ["Inlet-to-AV distance (target 3.5–4.5 cm)"],
+    criticalFindings: ["Inlet-to-AV distance outside 3.5–5 cm range", "AV leaflet impingement by device"],
+  },
+  "mcs_impella_cp:imp_a4c_lv_unload": {
+    description: "Apical 4-Chamber view for Impella LV unloading and MV assessment. LV decompression is the key hemodynamic goal — document LVEDD at each echo.",
+    structures: ["LV", "RV", "LA", "RA", "Mitral valve", "Tricuspid valve"],
+    howToGet: ["Obtain standard A4C view", "Measure LVEDD and LVESD", "Assess MV for new MR (pigtail entanglement)", "Measure TAPSE and RV S'"],
+    tips: ["Patient positioning: left lateral decubitus, 45–60°", "LV decompression is the key hemodynamic goal — document LVEDD at each echo", "RV failure is a common cause of suction alarms — assess TAPSE and RV S' routinely"],
+    pitfalls: ["Persistent LV dilation at high P-level = inadequate unloading or device malposition", "New MR = pigtail entanglement — do not attribute to worsening native MV disease without checking position"],
+    measurements: ["LVEDD and LVESD (compare to baseline)", "TAPSE (M-mode)", "RV S' (TDI lateral tricuspid annulus)"],
+    criticalFindings: ["New MR: pigtail entanglement", "Persistent LV dilation at high P-level: inadequate unloading or malposition"],
+  },
+  "mcs_impella_cp:impcp_ar_serial": {
+    description: "PLAX Color Doppler for serial AR assessment with Impella CP (14Fr). The 14Fr profile creates a larger crossing profile than the 2.5 and may worsen pre-existing AR.",
+    structures: ["Aortic valve", "LVOT", "Impella device"],
+    howToGet: ["Obtain PLAX view with AV and LVOT visible", "Apply color Doppler box over LVOT and AV", "Assess AR jet width relative to LVOT diameter", "Repeat at each P-level change and at each echo assessment"],
+    tips: ["Patient positioning: left lateral decubitus 30–45°", "Serial AR assessment is mandatory with Impella CP — document at each echo", "Mild AR with Impella CP is expected — moderate-severe AR causes recirculation"],
+    pitfalls: ["Device artifact may mimic AR jet — confirm with multiple views", "AR may be underestimated with high Impella flow rates"],
+    measurements: ["AR jet width / LVOT diameter ratio", "AR PHT if moderate-severe"],
+    criticalFindings: ["Moderate-severe AR (jet >65% LVOT width): significant recirculation — consider repositioning or P-level reduction"],
+  },
+  "mcs_impella_cp:impcp_ecpella": {
+    description: "PLAX and A4C views for ECPELLA configuration (Impella CP + VA-ECMO). The Impella vents the LV while ECMO provides systemic perfusion. AV opening and LV size are the key monitoring targets.",
+    structures: ["LV", "Aortic valve", "LVOT", "Impella device"],
+    howToGet: ["Obtain PLAX view", "Assess AV opening frequency — should open with each native beat", "Measure LVEDD — should be smaller than ECMO-only baseline", "Apply color Doppler over LVOT for AR and Impella flow assessment", "Obtain A4C for biventricular function"],
+    tips: ["Patient positioning: left lateral decubitus 30–45°", "ECPELLA: Impella vents LV while ECMO provides systemic perfusion", "AV opening and LV size are the key monitoring targets in ECPELLA"],
+    pitfalls: ["LV distension may persist if Impella P-level is too low — titrate up", "Competing flows from ECMO and Impella may cause turbulence in LVOT"],
+    measurements: ["AV opening frequency", "LVEDD (compare to ECMO-only baseline)"],
+    criticalFindings: ["Persistent LV distension despite Impella: increase P-level or consider surgical venting", "Absent AV opening with LV dilation: inadequate LV venting"],
+  },
+  "mcs_impella_cp:imp25_ar_serial": {
+    description: "PLAX Color Doppler for serial AR assessment with Impella 2.5 (12Fr). The 12Fr profile is smaller than CP and generally causes less AR. Trivial-mild AR is expected.",
+    structures: ["Aortic valve", "LVOT", "Impella device"],
+    howToGet: ["Obtain PLAX view with AV and LVOT visible", "Apply color Doppler box over LVOT and AV", "Assess AR jet width relative to LVOT diameter", "Repeat at each P-level change"],
+    tips: ["Patient positioning: left lateral decubitus 30–45°", "Trivial-mild AR is expected with Impella 2.5 at 12Fr profile", "Document AR grade at each echo for serial comparison"],
+    pitfalls: ["Device artifact may mimic AR jet", "AR may be underestimated with high Impella flow rates"],
+    measurements: ["AR jet width / LVOT diameter ratio"],
+    criticalFindings: ["Moderate-severe AR: significant recirculation — consider repositioning"],
+  },
+  "mcs_impella_cp:imp55_ar_serial": {
+    description: "PLAX Color Doppler for serial AR assessment with Impella 5.5 (21Fr surgical). The 21Fr profile creates the largest crossing profile and highest AR risk. Serial assessment is mandatory.",
+    structures: ["Aortic valve", "LVOT", "Impella device"],
+    howToGet: ["Obtain PLAX view with AV and LVOT visible", "Apply color Doppler box over LVOT and AV", "Assess AR jet width relative to LVOT diameter", "Repeat at each echo assessment"],
+    tips: ["Patient positioning: left lateral decubitus 30–45°", "Impella 5.5 has the highest AR risk due to 21Fr profile — serial assessment is mandatory", "Moderate-severe AR with Impella 5.5 significantly reduces net forward flow"],
+    pitfalls: ["Device artifact may mimic AR jet", "AR may be underestimated with high Impella flow rates"],
+    measurements: ["AR jet width / LVOT diameter ratio", "AR PHT if moderate-severe"],
+    criticalFindings: ["Moderate-severe AR: significant recirculation — consider repositioning or P-level adjustment"],
+  },
+  "mcs_impella_cp:imp55_bridge_serial": {
+    description: "Serial biventricular function assessment for Impella 5.5 bridge-to-decision/transplant. Documents LV recovery or progression to advanced therapy.",
+    structures: ["LV", "RV", "LA", "RA", "Mitral valve", "Tricuspid valve"],
+    howToGet: ["Obtain A4C view", "Measure LVEF by biplane Simpson's", "Measure TAPSE and RV S'", "Assess MR and TR severity", "Measure LVEDD and LVESD"],
+    tips: ["Patient positioning: left lateral decubitus, steep (60–90°)", "Serial biventricular function documents recovery or progression to advanced therapy", "Improving LVEF on serial echo = bridge-to-recovery candidate"],
+    pitfalls: ["LV function may appear better than native due to Impella unloading — assess at reduced P-level during weaning trial"],
+    measurements: ["LVEF (biplane Simpson's)", "TAPSE", "LVEDD and LVESD"],
+    criticalFindings: ["LVEF <20% at reduced P-level: weaning failure — escalate to advanced therapy"],
+  },
+  "mcs_impella_cp:impecp_expansion": {
+    description: "PLAX view for Impella ECP pump expansion confirmation. The ECP has an expandable pump that must be confirmed fully expanded in the LV cavity after deployment.",
+    structures: ["LV cavity", "Impella ECP pump", "Aortic valve", "LVOT"],
+    howToGet: ["Obtain PLAX view", "Identify the ECP pump in the LV cavity", "Confirm the pump appears fully expanded (larger cross-section than delivery profile)", "Measure inlet-to-AV distance", "Apply color Doppler for flow confirmation"],
+    tips: ["Patient positioning: left lateral decubitus 30–45°", "ECP pump expansion must be confirmed by echo after deployment", "Unexpanded pump = reduced flow output — check deployment"],
+    pitfalls: ["Partially expanded pump may be difficult to distinguish from fully expanded on 2D — use color Doppler flow pattern"],
+    measurements: ["Inlet-to-AV distance (target 3.5–4.5 cm)", "Pump cross-section (confirm expansion)"],
+    criticalFindings: ["Unexpanded or partially expanded pump: reduced flow — check deployment", "Inlet outside target range: reposition"],
+  },
+  "mcs_impella_cp:imp_rp_subcostal": {
+    description: "Subcostal view for Impella RP venous inlet confirmation. The RP inlet should be in the IVC, and the outlet in the pulmonary artery. Subcostal is the primary TTE window for RP assessment.",
+    structures: ["IVC", "RA", "Impella RP device", "Tricuspid valve"],
+    howToGet: ["Obtain subcostal 4-chamber view", "Rotate to IVC long axis", "Identify the Impella RP device in the IVC/RA", "Confirm inlet position in IVC", "Apply color Doppler to confirm flow direction"],
+    tips: ["Patient positioning: supine, knees flexed", "Subcostal is the primary TTE window for Impella RP assessment", "RP inlet should be in IVC — outlet in PA"],
+    pitfalls: ["RP device may be difficult to visualize in patients with poor subcostal windows", "Hepatic veins may obscure IVC visualization"],
+    measurements: ["RP inlet position relative to RA/IVC junction"],
+    criticalFindings: ["RP inlet in RA body: reposition", "RP outlet not in PA: urgent repositioning"],
+  },
+  "mcs_impella_cp:imp_rp_psax_outlet": {
+    description: "PSAX view for Impella RP outlet confirmation in the pulmonary artery. The outlet should be in the main PA, not in the RV or branch PA.",
+    structures: ["Main pulmonary artery", "Pulmonary valve", "RVOT", "Impella RP outlet"],
+    howToGet: ["Obtain PSAX view at AV level", "Identify the Impella RP device in the RVOT/PA", "Confirm outlet is in the main PA", "Apply color Doppler to confirm antegrade PA flow"],
+    tips: ["Patient positioning: left lateral decubitus 30–45°", "PSAX confirms RP outlet in main PA", "Color Doppler antegrade PA flow confirms correct outlet position"],
+    pitfalls: ["RP outlet in RV: device too shallow — advance", "RP outlet in branch PA: device too deep — withdraw"],
+    measurements: ["RP outlet position relative to pulmonary valve"],
+    criticalFindings: ["RP outlet in RV: reposition", "RP outlet in branch PA: reposition"],
+  },
+  "mcs_impella_cp:imp_rp_a4c_rv": {
+    description: "Apical 4-Chamber view for Impella RP RV unloading assessment. TAPSE and RV S' are the primary metrics for RP efficacy monitoring.",
+    structures: ["RV", "LV", "RA", "LA", "Tricuspid valve"],
+    howToGet: ["Obtain standard A4C view", "Measure TAPSE with M-mode at tricuspid annulus", "Apply PW TDI at tricuspid annulus for RV S'", "Assess TR severity", "Measure RV basal diameter"],
+    tips: ["Patient positioning: left lateral decubitus, steep (60–90°)", "TAPSE and RV S' are the primary metrics for RP efficacy monitoring", "Improving TAPSE on serial echo = RV recovery"],
+    pitfalls: ["RV function may appear better than native due to RP support — assess at reduced flow during weaning trial"],
+    measurements: ["TAPSE (normal ≥17 mm)", "RV S' (normal ≥9.5 cm/s)", "RV basal diameter"],
+    criticalFindings: ["TAPSE <10 mm: severe RV dysfunction", "RV dilation with TR: RV failure"],
+  },
+  "mcs_impella_cp:imp_rp_tee": {
+    description: "TEE Bicaval view for Impella RP positioning confirmation. Gold standard for RP inlet and outlet positioning in the cath lab or ICU.",
+    structures: ["IVC", "RA", "SVC", "Impella RP device"],
+    howToGet: ["Advance TEE probe to mid-esophagus", "Rotate to bicaval view (90–110°)", "Identify the Impella RP device in the IVC/RA", "Confirm inlet in IVC and outlet crossing TV into RV/PA", "Apply color Doppler to confirm flow"],
+    tips: ["Patient positioning: supine (intubated)", "TEE bicaval is the gold standard for RP positioning", "Real-time TEE guidance during repositioning is preferred"],
+    pitfalls: ["RP device may cause acoustic shadowing in TEE", "Multiple imaging planes may be needed to confirm outlet position"],
+    measurements: ["RP inlet position relative to RA/IVC junction"],
+    criticalFindings: ["RP inlet in RA body: reposition", "RP outlet not crossing TV: reposition"],
+  },
+  // ─── MCS — LifeVest ──────────────────────────────────────────────────────────
+  "mcs_lifevest:lv_ef_biplane": {
+    description: "Biplane EF assessment for LifeVest (WCD) eligibility and monitoring. EF ≤35% on GDMT ≥3 months is the primary ICD/LifeVest indication. Biplane Simpson's is the required method.",
+    structures: ["LV (A4C and A2C views)", "Endocardial border"],
+    howToGet: ["Obtain true A4C view — no foreshortening", "Trace LV endocardium in end-diastole and end-systole in A4C", "Rotate to A2C view", "Repeat tracings in A2C", "Calculate biplane EF", "If EF borderline: use contrast echo for accuracy"],
+    tips: ["Patient positioning: left lateral decubitus, 45–60°", "EF must be measured on optimized GDMT for ≥3 months before ICD/LifeVest decision", "Contrast echo is recommended when ≥2 endocardial segments are not visualized"],
+    pitfalls: ["Visual EF estimation is not acceptable for ICD/LifeVest decision — must use biplane Simpson's", "Single-plane (A4C only) underestimates EF in asymmetric LV", "Foreshortened A4C overestimates EF"],
+    measurements: ["LVEF biplane Simpson's", "LVEDD and LVESD"],
+    criticalFindings: ["EF ≤35% on GDMT ≥3 months: ICD/LifeVest indication", "EF ≤15%: high sudden death risk — expedite device decision"],
+  },
+  "mcs_lifevest:lv_lv_dimensions": {
+    description: "Serial LV dimensions assessment for LifeVest patients on GDMT. Documents LV remodeling response — positive remodeling (decreasing LVEDD/LVESD) may allow LifeVest discontinuation if EF recovers above 35%.",
+    structures: ["LV", "IVS", "Posterior wall"],
+    howToGet: ["Obtain PLAX view", "Use M-mode or 2D linear measurements at the level of the MV tips", "Measure LVEDD and LVESD", "Measure IVS and PW thickness", "Document at each follow-up for serial comparison"],
+    tips: ["Patient positioning: left lateral decubitus 30–45°", "Document LVEDD and LVESD at each follow-up for serial comparison", "Positive remodeling: ↓ LVEDD and LVESD over time on GDMT"],
+    pitfalls: ["M-mode measurements are angle-dependent — ensure beam is perpendicular to IVS and PW", "Foreshortened PLAX = oblique M-mode cut = overestimation of dimensions"],
+    measurements: ["LVEDD (normal ≤56 mm)", "LVESD (normal ≤40 mm)", "IVS thickness", "PW thickness"],
+    criticalFindings: ["Progressive LV dilation despite GDMT: poor prognosis — consider advanced therapy referral"],
+  },
+  // ─── MCS — ICD ───────────────────────────────────────────────────────────────
+  "mcs_icd:icd_ef_biplane": {
+    description: "Biplane EF assessment for ICD eligibility decision. EF ≤35% on GDMT ≥3 months is the primary ICD indication (Class I). Biplane Simpson's is the required method — visual estimation is not acceptable.",
+    structures: ["LV (A4C and A2C views)", "Endocardial border"],
+    howToGet: ["Obtain true A4C view — no foreshortening", "Trace LV endocardium in end-diastole and end-systole in A4C", "Rotate to A2C view", "Repeat tracings in A2C", "Calculate biplane EF", "If EF borderline: use contrast echo for accuracy"],
+    tips: ["Patient positioning: left lateral decubitus, 45–60°", "EF must be measured on optimized GDMT for ≥3 months before ICD decision", "Contrast echo is recommended when ≥2 endocardial segments are not visualized"],
+    pitfalls: ["Visual EF estimation is not acceptable for ICD decision — must use biplane Simpson's", "Single-plane (A4C only) underestimates EF in asymmetric LV — always use biplane", "Foreshortened A4C overestimates EF"],
+    measurements: ["LVEF biplane Simpson's", "LVEDD and LVESD"],
+    criticalFindings: ["EF ≤35% on GDMT ≥3 months: ICD indication (Class I)", "EF 36–40%: ICD Class IIb — shared decision-making"],
+  },
+  "mcs_icd:icd_crt_dyssynchrony": {
+    description: "Dyssynchrony assessment for CRT-D eligibility. Primary CRT criteria are EF ≤35% + LBBB + QRS ≥150 ms — echo dyssynchrony is supplementary. SPWMD >130 ms and IVMD >40 ms support CRT benefit.",
+    structures: ["LV", "IVS", "Lateral wall", "RVOT", "LVOT"],
+    howToGet: ["PLAX M-mode: measure SPWMD (septal-to-posterior wall motion delay). Normal <130 ms", "A4C: PW Doppler at LVOT for aortic pre-ejection time", "PSAX: PW Doppler at RVOT for pulmonary pre-ejection time", "Calculate IVMD = aortic pre-ejection time − pulmonary pre-ejection time. Normal <40 ms", "TDI at septal and lateral walls: assess timing of peak systolic velocity"],
+    tips: ["Patient positioning: left lateral decubitus, 45–60°", "CRT primary criteria: EF ≤35% + LBBB + QRS ≥150 ms — echo dyssynchrony is supplementary", "Post-CRT: dyssynchrony should resolve — SPWMD and IVMD should normalize"],
+    pitfalls: ["Dyssynchrony assessment is supplementary — QRS duration and morphology are primary CRT criteria", "RBBB pattern: dyssynchrony less predictable — CRT benefit less certain"],
+    measurements: ["SPWMD (normal <130 ms)", "IVMD (normal <40 ms)", "Aortic pre-ejection time", "Pulmonary pre-ejection time"],
+    criticalFindings: ["SPWMD >130 ms: significant intraventricular dyssynchrony", "IVMD >40 ms: significant interventricular dyssynchrony"],
+  },
+  "mcs_icd:icd_post_lead": {
+    description: "Post-implant lead assessment for ICD/CRT-D. Assesses for pericardial effusion, lead position, and new wall motion abnormalities (lead perforation). Any new pericardial effusion post-implant requires urgent assessment.",
+    structures: ["RV lead", "Pericardium", "IVC", "RA"],
+    howToGet: ["A4C: identify RV lead at RV apex or RVOT septum", "Subcostal 4-chamber: assess for pericardial effusion post-implant", "Subcostal IVC: assess for hemodynamic compromise if effusion present", "Assess for new wall motion abnormalities (lead perforation)"],
+    tips: ["Patient positioning: left lateral decubitus (apical) or supine (subcostal)", "Subcostal view is most useful for pericardial effusion assessment post-implant", "Any new effusion post-ICD implant: assess for tamponade physiology"],
+    pitfalls: ["Lead perforation may cause only small pericardial effusion — assess carefully", "New TR after ICD implant: RV lead may be impinging on TV leaflets"],
+    measurements: ["Pericardial effusion size", "IVC collapsibility (if effusion present)"],
+    criticalFindings: ["New pericardial effusion post-implant: cardiac perforation excluded", "Tamponade physiology: urgent pericardiocentesis", "New wall motion abnormality: lead perforation"],
+  },
+  // ─── Fetal Echo ──────────────────────────────────────────────────────────────
+  "fetal:abdominal-situs": {
+    description: "Abdominal situs view — the first step in fetal echo. Confirms normal situs solitus: stomach on the left, aorta left of spine, IVC right of spine. Situs abnormalities are strongly associated with complex congenital heart disease.",
+    structures: ["Fetal stomach (left)", "Aorta (left of spine)", "IVC (right of spine)", "Spine (posterior)"],
+    howToGet: ["Obtain transverse view of fetal abdomen at level of stomach", "Identify spine posteriorly", "Confirm stomach on left and aorta/IVC positions relative to spine"],
+    tips: ["Stomach on left = situs solitus (normal)", "Stomach on right = situs inversus or heterotaxy", "Absent stomach bubble: esophageal atresia or fetal swallowing problem"],
+    pitfalls: ["Fetal position may make left/right orientation difficult — confirm spine position first", "Stomach may be empty — rescan after 30 minutes"],
+    criticalFindings: ["Stomach on right: situs inversus or heterotaxy — high CHD risk", "Absent stomach bubble: esophageal atresia", "Aorta and IVC on same side: heterotaxy"],
+  },
+  "fetal:4cv": {
+    description: "The most important screening view in fetal echo. Obtained from a transverse cross-section of the fetal thorax at the level of the AV valves. The heart should occupy approximately 1/3 of the thoracic area.",
+    structures: ["LV", "RV", "LA", "RA", "Mitral valve", "Tricuspid valve", "IVS", "IAS", "Foramen ovale", "Pulmonary veins"],
+    howToGet: ["Obtain transverse view of fetal thorax at level of AV valves", "Heart should occupy ~1/3 of thoracic area", "Confirm 4 chambers, 2 AV valves, IVS and IAS", "Assess foramen ovale flap in LA", "Apply color Doppler across MV and TV"],
+    tips: ["Mother supine or left lateral tilt; obtain true transverse cardiac cut perpendicular to fetal spine", "The 4CV is the most important screening view — abnormal 4CV detects >50% of CHD", "Foramen ovale flap should be in LA (left-sided)"],
+    pitfalls: ["Oblique cut may make RV appear smaller than LV — ensure true transverse cut", "Foramen ovale flap in RA = abnormal (suggests obstructed pulmonary venous return)"],
+    criticalFindings: ["LV/RV size discrepancy: hypoplastic left or right heart", "AV valve atresia", "Large VSD", "Foramen ovale flap in RA: obstructed TAPVR"],
+  },
+  "fetal:lvot": {
+    description: "LVOT view — confirms the aorta arises from the LV. The aortic root should be continuous with the IVS (fibrous continuity). Interruption of this continuity suggests VSD or malalignment.",
+    structures: ["LV", "LVOT", "Aortic root", "IVS", "Mitral valve"],
+    howToGet: ["From 4CV, tilt transducer anteriorly toward fetal head", "Bring LVOT and aortic root into view", "Confirm aortic root arises from LV with IVS continuity", "Apply color Doppler across LVOT and AV"],
+    tips: ["LVOT view confirms LV-to-aorta connection", "IVS continuity with aortic root rules out perimembranous VSD"],
+    pitfalls: ["Overangulation may make PA appear to arise from LV (false TGA)", "VSD may interrupt IVS continuity"],
+    criticalFindings: ["Aorta arising from RV: TGA", "IVS discontinuity: VSD or malalignment", "Small LVOT: LVOTO or critical AS"],
+  },
+  "fetal:rvot": {
+    description: "RVOT view — confirms the pulmonary artery arises from the RV. The MPA is normally larger than the ascending aorta in the fetus. The PA bifurcates into LPA and RPA.",
+    structures: ["RV", "Main pulmonary artery (MPA)", "Ascending aorta", "SVC", "Descending aorta"],
+    howToGet: ["From LVOT view, tilt slightly more anteriorly", "Bring RVOT and MPA into view", "Confirm PA arises from RV", "Confirm MPA is larger than ascending aorta", "Apply color Doppler across pulmonary valve"],
+    tips: ["MPA should be larger than ascending aorta in fetus", "PA bifurcation into LPA and RPA confirms normal anatomy"],
+    pitfalls: ["PA arising from LV = TGA", "Small PA = pulmonary atresia/stenosis"],
+    criticalFindings: ["PA arising from LV: TGA", "Small PA: pulmonary atresia/stenosis", "PA = Ao size: abnormal"],
+  },
+  "fetal:3vv-ductal": {
+    description: "3-Vessel View (3VV) — a transverse view at the upper mediastinum showing the PA, aorta, and SVC in a line from left to right. The PA should be the largest vessel.",
+    structures: ["Main pulmonary artery", "Ascending aorta", "SVC", "Ductus arteriosus"],
+    howToGet: ["From RVOT view, tilt slightly superiorly", "Identify PA, aorta, and SVC in a line from left to right", "Confirm PA is largest, then aorta, then SVC", "Apply color Doppler"],
+    tips: ["PA > Ao > SVC in size — left to right in order", "Vessels should be in a straight line"],
+    pitfalls: ["PA < Ao: pulmonary stenosis/atresia", "Vessels not in a line: vascular ring or abnormal arch"],
+    criticalFindings: ["PA < Ao: pulmonary stenosis/atresia", "Absent SVC", "Vessels not in a line", "Reversed flow in PA"],
+  },
+  "fetal:3vt": {
+    description: "3-Vessel Tracheal View (3VT) — shows the PA, ductus arteriosus, aortic arch, and trachea. Confirms left aortic arch and normal ductal flow direction.",
+    structures: ["Main pulmonary artery", "Ductus arteriosus", "Aortic arch", "Trachea", "SVC"],
+    howToGet: ["From 3VV, tilt slightly more superiorly", "Identify the aortic arch and ductus arteriosus converging on the descending aorta", "Confirm left aortic arch (curves to left of trachea)", "Apply color Doppler"],
+    tips: ["Left aortic arch: curves to left of trachea", "Right aortic arch: curves to right — associated with 22q11, TOF"],
+    pitfalls: ["Right aortic arch may be missed if trachea not identified"],
+    criticalFindings: ["Right aortic arch: 22q11, TOF, vascular ring", "Double aortic arch", "Reversed ductal flow"],
+  },
+  "fetal:lbvc": {
+    description: "Long-axis Bicaval View — shows SVC and IVC draining into the RA. Confirms normal systemic venous return and foramen ovale position.",
+    structures: ["RA", "SVC", "IVC", "LA", "Foramen ovale"],
+    howToGet: ["Rotate from transverse to sagittal plane through right side of fetus", "Align with IVC/SVC axis entering RA", "Confirm both SVC and IVC drain into RA", "Assess foramen ovale flap"],
+    tips: ["Foramen ovale flap should be in LA", "SVC absent = persistent LSVC"],
+    criticalFindings: ["SVC absent: persistent LSVC", "IVC interruption with azygos continuation: polysplenia", "Dilated coronary sinus: persistent LSVC"],
+  },
+  "fetal:lv-short-axis": {
+    description: "LV Short-Axis view — confirms circular LV cross-section and both papillary muscles. Used for LV/RV size comparison and papillary muscle assessment.",
+    structures: ["LV (circular)", "Anterolateral papillary muscle", "Posteromedial papillary muscle", "RV"],
+    howToGet: ["From 4CV, rotate transducer to short-axis orientation", "Confirm circular LV cross-section", "Identify both papillary muscles", "Compare LV and RV sizes"],
+    tips: ["LV should appear circular — oval = oblique cut", "Both papillary muscles should be symmetric"],
+    criticalFindings: ["LV/RV size discrepancy: hypoplastic chamber", "Echogenic papillary muscles: cardiac tumor or ischemia"],
+  },
+  "fetal:rvot-short-axis": {
+    description: "RVOT Short-Axis view — shows RVOT, pulmonary valve, MPA bifurcation, and ductus arteriosus. Confirms pulmonary artery anatomy.",
+    structures: ["RVOT", "Pulmonary valve", "Main pulmonary artery", "LPA", "RPA", "Ductus arteriosus", "Aortic root"],
+    howToGet: ["From LV short-axis, tilt superiorly", "Identify RVOT and pulmonary valve", "Confirm MPA bifurcation into RPA and LPA", "Apply color Doppler across pulmonary valve"],
+    tips: ["PA bifurcation confirms normal pulmonary artery anatomy", "Ductus arteriosus connects MPA to descending aorta"],
+    criticalFindings: ["PA smaller than Ao: pulmonary stenosis/atresia", "Absent pulmonary valve", "Reversed DA flow: critical pulmonary obstruction"],
+  },
+  "fetal:bicaval": {
+    description: "Bicaval view — sagittal view showing both SVC and IVC draining into the RA. Best view for assessing venous return and foramen ovale.",
+    structures: ["RA", "SVC", "IVC", "LA", "RPA", "Aorta"],
+    howToGet: ["Sagittal or near-sagittal plane through right side of fetus", "Rotate from transverse to align with IVC/SVC axis", "Confirm both SVC and IVC drain into RA", "Apply color Doppler"],
+    tips: ["Foramen ovale flap should be in LA", "RPA visible in cross-section confirms correct plane"],
+    criticalFindings: ["SVC absent: persistent LSVC", "IVC interruption with azygos continuation: polysplenia", "ASD/sinus venosus defect"],
+  },
+  "fetal:aortic-arch": {
+    description: "Aortic Arch view — sagittal view showing the classic 'candy cane' aortic arch. Three head and neck vessels arise from the arch. Confirms left aortic arch.",
+    structures: ["Ascending aorta", "Aortic arch", "Descending aorta", "Head and neck vessels"],
+    howToGet: ["Sagittal plane through left side of fetus", "Align with aortic arch long axis", "Confirm candy-cane shape and 3 head/neck vessels", "Apply CW/PW Doppler at aortic isthmus"],
+    tips: ["Candy-cane shape = left aortic arch (normal)", "3 head/neck vessels should arise from arch", "Coarctation: narrowing at isthmus with retrograde or absent diastolic flow"],
+    pitfalls: ["Ductal arch may be confused with aortic arch — ductal arch is more vertical", "Only 2 head vessels visible suggests aberrant subclavian artery"],
+    criticalFindings: ["Right aortic arch: 22q11, TOF", "Coarctation — narrowing at isthmus", "Interrupted aortic arch"],
+  },
+  "fetal:ductal-arch": {
+    description: "Ductal Arch view — sagittal view showing the ductus arteriosus connecting the PA to the descending aorta. The 'hockey stick' shape distinguishes it from the aortic arch.",
+    structures: ["RV", "Pulmonary valve", "Ductus arteriosus", "Descending aorta"],
+    howToGet: ["Sagittal plane through right side of fetus", "Align with ductal arch long axis — more vertical than aortic arch", "Confirm hockey-stick shape", "Apply PW/Color Doppler in ductus"],
+    tips: ["Hockey-stick shape = ductal arch (more acute than aortic arch)", "No head/neck vessels arise from ductal arch"],
+    pitfalls: ["Ductal arch confused with aortic arch — DA is more anterior and vertical"],
+    criticalFindings: ["Absent ductus", "Constricted ductus (NSAIDs exposure)", "Reversed ductal flow: critical pulmonary stenosis/atresia"],
+  },
+  "fetal:rvot-bifurcation": {
+    description: "RVOT Bifurcation view — shows the main PA bifurcating into RPA and LPA. Confirms pulmonary artery anatomy and rules out pulmonary atresia.",
+    structures: ["Main pulmonary artery", "RPA", "LPA"],
+    howToGet: ["Slight superior tilt from RVOT view", "Identify MPA bifurcation into RPA and LPA", "Apply color Doppler"],
+    tips: ["PA bifurcation confirms normal pulmonary artery anatomy", "Absent bifurcation may indicate pulmonary atresia"],
+    criticalFindings: ["Absent bifurcation: pulmonary atresia with intact IVS", "Markedly asymmetric branch PAs"],
+  },
+  // ─── Pulmonary HTN & PE ──────────────────────────────────────────────────────
+  "pulm:psax-av": {
+    description: "PSAX at AV level for pulmonary HTN assessment. Shows RVOT, pulmonary valve, and PA. Key measurements: PA acceleration time (PAAT), PA diameter, and RVOT Doppler envelope shape.",
+    structures: ["Aortic valve", "RVOT", "Pulmonary valve", "Main PA", "LA", "RA", "Tricuspid valve"],
+    howToGet: ["Position probe at 3rd–4th ICS, left sternal border", "Rotate clockwise from PLAX to PSAX", "Tilt superiorly to open RVOT", "Align PW Doppler in RVOT just proximal to pulmonic valve for PAAT", "Measure PA diameter at end-diastole"],
+    tips: ["Mid-systolic notching of the RVOT Doppler envelope is highly specific for severe PH", "PAAT/RVET ratio <0.33 supports elevated PA pressure", "Measure PA diameter perpendicular to long axis, at the level of the pulmonic valve"],
+    pitfalls: ["Suboptimal RVOT alignment underestimates PAAT", "Gain too high may obscure mid-systolic notch"],
+    measurements: ["PA Acceleration Time (PAAT): normal ≥105 ms; <60 ms with notch = severe PH", "PA diameter: normal ≤25 mm", "RVOT Doppler envelope: smooth/symmetric vs mid-systolic notch"],
+    criticalFindings: ["PAAT <60 ms with mid-systolic notch: severe PH", "PA diameter >30 mm: significant PA dilation"],
+  },
+  "pulm:a4ch-rv": {
+    description: "Apical 4-Chamber RV-focused view for pulmonary HTN. Always use RV-focused view — standard LV-focused view underestimates RV size. Key measurements: RV dimensions, TRV, TAPSE, RA area.",
+    structures: ["RV", "LV", "RA", "LA", "Tricuspid valve", "Mitral valve", "IVS"],
+    howToGet: ["Obtain standard A4C view", "Tilt probe to maximize RV visualization", "Measure RV basal, mid, and longitudinal diameters", "Use CW Doppler through TR jet for TRV", "Measure TAPSE with M-mode at lateral tricuspid annulus"],
+    tips: ["Always use RV-focused apical 4-ch — standard LV-focused view underestimates RV size", "Measure TRV from multiple windows and use the highest quality signal", "McConnell's sign in PE: RV free wall hypokinesis with preserved or hyperdynamic apex"],
+    pitfalls: ["Standard LV-focused A4C underestimates RV size", "Poor TR signal in apical window — try parasternal or subcostal"],
+    measurements: ["RV basal diameter: normal ≤41 mm", "RV/LV basal ratio: normal <1.0", "TRV: normal ≤2.8 m/s; >3.4 m/s = high PH probability", "TAPSE: normal ≥17 mm", "RA area: normal ≤18 cm²"],
+    criticalFindings: ["RV/LV ratio ≥1.0: RV dilation", "TRV >3.4 m/s: high PH probability", "TAPSE <17 mm: RV dysfunction", "McConnell's sign: acute PE"],
+  },
+  "pulm:a5ch-cw": {
+    description: "Apical 5-Chamber CW Doppler view for TR velocity measurement. Used when apical 4-chamber TR signal is suboptimal.",
+    structures: ["LVOT", "Aortic valve", "Tricuspid valve", "RV"],
+    howToGet: ["From A4C, tilt anteriorly to bring LVOT into view", "Align CW Doppler beam with TR jet", "Measure peak TR velocity", "Calculate RVSP = 4v² + RAP"],
+    tips: ["Use highest quality TR signal from any window", "Subcostal window often provides best TR signal in patients with poor apical windows"],
+    pitfalls: ["Suboptimal TR alignment underestimates TRV — try multiple windows"],
+    measurements: ["TRV peak (m/s)", "RVSP = 4v² + RAP (mmHg)"],
+    criticalFindings: ["TRV >3.4 m/s: high PH probability", "RVSP >50 mmHg: significant PH"],
+  },
+  "pulm:psax-pap": {
+    description: "PSAX at papillary muscle level for D-sign assessment. The D-sign (flattened IVS) indicates RV pressure or volume overload.",
+    structures: ["LV (circular/D-shaped)", "RV", "IVS", "Papillary muscles"],
+    howToGet: ["From PSAX AV, tilt probe inferiorly to papillary muscle level", "Assess IVS morphology throughout the cardiac cycle", "Measure eccentricity index if D-sign present"],
+    tips: ["Systolic D-sign = RV pressure overload (PH or acute PE)", "Diastolic D-sign = RV volume overload (ASD, severe TR)", "Both systolic and diastolic flattening = combined pressure and volume overload"],
+    pitfalls: ["Oblique cut may give false D-sign — ensure true circular LV cross-section"],
+    measurements: ["IVS morphology: circular vs D-shaped", "Eccentricity index: normal ≤1.0; >1.0 = D-sign"],
+    criticalFindings: ["Systolic D-sign: RV pressure overload", "Eccentricity index >1.5: severe RV pressure overload"],
+  },
+  "pulm:subcostal-ivc": {
+    description: "Subcostal IVC view for RAP estimation in pulmonary HTN. IVC assessment is mandatory for accurate RVSP estimation — do not assume RAP without measuring.",
+    structures: ["IVC", "RA", "Hepatic veins"],
+    howToGet: ["Subcostal window, probe pointing toward right shoulder", "Rotate to visualize IVC entering RA", "Measure IVC diameter 1–2 cm from RA junction at end-expiration", "Perform sniff test"],
+    tips: ["IVC assessment is mandatory for accurate RVSP estimation", "In ventilated patients, IVC collapsibility is unreliable — use clinical estimate of RAP", "Dilated non-collapsing IVC in acute PE = RV failure and hemodynamic compromise"],
+    pitfalls: ["Hepatic veins may be mistaken for IVC — follow vessel to RA junction", "Ventilated patients: IVC collapsibility unreliable"],
+    measurements: ["IVC diameter: normal ≤21 mm", "IVC collapse (sniff): normal >50%", "Estimated RAP: 3–5 mmHg (normal) or ≥10 mmHg (elevated)"],
+    criticalFindings: ["IVC >21 mm + <50% collapse: RAP ≥10 mmHg", "Dilated non-collapsing IVC in acute PE: RV failure"],
+  },
+  "pulm:subcostal-rv": {
+    description: "Subcostal RV free wall view for RV hypertrophy assessment. RV wall thickness >5 mm distinguishes chronic PH from acute PE.",
+    structures: ["RV free wall", "RV apex", "IVS", "LV"],
+    howToGet: ["Subcostal window, rotate to visualize RV free wall in long axis", "Measure RV free wall thickness at end-diastole", "Assess TR jet with CW Doppler if apical signal is suboptimal"],
+    tips: ["RV wall thickness >5 mm distinguishes chronic PH from acute PE", "Subcostal window often provides the best TR signal in patients with poor apical windows", "Assess for pericardial effusion — any effusion in PH is an adverse prognostic marker"],
+    pitfalls: ["RV free wall may be difficult to measure accurately — use leading edge to leading edge"],
+    measurements: ["RV free wall thickness: normal ≤5 mm; >5 mm = RV hypertrophy"],
+    criticalFindings: ["RV free wall >5 mm: chronic PH (not acute PE)", "Pericardial effusion in PH: adverse prognostic marker"],
+  },
+  "pulm:plax-rv": {
+    description: "PLAX RV inflow view for TR assessment and RV inflow visualization. Provides an alternative TR signal when apical and parasternal windows are suboptimal.",
+    structures: ["RV", "Tricuspid valve", "RA", "Coronary sinus"],
+    howToGet: ["From PLAX, tilt rightward and inferiorly to open RV inflow view", "Align CW Doppler with TR jet", "Assess tricuspid valve morphology and TR severity"],
+    tips: ["RV inflow view provides an alternative TR signal when other windows are suboptimal", "Assess tricuspid valve for structural abnormality"],
+    pitfalls: ["Coronary sinus may be mistaken for TR jet — confirm with color Doppler"],
+    measurements: ["TRV peak (alternative window)", "TR severity"],
+    criticalFindings: ["TRV >3.4 m/s: high PH probability", "Structural TV abnormality"],
+  },
+  "pulm:suprasternal": {
+    description: "Suprasternal PA flow view for branch PA assessment. Provides direct PA flow assessment and right PA diameter measurement.",
+    structures: ["Aortic arch", "Descending aorta", "Right PA (cross-section)"],
+    howToGet: ["Suprasternal notch, patient neck extended", "Probe pointing toward left shoulder", "Align PW Doppler in right PA for PA flow assessment", "Measure PA diameter if visible"],
+    tips: ["Suprasternal window provides direct PA flow assessment", "Branch PA stenosis causes asymmetric PA flow — compare left and right PA velocities"],
+    pitfalls: ["Difficult window in patients with short neck or kyphosis"],
+    measurements: ["Right PA diameter: normal ≤15 mm"],
+    criticalFindings: ["Asymmetric PA flow: branch PA stenosis", "Right PA diameter >15 mm: dilated in significant PH"],
+  },
+  // ─── Diastolic Function ──────────────────────────────────────────────────────
+  "diastolic:tdi-e-prime": {
+    description: "TDI e' velocity at the mitral annulus — the primary measure of LV relaxation. Septal e' <7 cm/s and lateral e' <10 cm/s indicate impaired relaxation.",
+    structures: ["Mitral annulus (septal and lateral)", "LV myocardium"],
+    howToGet: ["Obtain A4C view", "Place PW TDI sample volume at septal mitral annulus (2–3 mm)", "Record e', a', and s' velocities", "Repeat at lateral mitral annulus", "Average septal and lateral e' for E/e' calculation"],
+    tips: ["Patient positioning: left lateral decubitus, 45–60°", "Sample volume 2–3 mm at mitral annulus — not inside myocardium", "Use average of septal and lateral e' for E/e' ratio"],
+    pitfalls: ["Sample volume too far from annulus underestimates e'", "Mitral annular calcification reduces e' velocity", "Lateral e' is higher than septal e' — do not average without both measurements"],
+    measurements: ["Septal e': normal ≥7 cm/s", "Lateral e': normal ≥10 cm/s", "Average e': (septal + lateral) / 2"],
+    criticalFindings: ["Septal e' <7 cm/s: impaired relaxation", "Lateral e' <10 cm/s: impaired relaxation"],
+  },
+  "diastolic:mitral-inflow": {
+    description: "Mitral inflow PW Doppler — E and A wave velocities and E/A ratio. The primary assessment of LV filling pattern.",
+    structures: ["Mitral valve tips", "LV inflow"],
+    howToGet: ["Obtain A4C view", "Place PW Doppler sample volume at mitral valve tips", "Record E and A wave velocities", "Measure E wave deceleration time (DT)", "Calculate E/A ratio"],
+    tips: ["Patient positioning: left lateral decubitus, 45–60°", "Sample volume at mitral valve tips — not in LA or LV body", "Valsalva maneuver: E/A ratio decrease ≥0.5 = pseudonormal pattern"],
+    pitfalls: ["E and A wave fusion at high heart rates — use longer PR interval or reduce heart rate", "Atrial fibrillation: A wave absent — E/A ratio not applicable"],
+    measurements: ["E velocity (cm/s)", "A velocity (cm/s)", "E/A ratio: normal 0.8–2.0", "E wave DT: normal 160–240 ms"],
+    criticalFindings: ["E/A <0.8: impaired relaxation (Grade I)", "E/A >2.0 + DT <160 ms: restrictive filling (Grade III)"],
+  },
+  "diastolic:e-e-prime-ratio": {
+    description: "E/e' ratio — the primary non-invasive estimate of LV filling pressures (LVEDP). E/e' >14 (average) indicates elevated filling pressures.",
+    structures: ["Mitral valve tips (E wave)", "Mitral annulus (e' velocity)"],
+    howToGet: ["Measure E velocity at mitral valve tips (PW Doppler)", "Measure septal and lateral e' (TDI)", "Calculate E/average e' ratio"],
+    tips: ["Use average e' (septal + lateral) / 2 for E/e' calculation", "E/e' >14 = elevated filling pressures", "E/e' 8–14 = indeterminate — use additional parameters"],
+    pitfalls: ["E/e' unreliable in mitral valve disease, constrictive pericarditis, or mitral annular calcification", "E/e' lateral alone less reliable than average"],
+    measurements: ["E/e' average: normal <8; borderline 8–14; elevated >14"],
+    criticalFindings: ["E/e' >14: elevated LV filling pressures"],
+  },
+  "diastolic:tr-velocity": {
+    description: "TR velocity (CW Doppler) for RVSP estimation — one of the 4 parameters for diastolic grade assessment. TRV >2.8 m/s (RVSP >34 mmHg) supports elevated filling pressures.",
+    structures: ["Tricuspid valve", "RA", "RV"],
+    howToGet: ["Obtain A4C or parasternal view with TR jet visible", "Align CW Doppler with TR jet", "Measure peak TR velocity", "Calculate RVSP = 4v² + RAP"],
+    tips: ["Use highest quality TR signal from any window", "TRV >2.8 m/s supports elevated filling pressures in diastolic assessment"],
+    pitfalls: ["Suboptimal TR alignment underestimates TRV", "Absent TR: cannot estimate RVSP"],
+    measurements: ["TRV peak: normal ≤2.8 m/s", "RVSP = 4v² + RAP"],
+    criticalFindings: ["TRV >2.8 m/s: elevated RVSP — supports elevated filling pressures"],
+  },
+  "diastolic:lavi": {
+    description: "LA Volume Index (LAVI) — a marker of chronic LV filling pressure elevation. LAVI >34 mL/m² indicates LA enlargement from chronically elevated filling pressures.",
+    structures: ["LA (A4C and A2C views)"],
+    howToGet: ["Obtain A4C view", "Trace LA endocardium at end-systole (just before MV opening)", "Rotate to A2C view", "Repeat LA tracing", "Calculate biplane LA volume", "Divide by BSA for LAVI"],
+    tips: ["Trace LA at end-systole (maximum LA size — just before MV opening)", "Exclude pulmonary veins and LAA from tracing", "LAVI >34 mL/m² = LA enlargement"],
+    pitfalls: ["Including pulmonary veins or LAA overestimates LAVI", "Foreshortened A4C underestimates LA volume"],
+    measurements: ["LA volume (biplane)", "LAVI: normal ≤34 mL/m²"],
+    criticalFindings: ["LAVI >34 mL/m²: LA enlargement from chronically elevated filling pressures", "LAVI >48 mL/m²: severely enlarged LA"],
+  },
+  "diastolic:pulm-venous": {
+    description: "Pulmonary venous flow PW Doppler — advanced diastolic parameter. S/D ratio <1 and Ar wave >35 cm/s indicate elevated filling pressures.",
+    structures: ["Right upper pulmonary vein (RUPV)", "LA"],
+    howToGet: ["Obtain A4C view", "Apply color Doppler to identify RUPV entering LA", "Place PW Doppler sample volume 1–2 cm into RUPV", "Record S, D, and Ar wave velocities", "Measure Ar wave duration"],
+    tips: ["RUPV is most consistently visualized in A4C", "Ar wave >35 cm/s or Ar duration > mitral A wave duration = elevated LVEDP"],
+    pitfalls: ["RUPV may be difficult to align — use color Doppler guidance", "Atrial fibrillation: Ar wave absent"],
+    measurements: ["S wave velocity", "D wave velocity", "S/D ratio: normal ≥1", "Ar wave velocity: normal <35 cm/s"],
+    criticalFindings: ["S/D ratio <1: elevated filling pressures", "Ar wave >35 cm/s: elevated LVEDP"],
+  },
+  "diastolic:la-strain": {
+    description: "LA Strain (LARS) — an advanced marker of LA function and filling pressures. LA reservoir strain <18% indicates impaired LA function and elevated filling pressures.",
+    structures: ["LA (A4C and A2C views)"],
+    howToGet: ["Obtain A4C and A2C views with optimal LA visualization", "Use dedicated speckle-tracking software", "Trace LA endocardium in both views", "Measure LA reservoir strain (peak positive strain)", "Measure LA conduit and booster pump strain if available"],
+    tips: ["LA reservoir strain <18% indicates impaired LA function", "LA strain is more sensitive than LAVI for early diastolic dysfunction", "Requires dedicated speckle-tracking software"],
+    pitfalls: ["Image quality must be adequate for speckle tracking — optimize before measurement", "Atrial fibrillation: LA strain not reliable"],
+    measurements: ["LA reservoir strain: normal ≥18%", "LA conduit strain", "LA booster pump strain"],
+    criticalFindings: ["LA reservoir strain <18%: impaired LA function", "LA reservoir strain <10%: severely impaired LA function"],
+  },
+  // ─── Strain ScanCoach ────────────────────────────────────────────────────────
+  "strain:psax_base": {
+    description: "PSAX Basal view for LV GLS acquisition. Basal short-axis slice for 3-slice GLS protocol. All 6 basal segments should be visible.",
+    structures: ["LV basal segments (6)", "Mitral valve"],
+    howToGet: ["Obtain PSAX view at mitral valve level", "Ensure all 6 basal segments are visible", "Optimize frame rate (50–90 fps)", "Record 3 consecutive beats"],
+    tips: ["Frame rate 50–90 fps for optimal speckle tracking", "All 6 basal segments must be visible", "Avoid foreshortening"],
+    pitfalls: ["Foreshortened view misses basal segments", "Frame rate too low (<40 fps) reduces tracking accuracy"],
+    measurements: ["Basal segment strain values", "Frame rate (fps)"],
+  },
+  "strain:psax_mid": {
+    description: "PSAX Mid view for LV GLS acquisition. Mid short-axis slice for 3-slice GLS protocol. Both papillary muscles should be visible.",
+    structures: ["LV mid segments (6)", "Anterolateral papillary muscle", "Posteromedial papillary muscle"],
+    howToGet: ["Obtain PSAX view at papillary muscle level", "Ensure both papillary muscles are visible", "Optimize frame rate (50–90 fps)", "Record 3 consecutive beats"],
+    tips: ["Both papillary muscles confirm correct mid-ventricular level", "Frame rate 50–90 fps for optimal speckle tracking"],
+    pitfalls: ["Papillary muscle level vs MV level — confirm correct slice"],
+    measurements: ["Mid segment strain values"],
+  },
+  "strain:psax_apex": {
+    description: "PSAX Apical view for LV GLS acquisition. Apical short-axis slice for 3-slice GLS protocol. No papillary muscles should be visible.",
+    structures: ["LV apical segments (6)"],
+    howToGet: ["Obtain PSAX view at apical level — no papillary muscles visible", "Optimize frame rate (50–90 fps)", "Record 3 consecutive beats"],
+    tips: ["No papillary muscles = correct apical level", "Apical segments are smallest — optimize gain"],
+    pitfalls: ["Including papillary muscles = too basal — move probe toward apex"],
+    measurements: ["Apical segment strain values"],
+  },
+  "strain:a4c": {
+    description: "Apical 4-Chamber view for LV GLS acquisition. Primary apical view for GLS. Septal and lateral wall segments.",
+    structures: ["LV (septal and lateral walls)", "Mitral valve", "LV apex"],
+    howToGet: ["Obtain true A4C view — no foreshortening", "Optimize frame rate (50–90 fps)", "Record 3 consecutive beats", "Trace LV endocardium"],
+    tips: ["True apex must be visible — foreshortening is the most common error", "Frame rate 50–90 fps for optimal speckle tracking", "Harmonic imaging improves endocardial definition"],
+    pitfalls: ["Foreshortened A4C overestimates GLS — ensure true apex", "Frame rate too low reduces tracking accuracy"],
+    measurements: ["Septal and lateral wall strain", "GLS contribution from A4C"],
+  },
+  "strain:a2c": {
+    description: "Apical 2-Chamber view for LV GLS acquisition. Anterior and inferior wall segments.",
+    structures: ["LV (anterior and inferior walls)", "Mitral valve", "LV apex"],
+    howToGet: ["Obtain A2C view — rotate 60° counterclockwise from A4C", "Optimize frame rate (50–90 fps)", "Record 3 consecutive beats", "Trace LV endocardium"],
+    tips: ["A2C provides anterior and inferior wall segments for GLS", "Ensure true apex is visible"],
+    pitfalls: ["Foreshortened A2C overestimates GLS", "Anterior wall near-field artifact — use harmonic imaging"],
+    measurements: ["Anterior and inferior wall strain"],
+  },
+  "strain:a3c": {
+    description: "Apical 3-Chamber (APLAX) view for LV GLS acquisition. Anteroseptal and inferolateral wall segments.",
+    structures: ["LV (anteroseptal and inferolateral walls)", "LVOT", "Aortic valve", "LV apex"],
+    howToGet: ["Obtain A3C (APLAX) view — rotate 60° counterclockwise from A2C", "Optimize frame rate (50–90 fps)", "Record 3 consecutive beats", "Trace LV endocardium"],
+    tips: ["A3C provides anteroseptal and inferolateral wall segments for GLS", "LVOT and AV visible confirms correct view"],
+    pitfalls: ["Foreshortened A3C overestimates GLS"],
+    measurements: ["Anteroseptal and inferolateral wall strain"],
+  },
+  "strain:normal": {
+    description: "Normal LV GLS pattern. GLS more negative than −20% with homogeneous bull's-eye pattern. All segments contribute equally.",
+    structures: ["LV (all 17 segments)"],
+    howToGet: ["Acquire 3-view apical GLS (A4C, A2C, A3C)", "Review bull's-eye map for homogeneous strain distribution"],
+    tips: ["Normal GLS: more negative than −20%", "Homogeneous bull's-eye = normal"],
+    measurements: ["LV GLS: normal < −20%"],
+    criticalFindings: ["GLS > −16%: abnormal — consider subclinical LV dysfunction"],
+  },
+  "strain:dcm": {
+    description: "DCM strain pattern. Global reduction in GLS with diffuse hypokinesis. GLS typically −10 to −15%. No regional pattern.",
+    structures: ["LV (all segments)"],
+    howToGet: ["Acquire 3-view apical GLS", "Review bull's-eye for global reduction"],
+    tips: ["Global reduction = DCM pattern", "No regional pattern distinguishes DCM from ischemic"],
+    measurements: ["LV GLS: typically −10 to −15% in DCM"],
+    criticalFindings: ["GLS > −10%: severely impaired — high event risk"],
+  },
+  "strain:amyloid": {
+    description: "Cardiac amyloid strain pattern. Characteristic apical sparing: basal and mid segments severely reduced, apical segments relatively preserved. Bull's-eye shows bright apex, dark base.",
+    structures: ["LV (basal, mid, and apical segments)"],
+    howToGet: ["Acquire 3-view apical GLS", "Review bull's-eye for apical sparing pattern", "Calculate relative apical strain (RAS) or apical-to-basal ratio"],
+    tips: ["Apical sparing is the hallmark of cardiac amyloid", "RAS = (apical strain) / (basal + mid strain) — >1.0 = apical sparing", "Combine with low-voltage ECG and elevated troponin for diagnosis"],
+    measurements: ["LV GLS", "Relative Apical Strain (RAS)"],
+    criticalFindings: ["Apical sparing pattern: high specificity for cardiac amyloid"],
+  },
+  "strain:hcm": {
+    description: "HCM strain pattern. Regional reduction in septal strain with preserved or supranormal lateral wall strain. Asymmetric septal hypertrophy.",
+    structures: ["IVS (hypertrophied)", "Lateral wall", "LV apex"],
+    howToGet: ["Acquire 3-view apical GLS", "Review bull's-eye for septal reduction", "Measure IVS thickness in PLAX"],
+    tips: ["Septal strain reduction with preserved lateral strain = HCM pattern", "Supranormal apical strain may be present"],
+    measurements: ["Septal strain", "Lateral wall strain", "IVS thickness"],
+    criticalFindings: ["Septal strain > −15% with IVS >15 mm: HCM"],
+  },
+  "strain:lad": {
+    description: "LAD territory ischemia strain pattern. Regional reduction in anterior, anteroseptal, and apical segments. Corresponds to LAD distribution.",
+    structures: ["Anterior wall", "Anteroseptal wall", "LV apex"],
+    howToGet: ["Acquire 3-view apical GLS", "Review bull's-eye for LAD territory reduction"],
+    tips: ["LAD territory: anterior, anteroseptal, and apical segments", "Compare to RCA and LCx territory patterns"],
+    measurements: ["Regional strain in LAD territory"],
+    criticalFindings: ["Regional strain > −10% in LAD territory: significant ischemia or infarction"],
+  },
+  "strain:rca": {
+    description: "RCA territory ischemia strain pattern. Regional reduction in inferior and inferoseptal segments. Corresponds to RCA distribution.",
+    structures: ["Inferior wall", "Inferoseptal wall"],
+    howToGet: ["Acquire 3-view apical GLS", "Review bull's-eye for RCA territory reduction"],
+    tips: ["RCA territory: inferior and inferoseptal segments", "Inferior wall hypokinesis in RCA territory"],
+    measurements: ["Regional strain in RCA territory"],
+    criticalFindings: ["Regional strain > −10% in RCA territory: significant ischemia or infarction"],
+  },
+  "strain:takotsubo": {
+    description: "Takotsubo (stress cardiomyopathy) strain pattern. Apical ballooning with preserved basal function. Opposite of cardiac amyloid.",
+    structures: ["LV apex (akinetic)", "LV base (hyperkinetic)"],
+    howToGet: ["Acquire 3-view apical GLS", "Review bull's-eye for apical reduction with basal preservation"],
+    tips: ["Apical ballooning = Takotsubo pattern", "Opposite of cardiac amyloid (apical sparing)", "Typically resolves within 4–8 weeks"],
+    measurements: ["Apical strain (severely reduced)", "Basal strain (preserved or supranormal)"],
+    criticalFindings: ["Apical akinesis with basal hyperkinesis: Takotsubo pattern"],
+  },
+  "strain:cardiotox": {
+    description: "Cardiotoxicity strain pattern. Global reduction in GLS preceding EF decline. GLS reduction >15% from baseline is the earliest marker of cardiotoxicity.",
+    structures: ["LV (all segments)"],
+    howToGet: ["Acquire 3-view apical GLS", "Compare to pre-treatment baseline", "Calculate relative GLS change"],
+    tips: ["GLS reduction >15% from baseline = subclinical cardiotoxicity", "GLS changes precede EF decline by weeks to months", "Serial monitoring recommended during cardiotoxic chemotherapy"],
+    measurements: ["LV GLS", "Relative GLS change from baseline (%)"],
+    criticalFindings: ["GLS reduction >15% from baseline: subclinical cardiotoxicity — consider cardioprotective therapy"],
+  },
+  "strain:myocarditis": {
+    description: "Myocarditis strain pattern. Variable — may show global or regional reduction. Lateral wall involvement is characteristic of viral myocarditis.",
+    structures: ["LV (variable segments)", "Lateral wall"],
+    howToGet: ["Acquire 3-view apical GLS", "Review bull's-eye for lateral wall involvement"],
+    tips: ["Lateral wall involvement is characteristic of viral myocarditis", "Combine with CMR for definitive diagnosis"],
+    measurements: ["LV GLS", "Regional strain in lateral wall"],
+    criticalFindings: ["Lateral wall strain reduction: viral myocarditis pattern", "Global reduction with new LV dilation: fulminant myocarditis"],
+  },
+  "strain:lbbb": {
+    description: "LBBB strain pattern. Septal flash and lateral wall late activation. Characteristic early septal contraction followed by late lateral wall contraction.",
+    structures: ["IVS (early contraction)", "Lateral wall (late contraction)"],
+    howToGet: ["Acquire 3-view apical GLS", "Review bull's-eye for septal-lateral timing difference", "Assess SPWMD in PLAX M-mode"],
+    tips: ["Septal flash = early septal contraction in LBBB", "SPWMD >130 ms = significant intraventricular dyssynchrony", "CRT response: dyssynchrony should resolve post-CRT"],
+    measurements: ["Septal strain timing", "Lateral wall strain timing", "SPWMD (normal <130 ms)"],
+    criticalFindings: ["SPWMD >130 ms: significant dyssynchrony — CRT candidate"],
+  },
+
+  // ─── ACHD MODULE (registry IDs) ─────────────────────────────────────────────
+  "achd:asd": {
+    description: "ASD / PFO assessment in adult congenital heart disease. Evaluate defect type, size, shunt direction, and RV volume overload. Determine suitability for device closure.",
+    structures: ["Interatrial septum", "Right ventricle", "Left atrium", "Pulmonary veins"],
+    howToGet: ["Subcostal 4-chamber — best window for IAS, beam perpendicular to septum", "Parasternal short axis — identify defect location relative to AV/MV", "Apical 4-chamber — RV dilation, TR, shunt direction", "Bicaval TEE view if applicable — gold standard for sinus venosus ASD"],
+    tips: ["Subcostal view eliminates dropout artefact that can mimic ASD in A4C", "Always measure all rims before recommending device closure", "Sinus venosus ASD is frequently missed — interrogate SVC–RA junction"],
+    pitfalls: ["A4C dropout can mimic ASD — confirm in subcostal view", "PAPVR may be missed if SVC–RA junction not assessed"],
+    measurements: ["ASD diameter (maximum dimension)", "Rim measurements (all ≥5 mm for device closure)", "RV end-diastolic dimension", "Qp:Qs"],
+    criticalFindings: ["R→L or bidirectional shunt → pulmonary hypertension / Eisenmenger", "RVSP >50 mmHg → catheterisation before closure"],
+  },
+  "achd:vsd": {
+    description: "VSD assessment in adult congenital heart disease. Characterise type, size, and shunt magnitude. Assess LV volume overload and PA pressure.",
+    structures: ["Interventricular septum", "Left ventricle", "Right ventricle", "Aortic valve"],
+    howToGet: ["Parasternal long axis — perimembranous VSD below AV", "Parasternal short axis — VSD type by clock-face location", "Apical 4-chamber — inlet VSD, LV dilation", "Subcostal — muscular VSDs in multiple planes"],
+    tips: ["PSAX is the best single view for VSD location (clock-face analogy)", "High CW gradient (>64 mmHg) confirms restrictive VSD and normal RV pressure", "Subarterial VSD: always check for AR due to leaflet prolapse"],
+    pitfalls: ["Low-velocity or bidirectional flow suggests elevated RV pressure", "Multiple muscular VSDs may be missed without color Doppler sweep"],
+    measurements: ["VSD diameter", "CW peak velocity across VSD", "Qp:Qs", "RV systolic pressure estimate"],
+    criticalFindings: ["Bidirectional or R→L shunt → Eisenmenger physiology", "New AR in outlet VSD → urgent assessment"],
+  },
+  "achd:tof": {
+    description: "Repaired Tetralogy of Fallot surveillance. Monitor RV dilation from pulmonary regurgitation, RVOT gradient, and determine optimal timing for pulmonary valve replacement.",
+    structures: ["Right ventricle", "RVOT", "Pulmonary valve", "Interventricular septum"],
+    howToGet: ["Parasternal long axis — RVOT, residual VSD", "Parasternal short axis — pulmonary valve, RVOT gradient", "Apical 4-chamber — RV size and function (FAC, TAPSE, S')", "Subcostal IVC — RA pressure"],
+    tips: ["PR PHT <100 ms indicates severe PR", "RVEDVI >160 mL/m² or RVESVI >80 mL/m² are thresholds for PVR consideration", "Assess for residual RVOT obstruction: peak gradient >40 mmHg warrants intervention"],
+    pitfalls: ["Look for patch dehiscence or aneurysmal RVOT", "TR severity worsens with RV dilation — quantify at each visit"],
+    measurements: ["RV volumes (RVEDVI, RVESVI)", "RVOT peak gradient", "PR PHT", "TAPSE", "FAC"],
+    criticalFindings: ["RVEDVI >160 mL/m² → PVR consideration", "RVOT gradient >40 mmHg → reintervention"],
+  },
+  "achd:coa": {
+    description: "Repaired coarctation of the aorta surveillance. Monitor for re-coarctation, aneurysm formation, bicuspid AV progression, and LV hypertrophy.",
+    structures: ["Descending aorta", "Aortic arch", "Aortic valve", "Left ventricle"],
+    howToGet: ["Suprasternal notch — primary window for CoA surveillance, CW Doppler descending aorta", "Parasternal long axis — bicuspid AV, aortic root dimensions", "Apical 5-chamber / LVOT — LVOT obstruction if BAV + AS", "Abdominal aorta (subcostal) — tardus parvus waveform confirms proximal obstruction"],
+    tips: ["'Diastolic tail' (persistent antegrade flow in diastole) is hallmark of significant CoA", "Bicuspid AV + CoA: high risk for aortic dilation — measure annually", "Pulsatility index <1.0 in abdominal aorta suggests significant re-coarctation"],
+    pitfalls: ["Doppler underestimates gradient if beam not aligned — use multiple windows", "LV hypertrophy from chronic pressure overload — assess wall thickness and mass"],
+    measurements: ["Peak velocity descending aorta", "Mean gradient across CoA", "Aortic root and ascending aorta dimensions", "LV wall thickness"],
+    criticalFindings: ["Peak velocity >3.5 m/s or mean gradient >20 mmHg → re-coarctation", "Aortic root >4.5 cm → surveillance imaging"],
+  },
+  "achd:tga": {
+    description: "TGA post-Mustard/Senning surveillance. Assess systemic RV function, baffle integrity, and TR severity. Systemic RV failure is the leading cause of late morbidity.",
+    structures: ["Systemic right ventricle", "Atrial baffles", "Tricuspid valve", "Pulmonary artery"],
+    howToGet: ["Apical 4-chamber — systemic RV function (FAC, TAPSE, S')", "Parasternal short axis — baffle anatomy, obstruction, leak", "Subcostal — best view for baffle assessment with color Doppler", "RVOT / Pulmonary artery — subpulmonary LV pressure"],
+    tips: ["Systemic RV failure is the leading cause of late morbidity in Mustard/Senning", "TR severity directly reflects systemic RV function — quantify with EROA and regurgitant volume", "Baffle leak: contrast echo (agitated saline) confirms direction"],
+    pitfalls: ["SVC baffle obstruction: peak velocity >1.5 m/s or gradient >9 mmHg", "IVC baffle obstruction may present with hepatomegaly and ascites"],
+    measurements: ["Systemic RV FAC", "TAPSE", "TR severity", "Baffle gradient"],
+    criticalFindings: ["Systemic RV FAC <35% → systemic RV failure", "Baffle obstruction gradient >9 mmHg → intervention"],
+  },
+  "achd:fontan": {
+    description: "Fontan circulation surveillance. Assess single ventricle function, Fontan conduit patency, AV valve regurgitation, and Fontan-associated liver disease markers.",
+    structures: ["Single ventricle", "Fontan conduit", "AV valve", "Pulmonary arteries"],
+    howToGet: ["Apical 4-chamber — single ventricle EF (biplane Simpson's or 3D)", "Subcostal IVC / Fontan conduit — obstruction (>1.5 m/s) or thrombus", "Suprasternal / pulmonary arteries — bilateral PA flow, branch PA stenosis", "Hepatic veins (subcostal) — Fontan pressure marker"],
+    tips: ["AV valve regurgitation significantly impacts Fontan physiology — even mild-moderate AR/MR is important", "Low pulsatility in Fontan conduit is normal — do not mistake for obstruction", "Hepatic vein flow reversal = severe AV valve regurgitation or very elevated Fontan pressure"],
+    pitfalls: ["Diastolic dysfunction is common — assess E/e' ratio and LAVI", "PA stenosis >50% diameter reduction warrants catheterisation"],
+    measurements: ["Single ventricle EF", "Fontan conduit peak velocity", "AV valve regurgitation severity", "Hepatic vein flow pattern"],
+    criticalFindings: ["SV EF <50% or FAC <35% → ventricular dysfunction", "Fontan conduit velocity >1.5 m/s → obstruction"],
+  },
+  "achd:ebstein": {
+    description: "Ebstein's anomaly assessment. Quantify TV displacement, TR severity, functional RV size, and LV compression. Assess for ASD/PFO and arrhythmia substrate.",
+    structures: ["Tricuspid valve", "Right ventricle", "Atrialized RV", "Left ventricle"],
+    howToGet: ["Apical 4-chamber — TV displacement, TR severity, RV/LV ratio", "Parasternal long axis — LV compression by enlarged RV", "Subcostal — ASD/PFO assessment", "PSAX — TV leaflet anatomy"],
+    tips: ["TV displacement index >8 mm/m² = significant Ebstein", "Functional RV size determines surgical approach", "ASD/PFO is present in 50% — assess for R→L shunt"],
+    pitfalls: ["LV compression by enlarged RV may cause LV diastolic dysfunction", "Accessory pathways (WPW) are common — correlate with ECG"],
+    measurements: ["TV displacement (mm)", "TV displacement index (mm/m²)", "Functional RV FAC", "TR severity"],
+    criticalFindings: ["Functional RV FAC <35% → severe dysfunction", "R→L shunt at ASD → cyanosis"],
+  },
+  "achd:psax-av": {
+    description: "Parasternal short-axis view at aortic valve level for ACHD assessment. Evaluate RVOT, pulmonary valve, and PA dimensions in the context of congenital lesions.",
+    structures: ["Aortic valve", "RVOT", "Pulmonary valve", "Main pulmonary artery", "Tricuspid valve"],
+    howToGet: ["Parasternal short-axis, 3rd–4th ICS, left sternal border", "Rotate clockwise from PLAX to PSAX", "Tilt superiorly to open RVOT", "Apply PW Doppler in RVOT for PAAT measurement"],
+    tips: ["Mid-systolic notching of RVOT Doppler envelope is highly specific for severe PH", "PAAT/RVET ratio <0.33 supports elevated PA pressure", "Measure PA diameter perpendicular to long axis at pulmonic valve level"],
+    pitfalls: ["PAAT is heart-rate dependent — correct for HR", "PA dilation may be post-stenotic in repaired ToF"],
+    measurements: ["PA acceleration time (PAAT)", "PA diameter", "RVOT peak velocity"],
+    criticalFindings: ["PAAT <60 ms with mid-systolic notch → severe pulmonary hypertension"],
+  },
+  "achd:a4c-rv": {
+    description: "Apical 4-chamber RV-focused view for ACHD. Quantify RV size and function in the context of congenital lesions causing RV volume or pressure overload.",
+    structures: ["Right ventricle", "Left ventricle", "Tricuspid valve", "Interatrial septum"],
+    howToGet: ["Apical window, 5th–6th ICS, mid-clavicular line", "Tilt probe to maximize RV visualization", "Measure RV basal, mid, and longitudinal diameters", "CW Doppler through TR jet for TRV", "M-mode at lateral tricuspid annulus for TAPSE"],
+    tips: ["RV:LV basal ratio ≥1.0 is a key sign of RV enlargement", "TAPSE <17 mm indicates RV longitudinal dysfunction", "RA area >18 cm² (end-systole) indicates RA enlargement"],
+    pitfalls: ["Foreshortened RV view underestimates dimensions — ensure true apex", "TR jet may be eccentric — use multiple windows for CW"],
+    measurements: ["RV basal diameter", "RV/LV basal ratio", "TRV (peak)", "TAPSE", "RA area"],
+    criticalFindings: ["RV/LV ratio ≥1.0 → significant RV enlargement", "TAPSE <17 mm → RV longitudinal dysfunction"],
+  },
+  "achd:subcostal-ivc": {
+    description: "Subcostal IVC view for ACHD. Assess IVC size and collapsibility for RA pressure estimation. Evaluate hepatic vein flow patterns reflecting Fontan or RV hemodynamics.",
+    structures: ["Inferior vena cava", "Right atrium", "Hepatic veins"],
+    howToGet: ["Supine, knees flexed", "Subxiphoid, angled toward right atrium", "Rotate to IVC long-axis view", "Measure IVC diameter at 1–2 cm from RA junction", "Assess collapsibility with sniff test"],
+    tips: ["IVC >21 mm + <50% collapse = RAP 10–20 mmHg", "Hepatic vein flow reversal suggests severe TR or elevated RA pressure", "Dilated IVC (>2.1 cm, <50% collapse) = RA pressure ≥15 mmHg"],
+    pitfalls: ["Hepatic veins may be mistaken for IVC — follow vessel to RA junction", "Loculated pericardial effusion may be missed — sweep carefully"],
+    measurements: ["IVC diameter", "IVC collapsibility index", "Hepatic vein S/D ratio"],
+    criticalFindings: ["IVC >21 mm + <50% collapse → elevated RA pressure", "Hepatic vein flow reversal → severe TR or Fontan failure"],
+  },
+  "achd:suprasternal": {
+    description: "Suprasternal notch view for ACHD. Primary window for aortic arch assessment, CoA surveillance, and branch pulmonary artery evaluation in congenital lesions.",
+    structures: ["Aortic arch", "Descending aorta", "Right pulmonary artery", "Innominate artery"],
+    howToGet: ["Suprasternal notch, probe angled toward left shoulder", "Rotate to visualize aortic arch in long axis", "Align CW Doppler with descending aorta flow", "Assess bilateral PA flow for branch PA stenosis"],
+    tips: ["'Diastolic tail' in descending aorta Doppler is hallmark of significant CoA", "Asymmetric PA flow suggests branch PA stenosis", "Measure aortic arch dimensions: transverse arch, isthmus, and descending aorta"],
+    pitfalls: ["Poor acoustic window in adults — ask patient to extend neck and tilt head back", "Doppler angle correction required for accurate gradient estimation"],
+    measurements: ["Descending aorta peak velocity", "Aortic arch dimensions", "Branch PA peak velocities"],
+    criticalFindings: ["Descending aorta peak velocity >3.5 m/s → significant CoA", "Branch PA peak velocity >2.5 m/s → stenosis"],
+  },
+
+  // ─── ECG MODULE (registry IDs) ───────────────────────────────────────────────
+  "ecg:limb-leads": {
+    description: "Limb lead electrode placement for standard 12-lead ECG acquisition. RA (right arm), LA (left arm), RL (right leg ground), LL (left leg) determine the frontal plane axis.",
+    structures: ["RA electrode", "LA electrode", "RL electrode (ground)", "LL electrode"],
+    howToGet: ["RA: right inner wrist or right infraclavicular area", "LA: left inner wrist or left infraclavicular area", "RL: right inner ankle or right lower abdomen (ground)", "LL: left inner ankle or left lower abdomen"],
+    tips: ["Consistent placement between serial ECGs is critical for ST comparison", "RA-LA reversal: inverted P/QRS in lead I, positive aVR — always check aVR polarity", "For amputees or casts: place electrodes on trunk as proximal as possible"],
+    pitfalls: ["RA-LA reversal: inverted P and QRS in lead I, positive aVR", "Electrodes placed over muscle (not bone-free areas): excessive artifact", "Dry or poorly adherent electrodes: baseline wander, noise"],
+    measurements: ["Frontal plane axis", "P-wave axis", "QRS axis"],
+    criticalFindings: ["Positive aVR in sinus rhythm → suspect RA-LA lead reversal"],
+  },
+  "ecg:precordial-leads": {
+    description: "Precordial (chest) lead placement V1–V6 for standard 12-lead ECG. Correct placement is essential to avoid false RBBB, Brugada-like patterns, and poor R wave progression.",
+    structures: ["V1 electrode", "V2 electrode", "V3 electrode", "V4 electrode", "V5 electrode", "V6 electrode"],
+    howToGet: ["V1: 4th ICS, right sternal border", "V2: 4th ICS, left sternal border", "V3: between V2 and V4 (diagonal)", "V4: 5th ICS, midclavicular line", "V5: same horizontal level as V4, anterior axillary line", "V6: same horizontal level as V4, midaxillary line"],
+    tips: ["V1/V2 too high (2nd–3rd ICS): false RBBB, Brugada-like ST elevation", "V4 is the anchor for V5 and V6 — accurate V4 placement is essential", "V5 is NOT in the 5th ICS — it is at the same horizontal level as V4"],
+    pitfalls: ["V1/V2 too high: false RBBB, Brugada-like pattern, poor R wave progression", "V4–V6 not at same horizontal level: distorted R wave progression", "Electrodes placed over breast tissue in women: attenuated amplitudes"],
+    measurements: ["R wave progression V1–V6", "ST segment in each lead", "T wave morphology"],
+    criticalFindings: ["ST elevation in V1–V4 with V1/V2 too high → confirm electrode position before diagnosing STEMI"],
+  },
+  "ecg:right-sided": {
+    description: "Right-sided leads V3R–V6R for right ventricular MI detection. Obtain in ALL inferior STEMIs. ST elevation ≥1 mm in V4R has 88% sensitivity for RV MI.",
+    structures: ["V3R electrode", "V4R electrode", "V5R electrode", "V6R electrode"],
+    howToGet: ["V3R: mirror image of V3 on the right side of the chest", "V4R: 5th ICS, right midclavicular line (mirror of V4)", "V5R: same horizontal level as V4R, right anterior axillary line", "V6R: same horizontal level as V4R, right midaxillary line"],
+    tips: ["V1 serves as V2R — no additional electrode needed for V2R", "Obtain right-sided leads within 10 minutes of inferior STEMI diagnosis", "RV MI: avoid nitrates (preload-dependent), aggressive IV fluids"],
+    pitfalls: ["Not obtaining right-sided leads in inferior STEMI — missing RV MI in 30–50%", "Placing right-sided leads at incorrect horizontal level"],
+    measurements: ["ST elevation in V4R (≥1 mm = RV MI)", "ST elevation in V3R–V6R"],
+    criticalFindings: ["ST elevation ≥1 mm in V4R → RV MI — avoid nitrates, aggressive fluids"],
+  },
+  "ecg:posterior-leads": {
+    description: "Posterior leads V7–V9 for posterior MI detection (LCx occlusion). Obtain when ST depression in V1–V3 is unexplained. ST elevation ≥0.5 mm in V7–V9 confirms posterior MI.",
+    structures: ["V7 electrode", "V8 electrode", "V9 electrode"],
+    howToGet: ["V7: same horizontal level as V4–V6, posterior axillary line (left side)", "V8: same horizontal level, tip of left scapula (midscapular line)", "V9: same horizontal level, left paraspinal area (left of spine)"],
+    tips: ["The horizontal level of V4 is the reference — all posterior leads must be at the same level", "Posterior MI presents as ST depression in V1–V3 (mirror image)", "Obtain posterior leads when V1–V3 show ST depression without anterior ischemia explanation"],
+    pitfalls: ["Not obtaining posterior leads when V1–V3 show ST depression", "Placing posterior leads at different horizontal level than V4–V6"],
+    measurements: ["ST elevation in V7–V9 (≥0.5 mm = posterior MI)"],
+    criticalFindings: ["ST elevation ≥0.5 mm in V7–V9 → posterior MI (LCx occlusion)"],
+  },
+  "ecg:neonatal-leads": {
+    description: "Neonatal and pediatric ECG electrode placement and interpretation. Age-specific reference ranges are required — adult criteria for LVH, RVH, QTc, and axis are NOT applicable to neonates.",
+    structures: ["Standard 10 electrodes", "Pediatric-sized electrodes", "Right-sided leads (V3R, V4R)"],
+    howToGet: ["Use pediatric-sized electrodes for neonates and small children", "Standard adult electrode positions apply but scaled to chest size", "For very small neonates: V3R and V4R are often more useful than V5–V6", "Right-sided leads are standard in neonatal ECG protocols"],
+    tips: ["Neonatal heart rate: 100–160 bpm (normal). A rate of 120 bpm is normal in a neonate", "Right ventricular dominance is normal in neonates — dominant R in V1, right axis deviation", "Neonatal QTc: ≤440 ms (Bazett). Long QT: >460 ms"],
+    pitfalls: ["Applying adult QTc cutoffs to neonates without age correction", "Diagnosing RVH in a neonate based on dominant R in V1 (normal variant)", "Using adult-sized electrodes on neonates — overlap and artifact"],
+    measurements: ["Heart rate (age-specific)", "PR interval (age-specific)", "QRS duration (age-specific)", "QTc (Bazett)"],
+    criticalFindings: ["QTc >460 ms in neonate → long QT syndrome — SIDS risk", "Complete heart block in neonate → maternal anti-Ro antibodies"],
+  },
+  "ecg:normal-ecg": {
+    description: "Normal 12-lead ECG interpretation. Systematic approach: rate, rhythm, axis, intervals (PR, QRS, QTc), morphology (P waves, QRS, ST, T waves). Normal values for adult ECG.",
+    structures: ["P wave", "PR interval", "QRS complex", "ST segment", "T wave", "QT interval"],
+    howToGet: ["Assess rate: count R-R intervals (300/large squares or 1500/small squares)", "Assess rhythm: regular vs irregular, P before every QRS", "Assess axis: leads I and aVF (normal: -30° to +90°)", "Measure intervals: PR (120–200 ms), QRS (<120 ms), QTc (≤440 ms men, ≤460 ms women)", "Assess morphology: P waves, QRS, ST segments, T waves"],
+    tips: ["Systematic approach prevents missed findings", "Always compare with previous ECG when available", "Normal QTc: ≤440 ms (men), ≤460 ms (women) by Bazett formula"],
+    pitfalls: ["Skipping systematic approach leads to missed findings", "Not comparing with previous ECG", "Misidentifying lead reversal as pathology"],
+    measurements: ["Heart rate", "PR interval", "QRS duration", "QTc", "Frontal axis"],
+    criticalFindings: ["QTc >500 ms → high risk for torsades de pointes", "Complete heart block (AV dissociation) → urgent pacing assessment"],
+  },
+  "ecg:stemi-patterns": {
+    description: "STEMI pattern recognition. Anterior (LAD), inferior (RCA/LCx), lateral (LCx), posterior (LCx), and STEMI equivalents (de Winter, Wellens, OMI). Immediate PCI target: door-to-balloon <90 min.",
+    structures: ["ST segments", "T waves", "Q waves"],
+    howToGet: ["Anterior STEMI: ST elevation V1–V4 (± I, aVL)", "Inferior STEMI: ST elevation II, III, aVF", "Lateral STEMI: ST elevation I, aVL, V5–V6", "Posterior MI: ST depression V1–V3 → obtain posterior leads", "de Winter pattern: upsloping ST depression V1–V6 + tall symmetric T waves"],
+    tips: ["Proximal LAD occlusion (V1–V6 + I, aVL) = widow maker — immediate PCI", "Always obtain right-sided leads in inferior STEMI — RV MI in 30–50%", "de Winter pattern = LAD occlusion equivalent — activate cath lab immediately"],
+    pitfalls: ["Posterior MI presents as ST depression in V1–V3 — not ST elevation", "New LBBB with ischemic symptoms = STEMI equivalent (apply Sgarbossa)", "Wellens pattern: do NOT stress test — critical proximal LAD stenosis"],
+    measurements: ["ST elevation amplitude (mm)", "ST depression amplitude (mm)", "T wave amplitude and morphology"],
+    criticalFindings: ["ST elevation ≥1 mm in ≥2 contiguous leads → STEMI — activate cath lab", "de Winter pattern → LAD occlusion equivalent"],
+  },
+  "ecg:lbbb-rbbb": {
+    description: "Bundle branch block recognition and interpretation. LBBB: broad notched R in I, aVL, V5–V6; RBBB: RSR' in V1, broad S in I, V5–V6. New LBBB may indicate acute MI.",
+    structures: ["QRS complex", "Bundle branches", "Interventricular septum"],
+    howToGet: ["LBBB: QRS ≥120 ms + broad notched R in I, aVL, V5–V6 + absent septal Q in I, V5–V6", "RBBB: QRS ≥120 ms + RSR' in V1 + broad S in I, V5–V6", "Incomplete BBB: QRS 110–119 ms with same morphology criteria"],
+    tips: ["New LBBB may indicate acute MI — apply Sgarbossa criteria", "LBBB makes standard ST analysis unreliable", "LBBB is a criterion for CRT (cardiac resynchronization therapy) in HFrEF"],
+    pitfalls: ["RBBB pattern with V1/V2 too high → false RBBB from electrode misplacement", "LBBB masks ischemic ST changes — use Sgarbossa/Smith modified criteria"],
+    measurements: ["QRS duration", "QRS morphology in V1, I, V5–V6"],
+    criticalFindings: ["New LBBB with chest pain → STEMI equivalent — apply Sgarbossa criteria"],
+  },
+  "ecg:brugada-pattern": {
+    description: "Brugada pattern recognition. Type 1 (coved): ST elevation ≥2 mm with coved morphology in V1–V2 (diagnostic). Type 2 (saddle-back): ST elevation ≥2 mm with saddle-back morphology (not diagnostic alone). Risk of sudden cardiac death from VF.",
+    structures: ["V1 electrode", "V2 electrode", "ST segment"],
+    howToGet: ["Standard V1–V2 placement (4th ICS)", "High precordial placement (2nd–3rd ICS) may unmask Brugada pattern", "Fever, sodium channel blockers, and vagotonic states unmask the pattern"],
+    tips: ["Type 1 Brugada (coved) is diagnostic — Type 2 (saddle-back) is not diagnostic alone", "Fever unmasks the pattern — treat aggressively in known Brugada patients", "ICD indicated for symptomatic patients (syncope, aborted SCA)"],
+    pitfalls: ["V1/V2 too high (2nd–3rd ICS) can mimic Brugada — confirm with standard placement", "RBBB with ST elevation in V1 is NOT Brugada unless coved morphology"],
+    measurements: ["ST elevation in V1–V2 (mm)", "ST morphology (coved vs saddle-back)"],
+    criticalFindings: ["Type 1 Brugada pattern + syncope → ICD evaluation", "Type 1 Brugada pattern + fever → treat fever aggressively"],
+  },
+  "ecg:sgarbossa": {
+    description: "Sgarbossa criteria for diagnosing acute MI in the presence of LBBB or ventricular pacing. Concordant ST changes are the most specific finding. Smith's modified criterion improves sensitivity.",
+    structures: ["ST segments in LBBB context", "QRS complex"],
+    howToGet: ["Apply to any ECG with LBBB or ventricular pacing", "Criterion 1: concordant ST elevation ≥1 mm in any lead (5 points)", "Criterion 2: concordant ST depression ≥1 mm in V1–V3 (3 points)", "Criterion 3: discordant ST elevation ≥5 mm (2 points)", "Smith modified criterion 3: ST/S ratio ≤-0.25 (more sensitive)"],
+    tips: ["Original Sgarbossa score ≥3 points is highly specific but insensitive", "Smith's modified criterion 3 (proportional ST/S ratio) improves sensitivity", "Any concordant ST change in LBBB should prompt urgent evaluation"],
+    pitfalls: ["Criterion 3 (discordant ST ≥5 mm) alone has poor specificity — use Smith modified", "Normal LBBB has discordant ST changes — only concordant changes are abnormal"],
+    measurements: ["ST elevation/depression amplitude", "ST/S ratio (Smith modified criterion 3)"],
+    criticalFindings: ["Concordant ST elevation ≥1 mm in LBBB → acute MI until proven otherwise", "Concordant ST depression ≥1 mm in V1–V3 in LBBB → posterior MI"],
+  },
+
+  // ─── MCS MODULES — correct registry IDs ─────────────────────────────────────
+  // mcs_lvad (registry IDs: plax_cannula, a5c_cannula, a4c_rv, a4c_lv, subcostal_ivc, cw_ar, pw_cannula)
+  "mcs_lvad:plax_cannula": {
+    description: "PLAX view for LVAD inflow cannula assessment. Measure cannula tip to aortic valve distance (target 3.5–4.5 cm). Confirm cannula is parallel to IVS and pointing toward mitral valve.",
+    structures: ["LV cavity", "Inflow cannula", "Aortic valve", "Mitral valve", "Interventricular septum"],
+    howToGet: ["Obtain standard PLAX view with LV, MV, AV, and aortic root visible", "Identify the LVAD inflow cannula as a hyperechoic structure in the LV cavity", "Measure distance from cannula tip to aortic valve (inner edge to inner edge)", "Apply color Doppler over the inflow cannula to assess flow direction"],
+    tips: ["PLAX is the primary view for inflow cannula distance measurement", "Reduce depth to 12–14 cm to better visualize the cannula tip", "If cannula is not visible in PLAX, try slight probe rotation or lateral angulation"],
+    pitfalls: ["Acoustic shadowing from the cannula may obscure posterior structures — adjust gain and TGC", "Cannula too shallow (<3.5 cm from AV): suction risk", "Cannula too deep (>5 cm): mitral valve entrapment risk"],
+    measurements: ["Cannula tip to AV distance (target 3.5–4.5 cm)", "AV opening frequency"],
+    criticalFindings: ["Cannula tip <3.5 cm from AV: suction risk — notify team", "Cannula tip >5 cm from AV: MV entrapment risk"],
+  },
+  "mcs_lvad:a5c_cannula": {
+    description: "Apical 5-chamber view for LVAD inflow cannula confirmation in a second orthogonal plane. Confirms cannula is in the central LV cavity and not impinging on the septum or lateral wall.",
+    structures: ["LV cavity", "LVOT", "Aortic valve", "Inflow cannula", "Mitral valve"],
+    howToGet: ["Obtain A4C view then tilt anteriorly to bring LVOT and AV into view", "Identify the inflow cannula in the LV cavity", "Confirm the cannula is in the central LV cavity, not impinging on septum or lateral wall", "Apply PW Doppler at the cannula inlet for velocity measurement"],
+    tips: ["A5C complements PLAX for confirming cannula position in two orthogonal planes", "Steep left lateral decubitus position improves apical window"],
+    pitfalls: ["Foreshortened apical view may make cannula appear closer to MV than it is — ensure true apex", "Gain artifacts may mimic cannula thrombus — reduce gain and use harmonic imaging"],
+    measurements: ["PW Doppler at inflow cannula (1.0–2.0 m/s normal)", "Cannula position relative to septum and lateral wall"],
+    criticalFindings: ["Cannula velocity >2.0 m/s → suspect obstruction (suction, thrombus, malposition)"],
+  },
+  "mcs_lvad:a4c_rv": {
+    description: "Apical 4-chamber view for RV function assessment on LVAD support. RV failure is the most critical post-LVAD complication. LVAD increases RV preload and may precipitate RV failure.",
+    structures: ["Right ventricle", "Left ventricle", "Tricuspid valve", "Interventricular septum"],
+    howToGet: ["Obtain standard A4C view with all four chambers visible", "Focus on RV size and function", "Measure TAPSE with M-mode at the tricuspid annulus", "Apply PW TDI at tricuspid annulus for RV S'", "Assess TR severity with color Doppler and CW for RVSP estimation"],
+    tips: ["RV assessment is the most critical post-LVAD echo parameter", "Serial TAPSE and RVSP monitoring detects early RV decompensation", "Leftward septal shift with RV dilation = RV failure, not adequate LV unloading"],
+    pitfalls: ["RV failure post-LVAD can be subtle — compare to pre-implant baseline", "Leftward septal shift with RV dilation = RV failure, not adequate LV unloading"],
+    measurements: ["TAPSE (≥17 mm normal; <10 mm = severe RV dysfunction post-LVAD)", "RV S' (≥9.5 cm/s normal)", "TR CW: RVSP", "RV basal and mid diameters"],
+    criticalFindings: ["TAPSE <10 mm post-LVAD → severe RV dysfunction", "Leftward septal shift + RV dilation → RV failure"],
+  },
+  "mcs_lvad:a4c_lv": {
+    description: "Apical 4-chamber view for LV decompression assessment on LVAD support. LV should decrease in size with adequate LVAD support. Persistent LV dilation suggests inadequate unloading.",
+    structures: ["Left ventricle", "Mitral valve", "Left atrium", "Interventricular septum"],
+    howToGet: ["Obtain standard A4C view", "Measure LVEDD and LVESD — compare to pre-LVAD baseline", "Assess MV for MR severity", "Assess septal position (midline preferred)"],
+    tips: ["LV decompression is the key hemodynamic goal — document LVEDD at each echo", "Rightward septal shift = LV over-decompression (reduce pump speed)", "Serial LVEDD monitoring documents LV recovery or progression"],
+    pitfalls: ["Persistent LV dilation at high pump speed = inadequate unloading or device malfunction", "Rightward septal shift = over-decompression — reduce pump speed"],
+    measurements: ["LVEDD and LVESD (serial)", "MR severity", "Septal position"],
+    criticalFindings: ["Persistent LV dilation despite high pump speed → device malfunction or obstruction", "Rightward septal shift → over-decompression — reduce pump speed"],
+  },
+  "mcs_lvad:subcostal_ivc": {
+    description: "Subcostal IVC view for RAP estimation and pericardial effusion assessment on LVAD support. New pericardial effusion post-LVAD requires urgent assessment.",
+    structures: ["Inferior vena cava", "Right atrium", "Hepatic veins", "Pericardium"],
+    howToGet: ["Obtain subcostal 4-chamber view", "Rotate to IVC long axis view — IVC entering RA", "Measure IVC diameter at 1–2 cm from RA junction", "Assess IVC collapsibility with sniff test", "Assess for pericardial effusion — circumferential or loculated"],
+    tips: ["IVC ≤21 mm + >50% collapse = RAP 0–5 mmHg", "IVC >21 mm + <50% collapse = RAP 10–20 mmHg", "Loculated pericardial effusion may be missed in standard views — sweep carefully"],
+    pitfalls: ["Hepatic veins may be mistaken for IVC — follow vessel to RA junction", "Loculated pericardial effusion may be missed in standard views"],
+    measurements: ["IVC diameter", "IVC collapsibility index", "Pericardial effusion size"],
+    criticalFindings: ["New pericardial effusion post-LVAD → urgent assessment (tamponade, perforation)"],
+  },
+  "mcs_lvad:cw_ar": {
+    description: "CW Doppler for aortic regurgitation assessment on LVAD support. AR causes recirculation (blood pumped into aorta re-enters LV via AR jet), reducing effective forward flow.",
+    structures: ["Aortic valve", "LVOT", "Left ventricle"],
+    howToGet: ["Obtain PLAX or A5C view with AV visible", "Apply color Doppler box over LVOT and AV", "Assess AR jet width relative to LVOT diameter", "Use CW Doppler to measure AR PHT if moderate-severe"],
+    tips: ["AR PHT <200 ms = significant AR causing recirculation", "Serial AR assessment is mandatory — AR tends to progress on LVAD", "Moderate-severe AR significantly reduces net forward flow"],
+    pitfalls: ["Device artifact may mimic AR jet — use color Doppler to confirm", "AR may be underestimated with high pump flow rates"],
+    measurements: ["AR jet width / LVOT diameter ratio", "AR PHT (if moderate-severe)", "AR vena contracta"],
+    criticalFindings: ["Moderate-severe AR → significant recirculation — consider AV closure or pump speed adjustment"],
+  },
+  "mcs_lvad:pw_cannula": {
+    description: "PW Doppler at LVAD inflow cannula for velocity measurement. Normal velocity 1.0–2.0 m/s. Velocity >2.0 m/s suggests obstruction (suction, thrombus, or malposition).",
+    structures: ["Inflow cannula", "LV cavity"],
+    howToGet: ["Obtain A5C or PLAX view with cannula visible", "Place PW sample volume within the cannula lumen", "Measure peak velocity", "Assess waveform morphology — should be continuous"],
+    tips: ["Continuous low-pulsatility waveform is normal", "Highly pulsatile waveform suggests retained native cardiac output (partial support)", "Absent or reversed diastolic flow suggests pump malfunction or severe AR"],
+    pitfalls: ["Acoustic shadowing from cannula may prevent adequate Doppler signal", "Sample volume placement outside cannula lumen gives inaccurate velocity"],
+    measurements: ["Peak cannula velocity (1.0–2.0 m/s normal)", "Waveform pulsatility"],
+    criticalFindings: ["Cannula velocity >2.0 m/s → suspect obstruction (suction, thrombus, malposition)"],
+  },
+
+  // mcs_ecmo (registry IDs: plax_lv, a4c_av, a4c_ef, subcostal_ivc, tee_bicaval, tee_melax, avalon_jet)
+  "mcs_ecmo:plax_lv": {
+    description: "PLAX view for LV distension and AV opening assessment on VA-ECMO. LV distension (LVEDD >70 mm) requires venting. AV must open with each beat to prevent thrombus.",
+    structures: ["Left ventricle", "Aortic valve", "Mitral valve", "LVOT"],
+    howToGet: ["Obtain standard PLAX view", "Measure LVEDD and LVESD — compare to pre-ECMO baseline", "Observe AV opening: does it open with each beat?", "Apply color Doppler to assess AR (retrograde aortic flow from ECMO increases AR)", "Assess for pericardial effusion"],
+    tips: ["LV distension on VA-ECMO is a medical emergency — call team immediately", "Reduce ECMO flow temporarily if LV distension develops while arranging venting", "AV non-opening may be intermittent — observe for at least 10 cardiac cycles"],
+    pitfalls: ["LV distension may develop gradually — serial assessment every 4–6 hours on VA-ECMO"],
+    measurements: ["LVEDD and LVESD", "AV opening frequency", "AR severity"],
+    criticalFindings: ["LVEDD >70 mm or LVESD >60 mm → LV distension — venting required", "AV not opening → thrombus risk — urgent venting"],
+  },
+  "mcs_ecmo:a4c_av": {
+    description: "Apical 4-chamber / 5-chamber view for AV opening assessment on VA-ECMO. AV must open with each beat. Continuous AV closure indicates LV distension and thrombus risk.",
+    structures: ["Left ventricle", "Aortic valve", "Right ventricle", "Mitral valve"],
+    howToGet: ["Obtain standard A4C view", "Tilt anteriorly to A5C to bring AV into view", "Observe AV opening frequency over 10 cardiac cycles", "Apply color Doppler at AV level"],
+    tips: ["AV opening every 2–4 beats is optimal on VA-ECMO", "Serial EF assessment is the primary weaning criterion for VA-ECMO", "EF >20–25% with AV opening = consider weaning trial"],
+    pitfalls: ["LV thrombus may be subtle — use contrast echo if apical views are suboptimal", "EF assessment on VA-ECMO reflects native cardiac function — ECMO reduces LV preload"],
+    measurements: ["AV opening frequency", "LVEF (biplane Simpson's)"],
+    criticalFindings: ["Continuous AV closure → LV distension and thrombus risk — urgent venting"],
+  },
+  "mcs_ecmo:a4c_ef": {
+    description: "Apical 4-chamber view for biventricular function assessment on VA-ECMO. Serial EF assessment is the primary weaning criterion. Improving EF suggests myocardial recovery.",
+    structures: ["Left ventricle", "Right ventricle", "Mitral valve", "Tricuspid valve"],
+    howToGet: ["Obtain standard A4C view", "Assess LV EF by biplane Simpson's", "Assess RV size and function: TAPSE, RV S'", "Look for LV thrombus — especially apical regions with poor AV opening", "Assess TR severity and estimate RVSP"],
+    tips: ["Serial EF assessment is the primary weaning criterion for VA-ECMO", "EF >20–25% with AV opening = consider weaning trial", "LV thrombus: high risk when AV does not open"],
+    pitfalls: ["LV thrombus may be subtle — use contrast echo if apical views are suboptimal"],
+    measurements: ["LVEF (biplane Simpson's)", "TAPSE", "RV S'", "TR CW: RVSP"],
+    criticalFindings: ["LV thrombus detected → urgent anticoagulation review", "LVEF <20% at weaning trial → weaning failure"],
+  },
+  "mcs_ecmo:subcostal_ivc": {
+    description: "Subcostal IVC view for RAP estimation on VA-ECMO. Elevated RAP suggests RV failure or volume overload. New pericardial effusion requires urgent assessment.",
+    structures: ["Inferior vena cava", "Right atrium", "Hepatic veins"],
+    howToGet: ["Obtain subcostal IVC long-axis view", "Measure IVC diameter at 1–2 cm from RA junction", "Assess IVC collapsibility with sniff test", "Assess for pericardial effusion"],
+    tips: ["IVC >21 mm + <50% collapse = RAP 10–20 mmHg", "Elevated RAP on VA-ECMO suggests RV failure or volume overload"],
+    pitfalls: ["Hepatic veins may be mistaken for IVC", "Loculated pericardial effusion may be missed"],
+    measurements: ["IVC diameter", "IVC collapsibility index"],
+    criticalFindings: ["New pericardial effusion on VA-ECMO → urgent assessment"],
+  },
+  "mcs_ecmo:tee_bicaval": {
+    description: "TEE bicaval view (90–100°) for VA-ECMO venous cannula position confirmation. Venous cannula tip should be at RA/IVC junction. Assess for RA thrombus at cannula tip.",
+    structures: ["Superior vena cava", "Inferior vena cava", "Right atrium", "Venous cannula"],
+    howToGet: ["Advance probe to mid-esophagus", "Rotate to bicaval view (90–100°) to visualize SVC, RA, and IVC", "Identify venous cannula tip — should be at RA/IVC junction", "Assess for RA thrombus at cannula tip"],
+    tips: ["TEE is preferred over TTE for cannula position assessment", "Bicaval view at 90–100° is the optimal TEE view for venous cannula"],
+    pitfalls: ["Cannula tip may be difficult to visualize in all patients — use multiple views", "Misdirected return jet (away from TV) = recirculation — reposition cannula"],
+    measurements: ["Cannula tip position relative to RA/IVC junction"],
+    criticalFindings: ["Cannula tip in RA body (too high) → recirculation", "RA thrombus at cannula tip → anticoagulation review"],
+  },
+  "mcs_ecmo:tee_melax": {
+    description: "TEE mid-esophageal long-axis view (120–135°) for VA-ECMO. Equivalent to PLAX. Assess LV distension, AV opening, and AR in the context of VA-ECMO support.",
+    structures: ["Left ventricle", "Aortic valve", "Mitral valve", "LVOT"],
+    howToGet: ["Advance probe to mid-esophagus", "Rotate to ME LAX view (120–135°)", "Identify LV, MV, AV, and aortic root", "Measure LVEDD", "Observe AV opening", "Apply color Doppler for AR assessment"],
+    tips: ["TEE ME LAX provides superior resolution for LV distension and AV opening", "Preferred in ICU/cath lab when TTE windows are limited"],
+    pitfalls: ["Acoustic shadowing from ECMO cannulas may obscure posterior structures"],
+    measurements: ["LVEDD", "AV opening frequency", "AR severity"],
+    criticalFindings: ["LVEDD >70 mm → LV distension on VA-ECMO — urgent venting"],
+  },
+  "mcs_ecmo:avalon_jet": {
+    description: "Color Doppler assessment of Avalon dual-lumen cannula return jet for VV-ECMO. Return jet must be directed toward the tricuspid valve to minimize recirculation.",
+    structures: ["Right atrium", "Tricuspid valve", "Avalon cannula", "SVC", "IVC"],
+    howToGet: ["TEE bicaval view (90–100°)", "Identify Avalon cannula in RA", "Apply color Doppler to assess return jet direction", "Confirm return jet is directed toward tricuspid valve (not toward SVC or IVC)"],
+    tips: ["Return jet directed toward TV = optimal positioning — minimizes recirculation", "Return jet directed toward SVC or IVC = recirculation — reposition cannula"],
+    pitfalls: ["Misdirected return jet is the most common cause of poor oxygenation on VV-ECMO", "Cannula rotation may redirect the jet — reassess after any patient movement"],
+    measurements: ["Return jet direction (toward TV vs away)"],
+    criticalFindings: ["Return jet directed away from TV → recirculation — reposition Avalon cannula"],
+  },
+
+  // mcs_impella_cp (registry IDs: plax_inlet, a5c_outlet, tee_melax, a4c_lv_unload, plax_ar_serial, ecpella_av)
+  "mcs_impella_cp:plax_inlet": {
+    description: "PLAX view for Impella CP inlet-to-AV distance measurement. Target: 3.5–4.5 cm below aortic valve. Primary view for Impella positioning assessment.",
+    structures: ["LV cavity", "Impella device", "Aortic valve", "LVOT", "Mitral valve"],
+    howToGet: ["Obtain PLAX view with AV and LVOT visible", "Identify the Impella device crossing the AV", "Measure distance from device inlet to AV annulus", "Apply color Doppler to confirm inlet in LV and outlet in aorta"],
+    tips: ["PLAX is the primary view for Impella positioning", "Reduce depth to 10–12 cm to better visualize the inlet-to-AV distance", "If device is too shallow, advance catheter; if too deep, withdraw slightly"],
+    pitfalls: ["Acoustic shadowing from device may obscure AV — use harmonic imaging", "Foreshortened PLAX underestimates inlet-to-AV distance"],
+    measurements: ["Inlet-to-AV distance (target 3.5–4.5 cm)"],
+    criticalFindings: ["Inlet-to-AV distance <3.5 cm: device too shallow — advance", "Inlet-to-AV distance >5 cm: device too deep — withdraw", "Device crossing MV: urgent repositioning"],
+  },
+  "mcs_impella_cp:a5c_outlet": {
+    description: "Apical 5-chamber view for Impella CP inlet confirmation in a second orthogonal plane. Confirms inlet is in the LV cavity and outlet is in the ascending aorta.",
+    structures: ["LV cavity", "LVOT", "Aortic valve", "Impella device", "Mitral valve"],
+    howToGet: ["Obtain A4C view then tilt anteriorly to bring LVOT and AV into view", "Identify the Impella device in the LVOT crossing the AV", "Confirm inlet area is in the LV cavity (below AV)", "Confirm outlet area is in the ascending aorta (above AV)", "Assess for MV impingement"],
+    tips: ["A5C confirms inlet position in a second orthogonal plane to PLAX", "If new MR develops after Impella placement, check inlet depth immediately"],
+    pitfalls: ["Foreshortened apical view may give false impression of inlet position", "New MR in A4C with Impella = pigtail entanglement — urgent repositioning"],
+    measurements: ["Inlet position relative to AV"],
+    criticalFindings: ["New MR after Impella placement → pigtail entanglement — urgent repositioning"],
+  },
+  "mcs_impella_cp:tee_melax": {
+    description: "TEE ME LAX view (120–135°) for Impella CP positioning — gold standard in cath lab and ICU. Equivalent to PLAX. Measure inlet-to-AV distance with superior resolution.",
+    structures: ["LV cavity", "Aortic valve", "LVOT", "Impella device", "Ascending aorta"],
+    howToGet: ["Advance probe to mid-esophagus", "Rotate to ME LAX view (120–135°)", "Identify Impella device crossing the AV", "Measure inlet-to-AV distance: 3.5–4.5 cm", "Confirm outlet in ascending aorta", "Assess AV leaflets for impingement"],
+    tips: ["TEE ME LAX is the gold standard for Impella positioning in the cath lab", "Real-time TEE guidance during repositioning is preferred over fluoroscopy alone"],
+    pitfalls: ["TEE probe may be difficult to advance past the device in some patients", "Acoustic shadowing from device — use multiple imaging planes"],
+    measurements: ["Inlet-to-AV distance (target 3.5–4.5 cm)"],
+    criticalFindings: ["Inlet-to-AV distance outside 3.5–4.5 cm range → reposition"],
+  },
+  "mcs_impella_cp:a4c_lv_unload": {
+    description: "Apical 4-chamber view for LV unloading and MV assessment on Impella CP support. LV should decrease in size with adequate support. New MR suggests pigtail entanglement.",
+    structures: ["Left ventricle", "Mitral valve", "Right ventricle", "Impella device"],
+    howToGet: ["Obtain standard A4C view", "Measure LVEDD and LVESD — should decrease from baseline with adequate P-level", "Assess MV for new MR (pigtail entanglement)", "Measure TAPSE and RV S' — RV failure causes suction alarms"],
+    tips: ["LV decompression is the key hemodynamic goal — document LVEDD at each echo", "RV failure is a common cause of suction alarms — assess TAPSE and RV S' routinely"],
+    pitfalls: ["Persistent LV dilation at high P-level = inadequate unloading or device malposition", "New MR = pigtail entanglement — do not attribute to worsening native MV disease without checking position"],
+    measurements: ["LVEDD and LVESD", "MR severity", "TAPSE", "RV S'"],
+    criticalFindings: ["New MR after Impella placement → pigtail entanglement — check inlet depth", "Persistent LV dilation at high P-level → device malposition or obstruction"],
+  },
+  "mcs_impella_cp:plax_ar_serial": {
+    description: "PLAX color Doppler for serial AR assessment with Impella CP (14Fr). The 14Fr profile creates significant crossing profile. AR causes recirculation reducing net forward flow.",
+    structures: ["Aortic valve", "LVOT", "Impella device"],
+    howToGet: ["Obtain PLAX view with AV and LVOT visible", "Apply color Doppler box over LVOT and AV", "Assess AR jet width relative to LVOT diameter", "Repeat at each P-level change"],
+    tips: ["Trivial-mild AR is expected with Impella CP at 14Fr profile", "Document AR grade at each echo for serial comparison", "Moderate-severe AR significantly reduces net forward flow"],
+    pitfalls: ["Device artifact may mimic AR jet", "AR may be underestimated with high Impella flow rates"],
+    measurements: ["AR jet width / LVOT diameter ratio"],
+    criticalFindings: ["Moderate-severe AR → significant recirculation — consider repositioning"],
+  },
+  "mcs_impella_cp:ecpella_av": {
+    description: "AV opening assessment in ECPELLA configuration (Impella CP + VA-ECMO). AV must open to prevent thrombus. Impella CP unloads LV to promote AV opening on VA-ECMO.",
+    structures: ["Aortic valve", "Left ventricle", "LVOT", "Impella device"],
+    howToGet: ["Obtain PLAX or A5C view with AV visible", "Observe AV opening frequency over 10 cardiac cycles", "Apply color Doppler at AV level", "Assess LV distension (LVEDD)"],
+    tips: ["ECPELLA: Impella CP unloads LV to promote AV opening on VA-ECMO", "AR assessment is even more important as recirculation reduces ECMO efficacy", "AV opening every 2–4 beats is optimal"],
+    pitfalls: ["AV non-opening may be intermittent — observe for at least 10 cardiac cycles"],
+    measurements: ["AV opening frequency", "LVEDD", "AR severity"],
+    criticalFindings: ["Continuous AV closure on ECPELLA → LV distension — increase Impella P-level"],
+  },
+
+  // mcs_impella_25 (registry IDs: plax_inlet, a5c_outlet, tee_melax, a4c_lv_unload, plax_ar_serial)
+  "mcs_impella_25:plax_inlet": {
+    description: "PLAX view for Impella 2.5 inlet-to-AV distance measurement. Target: 3.5–4.5 cm below aortic valve. The 12Fr profile is smaller than CP and generally causes less AR.",
+    structures: ["LV cavity", "Impella device", "Aortic valve", "LVOT", "Mitral valve"],
+    howToGet: ["Obtain PLAX view with AV and LVOT visible", "Identify the Impella 2.5 device crossing the AV", "Measure distance from device inlet to AV annulus", "Apply color Doppler to confirm inlet in LV and outlet in aorta"],
+    tips: ["PLAX is the primary view for Impella 2.5 positioning", "Reduce depth to 10–12 cm to better visualize the inlet-to-AV distance"],
+    pitfalls: ["Acoustic shadowing from device may obscure AV — use harmonic imaging", "Foreshortened PLAX underestimates inlet-to-AV distance"],
+    measurements: ["Inlet-to-AV distance (target 3.5–4.5 cm)"],
+    criticalFindings: ["Inlet-to-AV distance <3.5 cm: device too shallow — advance", "Inlet-to-AV distance >5 cm: device too deep — withdraw"],
+  },
+  "mcs_impella_25:a5c_outlet": {
+    description: "Apical 5-chamber view for Impella 2.5 inlet confirmation. Confirms inlet is in the LV cavity and outlet is in the ascending aorta. Second orthogonal plane to PLAX.",
+    structures: ["LV cavity", "LVOT", "Aortic valve", "Impella device"],
+    howToGet: ["Obtain A4C view then tilt anteriorly to bring LVOT and AV into view", "Identify the Impella 2.5 device in the LVOT crossing the AV", "Confirm inlet area is in the LV cavity (below AV)", "Assess for MV impingement"],
+    tips: ["A5C confirms inlet position in a second orthogonal plane to PLAX"],
+    pitfalls: ["New MR in A4C with Impella = pigtail entanglement — urgent repositioning"],
+    measurements: ["Inlet position relative to AV"],
+    criticalFindings: ["New MR after Impella 2.5 placement → pigtail entanglement"],
+  },
+  "mcs_impella_25:tee_melax": {
+    description: "TEE ME LAX view for Impella 2.5 positioning. Gold standard in cath lab. Measure inlet-to-AV distance with superior resolution compared to TTE.",
+    structures: ["LV cavity", "Aortic valve", "LVOT", "Impella device"],
+    howToGet: ["Advance probe to mid-esophagus", "Rotate to ME LAX view (120–135°)", "Identify Impella 2.5 device crossing the AV", "Measure inlet-to-AV distance: 3.5–4.5 cm"],
+    tips: ["TEE ME LAX is the gold standard for Impella positioning in the cath lab"],
+    pitfalls: ["Acoustic shadowing from device — use multiple imaging planes"],
+    measurements: ["Inlet-to-AV distance (target 3.5–4.5 cm)"],
+    criticalFindings: ["Inlet-to-AV distance outside 3.5–4.5 cm range → reposition"],
+  },
+  "mcs_impella_25:a4c_lv_unload": {
+    description: "Apical 4-chamber view for LV unloading assessment on Impella 2.5 support. Document LVEDD at each echo. New MR suggests pigtail entanglement.",
+    structures: ["Left ventricle", "Mitral valve", "Right ventricle"],
+    howToGet: ["Obtain standard A4C view", "Measure LVEDD and LVESD", "Assess MV for new MR", "Measure TAPSE and RV S'"],
+    tips: ["LV decompression is the key hemodynamic goal", "RV failure is a common cause of suction alarms"],
+    pitfalls: ["New MR = pigtail entanglement — check inlet depth"],
+    measurements: ["LVEDD and LVESD", "MR severity", "TAPSE"],
+    criticalFindings: ["New MR after Impella 2.5 placement → pigtail entanglement"],
+  },
+  "mcs_impella_25:plax_ar_serial": {
+    description: "PLAX color Doppler for serial AR assessment with Impella 2.5 (12Fr). The 12Fr profile is smaller than CP and generally causes less AR. Trivial-mild AR is expected.",
+    structures: ["Aortic valve", "LVOT", "Impella device"],
+    howToGet: ["Obtain PLAX view with AV and LVOT visible", "Apply color Doppler box over LVOT and AV", "Assess AR jet width relative to LVOT diameter", "Repeat at each P-level change"],
+    tips: ["Trivial-mild AR is expected with Impella 2.5 at 12Fr profile", "Document AR grade at each echo for serial comparison"],
+    pitfalls: ["Device artifact may mimic AR jet"],
+    measurements: ["AR jet width / LVOT diameter ratio"],
+    criticalFindings: ["Moderate-severe AR: significant recirculation — consider repositioning"],
+  },
+
+  // mcs_impella_55 (registry IDs: plax_inlet, a5c_outlet, tee_melax, a4c_lv_unload, plax_ar_serial, bridge_serial)
+  "mcs_impella_55:plax_inlet": {
+    description: "PLAX view for Impella 5.5 inlet-to-AV distance measurement. The 21Fr surgical profile requires cutdown. Target: 3.5–4.5 cm below aortic valve.",
+    structures: ["LV cavity", "Impella device", "Aortic valve", "LVOT"],
+    howToGet: ["Obtain PLAX view with AV and LVOT visible", "Identify the Impella 5.5 device crossing the AV", "Measure distance from device inlet to AV annulus", "Apply color Doppler to confirm inlet in LV and outlet in aorta"],
+    tips: ["PLAX is the primary view for Impella 5.5 positioning", "Impella 5.5 has the highest AR risk due to 21Fr profile — serial assessment is mandatory"],
+    pitfalls: ["Acoustic shadowing from the larger 21Fr device may be more prominent"],
+    measurements: ["Inlet-to-AV distance (target 3.5–4.5 cm)"],
+    criticalFindings: ["Inlet-to-AV distance outside 3.5–4.5 cm range → reposition"],
+  },
+  "mcs_impella_55:a5c_outlet": {
+    description: "Apical 5-chamber view for Impella 5.5 inlet confirmation. Second orthogonal plane to PLAX. Confirms inlet is in the LV cavity.",
+    structures: ["LV cavity", "LVOT", "Aortic valve", "Impella device"],
+    howToGet: ["Obtain A4C view then tilt anteriorly to bring LVOT and AV into view", "Identify the Impella 5.5 device in the LVOT crossing the AV", "Confirm inlet area is in the LV cavity", "Assess for MV impingement"],
+    tips: ["A5C confirms inlet position in a second orthogonal plane to PLAX"],
+    pitfalls: ["New MR in A4C with Impella = pigtail entanglement — urgent repositioning"],
+    measurements: ["Inlet position relative to AV"],
+    criticalFindings: ["New MR after Impella 5.5 placement → pigtail entanglement"],
+  },
+  "mcs_impella_55:tee_melax": {
+    description: "TEE ME LAX view for Impella 5.5 positioning. Gold standard in cath lab. The 21Fr profile may cause more acoustic shadowing — use multiple imaging planes.",
+    structures: ["LV cavity", "Aortic valve", "LVOT", "Impella device"],
+    howToGet: ["Advance probe to mid-esophagus", "Rotate to ME LAX view (120–135°)", "Identify Impella 5.5 device crossing the AV", "Measure inlet-to-AV distance: 3.5–4.5 cm"],
+    tips: ["TEE ME LAX is the gold standard for Impella positioning in the cath lab"],
+    pitfalls: ["21Fr profile may cause more acoustic shadowing than smaller devices"],
+    measurements: ["Inlet-to-AV distance (target 3.5–4.5 cm)"],
+    criticalFindings: ["Inlet-to-AV distance outside 3.5–4.5 cm range → reposition"],
+  },
+  "mcs_impella_55:a4c_lv_unload": {
+    description: "Apical 4-chamber view for LV unloading assessment on Impella 5.5 support. Document LVEDD at each echo. New MR suggests pigtail entanglement.",
+    structures: ["Left ventricle", "Mitral valve", "Right ventricle"],
+    howToGet: ["Obtain standard A4C view", "Measure LVEDD and LVESD", "Assess MV for new MR", "Measure TAPSE and RV S'"],
+    tips: ["LV decompression is the key hemodynamic goal", "RV failure is a common cause of suction alarms"],
+    pitfalls: ["New MR = pigtail entanglement — check inlet depth"],
+    measurements: ["LVEDD and LVESD", "MR severity", "TAPSE"],
+    criticalFindings: ["New MR after Impella 5.5 placement → pigtail entanglement"],
+  },
+  "mcs_impella_55:plax_ar_serial": {
+    description: "PLAX color Doppler for serial AR assessment with Impella 5.5 (21Fr surgical). The 21Fr profile creates the largest crossing profile and highest AR risk. Serial assessment is mandatory.",
+    structures: ["Aortic valve", "LVOT", "Impella device"],
+    howToGet: ["Obtain PLAX view with AV and LVOT visible", "Apply color Doppler box over LVOT and AV", "Assess AR jet width relative to LVOT diameter", "Repeat at each echo assessment"],
+    tips: ["Impella 5.5 has the highest AR risk due to 21Fr profile — serial assessment is mandatory", "Moderate-severe AR with Impella 5.5 significantly reduces net forward flow"],
+    pitfalls: ["Device artifact may mimic AR jet", "AR may be underestimated with high Impella flow rates"],
+    measurements: ["AR jet width / LVOT diameter ratio", "AR PHT if moderate-severe"],
+    criticalFindings: ["Moderate-severe AR → significant recirculation — consider repositioning or P-level adjustment"],
+  },
+  "mcs_impella_55:bridge_serial": {
+    description: "Serial biventricular function assessment for Impella 5.5 bridge-to-decision/transplant. Documents LV recovery or progression to advanced therapy. Improving LVEF = bridge-to-recovery candidate.",
+    structures: ["Left ventricle", "Right ventricle", "Mitral valve", "Tricuspid valve"],
+    howToGet: ["Obtain A4C view", "Measure LVEF by biplane Simpson's", "Measure TAPSE and RV S'", "Assess MR and TR severity", "Measure LVEDD and LVESD"],
+    tips: ["Serial biventricular function documents recovery or progression to advanced therapy", "Improving LVEF on serial echo = bridge-to-recovery candidate", "Assess at reduced P-level during weaning trial"],
+    pitfalls: ["LV function may appear better than native due to Impella unloading — assess at reduced P-level during weaning trial"],
+    measurements: ["LVEF (biplane Simpson's)", "TAPSE", "LVEDD and LVESD"],
+    criticalFindings: ["LVEF <20% at reduced P-level: weaning failure — escalate to advanced therapy"],
+  },
+
+  // mcs_impella_ecp (registry IDs: plax_expansion, plax_inlet, a5c_outlet, tee_melax, a4c_lv_unload, plax_ar_serial)
+  "mcs_impella_ecp:plax_expansion": {
+    description: "PLAX view for Impella ECP pump expansion confirmation. The ECP has an expandable pump that must be confirmed fully expanded in the LV cavity after deployment.",
+    structures: ["LV cavity", "Impella ECP pump", "Aortic valve", "LVOT"],
+    howToGet: ["Obtain PLAX view", "Identify the ECP pump in the LV cavity", "Confirm the pump appears fully expanded (larger cross-section than delivery profile)", "Measure inlet-to-AV distance", "Apply color Doppler for flow confirmation"],
+    tips: ["ECP pump expansion must be confirmed by echo after deployment", "Unexpanded pump = reduced flow output — check deployment"],
+    pitfalls: ["Partially expanded pump may be difficult to distinguish from fully expanded on 2D — use color Doppler flow pattern"],
+    measurements: ["Inlet-to-AV distance (target 3.5–4.5 cm)", "Pump cross-section (confirm expansion)"],
+    criticalFindings: ["Unexpanded or partially expanded pump → reduced flow — check deployment"],
+  },
+  "mcs_impella_ecp:plax_inlet": {
+    description: "PLAX view for Impella ECP inlet-to-AV distance measurement. Target: 3.5–4.5 cm below aortic valve. The 9Fr delivery profile expands to larger pump in LV.",
+    structures: ["LV cavity", "Impella ECP pump", "Aortic valve", "LVOT"],
+    howToGet: ["Obtain PLAX view with AV and LVOT visible", "Identify the expanded ECP pump in the LV cavity", "Measure distance from pump inlet to AV annulus", "Apply color Doppler to confirm inlet in LV and outlet in aorta"],
+    tips: ["PLAX is the primary view for Impella ECP positioning", "Confirm pump expansion before measuring inlet-to-AV distance"],
+    pitfalls: ["Unexpanded pump may be mistaken for correctly positioned device"],
+    measurements: ["Inlet-to-AV distance (target 3.5–4.5 cm)"],
+    criticalFindings: ["Inlet-to-AV distance outside 3.5–4.5 cm range → reposition"],
+  },
+  "mcs_impella_ecp:a5c_outlet": {
+    description: "Apical 5-chamber view for Impella ECP inlet confirmation. Second orthogonal plane to PLAX. Confirms expanded pump inlet is in the LV cavity.",
+    structures: ["LV cavity", "LVOT", "Aortic valve", "Impella ECP pump"],
+    howToGet: ["Obtain A4C view then tilt anteriorly to bring LVOT and AV into view", "Identify the ECP pump in the LVOT crossing the AV", "Confirm inlet area is in the LV cavity", "Assess for MV impingement"],
+    tips: ["A5C confirms inlet position in a second orthogonal plane to PLAX"],
+    pitfalls: ["New MR in A4C with Impella = pigtail entanglement — urgent repositioning"],
+    measurements: ["Inlet position relative to AV"],
+    criticalFindings: ["New MR after Impella ECP placement → pigtail entanglement"],
+  },
+  "mcs_impella_ecp:tee_melax": {
+    description: "TEE ME LAX view for Impella ECP positioning. Gold standard in cath lab. Confirm pump expansion and inlet-to-AV distance with superior resolution.",
+    structures: ["LV cavity", "Aortic valve", "LVOT", "Impella ECP pump"],
+    howToGet: ["Advance probe to mid-esophagus", "Rotate to ME LAX view (120–135°)", "Identify ECP pump crossing the AV", "Confirm pump expansion", "Measure inlet-to-AV distance: 3.5–4.5 cm"],
+    tips: ["TEE ME LAX is the gold standard for Impella positioning in the cath lab", "Confirm pump expansion before measuring inlet-to-AV distance"],
+    pitfalls: ["Unexpanded pump may be mistaken for correctly positioned device"],
+    measurements: ["Inlet-to-AV distance (target 3.5–4.5 cm)"],
+    criticalFindings: ["Unexpanded pump on TEE → check deployment"],
+  },
+  "mcs_impella_ecp:a4c_lv_unload": {
+    description: "Apical 4-chamber view for LV unloading assessment on Impella ECP support. Document LVEDD at each echo. New MR suggests pigtail entanglement.",
+    structures: ["Left ventricle", "Mitral valve", "Right ventricle"],
+    howToGet: ["Obtain standard A4C view", "Measure LVEDD and LVESD", "Assess MV for new MR", "Measure TAPSE and RV S'"],
+    tips: ["LV decompression is the key hemodynamic goal", "RV failure is a common cause of suction alarms"],
+    pitfalls: ["New MR = pigtail entanglement — check inlet depth"],
+    measurements: ["LVEDD and LVESD", "MR severity", "TAPSE"],
+    criticalFindings: ["New MR after Impella ECP placement → pigtail entanglement"],
+  },
+  "mcs_impella_ecp:plax_ar_serial": {
+    description: "PLAX color Doppler for serial AR assessment with Impella ECP. The expandable pump creates a variable crossing profile. Serial AR assessment is required.",
+    structures: ["Aortic valve", "LVOT", "Impella ECP pump"],
+    howToGet: ["Obtain PLAX view with AV and LVOT visible", "Apply color Doppler box over LVOT and AV", "Assess AR jet width relative to LVOT diameter", "Repeat at each echo assessment"],
+    tips: ["Document AR grade at each echo for serial comparison"],
+    pitfalls: ["Device artifact may mimic AR jet"],
+    measurements: ["AR jet width / LVOT diameter ratio"],
+    criticalFindings: ["Moderate-severe AR → significant recirculation — consider repositioning"],
+  },
+
+  // mcs_impella_rp (registry IDs: subcostal_inlet, psax_outlet, tee_bicaval, tee_rvio, a4c_rv_unload)
+  "mcs_impella_rp:subcostal_inlet": {
+    description: "Subcostal IVC view for Impella RP venous inlet confirmation. The RP inlet should be at the IVC/RA junction. Subcostal is the primary TTE window for RP inlet assessment.",
+    structures: ["Inferior vena cava", "Right atrium", "Impella RP device"],
+    howToGet: ["Obtain subcostal IVC long-axis view", "Identify the Impella RP inlet area: should be at IVC/RA junction", "Confirm inlet is NOT in the RA body (too high) or deep IVC (too deep)", "Apply color Doppler: assess flow at inlet"],
+    tips: ["TEE bicaval view (90–100°) provides superior resolution for inlet positioning", "Confirm inlet position before initiating support"],
+    pitfalls: ["Inlet too high in RA = recirculation (oxygenated blood from RP outlet re-enters inlet)", "Inlet too deep in IVC = hepatic vein obstruction"],
+    measurements: ["Inlet position relative to IVC/RA junction"],
+    criticalFindings: ["Inlet in RA body (too high) → recirculation", "Inlet deep in IVC → hepatic vein obstruction"],
+  },
+  "mcs_impella_rp:psax_outlet": {
+    description: "PSAX at AV level for Impella RP outlet confirmation in the main pulmonary artery. Outlet must be above the pulmonic valve (not in RVOT).",
+    structures: ["Main pulmonary artery", "Pulmonic valve", "RVOT", "Impella RP device"],
+    howToGet: ["Obtain PSAX view at AV level (RVOT and main PA visible)", "Identify the Impella RP outlet area in the main pulmonary artery", "Confirm outlet is above the pulmonic valve (not in RVOT)", "Apply color Doppler in RVOT/PA: confirm forward flow from RP outlet"],
+    tips: ["PSAX at AV level is the best TTE view for RP outlet confirmation", "TEE RV inflow-outflow view provides superior resolution for outlet positioning"],
+    pitfalls: ["Outlet in RVOT (not main PA) = device too shallow — reposition", "New PR after RP insertion = device crossing pulmonic valve — assess severity"],
+    measurements: ["Outlet position relative to pulmonic valve"],
+    criticalFindings: ["Outlet in RVOT (not main PA) → device too shallow — reposition"],
+  },
+  "mcs_impella_rp:tee_bicaval": {
+    description: "TEE bicaval view (90–100°) for Impella RP inlet position confirmation. Gold standard for RP positioning. Confirms inlet at IVC/RA junction with superior resolution.",
+    structures: ["Superior vena cava", "Inferior vena cava", "Right atrium", "Impella RP device"],
+    howToGet: ["Advance probe to mid-esophagus", "Rotate to bicaval view (90–100°)", "Identify Impella RP inlet at IVC/RA junction", "Apply color Doppler: confirm drainage flow"],
+    tips: ["TEE is the gold standard for Impella RP positioning — preferred over TTE in ICU/cath lab", "Bicaval view confirms inlet; RV inflow-outflow view confirms outlet — both required"],
+    pitfalls: ["TEE probe may be difficult to advance in patients with large RP device"],
+    measurements: ["Inlet position relative to IVC/RA junction"],
+    criticalFindings: ["Inlet in RA body (too high) → recirculation"],
+  },
+  "mcs_impella_rp:tee_rvio": {
+    description: "TEE RV inflow-outflow view (60–90°) for Impella RP outlet confirmation in main PA. Confirms outlet is above the pulmonic valve with superior resolution.",
+    structures: ["Right ventricle", "Pulmonic valve", "Main pulmonary artery", "Impella RP device"],
+    howToGet: ["Advance probe to mid-esophagus", "Rotate to RV inflow-outflow view (60–90°)", "Identify Impella RP outlet in main PA", "Confirm outlet is above pulmonic valve", "Apply color Doppler: confirm forward flow from outlet", "Assess PR: new PR = device crossing pulmonic valve"],
+    tips: ["TEE is the gold standard for Impella RP positioning", "Both bicaval (inlet) and RV inflow-outflow (outlet) views are required"],
+    pitfalls: ["Acoustic shadowing from device — use multiple imaging planes"],
+    measurements: ["Outlet position relative to pulmonic valve"],
+    criticalFindings: ["Outlet in RVOT (not main PA) → device too shallow — reposition"],
+  },
+  "mcs_impella_rp:a4c_rv_unload": {
+    description: "Apical 4-chamber view for RV unloading assessment on Impella RP support. Serial TAPSE and RVSP monitoring. TAPSE >10 mm and FAC >25% are weaning targets.",
+    structures: ["Right ventricle", "Left ventricle", "Tricuspid valve", "Interventricular septum"],
+    howToGet: ["Obtain standard A4C view", "Measure TAPSE (M-mode, lateral tricuspid annulus)", "Measure RV S' (TDI, lateral tricuspid annulus)", "Assess RV size (RV:LV ratio)", "Apply color Doppler: assess TR severity"],
+    tips: ["TAPSE >10 mm and FAC >25% are weaning targets for Impella RP", "LV function monitoring is essential — RP increases LV preload"],
+    pitfalls: ["Persistent RV dilation despite RP support = irreversible RV failure", "D-shaped septum persisting at high P-level = inadequate RV unloading"],
+    measurements: ["TAPSE", "RV S'", "RV:LV ratio", "TR CW: RVSP"],
+    criticalFindings: ["TAPSE <10 mm despite Impella RP → irreversible RV failure", "Persistent D-shaped septum at high P-level → inadequate RV unloading"],
+  },
+
+  // mcs_lifevest (registry IDs: a4c_ef, a2c_ef, plax_lv, a4c_wma, a4c_rv, a4c_diastolic)
+  "mcs_lifevest:a4c_ef": {
+    description: "Apical 4-chamber view for biplane EF measurement — standard protocol for LifeVest eligibility. EF ≤35% on GDMT ≥3 months is the primary LifeVest indication.",
+    structures: ["Left ventricle", "Right ventricle", "Mitral valve", "Tricuspid valve"],
+    howToGet: ["Obtain true A4C view — apex at top, all four chambers visible, no foreshortening", "Trace LV endocardium in end-diastole and end-systole", "Rotate to A2C view and repeat tracings", "Calculate biplane EF"],
+    tips: ["Biplane Simpson's is the only acceptable method for LifeVest EF decisions", "Use harmonic imaging to improve endocardial definition", "If EF is borderline (30–40%), use contrast echo for accuracy"],
+    pitfalls: ["Foreshortened apex = underestimation of LV volumes and EF", "Poor endocardial definition = use contrast echo"],
+    measurements: ["LVEF (biplane Simpson's)", "LV EDV and ESV"],
+    criticalFindings: ["LVEF ≤35% on GDMT ≥3 months → LifeVest indication"],
+  },
+  "mcs_lifevest:a2c_ef": {
+    description: "Apical 2-chamber view for biplane EF measurement. Required as the second plane for biplane Simpson's EF calculation. Rotate 60° counterclockwise from A4C.",
+    structures: ["Left ventricle", "Mitral valve", "Left atrium"],
+    howToGet: ["Rotate 60° counterclockwise from A4C view", "Ensure true apical view — no foreshortening", "Trace LV endocardium in end-diastole and end-systole", "Combine with A4C tracings for biplane EF"],
+    tips: ["A2C is required for biplane Simpson's — single-plane A4C underestimates EF in asymmetric LV", "Ensure same depth and gain settings as A4C for consistency"],
+    pitfalls: ["Foreshortened A2C = underestimation of LV volumes", "Papillary muscle inclusion in tracing = overestimation of LV mass"],
+    measurements: ["LV EDV and ESV (A2C plane)", "LVEF (biplane Simpson's)"],
+    criticalFindings: ["LVEF ≤35% on biplane Simpson's → LifeVest indication"],
+  },
+  "mcs_lifevest:plax_lv": {
+    description: "PLAX view for LV dimensions and M-mode measurements. Document LVEDD, LVESD, and wall thickness for serial comparison. Positive remodeling: decreasing LVEDD and LVESD on GDMT.",
+    structures: ["Left ventricle", "Mitral valve", "Aortic valve", "Interventricular septum", "Posterior wall"],
+    howToGet: ["Obtain standard PLAX view", "M-mode at the level of the mitral valve leaflet tips — perpendicular to LV walls", "Measure LVEDD (inner edge to inner edge in diastole)", "Measure LVESD (inner edge to inner edge in systole)", "Measure IVS and PW thickness"],
+    tips: ["Document LVEDD and LVESD at each follow-up for serial comparison", "Positive remodeling: ↓ LVEDD and LVESD over time on GDMT"],
+    pitfalls: ["M-mode not perpendicular to LV walls = inaccurate measurements", "Foreshortened PLAX = oblique M-mode cut = overestimation of dimensions"],
+    measurements: ["LVEDD (normal ≤58 mm M, ≤52 mm F)", "LVESD (normal ≤40 mm M, ≤35 mm F)", "IVS and PW thickness", "Fractional shortening"],
+    criticalFindings: ["LVEDD >70 mm → severe LV dilation"],
+  },
+  "mcs_lifevest:a4c_wma": {
+    description: "Apical 4-chamber view for wall motion abnormality assessment. Identify regional WMA suggesting ischemic cardiomyopathy vs global dysfunction suggesting non-ischemic etiology.",
+    structures: ["Left ventricle (all segments)", "Mitral valve", "Left atrium"],
+    howToGet: ["Obtain true A4C view", "Assess all visible LV segments systematically (basal, mid, apical)", "Grade each segment: normal, hypokinetic, akinetic, dyskinetic", "Note regional vs global pattern"],
+    tips: ["Regional WMA in a coronary distribution suggests ischemic cardiomyopathy", "Global dysfunction without regional WMA suggests non-ischemic etiology", "Apical WMA with preserved basal function = apical ballooning (Takotsubo)"],
+    pitfalls: ["Foreshortened apex may miss apical WMA", "Poor endocardial definition — use contrast echo"],
+    measurements: ["Wall motion score index (WMSI)", "Regional WMA distribution"],
+    criticalFindings: ["New regional WMA → acute ischemia until proven otherwise"],
+  },
+  "mcs_lifevest:a4c_rv": {
+    description: "Apical 4-chamber view for RV function assessment in LifeVest patients. RV dysfunction is common in heart failure and affects prognosis.",
+    structures: ["Right ventricle", "Tricuspid valve", "Right atrium"],
+    howToGet: ["Obtain A4C view with RV visible", "Measure TAPSE with M-mode at lateral tricuspid annulus", "Measure RV S' with TDI", "Assess TR severity with color Doppler and CW"],
+    tips: ["TAPSE <17 mm indicates RV longitudinal dysfunction", "RV dysfunction in HFrEF is an independent predictor of worse outcomes"],
+    pitfalls: ["TAPSE may be falsely elevated in RBBB — use FAC as well"],
+    measurements: ["TAPSE (≥17 mm normal)", "RV S' (≥9.5 cm/s normal)", "TR CW: RVSP"],
+    criticalFindings: ["TAPSE <10 mm → severe RV dysfunction"],
+  },
+  "mcs_lifevest:a4c_diastolic": {
+    description: "Apical 4-chamber view for diastolic function assessment in LifeVest patients. Diastolic dysfunction is common in HFrEF and contributes to symptoms.",
+    structures: ["Mitral valve", "Left atrium", "Pulmonary veins"],
+    howToGet: ["Obtain A4C view", "PW Doppler at mitral valve tips: measure E and A velocities, DT", "TDI at septal and lateral mitral annulus: measure e' velocities", "Calculate E/e' ratio", "Measure LAVI"],
+    tips: ["E/e' >14 suggests elevated LV filling pressures", "LAVI >34 mL/m² indicates LA enlargement from chronic elevated filling pressures"],
+    pitfalls: ["Diastolic grading is unreliable in AF — use mean E/e' and LAVI"],
+    measurements: ["E/A ratio", "DT", "E/e' ratio (septal, lateral, average)", "LAVI"],
+    criticalFindings: ["E/e' >14 + LAVI >34 mL/m² → elevated LV filling pressures"],
+  },
+
+  // mcs_icd (registry IDs: a4c_ef, a2c_ef, plax_lv, plax_mmode, pw_ivmd, subcostal_lead, a4c_lead)
+  "mcs_icd:a4c_ef": {
+    description: "Apical 4-chamber view for biplane EF measurement — ICD decision standard. EF ≤35% on GDMT ≥3 months = ICD indication (Class I). Visual EF estimation is NOT acceptable.",
+    structures: ["Left ventricle", "Right ventricle", "Mitral valve"],
+    howToGet: ["Obtain true A4C view — no foreshortening", "Trace LV endocardium in end-diastole and end-systole in A4C", "Rotate to A2C view", "Repeat tracings in A2C", "Calculate biplane EF", "If EF borderline: use contrast echo for accuracy"],
+    tips: ["EF must be measured on optimized GDMT for ≥3 months before ICD decision", "Contrast echo is recommended when ≥2 endocardial segments are not visualized"],
+    pitfalls: ["Visual EF estimation is not acceptable for ICD decision — must use biplane Simpson's", "Single-plane (A4C only) underestimates EF in asymmetric LV"],
+    measurements: ["LVEF (biplane Simpson's)", "LV EDV and ESV"],
+    criticalFindings: ["LVEF ≤35% on GDMT ≥3 months → ICD indication (Class I)"],
+  },
+  "mcs_icd:a2c_ef": {
+    description: "Apical 2-chamber view for biplane EF measurement for ICD decision. Required as the second plane for biplane Simpson's EF calculation.",
+    structures: ["Left ventricle", "Mitral valve", "Left atrium"],
+    howToGet: ["Rotate 60° counterclockwise from A4C view", "Ensure true apical view — no foreshortening", "Trace LV endocardium in end-diastole and end-systole", "Combine with A4C tracings for biplane EF"],
+    tips: ["A2C is required for biplane Simpson's — single-plane A4C underestimates EF in asymmetric LV"],
+    pitfalls: ["Foreshortened A2C = underestimation of LV volumes"],
+    measurements: ["LV EDV and ESV (A2C plane)", "LVEF (biplane Simpson's)"],
+    criticalFindings: ["LVEF ≤35% on biplane Simpson's → ICD indication"],
+  },
+  "mcs_icd:plax_lv": {
+    description: "PLAX view for LV dimensions assessment for ICD decision. Document LVEDD, LVESD, and wall thickness. Severely dilated LV (LVEDD >70 mm) indicates advanced cardiomyopathy.",
+    structures: ["Left ventricle", "Mitral valve", "Aortic valve", "Interventricular septum"],
+    howToGet: ["Obtain standard PLAX view", "Measure LVEDD and LVESD", "Measure IVS and PW thickness", "Assess MV morphology"],
+    tips: ["Document LVEDD and LVESD for serial comparison", "Positive remodeling on GDMT: decreasing LVEDD and LVESD"],
+    pitfalls: ["Foreshortened PLAX = oblique M-mode cut = overestimation of dimensions"],
+    measurements: ["LVEDD", "LVESD", "IVS and PW thickness"],
+    criticalFindings: ["LVEDD >70 mm → severely dilated cardiomyopathy"],
+  },
+  "mcs_icd:plax_mmode": {
+    description: "PLAX M-mode for SPWMD (septal-to-posterior wall motion delay) measurement for CRT eligibility assessment. SPWMD >130 ms indicates significant intraventricular dyssynchrony.",
+    structures: ["Interventricular septum", "Posterior wall", "Left ventricle"],
+    howToGet: ["Obtain PLAX view", "Apply M-mode at the level of the mitral valve leaflet tips", "Identify septal and posterior wall motion peaks", "Measure SPWMD (time from septal peak to posterior wall peak)"],
+    tips: ["Septal flash = early septal contraction in LBBB", "SPWMD >130 ms = significant intraventricular dyssynchrony", "CRT response: dyssynchrony should resolve post-CRT"],
+    pitfalls: ["SPWMD is supplementary — QRS duration and morphology are primary CRT criteria", "RBBB pattern: dyssynchrony less predictable"],
+    measurements: ["SPWMD (normal <130 ms)"],
+    criticalFindings: ["SPWMD >130 ms → significant dyssynchrony — CRT candidate (if EF ≤35% + LBBB + QRS ≥150 ms)"],
+  },
+  "mcs_icd:pw_ivmd": {
+    description: "PW Doppler for interventricular mechanical delay (IVMD) measurement for CRT eligibility. IVMD = aortic pre-ejection time − pulmonary pre-ejection time. Normal <40 ms.",
+    structures: ["LVOT", "RVOT", "Aortic valve", "Pulmonic valve"],
+    howToGet: ["A4C: PW Doppler at LVOT for aortic pre-ejection time (onset QRS to aortic flow)", "PSAX: PW Doppler at RVOT for pulmonary pre-ejection time", "Calculate IVMD = aortic pre-ejection time − pulmonary pre-ejection time"],
+    tips: ["CRT primary criteria: EF ≤35% + LBBB + QRS ≥150 ms — echo dyssynchrony is supplementary", "Post-CRT: IVMD should normalize"],
+    pitfalls: ["IVMD is supplementary — not a standalone CRT criterion"],
+    measurements: ["Aortic pre-ejection time", "Pulmonary pre-ejection time", "IVMD (normal <40 ms)"],
+    criticalFindings: ["IVMD >40 ms → significant interventricular dyssynchrony — CRT candidate"],
+  },
+  "mcs_icd:subcostal_lead": {
+    description: "Subcostal view for post-ICD/CRT-D implant assessment. Assess for pericardial effusion post-implant. Any new effusion requires urgent assessment for cardiac perforation.",
+    structures: ["Pericardium", "Right ventricle", "Inferior vena cava", "Right atrium"],
+    howToGet: ["Obtain subcostal 4-chamber view", "Assess for pericardial effusion — circumferential or loculated", "Obtain subcostal IVC view", "Assess IVC collapsibility if effusion present"],
+    tips: ["Subcostal view is most useful for pericardial effusion assessment post-implant", "Any new effusion post-ICD implant: assess for tamponade physiology"],
+    pitfalls: ["Lead perforation may cause only small pericardial effusion — assess carefully"],
+    measurements: ["Pericardial effusion size", "IVC collapsibility (if effusion present)"],
+    criticalFindings: ["New pericardial effusion post-ICD implant → cardiac perforation excluded", "IVC plethora + effusion → tamponade — urgent pericardiocentesis"],
+  },
+  "mcs_icd:a4c_lead": {
+    description: "Apical 4-chamber view for post-ICD/CRT-D lead assessment. Identify RV lead position and assess for new wall motion abnormalities (lead perforation) or new TR (lead impingement on TV).",
+    structures: ["Right ventricle", "RV lead", "Tricuspid valve", "Left ventricle"],
+    howToGet: ["Obtain A4C view", "Identify RV lead at RV apex or RVOT septum — appears as hyperechoic structure", "Assess for new wall motion abnormalities (lead perforation)", "Assess TR with color Doppler — new TR may indicate lead impingement on TV"],
+    tips: ["New TR after ICD implant: RV lead may be impinging on TV leaflets", "LV lead (CRT) is not directly visualized by TTE — in coronary sinus"],
+    pitfalls: ["Lead perforation may cause only small pericardial effusion — assess carefully"],
+    measurements: ["RV lead position", "TR severity"],
+    criticalFindings: ["New TR after ICD implant → RV lead impingement on TV", "New WMA after ICD implant → lead perforation"],
+  },
+
+  // ─── CHD MODULE (registry IDs) ───────────────────────────────────────────────
+  "chd:asd": {
+    description: "Atrial Septal Defect — overview. Select a clinical stage below to view the specific echo protocol for that phase of management.",
+    structures: ["Interatrial septum", "Right ventricle", "Left atrium", "Pulmonary veins"],
+    howToGet: ["Subcostal 4-chamber — best window for IAS assessment", "Apical 4-chamber — RV dilation, TR, shunt direction", "Parasternal short axis — ASD location relative to AV/MV"],
+    tips: ["Subcostal view eliminates dropout artefact that can mimic ASD in A4C", "Always measure all rims before recommending device closure"],
+    pitfalls: ["A4C dropout can mimic ASD — confirm in subcostal view"],
+    measurements: ["ASD diameter", "Rim measurements", "Qp:Qs"],
+    criticalFindings: ["R→L or bidirectional shunt → pulmonary hypertension / Eisenmenger"],
+  },
+  "chd:asd-diagnosis": {
+    description: "ASD Diagnosis & Sizing. Characterise ASD type, size, and location. Assess shunt direction and magnitude. Evaluate RV dilation and function. Identify associated anomalies (PAPVR, cleft MV in primum ASD).",
+    structures: ["Interatrial septum", "Right ventricle", "Pulmonary veins", "Mitral valve"],
+    howToGet: ["Subcostal — best view for IAS; perpendicular beam avoids dropout artefact", "A4C — RV dilation, TR, shunt direction on color Doppler", "PSAX — secundum ASD at fossa ovalis; primum at inferior IAS near AV valves", "Subcostal bicaval — sinus venosus ASD at SVC–RA junction; PAPVR", "PSAX high — right pulmonary veins for PAPVR assessment"],
+    tips: ["Subcostal view is the gold standard for IAS assessment", "Always measure all rims before recommending device closure", "Sinus venosus ASD is frequently missed — always interrogate the SVC–RA junction", "Qp:Qs >1.5 with RV dilation is the standard threshold for closure"],
+    pitfalls: ["A4C dropout can mimic ASD — confirm in subcostal view", "PAPVR may be missed if SVC–RA junction not assessed"],
+    measurements: ["ASD diameter (subcostal — maximum dimension)", "Rim measurements (all ≥5 mm for device closure)", "RV end-diastolic dimension (Z-score)", "Qp:Qs", "TR Vmax (RVSP estimate)"],
+    criticalFindings: ["R→L shunt or bidirectional shunt → pulmonary hypertension / Eisenmenger", "RVSP >50 mmHg → elevated PA pressure — catheterisation before closure"],
+  },
+  "chd:asd-post-closure": {
+    description: "ASD Post-Closure Surveillance. Confirm device position and IAS integrity. Assess for residual shunt, device erosion, and RV remodeling. Monitor for late complications.",
+    structures: ["Interatrial septum", "ASD device", "Right ventricle", "Aortic root"],
+    howToGet: ["Subcostal — device position, residual shunt", "A4C — RV size regression, TR", "PSAX — device position relative to aortic root (erosion risk)", "A4C + PSAX color Doppler — residual shunt assessment"],
+    tips: ["RV remodeling after ASD closure takes 6–12 months", "Device erosion is rare (<0.1%) but life-threatening — educate patients about symptoms", "Persistent pulmonary hypertension after closure suggests pre-existing pulmonary vascular disease"],
+    pitfalls: ["Persistent mild RV dilation at 1-month visit is expected — remodeling takes time"],
+    measurements: ["RV end-diastolic dimension (serial)", "TAPSE and FAC (serial)", "TR severity (serial)", "Residual shunt size"],
+    criticalFindings: ["Pericardial effusion post-device closure → device erosion — urgent surgical review", "New aortic regurgitation → aortic root erosion by device"],
+  },
+  "chd:vsd": {
+    description: "Ventricular Septal Defect — overview. Select a clinical stage below to view the specific echo protocol for that phase of management.",
+    structures: ["Interventricular septum", "Left ventricle", "Right ventricle", "Aortic valve"],
+    howToGet: ["Parasternal long axis — perimembranous VSD below AV", "Parasternal short axis — VSD type by clock-face location", "Apical 4-chamber — inlet VSD, LV dilation"],
+    tips: ["PSAX is the best single view for VSD location", "High CW gradient (>64 mmHg) confirms restrictive VSD and normal RV pressure"],
+    pitfalls: ["Multiple muscular VSDs may be missed without color Doppler sweep"],
+    measurements: ["VSD diameter", "CW peak velocity across VSD", "Qp:Qs"],
+    criticalFindings: ["Bidirectional or R→L shunt → Eisenmenger physiology"],
+  },
+  "chd:vsd-diagnosis": {
+    description: "VSD Diagnosis & Sizing. Characterise VSD type, size, and location. Assess shunt direction and magnitude. Evaluate LV volume overload and PA pressure.",
+    structures: ["Interventricular septum", "Left ventricle", "Right ventricle", "Aortic valve"],
+    howToGet: ["PLAX — perimembranous VSD below aortic valve; outlet VSD beneath pulmonary valve", "PSAX — perimembranous VSD at 9–11 o'clock; outlet VSD at 12 o'clock; inlet VSD at 5–7 o'clock", "A4C — inlet VSD, LV dilation, MV/TV morphology", "Subcostal — muscular VSDs in multiple planes with color Doppler"],
+    tips: ["PSAX view is the best single view for VSD location — use the clock-face analogy", "A high CW gradient across the VSD (>64 mmHg) means the RV pressure is low and the VSD is restrictive", "Subarterial VSD: always check for AR due to leaflet prolapse"],
+    pitfalls: ["Low-velocity or bidirectional flow suggests elevated RV pressure", "Multiple muscular VSDs may be missed without color Doppler sweep"],
+    measurements: ["VSD diameter", "CW peak velocity across VSD (RV systolic pressure = SBP − 4V²)", "Qp:Qs", "LV end-diastolic dimension (Z-score)"],
+    criticalFindings: ["Bidirectional or R→L shunt → Eisenmenger physiology", "New AR in outlet VSD → urgent assessment"],
+  },
+  "chd:vsd-post-closure": {
+    description: "VSD Post-Closure Surveillance. Confirm closure (surgical patch or device). Assess for residual VSD, LV remodeling, and late complications (AR in outlet VSD).",
+    structures: ["Interventricular septum", "VSD patch/device", "Left ventricle", "Aortic valve"],
+    howToGet: ["PLAX — residual VSD, aortic valve (AR)", "PSAX — residual VSD, pulmonary valve", "A4C — LV size regression, MV/TV function"],
+    tips: ["LV remodeling after VSD closure takes 6–12 months", "Outlet VSD repair: always follow the aortic valve long-term — AR can develop or progress years after repair"],
+    pitfalls: ["Residual VSD may be small and missed without careful color Doppler sweep"],
+    measurements: ["Residual VSD size", "AR severity (serial)", "LV end-diastolic dimension (serial)"],
+    criticalFindings: ["New or progressive AR post-outlet VSD repair → aortic valve assessment"],
+  },
+  "chd:tof": {
+    description: "Tetralogy of Fallot — overview. Select a clinical stage below to view the specific echo protocol for that phase of management.",
+    structures: ["Right ventricle", "RVOT", "Pulmonary valve", "Interventricular septum", "Aorta"],
+    howToGet: ["Parasternal long axis — VSD, aortic override, RVOTO", "Parasternal short axis — pulmonary valve, MPA, RPA/LPA", "Apical 4-chamber — RV function"],
+    tips: ["Use PSAX high to trace coronary origins before every ToF repair", "McGoon ratio and Nakata index predict suitability for complete repair"],
+    pitfalls: ["LAD-from-RCA anomaly is present in ~5% — must identify pre-operatively"],
+    measurements: ["RVOT gradient", "Pulmonary annulus Z-score", "McGoon ratio"],
+    criticalFindings: ["Coronary anomaly crossing RVOT → surgical approach modification"],
+  },
+  "chd:tof-preop": {
+    description: "ToF Pre-Op Assessment. Establish anatomy, quantify RVOTO severity, assess pulmonary annulus and branch PA sizes, identify coronary anomalies, and determine repair strategy.",
+    structures: ["Right ventricle", "RVOT", "Pulmonary valve", "Interventricular septum", "Coronary arteries"],
+    howToGet: ["PLAX — VSD, aortic override, RVOTO", "PSAX — pulmonary valve, MPA, RPA/LPA", "A4C/A5C — VSD size, RV function", "PSAX high — coronary origins (LAD-from-RCA anomaly in ~5%)"],
+    tips: ["Use PSAX high to trace coronary origins before every ToF repair — the LAD-from-RCA anomaly is present in ~5% and is a surgical game-changer", "McGoon ratio and Nakata index predict suitability for complete repair"],
+    pitfalls: ["LAD-from-RCA anomaly crossing RVOT must be identified pre-operatively"],
+    measurements: ["RVOT peak gradient", "Pulmonary annulus Z-score", "MPA, RPA, LPA diameters", "McGoon ratio", "Nakata index"],
+    criticalFindings: ["Coronary anomaly crossing RVOT → surgical approach modification"],
+  },
+  "chd:tof-postop": {
+    description: "ToF Post-Op Assessment. Assess residual RVOTO, PR severity, VSD patch integrity, RV function, and branch PA anatomy. Key post-op questions: residual VSD, residual RVOTO, PR severity.",
+    structures: ["Right ventricle", "RVOT", "Pulmonary valve", "VSD patch", "Branch PAs"],
+    howToGet: ["PLAX — residual VSD, RVOTO", "PSAX — pulmonary valve, PR severity, branch PAs", "A4C — RV size and function", "Subcostal — IVC, RA pressure"],
+    tips: ["PR PHT <100 ms indicates severe PR", "Assess for residual RVOT obstruction: peak gradient >40 mmHg warrants intervention", "Look for patch dehiscence or aneurysmal RVOT"],
+    pitfalls: ["Aneurysmal RVOT may be missed without careful PSAX sweep"],
+    measurements: ["RVOT peak gradient", "PR PHT", "RV end-diastolic dimension", "TAPSE"],
+    criticalFindings: ["Residual VSD with significant shunt → reintervention", "RVOT gradient >40 mmHg → reintervention"],
+  },
+  "chd:tof-surveillance": {
+    description: "ToF Long-Term Surveillance. Track RV remodeling, PR progression, and RVOT gradient over time. Identify the optimal window for pulmonary valve replacement.",
+    structures: ["Right ventricle", "Pulmonary valve", "RVOT", "Branch PAs"],
+    howToGet: ["PSAX — pulmonary valve, PR severity", "A4C — RV size and function (FAC, TAPSE, S')", "Subcostal IVC — RA pressure"],
+    tips: ["RVEDVI >160 mL/m² or RVESVI >80 mL/m² are thresholds for PVR consideration", "Assess TR severity — often worsens with RV dilation"],
+    pitfalls: ["RV volumes require CMR for accurate measurement — echo underestimates"],
+    measurements: ["RV volumes (RVEDVI, RVESVI)", "PR PHT", "RVOT gradient", "TAPSE", "FAC"],
+    criticalFindings: ["RVEDVI >160 mL/m² → PVR consideration"],
+  },
+  "chd:hlhs": {
+    description: "Hypoplastic Left Heart Syndrome — overview. Select a clinical stage below to view the specific echo protocol for that phase of management.",
+    structures: ["Hypoplastic left heart", "Right ventricle", "Tricuspid valve", "Aorta"],
+    howToGet: ["Apical 4-chamber — RV function, TR severity", "Subcostal — IAS assessment", "Suprasternal — aortic arch, coarctation"],
+    tips: ["Restrictive IAS in HLHS is a neonatal emergency — requires urgent balloon atrial septostomy", "Monthly echo surveillance is standard of care during interstage period"],
+    pitfalls: ["Restrictive IAS may not be apparent until after birth — assess carefully"],
+    measurements: ["IAS gradient", "RV function (FAC, TAPSE)", "TR severity"],
+    criticalFindings: ["Restrictive IAS → emergency balloon atrial septostomy"],
+  },
+  "chd:hlhs-prenatal-neonatal": {
+    description: "HLHS Pre-Op: Neonatal. Establish anatomy, assess atrial communication (restrictive IAS = emergency), evaluate RV function and TR severity, confirm aortic arch anatomy.",
+    structures: ["Hypoplastic left heart", "Right ventricle", "Interatrial septum", "Aortic arch"],
+    howToGet: ["A4C — RV size and function, TR severity, IAS", "Subcostal — IAS assessment, gradient across IAS", "Suprasternal — aortic arch, coarctation at isthmus", "PSAX — pulmonary artery anatomy"],
+    tips: ["Restrictive IAS (gradient >5 mmHg) is a neonatal emergency — urgent balloon atrial septostomy", "Assess TR severity — even mild-moderate TR significantly impacts Norwood outcome"],
+    pitfalls: ["Restrictive IAS may not be apparent until after birth"],
+    measurements: ["IAS gradient", "RV FAC and TAPSE", "TR severity", "Aortic arch dimensions"],
+    criticalFindings: ["Restrictive IAS gradient >5 mmHg → emergency balloon atrial septostomy"],
+  },
+  "chd:hlhs-post-norwood": {
+    description: "HLHS Post-Op: Norwood Stage 1. Neo-aorta, atrial septectomy, and systemic-to-PA shunt (modified BT shunt or Sano RV-PA conduit). Key questions: shunt patency, neo-aortic arch, RV function, TR.",
+    structures: ["Neo-aorta", "Systemic-to-PA shunt", "Right ventricle", "Tricuspid valve"],
+    howToGet: ["Suprasternal — neo-aortic arch, shunt flow", "A4C — RV function, TR severity", "Subcostal — IVC, RA pressure", "PSAX — shunt velocity, pulmonary blood flow"],
+    tips: ["Shunt obstruction is a surgical emergency — assess shunt velocity at each echo", "Neo-aortic arch obstruction: peak velocity >3 m/s suggests obstruction"],
+    pitfalls: ["Shunt may be difficult to visualize by TTE — use color Doppler sweep"],
+    measurements: ["Shunt peak velocity", "Neo-aortic arch gradient", "RV FAC and TAPSE", "TR severity"],
+    criticalFindings: ["Shunt obstruction (absent flow) → surgical emergency", "Neo-aortic arch gradient >20 mmHg → obstruction"],
+  },
+  "chd:hlhs-interstage": {
+    description: "HLHS Inter-Stage: Norwood → Glenn. The highest-risk period in HLHS management. Monthly echo surveillance is standard of care. Key concerns: shunt stenosis/thrombosis, RV dysfunction, TR progression.",
+     structures: ["Systemic-to-PA shunt", "Right ventricle", "Tricuspid valve", "Neo-aorta"],
+    howToGet: ["A4C — RV function, TR severity", "Suprasternal — shunt flow, neo-aortic arch", "Subcostal — IVC, RA pressure", "PSAX — shunt velocity"],
+    tips: ["Monthly echo surveillance is standard of care during interstage period", "Shunt stenosis or thrombosis is the leading cause of interstage mortality", "Weight-based growth monitoring correlates with interstage echo findings"],
+    pitfalls: ["Shunt may be difficult to visualize by TTE — use color Doppler sweep"],
+    measurements: ["Shunt peak velocity (serial)", "RV FAC and TAPSE (serial)", "TR severity (serial)"],
+    criticalFindings: ["Shunt obstruction → surgical emergency", "RV FAC <35% → RV dysfunction"],
+  },
+  "chd:hlhs-post-glenn": {
+    description: "HLHS Post-Op: Glenn Stage 2. Superior cavopulmonary anastomosis (SCPA). Key questions: Glenn anastomosis patency, RV function, TR severity, AV valve competence, branch PA anatomy.",
+    structures: ["Glenn anastomosis", "Right ventricle", "Tricuspid valve", "Branch PAs"],
+    howToGet: ["Suprasternal — SVC flow into PA, Glenn anastomosis", "A4C — RV function, TR severity", "PSAX — branch PA anatomy", "Subcostal — IVC, RA pressure"],
+    tips: ["Glenn anastomosis obstruction: peak velocity >1.5 m/s", "Assess for veno-venous collaterals causing desaturation", "TR severity is the most important modifiable risk factor for Fontan outcome"],
+    pitfalls: ["Veno-venous collaterals may not be visible by TTE — correlate with saturation"],
+    measurements: ["Glenn anastomosis peak velocity", "RV FAC and TAPSE", "TR severity", "Branch PA diameters"],
+    criticalFindings: ["Glenn anastomosis velocity >1.5 m/s → obstruction", "TR severity ≥moderate → intervention before Fontan"],
+  },
+  "chd:hlhs-post-fontan": {
+    description: "HLHS Post-Op: Fontan Stage 3. Total cavopulmonary connection (TCPC). Key questions: Fontan conduit patency, single RV function, TR severity, Fontan-associated liver disease.",
+    structures: ["Fontan conduit", "Single right ventricle", "Tricuspid valve", "Pulmonary arteries"],
+    howToGet: ["Subcostal — Fontan conduit, IVC flow", "A4C — RV function, TR severity", "Suprasternal — bilateral PA flow, branch PA stenosis", "Hepatic veins (subcostal) — Fontan pressure marker"],
+    tips: ["Fontan conduit obstruction: peak velocity >1.5 m/s", "Hepatic vein flow reversal = severe TR or very elevated Fontan pressure", "Protein-losing enteropathy and plastic bronchitis are Fontan complications — correlate clinically"],
+    pitfalls: ["Low pulsatility in Fontan conduit is normal — do not mistake for obstruction"],
+    measurements: ["Fontan conduit peak velocity", "RV FAC and TAPSE", "TR severity", "Hepatic vein flow pattern"],
+    criticalFindings: ["Fontan conduit velocity >1.5 m/s → obstruction", "RV FAC <35% → ventricular dysfunction"],
+  },
+  "chd:dtga": {
+    description: "d-Transposition of the Great Arteries — overview. Select a clinical stage below to view the specific echo protocol for that phase of management.",
+    structures: ["Aorta (anterior, rightward)", "Pulmonary artery (posterior, leftward)", "Ventricles"],
+    howToGet: ["Parasternal long axis — parallel great arteries (no crossing)", "Parasternal short axis — PA posterior to Ao", "Subcostal — IAS assessment"],
+    tips: ["Parallel great arteries on PLAX is the hallmark of TGA", "Restrictive IAS in d-TGA is a neonatal emergency"],
+    pitfalls: ["Restrictive IAS may not be apparent until after birth"],
+    measurements: ["IAS gradient", "Great artery relationships"],
+    criticalFindings: ["Restrictive IAS → emergency balloon atrial septostomy"],
+  },
+  "chd:dtga-neonatal": {
+    description: "d-TGA Neonatal Assessment. Confirm great artery relationships, assess IAS (restrictive = emergency), identify associated lesions (VSD, LVOTO), and plan arterial switch operation (ASO).",
+    structures: ["Aorta", "Pulmonary artery", "Interatrial septum", "Interventricular septum"],
+    howToGet: ["PLAX — parallel great arteries (no crossing), VSD", "PSAX — PA posterior to Ao, coronary origins", "Subcostal — IAS, gradient across IAS", "A4C — ventricular morphology, AV valves"],
+    tips: ["Coronary anatomy must be defined before ASO — PSAX high for coronary origins", "Restrictive IAS (gradient >5 mmHg) = emergency balloon atrial septostomy", "LVOTO: assess LV outflow tract — may require LV training if late presentation"],
+    pitfalls: ["Coronary anomalies are present in ~30% — must be identified pre-operatively"],
+    measurements: ["IAS gradient", "Coronary anatomy", "LVOTO gradient", "VSD size"],
+    criticalFindings: ["Restrictive IAS gradient >5 mmHg → emergency balloon atrial septostomy"],
+  },
+  "chd:dtga-post-aso": {
+    description: "d-TGA Post-Arterial Switch Operation (ASO) Surveillance. Monitor neo-aortic root dilation, neo-pulmonary stenosis, coronary flow, and biventricular function.",
+    structures: ["Neo-aortic root", "Neo-pulmonary artery", "Coronary arteries", "Ventricles"],
+    howToGet: ["PLAX — neo-aortic root dimensions (serial)", "PSAX — neo-pulmonary stenosis, coronary origins", "A4C — biventricular function", "Suprasternal — branch PA stenosis"],
+    tips: ["Neo-aortic root dilation is common after ASO — measure annually", "Neo-pulmonary stenosis (RVOTO) is the most common late complication", "Coronary flow assessment: color Doppler in PSAX for coronary ostia"],
+    pitfalls: ["Branch PA stenosis may be missed without suprasternal view"],
+    measurements: ["Neo-aortic root diameter (serial)", "Neo-pulmonary peak gradient", "LV and RV function"],
+    criticalFindings: ["Neo-aortic root >4.5 cm → surveillance imaging", "Neo-pulmonary gradient >40 mmHg → reintervention"],
+  },
+  "chd:cavsd": {
+    description: "Complete AV Septal Defect — overview. Select a clinical stage below to view the specific echo protocol for that phase of management.",
+    structures: ["Primum ASD", "Inlet VSD", "Common AV valve", "Left ventricle"],
+    howToGet: ["Apical 4-chamber — AV valve, shunt", "Parasternal long axis — LVOTO (gooseneck deformity)", "Subcostal — IAS, IVS"],
+    tips: ["CAVSD is strongly associated with Down syndrome", "Left AV valve regurgitation is the most important post-repair complication"],
+    pitfalls: ["Gooseneck deformity of LVOT may cause LVOTO — assess carefully"],
+    measurements: ["AV valve regurgitation severity", "LVOTO gradient", "Qp:Qs"],
+    criticalFindings: ["Severe left AV valve regurgitation → urgent intervention"],
+  },
+  "chd:cavsd-preop": {
+    description: "CAVSD Pre-Op Assessment. Characterise AV valve anatomy, assess shunt magnitude, evaluate ventricular balance, and identify LVOTO (gooseneck deformity).",
+    structures: ["Primum ASD", "Inlet VSD", "Common AV valve", "Left ventricle", "LVOT"],
+    howToGet: ["A4C — AV valve anatomy, shunt direction, ventricular balance", "PLAX — LVOTO (gooseneck deformity), subaortic obstruction", "Subcostal — IAS, IVS", "PSAX — AV valve leaflet anatomy (bridging leaflets)"],
+    tips: ["Ventricular balance: RV:LV ratio >1.5 = right dominant (RV larger) — may require single ventricle palliation", "Gooseneck deformity of LVOT: assess for LVOTO before repair", "Left AV valve cleft: identify and plan repair"],
+    pitfalls: ["Ventricular imbalance may require single ventricle palliation rather than biventricular repair"],
+    measurements: ["AV valve regurgitation severity", "LVOTO gradient", "RV:LV ratio", "Qp:Qs"],
+    criticalFindings: ["Severe left AV valve regurgitation → urgent repair", "Severe LVOTO → surgical planning modification"],
+  },
+  "chd:cavsd-postop": {
+    description: "CAVSD Post-Op Surveillance. Assess left AV valve function (primary concern), residual shunts, LVOTO, and biventricular function.",
+    structures: ["Left AV valve", "Residual ASD/VSD", "LVOT", "Ventricles"],
+    howToGet: ["A4C — left AV valve regurgitation, residual shunts", "PLAX — LVOTO, left AV valve", "Subcostal — residual IAS/IVS"],
+    tips: ["Left AV valve regurgitation is the most important post-repair complication", "Residual LVOTO may develop or progress after repair"],
+    pitfalls: ["Small residual shunts are common and may close spontaneously"],
+    measurements: ["Left AV valve regurgitation severity (serial)", "LVOTO gradient (serial)", "Residual shunt size"],
+    criticalFindings: ["Severe left AV valve regurgitation → reintervention", "LVOTO gradient >40 mmHg → reintervention"],
+  },
+  "chd:coa": {
+    description: "Coarctation of the Aorta — overview. Select a clinical stage below to view the specific echo protocol for that phase of management.",
+    structures: ["Aortic arch", "Aortic isthmus", "Descending aorta", "Aortic valve"],
+    howToGet: ["Suprasternal notch — primary window for CoA assessment", "Parasternal long axis — bicuspid AV", "Subcostal — abdominal aorta"],
+    tips: ["'Diastolic tail' in descending aorta Doppler is hallmark of significant CoA", "Bicuspid AV is present in 50–80% of CoA patients"],
+    pitfalls: ["Doppler underestimates gradient if beam not aligned"],
+    measurements: ["Peak velocity descending aorta", "Mean gradient across CoA"],
+    criticalFindings: ["Peak velocity >3.5 m/s or mean gradient >20 mmHg → significant CoA"],
+  },
+  "chd:coa-neonatal": {
+    description: "CoA Neonatal Assessment. Confirm coarctation location, severity, and associated lesions (bicuspid AV, VSD, HLHS spectrum). Assess LV function and ductal dependency.",
+    structures: ["Aortic isthmus", "Ductus arteriosus", "Aortic valve", "Left ventricle"],
+    howToGet: ["Suprasternal — aortic arch, isthmus, ductus", "PLAX — bicuspid AV, LV function", "A4C — LV function, mitral valve", "Subcostal — IVS, IAS"],
+    tips: ["Ductal dependency: prostaglandin E1 to maintain ductal patency", "Neonatal CoA may be masked by ductal flow — reassess after ductal closure", "Bicuspid AV is present in 50–80% of CoA patients"],
+    pitfalls: ["CoA may be masked by ductal flow in the neonate — reassess after ductal closure"],
+    measurements: ["Aortic isthmus diameter (Z-score)", "Aortic arch dimensions", "LV function"],
+    criticalFindings: ["Ductal-dependent CoA → prostaglandin E1 until surgical repair"],
+  },
+  "chd:coa-postop": {
+    description: "CoA Post-Op Surveillance. Monitor for re-coarctation, aneurysm formation, bicuspid AV progression, and LV hypertrophy regression.",
+    structures: ["Aortic arch", "Repair site", "Aortic valve", "Left ventricle"],
+    howToGet: ["Suprasternal — repair site, peak velocity, diastolic tail", "PLAX — bicuspid AV, aortic root", "A4C/PLAX — LV hypertrophy regression", "Subcostal — abdominal aorta (tardus parvus)"],
+    tips: ["'Diastolic tail' is hallmark of significant re-coarctation", "Bicuspid AV + CoA: high risk for aortic dilation — measure annually"],
+    pitfalls: ["Doppler underestimates gradient if beam not aligned — use multiple windows"],
+    measurements: ["Peak velocity at repair site", "Mean gradient", "Aortic root and ascending aorta dimensions", "LV wall thickness (serial)"],
+    criticalFindings: ["Peak velocity >3.5 m/s or mean gradient >20 mmHg → re-coarctation"],
+  },
+  "chd:tapvr": {
+    description: "Total Anomalous Pulmonary Venous Return — overview. Select a clinical stage below to view the specific echo protocol for that phase of management.",
+    structures: ["Pulmonary veins", "Vertical vein", "Right atrium", "Interatrial septum"],
+    howToGet: ["Subcostal — IAS, pulmonary venous confluence", "Suprasternal — vertical vein (supracardiac TAPVR)", "Parasternal — coronary sinus (cardiac TAPVR)"],
+    tips: ["Obstructed TAPVR is a neonatal emergency — pulmonary venous obstruction causes severe pulmonary edema", "Restrictive IAS in TAPVR is life-threatening"],
+    pitfalls: ["Pulmonary veins may be difficult to trace — use color Doppler"],
+    measurements: ["Pulmonary venous confluence size", "IAS gradient", "Vertical vein velocity"],
+    criticalFindings: ["Obstructed TAPVR → surgical emergency"],
+  },
+  "chd:tapvr-preop": {
+    description: "TAPVR Pre-Op Assessment. Confirm type (supracardiac, cardiac, infracardiac, mixed), identify obstruction, assess IAS, and evaluate RV function.",
+    structures: ["Pulmonary veins", "Vertical vein", "Coronary sinus", "Right atrium", "IAS"],
+    howToGet: ["Subcostal — pulmonary venous confluence, IAS", "Suprasternal — vertical vein (supracardiac), descending vertical vein (infracardiac)", "PSAX — coronary sinus dilation (cardiac TAPVR)", "A4C — RV dilation, TR, IAS"],
+    tips: ["Obstructed TAPVR: vertical vein velocity >1.5 m/s or pulsatile flow = obstruction", "Infracardiac TAPVR: most commonly obstructed type", "Restrictive IAS (gradient >5 mmHg) = emergency balloon atrial septostomy"],
+    pitfalls: ["Mixed TAPVR may be missed without careful pulmonary vein tracing"],
+    measurements: ["Vertical vein velocity", "IAS gradient", "RV function"],
+    criticalFindings: ["Obstructed TAPVR → surgical emergency", "Restrictive IAS gradient >5 mmHg → emergency balloon atrial septostomy"],
+  },
+  "chd:tapvr-postop": {
+    description: "TAPVR Post-Op Surveillance. Assess for pulmonary vein stenosis (most important late complication), residual shunts, and RV remodeling.",
+    structures: ["Pulmonary veins", "Pulmonary venous anastomosis", "Right ventricle", "IAS"],
+    howToGet: ["Subcostal — pulmonary venous anastomosis, flow velocity", "A4C — RV remodeling, TR", "PSAX — individual pulmonary vein velocities"],
+    tips: ["Pulmonary vein stenosis is the most important late complication of TAPVR repair", "Any individual pulmonary vein velocity >1.5 m/s warrants further evaluation"],
+    pitfalls: ["Pulmonary vein stenosis may be focal and missed without careful sweep"],
+    measurements: ["Individual pulmonary vein velocities (serial)", "RV size and function (serial)"],
+    criticalFindings: ["Pulmonary vein velocity >1.5 m/s → stenosis"],
+  },
+  "chd:truncus": {
+    description: "Truncus Arteriosus — overview. Select a clinical stage below to view the specific echo protocol for that phase of management.",
+    structures: ["Truncal valve", "Truncus arteriosus", "Interventricular septum", "Pulmonary arteries"],
+    howToGet: ["Parasternal long axis — truncal valve, VSD", "Parasternal short axis — PA origins from truncus", "Subcostal — IVS, IAS"],
+    tips: ["Truncal valve regurgitation is a major determinant of outcome", "PA banding is NOT performed in truncus — complete repair is required"],
+    pitfalls: ["Truncal valve may have 2–6 cusps — assess morphology carefully"],
+    measurements: ["Truncal valve regurgitation severity", "PA diameters", "VSD size"],
+    criticalFindings: ["Severe truncal valve regurgitation → urgent repair"],
+  },
+  "chd:truncus-preop": {
+    description: "Truncus Arteriosus Pre-Op Assessment. Confirm anatomy (Van Praagh/Collett type), assess truncal valve morphology and regurgitation, evaluate PA origins, and plan repair.",
+    structures: ["Truncal valve", "PA origins", "VSD", "Aortic arch"],
+    howToGet: ["PLAX — truncal valve, VSD", "PSAX — PA origins from truncus (type I: common trunk; type II: separate origins)", "Suprasternal — aortic arch, interrupted arch (present in ~15%)", "A4C — ventricular function"],
+    tips: ["Interrupted aortic arch is present in ~15% of truncus — always assess aortic arch", "Truncal valve regurgitation is a major determinant of outcome", "PA banding is NOT performed in truncus — complete repair is required"],
+    pitfalls: ["PA origins may be difficult to visualize — use multiple views"],
+    measurements: ["Truncal valve regurgitation severity", "PA diameters", "VSD size", "Aortic arch dimensions"],
+    criticalFindings: ["Severe truncal valve regurgitation → urgent repair", "Interrupted aortic arch → surgical planning modification"],
+  },
+  "chd:truncus-postop": {
+    description: "Truncus Arteriosus Post-Op Surveillance. Assess RV-PA conduit function, residual VSD, truncal (neo-aortic) valve function, and biventricular function.",
+    structures: ["RV-PA conduit", "Neo-aortic valve", "Residual VSD", "Ventricles"],
+    howToGet: ["PSAX — RV-PA conduit, conduit peak gradient", "PLAX — neo-aortic valve regurgitation", "A4C — biventricular function, residual VSD"],
+    tips: ["RV-PA conduit obstruction is the most common late complication", "Neo-aortic valve regurgitation may progress over time"],
+    pitfalls: ["Conduit calcification may cause acoustic shadowing"],
+    measurements: ["RV-PA conduit peak gradient (serial)", "Neo-aortic valve regurgitation severity (serial)", "Residual VSD size"],
+    criticalFindings: ["Conduit gradient >40 mmHg → reintervention", "Severe neo-aortic valve regurgitation → reintervention"],
+  },
+  "chd:ebstein": {
+    description: "Ebstein's Anomaly — overview. Select a clinical stage below to view the specific echo protocol for that phase of management.",
+    structures: ["Tricuspid valve", "Right ventricle", "Atrialized RV", "Left ventricle"],
+    howToGet: ["Apical 4-chamber — TV displacement, TR severity", "Parasternal long axis — LV compression", "Subcostal — ASD/PFO"],
+    tips: ["TV displacement index >8 mm/m² = significant Ebstein", "ASD/PFO is present in 50%"],
+    pitfalls: ["LV compression by enlarged RV may cause LV diastolic dysfunction"],
+    measurements: ["TV displacement index", "TR severity", "Functional RV FAC"],
+    criticalFindings: ["Functional RV FAC <35% → severe dysfunction"],
+  },
+  "chd:ebstein-neonatal": {
+    description: "Ebstein's Anomaly Neonatal Assessment. Assess severity of TV displacement, TR severity, functional RV size, and cyanosis from R→L shunt at ASD/PFO.",
+    structures: ["Tricuspid valve", "Right ventricle", "Atrialized RV", "IAS"],
+    howToGet: ["A4C — TV displacement, TR severity, RV/LV ratio", "Subcostal — IAS, R→L shunt", "PSAX — TV leaflet anatomy"],
+    tips: ["Neonatal Ebstein with severe TR and cyanosis: high mortality", "Functional RV size determines prognosis", "R→L shunt at ASD/PFO causes cyanosis"],
+    pitfalls: ["Pulmonary atresia with intact IVS can mimic Ebstein — assess RVOT carefully"],
+    measurements: ["TV displacement index", "TR severity", "Functional RV FAC", "IAS gradient"],
+    criticalFindings: ["Severe TR + cyanosis in neonate → high mortality", "R→L shunt at ASD → cyanosis"],
+  },
+  "chd:ebstein-pediatric-adult": {
+    description: "Ebstein's Anomaly Pediatric/Adult Surveillance. Monitor TV displacement, TR severity, functional RV function, and arrhythmia substrate. Determine optimal timing for surgical repair.",
+    structures: ["Tricuspid valve", "Right ventricle", "Atrialized RV", "IAS"],
+    howToGet: ["A4C — TV displacement, TR severity, RV/LV ratio", "PLAX — LV compression", "Subcostal — ASD/PFO", "PSAX — TV leaflet anatomy"],
+    tips: ["TV displacement index >8 mm/m² = significant Ebstein", "Functional RV FAC <35% = severe dysfunction — surgical repair", "ASD/PFO in 50% — assess for R→L shunt"],
+    pitfalls: ["Accessory pathways (WPW) are common — correlate with ECG"],
+    measurements: ["TV displacement index (serial)", "TR severity (serial)", "Functional RV FAC (serial)"],
+    criticalFindings: ["Functional RV FAC <35% → surgical repair", "R→L shunt at ASD → cyanosis"],
+  },
+  "chd:paivs": {
+    description: "Pulmonary Atresia with Intact Ventricular Septum — overview. Select a clinical stage below to view the specific echo protocol for that phase of management.",
+    structures: ["Right ventricle", "Pulmonary valve", "Tricuspid valve", "IAS"],
+    howToGet: ["Parasternal short axis — pulmonary valve (atretic), RVOT", "Apical 4-chamber — RV size, TR", "Subcostal — IAS"],
+    tips: ["RV size determines surgical approach (biventricular vs single ventricle)", "Restrictive IAS is a neonatal emergency"],
+    pitfalls: ["Critical PS may mimic PAIVS — confirm atresia vs severe stenosis"],
+    measurements: ["RV Z-score", "TV annulus Z-score", "IAS gradient"],
+    criticalFindings: ["Restrictive IAS → emergency balloon atrial septostomy"],
+  },
+  "chd:paivs-neonatal": {
+    description: "PAIVS Neonatal Assessment. Confirm pulmonary atresia, assess RV size (Z-score), TV annulus size, and IAS. Determine suitability for biventricular repair vs single ventricle palliation.",
+    structures: ["Right ventricle", "Pulmonary valve", "Tricuspid valve", "IAS"],
+    howToGet: ["PSAX — pulmonary valve (atretic), RVOT", "A4C — RV size, TR severity", "Subcostal — IAS, gradient", "PLAX — RV-coronary fistulae (color Doppler)"],
+    tips: ["RV Z-score >-2 = potential biventricular repair candidate", "TV annulus Z-score correlates with RV growth potential", "RV-coronary fistulae: assess for RVDCC (RV-dependent coronary circulation)"],
+    pitfalls: ["RVDCC: do NOT decompress RV if coronary flow is RV-dependent"],
+    measurements: ["RV Z-score", "TV annulus Z-score", "IAS gradient", "RV-coronary fistulae"],
+    criticalFindings: ["Restrictive IAS → emergency balloon atrial septostomy", "RVDCC → do NOT decompress RV"],
+  },
+  "chd:paivs-postop": {
+    description: "PAIVS Post-Op Surveillance. Assess RV growth, pulmonary valve function, residual RVOTO, and biventricular vs single ventricle pathway determination.",
+    structures: ["Right ventricle", "Pulmonary valve", "RVOT", "IAS"],
+    howToGet: ["PSAX — pulmonary valve, RVOT gradient", "A4C — RV growth, TR severity", "Subcostal — IAS"],
+    tips: ["RV growth after decompression determines biventricular vs single ventricle pathway", "Serial RV Z-score measurement guides management decisions"],
+    pitfalls: ["Residual RVOTO may require reintervention"],
+    measurements: ["RV Z-score (serial)", "RVOT peak gradient", "TR severity"],
+    criticalFindings: ["RVOT gradient >40 mmHg → reintervention"],
+  },
+  "chd:dorv": {
+    description: "Double Outlet Right Ventricle — overview. Select a clinical stage below to view the specific echo protocol for that phase of management.",
+    structures: ["Right ventricle", "Aorta", "Pulmonary artery", "Interventricular septum"],
+    howToGet: ["Parasternal long axis — both great arteries arising from RV", "Parasternal short axis — great artery relationships", "Apical 4-chamber — VSD location"],
+    tips: ["VSD location determines repair strategy (subaortic, subpulmonary, doubly committed, non-committed)", "DORV with subaortic VSD: repair similar to large VSD", "DORV with subpulmonary VSD (Taussig-Bing): repair similar to TGA"],
+    pitfalls: ["Great artery relationships vary widely in DORV — assess carefully"],
+    measurements: ["VSD location", "Great artery relationships", "RVOTO gradient"],
+    criticalFindings: ["Severe RVOTO → surgical planning modification"],
+  },
+  "chd:dorv-preop": {
+    description: "DORV Pre-Op Assessment. Characterise VSD location, great artery relationships, RVOTO, and coronary anatomy. VSD location determines repair strategy.",
+    structures: ["Right ventricle", "Aorta", "Pulmonary artery", "VSD", "Coronary arteries"],
+    howToGet: ["PLAX — both great arteries arising from RV, VSD", "PSAX — great artery relationships, coronary origins", "A4C — VSD location (subaortic vs subpulmonary vs doubly committed vs non-committed)", "Subcostal — IVS, IAS"],
+    tips: ["VSD location is the key determinant of repair strategy", "DORV with subpulmonary VSD (Taussig-Bing): repair similar to TGA (arterial switch)", "Coronary anatomy must be defined before repair"],
+    pitfalls: ["Non-committed VSD may require complex repair or single ventricle palliation"],
+    measurements: ["VSD location and size", "Great artery relationships", "RVOTO gradient", "Coronary anatomy"],
+    criticalFindings: ["Non-committed VSD → may require single ventricle palliation"],
+  },
+  "chd:dorv-postop": {
+    description: "DORV Post-Op Surveillance. Assess VSD patch integrity, residual RVOTO, great artery function, and biventricular function.",
+    structures: ["VSD patch", "RVOT", "Great arteries", "Ventricles"],
+    howToGet: ["PLAX — VSD patch, RVOTO", "PSAX — great artery function", "A4C — biventricular function"],
+    tips: ["Residual RVOTO is the most common late complication", "Serial assessment of biventricular function is required"],
+    pitfalls: ["Residual VSD may be small and missed without careful color Doppler sweep"],
+    measurements: ["RVOTO peak gradient (serial)", "Residual VSD size", "Biventricular function"],
+    criticalFindings: ["RVOTO gradient >40 mmHg → reintervention"],
+  },
+  "chd:ta": {
+    description: "Tricuspid Atresia — overview. Select a clinical stage below to view the specific echo protocol for that phase of management.",
+    structures: ["Tricuspid valve (atretic)", "Right ventricle (hypoplastic)", "Mitral valve", "IAS"],
+    howToGet: ["Apical 4-chamber — atretic TV, hypoplastic RV", "Subcostal — IAS, IVS", "Parasternal — great artery relationships"],
+    tips: ["Restrictive IAS in tricuspid atresia is a neonatal emergency", "VSD size determines pulmonary blood flow"],
+    pitfalls: ["Restrictive IAS may not be apparent until after birth"],
+    measurements: ["IAS gradient", "VSD size", "Pulmonary blood flow"],
+    criticalFindings: ["Restrictive IAS → emergency balloon atrial septostomy"],
+  },
+  "chd:ta-palliation": {
+    description: "Tricuspid Atresia Palliation (Norwood/BT Shunt/PA Band). Assess shunt or band function, IAS, and ventricular function. Prepare for Glenn and Fontan palliation.",
+    structures: ["Systemic-to-PA shunt or PA band", "Left ventricle", "IAS", "Mitral valve"],
+    howToGet: ["Suprasternal — shunt flow", "PSAX — PA band gradient", "A4C — LV function, MR", "Subcostal — IAS"],
+    tips: ["Shunt obstruction is a surgical emergency", "PA band: gradient 30–50 mmHg is optimal"],
+    pitfalls: ["Shunt may be difficult to visualize by TTE"],
+    measurements: ["Shunt peak velocity", "PA band gradient", "LV function"],
+    criticalFindings: ["Shunt obstruction → surgical emergency"],
+  },
+  "chd:ta-fontan": {
+    description: "Tricuspid Atresia Fontan Surveillance. Assess single LV function, Fontan conduit patency, MV regurgitation, and Fontan-associated complications.",
+    structures: ["Single left ventricle", "Fontan conduit", "Mitral valve", "Pulmonary arteries"],
+    howToGet: ["Subcostal — Fontan conduit", "A4C — LV function, MR", "Suprasternal — bilateral PA flow", "Hepatic veins — Fontan pressure"],
+    tips: ["MV regurgitation significantly impacts Fontan physiology", "Fontan conduit obstruction: peak velocity >1.5 m/s"],
+    pitfalls: ["Low pulsatility in Fontan conduit is normal"],
+    measurements: ["LV EF", "Fontan conduit peak velocity", "MR severity"],
+    criticalFindings: ["Fontan conduit velocity >1.5 m/s → obstruction"],
+  },
+  "chd:iaa": {
+    description: "Interrupted Aortic Arch — overview. Select a clinical stage below to view the specific echo protocol for that phase of management.",
+    structures: ["Aortic arch", "Ductus arteriosus", "Left ventricle", "VSD"],
+    howToGet: ["Suprasternal — aortic arch interruption", "Parasternal long axis — VSD, LVOTO", "Subcostal — IVS, IAS"],
+    tips: ["IAA is ductal-dependent — prostaglandin E1 is mandatory", "VSD is present in >95% of IAA"],
+    pitfalls: ["IAA may be missed without suprasternal view"],
+    measurements: ["Arch dimensions", "VSD size", "LVOTO gradient"],
+    criticalFindings: ["Ductal-dependent IAA → prostaglandin E1 mandatory"],
+  },
+  "chd:iaa-neonatal": {
+    description: "IAA Neonatal Assessment. Confirm arch interruption type (A, B, C), assess VSD, LVOTO, and associated lesions (DiGeorge syndrome in type B). Confirm ductal dependency.",
+    structures: ["Aortic arch", "Ductus arteriosus", "VSD", "LVOT"],
+    howToGet: ["Suprasternal — arch interruption, ductal flow", "PLAX — VSD, LVOTO", "A4C — ventricular function", "Subcostal — IVS, IAS"],
+    tips: ["Type B IAA (between LCCA and LSA) is most common and associated with DiGeorge syndrome (22q11 deletion)", "LVOTO: assess LV outflow tract — subaortic obstruction is common", "Ductal dependency: prostaglandin E1 mandatory"],
+    pitfalls: ["LVOTO may be missed without careful PLAX assessment"],
+    measurements: ["Arch dimensions", "VSD size", "LVOTO gradient"],
+    criticalFindings: ["Ductal-dependent IAA → prostaglandin E1 mandatory"],
+  },
+  "chd:iaa-postop": {
+    description: "IAA Post-Op Surveillance. Assess repair site, residual arch obstruction, VSD patch integrity, LVOTO, and LV function.",
+    structures: ["Aortic arch repair site", "VSD patch", "LVOT", "Left ventricle"],
+    howToGet: ["Suprasternal — repair site, peak velocity", "PLAX — VSD patch, LVOTO", "A4C — LV function"],
+    tips: ["Re-coarctation at repair site is the most common late complication", "LVOTO may develop or progress after repair"],
+    pitfalls: ["Residual LVOTO may be missed without careful PLAX assessment"],
+    measurements: ["Repair site peak velocity", "LVOTO gradient (serial)", "LV function"],
+    criticalFindings: ["Repair site peak velocity >3.5 m/s → re-obstruction", "LVOTO gradient >40 mmHg → reintervention"],
+  },
+  "chd:heterotaxy": {
+    description: "Heterotaxy Syndrome — overview. Select a clinical stage below to view the specific echo protocol for that phase of management.",
+    structures: ["Atrial situs", "Ventricular morphology", "Great arteries", "Pulmonary veins", "Systemic veins"],
+    howToGet: ["Subcostal — atrial situs, IVC/SVC", "Apical 4-chamber — ventricular morphology", "Suprasternal — great artery relationships"],
+    tips: ["Asplenia (right isomerism): bilateral right-sidedness, TAPVR, AVSD, complex CHD", "Polysplenia (left isomerism): bilateral left-sidedness, interrupted IVC, AVSD"],
+    pitfalls: ["IVC interruption in polysplenia: azygos continuation — assess carefully"],
+    measurements: ["Atrial situs", "Ventricular morphology", "Great artery relationships"],
+    criticalFindings: ["TAPVR in asplenia → surgical emergency if obstructed"],
+  },
+  "chd:heterotaxy-initial": {
+    description: "Heterotaxy Initial Assessment. Establish atrial situs, ventricular morphology, great artery relationships, systemic and pulmonary venous connections, and AV valve anatomy.",
+    structures: ["Atrial situs", "Ventricular morphology", "Great arteries", "Pulmonary veins", "Systemic veins"],
+    howToGet: ["Subcostal — atrial situs (IVC/SVC position), IVC interruption", "A4C — ventricular morphology (RV vs LV features), AV valves", "Suprasternal — great artery relationships, arch sidedness", "PSAX — pulmonary venous connections"],
+    tips: ["Asplenia (right isomerism): bilateral right atrial appendages, TAPVR, AVSD, complex CHD", "Polysplenia (left isomerism): bilateral left atrial appendages, interrupted IVC with azygos continuation", "Systematic segmental analysis is mandatory in heterotaxy"],
+    pitfalls: ["IVC interruption in polysplenia: azygos continuation — assess carefully before Fontan planning"],
+    measurements: ["Atrial situs", "Ventricular morphology", "Great artery relationships", "Pulmonary venous connections"],
+    criticalFindings: ["TAPVR in asplenia → surgical emergency if obstructed", "Obstructed pulmonary venous return → urgent intervention"],
+  },
+  // ─── CHD additional views ──────────────────────────────────────────────────
+  "chd:coa-diagnosis": {
+    description: "CoA Diagnosis / Pre-Intervention. Confirm coarctation severity, measure gradient, assess bicuspid AV, and determine suitability for balloon dilation vs surgical repair.",
+    structures: ["Aortic isthmus", "Aortic arch", "Bicuspid aortic valve", "Descending aorta"],
+    howToGet: ["Suprasternal — aortic arch, isthmus, peak velocity, diastolic tail", "PLAX — bicuspid AV, aortic root", "Subcostal — abdominal aorta (tardus parvus)"],
+    tips: ["'Diastolic tail' is hallmark of significant CoA — continuous forward flow in descending aorta throughout diastole", "Bicuspid AV is present in 50–80% of CoA patients", "Doppler underestimates gradient if beam not aligned — use suprasternal notch"],
+    pitfalls: ["Doppler underestimates gradient if beam not aligned", "Collateral vessels may reduce gradient despite significant CoA"],
+    measurements: ["Peak velocity at isthmus (m/s)", "Mean gradient (mmHg)", "Diastolic tail (present/absent)", "Aortic root and ascending aorta dimensions"],
+    criticalFindings: ["Peak velocity >3.5 m/s or mean gradient >20 mmHg → significant CoA", "Diastolic tail present → significant obstruction"],
+  },
+  "chd:dtga-preop": {
+    description: "d-TGA Pre-Op Assessment. Confirm great artery relationships, assess IAS (restrictive = emergency), identify associated lesions (VSD, LVOTO), and define coronary anatomy before arterial switch operation.",
+    structures: ["Aorta (anterior, rightward)", "Pulmonary artery (posterior, leftward)", "IAS", "Coronary arteries"],
+    howToGet: ["PLAX — parallel great arteries (no crossing), VSD", "PSAX high — coronary origins (must be defined before ASO)", "Subcostal — IAS, gradient across IAS", "A4C — ventricular morphology, AV valves"],
+    tips: ["Coronary anatomy must be defined before ASO — PSAX high for coronary origins", "Restrictive IAS (gradient >5 mmHg) = emergency balloon atrial septostomy", "LVOTO: assess LV outflow tract — may require LV training if late presentation"],
+    pitfalls: ["Coronary anomalies are present in ~30% — must be identified pre-operatively"],
+    measurements: ["IAS gradient", "Coronary anatomy", "LVOTO gradient", "VSD size"],
+    criticalFindings: ["Restrictive IAS gradient >5 mmHg → emergency balloon atrial septostomy"],
+  },
+  "chd:ebstein-assessment": {
+    description: "Ebstein's Anomaly Initial Assessment. Quantify TV displacement, assess TR severity, measure functional RV size, and identify ASD/PFO. Determine severity and timing for surgical repair.",
+    structures: ["Tricuspid valve", "Right ventricle", "Atrialized RV", "IAS"],
+    howToGet: ["A4C — TV displacement index (mm/m²), TR severity, RV/LV ratio", "PSAX — TV leaflet anatomy (anterior, posterior, septal leaflets)", "Subcostal — ASD/PFO, R→L shunt", "PLAX — LV compression by enlarged RV"],
+    tips: ["TV displacement index >8 mm/m² = significant Ebstein", "Functional RV FAC <35% = severe dysfunction — surgical repair", "ASD/PFO in 50% — assess for R→L shunt causing cyanosis"],
+    pitfalls: ["Accessory pathways (WPW) are common — correlate with ECG", "Atrialized RV may be mistaken for RA"],
+    measurements: ["TV displacement index (mm/m²)", "TR severity", "Functional RV FAC", "RV:LV ratio"],
+    criticalFindings: ["Functional RV FAC <35% → surgical repair", "R→L shunt at ASD → cyanosis"],
+  },
+  "chd:ebstein-postop": {
+    description: "Ebstein's Anomaly Post-Op Surveillance (Cone Procedure). Assess TV repair function, TR severity, functional RV recovery, and residual ASD.",
+    structures: ["Repaired tricuspid valve", "Right ventricle", "IAS"],
+    howToGet: ["A4C — TV function, TR severity, RV recovery", "Subcostal — residual ASD/PFO", "PSAX — TV leaflet coaptation"],
+    tips: ["Cone procedure creates a conical TV from native leaflet tissue", "TR severity after cone repair is the primary determinant of outcome", "RV recovery after cone repair may take 6–12 months"],
+    pitfalls: ["Residual ASD may be intentionally left for RV decompression"],
+    measurements: ["TR severity (serial)", "Functional RV FAC (serial)", "Residual ASD size"],
+    criticalFindings: ["Severe TR after cone repair → reintervention"],
+  },
+  "chd:heterotaxy-assessment": {
+    description: "Heterotaxy Segmental Assessment. Establish atrial situs, ventricular morphology, great artery relationships, systemic and pulmonary venous connections, and AV valve anatomy using systematic segmental analysis.",
+    structures: ["Atrial situs", "Ventricular morphology", "Great arteries", "Pulmonary veins", "Systemic veins"],
+    howToGet: ["Subcostal — atrial situs (IVC/SVC position), IVC interruption (azygos continuation)", "A4C — ventricular morphology (RV vs LV features), AV valves", "Suprasternal — great artery relationships, arch sidedness", "PSAX — pulmonary venous connections"],
+    tips: ["Asplenia (right isomerism): bilateral right atrial appendages, TAPVR, AVSD, complex CHD", "Polysplenia (left isomerism): bilateral left atrial appendages, interrupted IVC with azygos continuation", "Systematic segmental analysis is mandatory in heterotaxy"],
+    pitfalls: ["IVC interruption in polysplenia: azygos continuation — assess carefully before Fontan planning"],
+    measurements: ["Atrial situs", "Ventricular morphology", "Great artery relationships", "Pulmonary venous connections"],
+    criticalFindings: ["TAPVR in asplenia → surgical emergency if obstructed"],
+  },
+  "chd:iaa-preop": {
+    description: "IAA Pre-Op Assessment. Confirm arch interruption type (A, B, C), assess VSD, LVOTO, and associated lesions. Confirm ductal dependency. Type B is most common and associated with DiGeorge syndrome.",
+    structures: ["Aortic arch", "Ductus arteriosus", "VSD", "LVOT"],
+    howToGet: ["Suprasternal — arch interruption, ductal flow", "PLAX — VSD, LVOTO", "A4C — ventricular function", "Subcostal — IVS, IAS"],
+    tips: ["Type B IAA (between LCCA and LSA) is most common and associated with DiGeorge syndrome (22q11 deletion)", "LVOTO: assess LV outflow tract — subaortic obstruction is common", "Ductal dependency: prostaglandin E1 mandatory"],
+    pitfalls: ["LVOTO may be missed without careful PLAX assessment"],
+    measurements: ["Arch dimensions", "VSD size", "LVOTO gradient"],
+    criticalFindings: ["Ductal-dependent IAA → prostaglandin E1 mandatory"],
+  },
+  "chd:paivs-preop": {
+    description: "PA-IVS Pre-Op Assessment. Confirm pulmonary atresia, assess RV size (Z-score), TV annulus size, and IAS. Identify RV-coronary fistulae and RVDCC. Determine suitability for biventricular repair vs single ventricle palliation.",
+    structures: ["Right ventricle", "Pulmonary valve", "Tricuspid valve", "IAS", "RV-coronary fistulae"],
+    howToGet: ["PSAX — pulmonary valve (atretic), RVOT", "A4C — RV size, TR severity", "Subcostal — IAS, gradient", "PLAX — RV-coronary fistulae (color Doppler)"],
+    tips: ["RV Z-score >-2 = potential biventricular repair candidate", "TV annulus Z-score correlates with RV growth potential", "RV-coronary fistulae: assess for RVDCC (RV-dependent coronary circulation)"],
+    pitfalls: ["RVDCC: do NOT decompress RV if coronary flow is RV-dependent"],
+    measurements: ["RV Z-score", "TV annulus Z-score", "IAS gradient", "RV-coronary fistulae"],
+    criticalFindings: ["Restrictive IAS → emergency balloon atrial septostomy", "RVDCC → do NOT decompress RV"],
+  },
+  "chd:ta-preop": {
+    description: "Tricuspid Atresia Pre-Op Assessment. Confirm atretic TV, assess IAS (restrictive = emergency), VSD size, great artery relationships, and pulmonary blood flow. Determine palliation strategy.",
+    structures: ["Atretic tricuspid valve", "Hypoplastic right ventricle", "IAS", "VSD", "Great arteries"],
+    howToGet: ["A4C — atretic TV, hypoplastic RV, IAS", "Subcostal — IAS gradient", "PLAX — great artery relationships, VSD", "PSAX — pulmonary blood flow"],
+    tips: ["Restrictive IAS in tricuspid atresia is a neonatal emergency", "VSD size determines pulmonary blood flow", "Great artery relationships determine palliation strategy"],
+    pitfalls: ["Restrictive IAS may not be apparent until after birth"],
+    measurements: ["IAS gradient", "VSD size", "Pulmonary blood flow"],
+    criticalFindings: ["Restrictive IAS → emergency balloon atrial septostomy"],
+  },
+  "chd:tricuspid-atresia": {
+    description: "Tricuspid Atresia — overview. Absence of the tricuspid valve with a hypoplastic right ventricle. Select a clinical stage below to view the specific echo protocol for that phase of management.",
+    structures: ["Atretic tricuspid valve", "Hypoplastic right ventricle", "Mitral valve", "IAS"],
+    howToGet: ["Apical 4-chamber — atretic TV, hypoplastic RV", "Subcostal — IAS, IVS", "Parasternal — great artery relationships"],
+    tips: ["Restrictive IAS in tricuspid atresia is a neonatal emergency", "VSD size determines pulmonary blood flow"],
+    pitfalls: ["Restrictive IAS may not be apparent until after birth"],
+    measurements: ["IAS gradient", "VSD size", "Pulmonary blood flow"],
+    criticalFindings: ["Restrictive IAS → emergency balloon atrial septostomy"],
+  },
+  // ─── HOCM additional views ───────────────────────────────────────────────────
+  "hocm:a2c": {
+    description: "A2C provides the second plane for biplane LA volume measurement and LV EF (Simpson's). Also shows inferior and anterior wall motion. Useful for detecting anterior wall hypertrophy in HOCM.",
+    structures: ["LV (inferior, anterior walls)", "LA", "MV"],
+    howToGet: ["From A4C, rotate probe ~60° counter-clockwise", "Only LV and LA visible — no RV", "Optimize to show true apex without foreshortening"],
+    tips: ["Use A2C for biplane EF alongside A4C", "Anterior wall hypertrophy may be seen in apical HOCM variants"],
+    pitfalls: ["Foreshortened apex — move probe to true apex for accurate wall thickness"],
+    measurements: ["LA volume (biplane, mL)", "LV EF — biplane Simpson's (%)"],
+    criticalFindings: [],
+  },
+  "hocm:psax_mv": {
+    description: "PSAX at MV level shows the classic fish-mouth MV opening and allows assessment of MV leaflet morphology, SAM, and MV area. Essential for identifying anterior leaflet elongation predisposing to SAM.",
+    structures: ["Mitral valve leaflets", "Papillary muscles", "LV cavity at MV level"],
+    howToGet: ["From PLAX, rotate probe 90° clockwise", "Tilt inferiorly to bring MV into view", "Fish-mouth MV opening should be symmetric"],
+    tips: ["Anterior MV leaflet elongation is a key substrate for SAM", "Assess MV morphology for primary MV disease vs SAM-related MR"],
+    pitfalls: ["Oblique cut may overestimate MV area"],
+    measurements: ["MV area (planimetry, cm²)", "Anterior leaflet length (mm)"],
+    criticalFindings: [],
+  },
+  "hocm:psax_pap": {
+    description: "PSAX at papillary muscle level assesses mid-LV wall thickness, LV cavity size, and papillary muscle morphology. Midventricular HOCM shows obstruction at this level rather than LVOT.",
+    structures: ["LV mid-cavity", "Papillary muscles", "Interventricular septum"],
+    howToGet: ["From PSAX MV level, tilt probe slightly inferiorly", "Both papillary muscles visible as 'eyes'", "Measure wall thickness at end-diastole"],
+    tips: ["Midventricular HOCM: obstruction at papillary muscle level — assess with PW Doppler", "Papillary muscle hypertrophy is a substrate for SAM"],
+    pitfalls: ["Oblique cut overestimates wall thickness"],
+    measurements: ["IVS thickness (mm)", "Posterior wall thickness (mm)", "LV internal diameter (mm)"],
+    criticalFindings: ["Midventricular cavity obliteration → midventricular HOCM"],
+  },
+  "hocm:subcostal": {
+    description: "Subcostal view provides an alternative window for IVS thickness measurement and RV assessment. Particularly useful when parasternal windows are poor. Also assesses IVC for RAP estimation.",
+    structures: ["IVS", "RV", "LV", "IVC", "Hepatic veins"],
+    howToGet: ["Position probe subxiphoid, indicator toward left, angled toward left shoulder", "Ask patient to take a deep breath and hold to bring heart closer", "Optimize to show all four chambers"],
+    tips: ["IVC diameter and collapsibility: IVC >2.1 cm + <50% collapse = RAP ≥15 mmHg", "Subcostal IVS measurement is less affected by near-field artifact than parasternal"],
+    pitfalls: ["Oblique cut through IVS — ensure beam is perpendicular to septum"],
+    measurements: ["IVS thickness (subcostal, mm)", "IVC diameter (mm)", "IVC collapsibility (%)"],
+    criticalFindings: ["IVC >2.1 cm + <50% collapse → elevated RAP ≥15 mmHg"],
+  },
+  "hocm:valsalva_pos": {
+    description: "Valsalva Patient Positioning. Proper patient positioning and coaching for the Valsalva maneuver is essential for provokable HOCM gradient assessment. The strain phase reduces preload, increasing LVOT obstruction.",
+    structures: ["Patient positioning", "Valsalva technique"],
+    howToGet: ["Patient in left lateral decubitus position", "Coach patient to strain against closed glottis for 10–15 seconds", "Record CW Doppler from A5C continuously through maneuver and release", "Measure peak gradient on first beat after release"],
+    tips: ["Goal-Directed Valsalva: aim for 40 mmHg intrathoracic pressure (use pressure gauge if available)", "Measure peak gradient on FIRST beat after Valsalva release — this is typically the highest", "Keep CW beam on LVOT throughout — do not reposition during maneuver"],
+    pitfalls: ["Stopping recording at end of strain — misses peak provoked gradient on release", "Inadequate strain — patient must achieve adequate intrathoracic pressure"],
+    measurements: ["Provoked LVOT gradient (mmHg)", "Peak CW velocity (m/s) — post-Valsalva"],
+    criticalFindings: ["Provoked gradient ≥50 mmHg → significant provokable obstruction — guides therapy"],
+  },
+  "hocm:cw_lvot": {
+    description: "CW Doppler from A5C or A3C captures the characteristic dagger-shaped LVOT waveform of HOCM. Late-peaking, high-velocity signal. Measure at the TIP of the dagger — not the early systolic shoulder.",
+    structures: ["LVOT", "Aortic valve"],
+    howToGet: ["A5C: tilt probe anteriorly from A4C to bring LVOT into view", "Align CW beam parallel to LVOT flow (color Doppler first)", "A3C: alternative window — rotate ~60° CCW from A4C", "Use both A5C and A3C — report the HIGHEST gradient"],
+    tips: ["Dagger shape: slow early rise → steep late acceleration → sharp peak in late systole", "Measure at the TIP of the dagger — not the early systolic shoulder", "Use 100 mm/s sweep speed for gradient measurement"],
+    pitfalls: ["Measuring early systolic shoulder instead of late dagger peak — underestimates gradient", "MR contamination: align cursor strictly along LVOT axis, angling away from LA"],
+    measurements: ["Resting LVOT gradient (mmHg)", "Peak CW velocity (m/s)"],
+    criticalFindings: ["Resting gradient ≥30 mmHg → obstructive HOCM", "Resting gradient ≥50 mmHg → significant obstruction — guides therapy"],
+  },
+  "hocm:pw_lvot": {
+    description: "PW Doppler sample site localization in the LVOT. Used to confirm obstruction is at LVOT level (not valvular) and to precisely localize the level of maximum obstruction by stepwise sample volume advancement.",
+    structures: ["LVOT", "Aortic valve"],
+    howToGet: ["A5C: place PW sample volume 0.5–1 cm below AV", "Stepwise advancement toward AV: gradient increases as sample moves toward obstruction", "Confirm obstruction is subvalvular (LVOT) not valvular"],
+    tips: ["PW localization: gradient increases as sample moves from LVOT toward AV = subvalvular obstruction", "No gradient increase in LVOT on PW = valvular AS, not HOCM", "PW sample volume 2–5 mm for precise localization"],
+    pitfalls: ["Aliasing at high velocities — use CW for peak gradient measurement"],
+    measurements: ["PW LVOT velocity (m/s)", "Level of maximum obstruction"],
+    criticalFindings: [],
+  },
+  "hocm:mr_jet": {
+    description: "MR jet CW Doppler from A4C or A2C. SAM-related MR produces a posteriorly directed, late-systolic jet. Differentiate from primary MR (central/anterior jet, holosystolic). Critical for surgical planning.",
+    structures: ["Mitral valve", "Left atrium"],
+    howToGet: ["A4C: align CW beam along MR jet direction (color Doppler first)", "A2C: alternative window for anterior/inferior jets", "Distinguish from LVOT signal: MR is holosystolic, broad, rounded envelope"],
+    tips: ["SAM-related MR: posteriorly directed, late-systolic, crescent-shaped", "Primary MR: central or anterior jet, holosystolic plateau", "MR jet velocity ~4–5 m/s (gradient 64–100 mmHg) — similar to LVOT"],
+    pitfalls: ["MR jet may contaminate LVOT CW signal — align cursor strictly along LVOT axis", "Late-systolic MR may be missed if recording stops early"],
+    measurements: ["MR severity (color Doppler)", "MR jet direction (posterior = SAM-related)"],
+    criticalFindings: ["Severe MR → surgical planning (MV repair vs replacement)"],
+  },
+  "hocm:sam_plax": {
+    description: "SAM M-Mode from PLAX. M-mode through the mitral valve in PLAX captures systolic anterior motion of the anterior mitral leaflet and midsystolic aortic valve closure — the two classic M-mode signs of HOCM.",
+    structures: ["Anterior mitral leaflet", "Aortic valve", "LVOT"],
+    howToGet: ["PLAX: place M-mode cursor through MV anterior leaflet", "Optimize to show both MV and AV on same M-mode sweep", "Use zoom to improve temporal resolution"],
+    tips: ["SAM: anterior mitral leaflet moves toward IVS in systole — contact with IVS = severe obstruction", "Midsystolic AV closure: notching of AV M-mode in mid-systole = LVOT obstruction", "Duration of SAM-IVS contact correlates with gradient severity"],
+    pitfalls: ["Oblique M-mode cut may miss SAM"],
+    measurements: ["Duration of SAM-IVS contact (ms)", "Midsystolic AV closure (present/absent)"],
+    criticalFindings: ["SAM-IVS contact throughout systole → severe obstruction"],
+  },
+  "hocm:sam_zoom": {
+    description: "Zoomed PLAX for SAM assessment. Zoomed 2D view of the MV and LVOT in PLAX provides high-resolution assessment of SAM mechanism, leaflet morphology, and degree of LVOT narrowing.",
+    structures: ["Anterior mitral leaflet", "LVOT", "Interventricular septum"],
+    howToGet: ["PLAX: zoom on MV and LVOT region", "Use narrow sector for high frame rate", "Color Doppler to show LVOT turbulence and MR jet direction"],
+    tips: ["Zoom improves temporal resolution for SAM timing", "Color Doppler: LVOT turbulence (aliasing) + posteriorly directed MR jet = SAM", "Assess leaflet morphology: elongated anterior leaflet, accessory chordae"],
+    pitfalls: ["Color Doppler scale must be set appropriately — too high misses low-velocity MR"],
+    measurements: ["LVOT diameter at narrowest point (mm)", "SAM severity (mild/moderate/severe)"],
+    criticalFindings: ["Severe SAM with LVOT obliteration → significant obstruction"],
+  },
+  // ─── ICE additional views ────────────────────────────────────────────────────
+  "ice:esophagusview": {
+    description: "The esophagus view identifies the esophagus in relation to the posterior left atrium. Critical for ablation procedures to prevent atrio-esophageal fistula. The esophagus lies directly posterior to the LA.",
+    structures: ["Esophagus", "Posterior left atrium", "Left atrial wall"],
+    howToGet: ["Advance ICE catheter to mid-RA", "Rotate posteriorly to visualize posterior LA wall", "Identify esophagus as a rounded structure posterior to LA", "Color Doppler may show esophageal peristalsis"],
+    tips: ["Esophagus lies directly posterior to LA — risk of atrio-esophageal fistula during ablation", "Identify esophagus position before posterior LA wall ablation", "Distance from LA wall to esophagus varies — measure before ablation"],
+    pitfalls: ["Esophagus may not always be visible — correlate with fluoroscopy"],
+    measurements: ["Distance from LA posterior wall to esophagus (mm)"],
+    criticalFindings: ["Esophagus <5 mm from LA wall → high risk of atrio-esophageal fistula"],
+  },
+  "ice:leftpvview": {
+    description: "Visualises the left-sided pulmonary vein ostia (LSPV and LIPV) for ablation guidance and post-procedure assessment. Used to confirm catheter position at PV ostia and assess for PV stenosis.",
+    structures: ["Left superior pulmonary vein (LSPV)", "Left inferior pulmonary vein (LIPV)", "Left atrium"],
+    howToGet: ["Advance ICE catheter to mid-RA", "Rotate posteriorly and leftward to visualize left PV ostia", "Color Doppler to show PV flow", "PW Doppler to assess PV velocity"],
+    tips: ["LSPV and LIPV may share a common antrum in ~30% of patients", "PV velocity >1.5 m/s = PV stenosis", "Confirm ablation catheter position at PV ostia before energy delivery"],
+    pitfalls: ["PV ostia may be difficult to visualize without rotation"],
+    measurements: ["LSPV and LIPV ostial diameters (mm)", "PV velocity (m/s)"],
+    criticalFindings: ["PV velocity >1.5 m/s → PV stenosis"],
+  },
+  "ice:rightpvview": {
+    description: "Visualises the right-sided pulmonary vein ostia (RSPV and RIPV) for ablation guidance and post-procedure assessment. The right PVs are typically larger and closer to the SVC.",
+    structures: ["Right superior pulmonary vein (RSPV)", "Right inferior pulmonary vein (RIPV)", "Left atrium", "SVC"],
+    howToGet: ["Advance ICE catheter to mid-RA", "Rotate posteriorly and rightward to visualize right PV ostia", "Color Doppler to show PV flow", "RSPV is closest to SVC — assess carefully"],
+    tips: ["RSPV is the largest PV and closest to SVC — risk of SVC stenosis", "PV velocity >1.5 m/s = PV stenosis", "Confirm ablation catheter position at PV ostia before energy delivery"],
+    pitfalls: ["RSPV may be mistaken for SVC"],
+    measurements: ["RSPV and RIPV ostial diameters (mm)", "PV velocity (m/s)"],
+    criticalFindings: ["PV velocity >1.5 m/s → PV stenosis"],
+  },
+  "ice:pericardialview": {
+    description: "The catheter is advanced into the right ventricle and directed posteriorly to visualise the pericardial space. This is the primary view for detecting pericardial effusion and tamponade during procedures.",
+    structures: ["Pericardial space", "Right ventricle", "Left ventricle"],
+    howToGet: ["Advance ICE catheter into RV", "Direct posteriorly to visualize pericardial space", "Color Doppler to assess for pericardial effusion", "Compare with baseline assessment"],
+    tips: ["Baseline pericardial assessment before procedure is essential", "New pericardial effusion during procedure = perforation until proven otherwise", "RA collapse in systole = early tamponade sign"],
+    pitfalls: ["Small effusions may be missed without careful sweep"],
+    measurements: ["Pericardial effusion size (mm)", "RA collapse (present/absent)"],
+    criticalFindings: ["New pericardial effusion during procedure → perforation", "RA collapse → tamponade"],
+  },
+  // ─── POCUS Lung additional views ─────────────────────────────────────────────
+  "pocus_lung:rua": {
+    description: "Right Upper Anterior (Zone 1) — right upper anterior chest wall. Assess for A-lines (normal aeration), B-lines (interstitial syndrome), and sliding sign (pneumothorax if absent).",
+    structures: ["Right upper anterior lung", "Pleural line", "Ribs"],
+    howToGet: ["Place probe longitudinally in 2nd–3rd ICS, mid-clavicular line, right side", "Identify two ribs and pleural line between them ('bat sign')", "Assess for lung sliding, A-lines, B-lines"],
+    tips: ["A-lines (horizontal reverberation artifacts) = normal aeration", "B-lines (vertical, laser-like) = interstitial syndrome (pulmonary edema, pneumonia)", "Absent lung sliding = pneumothorax until proven otherwise"],
+    pitfalls: ["Absent sliding may be due to breath-holding or poor contact — confirm with M-mode"],
+    measurements: ["Lung sliding (present/absent)", "A-lines (present/absent)", "B-lines (count per zone)"],
+    criticalFindings: ["Absent lung sliding + A-lines + lung point → pneumothorax"],
+  },
+  "pocus_lung:rla": {
+    description: "Right Lower Anterior (Zone 2) — right lower anterior chest wall. Assess for B-lines, consolidation, and pleural effusion. Zone 2 is particularly sensitive for pulmonary edema.",
+    structures: ["Right lower anterior lung", "Pleural line", "Diaphragm"],
+    howToGet: ["Place probe longitudinally in 4th–5th ICS, mid-clavicular line, right side", "Identify pleural line and assess for B-lines", "Tilt inferiorly to assess for pleural effusion"],
+    tips: ["≥3 B-lines per zone = significant interstitial syndrome", "Zone 2 is the most sensitive zone for pulmonary edema", "Consolidation: tissue-like appearance with air bronchograms"],
+    pitfalls: ["B-lines at zone boundaries may be normal — assess all zones"],
+    measurements: ["B-line count per zone", "Lung sliding (present/absent)"],
+    criticalFindings: ["≥3 B-lines bilateral → pulmonary edema"],
+  },
+  "pocus_lung:rl_plaps": {
+    description: "Right Lateral — PLAPS Point (Posterolateral Alveolar and/or Pleural Syndrome). The PLAPS point is the most sensitive location for detecting pleural effusion and posterior consolidation.",
+    structures: ["Right posterolateral lung", "Pleural space", "Diaphragm", "Liver"],
+    howToGet: ["Place probe at right posterolateral chest wall, above diaphragm", "PLAPS point: intersection of anterior axillary line and horizontal line through xiphoid", "Assess for pleural effusion (anechoic space above diaphragm) and consolidation"],
+    tips: ["PLAPS point is the most sensitive location for pleural effusion", "Pleural effusion: anechoic space above diaphragm, with 'spine sign'", "Consolidation: tissue-like appearance with air bronchograms"],
+    pitfalls: ["Liver may be mistaken for pleural effusion — identify hepatic veins"],
+    measurements: ["Pleural effusion depth (mm)", "Consolidation (present/absent)"],
+    criticalFindings: ["Large pleural effusion → consider drainage"],
+  },
+  "pocus_lung:lua": {
+    description: "Left Upper Anterior (Zone 4) — left upper anterior chest wall. Assess for A-lines (normal aeration), B-lines (interstitial syndrome), and sliding sign (pneumothorax if absent).",
+    structures: ["Left upper anterior lung", "Pleural line", "Ribs"],
+    howToGet: ["Place probe longitudinally in 2nd–3rd ICS, mid-clavicular line, left side", "Identify two ribs and pleural line between them ('bat sign')", "Assess for lung sliding, A-lines, B-lines"],
+    tips: ["A-lines = normal aeration", "B-lines = interstitial syndrome", "Absent lung sliding = pneumothorax until proven otherwise"],
+    pitfalls: ["Cardiac motion may cause false lung sliding — use M-mode for confirmation"],
+    measurements: ["Lung sliding (present/absent)", "A-lines (present/absent)", "B-lines (count per zone)"],
+    criticalFindings: ["Absent lung sliding + A-lines + lung point → pneumothorax"],
+  },
+  "pocus_lung:lla": {
+    description: "Left Lower Anterior (Zone 5) — left lower anterior chest wall. Assess for B-lines, consolidation, and pleural effusion. Cardiac motion may cause false lung sliding artifacts.",
+    structures: ["Left lower anterior lung", "Pleural line", "Diaphragm"],
+    howToGet: ["Place probe longitudinally in 4th–5th ICS, mid-clavicular line, left side", "Identify pleural line and assess for B-lines", "Tilt inferiorly to assess for pleural effusion"],
+    tips: ["≥3 B-lines per zone = significant interstitial syndrome", "Cardiac motion may cause false lung sliding artifacts in zone 5", "Use M-mode to differentiate true lung sliding from cardiac motion"],
+    pitfalls: ["Cardiac motion may cause false lung sliding artifacts"],
+    measurements: ["B-line count per zone", "Lung sliding (present/absent)"],
+    criticalFindings: ["≥3 B-lines bilateral → pulmonary edema"],
+  },
+  "pocus_lung:ll_plaps": {
+    description: "Left Lateral — PLAPS Point. The most sensitive location for detecting left-sided pleural effusion and posterior consolidation. Spleen is the acoustic window on the left.",
+    structures: ["Left posterolateral lung", "Pleural space", "Diaphragm", "Spleen"],
+    howToGet: ["Place probe at left posterolateral chest wall, above diaphragm", "PLAPS point: intersection of anterior axillary line and horizontal line through xiphoid", "Assess for pleural effusion (anechoic space above diaphragm) and consolidation"],
+    tips: ["Spleen is the acoustic window on the left (vs liver on right)", "Pleural effusion: anechoic space above diaphragm, with 'spine sign'", "PLAPS point is the most sensitive location for pleural effusion"],
+    pitfalls: ["Spleen may be small and difficult to identify — use rib spaces as landmarks"],
+    measurements: ["Pleural effusion depth (mm)", "Consolidation (present/absent)"],
+    criticalFindings: ["Large pleural effusion → consider drainage"],
+  },
+  "pocus_lung:diaphragm_r": {
+    description: "Right Diaphragm assessment. Evaluate diaphragm excursion (M-mode), thickness, and thickening fraction. Diaphragm dysfunction is a common cause of respiratory failure and difficult weaning.",
+    structures: ["Right hemidiaphragm", "Liver", "Right pleural space"],
+    howToGet: ["Subcostal or right lateral approach", "Identify diaphragm as a bright echogenic line above liver", "M-mode: measure diaphragm excursion during quiet breathing and deep inspiration", "B-mode: measure diaphragm thickness at zone of apposition"],
+    tips: ["Normal diaphragm excursion: >1.8 cm (quiet) / >4.7 cm (deep inspiration)", "Diaphragm thickening fraction >20% = adequate function", "Paradoxical motion (moves up on inspiration) = diaphragm paralysis"],
+    pitfalls: ["M-mode cursor must be perpendicular to diaphragm motion"],
+    measurements: ["Diaphragm excursion (cm)", "Diaphragm thickness (mm)", "Thickening fraction (%)"],
+    criticalFindings: ["Paradoxical diaphragm motion → diaphragm paralysis", "Excursion <1.0 cm → severe dysfunction"],
+  },
+  "pocus_lung:diaphragm_l": {
+    description: "Left Diaphragm assessment. Evaluate diaphragm excursion (M-mode), thickness, and thickening fraction. Left hemidiaphragm is more difficult to image due to the absence of a solid acoustic window (spleen is smaller than liver).",
+    structures: ["Left hemidiaphragm", "Spleen", "Left pleural space"],
+    howToGet: ["Left lateral or subcostal approach", "Identify diaphragm above spleen", "M-mode: measure diaphragm excursion during quiet breathing and deep inspiration", "B-mode: measure diaphragm thickness at zone of apposition"],
+    tips: ["Left diaphragm is more difficult to image than right — use left lateral decubitus position", "Normal diaphragm excursion: >1.8 cm (quiet) / >4.7 cm (deep inspiration)", "Paradoxical motion = diaphragm paralysis"],
+    pitfalls: ["Spleen may be small — left diaphragm imaging is more challenging than right"],
+    measurements: ["Diaphragm excursion (cm)", "Diaphragm thickness (mm)", "Thickening fraction (%)"],
+    criticalFindings: ["Paradoxical diaphragm motion → diaphragm paralysis"],
+  },
+  // ─── POCUS Rush additional views ─────────────────────────────────────────────
+  "pocus_rush:pump_psax": {
+    description: "The Pump — PSAX. Parasternal short axis at papillary muscle level assesses LV systolic function (D-sign for RV pressure overload), regional wall motion, and LV cavity size in the RUSH protocol.",
+    structures: ["Left ventricle (mid-cavity)", "Right ventricle", "Interventricular septum"],
+    howToGet: ["PSAX at papillary muscle level", "Assess LV systolic function (visual EF)", "D-sign: flattened IVS = RV pressure overload (PE, pulmonary HTN)", "Assess for regional wall motion abnormalities"],
+    tips: ["D-sign (septal flattening) = RV pressure overload — consider PE", "Hyperdynamic LV + small cavity = distributive shock (sepsis, anaphylaxis)", "Dilated, hypokinetic LV = cardiogenic shock"],
+    pitfalls: ["PSAX may be difficult in supine ICU patients — use subcostal as backup"],
+    measurements: ["LV visual EF (%)", "D-sign (present/absent)", "LV cavity size"],
+    criticalFindings: ["D-sign → RV pressure overload → consider PE", "Hyperdynamic LV + small cavity → distributive shock"],
+  },
+  "pocus_rush:pump_a4c": {
+    description: "The Pump — Apical 4-Chamber. A4C assesses biventricular function, RV size, pericardial effusion, and tamponade in the RUSH protocol. The single most important view for shock assessment.",
+    structures: ["Left ventricle", "Right ventricle", "Pericardium", "Mitral valve", "Tricuspid valve"],
+    howToGet: ["A4C: standard apical 4-chamber", "Assess LV EF (biplane or visual)", "Assess RV size (RV:LV ratio)", "Assess pericardial effusion"],
+    tips: ["RV:LV ratio >1 = RV dilation (PE, RV infarct)", "RA systolic collapse = early tamponade sign", "McConnell's sign (apical hyperkinesis + free wall hypokinesis) = PE"],
+    pitfalls: ["Foreshortened A4C underestimates LV EF — move probe to true apex"],
+    measurements: ["LV EF (%)", "RV:LV ratio", "TAPSE (mm)", "Pericardial effusion (mm)"],
+    criticalFindings: ["RA systolic collapse → tamponade", "RV:LV >1.5 + McConnell's sign → massive PE"],
+  },
+  "pocus_rush:tank_luq": {
+    description: "The Tank — LUQ Free Fluid. Left upper quadrant (splenorenal space) assessment for free fluid (hemoperitoneum). Less sensitive than RUQ but essential for complete FAST/RUSH assessment.",
+    structures: ["Spleen", "Left kidney", "Splenorenal space", "Left pleural space"],
+    howToGet: ["Place probe in left posterior axillary line, 8th–11th ICS", "Identify spleen and left kidney", "Assess splenorenal space for free fluid", "Tilt superiorly to assess left pleural space"],
+    tips: ["Splenorenal space is less sensitive than Morison's pouch for hemoperitoneum", "Left pleural effusion may be mistaken for free fluid — identify diaphragm", "Free fluid: anechoic space between spleen and kidney"],
+    pitfalls: ["Left pleural effusion may be mistaken for intraperitoneal free fluid"],
+    measurements: ["Free fluid (present/absent)", "Depth of free fluid (mm)"],
+    criticalFindings: ["Free fluid in splenorenal space → hemoperitoneum → trauma activation"],
+  },
+  "pocus_rush:tank_pelvis": {
+    description: "The Tank — Pelvic Free Fluid. Pelvic assessment for free fluid (hemoperitoneum, ascites). The pelvis is the most dependent space in the supine patient and accumulates free fluid first.",
+    structures: ["Bladder", "Rectovesical/rectouterine space", "Pelvic free fluid"],
+    howToGet: ["Place probe suprapubically, transverse and sagittal planes", "Identify bladder as anechoic structure", "Assess posterior to bladder (rectovesical/rectouterine space) for free fluid", "Sagittal: assess posterior cul-de-sac"],
+    tips: ["Pelvis is the most dependent space in supine patient — free fluid accumulates here first", "Full bladder improves visualization", "Free fluid: anechoic space posterior to bladder"],
+    pitfalls: ["Empty bladder reduces sensitivity — assess even if bladder appears empty"],
+    measurements: ["Free fluid (present/absent)", "Depth of free fluid (mm)"],
+    criticalFindings: ["Free fluid in pelvis → hemoperitoneum → trauma activation"],
+  },
+  "pocus_rush:pipes_dvt": {
+    description: "The Pipes — DVT Assessment. Two-point compression ultrasound (common femoral vein and popliteal vein) is performed as part of the RUSH protocol. DVT + shock = PE until proven otherwise.",
+    structures: ["Common femoral vein", "Popliteal vein", "Femoral artery"],
+    howToGet: ["Linear probe (7–15 MHz) at femoral triangle: compress CFV", "Popliteal fossa: compress popliteal vein at knee crease", "Non-compressible vein = DVT", "Color Doppler to confirm venous flow"],
+    tips: ["Two-point compression: CFV and popliteal vein — sensitivity 97% for proximal DVT", "DVT + shock = PE until proven otherwise", "Color Doppler: absent flow = DVT"],
+    pitfalls: ["Artery vs vein: artery is pulsatile and non-compressible — identify by pulsatility", "Hematoma may mimic DVT — assess compressibility"],
+    measurements: ["CFV compressibility (yes/no)", "Popliteal vein compressibility (yes/no)"],
+    criticalFindings: ["Non-compressible CFV or popliteal vein → DVT → consider PE"],
+  },
+  "pocus_rush:pipes_ptx": {
+    description: "The Pipes — Pneumothorax. Anterior chest wall assessment for pneumothorax using lung sliding, A-lines, and lung point. Absent lung sliding + A-lines + lung point = pneumothorax.",
+    structures: ["Anterior pleural line", "Lung", "Ribs"],
+    howToGet: ["Place probe longitudinally at 2nd–3rd ICS, mid-clavicular line, most anterior position", "Identify bat sign (two ribs + pleural line)", "Assess for lung sliding (absent = PTX)", "M-mode: seashore sign (normal) vs barcode sign (PTX)"],
+    tips: ["Absent lung sliding + A-lines = PTX until proven otherwise", "Lung point (transition from PTX to normal lung) = 100% specific for PTX", "Barcode sign on M-mode = absent lung sliding = PTX"],
+    pitfalls: ["Absent sliding may be due to breath-holding, pleurodesis, or poor contact", "Bilateral PTX: no lung point may be found"],
+    measurements: ["Lung sliding (present/absent)", "Lung point (present/absent)"],
+    criticalFindings: ["Absent lung sliding + A-lines + lung point → pneumothorax → needle decompression"],
+  },
+  // ─── Stress Echo additional views ────────────────────────────────────────────
+  "stress:peak-psax-pm": {
+    description: "The papillary muscle level PSAX at peak stress is the single most important view for detecting ischaemia. New or worsening regional wall motion abnormality (RWMA) at peak stress indicates inducible ischaemia.",
+    structures: ["LV mid-cavity", "Papillary muscles", "Interventricular septum"],
+    howToGet: ["PSAX at papillary muscle level — same position as rest PSAX", "Acquire immediately at peak stress (within 60–90 seconds of peak HR)", "Side-by-side comparison with rest PSAX"],
+    tips: ["Acquire peak views within 60–90 seconds of peak HR — WMA resolves rapidly", "Side-by-side comparison with rest is essential", "PSAX at PM level is the most sensitive view for ischaemia detection"],
+    pitfalls: ["Delay in acquisition — WMA may resolve before imaging", "Foreshortened view — move probe to true apex"],
+    measurements: ["WMSI (wall motion score index)", "Regional WMA (new/worsening)"],
+    criticalFindings: ["New or worsening RWMA at peak → inducible ischaemia", "New RWMA in multiple territories → multivessel disease"],
+  },
+  "stress:peak-a4c": {
+    description: "Peak A4C assesses apical and mid-lateral/septal wall motion and provides biplane EF at peak stress. New apical WMA is highly specific for LAD territory ischaemia.",
+    structures: ["LV (apical, mid-lateral, mid-septal walls)", "Right ventricle", "Mitral valve"],
+    howToGet: ["A4C — same position as rest A4C", "Acquire immediately at peak stress (within 60–90 seconds of peak HR)", "Side-by-side comparison with rest A4C"],
+    tips: ["New apical WMA = LAD territory ischaemia", "New mid-lateral WMA = LCx territory ischaemia", "Biplane EF at peak: EF should increase ≥5% with exercise"],
+    pitfalls: ["Foreshortened A4C — move probe to true apex", "Delay in acquisition — WMA resolves rapidly"],
+    measurements: ["WMSI", "LV EF at peak (%)", "Regional WMA"],
+    criticalFindings: ["New apical WMA → LAD ischaemia", "EF drop >5% at peak → significant ischaemia"],
+  },
+  "stress:peak-a2c": {
+    description: "Peak A2C completes the biplane EF at peak stress and assesses the anterior (LAD) and inferior (RCA) walls. New anterior WMA is highly specific for LAD territory ischaemia.",
+    structures: ["LV (anterior, inferior walls)", "LA", "Mitral valve"],
+    howToGet: ["A2C — same position as rest A2C", "Acquire immediately at peak stress (within 60–90 seconds of peak HR)", "Side-by-side comparison with rest A2C"],
+    tips: ["New anterior WMA = LAD territory ischaemia", "New inferior WMA = RCA territory ischaemia", "Biplane EF requires both A4C and A2C"],
+    pitfalls: ["Foreshortened A2C — move probe to true apex", "Delay in acquisition — WMA resolves rapidly"],
+    measurements: ["WMSI", "LV EF at peak (biplane, %)", "Regional WMA"],
+    criticalFindings: ["New anterior WMA → LAD ischaemia", "New inferior WMA → RCA ischaemia"],
+  },
+  "stress:recovery-a4c": {
+    description: "Recovery views at 2–3 minutes post-exercise confirm resolution of stress-induced WMA and assess post-stress diastolic function. Persistent WMA at recovery indicates significant ischaemia or stunning.",
+    structures: ["LV (all walls)", "Right ventricle", "Mitral valve"],
+    howToGet: ["A4C at 2–3 minutes post-exercise", "Side-by-side comparison with peak and rest", "Assess for WMA resolution", "Diastolic stress: E/e' at recovery (within 1 minute post-exercise)"],
+    tips: ["Persistent WMA at recovery → significant ischaemia or stunning", "Diastolic stress echo: E/e' >14 at recovery = elevated filling pressures", "Recovery views confirm WMA resolution — important for safety"],
+    pitfalls: ["WMA may resolve before recovery imaging — compare with peak"],
+    measurements: ["WMSI at recovery", "E/e' at recovery (diastolic stress)"],
+    criticalFindings: ["Persistent WMA at recovery → significant ischaemia", "E/e' >14 at recovery → elevated filling pressures"],
+  },
+  "stress:dse-low-dose": {
+    description: "Low-dose dobutamine (5–10 mcg/kg/min) is used to assess myocardial viability. Viable but hibernating myocardium shows a biphasic response: improved function at low dose, then deterioration at peak dose.",
+    structures: ["LV (all walls)", "Interventricular septum"],
+    howToGet: ["Acquire views at rest, low-dose (5–10 mcg/kg/min), and peak dose", "Side-by-side comparison of all stages", "Assess for biphasic response in akinetic/hypokinetic segments"],
+    tips: ["Biphasic response = viable myocardium (hibernation)", "Sustained improvement at peak = stunning (no significant ischaemia)", "No response = scar (non-viable)"],
+    pitfalls: ["Biphasic response may be subtle — use side-by-side comparison"],
+    measurements: ["WMSI at each stage", "Biphasic response (present/absent per segment)"],
+    criticalFindings: ["Biphasic response → viable myocardium → revascularization may improve function"],
+  },
+  "stress:dse-peak": {
+    description: "Peak dobutamine stress (40 mcg/kg/min ± atropine 0.25–1 mg IV) is used for ischaemia detection when exercise stress is not possible. New RWMA at peak = inducible ischaemia.",
+    structures: ["LV (all walls)", "Interventricular septum"],
+    howToGet: ["Acquire views at peak dobutamine dose", "Side-by-side comparison with rest", "Target HR: 85% of age-predicted maximum HR", "Atropine 0.25–1 mg IV if target HR not achieved"],
+    tips: ["Target HR: 85% of APMHR (220 - age)", "Atropine augments HR if target not achieved at 40 mcg/kg/min", "Stop criteria: new RWMA, significant arrhythmia, BP drop >40 mmHg, severe hypertension"],
+    pitfalls: ["Inadequate HR response — consider atropine", "Arrhythmia may prevent adequate imaging"],
+    measurements: ["WMSI at peak", "Peak HR achieved", "Regional WMA"],
+    criticalFindings: ["New RWMA at peak → inducible ischaemia", "BP drop >40 mmHg → stop test"],
+  },
+  "stress:diastolic-stress": {
+    description: "Diastolic stress echo uses exercise to unmask elevated filling pressures in patients with exertional dyspnoea and preserved EF. E/e' >14 immediately post-exercise = exercise-induced diastolic dysfunction.",
+    structures: ["Mitral valve", "Mitral annulus (TDI)", "Tricuspid valve (TR)"],
+    howToGet: ["Acquire mitral inflow (E/A) and TDI e' immediately post-exercise (within 1 minute)", "TR velocity post-exercise for PASP estimation", "Compare with rest diastolic parameters"],
+    tips: ["E/e' >14 immediately post-exercise = elevated filling pressures", "TR velocity >3.4 m/s post-exercise = exercise-induced pulmonary hypertension", "Acquire within 1 minute of peak exercise — parameters normalize rapidly"],
+    pitfalls: ["Delay in acquisition — diastolic parameters normalize rapidly", "Tachycardia may cause E/A fusion — difficult to interpret"],
+    measurements: ["E/e' post-exercise", "TR velocity post-exercise (m/s)", "E/A ratio post-exercise"],
+    criticalFindings: ["E/e' >14 post-exercise → elevated filling pressures → HFpEF", "TR velocity >3.4 m/s post-exercise → exercise-induced pulmonary hypertension"],
+  },
+  // ─── Structural Heart additional views ───────────────────────────────────────
+  "structural:asd-sizing": {
+    description: "ASD sizing requires measurement of the defect diameter and assessment of all rims (aortic, superior vena cava, inferior vena cava, posterior, and inferior) to determine suitability for transcatheter closure.",
+    structures: ["Interatrial septum", "ASD", "Rims", "Pulmonary veins"],
+    howToGet: ["TEE: ME bicaval (90–110°) — ASD diameter, SVC and IVC rims", "TEE: ME 4C (0°) — posterior and inferior rims", "TEE: ME AV SAX (30–45°) — aortic rim", "3D TEE: en face view of ASD for device sizing"],
+    tips: ["Aortic rim <5 mm = deficient aortic rim — still closeable with Amplatzer", "All other rims must be ≥5 mm for transcatheter closure", "3D TEE provides the most accurate ASD sizing"],
+    pitfalls: ["2D TEE may underestimate ASD size — use 3D TEE for accurate sizing"],
+    measurements: ["ASD maximum diameter (mm)", "All rim measurements (mm)", "Device size = ASD + 2 × rim"],
+    criticalFindings: ["Deficient posterior or inferior rim → surgical repair preferred"],
+  },
+  "structural:asd-deployment": {
+    description: "ASD/PFO device deployment is guided by TEE or ICE. The LA disc is deployed first, then pulled back to the IAS, followed by RA disc deployment. Confirm position, compression, and absence of peridevice leak.",
+    structures: ["ASD device", "Interatrial septum", "Aortic root", "Pulmonary veins"],
+    howToGet: ["TEE ME bicaval (90–110°): confirm device position", "TEE ME 4C (0°): confirm RA and LA disc positions", "Color Doppler: assess for peridevice leak", "3D TEE: en face view of device"],
+    tips: ["LA disc must be fully deployed in LA before pulling back to IAS", "Device compression (waist) at IAS level = correct position", "Peridevice leak: color Doppler around device perimeter"],
+    pitfalls: ["Device embolization: ensure both discs are deployed before release"],
+    measurements: ["Device compression (%)", "Peridevice leak (present/absent)"],
+    criticalFindings: ["Device embolization → surgical retrieval", "Peridevice leak → may require reintervention"],
+  },
+  "structural:laao-deployment": {
+    description: "After Watchman/Amulet deployment, TEE confirms device position, compression, seal, and absence of peridevice leak. The device should be at or distal to the LAA ostium with ≥80% compression.",
+    structures: ["LAA device", "LAA ostium", "Left atrial appendage"],
+    howToGet: ["TEE: multiple views of LAA (0°, 45°, 90°, 135°) for device assessment", "Color Doppler: peridevice leak assessment", "3D TEE: en face view of device", "Confirm device position at or distal to LAA ostium"],
+    tips: ["Watchman: device compression 8–20% = optimal", "Amulet: assess all lobes of LAA", "Peridevice leak ≤5 mm = acceptable"],
+    pitfalls: ["Device too proximal → peridevice leak → reposition", "Device too distal → risk of embolization"],
+    measurements: ["Device compression (%)", "Peridevice leak (mm)", "Device position relative to LAA ostium"],
+    criticalFindings: ["Peridevice leak >5 mm → reposition", "Device embolization → surgical retrieval"],
+  },
+  "structural:tteer-guidance": {
+    description: "Tricuspid TEER (TriClip/CLASP) requires TEE guidance for transseptal puncture, clip delivery, and grasping of the tricuspid valve leaflets. The procedure is more complex than mitral TEER due to RV anatomy.",
+    structures: ["Tricuspid valve", "Right ventricle", "Interatrial septum", "Clip device"],
+    howToGet: ["TEE ME 4C (0°): TV anatomy, TR severity", "TEE ME RV inflow-outflow (60–90°): TV leaflets, clip delivery", "TEE bicaval (90–110°): transseptal puncture guidance", "3D TEE: en face view of TV for clip positioning"],
+    tips: ["Transseptal puncture for tricuspid TEER: posterior and inferior puncture", "TV leaflet grasping: anterior and septal leaflets are primary targets", "3D TEE is essential for clip positioning and leaflet grasping"],
+    pitfalls: ["TV anatomy is more complex than MV — requires 3D TEE for accurate assessment"],
+    measurements: ["TR severity pre/post clip", "TV gradient post clip", "Clip position"],
+    criticalFindings: ["Severe residual TR → additional clip or surgical referral", "TV stenosis (mean gradient >5 mmHg) → clip removal"],
+  },
+  "structural:tmvr-sizing": {
+    description: "Transcatheter mitral valve replacement (TMVR) requires careful sizing of the mitral annulus and assessment of neo-LVOTO risk. LVOTO is the most feared complication of TMVR.",
+    structures: ["Mitral annulus", "LVOT", "Anterior mitral leaflet", "Left ventricle"],
+    howToGet: ["TEE: 3D mitral annulus sizing (D1 × D2 × area)", "CT is gold standard for TMVR sizing — TEE is complementary", "PLAX: LVOT diameter, anterior mitral leaflet length", "A5C: LVOT gradient (baseline)"],
+    tips: ["Neo-LVOTO risk: anterior mitral leaflet pushed into LVOT by device", "LVOT area reduction >10% = high neo-LVOTO risk", "LAMPOON procedure may be required to prevent neo-LVOTO"],
+    pitfalls: ["2D TEE underestimates annulus size — use 3D TEE or CT"],
+    measurements: ["Mitral annulus D1 and D2 (mm)", "Mitral annulus area (cm²)", "LVOT diameter (mm)", "Anterior mitral leaflet length (mm)"],
+    criticalFindings: ["Neo-LVOTO (LVOT gradient >20 mmHg post-TMVR) → LAMPOON or surgical conversion"],
+  },
+  // ─── UEA additional views ─────────────────────────────────────────────────────
+  "uea:subcostal": {
+    description: "Subcostal view with UEA (ultrasound enhancing agent) for LV opacification. Provides an alternative window when parasternal and apical windows are suboptimal. Useful for IVC assessment and RV function.",
+    structures: ["LV (subcostal)", "RV", "IVC", "Hepatic veins"],
+    howToGet: ["Subcostal: standard subxiphoid position", "UEA bolus injection: 0.5–1 mL IV bolus", "Optimize gain and mechanical index for UEA imaging", "Assess LV opacification and wall motion"],
+    tips: ["Low mechanical index (0.1–0.2) for UEA imaging to prevent microbubble destruction", "Subcostal window is useful when apical windows are poor", "IVC assessment: UEA does not affect IVC collapsibility"],
+    pitfalls: ["High mechanical index destroys microbubbles — reduce MI for UEA imaging"],
+    measurements: ["LV EF (subcostal)", "IVC diameter (mm)"],
+    criticalFindings: [],
+  },
+  "chd:heterotaxy-palliation": {
+    description: "Heterotaxy Palliation Surveillance. Assess palliation strategy (Fontan pathway vs biventricular repair), ventricular function, AV valve regurgitation, and systemic/pulmonary venous connections.",
+    structures: ["Single ventricle or biventricles", "AV valves", "Pulmonary veins", "Systemic veins"],
+    howToGet: ["A4C — ventricular function, AV valve regurgitation", "Subcostal — systemic venous connections, Fontan conduit", "Suprasternal — bilateral PA flow", "PSAX — pulmonary venous connections"],
+    tips: ["AV valve regurgitation is the most important modifiable risk factor", "Heterotaxy with biventricular repair: assess both ventricles and AV valves"],
+    pitfalls: ["Complex anatomy requires systematic segmental analysis at each visit"],
+    measurements: ["Ventricular function", "AV valve regurgitation severity", "Fontan conduit peak velocity"],
+    criticalFindings: ["Severe AV valve regurgitation → intervention before Fontan"],
   },
 };
+/**
+ * Look up static content for a given module and viewId.
+ * Returns undefined if no static content is available.
+ */
+export function getStaticViewContent(
+  module: string,
+  viewId: string
+): StaticViewContent | undefined {
+  return STATIC_CONTENT[`${module}:${viewId}`];
+}
 
-/** Get static content for a specific module+view, or empty strings if not found */
+/**
+ * Check if static content exists for a given module and viewId.
+ */
+export function hasStaticContent(module: string, viewId: string): boolean {
+  return `${module}:${viewId}` in STATIC_CONTENT;
+}
+
 export function getStaticContent(module: string, viewId: string): ScanCoachStaticViewContent {
   return SCANCOACH_STATIC_CONTENT[module]?.[viewId] ?? {
     description: "",
