@@ -185,10 +185,92 @@ export default function LessonBlockEditor({
     });
   };
 
-  // Helper: get a short preview label for a block
-  const blockPreviewLabel = (b: Block) => {
+  // Helper: strip HTML tags and return plain text
+  const stripHtml = (html: string): string => {
+    if (!html) return "";
+    return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  };
+
+  // Helper: get a short preview label for a block (first ~60 chars of meaningful content)
+  const blockPreviewLabel = (b: Block): string => {
     const d = b.data as any;
-    return d?.heading || d?.title || d?.text?.slice?.(0, 40) || d?.label || b.type;
+    const truncate = (s: string, n = 60) => s.length > n ? s.slice(0, n).trimEnd() + "…" : s;
+    switch (b.type) {
+      case "hero":
+        return truncate(d?.headline || d?.subheadline || "Hero banner");
+      case "text":
+        return truncate(stripHtml(d?.html || "") || "Rich text block");
+      case "two_column":
+        return truncate(stripHtml(d?.leftHtml || d?.rightHtml || "") || "Two-column layout");
+      case "divided_columns": {
+        const cols: any[] = d?.columns ?? [];
+        return truncate(stripHtml(cols[0]?.html || "") || "Divided columns");
+      }
+      case "three_column":
+        return truncate(stripHtml(d?.col1Html || d?.col2Html || "") || "Three-column layout");
+      case "image":
+        return d?.alt ? truncate(d.alt) : d?.caption ? truncate(d.caption) : d?.url ? "Image" : "Image (no URL)";
+      case "video":
+        return d?.caption ? truncate(d.caption) : d?.embedUrl ? truncate(d.embedUrl, 50) : "Video embed";
+      case "embed":
+        return d?.caption ? truncate(d.caption) : "Embed / iFrame";
+      case "gallery": {
+        const imgs: any[] = d?.images ?? [];
+        return `Image gallery (${imgs.length} images)`;
+      }
+      case "bullets": {
+        const items: string[] = d?.items ?? [];
+        return truncate(d?.headline || items[0] || "Feature list");
+      }
+      case "numbered_list": {
+        const items: string[] = d?.items ?? [];
+        return truncate(d?.headline || items[0] || "Numbered list");
+      }
+      case "icon_grid":
+        return truncate(d?.headline || "Icon grid");
+      case "testimonial":
+        return truncate(d?.quote || d?.author || "Testimonial");
+      case "reviews":
+        return truncate(d?.headline || "Reviews");
+      case "faq": {
+        const items: any[] = d?.items ?? [];
+        return truncate(d?.headline || items[0]?.q || "FAQ");
+      }
+      case "alert":
+        return truncate(stripHtml(d?.text || "") || "Alert / callout");
+      case "flip_cards":
+        return truncate(d?.headline || "Flip cards");
+      case "instructor":
+        return truncate(d?.name || "Instructor profile");
+      case "countdown":
+        return truncate(d?.headline || "Countdown timer");
+      case "pricing_cta":
+      case "cta_standalone":
+        return truncate(d?.headline || d?.ctaText || "Call to action");
+      case "lead_capture":
+        return truncate(d?.headline || "Lead capture form");
+      case "logos":
+        return truncate(d?.headline || "Logos / social proof");
+      case "spacer":
+        return `Spacer (${d?.height ?? 48}px)`;
+      case "divider":
+        return "Divider";
+      case "logo_strip":
+        return truncate(d?.headline || "Logo strip");
+      case "footer":
+        return "Footer";
+      case "curriculum_auto":
+        return "Curriculum (auto)";
+      case "pricing_options_auto":
+        return "Pricing options (auto)";
+      case "related_products":
+        return "Related products";
+      default: {
+        // Fallback: try common keys
+        const text = d?.headline || d?.title || d?.heading || d?.text || d?.html || d?.quote || "";
+        return truncate(stripHtml(String(text)) || b.type.replace(/_/g, " "));
+      }
+    }
   };
 
   return (
@@ -479,28 +561,43 @@ export default function LessonBlockEditor({
                   <div className="flex-1 overflow-y-auto space-y-1.5">
                     {filteredSourceBlocks.length === 0 ? (
                       <p className="text-xs text-gray-400 py-4 text-center">No blocks found.</p>
-                    ) : filteredSourceBlocks.map((b, i) => (
+                    ) : filteredSourceBlocks.map((b, i) => {
+                      const catalogEntry = BLOCK_CATALOG.find(c => c.type === b.type);
+                      const preview = blockPreviewLabel(b);
+                      return (
                       <div
                         key={b.id}
-                        className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-gray-100 hover:border-teal-200 hover:bg-teal-50 group transition-colors"
+                        className="flex items-start justify-between gap-2 px-3 py-2.5 rounded-lg border border-gray-100 hover:border-teal-200 hover:bg-teal-50 group transition-colors"
                       >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-gray-400 text-xs font-mono w-5 shrink-0">{i + 1}</span>
-                          <div className="min-w-0">
-                            <p className="text-xs font-medium text-gray-700 capitalize">{b.type.replace(/_/g, " ")}</p>
-                            <p className="text-xs text-gray-400 truncate">{blockPreviewLabel(b)}</p>
+                        <div className="flex items-start gap-2.5 min-w-0">
+                          {/* Position number */}
+                          <span className="text-gray-300 text-xs font-mono w-5 shrink-0 mt-0.5 text-right">{i + 1}</span>
+                          {/* Block icon */}
+                          {catalogEntry && (
+                            <span className="shrink-0 text-teal-500 mt-0.5" style={{ fontSize: 14 }}>{catalogEntry.icon}</span>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            {/* Block type label */}
+                            <p className="text-xs font-semibold text-gray-700 leading-tight">
+                              {catalogEntry?.label ?? b.type.replace(/_/g, " ")}
+                            </p>
+                            {/* Content preview */}
+                            {preview && (
+                              <p className="text-xs text-gray-400 mt-0.5 leading-snug line-clamp-2">{preview}</p>
+                            )}
                           </div>
                         </div>
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-6 text-xs shrink-0 border-teal-300 text-teal-700 hover:bg-teal-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="h-6 text-xs shrink-0 border-teal-300 text-teal-700 hover:bg-teal-50 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5"
                           onClick={() => copyBlockFromLesson(b)}
                         >
                           <Copy className="w-3 h-3 mr-1" /> Copy
                         </Button>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </>
               )}

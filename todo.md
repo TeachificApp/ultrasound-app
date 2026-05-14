@@ -1819,3 +1819,8 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Enforce lesson-level drip in CoursePlayer (locks individual lessons, shows unlock date)
 - [x] Admin bypass for drip (admins see all content regardless of drip schedule)
 - [x] drip.test.ts: 5 unit tests for drip unlock logic (all passing)
+
+## Block Picker Improvements (May 14)
+- [x] Show text preview (first few words) for each block in "Copy from other lessons" picker — strips HTML, handles all block types
+- [x] Display blocks in position order in the picker (server orders by position, client preserves order)
+- [x] Show block type icon + catalog label in picker row for quick identification
