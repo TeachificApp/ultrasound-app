@@ -220,6 +220,7 @@ export default function CourseOverview() {
     const dripLocked = isDripLocked(lesson, section);
     const prereqLocked = isPrereqLocked(lesson);
     const locked = dripLocked || prereqLocked;
+    const showDone = done && !course.hideProgress;
 
     return (
       <button
@@ -230,7 +231,7 @@ export default function CourseOverview() {
           "w-full text-left flex items-start gap-3 px-4 py-3 transition-colors border-b border-gray-100 last:border-b-0",
           locked
             ? "opacity-60 cursor-not-allowed bg-gray-50"
-            : done
+            : showDone
             ? "hover:bg-teal-50/50 bg-white"
             : "hover:bg-teal-50/30 bg-white"
         )}
@@ -238,14 +239,14 @@ export default function CourseOverview() {
         <span className="mt-0.5 shrink-0">
           {locked ? (
             <Lock className="w-4 h-4 text-gray-400" />
-          ) : done ? (
+          ) : showDone ? (
             <CheckCircle className="w-4 h-4 text-teal-500" />
           ) : (
             <LessonTypeIcon type={lesson.type} />
           )}
         </span>
         <div className="flex-1 min-w-0">
-          <p className={cn("text-sm leading-snug", done ? "text-gray-500 line-through" : locked ? "text-gray-500" : "text-gray-800 font-medium")}>
+          <p className={cn("text-sm leading-snug", showDone ? "text-gray-500 line-through" : locked ? "text-gray-500" : "text-gray-800 font-medium")}>
             {lesson.title}
           </p>
           {dripLocked && (
@@ -298,7 +299,7 @@ export default function CourseOverview() {
                 className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5"
                 onClick={() => navigate(`/learn/${slug}/player?lesson=${continueLesson.id}`)}
               >
-                {completedCount > 0 ? "Continue" : "Start"} <ArrowRight className="w-3.5 h-3.5" />
+                {!course.hideProgress && completedCount > 0 ? "Continue" : "Start"} <ArrowRight className="w-3.5 h-3.5" />
               </Button>
             )}
           </div>
@@ -373,7 +374,7 @@ export default function CourseOverview() {
                     <p className="font-semibold text-gray-900 text-sm leading-snug">{section.title}</p>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-[10px] text-gray-500">{sectionTotal} lesson{sectionTotal !== 1 ? "s" : ""}</span>
-                      {sectionDone > 0 && (
+                      {sectionDone > 0 && !course.hideProgress && (
                         <span className="text-[10px] text-teal-600 font-medium">{sectionDone}/{sectionTotal} done</span>
                       )}
                       {sectionDripLocked && sectionUnlockDate && (
