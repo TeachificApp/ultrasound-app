@@ -11,7 +11,14 @@
  *   Orders       — order history
  *   Analytics    — overview stats
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import type React from "react";
+import {
+  DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable, arrayMove,
+} from "@dnd-kit/sortable";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -543,15 +550,25 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
 
 // ─── Lesson Row ──────────────────────────────────────────────────────────────
 
-function LessonRow({ lesson, onEdit, onQuiz, onDelete }: {
+function SortableLessonRow({ lesson, onEdit, onQuiz, onDelete }: {
   lesson: any;
   onEdit: (lesson: any) => void;
   onQuiz: (lesson: any) => void;
   onDelete: (id: number) => void;
 }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lesson.id });
+  const style: React.CSSProperties = {
+    transform: transform ? `translate3d(${transform.x}px,${transform.y}px,0)` : undefined,
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : undefined,
+    position: 'relative',
+  };
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50">
-      <GripVertical className="w-4 h-4 text-gray-300" />
+    <div ref={setNodeRef} style={style} className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 bg-white">
+      <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing touch-none p-0.5 rounded hover:bg-gray-100" title="Drag to reorder">
+        <GripVertical className="w-4 h-4 text-gray-400" />
+      </button>
       <span className="text-gray-400">{TYPE_ICONS[lesson.type] ?? <FileText className="w-4 h-4" />}</span>
       <span className="text-sm text-gray-700 flex-1">{lesson.title}</span>
       <span className="text-xs text-gray-400">{LESSON_TYPE_LABELS[lesson.type] ?? lesson.type}</span>
@@ -613,6 +630,41 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
     onSuccess: () => toast.success("Landing page saved"),
     onError: e => toast.error(`Error: ${e.message}`),
   });
+
+  const reorderLessons = trpc.lmsAdmin.reorderLessons.useMutation({
+    onError: e => toast.error(`Reorder failed: ${e.message}`),
+    onSuccess: () => refetch(),
+  });
+
+  const reorderSections = trpc.lmsAdmin.reorderSections.useMutation({
+    onError: e => toast.error(`Reorder failed: ${e.message}`),
+    onSuccess: () => refetch(),
+  });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleLessonDragEnd = useCallback((sectionId: number | null, lessons: any[]) => (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = lessons.findIndex(l => l.id === active.id);
+    const newIndex = lessons.findIndex(l => l.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reordered = arrayMove(lessons, oldIndex, newIndex);
+    reorderLessons.mutate({ lessons: reordered.map((l, i) => ({ id: l.id, position: i })) });
+  }, [reorderLessons]);
+
+  const handleSectionDragEnd = useCallback((sections: any[]) => (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = sections.findIndex(s => s.id === active.id);
+    const newIndex = sections.findIndex(s => s.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reordered = arrayMove(sections, oldIndex, newIndex);
+    reorderSections.mutate({ sections: reordered.map((s, i) => ({ id: s.id, position: i })) });
+  }, [reorderSections]);
 
   if (isLoading) return <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>;
   if (!course) return <div className="text-gray-500">Course not found</div>;
@@ -677,14 +729,19 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
                   <span className="font-medium text-sm text-teal-800 flex-1">Course-Level Lessons</span>
                   <span className="text-xs text-teal-600">Not inside any section</span>
                 </div>
-                <div className="divide-y divide-gray-100">
-                  {(course.topLevelLessons ?? []).map((lesson: any) => (
-                    <LessonRow key={lesson.id} lesson={lesson} onEdit={setEditLesson} onQuiz={setQuizLesson} onDelete={id => { if (confirm(`Delete lesson "${lesson.title}"?`)) deleteLesson.mutate({ id }); }} />
-                  ))}
-                </div>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleLessonDragEnd(null, course.topLevelLessons ?? [])}>
+                  <SortableContext items={(course.topLevelLessons ?? []).map((l: any) => l.id)} strategy={verticalListSortingStrategy}>
+                    <div className="divide-y divide-gray-100">
+                      {(course.topLevelLessons ?? []).map((lesson: any) => (
+                        <SortableLessonRow key={lesson.id} lesson={lesson} onEdit={setEditLesson} onQuiz={setQuizLesson} onDelete={id => { if (confirm(`Delete lesson "${lesson.title}"?`)) deleteLesson.mutate({ id }); }} />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
               </div>
             )}
 
+            {/* Sections with sortable lessons inside each */}
             {course.sections.map((section: any) => (
               <div key={section.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                 <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 border-b border-gray-200">
@@ -702,14 +759,18 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
                     <Trash2 className="w-3 h-3" />
                   </Button>
                 </div>
-                <div className="divide-y divide-gray-100">
-                  {section.lessons.map((lesson: any) => (
-                    <LessonRow key={lesson.id} lesson={lesson} onEdit={setEditLesson} onQuiz={setQuizLesson} onDelete={id => { if (confirm(`Delete lesson "${lesson.title}"?`)) deleteLesson.mutate({ id }); }} />
-                  ))}
-                  {section.lessons.length === 0 && (
-                    <div className="px-4 py-3 text-xs text-gray-400">No lessons yet. Add a lesson above.</div>
-                  )}
-                </div>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleLessonDragEnd(section.id, section.lessons)}>
+                  <SortableContext items={section.lessons.map((l: any) => l.id)} strategy={verticalListSortingStrategy}>
+                    <div className="divide-y divide-gray-100">
+                      {section.lessons.map((lesson: any) => (
+                        <SortableLessonRow key={lesson.id} lesson={lesson} onEdit={setEditLesson} onQuiz={setQuizLesson} onDelete={id => { if (confirm(`Delete lesson "${lesson.title}"?`)) deleteLesson.mutate({ id }); }} />
+                      ))}
+                      {section.lessons.length === 0 && (
+                        <div className="px-4 py-3 text-xs text-gray-400">No lessons yet. Add a lesson above.</div>
+                      )}
+                    </div>
+                  </SortableContext>
+                </DndContext>
               </div>
             ))}
             <div className="flex gap-2 flex-wrap">

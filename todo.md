@@ -1767,3 +1767,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add "Learning Objectives" as optional content block in BLOCK_CATALOG (Content category)
 - [x] Learning Objectives block: preview renders teal checklist
 - [x] Learning Objectives block: settings panel to edit title, objectives list, and colors
+## DnD Lesson Reorder Fix (May 14)
+- [x] Import dnd-kit (DndContext, SortableContext, useSortable, arrayMove, sensors) in LMSAdmin
+- [x] Replace static LessonRow with SortableLessonRow using useSortable hook
+- [x] Wrap each section's lesson list in DndContext + SortableContext
+- [x] Wire reorderLessons mutation on drag end (per section)
+- [x] Wire reorderSections mutation on drag end (sections list)
+- [x] Add PointerSensor with 5px activation distance to prevent accidental drags
