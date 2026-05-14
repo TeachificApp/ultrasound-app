@@ -1172,6 +1172,46 @@ export default function CoursePlayer() {
         </div>
       </div>
 
+      {/* ── Mobile Notes Drawer (shown on < lg screens when notes tab is active) ── */}
+      {rightPanelTab === "notes" && selectedLessonId && (
+        <div className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setRightPanelTab("info")}
+          />
+          {/* Drawer */}
+          <div className="relative bg-white rounded-t-2xl shadow-2xl flex flex-col max-h-[75vh]">
+            {/* Handle + header */}
+            <div className="flex items-center justify-between px-4 pt-3 pb-2 border-b border-gray-200 shrink-0">
+              <div className="flex items-center gap-2">
+                <StickyNote className="w-4 h-4 text-amber-600" />
+                <p className="text-sm font-semibold text-amber-800">My Notes</p>
+                {currentNote && (
+                  <span className="text-[10px] text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full">Saved</span>
+                )}
+              </div>
+              <button
+                onClick={() => setRightPanelTab("info")}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {/* Notes editor */}
+            <div className="flex-1 overflow-y-auto p-4">
+              <p className="text-[10px] text-gray-400 mb-3">Notes are saved per lesson and visible only to you.</p>
+              <LessonNoteEditor
+                key={`mobile-${selectedLessonId}`}
+                lessonId={selectedLessonId}
+                courseSlug={slug!}
+                initialNote={currentNote?.note ?? ""}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* WYSIWYG Lesson Block Editor (admin only) */}
       {showBlockEditor && selectedLessonId && lessonData && (
         <Suspense fallback={<div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center"><div className="bg-white text-gray-700 px-6 py-4 rounded-xl shadow-xl">Loading editor...</div></div>}>

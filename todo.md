@@ -1881,3 +1881,6 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix getCoursePlayer payload: strip heavy content columns (contentBlocks, content, videoContent) from lesson list
 - [x] Lazy-mount Landing Page and Course Overview editors in LMS Admin (only render on first tab visit)
 - [x] Improve CoursePlayer loading skeleton to match the actual 3-column layout
+
+## Bug: Notes Not Working on Mobile (May 14)
+- [x] Fix Notes panel not accessible/functional on mobile in CoursePlayer — added slide-up bottom drawer on < lg screens
