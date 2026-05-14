@@ -33,7 +33,7 @@ import {
   SortableBlock,
 } from "./LandingPageBuilder";
 import {
-  ArrowLeft, Save, Eye, Plus, Palette, X, FolderOpen, Layers, Settings,
+  ArrowLeft, Save, Eye, Plus, Palette, X, FolderOpen, Layers, Settings, GitBranch, Trash2, ChevronDown, ChevronUp, GripVertical,
 } from "lucide-react";
 
 // ─── Main Editor ─────────────────────────────────────────────────────────────
@@ -147,6 +147,84 @@ export default function FunnelPageEditor() {
   const currentPage = pageData?.page;
   const funnelName = pageData?.funnel?.name ?? "Funnel";
 
+  // Branch rules state
+  const [showBranchRules, setShowBranchRules] = useState(false);
+  const [editingRule, setEditingRule] = useState<any | null>(null);
+  const utils = trpc.useUtils();
+
+  const { data: branchRules = [] } = trpc.funnel.listBranchRules.useQuery(
+    { pageId: numericPageId },
+    { enabled: !isNaN(numericPageId) && showBranchRules }
+  );
+
+  const upsertBranchRule = trpc.funnel.upsertBranchRule.useMutation({
+    onSuccess: () => {
+      toast.success("Rule saved!");
+      utils.funnel.listBranchRules.invalidate({ pageId: numericPageId });
+      setEditingRule(null);
+    },
+    onError: (e: any) => toast.error(`Failed: ${e.message}`),
+  });
+
+  const deleteBranchRule = trpc.funnel.deleteBranchRule.useMutation({
+    onSuccess: () => {
+      toast.success("Rule deleted");
+      utils.funnel.listBranchRules.invalidate({ pageId: numericPageId });
+    },
+  });
+
+  const VARIABLES = [
+    { value: "product_purchased", label: "Product Purchased" },
+    { value: "order_bump_selected", label: "Order Bump Selected" },
+    { value: "email_contains", label: "Email Contains" },
+    { value: "email_domain", label: "Email Domain" },
+    { value: "purchase_price", label: "Purchase Price (cents)" },
+    { value: "source_url", label: "Source URL" },
+    { value: "utm_source", label: "UTM Source" },
+    { value: "utm_medium", label: "UTM Medium" },
+    { value: "utm_campaign", label: "UTM Campaign" },
+    { value: "date_range", label: "Date Range" },
+    { value: "day_of_week", label: "Day of Week (0=Sun)" },
+    { value: "hour_of_day", label: "Hour of Day (0-23)" },
+    { value: "country", label: "Country (ISO)" },
+    { value: "device_type", label: "Device Type" },
+    { value: "custom_field", label: "Custom Field" },
+  ];
+
+  const OPERATORS = [
+    { value: "equals", label: "Equals" },
+    { value: "not_equals", label: "Not Equals" },
+    { value: "contains", label: "Contains" },
+    { value: "not_contains", label: "Not Contains" },
+    { value: "starts_with", label: "Starts With" },
+    { value: "ends_with", label: "Ends With" },
+    { value: "greater_than", label: "Greater Than" },
+    { value: "less_than", label: "Less Than" },
+    { value: "between", label: "Between (use | separator)" },
+    { value: "in_list", label: "In List (comma-separated)" },
+    { value: "not_in_list", label: "Not In List" },
+    { value: "is_set", label: "Is Set" },
+    { value: "is_not_set", label: "Is Not Set" },
+  ];
+
+  function newCondition() {
+    return { variable: "product_purchased", operator: "equals", value: "" };
+  }
+
+  function newRule() {
+    return {
+      id: undefined,
+      funnelPageId: numericPageId,
+      name: "New Rule",
+      priority: branchRules.length,
+      matchMode: "all" as const,
+      targetPageId: null as number | null,
+      targetUrl: null as string | null,
+      isActive: true,
+      conditions: [newCondition()],
+    };
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-gray-50" style={{ fontFamily: "Inter, sans-serif" }}>
       {/* Top Bar */}
@@ -258,6 +336,186 @@ export default function FunnelPageEditor() {
               )}
             </div>
           </div>
+          {/* Branch Rules Panel */}
+          <div className="p-2 border-b border-gray-100">
+            <button
+              onClick={() => setShowBranchRules(v => !v)}
+              className="w-full flex items-center justify-between text-xs font-semibold text-gray-500 uppercase tracking-wider px-1 py-1 hover:text-teal-700 transition-colors"
+            >
+              <span className="flex items-center gap-1"><GitBranch size={12} /> Branch Rules</span>
+              {showBranchRules ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            </button>
+            {showBranchRules && (
+              <div className="mt-2 space-y-2">
+                {(branchRules as any[]).length === 0 && (
+                  <p className="text-[10px] text-gray-400 px-1">No rules yet. Rules are evaluated in order — first match wins.</p>
+                )}
+                {(branchRules as any[]).map((rule: any, idx: number) => (
+                  <div key={rule.id} className={`rounded-lg border text-[10px] px-2 py-1.5 ${
+                    rule.isActive ? "border-teal-200 bg-teal-50" : "border-gray-200 bg-gray-50 opacity-60"
+                  }`}>
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="font-semibold text-gray-700 truncate">{idx + 1}. {rule.name}</span>
+                      <div className="flex gap-1 flex-shrink-0">
+                        <button onClick={() => setEditingRule({ ...rule, conditions: rule.conditions ?? [] })} className="text-gray-400 hover:text-teal-600"><Settings size={10} /></button>
+                        <button onClick={() => { if (confirm("Delete this rule?")) deleteBranchRule.mutate({ id: rule.id }); }} className="text-gray-400 hover:text-red-500"><Trash2 size={10} /></button>
+                      </div>
+                    </div>
+                    <p className="text-gray-400 mt-0.5">
+                      {rule.conditions?.length ?? 0} condition{rule.conditions?.length !== 1 ? "s" : ""} ({rule.matchMode})
+                      {rule.targetPageId ? ` → page #${rule.targetPageId}` : rule.targetUrl ? ` → ${rule.targetUrl.substring(0, 20)}…` : " → (no target)"}
+                    </p>
+                  </div>
+                ))}
+                <button
+                  onClick={() => setEditingRule(newRule())}
+                  className="w-full flex items-center gap-1 justify-center text-[10px] text-teal-600 hover:text-teal-800 border border-dashed border-teal-300 rounded-lg py-1.5 transition-colors"
+                >
+                  <Plus size={10} /> Add Rule
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Branch Rule Editor Modal */}
+          {editingRule && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
+              <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                <div className="flex items-center justify-between p-4 border-b">
+                  <h3 className="font-semibold text-gray-800 text-sm">{editingRule.id ? "Edit" : "New"} Branch Rule</h3>
+                  <button onClick={() => setEditingRule(null)} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
+                </div>
+                <div className="p-4 space-y-4">
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Rule Name</label>
+                    <input
+                      className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                      value={editingRule.name}
+                      onChange={e => setEditingRule((r: any) => ({ ...r, name: e.target.value }))}
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <label className="text-xs font-medium text-gray-600 block mb-1">Match Mode</label>
+                      <select
+                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                        value={editingRule.matchMode}
+                        onChange={e => setEditingRule((r: any) => ({ ...r, matchMode: e.target.value }))}
+                      >
+                        <option value="all">All conditions must match</option>
+                        <option value="any">Any condition matches</option>
+                      </select>
+                    </div>
+                    <div className="flex items-end pb-2">
+                      <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editingRule.isActive}
+                          onChange={e => setEditingRule((r: any) => ({ ...r, isActive: e.target.checked }))}
+                          className="rounded border-gray-300"
+                        />
+                        Active
+                      </label>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 block mb-2">Conditions</label>
+                    <div className="space-y-2">
+                      {editingRule.conditions.map((cond: any, ci: number) => (
+                        <div key={ci} className="flex gap-1 items-start">
+                          <div className="flex-1 grid grid-cols-3 gap-1">
+                            <select
+                              className="col-span-1 text-xs border border-gray-200 rounded px-1.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                              value={cond.variable}
+                              onChange={e => setEditingRule((r: any) => ({ ...r, conditions: r.conditions.map((c: any, i: number) => i === ci ? { ...c, variable: e.target.value } : c) }))}
+                            >
+                              {VARIABLES.map(v => <option key={v.value} value={v.value}>{v.label}</option>)}
+                            </select>
+                            <select
+                              className="col-span-1 text-xs border border-gray-200 rounded px-1.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                              value={cond.operator}
+                              onChange={e => setEditingRule((r: any) => ({ ...r, conditions: r.conditions.map((c: any, i: number) => i === ci ? { ...c, operator: e.target.value } : c) }))}
+                            >
+                              {OPERATORS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                            </select>
+                            <input
+                              className="col-span-1 text-xs border border-gray-200 rounded px-1.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                              placeholder="Value"
+                              value={cond.value}
+                              onChange={e => setEditingRule((r: any) => ({ ...r, conditions: r.conditions.map((c: any, i: number) => i === ci ? { ...c, value: e.target.value } : c) }))}
+                            />
+                          </div>
+                          <button
+                            onClick={() => setEditingRule((r: any) => ({ ...r, conditions: r.conditions.filter((_: any, i: number) => i !== ci) }))}
+                            className="text-gray-300 hover:text-red-400 mt-1.5 flex-shrink-0"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => setEditingRule((r: any) => ({ ...r, conditions: [...r.conditions, newCondition()] }))}
+                      className="mt-2 text-xs text-teal-600 hover:text-teal-800 flex items-center gap-1"
+                    >
+                      <Plus size={10} /> Add Condition
+                    </button>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Redirect Target</label>
+                    <p className="text-[10px] text-gray-400 mb-2">Set a target page ID (from this funnel) or an external URL. Leave both empty to skip to next page.</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] text-gray-500 block mb-1">Target Page ID</label>
+                        <input
+                          type="number"
+                          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                          placeholder="e.g. 42"
+                          value={editingRule.targetPageId ?? ""}
+                          onChange={e => setEditingRule((r: any) => ({ ...r, targetPageId: e.target.value ? parseInt(e.target.value) : null }))}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-gray-500 block mb-1">Or External URL</label>
+                        <input
+                          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                          placeholder="https://..."
+                          value={editingRule.targetUrl ?? ""}
+                          onChange={e => setEditingRule((r: any) => ({ ...r, targetUrl: e.target.value || null }))}
+                        />
+                      </div>
+                    </div>
+                    {allPages.length > 0 && (
+                      <div className="mt-2">
+                        <label className="text-[10px] text-gray-500 block mb-1">Or pick a page from this funnel:</label>
+                        <select
+                          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                          value={editingRule.targetPageId ?? ""}
+                          onChange={e => setEditingRule((r: any) => ({ ...r, targetPageId: e.target.value ? parseInt(e.target.value) : null, targetUrl: null }))}
+                        >
+                          <option value="">— select page —</option>
+                          {allPages.map((p: any) => (
+                            <option key={p.id} value={p.id}>{p.title} ({p.pageType})</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 p-4 border-t">
+                  <Button variant="outline" onClick={() => setEditingRule(null)} className="text-sm">Cancel</Button>
+                  <Button
+                    onClick={() => upsertBranchRule.mutate(editingRule)}
+                    disabled={upsertBranchRule.isPending}
+                    className="bg-teal-600 hover:bg-teal-700 text-white text-sm"
+                  >
+                    {upsertBranchRule.isPending ? "Saving…" : "Save Rule"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Block catalog */}
           <div className="p-2 border-b border-gray-100">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-1 mb-2">Add Blocks</p>

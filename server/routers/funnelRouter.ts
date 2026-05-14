@@ -7,8 +7,9 @@ import { z } from "zod";
 import { router, protectedProcedure, publicProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
-import { funnels, funnelPages, funnelLeads, funnelTemplates, lmsCourses, digitalProducts, digitalBundles } from "../../drizzle/schema";
+import { funnels, funnelPages, funnelLeads, funnelTemplates, lmsCourses, digitalProducts, digitalBundles, funnelBranchRules, funnelBranchConditions } from "../../drizzle/schema";
 import { eq, and, asc, desc, sql } from "drizzle-orm";
+import { evaluateBranchRules, type VisitorContext } from "../lib/funnelBranchEngine";
 
 function slugify(text: string): string {
   return text
@@ -599,10 +600,138 @@ export const funnelRouter = router({
       }
       return { success: true, deleted: input.ids.length };
     }),
+
+  // ─── Branch Rules CRUD ────────────────────────────────────────────────────
+
+  /** List all branch rules for a funnel page (with conditions) */
+  listBranchRules: protectedProcedure
+    .input(z.object({ pageId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      const rules = await db
+        .select()
+        .from(funnelBranchRules)
+        .where(eq(funnelBranchRules.funnelPageId, input.pageId))
+        .orderBy(asc(funnelBranchRules.priority));
+      const result = [];
+      for (const rule of rules) {
+        const conditions = await db
+          .select()
+          .from(funnelBranchConditions)
+          .where(eq(funnelBranchConditions.ruleId, rule.id))
+          .orderBy(asc(funnelBranchConditions.id));
+        result.push({ ...rule, conditions });
+      }
+      return result;
+    }),
+
+  /** Create or update a branch rule (upsert by id) */
+  upsertBranchRule: protectedProcedure
+    .input(z.object({
+      id: z.number().optional(),
+      funnelPageId: z.number(),
+      name: z.string().min(1).max(255).default("Untitled Rule"),
+      priority: z.number().int().default(0),
+      matchMode: z.enum(["all", "any"]).default("all"),
+      targetPageId: z.number().nullable().optional(),
+      targetUrl: z.string().max(2048).nullable().optional(),
+      isActive: z.boolean().default(true),
+      conditions: z.array(z.object({
+        variable: z.enum([
+          "product_purchased", "order_bump_selected", "email_contains", "email_domain",
+          "purchase_price", "source_url", "utm_source", "utm_medium", "utm_campaign",
+          "date_range", "day_of_week", "hour_of_day", "country", "device_type", "custom_field",
+        ]),
+        operator: z.enum([
+          "equals", "not_equals", "contains", "not_contains", "starts_with", "ends_with",
+          "greater_than", "less_than", "between", "in_list", "not_in_list", "is_set", "is_not_set",
+        ]),
+        value: z.string().max(1024).default(""),
+      })).default([]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      let ruleId: number;
+      if (input.id) {
+        await db.update(funnelBranchRules).set({
+          name: input.name,
+          priority: input.priority,
+          matchMode: input.matchMode,
+          targetPageId: input.targetPageId ?? null,
+          targetUrl: input.targetUrl ?? null,
+          isActive: input.isActive,
+        }).where(eq(funnelBranchRules.id, input.id));
+        ruleId = input.id;
+        await db.delete(funnelBranchConditions).where(eq(funnelBranchConditions.ruleId, ruleId));
+      } else {
+        const res = await db.insert(funnelBranchRules).values({
+          funnelPageId: input.funnelPageId,
+          name: input.name,
+          priority: input.priority,
+          matchMode: input.matchMode,
+          targetPageId: input.targetPageId ?? null,
+          targetUrl: input.targetUrl ?? null,
+          isActive: input.isActive,
+        });
+        ruleId = res[0].insertId;
+      }
+      if (input.conditions.length > 0) {
+        await db.insert(funnelBranchConditions).values(
+          input.conditions.map(c => ({ ruleId, variable: c.variable, operator: c.operator, value: c.value }))
+        );
+      }
+      return { id: ruleId, success: true };
+    }),
+
+  /** Delete a branch rule and its conditions */
+  deleteBranchRule: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      await db.delete(funnelBranchConditions).where(eq(funnelBranchConditions.ruleId, input.id));
+      await db.delete(funnelBranchRules).where(eq(funnelBranchRules.id, input.id));
+      return { success: true };
+    }),
+
+  /** Reorder branch rules by updating priorities */
+  reorderBranchRules: protectedProcedure
+    .input(z.object({ ruleIds: z.array(z.number()) }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      for (let i = 0; i < input.ruleIds.length; i++) {
+        await db.update(funnelBranchRules).set({ priority: i }).where(eq(funnelBranchRules.id, input.ruleIds[i]));
+      }
+      return { success: true };
+    }),
+
+  /** Update funnel settings (slug, SEO, status, custom redirect) */
+  updateFunnelSettings: protectedProcedure
+    .input(z.object({
+      funnelId: z.number().int().positive(),
+      slug: z.string().min(1).max(255).regex(/^[a-z0-9-]+$/, "Slug must be lowercase letters, numbers, and hyphens only"),
+      name: z.string().min(1).max(255).optional(),
+      metaTitle: z.string().max(255).optional(),
+      metaDescription: z.string().max(500).optional(),
+      status: z.enum(["draft", "active", "archived", "paused"]).optional(),
+      thankYouUrl: z.string().max(500).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [existing] = await db.select({ id: funnels.id }).from(funnels)
+        .where(and(eq(funnels.slug, input.slug), sql`${funnels.id} != ${input.funnelId}`)).limit(1);
+      if (existing) throw new TRPCError({ code: "CONFLICT", message: "A funnel with this slug already exists" });
+      const { funnelId, ...fields } = input;
+      await db.update(funnels).set(fields).where(eq(funnels.id, funnelId));
+      return { success: true };
+    }),
 });
-
-// ─── Public Router (for rendering funnel pages) ─────────────────────────────
-
+// ─── Public Router (for rendering funnel pages) ──────────────────────────────────────────────────
 export const funnelPublicRouter = router({
   /** Get a funnel by slug (public) */
   getBySlug: publicProcedure
@@ -1002,26 +1131,68 @@ export const funnelPublicRouter = router({
       return { success: true };
     }),
 
-  /** Update funnel settings (slug, SEO, status, custom redirect) */
-  updateFunnelSettings: protectedProcedure
+  /** Evaluate branch rules for a funnel page given visitor context (public) */
+  evaluateBranch: publicProcedure
     .input(z.object({
-      funnelId: z.number().int().positive(),
-      slug: z.string().min(1).max(255).regex(/^[a-z0-9-]+$/, "Slug must be lowercase letters, numbers, and hyphens only"),
-      name: z.string().min(1).max(255).optional(),
-      metaTitle: z.string().max(255).optional(),
-      metaDescription: z.string().max(500).optional(),
-      status: z.enum(["draft", "active", "archived", "paused"]).optional(),
-      thankYouUrl: z.string().max(500).optional(),
+      pageId: z.number(),
+      context: z.object({
+        productsPurchased: z.array(z.string()).optional(),
+        orderBumpsSelected: z.array(z.string()).optional(),
+        email: z.string().optional(),
+        purchasePrice: z.number().optional(),
+        sourceUrl: z.string().optional(),
+        utmSource: z.string().optional(),
+        utmMedium: z.string().optional(),
+        utmCampaign: z.string().optional(),
+        country: z.string().optional(),
+        deviceType: z.string().optional(),
+        customFields: z.record(z.string(), z.string()).optional(),
+      }),
     }))
-    .mutation(async ({ ctx, input }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const [existing] = await db.select({ id: funnels.id }).from(funnels)
-        .where(and(eq(funnels.slug, input.slug), sql`${funnels.id} != ${input.funnelId}`)).limit(1);
-      if (existing) throw new TRPCError({ code: "CONFLICT", message: "A funnel with this slug already exists" });
-      const { funnelId, ...fields } = input;
-      await db.update(funnels).set(fields).where(eq(funnels.id, funnelId));
-      return { success: true };
+      const rules = await db
+        .select()
+        .from(funnelBranchRules)
+        .where(and(eq(funnelBranchRules.funnelPageId, input.pageId), eq(funnelBranchRules.isActive, true)))
+        .orderBy(asc(funnelBranchRules.priority));
+      const rulesWithConditions = [];
+      for (const rule of rules) {
+        const conditions = await db
+          .select()
+          .from(funnelBranchConditions)
+          .where(eq(funnelBranchConditions.ruleId, rule.id))
+          .orderBy(asc(funnelBranchConditions.id));
+        rulesWithConditions.push({ ...rule, conditions });
+      }
+      const result = evaluateBranchRules(rulesWithConditions, input.context);
+      if (!result) return { matched: false, targetPageId: null, targetUrl: null };
+      // Resolve target page slug if targetPageId is set
+      let targetPageSlug: string | null = null;
+      let targetFunnelSlug: string | null = null;
+      if (result.targetPageId) {
+        const [targetPage] = await db
+          .select({ slug: funnelPages.slug, funnelId: funnelPages.funnelId })
+          .from(funnelPages)
+          .where(eq(funnelPages.id, result.targetPageId));
+        if (targetPage) {
+          targetPageSlug = targetPage.slug;
+          const [targetFunnel] = await db
+            .select({ slug: funnels.slug })
+            .from(funnels)
+            .where(eq(funnels.id, targetPage.funnelId));
+          targetFunnelSlug = targetFunnel?.slug ?? null;
+        }
+      }
+      return {
+        matched: true,
+        ruleId: result.ruleId,
+        ruleName: result.ruleName,
+        targetPageId: result.targetPageId,
+        targetPageSlug,
+        targetFunnelSlug,
+        targetUrl: result.targetUrl,
+      };
     }),
+
 });

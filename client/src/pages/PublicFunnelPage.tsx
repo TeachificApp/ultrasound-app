@@ -727,13 +727,73 @@ export default function PublicFunnelPage() {
     );
   }
 
+  return <FunnelPageContent data={data} />;
+}
+
+// Inner component so hooks are always called (no early returns before hooks)
+function FunnelPageContent({ data }: { data: { funnel: any; page: any; nextPage: any } }) {
   const { funnel, page, nextPage } = data;
+
   let blocks: Block[] = [];
   try {
     blocks = page.blocks ? JSON.parse(page.blocks) : [];
   } catch {
     blocks = [];
   }
+
+  // ─── Branch Rule Evaluation ─────────────────────────────────────────────────
+  // Collect visitor context from URL params and sessionStorage
+  const urlParams = new URLSearchParams(window.location.search);
+  const sessionContext = (() => {
+    try { return JSON.parse(sessionStorage.getItem(`funnel_ctx_${funnel.id}`) ?? "{}"); } catch { return {}; }
+  })();
+  const visitorContext = {
+    productsPurchased: sessionContext.productsPurchased ?? [],
+    orderBumpsSelected: sessionContext.orderBumpsSelected ?? [],
+    email: sessionContext.email ?? undefined,
+    purchasePrice: sessionContext.purchasePrice ?? undefined,
+    sourceUrl: document.referrer || window.location.href,
+    utmSource: urlParams.get("utm_source") ?? undefined,
+    utmMedium: urlParams.get("utm_medium") ?? undefined,
+    utmCampaign: urlParams.get("utm_campaign") ?? undefined,
+    country: sessionContext.country ?? undefined,
+    deviceType: /Mobi|Android/i.test(navigator.userAgent) ? "mobile" : "desktop",
+    customFields: sessionContext.customFields ?? undefined,
+  };
+
+  const evaluateBranch = trpc.funnelPublic.evaluateBranch.useMutation();
+  const [resolvedNextUrl, setResolvedNextUrl] = useState<string | null>(null);
+  const [branchResolved, setBranchResolved] = useState(false);
+
+  useEffect(() => {
+    evaluateBranch.mutate(
+      { pageId: page.id, context: visitorContext },
+      {
+        onSuccess: (result: any) => {
+          if (result.matched) {
+            if (result.targetUrl) {
+              setResolvedNextUrl(result.targetUrl);
+            } else if (result.targetPageSlug && result.targetFunnelSlug) {
+              setResolvedNextUrl(`/f/${result.targetFunnelSlug}/${result.targetPageSlug}`);
+            }
+          } else if (nextPage) {
+            setResolvedNextUrl(`/f/${funnel.slug}/${nextPage.slug}`);
+          }
+          setBranchResolved(true);
+        },
+        onError: () => {
+          if (nextPage) setResolvedNextUrl(`/f/${funnel.slug}/${nextPage.slug}`);
+          setBranchResolved(true);
+        },
+      }
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page.id]);
+
+  // Effective next page for block rendering (use resolved URL or default)
+  const effectiveNextPage = resolvedNextUrl
+    ? { slug: resolvedNextUrl, title: nextPage?.title ?? "Continue", pageType: nextPage?.pageType ?? "" }
+    : nextPage;
 
   return (
     <div className="min-h-screen bg-white">
@@ -745,13 +805,26 @@ export default function PublicFunnelPage() {
             funnelId={funnel.id}
             pageId={page.id}
             funnelSlug={funnel.slug}
-            nextPage={nextPage}
+            nextPage={effectiveNextPage}
           />
         </div>
       ))}
 
-      {/* Next page navigation (if connected) */}
-      {nextPage && (
+      {/* Next page navigation — show resolved URL once branch evaluation is done */}
+      {branchResolved && resolvedNextUrl && (
+        <div className="px-8 py-8 bg-gray-50 border-t border-gray-200">
+          <div className="max-w-3xl mx-auto text-center">
+            <a
+              href={resolvedNextUrl}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-teal-600 text-white rounded-lg font-semibold hover:bg-teal-700 transition-colors"
+            >
+              Continue to {nextPage?.title ?? "Next Step"} <ArrowRight size={18} />
+            </a>
+          </div>
+        </div>
+      )}
+      {/* Fallback: show default next page while branch evaluation is pending */}
+      {!branchResolved && nextPage && (
         <div className="px-8 py-8 bg-gray-50 border-t border-gray-200">
           <div className="max-w-3xl mx-auto text-center">
             <a

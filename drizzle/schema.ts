@@ -3583,3 +3583,69 @@ export const educatorTemplates = mysqlTable("educatorTemplates", {
 });
 export type EducatorTemplate = typeof educatorTemplates.$inferSelect;
 export type InsertEducatorTemplate = typeof educatorTemplates.$inferInsert;
+
+// ─── Funnel Branch Rules ──────────────────────────────────────────────────────
+// Each rule belongs to a funnel page and defines: IF (conditions match) THEN go to (targetPageId or targetUrl)
+// Rules are evaluated in priority order; the first matching rule wins.
+// If no rule matches, the page's default nextPageId is used.
+export const funnelBranchRules = mysqlTable("funnel_branch_rules", {
+  id: int("id").autoincrement().primaryKey(),
+  funnelPageId: int("funnel_page_id").notNull(),      // the page this rule belongs to
+  name: varchar("name", { length: 255 }).notNull().default("Untitled Rule"),
+  priority: int("priority").default(0).notNull(),      // lower = evaluated first
+  // How to combine conditions: "all" = AND, "any" = OR
+  matchMode: mysqlEnum("match_mode", ["all", "any"]).default("all").notNull(),
+  // Where to send the visitor when this rule matches
+  targetPageId: int("target_page_id"),                 // go to another funnel page
+  targetUrl: varchar("target_url", { length: 2048 }), // or go to an external URL
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type FunnelBranchRule = typeof funnelBranchRules.$inferSelect;
+export type InsertFunnelBranchRule = typeof funnelBranchRules.$inferInsert;
+
+// Each condition belongs to a rule and tests one variable against a value
+export const funnelBranchConditions = mysqlTable("funnel_branch_conditions", {
+  id: int("id").autoincrement().primaryKey(),
+  ruleId: int("rule_id").notNull(),
+  // Variable being tested
+  variable: mysqlEnum("variable", [
+    "product_purchased",
+    "order_bump_selected",
+    "email_contains",
+    "email_domain",
+    "purchase_price",
+    "source_url",
+    "utm_source",
+    "utm_medium",
+    "utm_campaign",
+    "date_range",
+    "day_of_week",
+    "hour_of_day",
+    "country",
+    "device_type",
+    "custom_field",
+  ]).notNull(),
+  // Operator
+  operator: mysqlEnum("operator", [
+    "equals",
+    "not_equals",
+    "contains",
+    "not_contains",
+    "starts_with",
+    "ends_with",
+    "greater_than",
+    "less_than",
+    "between",
+    "in_list",
+    "not_in_list",
+    "is_set",
+    "is_not_set",
+  ]).notNull(),
+  // Value to compare against (serialized as string; complex values use "|" as separator)
+  value: varchar("value", { length: 1024 }).notNull().default(""),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type FunnelBranchCondition = typeof funnelBranchConditions.$inferSelect;
+export type InsertFunnelBranchCondition = typeof funnelBranchConditions.$inferInsert;

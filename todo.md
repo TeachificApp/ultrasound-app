@@ -1712,3 +1712,16 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Multiple order bumps configurable per checkout page (any product can be a bump)
 - [x] Funnel page hide option (hide page from funnel sequence)
 - [x] Funnel page standalone landing page (pull page out as independent URL)
+
+## Conditional Funnel Branching (May 14)
+- [x] Schema: funnel_branch_rules table (pageId, priority, matchMode, targetPageId, targetUrl)
+- [x] Schema: funnel_branch_conditions table (ruleId, variable, operator, value)
+- [x] Server: rules engine evaluator (evaluateBranchRules)
+- [x] Server: tRPC CRUD procedures (listRules, upsertRule, deleteRule)
+- [x] Server: getNextPage public procedure uses rules engine
+- [x] Admin UI: Branch Rules editor panel in FunnelPageEditor right panel
+- [x] Admin UI: Condition builder (variable picker, operator, value)
+- [x] Admin UI: Target page/URL selector per rule
+- [x] Admin UI: Rule priority ordering (drag-to-reorder)
+- [x] Public: Checkout form passes context (productId, bumpIds, email, price, sourceUrl) to next-page resolver
+- [x] Public: PublicFunnelPage evaluates branch rules on page load for redirect

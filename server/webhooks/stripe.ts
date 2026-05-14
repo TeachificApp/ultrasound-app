@@ -518,7 +518,7 @@ export function registerStripeWebhook(app: Express) {
   app.post("/api/stripe/webhook", (req: Request, res: Response) => {
     // Forward to the main webhook handler by re-emitting the request
     req.url = "/api/webhooks/stripe";
-    app.handle(req, res);
+    (app as any).handle(req, res);
   });
 
   console.log("[Stripe] Webhook registered at /api/webhooks/stripe and /api/stripe/webhook");
