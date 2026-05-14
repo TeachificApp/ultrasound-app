@@ -127,7 +127,7 @@ async function startServer() {
 
   // Build version debug endpoint to verify deployed code
   app.get("/api/debug/build-version", (_req, res) => {
-    res.json({ version: "2026-05-14-media-regex-fix", deployedAt: new Date().toISOString(), spaRegex: "^/(?!media/|api/|manus-storage/).*" });
+    res.json({ version: "2026-05-14-v2-api-media", deployedAt: new Date().toISOString(), spaRegex: "^/(?!media/|api/|manus-storage/).*" });
   });
   // Temporary debug endpoint to diagnose Railway DB connection
   app.get("/api/debug/db-status", async (_req, res) => {
