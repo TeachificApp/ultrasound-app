@@ -11,7 +11,7 @@
  *   Orders       — order history
  *   Analytics    — overview stats
  */
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef} from "react";
 import type React from "react";
 import {
   DndContext, DragOverlay, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent,
@@ -65,7 +65,7 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
 };
 
 const LESSON_TYPE_LABELS: Record<string, string> = {
-  text: "Rich Text",
+  text: "Text",
   video: "Video",
   video_text: "Video + Text",
   embed: "Multimedia Embed",
@@ -653,6 +653,20 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
   const [addLessonSection, setAddLessonSection] = useState<number | null>(null);
   const [addLessonAtCourseLevel, setAddLessonAtCourseLevel] = useState(false);
   const [editLesson, setEditLesson] = useState<any>(null);
+  const [pendingLessonId, setPendingLessonId] = useState<number | null>(null);
+  const { data: pendingLesson } = trpc.lmsAdmin.getLessonAdmin.useQuery(
+    { lessonId: pendingLessonId! },
+    { enabled: !!pendingLessonId }
+  );
+  // When pendingLesson loads, open the editor
+  const prevPendingLessonIdRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (pendingLesson && pendingLessonId !== null && pendingLessonId !== prevPendingLessonIdRef.current) {
+      prevPendingLessonIdRef.current = pendingLessonId;
+      setEditLesson(pendingLesson);
+      setPendingLessonId(null);
+    }
+  }, [pendingLesson, pendingLessonId]);
   const [quizLesson, setQuizLesson] = useState<any>(null);
   const [importMediaSection, setImportMediaSection] = useState<number | null>(null);
   const [editSectionDrip, setEditSectionDrip] = useState<{ id: number; title: string; dripDays: number } | null>(null);
@@ -977,10 +991,10 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
       {/* Dialogs */}
       <AddSectionDialog open={addSectionOpen} courseId={courseId} onClose={() => setAddSectionOpen(false)} onCreated={() => { setAddSectionOpen(false); refetch(); }} />
       {addLessonSection && (
-        <AddLessonDialog courseId={courseId} sectionId={addLessonSection} onClose={() => setAddLessonSection(null)} onCreated={() => { setAddLessonSection(null); refetch(); }} />
+        <AddLessonDialog courseId={courseId} sectionId={addLessonSection} onClose={() => setAddLessonSection(null)} onCreated={(id) => { setAddLessonSection(null); refetch(); setPendingLessonId(id); }} />
       )}
       {addLessonAtCourseLevel && (
-        <AddLessonDialog courseId={courseId} sectionId={undefined} onClose={() => setAddLessonAtCourseLevel(false)} onCreated={() => { setAddLessonAtCourseLevel(false); refetch(); }} />
+        <AddLessonDialog courseId={courseId} sectionId={undefined} onClose={() => setAddLessonAtCourseLevel(false)} onCreated={(id) => { setAddLessonAtCourseLevel(false); refetch(); setPendingLessonId(id); }} />
       )}
       {importMediaSection && (
         <ImportMediaAsLessonDialog sectionId={importMediaSection} courseId={courseId} onClose={() => setImportMediaSection(null)} onCreated={() => { setImportMediaSection(null); refetch(); }} />
@@ -1732,7 +1746,7 @@ function AddLessonDialog({ courseId, sectionId, onClose, onCreated }: {
   courseId: number;
   sectionId?: number;
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (lessonId: number) => void;
 }) {
   type LessonType = "text" | "video" | "video_text" | "embed" | "quiz" | "download";
   const [title, setTitle] = useState("");
@@ -1748,7 +1762,7 @@ function AddLessonDialog({ courseId, sectionId, onClose, onCreated }: {
   const [selectedAsset, setSelectedAsset] = useState<{ id: number; title: string; s3Url: string; mediaType: string } | null>(null);
 
   const create = trpc.lmsAdmin.createLesson.useMutation({
-    onSuccess: () => { toast.success("Lesson added"); onCreated(); },
+    onSuccess: (data) => { toast.success("Lesson added"); onCreated(data.id); },
     onError: e => toast.error(`Error: ${e.message}`),
   });
 
@@ -1795,7 +1809,7 @@ function AddLessonDialog({ courseId, sectionId, onClose, onCreated }: {
               <Select value={type} onValueChange={v => { setType(v as LessonType); setSelectedAsset(null); setContent(""); setVideoContent(""); setEmbedUrl(""); }}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="text">Rich Text</SelectItem>
+                  <SelectItem value="text">Text</SelectItem>
                   <SelectItem value="video">Video</SelectItem>
                   <SelectItem value="video_text">Video + Text</SelectItem>
                   <SelectItem value="embed">Multimedia Embed (iframe)</SelectItem>
@@ -1833,6 +1847,7 @@ function AddLessonDialog({ courseId, sectionId, onClose, onCreated }: {
                 </div>
               )}
               <Input value={content} onChange={e => setContent(e.target.value)} placeholder="https://..." className="mt-1" />
+              <p className="text-xs text-gray-400 mt-1">Upload video to Media Repository first, then pick it above — or paste a direct URL (Vimeo, YouTube, Wistia, etc.)</p>
             </div>
           )}
           {type === "video_text" && (
@@ -1853,8 +1868,9 @@ function AddLessonDialog({ courseId, sectionId, onClose, onCreated }: {
                 )}
                 <Input value={content} onChange={e => setContent(e.target.value)} placeholder="https://..." className="mt-1" />
               </div>
+                <p className="text-xs text-gray-400 mt-1">Upload video to Media Repository first, then pick it above — or paste a direct URL (Vimeo, YouTube, Wistia, etc.)</p>
               <div>
-                <Label className="text-sm">Text Content (below video)</Label>
+                <Label className="text-sm">Lesson Description</Label>
                 <div className="mt-1"><RichTextEditor value={videoContent} onChange={setVideoContent} /></div>
               </div>
             </div>
@@ -2078,7 +2094,7 @@ function LessonEditorPage({ lesson, onClose, onSaved, onSavedAndClose }: { lesso
               activeTab === "content" ? "bg-teal-600 text-white" : "text-gray-500 hover:text-gray-800"
             }`}
           >
-            Content Blocks
+            Lesson Editor
           </button>
           {lesson.type === "quiz" && (
             <button
@@ -2133,6 +2149,7 @@ function LessonEditorPage({ lesson, onClose, onSaved, onSavedAndClose }: { lesso
                 </div>
               )}
               <Input value={content} onChange={e => setContent(e.target.value)} placeholder="https://..." className="mt-1" />
+              <p className="text-xs text-gray-400 mt-1">Upload video to Media Repository first, then pick it above — or paste a direct URL (Vimeo, YouTube, Wistia, etc.)</p>
             </div>
           )}
           {lesson.type === "video_text" && (
@@ -2152,9 +2169,10 @@ function LessonEditorPage({ lesson, onClose, onSaved, onSavedAndClose }: { lesso
                   </div>
                 )}
                 <Input value={content} onChange={e => setContent(e.target.value)} placeholder="https://..." className="mt-1" />
+                <p className="text-xs text-gray-400 mt-1">Upload video to Media Repository first, then pick it above — or paste a direct URL (Vimeo, YouTube, Wistia, etc.)</p>
               </div>
               <div>
-                <Label className="text-sm">Text Content (below video)</Label>
+                <Label className="text-sm">Lesson Description</Label>
                 <div className="mt-1"><RichTextEditor value={videoContent} onChange={setVideoContent} /></div>
               </div>
             </div>
@@ -2232,7 +2250,7 @@ function LessonEditorPage({ lesson, onClose, onSaved, onSavedAndClose }: { lesso
       </div>
       )}
 
-      {/* Content Blocks Tab */}
+      {/* Lesson Editor Tab */}
       {activeTab === "content" && (
         <div className="flex-1 overflow-hidden flex flex-col">
           <LessonBlockEditor

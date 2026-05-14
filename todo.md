@@ -1789,3 +1789,6 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] New modules (sections) now append at end of course
 - [x] Fix DragOverlay import, DialogDescription import, getCourses→listCourses in copy dialogs
 - [x] Fix lmsRouter description column reference error
+
+## Lesson Add Flow Fix (May 14)
+- [ ] After adding a new lesson, open lesson editor instead of closing dialog

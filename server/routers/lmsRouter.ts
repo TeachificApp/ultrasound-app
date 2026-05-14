@@ -880,6 +880,17 @@ export const lmsLearnerRouter = router({
 // ─── Admin Router ─────────────────────────────────────────────────────────────
 
 export const lmsAdminRouter = router({
+  // ── Lesson fetch for editor ──
+  getLessonAdmin: protectedProcedure
+    .input(z.object({ lessonId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [lesson] = await db.select().from(lmsLessons).where(eq(lmsLessons.id, input.lessonId)).limit(1);
+      if (!lesson) throw new TRPCError({ code: "NOT_FOUND" });
+      return lesson;
+    }),
   // ── Courses ──
   listCourses: protectedProcedure
     .input(z.object({

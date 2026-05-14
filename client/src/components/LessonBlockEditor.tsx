@@ -17,6 +17,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Block, BlockType, BLOCK_CATALOG, CATALOG_CATEGORIES, BlockPreview, BlockSettings, SortableBlock, uid,
 } from "@/pages/admin/LandingPageBuilder";
 import {
@@ -112,6 +115,7 @@ export default function LessonBlockEditor({
   const selectedBlock = blocks.find(b => b.id === selectedBlockId) ?? null;
 
   return (
+    <>
     <div className="fixed inset-0 z-50 flex bg-black/40">
       {/* Main editor panel */}
       <div className="flex flex-col w-full max-w-6xl mx-auto bg-white shadow-2xl overflow-hidden">
@@ -190,50 +194,15 @@ export default function LessonBlockEditor({
               </DndContext>
             )}
 
-            {/* Add block button */}
+            {/* Add block button — opens modal picker */}
             {!previewMode && (
               <div className="mt-4">
                 <button
-                  onClick={() => setAddMenuOpen(o => !o)}
+                  onClick={() => setAddMenuOpen(true)}
                   className="w-full border-2 border-dashed border-teal-300 hover:border-teal-500 rounded-xl py-3 text-teal-600 hover:text-teal-700 text-sm flex items-center justify-center gap-2 transition-colors bg-white"
                 >
                   <Plus className="w-4 h-4" /> Add Block
                 </button>
-
-                {addMenuOpen && (
-                  <div className="mt-2 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-lg">
-                    {/* Category tabs */}
-                    <div className="flex border-b border-gray-200 overflow-x-auto bg-gray-50">
-                      {CATALOG_CATEGORIES.map(cat => (
-                        <button
-                          key={cat}
-                          onClick={() => setActiveCategory(cat)}
-                          className={cn(
-                            "px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors",
-                            activeCategory === cat
-                              ? "text-teal-700 border-b-2 border-teal-500 bg-white"
-                              : "text-gray-500 hover:text-gray-700"
-                          )}
-                        >
-                          {cat}
-                        </button>
-                      ))}
-                    </div>
-                    {/* Block grid */}
-                    <div className="grid grid-cols-3 gap-1 p-2 max-h-48 overflow-y-auto">
-                      {BLOCK_CATALOG.filter(b => b.category === activeCategory).map(b => (
-                        <button
-                          key={b.type}
-                          onClick={() => addBlock(b.type)}
-                          className="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-teal-50 text-gray-600 hover:text-teal-700 transition-colors text-center"
-                        >
-                          <span className="text-teal-600">{b.icon}</span>
-                          <span className="text-[10px] leading-tight">{b.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             )}
           </div>
@@ -258,5 +227,46 @@ export default function LessonBlockEditor({
         </div>
       </div>
     </div>
+      {/* Block Picker Modal */}
+      <Dialog open={addMenuOpen} onOpenChange={setAddMenuOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-teal-700 flex items-center gap-2">
+              <Plus className="w-5 h-5" /> Add Content Block
+            </DialogTitle>
+          </DialogHeader>
+          {/* Category tabs */}
+          <div className="flex border-b border-gray-200 overflow-x-auto bg-gray-50 rounded-t-lg -mx-1">
+            {CATALOG_CATEGORIES.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                className={cn(
+                  "px-4 py-2 text-xs font-medium whitespace-nowrap transition-colors",
+                  activeCategory === cat
+                    ? "text-teal-700 border-b-2 border-teal-500 bg-white"
+                    : "text-gray-500 hover:text-gray-700"
+                )}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+          {/* Block grid */}
+          <div className="grid grid-cols-4 gap-2 p-1 max-h-80 overflow-y-auto">
+            {BLOCK_CATALOG.filter(b => b.category === activeCategory).map(b => (
+              <button
+                key={b.type}
+                onClick={() => { addBlock(b.type); setAddMenuOpen(false); }}
+                className="flex flex-col items-center gap-2 p-3 rounded-xl hover:bg-teal-50 border border-transparent hover:border-teal-200 text-gray-600 hover:text-teal-700 transition-all text-center"
+              >
+                <span className="text-teal-600 text-2xl">{b.icon}</span>
+                <span className="text-xs leading-tight font-medium">{b.label}</span>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
