@@ -1,0 +1,57 @@
+{
+  "build_command": "pnpm run build",
+  "capabilities": [
+    "db",
+    "server",
+    "user"
+  ],
+  "dev_command": "pnpm run dev",
+  "env_vars": {
+    "DATABASE_URL": "mysql://2mhhtxpXA9Esras.9b3674e1e24c:mvsCM0Xk4QDYxH86nu44@gateway04.us-east-1.prod.aws.tidbcloud.com:4000/UrcfdRVE8J6mpMNR48QuFe?ssl={\"rejectUnauthorized\":true}"
+  },
+  "experiments": [
+    "no_db_push"
+  ],
+  "git_remote": {
+    "repo_url": "s3://vida-prod-gitrepo/webdev-git/310519663401463434/UrcfdRVE8J6mpMNR48QuFe",
+    "access_key_id": "ASIAZV3A2ECZBNFX4QCW",
+    "secret_access_key": "px/nPe5tXbXRaMpk4VxemFKx66tcA2QJjJzyme/p",
+    "session_token": "IQoJb3JpZ2luX2VjEJf//////////wEaCXVzLWVhc3QtMSJHMEUCIFACFx36KpIIm+rKUN1wxATldvau1Ox5eiZor0pqUlD9AiEA5SYZZsfrnzMnWSCRNZl6zz4+/JTP/ygY8LG47Xao9Nwq9QMIXxAEGgw2NjUzODYwOTg4NjYiDH4Ws5aJCuF8u6RXKyrSA4TXxMFcHjYs3s2rvttv+GstBSu95U/SeQ3vUkoXMTgnoi51Zm6q8wrlSsO6vgj/T3qcWJYXM4kRZrFGlHSQJoK3MkHRis9W7tK/WCKuPiU7YKR19Qj1tHIR7JVC/yQ7zKK0ct7mgZsrAgr6K3C7zTjirwSUfyfpaBSpthP3TGJxIalMRYG0MRF1K6rGLJg52hCoR4OD7cbE4ZBtIL6eqINPBO6b6aCPq10BhqFP/v2l+8Z6Et4GHsV5KO5jz21hY2rCdEhKfezLuED7zD3i9RbKe76nXLNthc9SafWxMzLk3VbZ1dcvWlWzENiK8UTK4a3hQkTHfouKsS2h+QTkVaVHGIfSabcxDcv/grgQiRaTu/ybqc130UiUPxFr2/EPVHnnUUSJhsx5kz418erKe6KNqbuoLb9c2o1ytw6nx8+Zjalx1L0onczbnfPN7WVgz/slJnz4cLxIqV+oZY+zS4UTdOFqXpdspevWMBJ6orZTLWpca+KVlInDBLVXsLyKFWBUUHYjAxMJseZjLdSkbgFRCC7DdEdu2qiYBhouDDqA4E4XHQrrfw5Ss6jtMW2Ufg+rQhLbjH5u0nR6xd0bXs8S4VYOiyKZ2feLipOi1fKWuf8w+q+X0AY6nQHwccMKepRv0jSzXkfGF6NC3dkSxOjRWZLhCaNPEJN6fZzNLuPK/u+rCFhn4DF5Qv5sRchOsMIBGL/4xX33R8r8VTs/fUuKJXUBRkW/6lSpMCrE9DzMyY3GgWrJXsfzkPXjB+ESRt5yiJ1SXSyb3DWM/MS6AJTY1K2TToI4h+X5PICbf6qW/YlXsg9mCet0f3/M+95ERpslUXLzEfcf",
+    "expiration": "2026-05-15T02:11:06.000Z"
+  },
+  "name": "ultrasound-assist",
+  "path": "/home/ubuntu/ultrasound-assist",
+  "port": 3000,
+  "secrets": {
+    "BUILT_IN_FORGE_API_KEY": "cuGrwern4Jfru4Q5D2KTaD",
+    "BUILT_IN_FORGE_API_URL": "https://forge.manus.ai",
+    "CF_R2_ACCESS_KEY_ID": "2bf12c3da86ab3bf2a54394aaf1b7303",
+    "CF_R2_ACCOUNT_ID": "926e046281eccc776864fd105e322ac8",
+    "CF_R2_BUCKET_NAME": "ultrasound-assist",
+    "CF_R2_PUBLIC_URL": "https://pub-1f4b81c70d1f49cb8817cc2abbb92288.r2.dev",
+    "CF_R2_SECRET_ACCESS_KEY": "2ad2dea927e74526d62268d5bf3d519b004be0c4242236d75807023dc18c1538",
+    "JWT_SECRET": "LBQGo3FhHAkPExJ4chipad",
+    "OAUTH_SERVER_URL": "https://api.manus.im",
+    "OWNER_NAME": "larawilliams0501",
+    "OWNER_OPEN_ID": "8Rf5JXPawpyd9eN4E94j4K",
+    "RAILWAY_MYSQL_URL": "mysql://root:KruQyAdWBhuuYwueWWPYcirRtkUYbYNE@viaduct.proxy.rlwy.net:37790/railway",
+    "SENDGRID_API_KEY": "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",
+    "SENDGRID_FROM_EMAIL": "admin@allaboutultrasound.com",
+    "SENDGRID_FROM_NAME": "AllAboutUltrasound",
+    "STRIPE_SECRET_KEY": "sk_test_51TPUwfPvVOPkJOleK10zMqQh19aefmBQVewhDDUItZ5cvIiErbuzllYzyuMCkcKz5lSo4ZosYF4KOV2DnpH2EouN00ht9ZTaZo",
+    "STRIPE_WEBHOOK_SECRET": "whsec_xQYpAVTY2lyCLF71IVVU5O4QySKnm8yO",
+    "THINKIFIC_API_KEY": "123ead08ade92984918f53e649805f5d",
+    "THINKIFIC_SUBDOMAIN": "allaboutultrasound",
+    "VITE_ANALYTICS_ENDPOINT": "https://manus-analytics.com",
+    "VITE_ANALYTICS_WEBSITE_ID": "b571f478-6b19-4469-a41a-b025eba13539",
+    "VITE_APP_ID": "UrcfdRVE8J6mpMNR48QuFe",
+    "VITE_APP_LOGO": "https://files.manuscdn.com/user_upload_by_module/web_dev_logo/310519663401463434/fxHwRtjjmQEbLTmx.webp",
+    "VITE_APP_TITLE": "UltrasoundAssist™ — General \u0026 Vascular Ultrasound Clinical Intelligence",
+    "VITE_FRONTEND_FORGE_API_KEY": "QNq5zWghtjNA6fBZueDsKu",
+    "VITE_FRONTEND_FORGE_API_URL": "https://forge.manus.ai",
+    "VITE_OAUTH_PORTAL_URL": "https://manus.im",
+    "VITE_STRIPE_PUBLISHABLE_KEY": "pk_test_51TPUwfPvVOPkJOleNgrGAwAOdpSNfrC1iqQ4iSiVvxhVmiNy99OACJY9UyXqZtWfSCgd6RFfgJ9KHT4L1UuiWY1B00uAS67RPK"
+  },
+  "template_id": "web-db-user",
+  "test_command": "pnpm test"
+}

@@ -1750,3 +1750,20 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] CoursePlayer: skip auth gate when user is admin (render as preview mode)
 - [x] Lesson viewer: skip premium/enrollment gate when user is admin
 - [x] LessonBlockEditor: retheme from dark to light color scheme (white/gray background, dark text)
+## Lesson Editor UI Cleanup + Templates (May 14)
+- [x] Fix admin preview bypass: CoursePlayer redirected to login before auth loaded (race condition)
+- [x] Fix Preview Course button: wrong URL /course/ → /learn/
+- [x] DnD: add SortableSectionRow for drag-to-reorder sections in curriculum tab
+- [x] createLesson: auto-append at end of section (max position + 1)
+- [x] createSection: auto-append at end of course (max position + 1)
+- [x] Content templates: lms_content_templates table + CRUD procedures
+- [x] LessonBlockEditor: "Save Template" button (saves selected block or full page)
+- [x] LessonBlockEditor: "Templates" button (insert saved template into lesson)
+- [x] Rename "Content" label → "Lesson Description" in lesson settings
+- [x] Rename "Content Blocks" tab → "Lesson Editor"
+- [x] Remove "Rich Text" type label → renamed to "Text"
+- [x] Remove "Blocks appear below the video in the player" subtitle from editor header
+- [x] Remove hardcoded "In This Lesson" objectives section from LessonBlockEditor
+- [x] Add "Learning Objectives" as optional content block in BLOCK_CATALOG (Content category)
+- [x] Learning Objectives block: preview renders teal checklist
+- [x] Learning Objectives block: settings panel to edit title, objectives list, and colors
