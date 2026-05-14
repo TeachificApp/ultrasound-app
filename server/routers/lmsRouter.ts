@@ -371,15 +371,23 @@ export const lmsLearnerRouter = router({
       const [enrollment] = await db.select().from(lmsEnrollments)
         .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, course.id))).limit(1);
 
-      const sections = await db.select().from(lmsSections).where(eq(lmsSections.courseId, course.id)).orderBy(asc(lmsSections.position));
-      const sectionsWithLessons = await Promise.all(sections.map(async (s) => {
-        const lessons = await db.select().from(lmsLessons).where(eq(lmsLessons.sectionId, s.id)).orderBy(asc(lmsLessons.position));
-        return { ...s, lessons };
-      }));
-      // Top-level lessons (no section)
-      const topLevelLessons = await db.select().from(lmsLessons)
-        .where(and(eq(lmsLessons.courseId, course.id), isNull(lmsLessons.sectionId)))
-        .orderBy(asc(lmsLessons.position));
+      // Fetch sections + ALL lessons for this course in 2 parallel queries (avoids N+1)
+      const [sections, allCourseLessons] = await Promise.all([
+        db.select().from(lmsSections).where(eq(lmsSections.courseId, course.id)).orderBy(asc(lmsSections.position)),
+        db.select().from(lmsLessons).where(eq(lmsLessons.courseId, course.id)).orderBy(asc(lmsLessons.position)),
+      ]);
+      // Group lessons by sectionId in JS — no extra round-trips
+      const lessonsBySectionId = new Map<number, typeof allCourseLessons>();
+      const topLevelLessons: typeof allCourseLessons = [];
+      for (const lesson of allCourseLessons) {
+        if (lesson.sectionId) {
+          if (!lessonsBySectionId.has(lesson.sectionId)) lessonsBySectionId.set(lesson.sectionId, []);
+          lessonsBySectionId.get(lesson.sectionId)!.push(lesson);
+        } else {
+          topLevelLessons.push(lesson);
+        }
+      }
+      const sectionsWithLessons = sections.map(s => ({ ...s, lessons: lessonsBySectionId.get(s.id) ?? [] }));
 
       // Progress
       let progress: typeof lmsLessonProgress.$inferSelect[] = [];
@@ -398,7 +406,17 @@ export const lmsLearnerRouter = router({
         logIpAccess({ userId: ctx.user.id, ipAddress: ip, userAgent: ctx.req?.headers?.["user-agent"] || undefined, contentType: "course", contentId: course.id }).catch(() => {});
       }
 
-      return { course, enrollment: effectiveEnrollment, sections: sectionsWithLessons, topLevelLessons, progress, isAdminPreview: !!isAdminPreview };
+      // Fetch course instructors (for right-panel instructor card)
+      const courseInstructorLinks = await db.select().from(lmsCourseInstructors)
+        .where(eq(lmsCourseInstructors.courseId, course.id));
+      const instructorIds = courseInstructorLinks.map(l => l.instructorId);
+      let instructors: typeof lmsInstructors.$inferSelect[] = [];
+      if (instructorIds.length > 0) {
+        instructors = await db.select().from(lmsInstructors)
+          .where(sql`${lmsInstructors.id} IN (${sql.join(instructorIds.map(id => sql`${id}`), sql`, `)})`);
+      }
+
+      return { course, enrollment: effectiveEnrollment, sections: sectionsWithLessons, topLevelLessons, progress, isAdminPreview: !!isAdminPreview, instructors };
     }),
 
   /** Get a single lesson (must be enrolled or lesson is preview) */
@@ -875,6 +893,58 @@ export const lmsLearnerRouter = router({
       });
       return { bookmarked: true };
     }),
+
+  /** Get course overview page data (enrolled or admin) */
+  getCourseOverview: protectedProcedure
+    .input(z.object({ slug: z.string(), preview: z.boolean().optional() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.slug)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      const isAdminPreview = input.preview && ctx.user.role === "admin";
+
+      // Check enrollment
+      const [enrollment] = await db.select().from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, course.id))).limit(1);
+      if (!enrollment && !isAdminPreview) throw new TRPCError({ code: "FORBIDDEN", message: "Enrollment required" });
+
+      // Fetch sections + lessons
+      const [sections, allLessons] = await Promise.all([
+        db.select().from(lmsSections).where(eq(lmsSections.courseId, course.id)).orderBy(asc(lmsSections.position)),
+        db.select().from(lmsLessons).where(eq(lmsLessons.courseId, course.id)).orderBy(asc(lmsLessons.position)),
+      ]);
+      const lessonsBySectionId = new Map<number, typeof allLessons>();
+      const topLevelLessons: typeof allLessons = [];
+      for (const lesson of allLessons) {
+        if (lesson.sectionId) {
+          if (!lessonsBySectionId.has(lesson.sectionId)) lessonsBySectionId.set(lesson.sectionId, []);
+          lessonsBySectionId.get(lesson.sectionId)!.push(lesson);
+        } else {
+          topLevelLessons.push(lesson);
+        }
+      }
+      const sectionsWithLessons = sections.map(s => ({ ...s, lessons: lessonsBySectionId.get(s.id) ?? [] }));
+
+      // Progress
+      let progress: typeof lmsLessonProgress.$inferSelect[] = [];
+      const effectiveEnrollment = enrollment ?? (isAdminPreview ? { id: -1, userId: ctx.user.id, courseId: course.id, enrolledAt: new Date(), progressPct: 0, completedAt: null, lastAccessedAt: new Date(), certificateIssuedAt: null } as any : null);
+      if (effectiveEnrollment && effectiveEnrollment.id !== -1) {
+        progress = await db.select().from(lmsLessonProgress).where(eq(lmsLessonProgress.enrollmentId, effectiveEnrollment.id));
+      }
+
+      // Instructors
+      const courseInstructorLinks = await db.select().from(lmsCourseInstructors)
+        .where(eq(lmsCourseInstructors.courseId, course.id));
+      const instructorIds = courseInstructorLinks.map(l => l.instructorId);
+      let instructors: typeof lmsInstructors.$inferSelect[] = [];
+      if (instructorIds.length > 0) {
+        instructors = await db.select().from(lmsInstructors)
+          .where(sql`${lmsInstructors.id} IN (${sql.join(instructorIds.map(id => sql`${id}`), sql`, `)})`);
+      }
+
+      return { course, enrollment: effectiveEnrollment, sections: sectionsWithLessons, topLevelLessons, progress, instructors, isAdminPreview: !!isAdminPreview };
+    }),
 });
 
 // ─── Admin Router ─────────────────────────────────────────────────────────────
@@ -977,6 +1047,8 @@ export const lmsAdminRouter = router({
       hasCertificate: z.boolean().optional(),
       isFeatured: z.boolean().optional(),
       isDrip: z.boolean().optional(),
+      showInstructor: z.boolean().optional(),
+      courseOverviewBlocks: z.string().nullable().optional(), // JSON array of Block objects
       metaTitle: z.string().optional(),
       metaDescription: z.string().optional(),
     }))
@@ -1273,6 +1345,8 @@ export const lmsAdminRouter = router({
       requireManualComplete: z.boolean().optional(),
       contentBlocks: z.string().nullable().optional(), // JSON array of Block objects
       learningObjectives: z.string().nullable().optional(), // JSON array of strings
+      showInstructor: z.enum(["inherit", "show", "hide"]).optional(),
+      prerequisiteLessonId: z.number().int().nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);

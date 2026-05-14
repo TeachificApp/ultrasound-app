@@ -2736,6 +2736,10 @@ export const lmsCourses = mysqlTable("lms_courses", {
   isFeatured: boolean("is_featured").default(false).notNull(),
   // Drip: unlock all immediately (false) or by schedule (true)
   isDrip: boolean("is_drip").default(false).notNull(),
+  // Show instructor profile card in the lesson player right panel
+  showInstructor: boolean("show_instructor").default(false).notNull(),
+  // Block editor content for the Course Overview page (JSON array of Block objects)
+  courseOverviewBlocks: longtext("course_overview_blocks"),
   createdByUserId: int("created_by_user_id").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
@@ -2784,6 +2788,10 @@ export const lmsLessons = mysqlTable("lms_lessons", {
   contentBlocks: longtext("content_blocks"),
   // Lesson learning objectives shown in "In This Lesson" panel (JSON array of strings)
   learningObjectives: longtext("learning_objectives"),
+  // Override course-level showInstructor: null = inherit from course, true = always show, false = always hide
+  showInstructor: mysqlEnum("show_instructor", ["inherit", "show", "hide"]).default("inherit").notNull(),
+  // Prerequisite: if set, student must complete the referenced lesson before accessing this lesson
+  prerequisiteLessonId: int("prerequisite_lesson_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });

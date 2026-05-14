@@ -1837,3 +1837,25 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Optimistic update for add section — immediately append new section row
 - [x] Section rename: single-click pencil icon triggers inline edit (not just double-click)
 - [ ] Add "Add Block" button to top toolbar of LessonBlockEditor
+
+## Performance / UX Fixes (May 14)
+- [ ] Fix lesson content area missing scrollbar (h-full on inner wrapper prevents scroll)
+- [ ] Fix slow course player load time
+
+## Instructor Profile in Player Sidebar (May 14)
+- [ ] Add "Instructor" tab to right-side panel in CoursePlayer
+- [ ] Course-level toggle: showInstructor field on lmsCourses
+- [ ] Lesson-level toggle: showInstructor field on lmsLessons (overrides course setting)
+- [ ] Fetch instructor data in getCoursePlayer and getLesson
+- [ ] Admin toggle in CourseSettingsForm and LessonEditorPage settings tab
+- [ ] Hide legacy content/videoContent fields when contentBlocks exist (all lesson types)
+- [ ] Fix Mark Complete checkmark not appearing in left and right sidebars after marking
+
+## Course Overview Page + Prerequisite Gating (May 14)
+- [x] Add prerequisiteOfLessonId column to lmsLessons schema + DB migration
+- [x] Add showInstructor columns to lmsCourses + lmsLessons + DB migration
+- [x] Build CourseOverview page: block editor + accordion curriculum + drip/prerequisite rules
+- [x] Add prerequisite lesson setting in LessonEditorPage settings tab
+- [x] Enforce prerequisite gating in CoursePlayer sidebar and lesson access
+- [x] Add instructor profile panel to course player right sidebar (course + lesson level toggle)
+- [x] Route: /learn/:slug/overview opens CourseOverview, /learn/:slug/player opens the player; sidebar has Overview link

@@ -651,6 +651,11 @@ export default function CourseLanding() {
             <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold" size="lg" onClick={handleEnroll} disabled={enrolling || enrollFree.isPending || createCheckout.isPending}>
               {enrolling ? "Processing..." : ctaText}<ChevronRight className="w-4 h-4 ml-1" />
             </Button>
+            {enrollment && (
+              <Button variant="outline" className="w-full border-teal-300 text-teal-700 hover:bg-teal-50" size="sm" onClick={() => navigate(`/learn/${slug}/overview`)}>
+                <BookOpen className="w-3.5 h-3.5 mr-1.5" /> Course Overview
+              </Button>
+            )}
             {!user && (
               <p className="text-xs text-gray-500 text-center">
                 <button className="text-teal-600 underline" onClick={() => navigate("/login")}>Sign in</button> or{" "}

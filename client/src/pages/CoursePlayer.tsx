@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import {
   Award, BookOpen, Bookmark, BookmarkCheck, CheckCircle, ChevronLeft, ChevronRight,
   Download, Eye, FileText, HelpCircle, Lock, Menu, Monitor, PlayCircle, StickyNote, X,
-  User, ListChecks, Pencil, ChevronDown, ChevronUp,
+  User, ListChecks, ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import LessonEffectPlayer, { fireLessonCompleteEffect } from "@/components/LessonEffectPlayer";
@@ -232,6 +232,7 @@ export default function CoursePlayer() {
     { enabled: !!slug && !!user }
   );
 
+  const [optimisticCompleted, setOptimisticCompleted] = useState<Set<number>>(new Set());
   const markComplete = trpc.lmsLearner.markLessonComplete.useMutation({
     onSuccess: () => {
       utils.lmsLearner.getCoursePlayer.invalidate({ slug: slug! });
@@ -254,7 +255,19 @@ export default function CoursePlayer() {
 
   useEffect(() => {
     if (data && !selectedLessonId) {
+      // Check for ?lesson=<id> URL param first
+      const params = new URLSearchParams(searchString);
+      const lessonParam = params.get("lesson");
       const topLevel = (data as any).topLevelLessons ?? [];
+      const allL = [...topLevel, ...data.sections.flatMap((s: any) => s.lessons)];
+      if (lessonParam) {
+        const paramId = parseInt(lessonParam);
+        const found = allL.find((l: any) => l.id === paramId);
+        if (found) {
+          setSelectedLessonId(found.id);
+          return;
+        }
+      }
       const first = topLevel[0] ?? data.sections[0]?.lessons[0];
       if (first) setSelectedLessonId(first.id);
     }
@@ -269,6 +282,8 @@ export default function CoursePlayer() {
 
   const handleMarkComplete = async () => {
     if (!selectedLessonId) return;
+    // Optimistically mark as complete immediately so checkmarks appear in both sidebars
+    setOptimisticCompleted(prev => new Set([...prev, selectedLessonId]));
     await markComplete.mutateAsync({ lessonId: selectedLessonId, courseSlug: slug! });
     fireLessonCompleteEffect();
     toast.success("Lesson marked complete!");
@@ -320,7 +335,7 @@ export default function CoursePlayer() {
   const { course, sections } = data;
   const progress = data.progress ?? [];
   const topLevelLessons: any[] = (data as any).topLevelLessons ?? [];
-  const completedIds = new Set(progress.filter((p: any) => p.completedAt).map((p: any) => p.lessonId));
+  const completedIds = new Set([...progress.filter((p: any) => p.completedAt).map((p: any) => p.lessonId), ...optimisticCompleted]);
   const bookmarkedIds = new Set((bookmarksData ?? []).map((b: any) => b.lessonId));
   const notesByLesson = new Map((notesData ?? []).map((n: any) => [n.lessonId, n]));
 
@@ -444,10 +459,16 @@ export default function CoursePlayer() {
           {/* Sidebar Header */}
           <div className="px-4 py-3 border-b border-gray-200 shrink-0">
             <button
-              className="text-teal-600 text-[10px] font-medium flex items-center gap-1 mb-2 hover:text-teal-800 transition-colors"
+              className="text-teal-600 text-[10px] font-medium flex items-center gap-1 mb-1 hover:text-teal-800 transition-colors"
               onClick={() => navigate("/education-library")}
             >
               <ChevronLeft className="w-3 h-3" /> Back to Library
+            </button>
+            <button
+              className="text-teal-500 text-[10px] font-medium flex items-center gap-1 mb-2 hover:text-teal-700 transition-colors"
+              onClick={() => navigate(`/learn/${slug}/overview`)}
+            >
+              <BookOpen className="w-3 h-3" /> Course Overview
             </button>
             <h3 className="text-teal-700 text-[11px] font-extrabold uppercase tracking-widest">Course Modules</h3>
           </div>
@@ -458,8 +479,11 @@ export default function CoursePlayer() {
             {topLevelLessons.map((lesson: any, idx: number) => {
               const done = completedIds.has(lesson.id);
               const active = lesson.id === selectedLessonId;
-              const lessonLocked = !dripBypassed && (lesson.dripDays ?? 0) > 0 && daysSinceEnroll < lesson.dripDays;
-              const lessonUnlockDate = lessonLocked ? new Date(enrolledAt.getTime() + lesson.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
+              const dripLocked = !dripBypassed && (lesson.dripDays ?? 0) > 0 && daysSinceEnroll < lesson.dripDays;
+              const prereqLocked = !dripBypassed && !!lesson.prerequisiteLessonId && !completedIds.has(lesson.prerequisiteLessonId);
+              const lessonLocked = dripLocked || prereqLocked;
+              const lessonUnlockDate = dripLocked ? new Date(enrolledAt.getTime() + lesson.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
+              const prereqTitle = prereqLocked ? (allLessons.find((l: any) => l.id === lesson.prerequisiteLessonId)?.title ?? "a previous lesson") : null;
               return (
                 <button
                   key={lesson.id}
@@ -484,7 +508,8 @@ export default function CoursePlayer() {
                   </span>
                   <div className="flex-1 min-w-0">
                     <span className="leading-snug font-semibold uppercase tracking-wide truncate block">{lesson.title}</span>
-                    {lessonLocked && lessonUnlockDate && <span className="text-[10px] text-gray-400 font-normal normal-case">Unlocks {lessonUnlockDate}</span>}
+                    {dripLocked && lessonUnlockDate && <span className="text-[10px] text-gray-400 font-normal normal-case">Unlocks {lessonUnlockDate}</span>}
+                    {prereqLocked && !dripLocked && <span className="text-[10px] text-orange-500 font-normal normal-case">Complete &ldquo;{prereqTitle}&rdquo; first</span>}
                   </div>
                 </button>
               );
@@ -540,8 +565,11 @@ export default function CoursePlayer() {
                       {section.lessons.map((lesson: any) => {
                         const done = completedIds.has(lesson.id);
                         const active = lesson.id === selectedLessonId;
-                        const lessonLocked = !dripBypassed && (lesson.dripDays ?? 0) > 0 && daysSinceEnroll < lesson.dripDays;
-                        const lessonUnlockDate = lessonLocked ? new Date(enrolledAt.getTime() + lesson.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
+                        const dripLocked = !dripBypassed && (lesson.dripDays ?? 0) > 0 && daysSinceEnroll < lesson.dripDays;
+                        const prereqLocked = !dripBypassed && !!lesson.prerequisiteLessonId && !completedIds.has(lesson.prerequisiteLessonId);
+                        const lessonLocked = dripLocked || prereqLocked;
+                        const lessonUnlockDate = dripLocked ? new Date(enrolledAt.getTime() + lesson.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
+                        const prereqTitle = prereqLocked ? (allLessons.find((l: any) => l.id === lesson.prerequisiteLessonId)?.title ?? "a previous lesson") : null;
                         return (
                           <button
                             key={lesson.id}
@@ -555,7 +583,8 @@ export default function CoursePlayer() {
                             <LessonIcon type={lesson.type} done={done} locked={lessonLocked} />
                             <div className="flex-1 min-w-0">
                               <span className="truncate block">{lesson.title}</span>
-                              {lessonLocked && lessonUnlockDate && <span className="text-[10px] text-gray-400">Unlocks {lessonUnlockDate}</span>}
+                              {dripLocked && lessonUnlockDate && <span className="text-[10px] text-gray-400">Unlocks {lessonUnlockDate}</span>}
+                              {prereqLocked && !dripLocked && <span className="text-[10px] text-orange-500">Complete &ldquo;{prereqTitle}&rdquo; first</span>}
                             </div>
                             {lesson.durationMinutes && !lessonLocked && <span className="text-[10px] text-gray-400 shrink-0">{lesson.durationMinutes}m</span>}
                           </button>
@@ -606,16 +635,7 @@ export default function CoursePlayer() {
               <h1 className="font-extrabold text-gray-900 text-base tracking-tight truncate flex-1">{currentSection?.title || lessonData.title}</h1>
             )}
             <div className="ml-auto flex items-center gap-2 shrink-0">
-              {/* Admin: Edit content blocks */}
-              {isAdmin && !showStudentView && selectedLessonId && (
-                <button
-                  onClick={() => setShowBlockEditor(true)}
-                  title="Edit lesson content blocks"
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border border-teal-400 text-teal-700 hover:bg-teal-50 transition-colors"
-                >
-                  <Pencil className="w-3 h-3" /> Edit Content
-                </button>
-              )}
+
               {selectedLessonId && (
                 <button
                   onClick={() => toggleBookmark.mutate({ lessonId: selectedLessonId, courseSlug: slug! })}
@@ -655,12 +675,12 @@ export default function CoursePlayer() {
                 <Skeleton className="h-64 w-full" />
               </div>
             ) : lessonData ? (
-              <div className="flex flex-col lg:flex-row h-full">
+              <div className="flex flex-col lg:flex-row min-h-full">
                 {/* ── Main media/content column ── */}
                 <div className="flex-1 p-5 flex flex-col">
 
-                  {/* ── Video lesson ── */}
-                  {(lessonData.type === "video" || lessonData.type === "video_text") && lessonData.content && (
+                  {/* ── Video lesson — only show if no content blocks override ── */}
+                  {(lessonData.type === "video" || lessonData.type === "video_text") && lessonData.content && contentBlocks.length === 0 && (
                     <div className="mb-5">
                       <div className="aspect-video bg-black rounded-xl overflow-hidden shadow-lg ring-1 ring-gray-200">
                         <video
@@ -677,22 +697,22 @@ export default function CoursePlayer() {
                     </div>
                   )}
 
-                  {/* ── Text below video (video_text) ── */}
-                  {lessonData.type === "video_text" && lessonData.videoContent && (
+                  {/* ── Text below video (video_text) — only show if no content blocks override ── */}
+                  {lessonData.type === "video_text" && lessonData.videoContent && contentBlocks.length === 0 && (
                     <div className="bg-gray-50 rounded-xl border border-gray-200 p-5 mb-5">
                       <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: lessonData.videoContent }} />
                     </div>
                   )}
 
-                  {/* ── Text lesson ── */}
-                  {lessonData.type === "text" && lessonData.content && (
+                  {/* ── Text lesson — only show if no content blocks override ── */}
+                  {lessonData.type === "text" && lessonData.content && contentBlocks.length === 0 && (
                     <div className="bg-gray-50 rounded-xl border border-gray-200 p-5 mb-5">
                       <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: lessonData.content }} />
                     </div>
                   )}
 
-                  {/* ── Embed lesson ── */}
-                  {lessonData.type === "embed" && lessonData.embedUrl && (
+                  {/* ── Embed lesson — only show if no content blocks override ── */}
+                  {lessonData.type === "embed" && lessonData.embedUrl && contentBlocks.length === 0 && (
                     <div className="mb-5">
                       <div className="aspect-video bg-black rounded-xl overflow-hidden shadow-lg ring-1 ring-gray-200">
                         <iframe
@@ -706,8 +726,8 @@ export default function CoursePlayer() {
                     </div>
                   )}
 
-                  {/* ── Download lesson ── */}
-                  {lessonData.type === "download" && lessonData.content && (
+                  {/* ── Download lesson — only show if no content blocks override ── */}
+                  {lessonData.type === "download" && lessonData.content && contentBlocks.length === 0 && (
                     <div className="bg-gray-50 rounded-xl border border-gray-200 p-5 mb-5 flex items-center gap-4">
                       <Download className="w-8 h-8 text-teal-600" />
                       <div>
@@ -767,7 +787,7 @@ export default function CoursePlayer() {
                         <div className="flex items-center gap-2 text-teal-700 text-sm font-semibold bg-teal-100 px-4 py-2 rounded-full">
                           <CheckCircle className="w-4 h-4" /> Completed
                         </div>
-                      ) : (requireManualComplete || lessonData.type === "text" || lessonData.type === "video" || lessonData.type === "video_text" || lessonData.type === "embed" || lessonData.type === "download") ? (
+                      ) : requireManualComplete ? (
                         <Button
                           className="bg-teal-500 hover:bg-teal-400 text-white font-bold px-6 py-2.5 rounded-full shadow-lg shadow-teal-500/20 uppercase tracking-wide text-sm"
                           onClick={handleMarkComplete}
@@ -847,6 +867,44 @@ export default function CoursePlayer() {
                       </button>
                     </div>
                   )}
+
+                  {/* ── Instructor Profile Panel ── */}
+                  {(() => {
+                    // Determine whether to show instructor panel:
+                    // lesson-level: 'show' always shows, 'hide' always hides, 'inherit' defers to course
+                    const lessonOverride = lessonData?.showInstructor ?? "inherit";
+                    const courseShow = !!(course as any).showInstructor;
+                    const shouldShow = lessonOverride === "show" ? true : lessonOverride === "hide" ? false : courseShow;
+                    const instructors = (data as any).instructors ?? [];
+                    if (!shouldShow || instructors.length === 0) return null;
+                    return (
+                      <div className="border-t border-gray-200 pt-4 space-y-3">
+                        <h3 className="text-xs font-bold text-teal-700 uppercase tracking-widest flex items-center gap-2">
+                          <User className="w-3.5 h-3.5" /> Your Instructor{instructors.length > 1 ? "s" : ""}
+                        </h3>
+                        {instructors.map((inst: any) => (
+                          <div key={inst.id} className="flex flex-col gap-2">
+                            <div className="flex items-center gap-2">
+                              {inst.avatarUrl ? (
+                                <img src={inst.avatarUrl} alt={inst.name} className="w-10 h-10 rounded-full object-cover border-2 border-teal-200 shrink-0" />
+                              ) : (
+                                <div className="w-10 h-10 rounded-full bg-teal-100 border-2 border-teal-200 flex items-center justify-center shrink-0">
+                                  <User className="w-5 h-5 text-teal-600" />
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-gray-900 truncate">{inst.name}</p>
+                                {inst.title && <p className="text-[10px] text-teal-600 truncate">{inst.title}</p>}
+                              </div>
+                            </div>
+                            {inst.bio && (
+                              <p className="text-[10px] text-gray-500 leading-relaxed line-clamp-4">{inst.bio}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             ) : (

@@ -38,6 +38,7 @@ import LMSHome from "./pages/LMSHome";
 import CollectionDetail from "./pages/CollectionDetail";
 import CourseLanding from "./pages/CourseLanding";
 import CoursePlayer from "./pages/CoursePlayer";
+import CourseOverview from "./pages/CourseOverview";
 import LMSAdmin from "./pages/admin/LMSAdmin";
 import LandingPageBuilder from "./pages/admin/LandingPageBuilder";
 const FunnelBuilder = lazy(() => import("./pages/admin/FunnelBuilder"));
@@ -360,6 +361,7 @@ function Router() {
         <Route path="/education-library" component={EducationLibrary} />
         <Route path="/collections/:id" component={CollectionDetail} />
         <Route path="/learn/:slug/player" component={CoursePlayer} />
+        <Route path="/learn/:slug/overview" component={CourseOverview} />
         <Route path="/learn/:slug" component={CourseLanding} />
           {/* ── Digital Downloads ───────────────────────────────────────────────────────── */}
         <Route path="/my-downloads" component={MyDownloads} />
@@ -436,6 +438,7 @@ function LMSRouter() {
         <Route path="/education-library" component={EducationLibrary} />
         <Route path="/collections/:id" component={CollectionDetail} />
         <Route path="/learn/:slug/player" component={CoursePlayer} />
+        <Route path="/learn/:slug/overview" component={CourseOverview} />
         <Route path="/learn/:slug" component={CourseLanding} />
 
         {/* Digital Downloads */}

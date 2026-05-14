@@ -36,6 +36,7 @@ import {
   Users, DollarSign, BarChart2, GripVertical, CheckCircle, AlertCircle,
   Link as LinkIcon, UserCheck, ArrowLeft, Upload, ImageIcon,
   Sparkles, Loader2, Eye, FolderOpen, Monitor, Video, FileText, CheckSquare, Settings2,
+  User, Lock,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import LessonEffectEditor from "@/components/LessonEffectEditor";
@@ -2173,8 +2174,26 @@ function LessonEditorPage({ lesson, onClose, onSaved, onSavedAndClose }: { lesso
     const [requireVideoCompletion, setRequireVideoCompletion] = useState(lesson.requireVideoCompletion === 1);
   const [requireManualComplete, setRequireManualComplete] = useState(lesson.requireManualComplete === 1);
   const [dripDays, setDripDays] = useState(String(lesson.dripDays ?? ""));
+  const [showInstructor, setShowInstructor] = useState<"inherit" | "show" | "hide">(lesson.showInstructor ?? "inherit");
+  const [prerequisiteLessonId, setPrerequisiteLessonId] = useState<string>(lesson.prerequisiteLessonId ? String(lesson.prerequisiteLessonId) : "none");
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<{ id: number; title: string; s3Url: string; mediaType: string } | null>(null);
+
+  // Fetch all lessons in this course for the prerequisite selector
+  const { data: courseLessonsData } = trpc.lmsAdmin.getLessonsWithBlocks.useQuery(
+    { courseId: lesson.courseId },
+    { enabled: !!lesson.courseId }
+  );
+  // Also fetch all lessons (including those without blocks) — reuse getCourse
+  const { data: courseData } = trpc.lmsAdmin.getCourse.useQuery(
+    { id: lesson.courseId },
+    { enabled: !!lesson.courseId }
+  );
+  const allCourseLessons = [
+    ...(courseData?.topLevelLessons ?? []),
+    ...(courseData?.sections ?? []).flatMap((s: any) => s.lessons ?? []),
+  ].filter((l: any) => l.id !== lesson.id); // exclude self
+
   const update = trpc.lmsAdmin.updateLesson.useMutation({
     onSuccess: () => { toast.success("Lesson saved"); },
     onError: e => toast.error(`Error: ${e.message}`),
@@ -2189,6 +2208,8 @@ function LessonEditorPage({ lesson, onClose, onSaved, onSavedAndClose }: { lesso
       requireVideoCompletion,
       requireManualComplete,
       dripDays: dripDays.trim() ? parseInt(dripDays) : null,
+      showInstructor,
+      prerequisiteLessonId: prerequisiteLessonId !== "none" ? parseInt(prerequisiteLessonId) : null,
       content: (lesson.type === "text" || lesson.type === "video" || lesson.type === "download" || lesson.type === "video_text") ? (content || null) : undefined,
       videoContent: lesson.type === "video_text" ? (videoContent || null) : undefined,
       embedUrl: lesson.type === "embed" ? (embedUrl || null) : undefined,
@@ -2359,6 +2380,46 @@ function LessonEditorPage({ lesson, onClose, onSaved, onSavedAndClose }: { lesso
               <p className="text-xs text-teal-600">Students enrolled today will unlock this lesson on day {dripDays}.</p>
             )}
           </div>
+          {/* Instructor display override */}
+          <div className="border border-gray-200 rounded-lg p-4 space-y-2 bg-gray-50">
+            <p className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+              <User className="w-4 h-4 text-teal-600" /> Instructor Panel
+            </p>
+            <p className="text-xs text-gray-500">Override the course-level instructor panel setting for this specific lesson.</p>
+            <Select value={showInstructor} onValueChange={(v: any) => setShowInstructor(v)}>
+              <SelectTrigger className="w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="inherit">Inherit from course</SelectItem>
+                <SelectItem value="show">Always show</SelectItem>
+                <SelectItem value="hide">Always hide</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Prerequisite lesson */}
+          <div className="border border-gray-200 rounded-lg p-4 space-y-2 bg-gray-50">
+            <p className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+              <Lock className="w-4 h-4 text-orange-500" /> Prerequisite Lesson
+            </p>
+            <p className="text-xs text-gray-500">Students must complete the selected lesson before accessing this one. Leave as "None" for no prerequisite.</p>
+            <Select value={prerequisiteLessonId} onValueChange={setPrerequisiteLessonId}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="No prerequisite" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None (no prerequisite)</SelectItem>
+                {allCourseLessons.map((l: any) => (
+                  <SelectItem key={l.id} value={String(l.id)}>{l.title}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {prerequisiteLessonId !== "none" && (
+              <p className="text-xs text-orange-600">Students must complete &ldquo;{allCourseLessons.find((l: any) => String(l.id) === prerequisiteLessonId)?.title ?? "the selected lesson"}&rdquo; first.</p>
+            )}
+          </div>
+
           {/* Effects section */}
           <div className="border-t pt-4">
             <p className="text-sm font-semibold text-teal-700 mb-3 flex items-center gap-1.5"><Sparkles className="h-4 w-4" /> Lesson Effect</p>
