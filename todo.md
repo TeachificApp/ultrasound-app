@@ -1859,3 +1859,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Enforce prerequisite gating in CoursePlayer sidebar and lesson access
 - [x] Add instructor profile panel to course player right sidebar (course + lesson level toggle)
 - [x] Route: /learn/:slug/overview opens CourseOverview, /learn/:slug/player opens the player; sidebar has Overview link
+
+## Hide Course Progress (May 14)
+- [x] Add hideProgress boolean column to lms_courses schema + DB migration
+- [x] Add hideProgress to updateCourse procedure input schema
+- [x] Add hideProgress toggle to Course Settings UI (LMS Admin)
+- [x] Suppress progress bar/percentage in CoursePlayer when hideProgress is true
+- [x] Suppress progress bar/percentage in CourseOverview when hideProgress is true

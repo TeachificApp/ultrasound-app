@@ -2738,6 +2738,8 @@ export const lmsCourses = mysqlTable("lms_courses", {
   isDrip: boolean("is_drip").default(false).notNull(),
   // Show instructor profile card in the lesson player right panel
   showInstructor: boolean("show_instructor").default(false).notNull(),
+  // Hide the progress bar/percentage from students in the course player and overview
+  hideProgress: boolean("hide_progress").default(false).notNull(),
   // Block editor content for the Course Overview page (JSON array of Block objects)
   courseOverviewBlocks: longtext("course_overview_blocks"),
   createdByUserId: int("created_by_user_id").notNull(),

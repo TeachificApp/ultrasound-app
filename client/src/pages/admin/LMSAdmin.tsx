@@ -1128,6 +1128,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
   const [hasCertificate, setHasCertificate] = useState(course.hasCertificate);
   const [isFeatured, setIsFeatured] = useState(course.isFeatured ?? false);
   const [isDrip, setIsDrip] = useState(course.isDrip ?? false);
+  const [hideProgress, setHideProgress] = useState(course.hideProgress ?? false);
   const [coverImageUrl, setCoverImageUrl] = useState(course.coverImageUrl ?? "");
   const [slug, setSlug] = useState(course.slug ?? "");
   const [metaTitle, setMetaTitle] = useState(course.metaTitle ?? "");
@@ -1362,6 +1363,13 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
           <p className="text-xs text-gray-400 mt-0.5">When enabled, sections and lessons can be scheduled to unlock a set number of days after enrollment. Configure per-section timing using the Drip button on each section.</p>
         </div>
       </div>
+      <div className="flex items-start gap-2">
+        <Switch checked={hideProgress} onCheckedChange={setHideProgress} id="hide-progress-switch" className="mt-0.5" />
+        <div>
+          <Label htmlFor="hide-progress-switch" className="text-sm">Hide course progress</Label>
+          <p className="text-xs text-gray-400 mt-0.5">When enabled, the progress bar and completion percentage will not be shown to students in the course player or overview page.</p>
+        </div>
+      </div>
 
       <div>
         <Label className="text-sm">Description (rich text)</Label>
@@ -1408,6 +1416,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
           hasCertificate,
           isFeatured,
           isDrip,
+          hideProgress,
           price: pricingType === "free" ? 0 : Math.round(parseFloat(price || "0") * 100),
           subscriptionInterval: pricingType === "subscription" ? subscriptionInterval : null,
           downPayment: pricingType === "payment_plan" ? Math.round(parseFloat(downPayment || "0") * 100) : null,

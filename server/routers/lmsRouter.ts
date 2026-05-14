@@ -1048,6 +1048,7 @@ export const lmsAdminRouter = router({
       isFeatured: z.boolean().optional(),
       isDrip: z.boolean().optional(),
       showInstructor: z.boolean().optional(),
+      hideProgress: z.boolean().optional(),
       courseOverviewBlocks: z.string().nullable().optional(), // JSON array of Block objects
       metaTitle: z.string().optional(),
       metaDescription: z.string().optional(),

@@ -306,8 +306,8 @@ export default function CourseOverview() {
       </header>
 
       <div className="max-w-5xl mx-auto px-6 py-8 space-y-8">
-        {/* Progress bar */}
-        {totalLessons > 0 && (
+        {/* Progress bar — hidden when course.hideProgress is enabled */}
+        {totalLessons > 0 && !course.hideProgress && (
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-gray-700">Your Progress</span>

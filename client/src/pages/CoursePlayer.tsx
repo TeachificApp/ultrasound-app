@@ -406,17 +406,19 @@ export default function CoursePlayer() {
           }
         </div>
         <div className="flex items-center gap-5">
-          {/* Progress bar */}
-          <div className="flex items-center gap-2.5">
-            <span className="text-gray-500 text-xs">Your Progress</span>
-            <div className="w-36 bg-gray-200 rounded-full h-2 overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-teal-500 to-teal-400 rounded-full transition-all duration-500"
-                style={{ width: `${data.enrollment?.progressPct ?? 0}%` }}
-              />
+          {/* Progress bar — hidden when course.hideProgress is enabled */}
+          {!course.hideProgress && (
+            <div className="flex items-center gap-2.5">
+              <span className="text-gray-500 text-xs">Your Progress</span>
+              <div className="w-36 bg-gray-200 rounded-full h-2 overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-teal-500 to-teal-400 rounded-full transition-all duration-500"
+                  style={{ width: `${data.enrollment?.progressPct ?? 0}%` }}
+                />
+              </div>
+              <span className="text-teal-600 font-bold text-xs">{data.enrollment?.progressPct ?? 0}%</span>
             </div>
-            <span className="text-teal-600 font-bold text-xs">{data.enrollment?.progressPct ?? 0}%</span>
-          </div>
+          )}
           {/* Admin controls */}
           {isAdmin && !isPreviewMode && (
             <button
