@@ -15,6 +15,8 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { RoleGuard } from "@/components/RoleGuard";
 import LMSLayout from "./components/LMSLayout";
 import { isLearnDomain, isIHeartEchoDomain, isMembersDomain } from "./hooks/useSubdomain";
+import UpgradePrompt from "./components/UpgradePrompt";
+import { useAuth } from "./_core/hooks/useAuth";
 import { usePageViewTracker } from "./hooks/useAnalytics";
 
 // ── Core pages (eagerly loaded — tiny, always needed) ────────────────────────
@@ -620,6 +622,16 @@ function IHeartEchoRouter() {
   );
 }
 
+/** Mounts the upgrade prompt only for free, authenticated, non-admin users */
+function UpgradePromptWrapper() {
+  const { user, loading } = useAuth();
+  if (loading || !user) return null;
+  const isPremium = (user as any).isPremium === true;
+  const isAdmin = (user as any).role === "admin";
+  const eligible = !isPremium && !isAdmin;
+  return <UpgradePrompt eligible={eligible} />;
+}
+
 function App() {
   const onLearnSubdomain = isLearnDomain();
   const onMembersSubdomain = isMembersDomain();
@@ -638,6 +650,7 @@ function App() {
               <DemoModeBanner />
               <GetAppBanner />
               <Router />
+              <UpgradePromptWrapper />
             </>
           )}
         </TooltipProvider>
