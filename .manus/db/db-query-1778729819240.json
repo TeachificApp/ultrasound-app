@@ -1,0 +1,90 @@
+{
+  "query": "SELECT * FROM media_folders;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT * FROM media_folders;",
+  "rows": [
+    {
+      "id": "1",
+      "name": "ACS",
+      "slug": "acs",
+      "description": "NULL",
+      "parent_id": "NULL",
+      "sort_order": "0",
+      "created_at": "1778729577871",
+      "updated_at": "1778729577871"
+    },
+    {
+      "id": "2",
+      "name": "Adult Echo",
+      "slug": "adult-echo",
+      "description": "NULL",
+      "parent_id": "NULL",
+      "sort_order": "0",
+      "created_at": "1778729577871",
+      "updated_at": "1778729577871"
+    },
+    {
+      "id": "3",
+      "name": "Pediatric Echo",
+      "slug": "pediatric-echo",
+      "description": "NULL",
+      "parent_id": "NULL",
+      "sort_order": "0",
+      "created_at": "1778729577871",
+      "updated_at": "1778729577871"
+    },
+    {
+      "id": "4",
+      "name": "Fetal Echo",
+      "slug": "fetal-echo",
+      "description": "NULL",
+      "parent_id": "NULL",
+      "sort_order": "0",
+      "created_at": "1778729577871",
+      "updated_at": "1778729577871"
+    },
+    {
+      "id": "5",
+      "name": "Abdominal",
+      "slug": "abdominal",
+      "description": "NULL",
+      "parent_id": "NULL",
+      "sort_order": "0",
+      "created_at": "1778729577871",
+      "updated_at": "1778729577871"
+    },
+    {
+      "id": "6",
+      "name": "Ob-Gyn",
+      "slug": "ob-gyn",
+      "description": "NULL",
+      "parent_id": "NULL",
+      "sort_order": "0",
+      "created_at": "1778729577871",
+      "updated_at": "1778729577871"
+    },
+    {
+      "id": "7",
+      "name": "Vascular",
+      "slug": "vascular",
+      "description": "NULL",
+      "parent_id": "NULL",
+      "sort_order": "0",
+      "created_at": "1778729577871",
+      "updated_at": "1778729577871"
+    },
+    {
+      "id": "8",
+      "name": "Breast",
+      "slug": "breast",
+      "description": "NULL",
+      "parent_id": "NULL",
+      "sort_order": "0",
+      "created_at": "1778729577871",
+      "updated_at": "1778729577871"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tslug\tdescription\tparent_id\tsort_order\tcreated_at\tupdated_at\n1\tACS\tacs\tNULL\tNULL\t0\t1778729577871\t1778729577871\n2\tAdult Echo\tadult-echo\tNULL\tNULL\t0\t1778729577871\t1778729577871\n3\tPediatric Echo\tpediatric-echo\tNULL\tNULL\t0\t1778729577871\t1778729577871\n4\tFetal Echo\tfetal-echo\tNULL\tNULL\t0\t1778729577871\t1778729577871\n5\tAbdominal\tabdominal\tNULL\tNULL\t0\t1778729577871\t1778729577871\n6\tOb-Gyn\tob-gyn\tNULL\tNULL\t0\t1778729577871\t1778729577871\n7\tVascular\tvascular\tNULL\tNULL\t0\t1778729577871\t1778729577871\n8\tBreast\tbreast\tNULL\tNULL\t0\t1778729577871\t1778729577871\n",
+  "stderr": "",
+  "execution_time_ms": 275
+}

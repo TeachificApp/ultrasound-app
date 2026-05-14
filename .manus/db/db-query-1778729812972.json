@@ -1,0 +1,76 @@
+{
+  "query": "SELECT id, assetId, versionNumber, LEFT(s3Url, 80) as s3Url_prefix FROM mediaVersions WHERE id >= 200000 ORDER BY assetId, versionNumber;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT id, assetId, versionNumber, LEFT(s3Url, 80) as s3Url_prefix FROM mediaVersions WHERE id >= 200000 ORDER BY assetId, versionNumber;",
+  "rows": [
+    {
+      "id": "200001",
+      "assetId": "200001",
+      "versionNumber": "1",
+      "s3Url_prefix": "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/"
+    },
+    {
+      "id": "200002",
+      "assetId": "230001",
+      "versionNumber": "1",
+      "s3Url_prefix": "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/"
+    },
+    {
+      "id": "200003",
+      "assetId": "230002",
+      "versionNumber": "1",
+      "s3Url_prefix": "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/"
+    },
+    {
+      "id": "200004",
+      "assetId": "260001",
+      "versionNumber": "1",
+      "s3Url_prefix": "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/"
+    },
+    {
+      "id": "200005",
+      "assetId": "290001",
+      "versionNumber": "1",
+      "s3Url_prefix": "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/"
+    },
+    {
+      "id": "200006",
+      "assetId": "290001",
+      "versionNumber": "2",
+      "s3Url_prefix": "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/"
+    },
+    {
+      "id": "200007",
+      "assetId": "290002",
+      "versionNumber": "1",
+      "s3Url_prefix": "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/"
+    },
+    {
+      "id": "200008",
+      "assetId": "290002",
+      "versionNumber": "2",
+      "s3Url_prefix": "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/"
+    },
+    {
+      "id": "200009",
+      "assetId": "290002",
+      "versionNumber": "3",
+      "s3Url_prefix": "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/"
+    },
+    {
+      "id": "200010",
+      "assetId": "290002",
+      "versionNumber": "4",
+      "s3Url_prefix": "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/"
+    },
+    {
+      "id": "200011",
+      "assetId": "290003",
+      "versionNumber": "1",
+      "s3Url_prefix": "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tassetId\tversionNumber\ts3Url_prefix\n200001\t200001\t1\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/\n200002\t230001\t1\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/\n200003\t230002\t1\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/\n200004\t260001\t1\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/\n200005\t290001\t1\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/\n200006\t290001\t2\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/\n200007\t290002\t1\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/\n200008\t290002\t2\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/\n200009\t290002\t3\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/\n200010\t290002\t4\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/\n200011\t290003\t1\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/\n",
+  "stderr": "",
+  "execution_time_ms": 259
+}

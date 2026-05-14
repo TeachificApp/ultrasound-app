@@ -191,15 +191,15 @@ async function startServer() {
       createContext,
     })
   );
+  // Media repository public serve/embed routes (cookieless, token-based access)
+  // MUST be registered BEFORE serveStatic so they take priority over the SPA catch-all
+  registerMediaServeRoutes(app);
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
-  // Media repository public serve/embed routes (cookieless, token-based access)
-  // MUST be registered AFTER serveStatic so the SPA wildcard doesn't intercept /media/:slug
-  registerMediaServeRoutes(app);
 
   const preferredPort = parseInt(process.env.PORT || "3000");
   // In production (Railway), bind directly to PORT without scanning

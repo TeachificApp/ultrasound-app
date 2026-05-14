@@ -1703,3 +1703,5 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Quiz questions lost (SPI quiz has 0 questions)
 - [x] PDF file 404 in media repository — FIXED in code (isServerRoute fix), needs production re-deploy
 - [x] Investigate MirrorSync overwriting production data — MirrorSync is one-way TiDB→Railway, not the cause; root cause was missing DB column
+- [x] Fix media /media/:slug 404 in production — moved media routes BEFORE SPA catch-all in index.ts
+- [x] Ensure iHeartEcho media repository settings/assets are transferred and accessible — migrated 7 assets, 8 folders from iHeartEcho DB with SCORM entry URLs

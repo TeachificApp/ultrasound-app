@@ -1,0 +1,16 @@
+{
+  "query": "SELECT id, assetId, versionNumber, s3Url FROM mediaVersions WHERE assetId = 200001;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT id, assetId, versionNumber, s3Url FROM mediaVersions WHERE assetId = 200001;",
+  "rows": [
+    {
+      "id": "200001",
+      "assetId": "200001",
+      "versionNumber": "1",
+      "s3Url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/media-repository/advanced-cardiac-sonographer-sample-quiz-eqlaod-v1.zip"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tassetId\tversionNumber\ts3Url\n200001\t200001\t1\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/media-repository/advanced-cardiac-sonographer-sample-quiz-eqlaod-v1.zip\n",
+  "stderr": "",
+  "execution_time_ms": 272
+}

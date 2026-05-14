@@ -1,0 +1,31 @@
+{
+  "query": "SHOW TABLES LIKE 'media%';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SHOW TABLES LIKE 'media%';",
+  "rows": [
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (media%)": "mediaAccessGrants"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (media%)": "mediaAccessLogs"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (media%)": "mediaAccessRules"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (media%)": "mediaAssets"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (media%)": "mediaVersions"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (media%)": "mediaViewEvents"
+    },
+    {
+      "Tables_in_UrcfdRVE8J6mpMNR48QuFe (media%)": "media_folders"
+    }
+  ],
+  "messages": [],
+  "stdout": "Tables_in_UrcfdRVE8J6mpMNR48QuFe (media%)\nmediaAccessGrants\nmediaAccessLogs\nmediaAccessRules\nmediaAssets\nmediaVersions\nmediaViewEvents\nmedia_folders\n",
+  "stderr": "",
+  "execution_time_ms": 262
+}

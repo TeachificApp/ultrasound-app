@@ -1,0 +1,31 @@
+{
+  "query": "SELECT id, assetId, s3Url, fileName, mimeType FROM mediaVersions ORDER BY createdAt DESC LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT id, assetId, s3Url, fileName, mimeType FROM mediaVersions ORDER BY createdAt DESC LIMIT 10;",
+  "rows": [
+    {
+      "id": "60001",
+      "assetId": "60001",
+      "s3Url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/media-repo/jumpstart-business-quick-guide-a03dbc0f/v1-Jumpstart Business Quick Guide.pdf",
+      "fileName": "Jumpstart Business Quick Guide.pdf",
+      "mimeType": "application/pdf"
+    },
+    {
+      "id": "30001",
+      "assetId": "30001",
+      "s3Url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/media-repo/lms-cover-1-1c5910bf/cover-1c5910bf.png",
+      "fileName": "cover-1c5910bf.png",
+      "mimeType": "image/png"
+    },
+    {
+      "id": "1",
+      "assetId": "1",
+      "s3Url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/media-repo/registry-review-quiz-physics-spi-unlimited-59a18a7b/v1-UNLIMITED REGISTRY REVIEW QUIZ - PHYSICS SPI.zip",
+      "fileName": "UNLIMITED REGISTRY REVIEW QUIZ - PHYSICS SPI.zip",
+      "mimeType": "application/x-zip-compressed"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tassetId\ts3Url\tfileName\tmimeType\n60001\t60001\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/media-repo/jumpstart-business-quick-guide-a03dbc0f/v1-Jumpstart Business Quick Guide.pdf\tJumpstart Business Quick Guide.pdf\tapplication/pdf\n30001\t30001\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/media-repo/lms-cover-1-1c5910bf/cover-1c5910bf.png\tcover-1c5910bf.png\timage/png\n1\t1\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/media-repo/registry-review-quiz-physics-spi-unlimited-59a18a7b/v1-UNLIMITED REGISTRY REVIEW QUIZ - PHYSICS SPI.zip\tUNLIMITED REGISTRY REVIEW QUIZ - PHYSICS SPI.zip\tapplication/x-zip-compressed\n",
+  "stderr": "",
+  "execution_time_ms": 272
+}

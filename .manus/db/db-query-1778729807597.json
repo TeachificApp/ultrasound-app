@@ -1,0 +1,59 @@
+{
+  "query": "SELECT id, slug, title, mediaType, folder FROM mediaAssets WHERE id >= 200000 ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT id, slug, title, mediaType, folder FROM mediaAssets WHERE id >= 200000 ORDER BY id;",
+  "rows": [
+    {
+      "id": "200001",
+      "slug": "advanced-cardiac-sonographer-sample-quiz-eqlaod",
+      "title": "Advanced Cardiac Sonographer Sample Quiz",
+      "mediaType": "scorm",
+      "folder": "acs"
+    },
+    {
+      "id": "230001",
+      "slug": "advanced-cardiac-sonographer-unlimited-q-k3tgg0",
+      "title": "Advanced Cardiac Sonographer UNLIMITED QUIZ",
+      "mediaType": "scorm",
+      "folder": "acs"
+    },
+    {
+      "id": "230002",
+      "slug": "advanced-cardiac-sonographer-unlimited-q-09xpbr",
+      "title": "Advanced Cardiac Sonographer - UNLIMITED QUIZ",
+      "mediaType": "zip",
+      "folder": "acs"
+    },
+    {
+      "id": "260001",
+      "slug": "acs-flashcards-kt66kl",
+      "title": "ACS Flashcards",
+      "mediaType": "scorm",
+      "folder": "acs"
+    },
+    {
+      "id": "290001",
+      "slug": "pediatric-echocardiography-test-learn-qu-4eklw1",
+      "title": "Pediatric Echocardiography Test & Learn Quiz",
+      "mediaType": "scorm",
+      "folder": "pediatric-echo"
+    },
+    {
+      "id": "290002",
+      "slug": "pediatric-echo-flashcards-wyo4on",
+      "title": "Pediatric Echo Flashcards",
+      "mediaType": "scorm",
+      "folder": "pediatric-echo"
+    },
+    {
+      "id": "290003",
+      "slug": "lara-williams-z3l1cx",
+      "title": "Lara Williams",
+      "mediaType": "image",
+      "folder": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tslug\ttitle\tmediaType\tfolder\n200001\tadvanced-cardiac-sonographer-sample-quiz-eqlaod\tAdvanced Cardiac Sonographer Sample Quiz\tscorm\tacs\n230001\tadvanced-cardiac-sonographer-unlimited-q-k3tgg0\tAdvanced Cardiac Sonographer UNLIMITED QUIZ\tscorm\tacs\n230002\tadvanced-cardiac-sonographer-unlimited-q-09xpbr\tAdvanced Cardiac Sonographer - UNLIMITED QUIZ\tzip\tacs\n260001\tacs-flashcards-kt66kl\tACS Flashcards\tscorm\tacs\n290001\tpediatric-echocardiography-test-learn-qu-4eklw1\tPediatric Echocardiography Test & Learn Quiz\tscorm\tpediatric-echo\n290002\tpediatric-echo-flashcards-wyo4on\tPediatric Echo Flashcards\tscorm\tpediatric-echo\n290003\tlara-williams-z3l1cx\tLara Williams\timage\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 273
+}

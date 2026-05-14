@@ -1,0 +1,34 @@
+{
+  "query": "DELETE FROM mediaVersions WHERE id = 200006; SELECT id, assetId, versionNumber, s3Url FROM mediaVersions WHERE assetId = 290002 ORDER BY versionNumber DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute DELETE FROM mediaVersions WHERE id = 200006; SELECT id, assetId, versionNumber, s3Url FROM mediaVersions WHERE assetId = 290002 ORDER BY versionNumber DESC;",
+  "rows": [
+    {
+      "id": "200010",
+      "assetId": "290002",
+      "versionNumber": "4",
+      "s3Url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/media-assets/Pediatric Echo Flashcards.zip-xtfv9q0p.zip"
+    },
+    {
+      "id": "200009",
+      "assetId": "290002",
+      "versionNumber": "3",
+      "s3Url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/media-repository/pediatric-echo-flashcards-wyo4on-scorm/Pediatric%20Echo%20Flashcards/index.html"
+    },
+    {
+      "id": "200008",
+      "assetId": "290002",
+      "versionNumber": "2",
+      "s3Url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/media-assets/Pediatric Echo Flashcards.zip-ctlpkjfh.zip"
+    },
+    {
+      "id": "200007",
+      "assetId": "290002",
+      "versionNumber": "1",
+      "s3Url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/media-repository/pediatric-echo-flashcards-wyo4on-scorm/Pediatric%20Echo%20Flashcards%20(Published)/index.html"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tassetId\tversionNumber\ts3Url\n200010\t290002\t4\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/media-assets/Pediatric Echo Flashcards.zip-xtfv9q0p.zip\n200009\t290002\t3\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/media-repository/pediatric-echo-flashcards-wyo4on-scorm/Pediatric%20Echo%20Flashcards/index.html\n200008\t290002\t2\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/media-assets/Pediatric Echo Flashcards.zip-ctlpkjfh.zip\n200007\t290002\t1\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/media-repository/pediatric-echo-flashcards-wyo4on-scorm/Pediatric%20Echo%20Flashcards%20(Published)/index.html\n",
+  "stderr": "",
+  "execution_time_ms": 290
+}

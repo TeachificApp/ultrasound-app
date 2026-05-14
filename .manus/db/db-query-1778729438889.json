@@ -1,0 +1,25 @@
+{
+  "query": "SELECT MAX(id) as max_asset_id FROM mediaAssets; SELECT MAX(id) as max_version_id FROM mediaVersions; SELECT MAX(id) as max_folder_id FROM media_folders;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute SELECT MAX(id) as max_asset_id FROM mediaAssets; SELECT MAX(id) as max_version_id FROM mediaVersions; SELECT MAX(id) as max_folder_id FROM media_folders;",
+  "rows": [
+    {
+      "max_asset_id": "60001"
+    },
+    {
+      "max_asset_id": "max_version_id"
+    },
+    {
+      "max_asset_id": "60001"
+    },
+    {
+      "max_asset_id": "max_folder_id"
+    },
+    {
+      "max_asset_id": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "max_asset_id\n60001\nmax_version_id\n60001\nmax_folder_id\nNULL\n",
+  "stderr": "",
+  "execution_time_ms": 292
+}
