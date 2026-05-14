@@ -1774,3 +1774,6 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Wire reorderLessons mutation on drag end (per section)
 - [x] Wire reorderSections mutation on drag end (sections list)
 - [x] Add PointerSensor with 5px activation distance to prevent accidental drags
+## DnD Fixes Round 2 (May 14)
+- [x] Fix lesson reorder not persisting (order reverts after drag)
+- [x] Make sections (modules) draggable and reorderable
