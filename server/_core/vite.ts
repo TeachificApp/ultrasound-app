@@ -6,12 +6,11 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import viteConfig from "../../vite.config";
 
-/** Paths that are handled by Express routes, not the SPA */
-const SERVER_ROUTE_PREFIXES = ["/media/"];
-
-function isServerRoute(url: string): boolean {
-  return SERVER_ROUTE_PREFIXES.some((p) => url.startsWith(p));
-}
+/**
+ * Regex that matches all paths EXCEPT those starting with /media/ or /api/.
+ * This ensures the SPA catch-all can NEVER intercept server-side routes.
+ */
+const SPA_CATCH_ALL_REGEX = /^\/(?!media\/|api\/|manus-storage\/).*/;
 
 export async function setupVite(app: Express, server: Server) {
   const serverOptions = {
@@ -28,13 +27,10 @@ export async function setupVite(app: Express, server: Server) {
   });
 
   app.use(vite.middlewares);
-  app.use("*", async (req, res, next) => {
-    const url = req.originalUrl;
 
-    // Let server-side routes pass through to Express handlers
-    if (isServerRoute(req.originalUrl)) {
-      return next();
-    }
+  // Use regex route so /media/* paths are structurally excluded
+  app.get(SPA_CATCH_ALL_REGEX, async (req, res, next) => {
+    const url = req.originalUrl;
 
     try {
       const clientTemplate = path.resolve(
@@ -72,12 +68,9 @@ export function serveStatic(app: Express) {
 
   app.use(express.static(distPath));
 
-  // fall through to index.html if the file doesn't exist
-  // Skip server-side routes so Express handlers can process them
-  app.use("*", (req, res, next) => {
-    if (isServerRoute(req.originalUrl)) {
-      return next();
-    }
+  // Use regex route so /media/* paths are structurally excluded — they can NEVER
+  // be caught by this fallback, regardless of route registration order.
+  app.get(SPA_CATCH_ALL_REGEX, (_req, res) => {
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }
