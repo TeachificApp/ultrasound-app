@@ -1792,3 +1792,30 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 
 ## Lesson Add Flow Fix (May 14)
 - [ ] After adding a new lesson, open lesson editor instead of closing dialog
+
+## Module Editing + Drip Content (May 14)
+- [ ] Inline module name editing in curriculum tab (click pencil icon to rename)
+- [ ] Drip content: per-section dripDays setting in admin UI
+- [ ] Drip content: server gates lessons based on enrollment date + section dripDays
+- [ ] Drip content: student player shows locked/upcoming sections with unlock date
+- [ ] Drip content: admin preview bypasses drip lock
+
+## Builder UX Improvements (May 14)
+- [x] Fix "Content Blocks" label → "Lesson Editor" in LessonBlockEditor header
+- [x] Fix auto-open lesson editor after adding new lesson (pass full lesson object directly, no secondary fetch)
+- [x] Add up/down arrow reorder buttons to LessonBlockEditor blocks (alongside drag)
+- [x] Add up/down arrow reorder buttons to SortableLessonRow in curriculum builder
+- [x] Add up/down arrow reorder buttons to SortableSectionRow in curriculum builder
+- [x] Add up/down arrow reorder buttons to LandingPageBuilder SortableBlock
+- [x] Add up/down arrow reorder buttons to FunnelPageEditor SortableBlock
+- [x] Add up/down arrow reorder buttons to DownloadLandingPageBuilder SortableBlock
+- [x] Add up/down arrow reorder buttons to FunnelBuilder SortableFunnelCard and SortableFunnelPageRow
+- [x] Add "Copy from other lessons" tab to LessonBlockEditor block picker (browse by course/lesson, copy blocks)
+- [x] Add getLessonsWithBlocks procedure to lmsAdminRouter
+- [x] Add inline module name editing to SortableSectionRow (click title to edit, Enter/blur to save)
+- [x] Implement drip content system: SectionDripDialog with day-count input
+- [x] Add isDrip toggle to CourseSettingsForm with description
+- [x] Add lesson-level dripDays field to LessonEditorPage settings tab
+- [x] Enforce lesson-level drip in CoursePlayer (locks individual lessons, shows unlock date)
+- [x] Admin bypass for drip (admins see all content regardless of drip schedule)
+- [x] drip.test.ts: 5 unit tests for drip unlock logic (all passing)

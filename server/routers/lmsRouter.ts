@@ -1168,13 +1168,15 @@ export const lmsAdminRouter = router({
     }),
 
   updateSection: protectedProcedure
-    .input(z.object({ id: z.number(), title: z.string().min(1).optional(), position: z.number().int().optional(), isPreview: z.boolean().optional(), dripDays: z.number().int().min(0).optional() }))
+    .input(z.object({ id: z.number(), title: z.string().min(1).optional(), position: z.number().int().optional(), isPreview: z.boolean().optional(), dripDays: z.number().int().min(0).nullable().optional() }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const { id, ...updates } = input;
-      await db.update(lmsSections).set(updates).where(eq(lmsSections.id, id));
+      // Convert null dripDays to 0 (no drip)
+      const safeUpdates = { ...updates, ...(updates.dripDays === null ? { dripDays: 0 } : {}) };
+      await db.update(lmsSections).set(safeUpdates).where(eq(lmsSections.id, id));
       return { success: true };
     }),
 
@@ -1265,7 +1267,7 @@ export const lmsAdminRouter = router({
       mediaAssetId: z.number().nullable().optional(),
       position: z.number().int().optional(),
       isPreview: z.boolean().optional(),
-      dripDays: z.number().int().optional(),
+      dripDays: z.number().int().nullable().optional(),
       durationMinutes: z.number().int().nullable().optional(),
       requireVideoCompletion: z.boolean().optional(),
       requireManualComplete: z.boolean().optional(),
@@ -1282,6 +1284,8 @@ export const lmsAdminRouter = router({
       );
       if (requireVideoCompletion !== undefined) updates.requireVideoCompletion = requireVideoCompletion ? 1 : 0;
       if (requireManualComplete !== undefined) updates.requireManualComplete = requireManualComplete ? 1 : 0;
+      // Convert null dripDays to 0 (no drip)
+      if (updates.dripDays === null) updates.dripDays = 0;
       if (Object.keys(updates).length > 0) await db.update(lmsLessons).set(updates).where(eq(lmsLessons.id, id));
       return { success: true };
     }),
@@ -2473,6 +2477,30 @@ Generate 3-6 sections with 2-5 lessons each. Lesson types can be: text, video (f
       }
 
       return { id: newCourseId, slug: newSlug, title: newTitle };
+    }),
+
+  // ── Block Picker: fetch lessons with contentBlocks from a course ──
+  getLessonsWithBlocks: protectedProcedure
+    .input(z.object({ courseId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const lessons = await db.select({
+        id: lmsLessons.id,
+        title: lmsLessons.title,
+        type: lmsLessons.type,
+        contentBlocks: lmsLessons.contentBlocks,
+        sectionId: lmsLessons.sectionId,
+      }).from(lmsLessons)
+        .where(and(
+          eq(lmsLessons.courseId, input.courseId),
+          sql`${lmsLessons.contentBlocks} IS NOT NULL`,
+          sql`${lmsLessons.contentBlocks} != '[]'`,
+          sql`${lmsLessons.contentBlocks} != 'null'`,
+        ))
+        .orderBy(asc(lmsLessons.position));
+      return lessons;
     }),
 });
 

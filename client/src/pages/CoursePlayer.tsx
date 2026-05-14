@@ -345,6 +345,8 @@ export default function CoursePlayer() {
   })();
 
   const showStudentView = adminPreviewStudent || !isAdmin;
+  // Drip: admins not in student-view mode bypass all drip locks
+  const dripBypassed = isAdmin && !showStudentView;
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-gray-50">
@@ -442,33 +444,41 @@ export default function CoursePlayer() {
             {topLevelLessons.map((lesson: any, idx: number) => {
               const done = completedIds.has(lesson.id);
               const active = lesson.id === selectedLessonId;
+              const lessonLocked = !dripBypassed && (lesson.dripDays ?? 0) > 0 && daysSinceEnroll < lesson.dripDays;
+              const lessonUnlockDate = lessonLocked ? new Date(enrolledAt.getTime() + lesson.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
               return (
                 <button
                   key={lesson.id}
-                  onClick={() => setSelectedLessonId(lesson.id)}
+                  onClick={() => { if (!lessonLocked) setSelectedLessonId(lesson.id); }}
+                  disabled={lessonLocked}
                   className={cn(
                     "w-full text-left px-3 py-2.5 flex items-center gap-3 text-xs transition-all border-l-4",
                     active
                       ? "bg-teal-50 text-teal-900 border-teal-500"
-                      : done
-                        ? "text-gray-500 hover:bg-gray-50 border-transparent"
-                        : "text-gray-700 hover:bg-gray-50 border-transparent",
+                      : lessonLocked
+                        ? "text-gray-400 cursor-not-allowed border-transparent"
+                        : done
+                          ? "text-gray-500 hover:bg-gray-50 border-transparent"
+                          : "text-gray-700 hover:bg-gray-50 border-transparent",
                   )}
                 >
                   <span className={cn(
                     "w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-extrabold shrink-0",
-                    active ? "bg-teal-500 text-white" : done ? "bg-teal-100 text-teal-700" : "bg-gray-100 text-gray-500"
+                    active ? "bg-teal-500 text-white" : lessonLocked ? "bg-gray-100 text-gray-400" : done ? "bg-teal-100 text-teal-700" : "bg-gray-100 text-gray-500"
                   )}>
-                    {done ? "✓" : String(idx + 1).padStart(2, "0")}
+                    {lessonLocked ? <Lock className="w-3 h-3" /> : done ? "✓" : String(idx + 1).padStart(2, "0")}
                   </span>
-                  <span className="leading-snug font-semibold uppercase tracking-wide truncate">{lesson.title}</span>
+                  <div className="flex-1 min-w-0">
+                    <span className="leading-snug font-semibold uppercase tracking-wide truncate block">{lesson.title}</span>
+                    {lessonLocked && lessonUnlockDate && <span className="text-[10px] text-gray-400 font-normal normal-case">Unlocks {lessonUnlockDate}</span>}
+                  </div>
                 </button>
               );
             })}
 
             {/* Sections */}
             {sections.map((section: any, sIdx: number) => {
-              const sectionLocked = (section.dripDays ?? 0) > 0 && daysSinceEnroll < section.dripDays;
+              const sectionLocked = !dripBypassed && (section.dripDays ?? 0) > 0 && daysSinceEnroll < section.dripDays;
               const unlockDate = sectionLocked
                 ? new Date(enrolledAt.getTime() + section.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" })
                 : null;
@@ -516,18 +526,24 @@ export default function CoursePlayer() {
                       {section.lessons.map((lesson: any) => {
                         const done = completedIds.has(lesson.id);
                         const active = lesson.id === selectedLessonId;
+                        const lessonLocked = !dripBypassed && (lesson.dripDays ?? 0) > 0 && daysSinceEnroll < lesson.dripDays;
+                        const lessonUnlockDate = lessonLocked ? new Date(enrolledAt.getTime() + lesson.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
                         return (
                           <button
                             key={lesson.id}
-                            onClick={() => setSelectedLessonId(lesson.id)}
+                            onClick={() => { if (!lessonLocked) setSelectedLessonId(lesson.id); }}
+                            disabled={lessonLocked}
                             className={cn(
                               "w-full text-left px-2 py-1.5 flex items-center gap-2 text-[11px] transition-colors rounded",
-                              active ? "text-teal-700 bg-teal-50 font-semibold" : done ? "text-gray-400" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50",
+                              active ? "text-teal-700 bg-teal-50 font-semibold" : lessonLocked ? "text-gray-400 cursor-not-allowed" : done ? "text-gray-400" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50",
                             )}
                           >
-                            <LessonIcon type={lesson.type} done={done} />
-                            <span className="truncate flex-1">{lesson.title}</span>
-                            {lesson.durationMinutes && <span className="text-[10px] text-gray-400 shrink-0">{lesson.durationMinutes}m</span>}
+                            <LessonIcon type={lesson.type} done={done} locked={lessonLocked} />
+                            <div className="flex-1 min-w-0">
+                              <span className="truncate block">{lesson.title}</span>
+                              {lessonLocked && lessonUnlockDate && <span className="text-[10px] text-gray-400">Unlocks {lessonUnlockDate}</span>}
+                            </div>
+                            {lesson.durationMinutes && !lessonLocked && <span className="text-[10px] text-gray-400 shrink-0">{lesson.durationMinutes}m</span>}
                           </button>
                         );
                       })}

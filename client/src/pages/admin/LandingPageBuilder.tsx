@@ -2031,8 +2031,8 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
 }
 // ─── Sortable Block Card ──────────────────────────────────────────────────────
 
-export function SortableBlock({ block, isSelected, onSelect, onDelete, onDuplicate, coursePrice, courseTitle }: {
-  block: Block; isSelected: boolean; onSelect: () => void; onDelete: () => void; onDuplicate: () => void; coursePrice?: number; courseTitle?: string;
+export function SortableBlock({ block, isSelected, onSelect, onDelete, onDuplicate, onMoveUp, onMoveDown, coursePrice, courseTitle }: {
+  block: Block; isSelected: boolean; onSelect: () => void; onDelete: () => void; onDuplicate: () => void; onMoveUp?: () => void; onMoveDown?: () => void; coursePrice?: number; courseTitle?: string;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
@@ -2042,6 +2042,11 @@ export function SortableBlock({ block, isSelected, onSelect, onDelete, onDuplica
       <div className={`absolute top-2 right-2 z-10 flex gap-1 ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity`}>
         <button onClick={e => { e.stopPropagation(); onDuplicate(); }} className="w-7 h-7 bg-white border border-gray-200 rounded shadow text-gray-500 hover:text-teal-600 flex items-center justify-center" title="Duplicate"><Copy size={12} /></button>
         <button onClick={e => { e.stopPropagation(); onDelete(); }} className="w-7 h-7 bg-white border border-gray-200 rounded shadow text-gray-500 hover:text-red-500 flex items-center justify-center" title="Delete"><Trash2 size={12} /></button>
+      </div>
+      {/* Up/Down arrow buttons */}
+      <div className={`absolute top-2 left-10 z-10 flex flex-col gap-0.5 ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity`}>
+        <button disabled={!onMoveUp} onClick={e => { e.stopPropagation(); onMoveUp?.(); }} className="w-6 h-6 bg-white border border-gray-200 rounded shadow text-gray-400 hover:text-teal-600 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed" title="Move up"><ChevronUp size={12} /></button>
+        <button disabled={!onMoveDown} onClick={e => { e.stopPropagation(); onMoveDown?.(); }} className="w-6 h-6 bg-white border border-gray-200 rounded shadow text-gray-400 hover:text-teal-600 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed" title="Move down"><ChevronDown size={12} /></button>
       </div>
       <div {...attributes} {...listeners} onClick={e => e.stopPropagation()}
         className={`absolute top-2 left-2 z-10 w-7 h-7 bg-white border border-gray-200 rounded shadow text-gray-400 hover:text-gray-600 flex items-center justify-center cursor-grab active:cursor-grabbing ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity`}
@@ -2305,10 +2310,12 @@ export default function LandingPageBuilder() {
             <div className="bg-white min-h-full shadow-sm mx-auto" style={{ maxWidth: "900px" }}>
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
-                  {blocks.map(block => (
+                  {blocks.map((block, idx) => (
                     <SortableBlock key={block.id} block={block} isSelected={selectedId === block.id}
                       onSelect={() => setSelectedId(block.id)} onDelete={() => deleteBlock(block.id)}
-                      onDuplicate={() => duplicateBlock(block.id)} coursePrice={courseInfo?.price} courseTitle={courseInfo?.title} />
+                      onDuplicate={() => duplicateBlock(block.id)} coursePrice={courseInfo?.price} courseTitle={courseInfo?.title}
+                      onMoveUp={idx > 0 ? () => setBlocks(prev => arrayMove(prev, idx, idx - 1)) : undefined}
+                      onMoveDown={idx < blocks.length - 1 ? () => setBlocks(prev => arrayMove(prev, idx, idx + 1)) : undefined} />
                   ))}
                 </SortableContext>
               </DndContext>

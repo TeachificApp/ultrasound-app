@@ -157,8 +157,11 @@ function FunnelListView({ onSelect, onCreate }: { onSelect: (id: number) => void
           <DndContext sensors={listSensors} collisionDetection={closestCenter} onDragEnd={handleFunnelDragEnd}>
             <SortableContext items={localFunnels.map(f => f.id)} strategy={verticalListSortingStrategy}>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {localFunnels.map((funnel: Funnel) => (
-                  <SortableFunnelCard key={funnel.id} funnel={funnel} onClick={() => onSelect(funnel.id)} />
+                {localFunnels.map((funnel: Funnel, fi: number) => (
+                  <SortableFunnelCard key={funnel.id} funnel={funnel} onClick={() => onSelect(funnel.id)}
+                    onMoveUp={fi > 0 ? () => setLocalFunnels(prev => { const r = arrayMove(prev, fi, fi - 1); reorderFunnels.mutate({ funnelIds: r.map(f => f.id) }); return r; }) : undefined}
+                    onMoveDown={fi < localFunnels.length - 1 ? () => setLocalFunnels(prev => { const r = arrayMove(prev, fi, fi + 1); reorderFunnels.mutate({ funnelIds: r.map(f => f.id) }); return r; }) : undefined}
+                  />
                 ))}
               </div>
             </SortableContext>
@@ -169,7 +172,7 @@ function FunnelListView({ onSelect, onCreate }: { onSelect: (id: number) => void
   );
 }
 
-function SortableFunnelCard({ funnel, onClick }: { funnel: Funnel; onClick: () => void }) {
+function SortableFunnelCard({ funnel, onClick, onMoveUp, onMoveDown }: { funnel: Funnel; onClick: () => void; onMoveUp?: () => void; onMoveDown?: () => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: funnel.id });
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -188,7 +191,7 @@ function SortableFunnelCard({ funnel, onClick }: { funnel: Funnel; onClick: () =
       isDragging ? "border-teal-400 shadow-xl" : "border-gray-200 hover:shadow-md hover:border-teal-200"
     }`}>
       <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
           {/* Drag handle */}
           <button
             {...attributes}
@@ -199,6 +202,10 @@ function SortableFunnelCard({ funnel, onClick }: { funnel: Funnel; onClick: () =
           >
             <GripVertical size={14} />
           </button>
+          <div className="flex flex-col gap-0">
+            <button disabled={!onMoveUp} onClick={e => { e.stopPropagation(); onMoveUp?.(); }} className="w-4 h-4 flex items-center justify-center text-gray-300 hover:text-teal-600 disabled:opacity-20 disabled:cursor-not-allowed" title="Move up"><ChevronUp size={12} /></button>
+            <button disabled={!onMoveDown} onClick={e => { e.stopPropagation(); onMoveDown?.(); }} className="w-4 h-4 flex items-center justify-center text-gray-300 hover:text-teal-600 disabled:opacity-20 disabled:cursor-not-allowed" title="Move down"><ChevronDown size={12} /></button>
+          </div>
           <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: funnel.accentColor + "20", color: funnel.accentColor }}>
             <Layers size={16} />
           </div>
@@ -658,6 +665,8 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
                   onDuplicate={() => duplicatePage.mutate({ id: page.id })}
                   onRename={() => { const newTitle = prompt("Page title:", page.title); if (newTitle && newTitle !== page.title) updatePage.mutate({ id: page.id, title: newTitle }); }}
                   onDelete={() => { if (confirm("Delete this page?")) deletePage.mutate({ id: page.id }); }}
+                  onMoveUp={idx > 0 ? () => setLocalPages(prev => { const r = arrayMove(prev, idx, idx - 1); reorderPages.mutate({ funnelId, pageIds: r.map(p => p.id) }); return r; }) : undefined}
+                  onMoveDown={idx < localPages.length - 1 ? () => setLocalPages(prev => { const r = arrayMove(prev, idx, idx + 1); reorderPages.mutate({ funnelId, pageIds: r.map(p => p.id) }); return r; }) : undefined}
                 />
               );
             })}
@@ -699,7 +708,7 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
 // ─── Sortable Funnel Page Row ────────────────────────────────────────────────
 
 function SortableFunnelPageRow({
-  page, idx, meta, nextPage, isLast, funnelId, onEditPage, onDuplicate, onRename, onDelete,
+  page, idx, meta, nextPage, isLast, funnelId, onEditPage, onDuplicate, onRename, onDelete, onMoveUp, onMoveDown,
 }: {
   page: FunnelPage;
   idx: number;
@@ -711,6 +720,8 @@ function SortableFunnelPageRow({
   onDuplicate: () => void;
   onRename: () => void;
   onDelete: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: page.id });
   const style = {
@@ -736,6 +747,10 @@ function SortableFunnelPageRow({
             >
               <GripVertical size={16} />
             </button>
+            <div className="flex flex-col gap-0">
+              <button disabled={!onMoveUp} onClick={onMoveUp} className="w-4 h-4 flex items-center justify-center text-gray-300 hover:text-teal-600 disabled:opacity-20 disabled:cursor-not-allowed" title="Move up"><ChevronUp size={12} /></button>
+              <button disabled={!onMoveDown} onClick={onMoveDown} className="w-4 h-4 flex items-center justify-center text-gray-300 hover:text-teal-600 disabled:opacity-20 disabled:cursor-not-allowed" title="Move down"><ChevronDown size={12} /></button>
+            </div>
             <div className="flex items-center justify-center w-7 h-7 rounded-full bg-gray-100 text-xs font-bold text-gray-500">
               {idx + 1}
             </div>

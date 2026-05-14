@@ -567,7 +567,7 @@ export default function FunnelPageEditor() {
             <div className="bg-white min-h-full shadow-sm mx-auto" style={{ maxWidth: "900px" }}>
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
-                  {blocks.map(block => (
+                  {blocks.map((block, idx) => (
                     <SortableBlock
                       key={block.id}
                       block={block}
@@ -575,6 +575,8 @@ export default function FunnelPageEditor() {
                       onSelect={() => setSelectedId(block.id)}
                       onDelete={() => deleteBlock(block.id)}
                       onDuplicate={() => duplicateBlock(block.id)}
+                      onMoveUp={idx > 0 ? () => setBlocks(prev => arrayMove(prev, idx, idx - 1)) : undefined}
+                      onMoveDown={idx < blocks.length - 1 ? () => setBlocks(prev => arrayMove(prev, idx, idx + 1)) : undefined}
                     />
                   ))}
                 </SortableContext>

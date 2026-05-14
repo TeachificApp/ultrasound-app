@@ -11,7 +11,7 @@
  *   Orders       — order history
  *   Analytics    — overview stats
  */
-import { useState, useEffect, useCallback, useRef} from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type React from "react";
 import {
   DndContext, DragOverlay, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent,
@@ -32,7 +32,7 @@ import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import RichTextEditor from "@/components/RichTextEditor";
 import {
-  BookOpen, ChevronLeft, ChevronRight, Clock, Copy, Download, Edit2, HelpCircle, Plus, Trash2,
+  BookOpen, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Clock, Copy, Download, Edit2, HelpCircle, Plus, Trash2,
   Users, DollarSign, BarChart2, GripVertical, CheckCircle, AlertCircle,
   Link as LinkIcon, UserCheck, ArrowLeft, Upload, ImageIcon,
   Sparkles, Loader2, Eye, FolderOpen, Monitor, Video, FileText, CheckSquare, Settings2,
@@ -550,12 +550,14 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
 
 // ─── Lesson Row ──────────────────────────────────────────────────────────────
 
-function SortableLessonRow({ lesson, onEdit, onQuiz, onDelete, onCopy }: {
+function SortableLessonRow({ lesson, onEdit, onQuiz, onDelete, onCopy, onMoveUp, onMoveDown }: {
   lesson: any;
   onEdit: (lesson: any) => void;
   onQuiz: (lesson: any) => void;
   onDelete: (id: number) => void;
   onCopy?: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lesson.id });
   const style: React.CSSProperties = {
@@ -570,6 +572,10 @@ function SortableLessonRow({ lesson, onEdit, onQuiz, onDelete, onCopy }: {
       <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing touch-none p-0.5 rounded hover:bg-gray-100" title="Drag to reorder">
         <GripVertical className="w-4 h-4 text-gray-400" />
       </button>
+      <div className="flex flex-col gap-0">
+        <button disabled={!onMoveUp} onClick={onMoveUp} className="w-4 h-4 flex items-center justify-center text-gray-300 hover:text-teal-600 disabled:opacity-20 disabled:cursor-not-allowed" title="Move up"><ChevronUp className="w-3 h-3" /></button>
+        <button disabled={!onMoveDown} onClick={onMoveDown} className="w-4 h-4 flex items-center justify-center text-gray-300 hover:text-teal-600 disabled:opacity-20 disabled:cursor-not-allowed" title="Move down"><ChevronDown className="w-3 h-3" /></button>
+      </div>
       <span className="text-gray-400">{TYPE_ICONS[lesson.type] ?? <FileText className="w-4 h-4" />}</span>
       <span className="text-sm text-gray-700 flex-1">{lesson.title}</span>
       <span className="text-xs text-gray-400">{LESSON_TYPE_LABELS[lesson.type] ?? lesson.type}</span>
@@ -598,13 +604,16 @@ function SortableLessonRow({ lesson, onEdit, onQuiz, onDelete, onCopy }: {
 
 // ─── Sortable Section Row ────────────────────────────────────────────────────
 
-function SortableSectionRow({ section, children, onAddLesson, onDrip, onDelete, onCopyModule }: {
+function SortableSectionRow({ section, children, onAddLesson, onDrip, onDelete, onCopyModule, onMoveUp, onMoveDown, onRenameSection }: {
   section: any;
   children: React.ReactNode;
   onAddLesson: () => void;
   onDrip: () => void;
   onDelete: () => void;
   onCopyModule?: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  onRenameSection?: (newTitle: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: section.id });
   const style: React.CSSProperties = {
@@ -614,13 +623,44 @@ function SortableSectionRow({ section, children, onAddLesson, onDrip, onDelete, 
     zIndex: isDragging ? 50 : undefined,
     position: 'relative',
   };
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(section.title);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const commitRename = () => {
+    const trimmed = titleDraft.trim();
+    if (trimmed && trimmed !== section.title && onRenameSection) onRenameSection(trimmed);
+    setEditingTitle(false);
+  };
   return (
     <div ref={setNodeRef} style={style} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
       <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 border-b border-gray-200">
         <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing touch-none p-0.5 rounded hover:bg-gray-100" title="Drag to reorder section">
           <GripVertical className="w-4 h-4 text-gray-400" />
         </button>
-        <span className="font-medium text-sm text-gray-800 flex-1">{section.title}</span>
+        <div className="flex flex-col gap-0">
+          <button disabled={!onMoveUp} onClick={onMoveUp} className="w-4 h-4 flex items-center justify-center text-gray-300 hover:text-teal-600 disabled:opacity-20 disabled:cursor-not-allowed" title="Move up"><ChevronUp className="w-3 h-3" /></button>
+          <button disabled={!onMoveDown} onClick={onMoveDown} className="w-4 h-4 flex items-center justify-center text-gray-300 hover:text-teal-600 disabled:opacity-20 disabled:cursor-not-allowed" title="Move down"><ChevronDown className="w-3 h-3" /></button>
+        </div>
+        {editingTitle ? (
+          <input
+            ref={titleInputRef}
+            value={titleDraft}
+            onChange={e => setTitleDraft(e.target.value)}
+            onBlur={commitRename}
+            onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') { setEditingTitle(false); setTitleDraft(section.title); } }}
+            className="flex-1 font-medium text-sm text-gray-800 bg-white border border-teal-400 rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-teal-500"
+            autoFocus
+          />
+        ) : (
+          <span
+            className="font-medium text-sm text-gray-800 flex-1 cursor-pointer hover:text-teal-700 group/title"
+            title="Click to rename"
+            onDoubleClick={() => { setTitleDraft(section.title); setEditingTitle(true); }}
+          >
+            {section.title}
+            <Pencil className="inline w-3 h-3 ml-1.5 text-gray-300 group-hover/title:text-teal-400 transition-colors" />
+          </span>
+        )}
         <Button size="sm" variant="ghost" className="h-7 text-xs text-teal-600" onClick={onAddLesson}>
           <Plus className="w-3 h-3 mr-1" /> Add Lesson
         </Button>
@@ -653,26 +693,13 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
   const [addLessonSection, setAddLessonSection] = useState<number | null>(null);
   const [addLessonAtCourseLevel, setAddLessonAtCourseLevel] = useState(false);
   const [editLesson, setEditLesson] = useState<any>(null);
-  const [pendingLessonId, setPendingLessonId] = useState<number | null>(null);
-  const { data: pendingLesson } = trpc.lmsAdmin.getLessonAdmin.useQuery(
-    { lessonId: pendingLessonId! },
-    { enabled: !!pendingLessonId }
-  );
-  // When pendingLesson loads, open the editor
-  const prevPendingLessonIdRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (pendingLesson && pendingLessonId !== null && pendingLessonId !== prevPendingLessonIdRef.current) {
-      prevPendingLessonIdRef.current = pendingLessonId;
-      setEditLesson(pendingLesson);
-      setPendingLessonId(null);
-    }
-  }, [pendingLesson, pendingLessonId]);
+  // No pendingLessonId needed — AddLessonDialog now passes the full lesson object directly
   const [quizLesson, setQuizLesson] = useState<any>(null);
   const [importMediaSection, setImportMediaSection] = useState<number | null>(null);
   const [editSectionDrip, setEditSectionDrip] = useState<{ id: number; title: string; dripDays: number } | null>(null);
 
   const updateSection = trpc.lmsAdmin.updateSection.useMutation({
-    onSuccess: () => { toast.success("Section updated"); setEditSectionDrip(null); refetch(); },
+    onSuccess: (_data, vars) => { if (vars.dripDays !== undefined) { toast.success("Drip schedule saved"); setEditSectionDrip(null); } refetch(); },
     onError: e => toast.error(`Error: ${e.message}`),
   });
 
@@ -912,12 +939,14 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
                   </div>
                   <SortableContext items={localTopLessons.map((l: any) => l.id)} strategy={verticalListSortingStrategy}>
                     <div className="divide-y divide-gray-100">
-                      {localTopLessons.map((lesson: any) => (
+                      {localTopLessons.map((lesson: any, li: number) => (
                         <SortableLessonRow
                           key={lesson.id} lesson={lesson}
                           onEdit={setEditLesson} onQuiz={setQuizLesson}
                           onCopy={() => setCopyLessonTarget(lesson)}
                           onDelete={id => { if (confirm(`Delete lesson "${lesson.title}"?`)) deleteLesson.mutate({ id }); }}
+                          onMoveUp={li > 0 ? () => setLocalTopLessons(prev => { const r = arrayMove(prev, li, li - 1); reorderLessons.mutate({ lessons: r.map((l: any, i: number) => ({ id: l.id, position: i })) }); return r; }) : undefined}
+                          onMoveDown={li < localTopLessons.length - 1 ? () => setLocalTopLessons(prev => { const r = arrayMove(prev, li, li + 1); reorderLessons.mutate({ lessons: r.map((l: any, i: number) => ({ id: l.id, position: i })) }); return r; }) : undefined}
                         />
                       ))}
                     </div>
@@ -928,7 +957,7 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
               {/* Sections */}
               <SortableContext items={localSections.map((s: any) => s.id)} strategy={verticalListSortingStrategy}>
                 <div className="space-y-4">
-                  {localSections.map((section: any) => (
+                  {localSections.map((section: any, si: number) => (
                     <SortableSectionRow
                       key={section.id}
                       section={section}
@@ -936,15 +965,20 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
                       onDrip={() => setEditSectionDrip({ id: section.id, title: section.title, dripDays: section.dripDays ?? 0 })}
                       onCopyModule={() => setCopyModuleTarget(section)}
                       onDelete={() => { if (confirm(`Delete section "${section.title}" and all its lessons?`)) deleteSection.mutate({ id: section.id }); }}
+                      onMoveUp={si > 0 ? () => setLocalSections(prev => { const r = arrayMove(prev, si, si - 1); reorderSections.mutate({ sections: r.map((s: any, i: number) => ({ id: s.id, position: i })) }); return r; }) : undefined}
+                      onMoveDown={si < localSections.length - 1 ? () => setLocalSections(prev => { const r = arrayMove(prev, si, si + 1); reorderSections.mutate({ sections: r.map((s: any, i: number) => ({ id: s.id, position: i })) }); return r; }) : undefined}
+                      onRenameSection={(newTitle) => updateSection.mutate({ id: section.id, title: newTitle })}
                     >
                       <SortableContext items={section.lessons.map((l: any) => l.id)} strategy={verticalListSortingStrategy}>
                         <div className="divide-y divide-gray-100">
-                          {section.lessons.map((lesson: any) => (
+                          {section.lessons.map((lesson: any, li: number) => (
                             <SortableLessonRow
                               key={lesson.id} lesson={lesson}
                               onEdit={setEditLesson} onQuiz={setQuizLesson}
                               onCopy={() => setCopyLessonTarget(lesson)}
                               onDelete={id => { if (confirm(`Delete lesson "${lesson.title}"?`)) deleteLesson.mutate({ id }); }}
+                              onMoveUp={li > 0 ? () => setLocalSections(prev => { const secs = [...prev]; const lessons = arrayMove(secs[si].lessons, li, li - 1); secs[si] = { ...secs[si], lessons }; reorderLessons.mutate({ lessons: lessons.map((l: any, i: number) => ({ id: l.id, position: i })) }); return secs; }) : undefined}
+                              onMoveDown={li < section.lessons.length - 1 ? () => setLocalSections(prev => { const secs = [...prev]; const lessons = arrayMove(secs[si].lessons, li, li + 1); secs[si] = { ...secs[si], lessons }; reorderLessons.mutate({ lessons: lessons.map((l: any, i: number) => ({ id: l.id, position: i })) }); return secs; }) : undefined}
                             />
                           ))}
                           {section.lessons.length === 0 && (
@@ -990,11 +1024,18 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
 
       {/* Dialogs */}
       <AddSectionDialog open={addSectionOpen} courseId={courseId} onClose={() => setAddSectionOpen(false)} onCreated={() => { setAddSectionOpen(false); refetch(); }} />
+      {editSectionDrip && (
+        <SectionDripDialog
+          section={editSectionDrip}
+          onClose={() => setEditSectionDrip(null)}
+          onSave={(dripDays) => updateSection.mutate({ id: editSectionDrip.id, dripDays })}
+        />
+      )}
       {addLessonSection && (
-        <AddLessonDialog courseId={courseId} sectionId={addLessonSection} onClose={() => setAddLessonSection(null)} onCreated={(id) => { setAddLessonSection(null); refetch(); setPendingLessonId(id); }} />
+        <AddLessonDialog courseId={courseId} sectionId={addLessonSection} onClose={() => setAddLessonSection(null)} onCreated={(lesson) => { setAddLessonSection(null); refetch(); setEditLesson(lesson); }} />
       )}
       {addLessonAtCourseLevel && (
-        <AddLessonDialog courseId={courseId} sectionId={undefined} onClose={() => setAddLessonAtCourseLevel(false)} onCreated={(id) => { setAddLessonAtCourseLevel(false); refetch(); setPendingLessonId(id); }} />
+        <AddLessonDialog courseId={courseId} sectionId={undefined} onClose={() => setAddLessonAtCourseLevel(false)} onCreated={(lesson) => { setAddLessonAtCourseLevel(false); refetch(); setEditLesson(lesson); }} />
       )}
       {importMediaSection && (
         <ImportMediaAsLessonDialog sectionId={importMediaSection} courseId={courseId} onClose={() => setImportMediaSection(null)} onCreated={() => { setImportMediaSection(null); refetch(); }} />
@@ -1072,6 +1113,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
   const [installmentIntervalDays, setInstallmentIntervalDays] = useState(String(course.installmentIntervalDays ?? 30));
   const [hasCertificate, setHasCertificate] = useState(course.hasCertificate);
   const [isFeatured, setIsFeatured] = useState(course.isFeatured ?? false);
+  const [isDrip, setIsDrip] = useState(course.isDrip ?? false);
   const [coverImageUrl, setCoverImageUrl] = useState(course.coverImageUrl ?? "");
   const [slug, setSlug] = useState(course.slug ?? "");
   const [metaTitle, setMetaTitle] = useState(course.metaTitle ?? "");
@@ -1291,14 +1333,20 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
         )}
       </div>
 
-      <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
         <Switch checked={hasCertificate} onCheckedChange={setHasCertificate} id="cert-switch" />
         <Label htmlFor="cert-switch" className="text-sm">Certificate of completion</Label>
       </div>
-
       <div className="flex items-center gap-2">
         <Switch checked={isFeatured} onCheckedChange={setIsFeatured} id="featured-switch" />
         <Label htmlFor="featured-switch" className="text-sm">Featured on LMS Home Page</Label>
+      </div>
+      <div className="flex items-start gap-2">
+        <Switch checked={isDrip} onCheckedChange={setIsDrip} id="drip-switch" className="mt-0.5" />
+        <div>
+          <Label htmlFor="drip-switch" className="text-sm">Enable drip content</Label>
+          <p className="text-xs text-gray-400 mt-0.5">When enabled, sections and lessons can be scheduled to unlock a set number of days after enrollment. Configure per-section timing using the Drip button on each section.</p>
+        </div>
       </div>
 
       <div>
@@ -1345,6 +1393,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
           isFree: pricingType === "free",
           hasCertificate,
           isFeatured,
+          isDrip,
           price: pricingType === "free" ? 0 : Math.round(parseFloat(price || "0") * 100),
           subscriptionInterval: pricingType === "subscription" ? subscriptionInterval : null,
           downPayment: pricingType === "payment_plan" ? Math.round(parseFloat(downPayment || "0") * 100) : null,
@@ -1653,6 +1702,65 @@ function ImportMediaAsLessonDialog({ sectionId, courseId, onClose, onCreated }: 
 
 // ─── Add Section Dialog ───────────────────────────────────────────────────────
 
+// ─── Section Drip Dialog ─────────────────────────────────────────────────────
+function SectionDripDialog({ section, onClose, onSave }: { section: any; onClose: () => void; onSave: (dripDays: number | null) => void }) {
+  const [dripDays, setDripDays] = useState<string>(section.dripDays ? String(section.dripDays) : "");
+  const [saving, setSaving] = useState(false);
+  const handleSave = () => {
+    setSaving(true);
+    const val = dripDays.trim() ? parseInt(dripDays) : null;
+    onSave(val);
+    toast.success(val ? `Drip set: unlocks ${val} day${val === 1 ? "" : "s"} after enrollment` : "Drip removed — section available immediately");
+    onClose();
+  };
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><Clock className="w-4 h-4 text-teal-600" /> Drip Schedule</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <p className="text-sm text-gray-600">Set how many days after enrollment this section becomes available. Leave blank to make it available immediately.</p>
+          <div>
+            <Label className="text-sm">Section: <span className="font-semibold text-gray-800">{section.title}</span></Label>
+          </div>
+          <div>
+            <Label className="text-sm">Unlock after (days)</Label>
+            <div className="flex items-center gap-2 mt-1">
+              <Input
+                type="number"
+                min="0"
+                value={dripDays}
+                onChange={e => setDripDays(e.target.value)}
+                placeholder="e.g. 7"
+                className="w-32"
+              />
+              <span className="text-sm text-gray-500">days after enrollment</span>
+            </div>
+            {dripDays && parseInt(dripDays) > 0 && (
+              <p className="text-xs text-teal-600 mt-1">Students enrolled today will unlock this on day {dripDays}.</p>
+            )}
+          </div>
+          {section.dripDays > 0 && (
+            <button
+              className="text-xs text-red-500 hover:text-red-700 underline"
+              onClick={() => { setDripDays(""); }}
+            >
+              Remove drip (unlock immediately)
+            </button>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button className="bg-teal-600 hover:bg-teal-700 text-white" disabled={saving} onClick={handleSave}>
+            Save Drip
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+// ─── Add Section Dialog ───────────────────────────────────────────────────────
 function AddSectionDialog({ open, courseId, onClose, onCreated }: { open: boolean; courseId: number; onClose: () => void; onCreated: () => void }) {
   
   const [title, setTitle] = useState("");
@@ -1746,7 +1854,7 @@ function AddLessonDialog({ courseId, sectionId, onClose, onCreated }: {
   courseId: number;
   sectionId?: number;
   onClose: () => void;
-  onCreated: (lessonId: number) => void;
+  onCreated: (lesson: any) => void;
 }) {
   type LessonType = "text" | "video" | "video_text" | "embed" | "quiz" | "download";
   const [title, setTitle] = useState("");
@@ -1762,7 +1870,16 @@ function AddLessonDialog({ courseId, sectionId, onClose, onCreated }: {
   const [selectedAsset, setSelectedAsset] = useState<{ id: number; title: string; s3Url: string; mediaType: string } | null>(null);
 
   const create = trpc.lmsAdmin.createLesson.useMutation({
-    onSuccess: (data) => { toast.success("Lesson added"); onCreated(data.id); },
+    onSuccess: (data) => {
+      toast.success("Lesson added");
+      onCreated({
+        id: data.id, title, type, content, videoContent, embedUrl,
+        isPreview, durationMinutes: durationMinutes ? parseInt(durationMinutes) : null,
+        requireVideoCompletion: requireVideoCompletion ? 1 : 0,
+        requireManualComplete: requireManualComplete ? 1 : 0,
+        contentBlocks: null, mediaAssetId: selectedAsset?.id ?? null,
+      });
+    },
     onError: e => toast.error(`Error: ${e.message}`),
   });
 
@@ -2041,11 +2158,11 @@ function LessonEditorPage({ lesson, onClose, onSaved, onSavedAndClose }: { lesso
   const [embedUrl, setEmbedUrl] = useState(lesson.embedUrl ?? "");
   const [isPreview, setIsPreview] = useState(!!lesson.isPreview);
   const [durationMinutes, setDurationMinutes] = useState(String(lesson.durationMinutes ?? ""));
-  const [requireVideoCompletion, setRequireVideoCompletion] = useState(lesson.requireVideoCompletion === 1);
+    const [requireVideoCompletion, setRequireVideoCompletion] = useState(lesson.requireVideoCompletion === 1);
   const [requireManualComplete, setRequireManualComplete] = useState(lesson.requireManualComplete === 1);
+  const [dripDays, setDripDays] = useState(String(lesson.dripDays ?? ""));
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<{ id: number; title: string; s3Url: string; mediaType: string } | null>(null);
-
   const update = trpc.lmsAdmin.updateLesson.useMutation({
     onSuccess: () => { toast.success("Lesson saved"); },
     onError: e => toast.error(`Error: ${e.message}`),
@@ -2059,6 +2176,7 @@ function LessonEditorPage({ lesson, onClose, onSaved, onSavedAndClose }: { lesso
       durationMinutes: durationMinutes ? parseInt(durationMinutes) : null,
       requireVideoCompletion,
       requireManualComplete,
+      dripDays: dripDays.trim() ? parseInt(dripDays) : null,
       content: (lesson.type === "text" || lesson.type === "video" || lesson.type === "download" || lesson.type === "video_text") ? (content || null) : undefined,
       videoContent: lesson.type === "video_text" ? (videoContent || null) : undefined,
       embedUrl: lesson.type === "embed" ? (embedUrl || null) : undefined,
@@ -2203,11 +2321,32 @@ function LessonEditorPage({ lesson, onClose, onSaved, onSavedAndClose }: { lesso
               <Label htmlFor="edit-req-video" className="text-sm">Require video completion before marking complete</Label>
             </div>
           )}
-          <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2">
             <Switch checked={requireManualComplete} onCheckedChange={setRequireManualComplete} id="edit-req-manual" />
             <Label htmlFor="edit-req-manual" className="text-sm">Show "Mark Complete" button (manual completion)</Label>
           </div>
-
+          {/* Drip scheduling */}
+          <div className="border border-gray-200 rounded-lg p-4 space-y-2 bg-gray-50">
+            <p className="text-sm font-semibold text-gray-700 flex items-center gap-1.5"><Clock className="w-4 h-4 text-teal-600" /> Drip Schedule</p>
+            <p className="text-xs text-gray-500">Optionally lock this lesson until a set number of days after enrollment. Leave blank to inherit section drip or be available immediately.</p>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                min="0"
+                value={dripDays}
+                onChange={e => setDripDays(e.target.value)}
+                placeholder="e.g. 3"
+                className="w-28"
+              />
+              <span className="text-sm text-gray-500">days after enrollment</span>
+              {dripDays && parseInt(dripDays) > 0 && (
+                <button className="text-xs text-red-500 hover:text-red-700 underline ml-2" onClick={() => setDripDays("")}>Clear</button>
+              )}
+            </div>
+            {dripDays && parseInt(dripDays) > 0 && (
+              <p className="text-xs text-teal-600">Students enrolled today will unlock this lesson on day {dripDays}.</p>
+            )}
+          </div>
           {/* Effects section */}
           <div className="border-t pt-4">
             <p className="text-sm font-semibold text-teal-700 mb-3 flex items-center gap-1.5"><Sparkles className="h-4 w-4" /> Lesson Effect</p>
@@ -2255,6 +2394,7 @@ function LessonEditorPage({ lesson, onClose, onSaved, onSavedAndClose }: { lesso
         <div className="flex-1 overflow-hidden flex flex-col">
           <LessonBlockEditor
             lessonId={lesson.id}
+            courseId={lesson.courseId}
             courseSlug={""}
             initialBlocks={lesson.contentBlocks ? (typeof lesson.contentBlocks === "string" ? JSON.parse(lesson.contentBlocks) : lesson.contentBlocks) as Block[] : []}
             onClose={() => setActiveTab("settings")}

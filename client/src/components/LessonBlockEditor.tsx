@@ -5,7 +5,7 @@
  * Reuses the same Block system (BLOCK_CATALOG, BlockPreview, BlockSettings, SortableBlock)
  * as the LandingPageBuilder.
  */
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent,
 } from "@dnd-kit/core";
@@ -23,12 +23,13 @@ import {
   Block, BlockType, BLOCK_CATALOG, CATALOG_CATEGORIES, BlockPreview, BlockSettings, SortableBlock, uid,
 } from "@/pages/admin/LandingPageBuilder";
 import {
-  X, Plus, Save, Trash2, Eye, EyeOff,
+  X, Plus, Save, Eye, EyeOff, ChevronUp, ChevronDown, Copy, BookOpen, Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface LessonBlockEditorProps {
   lessonId: number;
+  courseId?: number;
   courseSlug: string;
   initialBlocks: Block[];
   onClose: () => void;
@@ -36,8 +37,12 @@ interface LessonBlockEditorProps {
   onSavedAndClose?: () => void;
 }
 
+// Picker tab type
+type PickerTab = "catalog" | "from_lessons";
+
 export default function LessonBlockEditor({
   lessonId,
+  courseId,
   courseSlug,
   initialBlocks,
   onClose,
@@ -48,10 +53,52 @@ export default function LessonBlockEditor({
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState(CATALOG_CATEGORIES[0]);
+  const [pickerTab, setPickerTab] = useState<PickerTab>("catalog");
   const [previewMode, setPreviewMode] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Block-from-lessons state
+  const [selectedSourceCourseId, setSelectedSourceCourseId] = useState<number | null>(courseId ?? null);
+  const [selectedSourceLessonId, setSelectedSourceLessonId] = useState<number | null>(null);
+  const [blockSearch, setBlockSearch] = useState("");
+
   const updateLesson = trpc.lmsAdmin.updateLesson.useMutation();
+
+  // Fetch all courses for the course picker
+  const { data: coursesData } = trpc.lmsAdmin.listCourses.useQuery(
+    { status: "all", type: "all", page: 1, pageSize: 100 },
+    { enabled: addMenuOpen && pickerTab === "from_lessons" }
+  );
+
+  // Fetch lessons with blocks for the selected source course
+  const { data: sourceLessons, isLoading: loadingSourceLessons } = trpc.lmsAdmin.getLessonsWithBlocks.useQuery(
+    { courseId: selectedSourceCourseId! },
+    { enabled: addMenuOpen && pickerTab === "from_lessons" && !!selectedSourceCourseId }
+  );
+
+  // Parse blocks for the selected source lesson
+  const sourceLessonBlocks = useMemo<Block[]>(() => {
+    if (!selectedSourceLessonId || !sourceLessons) return [];
+    const lesson = sourceLessons.find(l => l.id === selectedSourceLessonId);
+    if (!lesson?.contentBlocks) return [];
+    try {
+      const parsed = typeof lesson.contentBlocks === "string"
+        ? JSON.parse(lesson.contentBlocks)
+        : lesson.contentBlocks;
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }, [selectedSourceLessonId, sourceLessons]);
+
+  const filteredSourceBlocks = useMemo(() => {
+    if (!blockSearch.trim()) return sourceLessonBlocks;
+    const q = blockSearch.toLowerCase();
+    return sourceLessonBlocks.filter(b =>
+      b.type.toLowerCase().includes(q) ||
+      JSON.stringify(b.data).toLowerCase().includes(q)
+    );
+  }, [sourceLessonBlocks, blockSearch]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -72,6 +119,21 @@ export default function LessonBlockEditor({
     const newBlock: Block = { id: uid(), type, data: { ...catalog.defaultData } };
     setBlocks(bs => [...bs, newBlock]);
     setSelectedBlockId(newBlock.id);
+    setAddMenuOpen(false);
+  };
+
+  const copyBlockFromLesson = (block: Block) => {
+    const copy: Block = { ...block, id: uid() };
+    setBlocks(bs => [...bs, copy]);
+    toast.success("Block copied!");
+    setAddMenuOpen(false);
+  };
+
+  const copyAllBlocksFromLesson = () => {
+    if (!sourceLessonBlocks.length) return;
+    const copies = sourceLessonBlocks.map(b => ({ ...b, id: uid() }));
+    setBlocks(bs => [...bs, ...copies]);
+    toast.success(`${copies.length} block${copies.length > 1 ? "s" : ""} copied!`);
     setAddMenuOpen(false);
   };
 
@@ -114,6 +176,21 @@ export default function LessonBlockEditor({
 
   const selectedBlock = blocks.find(b => b.id === selectedBlockId) ?? null;
 
+  const moveBlock = (id: string, dir: -1 | 1) => {
+    setBlocks(bs => {
+      const idx = bs.findIndex(b => b.id === id);
+      const newIdx = idx + dir;
+      if (newIdx < 0 || newIdx >= bs.length) return bs;
+      return arrayMove(bs, idx, newIdx);
+    });
+  };
+
+  // Helper: get a short preview label for a block
+  const blockPreviewLabel = (b: Block) => {
+    const d = b.data as any;
+    return d?.heading || d?.title || d?.text?.slice?.(0, 40) || d?.label || b.type;
+  };
+
   return (
     <>
     <div className="fixed inset-0 z-50 flex bg-black/40">
@@ -122,7 +199,7 @@ export default function LessonBlockEditor({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-gray-200 shrink-0">
           <div className="flex items-center gap-3">
-            <span className="text-teal-700 font-bold text-sm uppercase tracking-wide">Lesson Content Editor</span>
+            <span className="text-teal-700 font-bold text-sm uppercase tracking-wide">Lesson Editor</span>
             <span className="text-gray-400 text-xs">Blocks appear below the video in the player</span>
           </div>
           <div className="flex items-center gap-2">
@@ -164,7 +241,7 @@ export default function LessonBlockEditor({
 
         <div className="flex flex-1 overflow-hidden">
           {/* Left: Canvas */}
-          <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
+          <div className="flex-1 overflow-y-auto bg-gray-50 p-4 pl-10">
             {/* Blocks canvas */}
             {previewMode ? (
               <div className="space-y-4">
@@ -180,15 +257,35 @@ export default function LessonBlockEditor({
             ) : (
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
-                  {blocks.map(block => (
-                    <SortableBlock
-                      key={block.id}
-                      block={block}
-                      isSelected={block.id === selectedBlockId}
-                      onSelect={() => setSelectedBlockId(block.id === selectedBlockId ? null : block.id)}
-                      onDelete={() => deleteBlock(block.id)}
-                      onDuplicate={() => duplicateBlock(block.id)}
-                    />
+                  {blocks.map((block, idx) => (
+                    <div key={block.id} className="relative group/blockrow">
+                      {/* Up/Down arrow buttons */}
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-7 flex flex-col gap-0.5 opacity-0 group-hover/blockrow:opacity-100 transition-opacity z-10">
+                        <button
+                          disabled={idx === 0}
+                          onClick={() => moveBlock(block.id, -1)}
+                          className="w-5 h-5 flex items-center justify-center rounded bg-white border border-gray-200 text-gray-400 hover:text-teal-600 hover:border-teal-300 disabled:opacity-30 disabled:cursor-not-allowed shadow-sm"
+                          title="Move up"
+                        >
+                          <ChevronUp className="w-3 h-3" />
+                        </button>
+                        <button
+                          disabled={idx === blocks.length - 1}
+                          onClick={() => moveBlock(block.id, 1)}
+                          className="w-5 h-5 flex items-center justify-center rounded bg-white border border-gray-200 text-gray-400 hover:text-teal-600 hover:border-teal-300 disabled:opacity-30 disabled:cursor-not-allowed shadow-sm"
+                          title="Move down"
+                        >
+                          <ChevronDown className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <SortableBlock
+                        block={block}
+                        isSelected={block.id === selectedBlockId}
+                        onSelect={() => setSelectedBlockId(block.id === selectedBlockId ? null : block.id)}
+                        onDelete={() => deleteBlock(block.id)}
+                        onDuplicate={() => duplicateBlock(block.id)}
+                      />
+                    </div>
                   ))}
                 </SortableContext>
               </DndContext>
@@ -227,46 +324,191 @@ export default function LessonBlockEditor({
         </div>
       </div>
     </div>
-      {/* Block Picker Modal */}
-      <Dialog open={addMenuOpen} onOpenChange={setAddMenuOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-teal-700 flex items-center gap-2">
-              <Plus className="w-5 h-5" /> Add Content Block
-            </DialogTitle>
-          </DialogHeader>
-          {/* Category tabs */}
-          <div className="flex border-b border-gray-200 overflow-x-auto bg-gray-50 rounded-t-lg -mx-1">
-            {CATALOG_CATEGORIES.map(cat => (
-              <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                className={cn(
-                  "px-4 py-2 text-xs font-medium whitespace-nowrap transition-colors",
-                  activeCategory === cat
-                    ? "text-teal-700 border-b-2 border-teal-500 bg-white"
-                    : "text-gray-500 hover:text-gray-700"
-                )}
-              >
-                {cat}
-              </button>
-            ))}
+
+    {/* Block Picker Modal */}
+    <Dialog open={addMenuOpen} onOpenChange={open => { setAddMenuOpen(open); if (!open) setBlockSearch(""); }}>
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+        <DialogHeader className="shrink-0">
+          <DialogTitle className="text-teal-700 flex items-center gap-2">
+            <Plus className="w-5 h-5" /> Add Content Block
+          </DialogTitle>
+        </DialogHeader>
+
+        {/* Top-level tabs: Catalog vs From Lessons */}
+        <div className="flex gap-1 border-b border-gray-200 shrink-0 -mx-1 px-1">
+          <button
+            onClick={() => setPickerTab("catalog")}
+            className={cn(
+              "px-4 py-2 text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5",
+              pickerTab === "catalog"
+                ? "text-teal-700 border-b-2 border-teal-500"
+                : "text-gray-500 hover:text-gray-700"
+            )}
+          >
+            <Plus className="w-3.5 h-3.5" /> New Block
+          </button>
+          <button
+            onClick={() => setPickerTab("from_lessons")}
+            className={cn(
+              "px-4 py-2 text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5",
+              pickerTab === "from_lessons"
+                ? "text-teal-700 border-b-2 border-teal-500"
+                : "text-gray-500 hover:text-gray-700"
+            )}
+          >
+            <BookOpen className="w-3.5 h-3.5" /> Copy from Other Lessons
+          </button>
+        </div>
+
+        {/* ── Catalog tab ── */}
+        {pickerTab === "catalog" && (
+          <div className="flex flex-col flex-1 overflow-hidden">
+            {/* Category tabs */}
+            <div className="flex border-b border-gray-200 overflow-x-auto bg-gray-50 shrink-0">
+              {CATALOG_CATEGORIES.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setActiveCategory(cat)}
+                  className={cn(
+                    "px-4 py-2 text-xs font-medium whitespace-nowrap transition-colors",
+                    activeCategory === cat
+                      ? "text-teal-700 border-b-2 border-teal-500 bg-white"
+                      : "text-gray-500 hover:text-gray-700"
+                  )}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+            {/* Block grid */}
+            <div className="grid grid-cols-4 gap-2 p-1 overflow-y-auto flex-1">
+              {BLOCK_CATALOG.filter(b => b.category === activeCategory).map(b => (
+                <button
+                  key={b.type}
+                  onClick={() => { addBlock(b.type); setAddMenuOpen(false); }}
+                  className="flex flex-col items-center gap-2 p-3 rounded-xl hover:bg-teal-50 border border-transparent hover:border-teal-200 text-gray-600 hover:text-teal-700 transition-all text-center"
+                >
+                  <span className="text-teal-600 text-2xl">{b.icon}</span>
+                  <span className="text-xs leading-tight font-medium">{b.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
-          {/* Block grid */}
-          <div className="grid grid-cols-4 gap-2 p-1 max-h-80 overflow-y-auto">
-            {BLOCK_CATALOG.filter(b => b.category === activeCategory).map(b => (
-              <button
-                key={b.type}
-                onClick={() => { addBlock(b.type); setAddMenuOpen(false); }}
-                className="flex flex-col items-center gap-2 p-3 rounded-xl hover:bg-teal-50 border border-transparent hover:border-teal-200 text-gray-600 hover:text-teal-700 transition-all text-center"
-              >
-                <span className="text-teal-600 text-2xl">{b.icon}</span>
-                <span className="text-xs leading-tight font-medium">{b.label}</span>
-              </button>
-            ))}
+        )}
+
+        {/* ── From Lessons tab ── */}
+        {pickerTab === "from_lessons" && (
+          <div className="flex flex-1 overflow-hidden gap-3 min-h-0">
+            {/* Left: Course + Lesson picker */}
+            <div className="w-52 shrink-0 flex flex-col gap-2 overflow-y-auto border-r border-gray-100 pr-2">
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Course</label>
+                <select
+                  className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400"
+                  value={selectedSourceCourseId ?? ""}
+                  onChange={e => {
+                    setSelectedSourceCourseId(e.target.value ? Number(e.target.value) : null);
+                    setSelectedSourceLessonId(null);
+                  }}
+                >
+                  <option value="">— select course —</option>
+                  {coursesData?.courses.map(c => (
+                    <option key={c.id} value={c.id}>{c.title}</option>
+                  ))}
+                </select>
+              </div>
+              {selectedSourceCourseId && (
+                <div className="flex-1 overflow-y-auto">
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Lesson</label>
+                  {loadingSourceLessons ? (
+                    <p className="text-xs text-gray-400 py-2">Loading…</p>
+                  ) : !sourceLessons?.length ? (
+                    <p className="text-xs text-gray-400 py-2">No lessons with blocks in this course.</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {sourceLessons.map(l => (
+                        <button
+                          key={l.id}
+                          onClick={() => { setSelectedSourceLessonId(l.id); setBlockSearch(""); }}
+                          className={cn(
+                            "w-full text-left text-xs px-2 py-1.5 rounded-lg transition-colors",
+                            selectedSourceLessonId === l.id
+                              ? "bg-teal-50 text-teal-700 font-semibold border border-teal-200"
+                              : "text-gray-600 hover:bg-gray-50"
+                          )}
+                        >
+                          {l.title}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Right: Block list */}
+            <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+              {!selectedSourceLessonId ? (
+                <div className="flex flex-col items-center justify-center h-full text-gray-400 text-xs gap-2">
+                  <BookOpen className="w-8 h-8 opacity-30" />
+                  <p>Select a lesson to browse its blocks</p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 mb-2 shrink-0">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" />
+                      <Input
+                        value={blockSearch}
+                        onChange={e => setBlockSearch(e.target.value)}
+                        placeholder="Search blocks…"
+                        className="pl-7 h-7 text-xs"
+                      />
+                    </div>
+                    {sourceLessonBlocks.length > 0 && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs border-teal-300 text-teal-700 hover:bg-teal-50 shrink-0"
+                        onClick={copyAllBlocksFromLesson}
+                      >
+                        <Copy className="w-3 h-3 mr-1" /> Copy All ({sourceLessonBlocks.length})
+                      </Button>
+                    )}
+                  </div>
+                  <div className="flex-1 overflow-y-auto space-y-1.5">
+                    {filteredSourceBlocks.length === 0 ? (
+                      <p className="text-xs text-gray-400 py-4 text-center">No blocks found.</p>
+                    ) : filteredSourceBlocks.map((b, i) => (
+                      <div
+                        key={b.id}
+                        className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-gray-100 hover:border-teal-200 hover:bg-teal-50 group transition-colors"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-gray-400 text-xs font-mono w-5 shrink-0">{i + 1}</span>
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-gray-700 capitalize">{b.type.replace(/_/g, " ")}</p>
+                            <p className="text-xs text-gray-400 truncate">{blockPreviewLabel(b)}</p>
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-6 text-xs shrink-0 border-teal-300 text-teal-700 hover:bg-teal-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => copyBlockFromLesson(b)}
+                        >
+                          <Copy className="w-3 h-3 mr-1" /> Copy
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        )}
+      </DialogContent>
+    </Dialog>
     </>
   );
 }
