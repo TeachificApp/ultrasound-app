@@ -1681,7 +1681,7 @@ function AddLessonDialog({ courseId, sectionId, onClose, onCreated }: {
           {/* Content fields by type */}
           {type === "text" && (
             <div>
-              <Label className="text-sm">Content</Label>
+              <Label className="text-sm">Lesson Description</Label>
               <div className="mt-1"><RichTextEditor value={content} onChange={setContent} /></div>
             </div>
           )}
@@ -1873,7 +1873,7 @@ function LessonEditorPage({ lesson, onClose, onSaved, onSavedAndClose }: { lesso
           {/* Content fields by type */}
           {lesson.type === "text" && (
             <div>
-              <Label className="text-sm">Content</Label>
+              <Label className="text-sm">Lesson Description</Label>
               <div className="mt-1"><RichTextEditor value={content} onChange={setContent} /></div>
             </div>
           )}
@@ -1999,7 +1999,6 @@ function LessonEditorPage({ lesson, onClose, onSaved, onSavedAndClose }: { lesso
             lessonId={lesson.id}
             courseSlug={""}
             initialBlocks={lesson.contentBlocks ? (typeof lesson.contentBlocks === "string" ? JSON.parse(lesson.contentBlocks) : lesson.contentBlocks) as Block[] : []}
-            initialObjectives={lesson.learningObjectives ? (typeof lesson.learningObjectives === "string" ? JSON.parse(lesson.learningObjectives) : lesson.learningObjectives) as string[] : []}
             onClose={() => setActiveTab("settings")}
             onSaved={() => { onSaved(); }}
             onSavedAndClose={() => { if (onSavedAndClose) onSavedAndClose(); else onSaved(); }}

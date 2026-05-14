@@ -28,7 +28,6 @@ interface LessonBlockEditorProps {
   lessonId: number;
   courseSlug: string;
   initialBlocks: Block[];
-  initialObjectives: string[];
   onClose: () => void;
   onSaved: () => void;
   onSavedAndClose?: () => void;
@@ -38,13 +37,11 @@ export default function LessonBlockEditor({
   lessonId,
   courseSlug,
   initialBlocks,
-  initialObjectives,
   onClose,
   onSaved,
   onSavedAndClose,
 }: LessonBlockEditorProps) {
   const [blocks, setBlocks] = useState<Block[]>(initialBlocks);
-  const [objectives, setObjectives] = useState<string[]>(initialObjectives.length ? initialObjectives : [""]);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState(CATALOG_CATEGORIES[0]);
@@ -95,11 +92,9 @@ export default function LessonBlockEditor({
   const handleSave = async (andClose = false) => {
     setSaving(true);
     try {
-      const cleanObjectives = objectives.filter(o => o.trim());
       await updateLesson.mutateAsync({
         id: lessonId,
         contentBlocks: JSON.stringify(blocks),
-        learningObjectives: JSON.stringify(cleanObjectives),
       });
       toast.success("Lesson content saved!");
       if (andClose && onSavedAndClose) {
@@ -166,44 +161,6 @@ export default function LessonBlockEditor({
         <div className="flex flex-1 overflow-hidden">
           {/* Left: Canvas */}
           <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
-            {/* Learning Objectives section */}
-            <div className="mb-6 bg-teal-50 border border-teal-200 rounded-xl p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-teal-700 text-xs font-bold uppercase tracking-wide">
-                  "In This Lesson" Objectives
-                </h3>
-                <button
-                  onClick={() => setObjectives(o => [...o, ""])}
-                  className="text-teal-600 hover:text-teal-800 text-xs flex items-center gap-1"
-                >
-                  <Plus className="w-3 h-3" /> Add
-                </button>
-              </div>
-              <div className="space-y-2">
-                {objectives.map((obj, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <span className="text-teal-500 text-xs">✓</span>
-                    <Input
-                      value={obj}
-                      onChange={e => {
-                        const next = [...objectives];
-                        next[i] = e.target.value;
-                        setObjectives(next);
-                      }}
-                      placeholder={`Objective ${i + 1}...`}
-                      className="h-7 text-xs bg-white border-teal-200 text-gray-800 placeholder:text-gray-400 flex-1"
-                    />
-                    <button
-                      onClick={() => setObjectives(o => o.filter((_, j) => j !== i))}
-                      className="text-gray-400 hover:text-red-500"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
             {/* Blocks canvas */}
             {previewMode ? (
               <div className="space-y-4">

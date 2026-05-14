@@ -12,7 +12,7 @@
 
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { and, desc, eq, isNull, sql, asc, isNotNull } from "drizzle-orm";
+import { and, desc, eq, isNull, sql, asc, isNotNull, max } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
@@ -1204,12 +1204,22 @@ export const lmsAdminRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Auto-calculate position: append at end of section (or course top-level)
+      const posResult = await db
+        .select({ maxPos: max(lmsLessons.position) })
+        .from(lmsLessons)
+        .where(
+          input.sectionId
+            ? eq(lmsLessons.sectionId, input.sectionId)
+            : and(eq(lmsLessons.courseId, input.courseId), isNull(lmsLessons.sectionId))
+        );
+      const nextPosition = (posResult[0]?.maxPos ?? -1) + 1;
       const [result] = await db.insert(lmsLessons).values({
         courseId: input.courseId,
         sectionId: input.sectionId ?? null,
         title: input.title,
         type: input.type,
-        position: input.position,
+        position: nextPosition,
         content: input.content ?? null,
         videoContent: input.videoContent ?? null,
         embedUrl: input.embedUrl ?? null,

@@ -856,7 +856,6 @@ export default function CoursePlayer() {
             lessonId={selectedLessonId}
             courseSlug={slug!}
             initialBlocks={contentBlocks}
-            initialObjectives={learningObjectives}
             onClose={() => setShowBlockEditor(false)}
             onSaved={() => {
               refetchLesson();

@@ -1777,3 +1777,7 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 ## DnD Fixes Round 2 (May 14)
 - [x] Fix lesson reorder not persisting (order reverts after drag)
 - [x] Make sections (modules) draggable and reorderable
+## Lesson Editor Fixes Round 3 (May 14)
+- [x] Rename "Content" label to "Lesson Description" in lesson settings form (both create and edit dialogs)
+- [x] Remove hardcoded "In This Lesson" objectives section from Lesson Editor canvas
+- [x] Fix new lessons appending at wrong position — server now auto-calculates max(position)+1
