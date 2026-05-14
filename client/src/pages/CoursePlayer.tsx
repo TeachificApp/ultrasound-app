@@ -658,19 +658,6 @@ export default function CoursePlayer() {
               <div className="flex flex-col lg:flex-row h-full">
                 {/* ── Main media/content column ── */}
                 <div className="flex-1 p-5 flex flex-col">
-                  {/* Lesson title (large, uppercase) */}
-                  <div className="flex items-start gap-3 mb-4">
-                    {lessonData.type === "video" || lessonData.type === "video_text" ? (
-                      <Monitor className="w-6 h-6 text-teal-400 shrink-0 mt-1" />
-                    ) : lessonData.type === "quiz" ? (
-                      <HelpCircle className="w-6 h-6 text-teal-400 shrink-0 mt-1" />
-                    ) : (
-                      <FileText className="w-6 h-6 text-teal-400 shrink-0 mt-1" />
-                    )}
-                    <h2 className="text-2xl lg:text-3xl font-extrabold text-gray-900 uppercase tracking-tight leading-tight">
-                      {lessonData.title}
-                    </h2>
-                  </div>
 
                   {/* ── Video lesson ── */}
                   {(lessonData.type === "video" || lessonData.type === "video_text") && lessonData.content && (
@@ -756,13 +743,6 @@ export default function CoursePlayer() {
                     </div>
                   )}
 
-                  {/* ── Lesson Overview ── */}
-                  {lessonData.description && contentBlocks.length === 0 && (
-                    <div className="mt-4 bg-gray-50 rounded-xl border border-gray-200 p-5">
-                      <h3 className="text-xs font-bold text-teal-700 uppercase tracking-wide mb-2">Lesson Overview</h3>
-                      <p className="text-gray-600 text-sm leading-relaxed">{lessonData.description}</p>
-                    </div>
-                  )}
 
                   {/* ── Inline note editor ── */}
                   {selectedLessonId && sidebarTab === "notes" && (
