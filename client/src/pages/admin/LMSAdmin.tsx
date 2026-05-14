@@ -2430,7 +2430,7 @@ function LessonEditorPage({ lesson, onClose, onSaved, onSavedAndClose }: { lesso
   const [requireManualComplete, setRequireManualComplete] = useState(lesson.requireManualComplete === 1);
   const [dripDays, setDripDays] = useState(String(lesson.dripDays ?? ""));
   const [showInstructor, setShowInstructor] = useState<"inherit" | "show" | "hide">(lesson.showInstructor ?? "inherit");
-  const [prerequisiteLessonId, setPrerequisiteLessonId] = useState<string>(lesson.prerequisiteLessonId ? String(lesson.prerequisiteLessonId) : "none");
+  const [isPrerequisite, setIsPrerequisite] = useState<boolean>(!!lesson.isPrerequisite);
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<{ id: number; title: string; s3Url: string; mediaType: string } | null>(null);
 
@@ -2460,11 +2460,12 @@ function LessonEditorPage({ lesson, onClose, onSaved, onSavedAndClose }: { lesso
       title: title.trim(),
       isPreview,
       durationMinutes: durationMinutes ? parseInt(durationMinutes) : null,
-      requireVideoCompletion,
+      // Auto-enable requireVideoCompletion when lesson is a prerequisite gate (video lessons only)
+      requireVideoCompletion: (isPrerequisite && (lesson.type === "video" || lesson.type === "video_text")) ? true : requireVideoCompletion,
       requireManualComplete,
       dripDays: dripDays.trim() ? parseInt(dripDays) : null,
       showInstructor,
-      prerequisiteLessonId: prerequisiteLessonId !== "none" ? parseInt(prerequisiteLessonId) : null,
+      isPrerequisite,
       content: (lesson.type === "text" || lesson.type === "video" || lesson.type === "download" || lesson.type === "video_text") ? (content || null) : undefined,
       videoContent: lesson.type === "video_text" ? (videoContent || null) : undefined,
       embedUrl: lesson.type === "embed" ? (embedUrl || null) : undefined,
@@ -2653,25 +2654,36 @@ function LessonEditorPage({ lesson, onClose, onSaved, onSavedAndClose }: { lesso
             </Select>
           </div>
 
-          {/* Prerequisite lesson */}
-          <div className="border border-gray-200 rounded-lg p-4 space-y-2 bg-gray-50">
-            <p className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
-              <Lock className="w-4 h-4 text-orange-500" /> Prerequisite Lesson
+          {/* Prerequisite gate */}
+          <div className="border border-orange-200 rounded-lg p-4 space-y-3 bg-orange-50">
+            <p className="text-sm font-semibold text-orange-800 flex items-center gap-1.5">
+              <Lock className="w-4 h-4 text-orange-500" /> Prerequisite Gate
             </p>
-            <p className="text-xs text-gray-500">Students must complete the selected lesson before accessing this one. Leave as "None" for no prerequisite.</p>
-            <Select value={prerequisiteLessonId} onValueChange={setPrerequisiteLessonId}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="No prerequisite" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None (no prerequisite)</SelectItem>
-                {allCourseLessons.map((l: any) => (
-                  <SelectItem key={l.id} value={String(l.id)}>{l.title}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {prerequisiteLessonId !== "none" && (
-              <p className="text-xs text-orange-600">Students must complete &ldquo;{allCourseLessons.find((l: any) => String(l.id) === prerequisiteLessonId)?.title ?? "the selected lesson"}&rdquo; first.</p>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={isPrerequisite}
+                onCheckedChange={v => {
+                  setIsPrerequisite(v);
+                  // Auto-enable requireVideoCompletion for video lessons when marked as prerequisite
+                  if (v && (lesson.type === "video" || lesson.type === "video_text")) setRequireVideoCompletion(true);
+                }}
+                id="edit-is-prerequisite"
+              />
+              <Label htmlFor="edit-is-prerequisite" className="text-sm font-medium text-orange-900">Mark this lesson as a prerequisite</Label>
+            </div>
+            {isPrerequisite ? (
+              <div className="text-xs text-orange-700 bg-orange-100 rounded-md px-3 py-2 space-y-1">
+                <p className="font-semibold">🔒 Prerequisite gate active</p>
+                <p>All lessons that appear <strong>after</strong> this one in the course will be locked until this lesson is completed.</p>
+                {(lesson.type === "video" || lesson.type === "video_text") && (
+                  <p className="text-orange-600">Video completion is automatically required for prerequisite lessons.</p>
+                )}
+                {!(lesson.type === "video" || lesson.type === "video_text") && !requireManualComplete && (
+                  <p className="text-orange-600">Since this lesson has no video and no Mark Complete button, the gate will be satisfied when the student <strong>opens</strong> this lesson.</p>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-500">When enabled, all subsequent lessons in the course are locked until this lesson is completed (or opened, if no Mark Complete button).</p>
             )}
           </div>
 

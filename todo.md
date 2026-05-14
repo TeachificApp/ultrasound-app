@@ -1884,3 +1884,13 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 
 ## Bug: Notes Not Working on Mobile (May 14)
 - [x] Fix Notes panel not accessible/functional on mobile in CoursePlayer — added slide-up bottom drawer on < lg screens
+
+## Prerequisite Logic Redesign (May 14)
+- [ ] Replace prerequisiteLessonId with isPrerequisite boolean + requireVideoCompletion boolean on lms_lessons
+- [ ] Update updateLesson procedure to handle isPrerequisite + requireVideoCompletion
+- [ ] Update getCoursePlayer + getCourseOverview to return isPrerequisite + requireVideoCompletion
+- [ ] Update LessonEditorPage: replace Prerequisite Lesson dropdown with Is Prerequisite toggle + Require Video Completion toggle
+- [ ] Rewrite CoursePlayer gating: lock all lessons after the first incomplete prerequisite in course order
+- [ ] Rewrite CourseOverview gating: same logic for accordion curriculum
+- [ ] Auto-enforce video completion when lesson isPrerequisite = true
+- [ ] If no Mark Complete button, prerequisite is satisfied by opening the lesson (or video completion if video exists)

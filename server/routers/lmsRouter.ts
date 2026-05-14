@@ -417,6 +417,7 @@ export const lmsLearnerRouter = router({
           requireVideoCompletion: lmsLessons.requireVideoCompletion,
           requireManualComplete: lmsLessons.requireManualComplete,
           prerequisiteLessonId: lmsLessons.prerequisiteLessonId,
+          isPrerequisite: lmsLessons.isPrerequisite,
           showInstructor: lmsLessons.showInstructor,
           effectEnabled: lmsLessons.effectEnabled,
           effectTrigger: lmsLessons.effectTrigger,
@@ -1282,6 +1283,7 @@ export const lmsAdminRouter = router({
           requireVideoCompletion: lmsLessons.requireVideoCompletion,
           requireManualComplete: lmsLessons.requireManualComplete,
           prerequisiteLessonId: lmsLessons.prerequisiteLessonId,
+          isPrerequisite: lmsLessons.isPrerequisite,
           showInstructor: lmsLessons.showInstructor,
           effectEnabled: lmsLessons.effectEnabled,
           createdAt: lmsLessons.createdAt,
@@ -1430,17 +1432,19 @@ export const lmsAdminRouter = router({
       learningObjectives: z.string().nullable().optional(), // JSON array of strings
       showInstructor: z.enum(["inherit", "show", "hide"]).optional(),
       prerequisiteLessonId: z.number().int().nullable().optional(),
+      isPrerequisite: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const { id, requireVideoCompletion, requireManualComplete, ...rest } = input;
+      const { id, requireVideoCompletion, requireManualComplete, isPrerequisite, ...rest } = input;
       const updates: Record<string, unknown> = Object.fromEntries(
         Object.entries(rest).filter(([, v]) => v !== undefined)
       );
       if (requireVideoCompletion !== undefined) updates.requireVideoCompletion = requireVideoCompletion ? 1 : 0;
       if (requireManualComplete !== undefined) updates.requireManualComplete = requireManualComplete ? 1 : 0;
+      if (isPrerequisite !== undefined) updates.isPrerequisite = isPrerequisite;
       // Convert null dripDays to 0 (no drip)
       if (updates.dripDays === null) updates.dripDays = 0;
       if (Object.keys(updates).length > 0) await db.update(lmsLessons).set(updates).where(eq(lmsLessons.id, id));

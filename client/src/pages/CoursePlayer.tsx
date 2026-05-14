@@ -197,12 +197,12 @@ function CertificateDialog({ open, onClose, courseTitle, certificateUrl }: {
 // ─── Mobile Sidebar Content ──────────────────────────────────────────────────
 function MobileSidebarContent({
   data, sidebarTab, setSidebarTab, selectedLessonId, setSelectedLessonId,
-  completedIds, notesData, bookmarksData, slug, course,
+  completedIds, notesData, bookmarksData, slug, course, prereqLockedIds,
 }: {
   data: any; sidebarTab: string; setSidebarTab: (t: any) => void;
   selectedLessonId: number | null; setSelectedLessonId: (id: number) => void;
   completedIds: Set<number>; notesData: any; bookmarksData: any;
-  slug: string; course: any;
+  slug: string; course: any; prereqLockedIds: Set<number>;
 }) {
   const topLevelLessons = data?.topLevelLessons ?? [];
   const sections = data?.sections ?? [];
@@ -221,7 +221,7 @@ function MobileSidebarContent({
               const done = completedIds.has(lesson.id);
               const active = lesson.id === selectedLessonId;
               const dripLocked = !dripBypassed && (lesson.dripDays ?? 0) > 0 && daysSinceEnroll < lesson.dripDays;
-              const prereqLocked = !dripBypassed && !!lesson.prerequisiteLessonId && !completedIds.has(lesson.prerequisiteLessonId);
+              const prereqLocked = prereqLockedIds.has(lesson.id);
               const lessonLocked = dripLocked || prereqLocked;
               const lessonUnlockDate = dripLocked ? new Date(enrolledAt.getTime() + lesson.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
               return (
@@ -235,7 +235,7 @@ function MobileSidebarContent({
                   <div className="flex-1 min-w-0">
                     <span className="leading-snug font-semibold uppercase tracking-wide truncate block">{lesson.title}</span>
                     {dripLocked && lessonUnlockDate && <span className="text-[10px] text-gray-400 font-normal normal-case">Unlocks {lessonUnlockDate}</span>}
-                    {prereqLocked && !dripLocked && <span className="text-[10px] text-orange-500 font-normal normal-case">Complete prerequisite first</span>}
+                    {prereqLocked && !dripLocked && <span className="text-[10px] text-orange-500 font-normal normal-case">Complete prerequisite lesson first</span>}
                   </div>
                 </button>
               );
@@ -267,7 +267,7 @@ function MobileSidebarContent({
                         const done = completedIds.has(lesson.id);
                         const active = lesson.id === selectedLessonId;
                         const dripLocked = !dripBypassed && (lesson.dripDays ?? 0) > 0 && daysSinceEnroll < lesson.dripDays;
-                        const prereqLocked = !dripBypassed && !!lesson.prerequisiteLessonId && !completedIds.has(lesson.prerequisiteLessonId);
+                        const prereqLocked = prereqLockedIds.has(lesson.id);
                         const lessonLocked = dripLocked || prereqLocked;
                         const lessonUnlockDate = dripLocked ? new Date(enrolledAt.getTime() + lesson.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
                         return (
@@ -278,7 +278,7 @@ function MobileSidebarContent({
                             <div className="flex-1 min-w-0">
                               <span className="truncate block">{lesson.title}</span>
                               {dripLocked && lessonUnlockDate && <span className="text-[10px] text-gray-400">Unlocks {lessonUnlockDate}</span>}
-                              {prereqLocked && !dripLocked && <span className="text-[10px] text-orange-500">Complete prerequisite first</span>}
+                              {prereqLocked && !dripLocked && <span className="text-[10px] text-orange-500">Complete prerequisite lesson first</span>}
                             </div>
                             {lesson.durationMinutes && !lessonLocked && <span className="text-[10px] text-gray-400 shrink-0">{lesson.durationMinutes}m</span>}
                           </button>
@@ -507,6 +507,44 @@ export default function CoursePlayer() {
   const daysSinceEnroll = Math.floor((Date.now() - enrolledAt.getTime()) / (1000 * 60 * 60 * 24));
 
   const allLessons = [...topLevelLessons, ...sections.flatMap((s: any) => s.lessons)];
+
+  // ── Prerequisite Gate Logic ──────────────────────────────────────────────────
+  // Build a Set of lesson IDs that are locked by prerequisite gates.
+  // A lesson marked isPrerequisite=true acts as a gate: all lessons that appear
+  // AFTER it in the flat course order are locked until the gate lesson is satisfied.
+  //
+  // Satisfaction rules:
+  //   - If the gate lesson has requireVideoCompletion=1 OR requireManualComplete=1:
+  //     the lesson must be in completedIds (i.e. explicitly marked complete).
+  //   - Otherwise (no explicit completion mechanism): the gate is satisfied when
+  //     the student has OPENED the lesson (i.e. it exists in progress, even without completedAt).
+  const openedIds = new Set(progress.map((p: any) => p.lessonId));
+  // Prerequisite gating is independent of drip — always applies (admins bypass via dripBypassed)
+  const prereqLockedIds = new Set<number>();
+  if (!dripBypassed) {
+    let gateActive = false;
+    for (const lesson of allLessons) {
+      if (gateActive) {
+        prereqLockedIds.add(lesson.id);
+      }
+      if (lesson.isPrerequisite) {
+        // Gate is satisfied if:
+        // - lesson has explicit completion (video required OR mark-complete button shown) → must be in completedIds
+        // - otherwise (no explicit mechanism) → satisfied if lesson has been opened at all
+        const hasExplicitCompletion = lesson.requireVideoCompletion === 1 || lesson.showMarkComplete === 1;
+        const gateSatisfied = hasExplicitCompletion
+          ? completedIds.has(lesson.id)
+          : openedIds.has(lesson.id) || completedIds.has(lesson.id);
+        if (!gateSatisfied) {
+          gateActive = true;
+        } else {
+          gateActive = false; // this gate cleared; next prerequisite may re-activate
+        }
+      }
+    }
+  }
+  // ────────────────────────────────────────────────────────────────────────────
+
   const currentIdx = allLessons.findIndex((l: any) => l.id === selectedLessonId);
   const prevLesson = currentIdx > 0 ? allLessons[currentIdx - 1] : null;
   const nextLesson = currentIdx < allLessons.length - 1 ? allLessons[currentIdx + 1] : null;
@@ -674,6 +712,7 @@ export default function CoursePlayer() {
             bookmarksData={bookmarksData}
             slug={slug!}
             course={course}
+            prereqLockedIds={prereqLockedIds}
           />
         </aside>
 
@@ -707,10 +746,9 @@ export default function CoursePlayer() {
               const done = completedIds.has(lesson.id);
               const active = lesson.id === selectedLessonId;
               const dripLocked = !dripBypassed && (lesson.dripDays ?? 0) > 0 && daysSinceEnroll < lesson.dripDays;
-              const prereqLocked = !dripBypassed && !!lesson.prerequisiteLessonId && !completedIds.has(lesson.prerequisiteLessonId);
+              const prereqLocked = prereqLockedIds.has(lesson.id);
               const lessonLocked = dripLocked || prereqLocked;
               const lessonUnlockDate = dripLocked ? new Date(enrolledAt.getTime() + lesson.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
-              const prereqTitle = prereqLocked ? (allLessons.find((l: any) => l.id === lesson.prerequisiteLessonId)?.title ?? "a previous lesson") : null;
               return (
                 <button
                   key={lesson.id}
@@ -736,7 +774,7 @@ export default function CoursePlayer() {
                   <div className="flex-1 min-w-0">
                     <span className="leading-snug font-semibold uppercase tracking-wide truncate block">{lesson.title}</span>
                     {dripLocked && lessonUnlockDate && <span className="text-[10px] text-gray-400 font-normal normal-case">Unlocks {lessonUnlockDate}</span>}
-                    {prereqLocked && !dripLocked && <span className="text-[10px] text-orange-500 font-normal normal-case">Complete &ldquo;{prereqTitle}&rdquo; first</span>}
+                    {prereqLocked && !dripLocked && <span className="text-[10px] text-orange-500 font-normal normal-case">Complete prerequisite lesson first</span>}
                   </div>
                 </button>
               );
@@ -793,10 +831,9 @@ export default function CoursePlayer() {
                         const done = completedIds.has(lesson.id);
                         const active = lesson.id === selectedLessonId;
                         const dripLocked = !dripBypassed && (lesson.dripDays ?? 0) > 0 && daysSinceEnroll < lesson.dripDays;
-                        const prereqLocked = !dripBypassed && !!lesson.prerequisiteLessonId && !completedIds.has(lesson.prerequisiteLessonId);
+                        const prereqLocked = prereqLockedIds.has(lesson.id);
                         const lessonLocked = dripLocked || prereqLocked;
                         const lessonUnlockDate = dripLocked ? new Date(enrolledAt.getTime() + lesson.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
-                        const prereqTitle = prereqLocked ? (allLessons.find((l: any) => l.id === lesson.prerequisiteLessonId)?.title ?? "a previous lesson") : null;
                         return (
                           <button
                             key={lesson.id}
@@ -811,7 +848,7 @@ export default function CoursePlayer() {
                             <div className="flex-1 min-w-0">
                               <span className="truncate block">{lesson.title}</span>
                               {dripLocked && lessonUnlockDate && <span className="text-[10px] text-gray-400">Unlocks {lessonUnlockDate}</span>}
-                              {prereqLocked && !dripLocked && <span className="text-[10px] text-orange-500">Complete &ldquo;{prereqTitle}&rdquo; first</span>}
+                              {prereqLocked && !dripLocked && <span className="text-[10px] text-orange-500">Complete prerequisite lesson first</span>}
                             </div>
                             {lesson.durationMinutes && !lessonLocked && <span className="text-[10px] text-gray-400 shrink-0">{lesson.durationMinutes}m</span>}
                           </button>

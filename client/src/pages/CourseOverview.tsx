@@ -197,18 +197,37 @@ export default function CourseOverview() {
     return unlockDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
-  // Determine if a lesson is prerequisite-locked
-  const isPrereqLocked = (lesson: any) => {
-    if (!lesson.prerequisiteLessonId) return false;
-    return !completedIds.has(lesson.prerequisiteLessonId);
-  };
+  // Build set of prerequisite-locked lesson IDs using new isPrerequisite gate logic:
+  // A lesson marked isPrerequisite=true gates ALL subsequent lessons until it is completed (or opened if no markComplete).
+  const prereqLockedIds = (() => {
+    const locked = new Set<number>();
+    let gating = false;
+    let gatingLesson: any = null;
+    for (const lesson of allLessons) {
+      if (gating) {
+        // Check if the gate lesson is satisfied
+        const gateSatisfied = completedIds.has(gatingLesson.id) ||
+          (!gatingLesson.showMarkComplete && /* opened = any progress */ false);
+        if (gateSatisfied) {
+          gating = false;
+          gatingLesson = null;
+        } else {
+          locked.add(lesson.id);
+        }
+      }
+      // After processing lock status, check if this lesson itself is a new gate
+      if (lesson.isPrerequisite) {
+        const satisfied = completedIds.has(lesson.id);
+        if (!satisfied) {
+          gating = true;
+          gatingLesson = lesson;
+        }
+      }
+    }
+    return locked;
+  })();
 
-  const prereqTitle = (lesson: any) => {
-    const prereqId = lesson.prerequisiteLessonId;
-    if (!prereqId) return "";
-    const prereq = allLessons.find((l: any) => l.id === prereqId);
-    return prereq?.title ?? "a previous lesson";
-  };
+  const isPrereqLocked = (lesson: any) => prereqLockedIds.has(lesson.id);
 
   const navigateToLesson = (lessonId: number, locked: boolean) => {
     if (locked) return;
@@ -256,7 +275,7 @@ export default function CourseOverview() {
           )}
           {prereqLocked && !dripLocked && (
             <p className="text-[10px] text-orange-600 mt-0.5 flex items-center gap-1">
-              <Lock className="w-3 h-3" /> Complete &ldquo;{prereqTitle(lesson)}&rdquo; first
+              <Lock className="w-3 h-3" /> Complete prerequisite lesson first
             </p>
           )}
           {lesson.durationMinutes && !locked && (

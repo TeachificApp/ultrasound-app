@@ -2792,7 +2792,10 @@ export const lmsLessons = mysqlTable("lms_lessons", {
   learningObjectives: longtext("learning_objectives"),
   // Override course-level showInstructor: null = inherit from course, true = always show, false = always hide
   showInstructor: mysqlEnum("show_instructor", ["inherit", "show", "hide"]).default("inherit").notNull(),
-  // Prerequisite: if set, student must complete the referenced lesson before accessing this lesson
+  // Prerequisite gate: when true, this lesson acts as a gate — all subsequent lessons in the course
+  // are locked until this lesson is completed (or at minimum opened, if no Mark Complete button).
+  isPrerequisite: boolean("is_prerequisite").default(false).notNull(),
+  // Legacy: kept for DB compatibility but no longer used in logic
   prerequisiteLessonId: int("prerequisite_lesson_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
