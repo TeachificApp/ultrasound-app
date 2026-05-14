@@ -1141,12 +1141,18 @@ export const lmsAdminRouter = router({
 
   // ── Sections ──
   createSection: protectedProcedure
-    .input(z.object({ courseId: z.number(), title: z.string().min(1), position: z.number().int().default(0) }))
+    .input(z.object({ courseId: z.number(), title: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const [result] = await db.insert(lmsSections).values(input).$returningId();
+      // Auto-append at end
+      const posResult = await db
+        .select({ maxPos: max(lmsSections.position) })
+        .from(lmsSections)
+        .where(eq(lmsSections.courseId, input.courseId));
+      const nextPosition = (posResult[0]?.maxPos ?? -1) + 1;
+      const [result] = await db.insert(lmsSections).values({ courseId: input.courseId, title: input.title, position: nextPosition }).$returningId();
       return { id: result.id };
     }),
 
@@ -1290,6 +1296,117 @@ export const lmsAdminRouter = router({
       return { success: true };
     }),
 
+  // ── Move / Copy ──
+  moveLesson: protectedProcedure
+    .input(z.object({
+      lessonId: z.number(),
+      targetSectionId: z.number().nullable(), // null = top-level
+      courseId: z.number(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Get next position in target section
+      const posResult = await db
+        .select({ maxPos: max(lmsLessons.position) })
+        .from(lmsLessons)
+        .where(
+          input.targetSectionId
+            ? eq(lmsLessons.sectionId, input.targetSectionId)
+            : and(eq(lmsLessons.courseId, input.courseId), isNull(lmsLessons.sectionId))
+        );
+      const nextPosition = (posResult[0]?.maxPos ?? -1) + 1;
+      await db.update(lmsLessons)
+        .set({ sectionId: input.targetSectionId, position: nextPosition })
+        .where(eq(lmsLessons.id, input.lessonId));
+      return { success: true };
+    }),
+
+  copyLesson: protectedProcedure
+    .input(z.object({
+      lessonId: z.number(),
+      targetCourseId: z.number(),
+      targetSectionId: z.number().nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [src] = await db.select().from(lmsLessons).where(eq(lmsLessons.id, input.lessonId)).limit(1);
+      if (!src) throw new TRPCError({ code: "NOT_FOUND" });
+      const posResult = await db
+        .select({ maxPos: max(lmsLessons.position) })
+        .from(lmsLessons)
+        .where(
+          input.targetSectionId
+            ? eq(lmsLessons.sectionId, input.targetSectionId)
+            : and(eq(lmsLessons.courseId, input.targetCourseId), isNull(lmsLessons.sectionId))
+        );
+      const nextPosition = (posResult[0]?.maxPos ?? -1) + 1;
+      const { id: _id, courseId: _c, sectionId: _s, position: _p, ...rest } = src;
+      const [result] = await db.insert(lmsLessons).values({
+        ...rest,
+        courseId: input.targetCourseId,
+        sectionId: input.targetSectionId,
+        position: nextPosition,
+      }).$returningId();
+      // Copy quiz if present
+      const [quiz] = await db.select().from(lmsQuizzes).where(eq(lmsQuizzes.lessonId, input.lessonId)).limit(1);
+      if (quiz) {
+        const { id: _qid, lessonId: _ql, ...quizRest } = quiz;
+        const [newQuiz] = await db.insert(lmsQuizzes).values({ ...quizRest, lessonId: result.id }).$returningId();
+        const questions = await db.select().from(lmsQuizQuestions).where(eq(lmsQuizQuestions.quizId, quiz.id));
+        if (questions.length > 0) {
+          await db.insert(lmsQuizQuestions).values(questions.map(q => { const { id: _qi, quizId: _qqi, ...qr } = q; return { ...qr, quizId: newQuiz.id }; }));
+        }
+      }
+      return { id: result.id };
+    }),
+
+  copyModule: protectedProcedure
+    .input(z.object({
+      sectionId: z.number(),
+      targetCourseId: z.number(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [srcSection] = await db.select().from(lmsSections).where(eq(lmsSections.id, input.sectionId)).limit(1);
+      if (!srcSection) throw new TRPCError({ code: "NOT_FOUND" });
+      // Get next section position in target course
+      const secPosResult = await db.select({ maxPos: max(lmsSections.position) }).from(lmsSections).where(eq(lmsSections.courseId, input.targetCourseId));
+      const nextSecPos = (secPosResult[0]?.maxPos ?? -1) + 1;
+      const [newSection] = await db.insert(lmsSections).values({
+        courseId: input.targetCourseId,
+        title: srcSection.title,
+        position: nextSecPos,
+        dripDays: srcSection.dripDays,
+      }).$returningId();
+      // Copy all lessons in the section
+      const lessons = await db.select().from(lmsLessons).where(eq(lmsLessons.sectionId, input.sectionId)).orderBy(asc(lmsLessons.position));
+      for (const lesson of lessons) {
+        const { id: _id, courseId: _c, sectionId: _s, ...rest } = lesson;
+        const [newLesson] = await db.insert(lmsLessons).values({
+          ...rest,
+          courseId: input.targetCourseId,
+          sectionId: newSection.id,
+        }).$returningId();
+        // Copy quiz if present
+        const [quiz] = await db.select().from(lmsQuizzes).where(eq(lmsQuizzes.lessonId, lesson.id)).limit(1);
+        if (quiz) {
+          const { id: _qid, lessonId: _ql, ...quizRest } = quiz;
+          const [newQuiz] = await db.insert(lmsQuizzes).values({ ...quizRest, lessonId: newLesson.id }).$returningId();
+          const questions = await db.select().from(lmsQuizQuestions).where(eq(lmsQuizQuestions.quizId, quiz.id));
+          if (questions.length > 0) {
+            await db.insert(lmsQuizQuestions).values(questions.map(q => { const { id: _qi, quizId: _qqi, ...qr } = q; return { ...qr, quizId: newQuiz.id }; }));
+          }
+        }
+      }
+      return { id: newSection.id };
+    }),
+
   // ── Lesson Effects ──
   updateLessonEffect: protectedProcedure
     .input(z.object({
@@ -1424,7 +1541,7 @@ export const lmsAdminRouter = router({
               .where(eq(lmsSections.courseId, input.courseId))
               .orderBy(asc(lmsSections.position));
             const lessons = await db
-              .select({ title: lmsLessons.title, description: lmsLessons.description })
+              .select({ title: lmsLessons.title })
               .from(lmsLessons)
               .where(eq(lmsLessons.courseId, input.courseId))
               .orderBy(asc(lmsLessons.position));

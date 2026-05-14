@@ -14,7 +14,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type React from "react";
 import {
-  DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent,
+  DndContext, DragOverlay, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent,
 } from "@dnd-kit/core";
 import {
   SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable, arrayMove,
@@ -26,7 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -550,11 +550,12 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
 
 // ─── Lesson Row ──────────────────────────────────────────────────────────────
 
-function SortableLessonRow({ lesson, onEdit, onQuiz, onDelete }: {
+function SortableLessonRow({ lesson, onEdit, onQuiz, onDelete, onCopy }: {
   lesson: any;
   onEdit: (lesson: any) => void;
   onQuiz: (lesson: any) => void;
   onDelete: (id: number) => void;
+  onCopy?: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lesson.id });
   const style: React.CSSProperties = {
@@ -580,6 +581,11 @@ function SortableLessonRow({ lesson, onEdit, onQuiz, onDelete }: {
           <HelpCircle className="w-3 h-3 mr-1" /> Quiz
         </Button>
       )}
+      {onCopy && (
+        <Button size="sm" variant="ghost" className="h-7 text-xs text-blue-500 hover:bg-blue-50" title="Copy to another course" onClick={onCopy}>
+          <Copy className="w-3 h-3" />
+        </Button>
+      )}
       <Button size="sm" variant="ghost" className="h-7 text-xs text-teal-600 hover:bg-teal-50" onClick={() => onEdit(lesson)}>
         <Edit2 className="w-3 h-3" />
       </Button>
@@ -592,12 +598,13 @@ function SortableLessonRow({ lesson, onEdit, onQuiz, onDelete }: {
 
 // ─── Sortable Section Row ────────────────────────────────────────────────────
 
-function SortableSectionRow({ section, children, onAddLesson, onDrip, onDelete }: {
+function SortableSectionRow({ section, children, onAddLesson, onDrip, onDelete, onCopyModule }: {
   section: any;
   children: React.ReactNode;
   onAddLesson: () => void;
   onDrip: () => void;
   onDelete: () => void;
+  onCopyModule?: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: section.id });
   const style: React.CSSProperties = {
@@ -620,6 +627,11 @@ function SortableSectionRow({ section, children, onAddLesson, onDrip, onDelete }
         <Button size="sm" variant="ghost" className="h-7 text-xs text-gray-500 hover:bg-gray-100" title="Drip schedule" onClick={onDrip}>
           <Clock className="w-3 h-3 mr-1" />{(section.dripDays ?? 0) > 0 ? `+${section.dripDays}d` : "Drip"}
         </Button>
+        {onCopyModule && (
+          <Button size="sm" variant="ghost" className="h-7 text-xs text-blue-500 hover:bg-blue-50" title="Copy module to another course" onClick={onCopyModule}>
+            <Copy className="w-3 h-3 mr-1" /> Copy
+          </Button>
+        )}
         <Button size="sm" variant="ghost" className="h-7 text-red-400 hover:bg-red-50" onClick={onDelete}>
           <Trash2 className="w-3 h-3" />
         </Button>
@@ -673,6 +685,9 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
   // Local state for optimistic DnD reordering
   const [localSections, setLocalSections] = useState<any[]>([]);
   const [localTopLessons, setLocalTopLessons] = useState<any[]>([]);
+  const [activeDragId, setActiveDragId] = useState<number | null>(null);
+  const [copyLessonTarget, setCopyLessonTarget] = useState<any | null>(null);
+  const [copyModuleTarget, setCopyModuleTarget] = useState<any | null>(null);
 
   useEffect(() => {
     if (course) {
@@ -689,52 +704,127 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
     onError: (e) => { toast.error(`Reorder failed: ${e.message}`); refetch(); },
   });
 
+  const moveLesson = trpc.lmsAdmin.moveLesson.useMutation({
+    onSuccess: () => { toast.success("Lesson moved"); refetch(); },
+    onError: (e) => { toast.error(`Move failed: ${e.message}`); refetch(); },
+  });
+
+  const copyLesson = trpc.lmsAdmin.copyLesson.useMutation({
+    onSuccess: () => { toast.success("Lesson copied successfully"); refetch(); },
+    onError: (e) => toast.error(`Copy failed: ${e.message}`),
+  });
+
+  const copyModule = trpc.lmsAdmin.copyModule.useMutation({
+    onSuccess: () => { toast.success("Module copied successfully"); refetch(); },
+    onError: (e) => toast.error(`Copy failed: ${e.message}`),
+  });
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  const handleSectionDragEnd = useCallback((event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    setLocalSections(prev => {
-      const oldIndex = prev.findIndex(s => s.id === active.id);
-      const newIndex = prev.findIndex(s => s.id === over.id);
-      if (oldIndex === -1 || newIndex === -1) return prev;
-      const reordered = arrayMove(prev, oldIndex, newIndex);
-      reorderSections.mutate({ sections: reordered.map((s, i) => ({ id: s.id, position: i })) });
-      return reordered;
-    });
-  }, [reorderSections]);
+  const handleDragStart = useCallback((event: any) => {
+    setActiveDragId(event.active.id as number);
+  }, []);
 
-  const handleLessonDragEnd = useCallback((sectionId: number | null) => (event: DragEndEvent) => {
+  // Unified drag end: handles section reorder, lesson reorder within section, and cross-section move
+  const handleUnifiedDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
+    setActiveDragId(null);
     if (!over || active.id === over.id) return;
-    if (sectionId === null) {
-      setLocalTopLessons(prev => {
-        const oldIndex = prev.findIndex(l => l.id === active.id);
-        const newIndex = prev.findIndex(l => l.id === over.id);
-        if (oldIndex === -1 || newIndex === -1) return prev;
-        const reordered = arrayMove(prev, oldIndex, newIndex);
-        reorderLessons.mutate({ lessons: reordered.map((l, i) => ({ id: l.id, position: i })) });
-        return reordered;
-      });
+
+    const activeId = active.id as number;
+    const overId = over.id as number;
+
+    // Check if active is a section
+    const activeSectionIdx = localSections.findIndex(s => s.id === activeId);
+    if (activeSectionIdx !== -1) {
+      // Section reorder
+      const overSectionIdx = localSections.findIndex(s => s.id === overId);
+      if (overSectionIdx !== -1) {
+        setLocalSections(prev => {
+          const reordered = arrayMove(prev, activeSectionIdx, overSectionIdx);
+          reorderSections.mutate({ sections: reordered.map((s, i) => ({ id: s.id, position: i })) });
+          return reordered;
+        });
+      }
+      return;
+    }
+
+    // Active is a lesson — find which section it's in
+    const findLessonSection = (lessonId: number) => {
+      for (const sec of localSections) {
+        if (sec.lessons.some((l: any) => l.id === lessonId)) return sec.id as number;
+      }
+      if (localTopLessons.some(l => l.id === lessonId)) return null;
+      return undefined;
+    };
+
+    const sourceSectionId = findLessonSection(activeId);
+    if (sourceSectionId === undefined) return; // not found
+
+    // Determine target section: over could be a lesson or a section header
+    const overIsSection = localSections.some(s => s.id === overId);
+    let targetSectionId: number | null;
+    if (overIsSection) {
+      targetSectionId = overId;
     } else {
+      targetSectionId = findLessonSection(overId) ?? null;
+    }
+
+    if (sourceSectionId === targetSectionId) {
+      // Same section reorder
+      if (sourceSectionId === null) {
+        setLocalTopLessons(prev => {
+          const oldIndex = prev.findIndex(l => l.id === activeId);
+          const newIndex = prev.findIndex(l => l.id === overId);
+          if (oldIndex === -1 || newIndex === -1) return prev;
+          const reordered = arrayMove(prev, oldIndex, newIndex);
+          reorderLessons.mutate({ lessons: reordered.map((l, i) => ({ id: l.id, position: i })) });
+          return reordered;
+        });
+      } else {
+        setLocalSections(prev => {
+          const secIdx = prev.findIndex(s => s.id === sourceSectionId);
+          if (secIdx === -1) return prev;
+          const lessons = prev[secIdx].lessons;
+          const oldIndex = lessons.findIndex((l: any) => l.id === activeId);
+          const newIndex = lessons.findIndex((l: any) => l.id === overId);
+          if (oldIndex === -1 || newIndex === -1) return prev;
+          const reordered = arrayMove(lessons, oldIndex, newIndex);
+          reorderLessons.mutate({ lessons: reordered.map((l: any, i: number) => ({ id: l.id, position: i })) });
+          const newSections = [...prev];
+          newSections[secIdx] = { ...prev[secIdx], lessons: reordered };
+          return newSections;
+        });
+      }
+    } else {
+      // Cross-section move — optimistic update
+      let movedLesson: any;
       setLocalSections(prev => {
-        const secIdx = prev.findIndex(s => s.id === sectionId);
-        if (secIdx === -1) return prev;
-        const lessons = prev[secIdx].lessons;
-        const oldIndex = lessons.findIndex((l: any) => l.id === active.id);
-        const newIndex = lessons.findIndex((l: any) => l.id === over.id);
-        if (oldIndex === -1 || newIndex === -1) return prev;
-        const reordered = arrayMove(lessons, oldIndex, newIndex);
-        reorderLessons.mutate({ lessons: reordered.map((l: any, i: number) => ({ id: l.id, position: i })) });
-        const newSections = [...prev];
-        newSections[secIdx] = { ...prev[secIdx], lessons: reordered };
+        const newSections = prev.map(sec => {
+          if (sec.id === sourceSectionId) {
+            const lessons = sec.lessons.filter((l: any) => l.id !== activeId);
+            movedLesson = sec.lessons.find((l: any) => l.id === activeId);
+            return { ...sec, lessons };
+          }
+          if (sec.id === targetSectionId && movedLesson) {
+            return { ...sec, lessons: [...sec.lessons, { ...movedLesson, sectionId: targetSectionId }] };
+          }
+          return sec;
+        });
         return newSections;
       });
+      if (sourceSectionId === null) {
+        setLocalTopLessons(prev => {
+          movedLesson = prev.find(l => l.id === activeId);
+          return prev.filter(l => l.id !== activeId);
+        });
+      }
+      moveLesson.mutate({ lessonId: activeId, targetSectionId, courseId });
     }
-  }, [reorderLessons]);
+  }, [localSections, localTopLessons, reorderLessons, reorderSections, moveLesson, courseId]);
 
   if (isLoading) return <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>;
   if (!course) return <div className="text-gray-500">Course not found</div>;
@@ -792,27 +882,36 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
         {/* Curriculum Tab */}
         <TabsContent value="curriculum" className="mt-4">
           <div className="space-y-4">
-            {/* Top-level lessons (no section) */}
-            {localTopLessons.length > 0 && (
-              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                <div className="flex items-center gap-3 px-4 py-3 bg-teal-50 border-b border-teal-200">
-                  <span className="font-medium text-sm text-teal-800 flex-1">Course-Level Lessons</span>
-                  <span className="text-xs text-teal-600">Not inside any section</span>
-                </div>
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleLessonDragEnd(null)}>
+            {/* Single unified DndContext for all drag operations */}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleUnifiedDragEnd}
+            >
+              {/* Top-level lessons (no section) */}
+              {localTopLessons.length > 0 && (
+                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                  <div className="flex items-center gap-3 px-4 py-3 bg-teal-50 border-b border-teal-200">
+                    <span className="font-medium text-sm text-teal-800 flex-1">Course-Level Lessons</span>
+                    <span className="text-xs text-teal-600">Not inside any section</span>
+                  </div>
                   <SortableContext items={localTopLessons.map((l: any) => l.id)} strategy={verticalListSortingStrategy}>
                     <div className="divide-y divide-gray-100">
                       {localTopLessons.map((lesson: any) => (
-                        <SortableLessonRow key={lesson.id} lesson={lesson} onEdit={setEditLesson} onQuiz={setQuizLesson} onDelete={id => { if (confirm(`Delete lesson "${lesson.title}"?`)) deleteLesson.mutate({ id }); }} />
+                        <SortableLessonRow
+                          key={lesson.id} lesson={lesson}
+                          onEdit={setEditLesson} onQuiz={setQuizLesson}
+                          onCopy={() => setCopyLessonTarget(lesson)}
+                          onDelete={id => { if (confirm(`Delete lesson "${lesson.title}"?`)) deleteLesson.mutate({ id }); }}
+                        />
                       ))}
                     </div>
                   </SortableContext>
-                </DndContext>
-              </div>
-            )}
+                </div>
+              )}
 
-            {/* Sections — outer DndContext for section reordering */}
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSectionDragEnd}>
+              {/* Sections */}
               <SortableContext items={localSections.map((s: any) => s.id)} strategy={verticalListSortingStrategy}>
                 <div className="space-y-4">
                   {localSections.map((section: any) => (
@@ -821,25 +920,36 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
                       section={section}
                       onAddLesson={() => setAddLessonSection(section.id)}
                       onDrip={() => setEditSectionDrip({ id: section.id, title: section.title, dripDays: section.dripDays ?? 0 })}
+                      onCopyModule={() => setCopyModuleTarget(section)}
                       onDelete={() => { if (confirm(`Delete section "${section.title}" and all its lessons?`)) deleteSection.mutate({ id: section.id }); }}
                     >
-                      {/* Inner DndContext for lesson reordering within this section */}
-                      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleLessonDragEnd(section.id)}>
-                        <SortableContext items={section.lessons.map((l: any) => l.id)} strategy={verticalListSortingStrategy}>
-                          <div className="divide-y divide-gray-100">
-                            {section.lessons.map((lesson: any) => (
-                              <SortableLessonRow key={lesson.id} lesson={lesson} onEdit={setEditLesson} onQuiz={setQuizLesson} onDelete={id => { if (confirm(`Delete lesson "${lesson.title}"?`)) deleteLesson.mutate({ id }); }} />
-                            ))}
-                            {section.lessons.length === 0 && (
-                              <div className="px-4 py-3 text-xs text-gray-400">No lessons yet. Add a lesson above.</div>
-                            )}
-                          </div>
-                        </SortableContext>
-                      </DndContext>
+                      <SortableContext items={section.lessons.map((l: any) => l.id)} strategy={verticalListSortingStrategy}>
+                        <div className="divide-y divide-gray-100">
+                          {section.lessons.map((lesson: any) => (
+                            <SortableLessonRow
+                              key={lesson.id} lesson={lesson}
+                              onEdit={setEditLesson} onQuiz={setQuizLesson}
+                              onCopy={() => setCopyLessonTarget(lesson)}
+                              onDelete={id => { if (confirm(`Delete lesson "${lesson.title}"?`)) deleteLesson.mutate({ id }); }}
+                            />
+                          ))}
+                          {section.lessons.length === 0 && (
+                            <div className="px-4 py-3 text-xs text-gray-400 italic">No lessons yet — drag a lesson here or click Add Lesson.</div>
+                          )}
+                        </div>
+                      </SortableContext>
                     </SortableSectionRow>
                   ))}
                 </div>
               </SortableContext>
+
+              <DragOverlay>
+                {activeDragId ? (
+                  <div className="bg-white border border-teal-300 rounded-lg px-4 py-2 shadow-xl text-sm text-teal-700 font-medium opacity-90 cursor-grabbing">
+                    Moving...
+                  </div>
+                ) : null}
+              </DragOverlay>
             </DndContext>
 
             <div className="flex gap-2 flex-wrap">
@@ -880,6 +990,28 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
       )}
       {quizLesson && (
         <QuizBuilderDialog lesson={quizLesson} onClose={() => setQuizLesson(null)} />
+      )}
+      {copyLessonTarget && (
+        <CopyLessonDialog
+          lesson={copyLessonTarget}
+          currentCourseId={courseId}
+          onClose={() => setCopyLessonTarget(null)}
+          onCopy={(targetCourseId, targetSectionId) => {
+            copyLesson.mutate({ lessonId: copyLessonTarget.id, targetCourseId, targetSectionId });
+            setCopyLessonTarget(null);
+          }}
+        />
+      )}
+      {copyModuleTarget && (
+        <CopyModuleDialog
+          section={copyModuleTarget}
+          currentCourseId={courseId}
+          onClose={() => setCopyModuleTarget(null)}
+          onCopy={(targetCourseId) => {
+            copyModule.mutate({ sectionId: copyModuleTarget.id, targetCourseId });
+            setCopyModuleTarget(null);
+          }}
+        />
       )}
     </div>
   );
@@ -1776,6 +1908,114 @@ function AddLessonDialog({ courseId, sectionId, onClose, onCreated }: {
 }
 
 // ─── Full-Screen Lesson Editor Page ─────────────────────────────────────────
+
+function CopyLessonDialog({
+  lesson, currentCourseId, onClose, onCopy,
+}: {
+  lesson: any;
+  currentCourseId: number;
+  onClose: () => void;
+  onCopy: (targetCourseId: number, targetSectionId: number | null) => void;
+}) {
+  const { data: coursesResp1 } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", page: 1, pageSize: 200 });
+  const courses1 = coursesResp1?.courses ?? [];
+  const [selectedCourseId, setSelectedCourseId] = useState<number>(currentCourseId);
+  const [selectedSectionId, setSelectedSectionId] = useState<number | null>(null);
+  const { data: targetCourse } = trpc.lmsAdmin.getCourse.useQuery({ id: selectedCourseId }, { enabled: !!selectedCourseId });
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Copy Lesson to Another Course</DialogTitle>
+          <DialogDescription>Choose the destination course and section for “{lesson.title}”.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-gray-700">Destination Course</label>
+            <Select value={String(selectedCourseId)} onValueChange={v => { setSelectedCourseId(Number(v)); setSelectedSectionId(null); }}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select course" />
+              </SelectTrigger>
+              <SelectContent>
+                {(courses1).map((c: any) => (
+                  <SelectItem key={c.id} value={String(c.id)}>{c.title}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-gray-700">Destination Section <span className="text-gray-400 font-normal">(optional)</span></label>
+            <Select value={selectedSectionId === null ? "__top__" : String(selectedSectionId)} onValueChange={v => setSelectedSectionId(v === "__top__" ? null : Number(v))}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Course level (no section)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__top__">Course level (no section)</SelectItem>
+                {(targetCourse?.sections ?? []).map((s: any) => (
+                  <SelectItem key={s.id} value={String(s.id)}>{s.title}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => onCopy(selectedCourseId, selectedSectionId)}>
+            <Copy className="w-4 h-4 mr-2" /> Copy Lesson
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CopyModuleDialog({
+  section, currentCourseId, onClose, onCopy,
+}: {
+  section: any;
+  currentCourseId: number;
+  onClose: () => void;
+  onCopy: (targetCourseId: number) => void;
+}) {
+  const { data: coursesResp2 } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", page: 1, pageSize: 200 });
+  const courses2 = coursesResp2?.courses ?? [];
+  const [selectedCourseId, setSelectedCourseId] = useState<number>(currentCourseId);
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Copy Module to Another Course</DialogTitle>
+          <DialogDescription>
+            Copy “{section.title}” and all its {section.lessons?.length ?? 0} lesson(s) to another course.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-gray-700">Destination Course</label>
+            <Select value={String(selectedCourseId)} onValueChange={v => setSelectedCourseId(Number(v))}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select course" />
+              </SelectTrigger>
+              <SelectContent>
+                {(courses2).map((c: any) => (
+                  <SelectItem key={c.id} value={String(c.id)}>{c.title}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => onCopy(selectedCourseId)}>
+            <Copy className="w-4 h-4 mr-2" /> Copy Module
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function LessonEditorPage({ lesson, onClose, onSaved, onSavedAndClose }: { lesson: any; onClose: () => void; onSaved: () => void; onSavedAndClose?: () => void }) {
   const [activeTab, setActiveTab] = useState<"settings" | "content" | "quiz">("settings");

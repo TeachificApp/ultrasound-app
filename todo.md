@@ -1781,3 +1781,11 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Rename "Content" label to "Lesson Description" in lesson settings form (both create and edit dialogs)
 - [x] Remove hardcoded "In This Lesson" objectives section from Lesson Editor canvas
 - [x] Fix new lessons appending at wrong position — server now auto-calculates max(position)+1
+
+## Cross-Module/Course Lesson Management (May 14)
+- [x] Drag lessons across modules (sections) within a course
+- [x] Copy lessons to other courses (with destination section picker)
+- [x] Copy entire modules to other courses
+- [x] New modules (sections) now append at end of course
+- [x] Fix DragOverlay import, DialogDescription import, getCourses→listCourses in copy dialogs
+- [x] Fix lmsRouter description column reference error
