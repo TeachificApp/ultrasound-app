@@ -17,9 +17,8 @@ import LMSLayout from "./components/LMSLayout";
 import { isLearnDomain, isIHeartEchoDomain, isMembersDomain } from "./hooks/useSubdomain";
 import { usePageViewTracker } from "./hooks/useAnalytics";
 
-// ── Core pages ────────────────────────────────────────────────────────────────
+// ── Core pages (eagerly loaded — tiny, always needed) ────────────────────────
 import Home from "./pages/Home";
-import Profile from "./pages/Profile";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import VerifyEmail from "./pages/VerifyEmail";
@@ -29,211 +28,221 @@ import MagicLinkRequest from "./pages/MagicLinkRequest";
 import MagicLinkCallback from "./pages/MagicLinkCallback";
 import Enrolled from "./pages/Enrolled";
 import Unsubscribe from "./pages/Unsubscribe";
-import UpgradeSuccess from "./pages/UpgradeSuccess";
-import Premium from "./pages/Premium";
+
+// ── All other pages — lazy loaded for code splitting ─────────────────────────
+const Profile = lazy(() => import("./pages/Profile"));
+const UpgradeSuccess = lazy(() => import("./pages/UpgradeSuccess"));
+const Premium = lazy(() => import("./pages/Premium"));
 
 // ── LMS — Education Library ─────────────────────────────────────────────────
-import EducationLibrary from "./pages/EducationLibrary";
-import LMSHome from "./pages/LMSHome";
-import CollectionDetail from "./pages/CollectionDetail";
-import CourseLanding from "./pages/CourseLanding";
-import CoursePlayer from "./pages/CoursePlayer";
-import CourseOverview from "./pages/CourseOverview";
-import LMSAdmin from "./pages/admin/LMSAdmin";
-import LandingPageBuilder from "./pages/admin/LandingPageBuilder";
+const EducationLibrary = lazy(() => import("./pages/EducationLibrary"));
+const LMSHome = lazy(() => import("./pages/LMSHome"));
+const CollectionDetail = lazy(() => import("./pages/CollectionDetail"));
+const CourseLanding = lazy(() => import("./pages/CourseLanding"));
+const CoursePlayer = lazy(() => import("./pages/CoursePlayer"));
+const CourseOverview = lazy(() => import("./pages/CourseOverview"));
+const LMSAdmin = lazy(() => import("./pages/admin/LMSAdmin"));
+const LandingPageBuilder = lazy(() => import("./pages/admin/LandingPageBuilder"));
 const FunnelBuilder = lazy(() => import("./pages/admin/FunnelBuilder"));
 const FunnelPageEditor = lazy(() => import("./pages/admin/FunnelPageEditor"));
 const ContactsAdmin = lazy(() => import("./pages/admin/ContactsAdmin"));
 const SharingMonitor = lazy(() => import("./pages/admin/SharingMonitor"));
 const PublicFunnelPage = lazy(() => import("./pages/PublicFunnelPage"));
 const StandaloneLandingPage = lazy(() => import("./pages/StandaloneLandingPage"));
+
 // ── Digital Downloads ──────────────────────────────────────────────────────────
-import DownloadsBrowse from "./pages/DownloadsBrowse";
-import DownloadLanding from "./pages/DownloadLanding";
-import DownloadFiles from "./pages/DownloadFiles";
-import DownloadLandingPageBuilder from "./pages/admin/DownloadLandingPageBuilder";
-import MyDownloads from "./pages/MyDownloads";
-import BundleLanding from "./pages/BundleLanding";
+const DownloadsBrowse = lazy(() => import("./pages/DownloadsBrowse"));
+const DownloadLanding = lazy(() => import("./pages/DownloadLanding"));
+const DownloadFiles = lazy(() => import("./pages/DownloadFiles"));
+const DownloadLandingPageBuilder = lazy(() => import("./pages/admin/DownloadLandingPageBuilder"));
+const MyDownloads = lazy(() => import("./pages/MyDownloads"));
+const BundleLanding = lazy(() => import("./pages/BundleLanding"));
 
 // ── UltrasoundAssist™ Hub ────────────────────────────────────────────────────
-import UltrasoundAssistHub from "./pages/UltrasoundAssistHub";
-import ObGynCalculators from "./pages/ObGynCalculators";
-import ClinicalInterpretationEngine from "./pages/ClinicalInterpretationEngine";
+const UltrasoundAssistHub = lazy(() => import("./pages/UltrasoundAssistHub"));
+const ObGynCalculators = lazy(() => import("./pages/ObGynCalculators"));
+const ClinicalInterpretationEngine = lazy(() => import("./pages/ClinicalInterpretationEngine"));
 
 // ── Abdominal Ultrasound ──────────────────────────────────────────────────────
-import AbdominalNavigator from "./pages/AbdominalNavigator";
-import AbdominalScanCoach from "./pages/AbdominalScanCoach";
+const AbdominalNavigator = lazy(() => import("./pages/AbdominalNavigator"));
+const AbdominalScanCoach = lazy(() => import("./pages/AbdominalScanCoach"));
 
 // ── Pelvic/Gyn Ultrasound ─────────────────────────────────────────────────────
-import PelvicGynNavigator from "./pages/PelvicGynNavigator";
-import PelvicGynScanCoach from "./pages/PelvicGynScanCoach";
+const PelvicGynNavigator = lazy(() => import("./pages/PelvicGynNavigator"));
+const PelvicGynScanCoach = lazy(() => import("./pages/PelvicGynScanCoach"));
 
 // ── Obstetric 1st Trimester ───────────────────────────────────────────────────
-import OB1Navigator from "./pages/OB1Navigator";
-import OB1ScanCoach from "./pages/OB1ScanCoach";
+const OB1Navigator = lazy(() => import("./pages/OB1Navigator"));
+const OB1ScanCoach = lazy(() => import("./pages/OB1ScanCoach"));
 
 // ── Obstetric 2nd/3rd Trimester ───────────────────────────────────────────────
-import OB23Navigator from "./pages/OB23Navigator";
-import OB23ScanCoach from "./pages/OB23ScanCoach";
+const OB23Navigator = lazy(() => import("./pages/OB23Navigator"));
+const OB23ScanCoach = lazy(() => import("./pages/OB23ScanCoach"));
 
 // ── Small Parts — Thyroid ─────────────────────────────────────────────────────
-import ThyroidNavigator from "./pages/ThyroidNavigator";
-import ThyroidScanCoach from "./pages/ThyroidScanCoach";
+const ThyroidNavigator = lazy(() => import("./pages/ThyroidNavigator"));
+const ThyroidScanCoach = lazy(() => import("./pages/ThyroidScanCoach"));
 
 // ── Small Parts — Scrotum ─────────────────────────────────────────────────────
-import ScrotumNavigator from "./pages/ScrotumNavigator";
-import ScrotumScanCoach from "./pages/ScrotumScanCoach";
+const ScrotumNavigator = lazy(() => import("./pages/ScrotumNavigator"));
+const ScrotumScanCoach = lazy(() => import("./pages/ScrotumScanCoach"));
 
 // ── Breast Ultrasound ─────────────────────────────────────────────────────────
-import BreastNavigator from "./pages/BreastNavigator";
-import BreastScanCoach from "./pages/BreastScanCoach";
+const BreastNavigator = lazy(() => import("./pages/BreastNavigator"));
+const BreastScanCoach = lazy(() => import("./pages/BreastScanCoach"));
 
 // ── Vascular — Venous ─────────────────────────────────────────────────────────
-import VenousNavigator from "./pages/VenousNavigator";
-import VenousScanCoach from "./pages/VenousScanCoach";
+const VenousNavigator = lazy(() => import("./pages/VenousNavigator"));
+const VenousScanCoach = lazy(() => import("./pages/VenousScanCoach"));
 
 // ── Vascular — Arterial ───────────────────────────────────────────────────────
-import ArterialNavigator from "./pages/ArterialNavigator";
-import ArterialScanCoach from "./pages/ArterialScanCoach";
+const ArterialNavigator = lazy(() => import("./pages/ArterialNavigator"));
+const ArterialScanCoach = lazy(() => import("./pages/ArterialScanCoach"));
 
 // ── Vascular — Abdominal/Renal/Mesenteric ────────────────────────────────────
-import AbdominalVascularNavigator from "./pages/AbdominalVascularNavigator";
-import AbdominalVascularScanCoach from "./pages/AbdominalVascularScanCoach";
+const AbdominalVascularNavigator = lazy(() => import("./pages/AbdominalVascularNavigator"));
+const AbdominalVascularScanCoach = lazy(() => import("./pages/AbdominalVascularScanCoach"));
 
 // ── Vascular — Abdominal Aorta/EndoLeak ──────────────────────────────────────
-import AortaNavigator from "./pages/AortaNavigator";
-import AortaScanCoach from "./pages/AortaScanCoach";
+const AortaNavigator = lazy(() => import("./pages/AortaNavigator"));
+const AortaScanCoach = lazy(() => import("./pages/AortaScanCoach"));
 
 // ── Vascular — Extracranial Carotid ──────────────────────────────────────────
-import CarotidNavigator from "./pages/CarotidNavigator";
-import CarotidScanCoach from "./pages/CarotidScanCoach";
+const CarotidNavigator = lazy(() => import("./pages/CarotidNavigator"));
+const CarotidScanCoach = lazy(() => import("./pages/CarotidScanCoach"));
 
 // ── Vascular — Intracranial Duplex/TCD ───────────────────────────────────────
-import TCDNavigator from "./pages/TCDNavigator";
-import TCDScanCoach from "./pages/TCDScanCoach";
+const TCDNavigator = lazy(() => import("./pages/TCDNavigator"));
+const TCDScanCoach = lazy(() => import("./pages/TCDScanCoach"));
 
 // ── MSK ───────────────────────────────────────────────────────────────────────
-import MSKNavigator from "./pages/MSKNavigator";
-import MSKScanCoach from "./pages/MSKScanCoach";
+const MSKNavigator = lazy(() => import("./pages/MSKNavigator"));
+const MSKScanCoach = lazy(() => import("./pages/MSKScanCoach"));
 
 // ── POCUS-Assist™ ─────────────────────────────────────────────────────────────
-import POCUSAssistHub from "./pages/POCUSAssistHub";
-import POCUSEfastNavigator from "./pages/POCUSEfastNavigator";
-import POCUSRushNavigator from "./pages/POCUSRushNavigator";
-import POCUSCardiacNavigator from "./pages/POCUSCardiacNavigator";
-import POCUSLungNavigator from "./pages/POCUSLungNavigator";
-import POCUSEfastScanCoach from "./pages/POCUSEfastScanCoach";
-import POCUSRushScanCoach from "./pages/POCUSRushScanCoach";
-import POCUSCardiacScanCoach from "./pages/POCUSCardiacScanCoach";
-import POCUSLungScanCoach from "./pages/POCUSLungScanCoach";
+const POCUSAssistHub = lazy(() => import("./pages/POCUSAssistHub"));
+const POCUSEfastNavigator = lazy(() => import("./pages/POCUSEfastNavigator"));
+const POCUSRushNavigator = lazy(() => import("./pages/POCUSRushNavigator"));
+const POCUSCardiacNavigator = lazy(() => import("./pages/POCUSCardiacNavigator"));
+const POCUSLungNavigator = lazy(() => import("./pages/POCUSLungNavigator"));
+const POCUSEfastScanCoach = lazy(() => import("./pages/POCUSEfastScanCoach"));
+const POCUSRushScanCoach = lazy(() => import("./pages/POCUSRushScanCoach"));
+const POCUSCardiacScanCoach = lazy(() => import("./pages/POCUSCardiacScanCoach"));
+const POCUSLungScanCoach = lazy(() => import("./pages/POCUSLungScanCoach"));
 
 // ── Fetal EchoAssist™ ─────────────────────────────────────────────────────────
-import FetalEchoAssist from "./pages/FetalEchoAssist";
-import FetalNavigator from "./pages/FetalNavigator";
-import FetalScanCoach from "./pages/FetalScanCoach";
-import AppendixNavigator from "./pages/AppendixNavigator";
-import AppendixScanCoach from "./pages/AppendixScanCoach";
-import InvasiveProceduresNavigator from "./pages/InvasiveProceduresNavigator";
-import InvasiveProceduresScanCoach from "./pages/InvasiveProceduresScanCoach";
+const FetalEchoAssist = lazy(() => import("./pages/FetalEchoAssist"));
+const FetalNavigator = lazy(() => import("./pages/FetalNavigator"));
+const FetalScanCoach = lazy(() => import("./pages/FetalScanCoach"));
+const AppendixNavigator = lazy(() => import("./pages/AppendixNavigator"));
+const AppendixScanCoach = lazy(() => import("./pages/AppendixScanCoach"));
+const InvasiveProceduresNavigator = lazy(() => import("./pages/InvasiveProceduresNavigator"));
+const InvasiveProceduresScanCoach = lazy(() => import("./pages/InvasiveProceduresScanCoach"));
+
 // ── PediatricAssist™ ──────────────────────────────────────────────────────────
-import PediatricNavigator from "./pages/PediatricNavigator";
-import PediatricScanCoach from "./pages/PediatricScanCoach";
-import PediatricCalculators from "./pages/PediatricCalculators";
+const PediatricNavigator = lazy(() => import("./pages/PediatricNavigator"));
+const PediatricScanCoach = lazy(() => import("./pages/PediatricScanCoach"));
+const PediatricCalculators = lazy(() => import("./pages/PediatricCalculators"));
 
 // ── LMS Engines ───────────────────────────────────────────────────────────────
-import QuickFire from "./pages/QuickFire";
-import FlashcardDeck from "./pages/FlashcardDeck";
-import CaseLibrary from "./pages/CaseLibrary";
-import RegistryReviewHub from "./pages/RegistryReviewHub";
-import CaseDetail from "./pages/CaseDetail";
-import SubmitCase from "./pages/SubmitCase";
-import SoundBytes from "./pages/SoundBytes";
+const QuickFire = lazy(() => import("./pages/QuickFire"));
+const FlashcardDeck = lazy(() => import("./pages/FlashcardDeck"));
+const CaseLibrary = lazy(() => import("./pages/CaseLibrary"));
+const RegistryReviewHub = lazy(() => import("./pages/RegistryReviewHub"));
+const CaseDetail = lazy(() => import("./pages/CaseDetail"));
+const SubmitCase = lazy(() => import("./pages/SubmitCase"));
+const SoundBytes = lazy(() => import("./pages/SoundBytes"));
 
 // ── Admin & Platform ──────────────────────────────────────────────────────────
-import AdminCaseManagement from "./pages/AdminCaseManagement";
-import QuickFireAdmin from "./pages/QuickFireAdmin";
-import ChallengeCardGenerator from "./pages/ChallengeCardGenerator";
-import SocialContentGenerator from "./pages/SocialContentGenerator";
-import ScanCoachEditor from "./pages/ScanCoachEditor";
-import NavigatorEditor from "./pages/NavigatorEditor";
-import MediaRepository from "./pages/admin/MediaRepository";
-import ScanCoachHub from "./pages/ScanCoachHub";
-import ThinkificWebhookAdmin from "./pages/ThinkificWebhookAdmin";
-import FormBuilderAdmin from "./pages/FormBuilderAdmin";
-import EmailAdmin from "./pages/EmailAdmin";
-import PlatformAdmin from "./pages/PlatformAdmin";
-import EducatorAssist from "./pages/EducatorAssist";
-import SonoQuizCreator from "./pages/SonoQuizCreator";
-import SonoQuizHost from "./pages/SonoQuizHost";
-import SonoQuizPlay from "./pages/SonoQuizPlay";
-import ImageQualityReview from "./pages/ImageQualityReview";
+const AdminCaseManagement = lazy(() => import("./pages/AdminCaseManagement"));
+const QuickFireAdmin = lazy(() => import("./pages/QuickFireAdmin"));
+const ChallengeCardGenerator = lazy(() => import("./pages/ChallengeCardGenerator"));
+const SocialContentGenerator = lazy(() => import("./pages/SocialContentGenerator"));
+const ScanCoachEditor = lazy(() => import("./pages/ScanCoachEditor"));
+const NavigatorEditor = lazy(() => import("./pages/NavigatorEditor"));
+const MediaRepository = lazy(() => import("./pages/admin/MediaRepository"));
+const ScanCoachHub = lazy(() => import("./pages/ScanCoachHub"));
+const ThinkificWebhookAdmin = lazy(() => import("./pages/ThinkificWebhookAdmin"));
+const FormBuilderAdmin = lazy(() => import("./pages/FormBuilderAdmin"));
+const EmailAdmin = lazy(() => import("./pages/EmailAdmin"));
+const PlatformAdmin = lazy(() => import("./pages/PlatformAdmin"));
+const EducatorAssist = lazy(() => import("./pages/EducatorAssist"));
+const SonoQuizCreator = lazy(() => import("./pages/SonoQuizCreator"));
+const SonoQuizHost = lazy(() => import("./pages/SonoQuizHost"));
+const SonoQuizPlay = lazy(() => import("./pages/SonoQuizPlay"));
+const ImageQualityReview = lazy(() => import("./pages/ImageQualityReview"));
 
 // ── DIY Accreditation™ (hidden, backend use) ──────────────────────────────────
-import DIYMemberPortal from "./pages/DIYMemberPortal";
-import DIYAccreditationPlans from "./pages/DIYAccreditationPlans";
-import DIYRegister from "./pages/DIYRegister";
-import AccreditationNavigator from "./pages/AccreditationNavigator";
-import AccreditationTool from "./pages/AccreditationTool";
-import AccreditationManager from "./pages/AccreditationManager";
+const DIYMemberPortal = lazy(() => import("./pages/DIYMemberPortal"));
+const DIYAccreditationPlans = lazy(() => import("./pages/DIYAccreditationPlans"));
+const DIYRegister = lazy(() => import("./pages/DIYRegister"));
+const AccreditationNavigator = lazy(() => import("./pages/AccreditationNavigator"));
+const AccreditationTool = lazy(() => import("./pages/AccreditationTool"));
+const AccreditationManager = lazy(() => import("./pages/AccreditationManager"));
 
 // ── Learn Fetal Echo ────────────────────────────────────────────
-import LearnFetalEcho from "./pages/LearnFetalEcho";
+const LearnFetalEcho = lazy(() => import("./pages/LearnFetalEcho"));
 
 // ── iHeartEcho™ EchoAssist Pages ────────────────────────────────────────────
-import IHeartEchoHome from "./pages/iheartecho/IHeartEchoHome";
-import EchoAssist from "./pages/iheartecho/EchoAssist";
-import EchoAssistHub from "./pages/iheartecho/EchoAssistHub";
-import TTENavigator from "./pages/iheartecho/TTENavigator";
-import TEENavigator from "./pages/iheartecho/TEENavigator";
-import ICENavigator from "./pages/iheartecho/ICENavigator";
-import DeviceNavigator from "./pages/iheartecho/DeviceNavigator";
-import ACHDNavigator from "./pages/iheartecho/ACHDNavigator";
-import ACHDEchoAssist from "./pages/iheartecho/ACHDEchoAssist";
-import StressNavigator from "./pages/iheartecho/StressNavigator";
-import StrainNavigator from "./pages/iheartecho/StrainNavigator";
-import StrainScanCoach from "./pages/iheartecho/StrainScanCoach";
-import TEEScanCoach from "./pages/iheartecho/TEEScanCoach";
-import ICEScanCoach from "./pages/iheartecho/ICEScanCoach";
-import UEANavigator from "./pages/iheartecho/UEANavigator";
-import UEAScanCoach from "./pages/iheartecho/UEAScanCoach";
-import HOCMNavigator from "./pages/iheartecho/HOCMNavigator";
-import HOCMScanCoach from "./pages/iheartecho/HOCMScanCoach";
-import StressScanCoach from "./pages/iheartecho/StressScanCoach";
-import StressEchoAssistPage from "./pages/iheartecho/StressEchoAssist";
-import StructuralHeartScanCoach from "./pages/iheartecho/StructuralHeartScanCoach";
-import PulmHTNNavigator from "./pages/iheartecho/PulmHTNNavigator";
-import DiastolicNavigator from "./pages/iheartecho/DiastolicNavigator";
-import MechanicalSupportNavigator from "./pages/iheartecho/MechanicalSupportNavigator";
-import MechanicalSupportScanCoach from "./pages/iheartecho/MechanicalSupportScanCoach";
-import ECGNavigator from "./pages/iheartecho/ECGNavigator";
-import ECGCoach from "./pages/iheartecho/ECGCoach";
-import ECGAssist from "./pages/iheartecho/ECGAssist";
-import HemodynamicsLab from "./pages/iheartecho/HemodynamicsLab";
-import ReportBuilder from "./pages/iheartecho/ReportBuilder";
-import GuidelinesAssist from "./pages/iheartecho/GuidelinesAssist";
-import PediatricEchoAssist from "./pages/iheartecho/PediatricEchoAssist";
-import ScanCoachIHE from "./pages/iheartecho/ScanCoach";
-import EngagementDashboard from "./pages/iheartecho/EngagementDashboard";
-import SoundBytesAdmin from "./pages/iheartecho/SoundBytesAdmin";
-import Leaderboard from "./pages/Leaderboard";
-import LabAdmin from "./pages/iheartecho/LabAdmin";
-import EducatorAdmin from "./pages/iheartecho/EducatorAdmin";
-import StudentDashboard from "./pages/iheartecho/StudentDashboard";
-import SoundBytesPage from "./pages/SoundBytes";
+const IHeartEchoHome = lazy(() => import("./pages/iheartecho/IHeartEchoHome"));
+const EchoAssist = lazy(() => import("./pages/iheartecho/EchoAssist"));
+const EchoAssistHub = lazy(() => import("./pages/iheartecho/EchoAssistHub"));
+const TTENavigator = lazy(() => import("./pages/iheartecho/TTENavigator"));
+const TEENavigator = lazy(() => import("./pages/iheartecho/TEENavigator"));
+const ICENavigator = lazy(() => import("./pages/iheartecho/ICENavigator"));
+const DeviceNavigator = lazy(() => import("./pages/iheartecho/DeviceNavigator"));
+const ACHDNavigator = lazy(() => import("./pages/iheartecho/ACHDNavigator"));
+const ACHDEchoAssist = lazy(() => import("./pages/iheartecho/ACHDEchoAssist"));
+const StressNavigator = lazy(() => import("./pages/iheartecho/StressNavigator"));
+const StrainNavigator = lazy(() => import("./pages/iheartecho/StrainNavigator"));
+const StrainScanCoach = lazy(() => import("./pages/iheartecho/StrainScanCoach"));
+const TEEScanCoach = lazy(() => import("./pages/iheartecho/TEEScanCoach"));
+const ICEScanCoach = lazy(() => import("./pages/iheartecho/ICEScanCoach"));
+const UEANavigator = lazy(() => import("./pages/iheartecho/UEANavigator"));
+const UEAScanCoach = lazy(() => import("./pages/iheartecho/UEAScanCoach"));
+const HOCMNavigator = lazy(() => import("./pages/iheartecho/HOCMNavigator"));
+const HOCMScanCoach = lazy(() => import("./pages/iheartecho/HOCMScanCoach"));
+const StressScanCoach = lazy(() => import("./pages/iheartecho/StressScanCoach"));
+const StressEchoAssistPage = lazy(() => import("./pages/iheartecho/StressEchoAssist"));
+const StructuralHeartScanCoach = lazy(() => import("./pages/iheartecho/StructuralHeartScanCoach"));
+const PulmHTNNavigator = lazy(() => import("./pages/iheartecho/PulmHTNNavigator"));
+const DiastolicNavigator = lazy(() => import("./pages/iheartecho/DiastolicNavigator"));
+const MechanicalSupportNavigator = lazy(() => import("./pages/iheartecho/MechanicalSupportNavigator"));
+const MechanicalSupportScanCoach = lazy(() => import("./pages/iheartecho/MechanicalSupportScanCoach"));
+const ECGNavigator = lazy(() => import("./pages/iheartecho/ECGNavigator"));
+const ECGCoach = lazy(() => import("./pages/iheartecho/ECGCoach"));
+const ECGAssist = lazy(() => import("./pages/iheartecho/ECGAssist"));
+const HemodynamicsLab = lazy(() => import("./pages/iheartecho/HemodynamicsLab"));
+const ReportBuilder = lazy(() => import("./pages/iheartecho/ReportBuilder"));
+const GuidelinesAssist = lazy(() => import("./pages/iheartecho/GuidelinesAssist"));
+const PediatricEchoAssist = lazy(() => import("./pages/iheartecho/PediatricEchoAssist"));
+const ScanCoachIHE = lazy(() => import("./pages/iheartecho/ScanCoach"));
+const EngagementDashboard = lazy(() => import("./pages/iheartecho/EngagementDashboard"));
+const SoundBytesAdmin = lazy(() => import("./pages/iheartecho/SoundBytesAdmin"));
+const Leaderboard = lazy(() => import("./pages/Leaderboard"));
+const LabAdmin = lazy(() => import("./pages/iheartecho/LabAdmin"));
+const EducatorAdmin = lazy(() => import("./pages/iheartecho/EducatorAdmin"));
+const StudentDashboard = lazy(() => import("./pages/iheartecho/StudentDashboard"));
+const SoundBytesPage = lazy(() => import("./pages/SoundBytes"));
 
 // ── CME Hub ─────────────────────────────────────────────────────────────────────────
-import CMEHub from "./pages/CMEHub";
+const CMEHub = lazy(() => import("./pages/CMEHub"));
 
 // ── Physician Over-Read (public, token-based) ─────────────────────────────────
-import PhysicianOverReadForm from "./pages/PhysicianOverReadForm";
+const PhysicianOverReadForm = lazy(() => import("./pages/PhysicianOverReadForm"));
 
 // ── Analytics Reporting ──────────────────────────────────────────────────────
-import UserAnalytics from "./pages/admin/UserAnalytics";
+const UserAnalytics = lazy(() => import("./pages/admin/UserAnalytics"));
 
 function Router() {
   usePageViewTracker();
+  const pageFallback = (
+    <div className="flex items-center justify-center h-screen">
+      <div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" />
+    </div>
+  );
   return (
-    <>
+    <Suspense fallback={pageFallback}>
       <Switch>
         {/* ── Public ────────────────────────────────────────────────────── */}
         <Route path="/" component={Home} />
@@ -420,7 +429,7 @@ function Router() {
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>
-    </>
+    </Suspense>
   );
 }
 
@@ -430,8 +439,14 @@ function Router() {
  */
 function LMSRouter() {
   usePageViewTracker();
+  const pageFallback = (
+    <div className="flex items-center justify-center h-screen">
+      <div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" />
+    </div>
+  );
   return (
     <LMSLayout>
+      <Suspense fallback={pageFallback}>
       <Switch>
         {/* LMS Home */}
         <Route path="/" component={LMSHome} />
@@ -464,6 +479,7 @@ function LMSRouter() {
         {/* Fallback */}
         <Route component={NotFound} />
       </Switch>
+      </Suspense>
     </LMSLayout>
   );
 }
@@ -474,8 +490,13 @@ function LMSRouter() {
  */
 function IHeartEchoRouter() {
   usePageViewTracker();
+  const pageFallback = (
+    <div className="flex items-center justify-center h-screen">
+      <div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" />
+    </div>
+  );
   return (
-    <>
+    <Suspense fallback={pageFallback}>
       <Switch>
         {/* ── Public ────────────────────────────────────────────────────── */}
         <Route path="/" component={IHeartEchoHome} />
@@ -595,7 +616,7 @@ function IHeartEchoRouter() {
         <Route path="/media/:slug/:action" component={MediaRedirect} />
         <Route path="/media/:slug" component={MediaRedirect} />
       </Switch>
-    </>
+    </Suspense>
   );
 }
 
