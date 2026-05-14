@@ -5,6 +5,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
+import MediaRedirect from "@/pages/MediaRedirect";
 import { Route, Switch, useLocation } from "wouter";
 import { useEffect, lazy, Suspense } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -410,6 +411,8 @@ function Router() {
         {/* ── Physician Over-Read (public, token-based) ─────────────────── */}
         <Route path="/physician-review/:token" component={PhysicianOverReadForm} />
 
+        <Route path="/media/:slug/:action" component={MediaRedirect} />
+        <Route path="/media/:slug" component={MediaRedirect} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>
@@ -451,6 +454,8 @@ function LMSRouter() {
         <Route path="/register" component={Register} />
         <Route path="/profile" component={Profile} />
 
+        <Route path="/media/:slug/:action" component={MediaRedirect} />
+        <Route path="/media/:slug" component={MediaRedirect} />
         {/* Fallback */}
         <Route component={NotFound} />
       </Switch>
@@ -582,6 +587,8 @@ function IHeartEchoRouter() {
 
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
+        <Route path="/media/:slug/:action" component={MediaRedirect} />
+        <Route path="/media/:slug" component={MediaRedirect} />
       </Switch>
     </>
   );

@@ -175,7 +175,7 @@ function proxyInline(
     });
 }
 
-router.get("/media/:slug", async (req: Request, res: Response) => {
+router.get("/api/media/:slug", async (req: Request, res: Response) => {
   setCorsHeaders(res);
   const token = (req.query.token as string) || undefined;
   const result = await resolveMedia(req.params.slug, token);
@@ -230,7 +230,7 @@ router.get("/media/:slug", async (req: Request, res: Response) => {
 
 // ─── GET /media/:slug/download — force file download (Content-Disposition: attachment) ───
 
-router.get("/media/:slug/download", async (req: Request, res: Response) => {
+router.get("/api/media/:slug/download", async (req: Request, res: Response) => {
   setCorsHeaders(res);
   const token = (req.query.token as string) || undefined;
   const result = await resolveMedia(req.params.slug, token);
@@ -276,7 +276,7 @@ router.get("/media/:slug/download", async (req: Request, res: Response) => {
 
 // ─── GET /media/:slug/info — JSON metadata ────────────────────────────────────────────
 
-router.get("/media/:slug/info", async (req: Request, res: Response) => {
+router.get("/api/media/:slug/info", async (req: Request, res: Response) => {
   setCorsHeaders(res);
   const token = (req.query.token as string) || undefined;
   const result = await resolveMedia(req.params.slug, token);
@@ -299,7 +299,7 @@ router.get("/media/:slug/info", async (req: Request, res: Response) => {
 
 // ─── GET /media/:slug/embed — responsive HTML embed viewer ───────────────────
 
-router.get("/media/:slug/embed", async (req: Request, res: Response) => {
+router.get("/api/media/:slug/embed", async (req: Request, res: Response) => {
   setCorsHeaders(res);
   const token = (req.query.token as string) || undefined;
   const result = await resolveMedia(req.params.slug, token);
