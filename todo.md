@@ -1840,7 +1840,7 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 
 ## Performance / UX Fixes (May 14)
 - [ ] Fix lesson content area missing scrollbar (h-full on inner wrapper prevents scroll)
-- [ ] Fix slow course player load time
+- [x] Fix slow course player load time
 
 ## Instructor Profile in Player Sidebar (May 14)
 - [ ] Add "Instructor" tab to right-side panel in CoursePlayer
@@ -1866,3 +1866,18 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add hideProgress toggle to Course Settings UI (LMS Admin)
 - [x] Suppress progress bar/percentage in CoursePlayer when hideProgress is true
 - [x] Suppress progress bar/percentage in CourseOverview when hideProgress is true
+
+## UX Improvements (May 14 - round 2)
+- [x] Remove Edit Overview button from CourseOverview page
+- [x] Add Edit Overview button + Preview Overview link to LMS Admin course editor (Overview tab)
+- [x] Move Lesson Notes into CoursePlayer right panel (notes tab opens inline, not modal)
+- [x] Mobile: hamburger menu for CoursePlayer left sidebar on small screens
+- [x] Mobile: responsive layout polish for CoursePlayer and CourseOverview
+
+## Performance: Course Editor & Player Load Times (May 14)
+- [x] Add DB indexes on all LMS foreign key columns (course_id, section_id, user_id, enrollment_id, etc.)
+- [x] Fix N+1 queries in getCourse (admin): batch-fetch all lessons in one query instead of per-section
+- [x] Fix N+1 queries in listCourses/listFeatured: batch-fetch instructors instead of per-course
+- [x] Fix getCoursePlayer payload: strip heavy content columns (contentBlocks, content, videoContent) from lesson list
+- [x] Lazy-mount Landing Page and Course Overview editors in LMS Admin (only render on first tab visit)
+- [x] Improve CoursePlayer loading skeleton to match the actual 3-column layout

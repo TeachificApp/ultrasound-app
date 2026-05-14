@@ -283,16 +283,6 @@ export default function CourseOverview() {
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {isAdmin && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-teal-300 text-teal-700 hover:bg-teal-50 text-xs gap-1.5"
-                onClick={() => setShowEditor(true)}
-              >
-                <Edit3 className="w-3.5 h-3.5" /> Edit Overview
-              </Button>
-            )}
             {continueLesson && (
               <Button
                 size="sm"

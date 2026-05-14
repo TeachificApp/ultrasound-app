@@ -35,7 +35,7 @@ import {
   BookOpen, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Clock, Copy, Download, Edit2, HelpCircle, Pencil, Plus, Trash2,
   Users, DollarSign, BarChart2, GripVertical, CheckCircle, AlertCircle,
   Link as LinkIcon, UserCheck, ArrowLeft, Upload, ImageIcon,
-  Sparkles, Loader2, Eye, FolderOpen, Monitor, Video, FileText, CheckSquare, Settings2,
+  Sparkles, Loader2, Eye, EyeOff, Save, X, FolderOpen, Monitor, Video, FileText, CheckSquare, Settings2,
   User, Lock,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
@@ -43,7 +43,9 @@ import LessonEffectEditor from "@/components/LessonEffectEditor";
 import DigitalDownloadsAdmin from "./DigitalDownloadsAdmin";
 import OrderBumpsAdmin from "./OrderBumpsAdmin";
 import LessonBlockEditor from "@/components/LessonBlockEditor";
-import { Block } from "@/pages/admin/LandingPageBuilder";
+import {
+  Block, BlockType, BLOCK_CATALOG, CATALOG_CATEGORIES, BlockPreview, BlockSettings, SortableBlock, uid,
+} from "@/pages/admin/LandingPageBuilder";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -694,6 +696,12 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
   const utils = trpc.useUtils();
   const { data: course, isLoading, refetch } = trpc.lmsAdmin.getCourse.useQuery({ id: courseId });
   const [activeTab, setActiveTab] = useState("settings");
+  // Track which tabs have been visited to lazy-mount heavy editors
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set(["settings"]));
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    setVisitedTabs(prev => { const next = new Set(prev); next.add(tab); return next; });
+  };
   const [addSectionOpen, setAddSectionOpen] = useState(false);
   const [addLessonSection, setAddLessonSection] = useState<number | null>(null);
   const [addLessonAtCourseLevel, setAddLessonAtCourseLevel] = useState(false);
@@ -910,13 +918,14 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
         </a>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="bg-gray-100">
           <TabsTrigger value="settings" className="text-xs">Settings</TabsTrigger>
           <TabsTrigger value="curriculum" className="text-xs">
             {course.type === "quiz" ? "Questions" : course.type === "download" ? "Files" : "Curriculum"}
           </TabsTrigger>
           <TabsTrigger value="landing" className="text-xs">Landing Page</TabsTrigger>
+          <TabsTrigger value="overview" className="text-xs">Course Overview</TabsTrigger>
           <TabsTrigger value="instructors" className="text-xs">Instructors</TabsTrigger>
         </TabsList>
 
@@ -1020,9 +1029,27 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
           </div>
         </TabsContent>
 
-        {/* Landing Page Tab */}
+        {/* Landing Page Tab — lazy-mounted on first visit to avoid parsing the large builder on load */}
         <TabsContent value="landing" className="mt-4">
-          <LandingPageEditor courseId={courseId} landingPage={course.landingPage} courseType={course.type} onSave={data => updateLandingPage.mutate({ courseId, ...data })} saving={updateLandingPage.isPending} />
+          {visitedTabs.has("landing") ? (
+            <LandingPageEditor courseId={courseId} landingPage={course.landingPage} courseType={course.type} onSave={data => updateLandingPage.mutate({ courseId, ...data })} saving={updateLandingPage.isPending} />
+          ) : (
+            <div className="flex items-center justify-center h-32 text-gray-400 text-sm">Loading Landing Page editor…</div>
+          )}
+        </TabsContent>
+
+        {/* Course Overview Tab — lazy-mounted on first visit */}
+        <TabsContent value="overview" className="mt-4">
+          {visitedTabs.has("overview") ? (
+            <CourseOverviewEditor
+              courseId={courseId}
+              courseSlug={course.slug}
+              initialBlocks={course.courseOverviewBlocks ? (typeof course.courseOverviewBlocks === "string" ? JSON.parse(course.courseOverviewBlocks) : course.courseOverviewBlocks) : []}
+              onSaved={() => refetch()}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-32 text-gray-400 text-sm">Loading Overview editor…</div>
+          )}
         </TabsContent>
 
         {/* Instructors Tab */}
@@ -1532,6 +1559,225 @@ function LandingPageEditor({ courseId, landingPage, courseType, onSave, saving }
       <Button className="bg-teal-600 hover:bg-teal-700 text-white" disabled={saving} onClick={() => onSave({ heroTitle, heroSubtitle, heroImageUrl, ctaText, whatYouLearn, bodyContent, requirements })}>
         {saving ? "Saving..." : "Save Landing Page"}
       </Button>
+    </div>
+  );
+}
+
+// ─── Course Overview Editor ─────────────────────────────────────────────────
+
+function CourseOverviewEditor({
+  courseId,
+  courseSlug,
+  initialBlocks,
+  onSaved,
+}: {
+  courseId: number;
+  courseSlug: string;
+  initialBlocks: Block[];
+  onSaved: () => void;
+}) {
+  const [blocks, setBlocks] = useState<Block[]>(initialBlocks);
+  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [activeCategory, setActiveCategory] = useState(CATALOG_CATEGORIES[0]);
+  const [previewMode, setPreviewMode] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const updateCourse = trpc.lmsAdmin.updateCourse.useMutation();
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await updateCourse.mutateAsync({ id: courseId, courseOverviewBlocks: JSON.stringify(blocks) });
+      toast.success("Course Overview saved!");
+      onSaved();
+    } catch (e: any) {
+      toast.error(`Save failed: ${e.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addBlock = (type: BlockType) => {
+    const catalog = BLOCK_CATALOG.find(c => c.type === type);
+    if (!catalog) return;
+    const newBlock: Block = { id: uid(), type, data: { ...catalog.defaultData } };
+    setBlocks(bs => [...bs, newBlock]);
+    setSelectedBlockId(newBlock.id);
+    setAddMenuOpen(false);
+  };
+
+  const updateBlock = (id: string, data: Record<string, any>) => {
+    setBlocks(bs => bs.map(b => b.id === id ? { ...b, data: { ...b.data, ...data } } : b));
+  };
+
+  const deleteBlock = (id: string) => {
+    setBlocks(bs => bs.filter(b => b.id !== id));
+    if (selectedBlockId === id) setSelectedBlockId(null);
+  };
+
+  const duplicateBlock = (id: string) => {
+    const idx = blocks.findIndex(b => b.id === id);
+    if (idx < 0) return;
+    const copy: Block = { ...blocks[idx], id: uid() };
+    setBlocks(bs => [...bs.slice(0, idx + 1), copy, ...bs.slice(idx + 1)]);
+    setSelectedBlockId(copy.id);
+  };
+
+  const moveBlock = (id: string, dir: -1 | 1) => {
+    setBlocks(bs => {
+      const idx = bs.findIndex(b => b.id === id);
+      const newIdx = idx + dir;
+      if (newIdx < 0 || newIdx >= bs.length) return bs;
+      return arrayMove(bs, idx, newIdx);
+    });
+  };
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setBlocks(bs => {
+        const oldIdx = bs.findIndex(b => b.id === active.id);
+        const newIdx = bs.findIndex(b => b.id === over.id);
+        return arrayMove(bs, oldIdx, newIdx);
+      });
+    }
+  }, []);
+
+  const selectedBlock = blocks.find(b => b.id === selectedBlockId) ?? null;
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between px-5 py-3 bg-gray-50 border-b border-gray-200">
+        <div className="flex items-center gap-3">
+          <span className="text-teal-700 font-bold text-sm">Course Overview Page Builder</span>
+          <span className="text-gray-400 text-xs">Shown to enrolled students at /learn/{courseSlug}/overview</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <a
+            href={`/learn/${courseSlug}/overview`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-teal-300 text-teal-700 hover:bg-teal-50 text-xs font-medium transition-colors"
+          >
+            <Eye className="w-3.5 h-3.5" /> Preview Overview
+          </a>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setPreviewMode(p => !p)}
+            className={cn("text-xs h-7", previewMode ? "border-teal-500 text-teal-700 bg-teal-50" : "text-gray-500 hover:text-teal-700")}
+          >
+            {previewMode ? <EyeOff className="w-3 h-3 mr-1" /> : <Eye className="w-3 h-3 mr-1" />}
+            {previewMode ? "Edit" : "Preview"}
+          </Button>
+          {!previewMode && (
+            <Button size="sm" className="bg-teal-500 hover:bg-teal-600 text-white text-xs h-7" onClick={() => setAddMenuOpen(true)}>
+              <Plus className="w-3 h-3 mr-1" /> Add Block
+            </Button>
+          )}
+          <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white text-xs h-7 font-semibold" onClick={handleSave} disabled={saving}>
+            <Save className="w-3 h-3 mr-1" />{saving ? "Saving..." : "Save"}
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex overflow-hidden" style={{ minHeight: 480 }}>
+        {/* Canvas */}
+        <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
+          {previewMode ? (
+            <div className="space-y-4">
+              {blocks.map(block => (
+                <div key={block.id} className="bg-white rounded-xl overflow-hidden shadow-sm">
+                  <BlockPreview block={block} />
+                </div>
+              ))}
+              {blocks.length === 0 && <div className="text-center text-gray-400 py-12">No content blocks yet.</div>}
+            </div>
+          ) : (
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
+                {blocks.map((block, idx) => (
+                  <SortableBlock
+                    key={block.id}
+                    block={block}
+                    isSelected={block.id === selectedBlockId}
+                    onSelect={() => setSelectedBlockId(block.id === selectedBlockId ? null : block.id)}
+                    onDelete={() => deleteBlock(block.id)}
+                    onDuplicate={() => duplicateBlock(block.id)}
+                    onMoveUp={idx > 0 ? () => moveBlock(block.id, -1) : undefined}
+                    onMoveDown={idx < blocks.length - 1 ? () => moveBlock(block.id, 1) : undefined}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+          )}
+          {!previewMode && (
+            <div className="mt-4">
+              <button
+                onClick={() => setAddMenuOpen(true)}
+                className="w-full border-2 border-dashed border-teal-300 hover:border-teal-500 rounded-xl py-3 text-teal-600 hover:text-teal-700 text-sm flex items-center justify-center gap-2 transition-colors bg-white"
+              >
+                <Plus className="w-4 h-4" /> Add Block
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Right: Block settings */}
+        {!previewMode && selectedBlock && (
+          <div className="w-72 shrink-0 bg-white border-l border-gray-200 overflow-y-auto">
+            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+              <span className="text-gray-700 text-xs font-bold uppercase tracking-wide">Block Settings</span>
+              <button onClick={() => setSelectedBlockId(null)} className="text-gray-400 hover:text-gray-700"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="p-3">
+              <BlockSettings block={selectedBlock} onChange={data => updateBlock(selectedBlock.id, data)} />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Block Picker Modal */}
+      <Dialog open={addMenuOpen} onOpenChange={open => { setAddMenuOpen(open); }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="text-teal-700 flex items-center gap-2"><Plus className="w-5 h-5" /> Add Content Block</DialogTitle>
+          </DialogHeader>
+          <div className="flex gap-1 border-b border-gray-200 shrink-0 overflow-x-auto pb-px">
+            {CATALOG_CATEGORIES.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                className={cn(
+                  "px-3 py-2 text-xs font-semibold whitespace-nowrap transition-colors",
+                  activeCategory === cat ? "text-teal-700 border-b-2 border-teal-500" : "text-gray-500 hover:text-gray-700"
+                )}
+              >{cat}</button>
+            ))}
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            <div className="grid grid-cols-2 gap-2 p-3">
+              {BLOCK_CATALOG.filter(b => b.category === activeCategory).map(item => (
+                <button
+                  key={item.type}
+                  onClick={() => addBlock(item.type)}
+                  className="flex items-start gap-2 p-3 rounded-lg border border-gray-200 hover:border-teal-400 hover:bg-teal-50 text-left transition-colors group"
+                >
+                  <span className="text-lg shrink-0">{item.icon}</span>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-800 group-hover:text-teal-700">{item.label}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">{item.description}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

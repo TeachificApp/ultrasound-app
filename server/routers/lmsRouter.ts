@@ -196,17 +196,27 @@ export const lmsPublicRouter = router({
       const courses = await db.select().from(lmsCourses).where(and(...conditions)).orderBy(desc(lmsCourses.createdAt)).limit(input.pageSize).offset(offset);
       const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(lmsCourses).where(and(...conditions));
 
-      // Attach primary instructor for each course
-      const enriched = await Promise.all(courses.map(async (c) => {
-        const [ci] = await db.select({ instructorId: lmsCourseInstructors.instructorId }).from(lmsCourseInstructors)
-          .where(and(eq(lmsCourseInstructors.courseId, c.id), eq(lmsCourseInstructors.isPrimary, true))).limit(1);
-        let instructor = null;
-        if (ci) {
-          const [ins] = await db.select().from(lmsInstructors).where(eq(lmsInstructors.id, ci.instructorId)).limit(1);
-          instructor = ins ?? null;
+      // Batch-fetch primary instructors for all courses in 2 queries (avoids N+1)
+      const courseIds = courses.map(c => c.id);
+      let enriched: any[] = courses.map(c => ({ ...c, instructor: null }));
+      if (courseIds.length > 0) {
+        const ciRows = await db.select().from(lmsCourseInstructors)
+          .where(and(
+            sql`${lmsCourseInstructors.courseId} IN (${sql.join(courseIds.map(id => sql`${id}`), sql`, `)})`,
+            eq(lmsCourseInstructors.isPrimary, true)
+          ));
+        const instructorIds = Array.from(new Set(ciRows.map(ci => ci.instructorId)));
+        if (instructorIds.length > 0) {
+          const insRows = await db.select().from(lmsInstructors)
+            .where(sql`${lmsInstructors.id} IN (${sql.join(instructorIds.map(id => sql`${id}`), sql`, `)})`);
+          const insMap = new Map(insRows.map(i => [i.id, i]));
+          const ciMap = new Map(ciRows.map(ci => [ci.courseId, ci]));
+          enriched = courses.map(c => {
+            const ci = ciMap.get(c.id);
+            return { ...c, instructor: ci ? (insMap.get(ci.instructorId) ?? null) : null };
+          });
         }
-        return { ...c, instructor };
-      }));
+      }
 
       return { courses: enriched, total: Number(count), page: input.page, pageSize: input.pageSize };
     }),
@@ -219,17 +229,28 @@ export const lmsPublicRouter = router({
       .where(and(eq(lmsCourses.status, "public"), eq(lmsCourses.isFeatured, true)))
       .orderBy(desc(lmsCourses.updatedAt))
       .limit(8);
-    // Attach primary instructor
-    const enriched = await Promise.all(courses.map(async (c) => {
-      const [ci] = await db.select({ instructorId: lmsCourseInstructors.instructorId }).from(lmsCourseInstructors)
-        .where(and(eq(lmsCourseInstructors.courseId, c.id), eq(lmsCourseInstructors.isPrimary, true))).limit(1);
-      let instructor = null;
-      if (ci) {
-        const [ins] = await db.select().from(lmsInstructors).where(eq(lmsInstructors.id, ci.instructorId)).limit(1);
-        instructor = ins ?? null;
+    // Batch-fetch primary instructors (avoids N+1)
+    const courseIds = courses.map(c => c.id);
+    let enriched: any[] = courses.map(c => ({ ...c, instructor: null }));
+    if (courseIds.length > 0) {
+      const ciRows = await db.select().from(lmsCourseInstructors)
+        .where(and(
+          sql`${lmsCourseInstructors.courseId} IN (${sql.join(courseIds.map(id => sql`${id}`), sql`, `)})`,
+          eq(lmsCourseInstructors.isPrimary, true)
+        ));
+      const instructorIds = Array.from(new Set(ciRows.map(ci => ci.instructorId)));
+      if (instructorIds.length > 0) {
+        const insRows = await db.select().from(lmsInstructors)
+          .where(sql`${lmsInstructors.id} IN (${sql.join(instructorIds.map(id => sql`${id}`), sql`, `)})`);
+
+        const insMap = new Map(insRows.map(i => [i.id, i]));
+        const ciMap = new Map(ciRows.map(ci => [ci.courseId, ci]));
+        enriched = courses.map(c => {
+          const ci = ciMap.get(c.id);
+          return { ...c, instructor: ci ? (insMap.get(ci.instructorId) ?? null) : null };
+        });
       }
-      return { ...c, instructor };
-    }));
+    }
     return enriched;
   }),
 
@@ -258,12 +279,19 @@ export const lmsPublicRouter = router({
         return { ...s, lessons };
       }));
 
-      // Instructors
+      // Instructors — batch fetch to avoid N+1
       const cis = await db.select().from(lmsCourseInstructors).where(eq(lmsCourseInstructors.courseId, course.id));
-      const instructors = await Promise.all(cis.map(async (ci) => {
-        const [ins] = await db.select().from(lmsInstructors).where(eq(lmsInstructors.id, ci.instructorId)).limit(1);
-        return ins ? { ...ins, revenueSharePct: ci.revenueSharePct, isPrimary: ci.isPrimary } : null;
-      }));
+      let instructors: any[] = [];
+      if (cis.length > 0) {
+        const instructorIds = cis.map(ci => ci.instructorId);
+        const insRows = await db.select().from(lmsInstructors)
+          .where(sql`${lmsInstructors.id} IN (${sql.join(instructorIds.map(id => sql`${id}`), sql`, `)})`);
+        const insMap = new Map(insRows.map(i => [i.id, i]));
+        instructors = cis.map(ci => {
+          const ins = insMap.get(ci.instructorId);
+          return ins ? { ...ins, revenueSharePct: ci.revenueSharePct, isPrimary: ci.isPrimary } : null;
+        }).filter(Boolean);
+      }
 
       // Landing page
       const [landingPage] = await db.select().from(lmsLandingPages).where(eq(lmsLandingPages.courseId, course.id)).limit(1);
@@ -372,9 +400,36 @@ export const lmsLearnerRouter = router({
         .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, course.id))).limit(1);
 
       // Fetch sections + ALL lessons for this course in 2 parallel queries (avoids N+1)
+      // Select only lightweight columns for the sidebar — heavy content (contentBlocks, content, videoContent)
+      // is fetched on-demand by getLesson when the student opens a specific lesson.
       const [sections, allCourseLessons] = await Promise.all([
         db.select().from(lmsSections).where(eq(lmsSections.courseId, course.id)).orderBy(asc(lmsSections.position)),
-        db.select().from(lmsLessons).where(eq(lmsLessons.courseId, course.id)).orderBy(asc(lmsLessons.position)),
+        db.select({
+          id: lmsLessons.id,
+          courseId: lmsLessons.courseId,
+          sectionId: lmsLessons.sectionId,
+          title: lmsLessons.title,
+          type: lmsLessons.type,
+          position: lmsLessons.position,
+          isPreview: lmsLessons.isPreview,
+          dripDays: lmsLessons.dripDays,
+          durationMinutes: lmsLessons.durationMinutes,
+          requireVideoCompletion: lmsLessons.requireVideoCompletion,
+          requireManualComplete: lmsLessons.requireManualComplete,
+          prerequisiteLessonId: lmsLessons.prerequisiteLessonId,
+          showInstructor: lmsLessons.showInstructor,
+          effectEnabled: lmsLessons.effectEnabled,
+          effectTrigger: lmsLessons.effectTrigger,
+          effectBannerText: lmsLessons.effectBannerText,
+          effectBannerBgColor: lmsLessons.effectBannerBgColor,
+          effectBannerTextColor: lmsLessons.effectBannerTextColor,
+          effectSound: lmsLessons.effectSound,
+          effectSoundUrl: lmsLessons.effectSoundUrl,
+          effectConfetti: lmsLessons.effectConfetti,
+          effectConfettiColors: lmsLessons.effectConfettiColors,
+          createdAt: lmsLessons.createdAt,
+          updatedAt: lmsLessons.updatedAt,
+        }).from(lmsLessons).where(eq(lmsLessons.courseId, course.id)).orderBy(asc(lmsLessons.position)),
       ]);
       // Group lessons by sectionId in JS — no extra round-trips
       const lessonsBySectionId = new Map<number, typeof allCourseLessons>();
@@ -1209,18 +1264,45 @@ export const lmsAdminRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.id, input.id)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
-      const sections = await db.select().from(lmsSections).where(eq(lmsSections.courseId, course.id)).orderBy(asc(lmsSections.position));
-      const sectionsWithLessons = await Promise.all(sections.map(async (s) => {
-        const lessons = await db.select().from(lmsLessons).where(eq(lmsLessons.sectionId, s.id)).orderBy(asc(lmsLessons.position));
-        return { ...s, lessons };
-      }));
-      // Top-level lessons (not inside any section)
-      const topLevelLessons = await db.select().from(lmsLessons)
-        .where(and(eq(lmsLessons.courseId, course.id), isNull(lmsLessons.sectionId)))
-        .orderBy(asc(lmsLessons.position));
-      const [landingPage] = await db.select().from(lmsLandingPages).where(eq(lmsLandingPages.courseId, course.id)).limit(1);
-      const cis = await db.select().from(lmsCourseInstructors).where(eq(lmsCourseInstructors.courseId, course.id));
-      return { ...course, sections: sectionsWithLessons, topLevelLessons, landingPage: landingPage ?? null, courseInstructors: cis };
+      // Batch fetch sections + all lessons in 2 parallel queries (avoids N+1)
+      // Strip heavy content columns (contentBlocks, content, videoContent) from the list —
+      // they are fetched on-demand by getLessonsWithBlocks when the editor opens a lesson.
+      const [sections, allLessons, landingPage, cis] = await Promise.all([
+        db.select().from(lmsSections).where(eq(lmsSections.courseId, course.id)).orderBy(asc(lmsSections.position)),
+        db.select({
+          id: lmsLessons.id,
+          courseId: lmsLessons.courseId,
+          sectionId: lmsLessons.sectionId,
+          title: lmsLessons.title,
+          type: lmsLessons.type,
+          position: lmsLessons.position,
+          isPreview: lmsLessons.isPreview,
+          dripDays: lmsLessons.dripDays,
+          durationMinutes: lmsLessons.durationMinutes,
+          requireVideoCompletion: lmsLessons.requireVideoCompletion,
+          requireManualComplete: lmsLessons.requireManualComplete,
+          prerequisiteLessonId: lmsLessons.prerequisiteLessonId,
+          showInstructor: lmsLessons.showInstructor,
+          effectEnabled: lmsLessons.effectEnabled,
+          createdAt: lmsLessons.createdAt,
+          updatedAt: lmsLessons.updatedAt,
+        }).from(lmsLessons).where(eq(lmsLessons.courseId, course.id)).orderBy(asc(lmsLessons.position)),
+        db.select().from(lmsLandingPages).where(eq(lmsLandingPages.courseId, course.id)).limit(1),
+        db.select().from(lmsCourseInstructors).where(eq(lmsCourseInstructors.courseId, course.id)),
+      ]);
+      // Group lessons by sectionId in JS
+      const lessonsBySectionId = new Map<number, typeof allLessons>();
+      const topLevelLessons: typeof allLessons = [];
+      for (const lesson of allLessons) {
+        if (lesson.sectionId) {
+          if (!lessonsBySectionId.has(lesson.sectionId)) lessonsBySectionId.set(lesson.sectionId, []);
+          lessonsBySectionId.get(lesson.sectionId)!.push(lesson);
+        } else {
+          topLevelLessons.push(lesson);
+        }
+      }
+      const sectionsWithLessons = sections.map(s => ({ ...s, lessons: lessonsBySectionId.get(s.id) ?? [] }));
+      return { ...course, sections: sectionsWithLessons, topLevelLessons, landingPage: landingPage[0] ?? null, courseInstructors: cis };
     }),
 
   // ── Sections ──
