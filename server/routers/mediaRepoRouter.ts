@@ -262,6 +262,7 @@ export const mediaRepoRouter = router({
     .input(z.object({
       id: z.number().int().positive(),
       title: z.string().min(1).max(255).optional(),
+      slug: z.string().min(1).max(128).regex(/^[a-z0-9-]+$/, "Slug must be lowercase letters, numbers, and hyphens only").optional(),
       description: z.string().max(2000).nullable().optional(),
       tags: z.string().max(500).nullable().optional(),
       access: z.enum(["public", "private"]).optional(),
@@ -271,8 +272,17 @@ export const mediaRepoRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
+      // Validate slug uniqueness if changing
+      if (input.slug) {
+        const [existing] = await db.select({ id: mediaAssets.id }).from(mediaAssets)
+          .where(and(eq(mediaAssets.slug, input.slug), sql`${mediaAssets.id} != ${input.id}`))
+          .limit(1);
+        if (existing) throw new TRPCError({ code: "CONFLICT", message: "A media asset with this slug already exists" });
+      }
+
       const updates: Record<string, unknown> = {};
       if (input.title !== undefined) updates.title = input.title;
+      if (input.slug !== undefined) updates.slug = input.slug;
       if (input.description !== undefined) updates.description = input.description;
       if (input.tags !== undefined) updates.tags = input.tags;
       if (input.access !== undefined) updates.access = input.access;

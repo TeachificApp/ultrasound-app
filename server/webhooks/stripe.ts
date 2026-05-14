@@ -381,6 +381,40 @@ async function handleBrandSubscriptionLifecycle(subscription: Record<string, unk
   }
 }
 
+/**
+ * Handle payment_intent.succeeded for inline funnel form checkout.
+ * This is triggered when a user pays inline via Stripe Elements (PaymentIntent flow)
+ * instead of being redirected to Stripe Checkout.
+ */
+async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, unknown>) {
+  const meta = (paymentIntent.metadata ?? {}) as Record<string, string>;
+  if (meta.type !== "funnel_form_purchase") return; // Not a funnel form purchase
+
+  const funnelId = meta.funnel_id ? parseInt(meta.funnel_id) : null;
+  const funnelPageId = meta.funnel_page_id ? parseInt(meta.funnel_page_id) : null;
+  const customerEmail = meta.customer_email;
+  const customerName = meta.customer_name;
+  const amount = paymentIntent.amount as number;
+  const piId = paymentIntent.id as string;
+
+  console.log(`[Stripe] payment_intent.succeeded — funnel form purchase — email: ${customerEmail}, amount: ${amount}, PI: ${piId}`);
+
+  const db = await getDb();
+  if (!db) return;
+
+  // Track conversion on the funnel page
+  if (funnelPageId) {
+    const { sql } = await import("drizzle-orm");
+    await db.execute(sql`UPDATE funnel_pages SET conversions = conversions + 1 WHERE id = ${funnelPageId}`);
+  }
+
+  // Notify owner
+  await notifyOwner({
+    title: "💰 New Funnel Payment (Inline Checkout)",
+    content: `Funnel form payment succeeded.\nEmail: ${customerEmail}\nName: ${customerName}\nAmount: $${((amount ?? 0) / 100).toFixed(2)}\nFunnel ID: ${funnelId}\nPage ID: ${funnelPageId}\nPaymentIntent: ${piId}`,
+  });
+}
+
 export function registerStripeWebhook(app: Express) {
   // Raw body needed for Stripe signature verification
   app.post(
@@ -464,6 +498,8 @@ export function registerStripeWebhook(app: Express) {
           await handleDigitalDownloadCheckoutCompleted(sessionObj);
           await handleDigitalBundleCheckoutCompleted(sessionObj);
           await handleBrandMembershipCheckoutCompleted(sessionObj);
+        } else if (eventType === "payment_intent.succeeded") {
+          await handleFunnelPaymentIntentSucceeded(sessionObj);
         } else if (eventType === "customer.subscription.deleted" || eventType === "customer.subscription.updated") {
           await handleBrandSubscriptionLifecycle(sessionObj, eventType);
         } else {

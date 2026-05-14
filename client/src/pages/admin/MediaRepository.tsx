@@ -634,12 +634,27 @@ function AssetDetailDialog({ assetId, onClose, onRefresh }: AssetDetailDialogPro
   const [inviteExpiry, setInviteExpiry] = useState("30");
   const [inviteMessage, setInviteMessage] = useState("");
   const [selectedToken, setSelectedToken] = useState<string | undefined>(undefined);
+  const [editSlug, setEditSlug] = useState("");
+  const [slugInitialized, setSlugInitialized] = useState(false);
 
   const { data, refetch } = trpc.mediaRepo.getAsset.useQuery(
     { id: assetId! },
     { enabled: !!assetId }
   );
+  // Initialize slug state when data loads
+  if (data && !slugInitialized) {
+    setEditSlug(data.asset.slug);
+    setSlugInitialized(true);
+  }
+  // Reset when dialog closes/opens for different asset
+  if (!assetId && slugInitialized) {
+    setSlugInitialized(false);
+  }
   const { data: foldersData } = trpc.mediaRepo.listFoldersFull.useQuery();
+  const updateSlugMutation = trpc.mediaRepo.updateAsset.useMutation({
+    onSuccess: () => { toast.success("Slug updated"); refetch(); onRefresh(); },
+    onError: (e) => toast.error(e.message),
+  });
   const moveToFolderMutation = trpc.mediaRepo.moveAssetToFolder.useMutation({
     onSuccess: () => { toast.success("Folder updated"); refetch(); onRefresh(); },
     onError: (e) => toast.error(e.message),
@@ -758,6 +773,27 @@ function AssetDetailDialog({ assetId, onClose, onRefresh }: AssetDetailDialogPro
                 )}
               </div>
             </div>
+
+          {/* Slug Editor */}
+          <div className="px-5 py-3 border-b border-border">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground whitespace-nowrap">/media/</span>
+              <input
+                value={editSlug}
+                onChange={e => setEditSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-"))}
+                className="flex-1 text-xs font-mono border border-border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                placeholder="asset-slug"
+              />
+              <button
+                className="text-xs px-2 py-1 rounded border border-teal-300 text-teal-600 hover:bg-teal-50 disabled:opacity-50"
+                disabled={updateSlugMutation.isPending || !editSlug.trim() || editSlug === asset.slug}
+                onClick={() => updateSlugMutation.mutate({ id: asset.id, slug: editSlug.trim() })}
+              >
+                {updateSlugMutation.isPending ? "Saving..." : "Save Slug"}
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Changing the slug will break existing embed/share links.</p>
+          </div>
 
           <div className="px-5 pb-6 pt-2">
           <Tabs defaultValue="embed">

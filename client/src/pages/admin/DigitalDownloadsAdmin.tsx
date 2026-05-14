@@ -389,7 +389,7 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
           </div>
           <Button size="sm" variant="outline" className="border-teal-300 text-teal-600 hover:bg-teal-50"
             disabled={updateSettingsMut.isPending}
-            onClick={() => updateSettingsMut.mutate({ id: productId, slug: slug.trim() || product.slug, metaTitle: metaTitle.trim() || undefined, metaDescription: metaDescription.trim() || undefined })}
+            onClick={() => updateSettingsMut.mutate({ productId, slug: slug.trim() || product.slug, metaTitle: metaTitle.trim() || undefined, metaDescription: metaDescription.trim() || undefined })}
           >
             {updateSettingsMut.isPending ? "Saving..." : "Save URL & SEO"}
           </Button>

@@ -803,6 +803,23 @@ export const downloadsAdminRouter = router({
       await db.update(digitalProducts).set(fields).where(eq(digitalProducts.id, productId));
       return { success: true };
     }),
+
+  /** Update bundle slug */
+  updateBundleSlug: protectedProcedure
+    .input(z.object({
+      bundleId: z.number().int().positive(),
+      slug: z.string().min(1).max(255).regex(/^[a-z0-9-]+$/, "Slug must be lowercase letters, numbers, and hyphens only"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [existing] = await db.select({ id: digitalBundles.id }).from(digitalBundles)
+        .where(and(eq(digitalBundles.slug, input.slug), sql`${digitalBundles.id} != ${input.bundleId}`)).limit(1);
+      if (existing) throw new TRPCError({ code: "CONFLICT", message: "A bundle with this slug already exists" });
+      await db.update(digitalBundles).set({ slug: input.slug }).where(eq(digitalBundles.id, input.bundleId));
+      return { success: true };
+    }),
 });
 
 // ─── Email Helper ───────────────────────────────────────────────────────────

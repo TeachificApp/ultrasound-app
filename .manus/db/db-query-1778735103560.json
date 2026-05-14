@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE funnel_pages ADD COLUMN is_hidden BOOLEAN NOT NULL DEFAULT false; ALTER TABLE funnel_pages ADD COLUMN is_standalone_landing BOOLEAN NOT NULL DEFAULT false;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2mhhtxpXA9Esras.9b3674e1e24c --database UrcfdRVE8J6mpMNR48QuFe --execute ALTER TABLE funnel_pages ADD COLUMN is_hidden BOOLEAN NOT NULL DEFAULT false; ALTER TABLE funnel_pages ADD COLUMN is_standalone_landing BOOLEAN NOT NULL DEFAULT false;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 735
+}

@@ -53,6 +53,8 @@ interface FunnelPage {
   orderBumpId: number | null;
   sortOrder: number;
   isActive: boolean;
+  isHidden: boolean;
+  isStandaloneLanding: boolean;
   views: number;
   conversions: number;
   createdAt: string;
@@ -732,6 +734,8 @@ function SortableFunnelPageRow({
           <span>{page.conversions} conversions</span>
           {page.productType && <span className="flex items-center gap-1"><Package size={11} /> {page.productType}</span>}
           {page.orderBumpId && <span className="flex items-center gap-1"><ShoppingCart size={11} /> Order bump attached</span>}
+          {page.isHidden && <span className="text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded font-medium">Hidden</span>}
+          {page.isStandaloneLanding && <span className="text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-medium">Standalone /p/{page.slug}</span>}
         </div>
       </div>
       {/* Connection arrow */}

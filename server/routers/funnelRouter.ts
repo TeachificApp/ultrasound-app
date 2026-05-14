@@ -7,7 +7,7 @@ import { z } from "zod";
 import { router, protectedProcedure, publicProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
-import { funnels, funnelPages, funnelLeads, funnelTemplates } from "../../drizzle/schema";
+import { funnels, funnelPages, funnelLeads, funnelTemplates, lmsCourses, digitalProducts, digitalBundles } from "../../drizzle/schema";
 import { eq, and, asc, desc, sql } from "drizzle-orm";
 
 function slugify(text: string): string {
@@ -21,6 +21,22 @@ function slugify(text: string): string {
 // ─── Admin Router ────────────────────────────────────────────────────────────
 
 export const funnelRouter = router({
+  /** List all products (courses, downloads, bundles) for order bump picker */
+  listAllProducts: protectedProcedure.query(async ({ ctx }) => {
+    if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    const db = await getDb();
+    const [courses, downloads, bundles] = await Promise.all([
+      db.select({ id: lmsCourses.id, title: lmsCourses.title, price: lmsCourses.price, thumbnailUrl: lmsCourses.thumbnailUrl }).from(lmsCourses).orderBy(asc(lmsCourses.title)),
+      db.select({ id: digitalProducts.id, title: digitalProducts.title, price: digitalProducts.price, thumbnailUrl: digitalProducts.thumbnailUrl }).from(digitalProducts).orderBy(asc(digitalProducts.title)),
+      db.select({ id: digitalBundles.id, name: digitalBundles.name, price: digitalBundles.price, thumbnailUrl: digitalBundles.thumbnailUrl }).from(digitalBundles).orderBy(asc(digitalBundles.name)),
+    ]);
+    return [
+      ...courses.map(c => ({ id: c.id, type: "course" as const, name: c.title, price: c.price ?? 0, imageUrl: c.thumbnailUrl ?? "" })),
+      ...downloads.map(d => ({ id: d.id, type: "download" as const, name: d.title, price: d.price ?? 0, imageUrl: d.thumbnailUrl ?? "" })),
+      ...bundles.map(b => ({ id: b.id, type: "bundle" as const, name: b.name, price: b.price ?? 0, imageUrl: b.thumbnailUrl ?? "" })),
+    ];
+  }),
+
   /** List all funnels */
   list: protectedProcedure.query(async ({ ctx }) => {
     if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
@@ -301,6 +317,8 @@ export const funnelRouter = router({
         customPriceLabel: z.string().nullable().optional(),
         orderBumpId: z.number().nullable().optional(),
         isActive: z.boolean().optional(),
+        isHidden: z.boolean().optional(),
+        isStandaloneLanding: z.boolean().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -603,7 +621,32 @@ export const funnelPublicRouter = router({
         .from(funnelPages)
         .where(eq(funnelPages.funnelId, funnel.id))
         .orderBy(asc(funnelPages.sortOrder));
-      return { ...funnel, pages };
+      // Filter out hidden pages from the public sequence
+      const visiblePages = pages.filter(p => !p.isHidden);
+      return { ...funnel, pages: visiblePages };
+    }),
+
+  /** Get a standalone landing page by its slug (public — served at /p/{slug}) */
+  getStandalonePage: publicProcedure
+    .input(z.object({ slug: z.string() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      const [page] = await db
+        .select()
+        .from(funnelPages)
+        .where(
+          and(
+            eq(funnelPages.slug, input.slug),
+            eq(funnelPages.isStandaloneLanding, true),
+            eq(funnelPages.isActive, true)
+          )
+        );
+      if (!page) throw new TRPCError({ code: "NOT_FOUND", message: "Page not found" });
+      // Get the parent funnel for branding
+      const [funnel] = await db.select().from(funnels).where(eq(funnels.id, page.funnelId));
+      // Track page view
+      await db.execute(sql`UPDATE funnel_pages SET views = views + 1 WHERE id = ${page.id}`);
+       return { funnel: funnel || null, page };
     }),
 
   /** Get a specific funnel page (public) */
@@ -778,6 +821,142 @@ export const funnelPublicRouter = router({
       // Track conversion
       await db.execute(sql`UPDATE funnel_pages SET conversions = conversions + 1 WHERE id = ${page.id}`);
       return { checkoutUrl: session.url };
+    }),
+
+  /** Create a PaymentIntent for inline Stripe Elements checkout (no redirect) */
+  createFunnelPaymentIntent: publicProcedure
+    .input(
+      z.object({
+        funnelId: z.number(),
+        pageId: z.number(),
+        origin: z.string(),
+        email: z.string().email(),
+        firstName: z.string().optional(),
+        lastName: z.string().optional(),
+        phone: z.string().optional(),
+        selectedProductIndex: z.number().default(0),
+        addedBumpIndexes: z.array(z.number()).default([]),
+        billingAddress: z.object({
+          address: z.string(),
+          address2: z.string().optional(),
+          country: z.string(),
+          state: z.string(),
+          city: z.string(),
+          postalCode: z.string(),
+        }).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      const [page] = await db.select().from(funnelPages).where(eq(funnelPages.id, input.pageId));
+      if (!page) throw new TRPCError({ code: "NOT_FOUND", message: "Funnel page not found" });
+      const [funnel] = await db.select().from(funnels).where(eq(funnels.id, input.funnelId));
+      if (!funnel) throw new TRPCError({ code: "NOT_FOUND", message: "Funnel not found" });
+
+      // Parse blocks to find checkout_form block
+      let checkoutBlock: any = null;
+      try {
+        const blocks = JSON.parse(page.blocks || "[]");
+        checkoutBlock = blocks.find((b: any) => b.type === "checkout_form");
+      } catch {}
+      if (!checkoutBlock) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "No checkout form found on this page" });
+      }
+
+      const products = checkoutBlock.data?.products ?? [];
+      const orderBumps = checkoutBlock.data?.orderBumps ?? [];
+      const selectedProduct = products[input.selectedProductIndex];
+      if (!selectedProduct) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid product selection" });
+      }
+
+      // Calculate total amount
+      let totalAmount = selectedProduct.price; // cents
+      const bumpDetails: string[] = [];
+      for (const bumpIdx of input.addedBumpIndexes) {
+        const bump = orderBumps[bumpIdx];
+        if (bump && bump.price > 0) {
+          totalAmount += bump.price;
+          bumpDetails.push(bump.title);
+        }
+      }
+
+      if (totalAmount < 50) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Minimum charge amount is $0.50" });
+      }
+
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+
+      // Build description for the payment
+      let description = selectedProduct.name;
+      if (bumpDetails.length > 0) {
+        description += " + " + bumpDetails.join(", ");
+      }
+
+      // Find thank you page for success redirect
+      const allPages = await db.select().from(funnelPages)
+        .where(eq(funnelPages.funnelId, funnel.id))
+        .orderBy(asc(funnelPages.sortOrder));
+      const thankYouPage = allPages.find(p => p.pageType === "thank_you");
+      const successRedirect = checkoutBlock.data?.successRedirect;
+      const successUrl = successRedirect
+        ? (successRedirect.startsWith("http") ? successRedirect : `${input.origin}${successRedirect}`)
+        : thankYouPage
+          ? `${input.origin}/f/${funnel.slug}/${thankYouPage.slug}?success=1`
+          : `${input.origin}/f/${funnel.slug}/${page.slug}?success=1`;
+
+      // Create PaymentIntent
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: totalAmount,
+        currency: "usd",
+        description,
+        receipt_email: input.email,
+        metadata: {
+          type: "funnel_form_purchase",
+          funnel_id: funnel.id.toString(),
+          funnel_page_id: page.id.toString(),
+          customer_email: input.email,
+          customer_name: `${input.firstName || ""} ${input.lastName || ""}`.trim(),
+          customer_phone: input.phone || "",
+          bumps_added: input.addedBumpIndexes.join(","),
+          user_id: ctx.user?.id?.toString() || "",
+          success_url: successUrl,
+        },
+        automatic_payment_methods: { enabled: true },
+      });
+
+      // Extract IP and user agent from request
+      const fwd = ctx.req?.headers?.["x-forwarded-for"];
+      const ip = typeof fwd === "string" ? fwd.split(",")[0].trim() : ctx.req?.socket?.remoteAddress || null;
+      const ua = ctx.req?.headers?.["user-agent"] || null;
+
+      // Store as a lead
+      await db.insert(funnelLeads).values({
+        funnelId: input.funnelId,
+        funnelPageId: input.pageId,
+        email: input.email,
+        name: `${input.firstName || ""} ${input.lastName || ""}`.trim() || null,
+        phone: input.phone || null,
+        customFields: JSON.stringify({
+          selectedProduct: selectedProduct.name,
+          bumps: input.addedBumpIndexes.map(i => orderBumps[i]?.title).filter(Boolean),
+          billingAddress: input.billingAddress,
+          paymentIntentId: paymentIntent.id,
+        }),
+        userId: ctx.user?.id || null,
+        source: "checkout_form",
+        ipAddress: ip || null,
+        userAgent: ua || null,
+        sourcePage: input.origin ? `${input.origin}/f/${funnel.slug}/${page.slug}` : null,
+      });
+
+      return {
+        clientSecret: paymentIntent.client_secret!,
+        paymentIntentId: paymentIntent.id,
+        amount: totalAmount,
+        successUrl,
+      };
     }),
 
   /** Submit a lead capture form (public) */

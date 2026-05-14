@@ -33,7 +33,7 @@ import {
   SortableBlock,
 } from "./LandingPageBuilder";
 import {
-  ArrowLeft, Save, Eye, Plus, Palette, X, FolderOpen, Layers,
+  ArrowLeft, Save, Eye, Plus, Palette, X, FolderOpen, Layers, Settings,
 } from "lucide-react";
 
 // ─── Main Editor ─────────────────────────────────────────────────────────────
@@ -227,6 +227,37 @@ export default function FunnelPageEditor() {
             </div>
           )}
 
+          {/* Page Settings */}
+          <div className="p-2 border-b border-gray-100">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-1 mb-2 flex items-center gap-1">
+              <Settings size={12} /> Page Settings
+            </p>
+            <div className="space-y-2 px-1">
+              <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={currentPage?.isHidden ?? false}
+                  onChange={e => updatePage.mutate({ id: numericPageId, isHidden: e.target.checked })}
+                  className="rounded border-gray-300"
+                />
+                <span>Hidden from funnel</span>
+              </label>
+              <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={currentPage?.isStandaloneLanding ?? false}
+                  onChange={e => updatePage.mutate({ id: numericPageId, isStandaloneLanding: e.target.checked })}
+                  className="rounded border-gray-300"
+                />
+                <span>Standalone page</span>
+              </label>
+              {currentPage?.isStandaloneLanding && (
+                <p className="text-[10px] text-blue-600 bg-blue-50 rounded px-1.5 py-1">
+                  Accessible at /p/{currentPage.slug}
+                </p>
+              )}
+            </div>
+          </div>
           {/* Block catalog */}
           <div className="p-2 border-b border-gray-100">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-1 mb-2">Add Blocks</p>

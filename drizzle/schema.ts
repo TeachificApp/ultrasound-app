@@ -3215,6 +3215,8 @@ export const funnelPages = mysqlTable("funnel_pages", {
   sortOrder: int("sort_order").default(0).notNull(),
   // Status
   isActive: boolean("is_active").default(true).notNull(),
+  isHidden: boolean("is_hidden").default(false).notNull(), // hide from funnel sequence but keep accessible via direct URL
+  isStandaloneLanding: boolean("is_standalone_landing").default(false).notNull(), // serve as standalone landing page at /p/{slug}
   // Analytics
   views: int("views").default(0).notNull(),
   conversions: int("conversions").default(0).notNull(),

@@ -1705,3 +1705,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Investigate MirrorSync overwriting production data — MirrorSync is one-way TiDB→Railway, not the cause; root cause was missing DB column
 - [x] Fix media /media/:slug 404 in production — moved media routes BEFORE SPA catch-all in index.ts
 - [x] Ensure iHeartEcho media repository settings/assets are transferred and accessible — migrated 7 assets, 8 folders from iHeartEcho DB with SCORM entry URLs
+
+## New Features (May 14)
+- [x] Editable slugs for courses, downloads, media assets, and products
+- [x] Inline Stripe checkout form with Stripe Elements (keep users on one page)
+- [x] Multiple order bumps configurable per checkout page (any product can be a bump)
+- [x] Funnel page hide option (hide page from funnel sequence)
+- [x] Funnel page standalone landing page (pull page out as independent URL)

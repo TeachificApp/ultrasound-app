@@ -45,6 +45,7 @@ const FunnelPageEditor = lazy(() => import("./pages/admin/FunnelPageEditor"));
 const ContactsAdmin = lazy(() => import("./pages/admin/ContactsAdmin"));
 const SharingMonitor = lazy(() => import("./pages/admin/SharingMonitor"));
 const PublicFunnelPage = lazy(() => import("./pages/PublicFunnelPage"));
+const StandaloneLandingPage = lazy(() => import("./pages/StandaloneLandingPage"));
 // ── Digital Downloads ──────────────────────────────────────────────────────────
 import DownloadsBrowse from "./pages/DownloadsBrowse";
 import DownloadLanding from "./pages/DownloadLanding";
@@ -407,6 +408,7 @@ function Router() {
 
         {/* ── Public Funnel Pages ────────────────────────────────────── */}
         <Route path="/f/:slug/:pageSlug">{() => <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><PublicFunnelPage /></Suspense>}</Route>
+        <Route path="/p/:slug">{() => <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><StandaloneLandingPage /></Suspense>}</Route>
 
         {/* ── Physician Over-Read (public, token-based) ─────────────────── */}
         <Route path="/physician-review/:token" component={PhysicianOverReadForm} />

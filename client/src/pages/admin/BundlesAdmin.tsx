@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Package, ArrowLeft, Check } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, ArrowLeft, Check, Link as LinkIcon } from "lucide-react";
 
 function BundleList({ onEdit }: { onEdit: (id: number) => void }) {
   const { data: bundles, isLoading } = trpc.downloadsAdmin.listBundles.useQuery();
@@ -139,6 +139,11 @@ function BundleEditor({ bundleId, onBack }: { bundleId: number; onBack: () => vo
     onError: (e) => toast.error(e.message),
   });
 
+  const updateSlugMut = trpc.downloadsAdmin.updateBundleSlug.useMutation({
+    onSuccess: () => { utils.downloadsAdmin.listBundles.invalidate(); toast.success("Slug updated"); },
+    onError: (e) => toast.error(e.message),
+  });
+
   const bundle = bundles?.find((b) => b.id === bundleId);
   const [title, setTitle] = useState(bundle?.title ?? "");
   const [subtitle, setSubtitle] = useState(bundle?.subtitle ?? "");
@@ -146,6 +151,7 @@ function BundleEditor({ bundleId, onBack }: { bundleId: number; onBack: () => vo
   const [originalPrice, setOriginalPrice] = useState(((bundle?.originalPrice ?? 0) / 100).toFixed(2));
   const [discountPrice, setDiscountPrice] = useState(((bundle?.discountPrice ?? 0) / 100).toFixed(2));
   const [status, setStatus] = useState(bundle?.status ?? "draft");
+  const [slug, setSlug] = useState(bundle?.slug ?? "");
   const [selectedProductIds, setSelectedProductIds] = useState<number[]>(
     bundle?.items.map((i) => i.productId) ?? []
   );
@@ -251,6 +257,24 @@ function BundleEditor({ bundleId, onBack }: { bundleId: number; onBack: () => vo
               </p>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* URL Slug */}
+      <Card>
+        <CardHeader><CardTitle className="text-base flex items-center gap-2"><LinkIcon className="w-4 h-4 text-teal-600" /> URL Slug</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground whitespace-nowrap">/bundles/</span>
+            <Input value={slug} onChange={e => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-"))} placeholder="bundle-slug" className="flex-1" />
+          </div>
+          <p className="text-xs text-muted-foreground">Lowercase letters, numbers, and hyphens only. Changing this will break existing links.</p>
+          <Button size="sm" variant="outline" className="border-teal-300 text-teal-600 hover:bg-teal-50"
+            disabled={updateSlugMut.isPending || !slug.trim()}
+            onClick={() => updateSlugMut.mutate({ bundleId, slug: slug.trim() })}
+          >
+            {updateSlugMut.isPending ? "Saving..." : "Save Slug"}
+          </Button>
         </CardContent>
       </Card>
 

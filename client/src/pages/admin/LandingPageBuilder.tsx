@@ -974,6 +974,103 @@ function BSLinkField({ label = "Button Link", value, onChange }: { label?: strin
   );
 }
 
+// ─── Order Bumps Editor (with product picker) ──────────────────────────────
+type OrderBumpItem = { title: string; headline: string; description: string; price: number; imageUrl: string; ctaText: string; ctaEmoji: string; externalUrl: string };
+
+function OrderBumpsEditor({ bumps, onUpdate }: { bumps: OrderBumpItem[]; onUpdate: (next: OrderBumpItem[]) => void }) {
+  const [showPicker, setShowPicker] = useState(false);
+  const { data: allProducts } = trpc.funnel.listAllProducts.useQuery(undefined, { enabled: showPicker });
+
+  const addManual = () => {
+    onUpdate([...bumps, { title: "New Bump", headline: "", description: "", price: 0, imageUrl: "", ctaText: "+ Add", ctaEmoji: "\uD83D\uDC4D", externalUrl: "" }]);
+  };
+
+  const addFromProduct = (p: { name: string; price: number; imageUrl: string; type: string }) => {
+    onUpdate([...bumps, {
+      title: p.name,
+      headline: `Add ${p.name} to your order!`,
+      description: "",
+      price: p.price,
+      imageUrl: p.imageUrl,
+      ctaText: "+ Add",
+      ctaEmoji: "\uD83D\uDC4D",
+      externalUrl: "",
+    }]);
+    setShowPicker(false);
+  };
+
+  const remove = (idx: number) => onUpdate(bumps.filter((_, j) => j !== idx));
+  const update = (idx: number, key: string, val: any) => {
+    const next = [...bumps];
+    next[idx] = { ...next[idx], [key]: val };
+    onUpdate(next);
+  };
+
+  return (
+    <div className="border border-gray-200 rounded p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold text-gray-700">Order Bumps ({bumps.length})</span>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowPicker(!showPicker)} className="text-xs text-blue-600 flex items-center gap-1"><Package size={12} /> From Product</button>
+          <button onClick={addManual} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Manual</button>
+        </div>
+      </div>
+
+      {/* Product Picker Dropdown */}
+      {showPicker && (
+        <div className="border border-blue-200 rounded p-2 bg-blue-50/50 max-h-48 overflow-y-auto space-y-1">
+          <p className="text-xs text-blue-700 font-medium mb-1">Select a product to add as order bump:</p>
+          {!allProducts ? (
+            <p className="text-xs text-gray-500">Loading products...</p>
+          ) : allProducts.length === 0 ? (
+            <p className="text-xs text-gray-500">No products found. Create courses, downloads, or bundles first.</p>
+          ) : (
+            allProducts.map((p, idx) => (
+              <button
+                key={`${p.type}-${p.id}`}
+                onClick={() => addFromProduct(p)}
+                className="w-full flex items-center gap-2 p-1.5 rounded hover:bg-blue-100 text-left transition-colors"
+              >
+                {p.imageUrl ? (
+                  <img src={p.imageUrl} alt="" className="w-6 h-6 rounded object-cover flex-shrink-0" />
+                ) : (
+                  <div className="w-6 h-6 rounded bg-gray-200 flex items-center justify-center flex-shrink-0">
+                    <Package size={10} className="text-gray-400" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <span className="text-xs font-medium truncate block">{p.name}</span>
+                  <span className="text-[10px] text-gray-500">{p.type} • ${(p.price / 100).toFixed(2)}</span>
+                </div>
+              </button>
+            ))
+          )}
+          <button onClick={() => setShowPicker(false)} className="text-xs text-gray-500 hover:text-gray-700 mt-1">Cancel</button>
+        </div>
+      )}
+
+      {/* Bump Items */}
+      {bumps.map((b, i) => (
+        <div key={i} className="border border-gray-100 rounded p-2 space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-500">Bump {i + 1}</span>
+            <button onClick={() => remove(i)} className="text-red-400 hover:text-red-600"><X size={10} /></button>
+          </div>
+          <DebouncedInput value={b.title} onChange={v => update(i, "title", v)} className="h-7 text-xs" placeholder="Title (e.g. Workbook)" />
+          <DebouncedInput value={b.headline} onChange={v => update(i, "headline", v)} className="h-7 text-xs" placeholder="Headline text" />
+          <DebouncedInput value={b.description} onChange={v => update(i, "description", v)} className="h-7 text-xs" placeholder="Description" />
+          <div className="grid grid-cols-2 gap-2">
+            <Input type="number" value={b.price} onChange={e => update(i, "price", Number(e.target.value))} className="h-7 text-xs" placeholder="Price (cents)" />
+            <DebouncedInput value={b.ctaText} onChange={v => update(i, "ctaText", v)} className="h-7 text-xs" placeholder="CTA text" />
+          </div>
+          <DebouncedInput value={b.imageUrl} onChange={v => update(i, "imageUrl", v)} className="h-7 text-xs" placeholder="Image URL (optional)" />
+          <DebouncedInput value={b.externalUrl} onChange={v => update(i, "externalUrl", v)} className="h-7 text-xs" placeholder="External URL (optional)" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── Opt-Out Link Settings panel (shared across CTA blocks) ──────────────────
 function OptOutSettings({ d, set }: { d: Record<string, any>; set: (key: string, value: any) => void }) {
   const enabled = d.optOutEnabled ?? false;
@@ -1704,24 +1801,8 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
               </div>
             ))}
           </div>
-          {/* Order Bumps */}
-          <div className="border border-gray-200 rounded p-3 space-y-2">
-            <div className="flex items-center justify-between"><span className="text-xs font-semibold text-gray-700">Order Bumps ({cfBumps.length})</span><button onClick={() => set("orderBumps", [...cfBumps, { title: "New Bump", headline: "", description: "", price: 0, imageUrl: "", ctaText: "+ Add", ctaEmoji: "\uD83D\uDC4D", externalUrl: "" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div>
-            {cfBumps.map((b, i) => (
-              <div key={i} className="border border-gray-100 rounded p-2 space-y-1">
-                <div className="flex items-center justify-between"><span className="text-xs text-gray-500">Bump {i + 1}</span><button onClick={() => set("orderBumps", cfBumps.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div>
-                <DebouncedInput value={b.title} onChange={v => { const next = [...cfBumps]; next[i] = { ...next[i], title: v }; set("orderBumps", next); }} className="h-7 text-xs" placeholder="Title (e.g. Workbook)" />
-                <DebouncedInput value={b.headline} onChange={v => { const next = [...cfBumps]; next[i] = { ...next[i], headline: v }; set("orderBumps", next); }} className="h-7 text-xs" placeholder="Headline text" />
-                <DebouncedInput value={b.description} onChange={v => { const next = [...cfBumps]; next[i] = { ...next[i], description: v }; set("orderBumps", next); }} className="h-7 text-xs" placeholder="Description" />
-                <div className="grid grid-cols-2 gap-2">
-                  <Input type="number" value={b.price} onChange={e => { const next = [...cfBumps]; next[i] = { ...next[i], price: Number(e.target.value) }; set("orderBumps", next); }} className="h-7 text-xs" placeholder="Price (cents)" />
-                  <DebouncedInput value={b.ctaText} onChange={v => { const next = [...cfBumps]; next[i] = { ...next[i], ctaText: v }; set("orderBumps", next); }} className="h-7 text-xs" placeholder="CTA text" />
-                </div>
-                <DebouncedInput value={b.imageUrl} onChange={v => { const next = [...cfBumps]; next[i] = { ...next[i], imageUrl: v }; set("orderBumps", next); }} className="h-7 text-xs" placeholder="Image URL (optional)" />
-                <DebouncedInput value={b.externalUrl} onChange={v => { const next = [...cfBumps]; next[i] = { ...next[i], externalUrl: v }; set("orderBumps", next); }} className="h-7 text-xs" placeholder="External URL (optional — for non-platform products)" />
-              </div>
-            ))}
-          </div>
+          {/* Order Bumps — with product picker */}
+          <OrderBumpsEditor bumps={cfBumps} onUpdate={(next: any[]) => set("orderBumps", next)} />
           {/* Terms & Submit */}
           <BSTextField data={d} onSet={set} label="Terms Text" field="termsText" multiline />
           <div className="grid grid-cols-2 gap-2">

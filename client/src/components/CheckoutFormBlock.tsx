@@ -1,21 +1,21 @@
 /**
  * CheckoutFormBlock.tsx
  * A full checkout form component for funnel pages.
- * Supports inline embedding or standalone page rendering.
+ * Uses inline Stripe Elements (PaymentElement) for on-page payment.
  * Includes: contact info, product selection, billing address,
  * Stripe payment, order bumps, terms, and submit.
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { loadStripe } from "@stripe/stripe-js";
 import {
   Elements,
-  CardElement,
+  PaymentElement,
   useStripe,
   useElements,
 } from "@stripe/react-stripe-js";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Loader2, Lock, ShoppingCart } from "lucide-react";
+import { Loader2, Lock, ShoppingCart, CheckCircle2 } from "lucide-react";
 
 // Load Stripe outside of component to avoid re-creating on every render
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "");
@@ -67,12 +67,10 @@ interface CheckoutFormBlockProps {
   funnelSlug: string;
 }
 
-// ─── Inner Form (needs Stripe context) ───────────────────────────────────────
+// ─── Contact & Product Selection Step ────────────────────────────────────────
 
 function CheckoutFormInner({ data, funnelId, pageId, funnelSlug }: CheckoutFormBlockProps) {
   const d = data as unknown as CheckoutFormData;
-  const stripe = useStripe();
-  const elements = useElements();
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -87,8 +85,13 @@ function CheckoutFormInner({ data, funnelId, pageId, funnelSlug }: CheckoutFormB
   const [selectedProductIdx, setSelectedProductIdx] = useState(0);
   const [addedBumps, setAddedBumps] = useState<Set<number>>(new Set());
   const [termsAccepted, setTermsAccepted] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
+
+  // Payment intent state
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [successUrl, setSuccessUrl] = useState<string | null>(null);
+  const [isCreatingIntent, setIsCreatingIntent] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
 
   const products = d.products ?? [];
   const orderBumps = d.orderBumps ?? [];
@@ -103,28 +106,30 @@ function CheckoutFormInner({ data, funnelId, pageId, funnelSlug }: CheckoutFormB
     return total;
   }, [selectedProductIdx, addedBumps, products, orderBumps]);
 
+  const createPaymentIntent = trpc.funnelPublic.createFunnelPaymentIntent.useMutation({
+    onError: (e: any) => toast.error(e.message || "Failed to initialize payment"),
+  });
+
+  // Fallback to redirect checkout
   const createCheckout = trpc.funnelPublic.createFunnelFormCheckout.useMutation({
     onError: (e: any) => toast.error(e.message || "Checkout failed"),
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleProceedToPayment = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!termsAccepted && d.termsText) {
       toast.error("Please accept the terms to continue");
       return;
     }
-
     if (!email) {
       toast.error("Please enter your email address");
       return;
     }
 
-    setIsSubmitting(true);
-
+    setIsCreatingIntent(true);
     try {
-      // Create checkout session on the server
-      const result = await createCheckout.mutateAsync({
+      const result = await createPaymentIntent.mutateAsync({
         funnelId,
         pageId,
         origin: window.location.origin,
@@ -137,15 +142,12 @@ function CheckoutFormInner({ data, funnelId, pageId, funnelSlug }: CheckoutFormB
         billingAddress: d.showBillingInfo ? { address, address2, country, state, city, postalCode } : undefined,
       });
 
-      if (result.checkoutUrl) {
-        // Redirect to Stripe Checkout
-        window.open(result.checkoutUrl, "_blank");
-        toast.success("Redirecting to secure checkout...");
-      }
-    } catch (err) {
+      setClientSecret(result.clientSecret);
+      setSuccessUrl(result.successUrl);
+    } catch {
       // Error handled by mutation onError
     } finally {
-      setIsSubmitting(false);
+      setIsCreatingIntent(false);
     }
   };
 
@@ -156,8 +158,98 @@ function CheckoutFormInner({ data, funnelId, pageId, funnelSlug }: CheckoutFormB
     setAddedBumps(next);
   };
 
+  // If payment succeeded, show success message
+  if (paymentSuccess) {
+    return (
+      <div className="max-w-2xl mx-auto text-center py-12 px-4" style={{ color: d.textColor ?? "#0e1e2e" }}>
+        <CheckCircle2 size={64} className="mx-auto mb-4" style={{ color: accent }} />
+        <h2 className="text-2xl font-bold mb-2">Payment Successful!</h2>
+        <p className="text-gray-600 mb-6">Thank you for your purchase. You will receive a confirmation email shortly.</p>
+        {successUrl && (
+          <a
+            href={successUrl}
+            className="inline-block px-8 py-3 rounded-lg font-semibold text-white transition-opacity hover:opacity-90"
+            style={{ backgroundColor: accent }}
+          >
+            Continue
+          </a>
+        )}
+      </div>
+    );
+  }
+
+  // If we have a clientSecret, show the Stripe PaymentElement
+  if (clientSecret) {
+    return (
+      <div className="max-w-2xl mx-auto px-4" style={{ color: d.textColor ?? "#0e1e2e" }}>
+        {/* Header Banner */}
+        <div
+          className="rounded-lg px-6 py-4 mb-6 text-center text-white font-bold text-lg flex items-center justify-center gap-2"
+          style={{ backgroundColor: accent }}
+        >
+          <Lock size={18} />
+          <span>Complete Your Payment — ${(totalPrice / 100).toFixed(2)}</span>
+        </div>
+
+        {/* Order Summary */}
+        <div className="border border-gray-200 rounded-lg mb-6 p-4 space-y-2 text-sm">
+          {selectedProduct && (
+            <div className="flex justify-between">
+              <span className="font-medium">{selectedProduct.name}</span>
+              <span className="font-medium">${(selectedProduct.price / 100).toFixed(2)}</span>
+            </div>
+          )}
+          {Array.from(addedBumps).map((idx) => {
+            const bump = orderBumps[idx];
+            if (!bump) return null;
+            return (
+              <div key={idx} className="flex justify-between text-gray-600">
+                <span>{bump.title}</span>
+                <span>${(bump.price / 100).toFixed(2)}</span>
+              </div>
+            );
+          })}
+          <div className="flex justify-between font-bold border-t border-gray-200 pt-2 mt-2">
+            <span>Total</span>
+            <span>${(totalPrice / 100).toFixed(2)}</span>
+          </div>
+        </div>
+
+        <Elements
+          stripe={stripePromise}
+          options={{
+            clientSecret,
+            appearance: {
+              theme: "stripe",
+              variables: {
+                colorPrimary: accent,
+                fontFamily: "Inter, system-ui, sans-serif",
+              },
+            },
+          }}
+        >
+          <PaymentStep
+            accent={accent}
+            submitText={d.submitText ?? "Pay Now"}
+            successUrl={successUrl}
+            onSuccess={() => setPaymentSuccess(true)}
+          />
+        </Elements>
+
+        <button
+          type="button"
+          onClick={() => setClientSecret(null)}
+          className="w-full mt-4 text-sm text-gray-500 hover:text-gray-700 underline"
+        >
+          ← Back to order details
+        </button>
+      </div>
+    );
+  }
+
+  // Step 1: Contact info, product selection, bumps
   return (
-    <form onSubmit={handleSubmit} className="max-w-2xl mx-auto" style={{ color: d.textColor ?? "#0e1e2e" }}>
+    <form onSubmit={handleProceedToPayment} className="max-w-2xl mx-auto" style={{ color: d.textColor ?? "#0e1e2e" }}>
       {/* Header Banner */}
       <div
         className="rounded-lg px-6 py-4 mb-6 text-center text-white font-bold text-lg flex items-center justify-center gap-2"
@@ -297,24 +389,6 @@ function CheckoutFormInner({ data, funnelId, pageId, funnelSlug }: CheckoutFormB
         </fieldset>
       )}
 
-      {/* Payment Information */}
-      <fieldset className="border border-gray-300 rounded-lg p-5 mb-5">
-        <legend className="text-xs font-bold tracking-wider text-gray-600 px-2 uppercase">Payment Information</legend>
-        <div className="border border-gray-200 rounded-lg p-4">
-          <CardElement
-            options={{
-              style: {
-                base: {
-                  fontSize: "16px",
-                  color: "#1a1a1a",
-                  "::placeholder": { color: "#9ca3af" },
-                },
-              },
-            }}
-          />
-        </div>
-      </fieldset>
-
       {/* Order Bumps */}
       {orderBumps.length > 0 && (
         <div className="space-y-4 mb-5">
@@ -360,7 +434,7 @@ function CheckoutFormInner({ data, funnelId, pageId, funnelSlug }: CheckoutFormB
                     backgroundColor: addedBumps.has(idx) ? accent : "transparent",
                   }}
                 >
-                  {addedBumps.has(idx) ? "Added ✓" : (bump.ctaText || "+ Add")}
+                  {addedBumps.has(idx) ? "Added \u2713" : (bump.ctaText || "+ Add")}
                 </button>
               </div>
             </div>
@@ -380,7 +454,7 @@ function CheckoutFormInner({ data, funnelId, pageId, funnelSlug }: CheckoutFormB
             Summary
           </span>
           <span className="text-xs text-gray-500">
-            {showSummary ? "Hide" : "For more details, fill the form"} ▾
+            {showSummary ? "Hide" : "For more details, fill the form"} \u25BE
           </span>
         </button>
         {showSummary && (
@@ -429,28 +503,110 @@ function CheckoutFormInner({ data, funnelId, pageId, funnelSlug }: CheckoutFormB
         </label>
       )}
 
-      {/* Submit Button */}
+      {/* Proceed to Payment Button */}
       <button
         type="submit"
-        disabled={isSubmitting}
+        disabled={isCreatingIntent}
         className="w-full py-4 rounded-lg font-bold text-white text-lg transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
         style={{ backgroundColor: accent }}
       >
-        {isSubmitting && <Loader2 size={20} className="animate-spin" />}
-        {d.submitText ?? "Submit"}
+        {isCreatingIntent && <Loader2 size={20} className="animate-spin" />}
+        {isCreatingIntent ? "Preparing Payment..." : `Proceed to Payment — $${(totalPrice / 100).toFixed(2)}`}
       </button>
     </form>
   );
 }
 
-// ─── Wrapper with Stripe Elements Provider ───────────────────────────────────
+// ─── Payment Step (Stripe PaymentElement) ───────────────────────────────────
+
+function PaymentStep({
+  accent,
+  submitText,
+  successUrl,
+  onSuccess,
+}: {
+  accent: string;
+  submitText: string;
+  successUrl: string | null;
+  onSuccess: () => void;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+
+  const handlePayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+
+    setIsProcessing(true);
+    setPaymentError(null);
+
+    try {
+      const { error, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: successUrl || window.location.href,
+        },
+        redirect: "if_required",
+      });
+
+      if (error) {
+        setPaymentError(error.message || "Payment failed. Please try again.");
+      } else if (paymentIntent && paymentIntent.status === "succeeded") {
+        toast.success("Payment successful!");
+        onSuccess();
+      } else if (paymentIntent && paymentIntent.status === "requires_action") {
+        // 3D Secure or other action — Stripe handles this automatically
+        toast.info("Additional verification required...");
+      }
+    } catch (err: any) {
+      setPaymentError(err.message || "An unexpected error occurred.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handlePayment}>
+      <div className="border border-gray-200 rounded-lg p-5 mb-5">
+        <PaymentElement
+          options={{
+            layout: "tabs",
+          }}
+        />
+      </div>
+
+      {paymentError && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-sm text-red-700">
+          {paymentError}
+        </div>
+      )}
+
+      <button
+        type="submit"
+        disabled={isProcessing || !stripe || !elements}
+        className="w-full py-4 rounded-lg font-bold text-white text-lg transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
+        style={{ backgroundColor: accent }}
+      >
+        {isProcessing && <Loader2 size={20} className="animate-spin" />}
+        {isProcessing ? "Processing..." : submitText}
+      </button>
+
+      <div className="flex items-center justify-center gap-2 mt-3 text-xs text-gray-400">
+        <Lock size={12} />
+        <span>Secured by Stripe. Your payment information is encrypted.</span>
+      </div>
+    </form>
+  );
+}
+
+// ─── Wrapper ────────────────────────────────────────────────────────────────
 
 export default function CheckoutFormBlock(props: CheckoutFormBlockProps) {
   return (
     <div className="px-4 py-10" style={{ backgroundColor: props.data.bgColor ?? "#ffffff" }}>
-      <Elements stripe={stripePromise}>
-        <CheckoutFormInner {...props} />
-      </Elements>
+      <CheckoutFormInner {...props} />
     </div>
   );
 }
