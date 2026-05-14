@@ -601,7 +601,41 @@ export const funnelRouter = router({
       return { success: true, deleted: input.ids.length };
     }),
 
-  // ─── Branch Rules CRUD ────────────────────────────────────────────────────
+    // ─── Flow Diagram ─────────────────────────────────────────────────────────────────
+
+  /** Return all pages + branch rules for a funnel, ready for the flow diagram */
+  getFlowDiagram: protectedProcedure
+    .input(z.object({ funnelId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      const pages = await db
+        .select()
+        .from(funnelPages)
+        .where(eq(funnelPages.funnelId, input.funnelId))
+        .orderBy(asc(funnelPages.sortOrder));
+      const pagesWithRules = [];
+      for (const page of pages) {
+        const rules = await db
+          .select()
+          .from(funnelBranchRules)
+          .where(eq(funnelBranchRules.funnelPageId, page.id))
+          .orderBy(asc(funnelBranchRules.priority));
+        const rulesWithConditions = [];
+        for (const rule of rules) {
+          const conditions = await db
+            .select()
+            .from(funnelBranchConditions)
+            .where(eq(funnelBranchConditions.ruleId, rule.id))
+            .orderBy(asc(funnelBranchConditions.id));
+          rulesWithConditions.push({ ...rule, conditions });
+        }
+        pagesWithRules.push({ ...page, branchRules: rulesWithConditions });
+      }
+      return pagesWithRules;
+    }),
+
+  // ─── Branch Rules CRUD ────────────────────────────────────────────────
 
   /** List all branch rules for a funnel page (with conditions) */
   listBranchRules: protectedProcedure

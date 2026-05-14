@@ -18,6 +18,7 @@ import {
   Globe, FileText, CreditCard, Gift, ThumbsUp, Layers, ArrowRight,
   ExternalLink, BarChart3, Pencil, Check, X, ChevronDown, ChevronLeft, Zap,
   LayoutTemplate, ShoppingCart, Download, BookOpen, Package, GripVertical,
+  GitBranch, List,
 } from "lucide-react";
 import {
   DndContext,
@@ -34,6 +35,7 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { FunnelFlowDiagram } from "@/components/FunnelFlowDiagram";
 
 type FunnelStatus = "draft" | "active" | "archived";
 type PageType = "landing" | "checkout" | "upsell" | "downsell" | "thank_you" | "custom";
@@ -473,6 +475,7 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
   const [showAddPage, setShowAddPage] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [localPages, setLocalPages] = useState<FunnelPage[]>([]);
+  const [pageView, setPageView] = useState<"list" | "diagram">("list");
 
   const updateFunnel = trpc.funnel.update.useMutation({ onSuccess: () => { refetch(); toast.success("Updated"); } });
   const deleteFunnel = trpc.funnel.delete.useMutation({ onSuccess: () => { toast.success("Funnel deleted"); onBack(); } });
@@ -601,14 +604,41 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Funnel Pages</h2>
-          <p className="text-xs text-gray-400 mt-0.5">Drag the handle to reorder steps</p>
+          <p className="text-xs text-gray-400 mt-0.5">{pageView === "list" ? "Drag the handle to reorder steps" : "Click a node to edit the page"}</p>
         </div>
-        <Button onClick={() => setShowAddPage(true)} variant="outline" size="sm" className="gap-1.5 text-xs">
-          <Plus size={14} /> Add Page
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* View toggle */}
+          <div className="flex items-center rounded-lg border border-gray-200 bg-white overflow-hidden">
+            <button
+              onClick={() => setPageView("list")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors ${
+                pageView === "list" ? "bg-teal-600 text-white" : "text-gray-500 hover:bg-gray-50"
+              }`}
+            >
+              <List size={13} /> List
+            </button>
+            <button
+              onClick={() => setPageView("diagram")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors ${
+                pageView === "diagram" ? "bg-teal-600 text-white" : "text-gray-500 hover:bg-gray-50"
+              }`}
+            >
+              <GitBranch size={13} /> Diagram
+            </button>
+          </div>
+          <Button onClick={() => setShowAddPage(true)} variant="outline" size="sm" className="gap-1.5 text-xs">
+            <Plus size={14} /> Add Page
+          </Button>
+        </div>
       </div>
 
+      {/* Diagram View */}
+      {pageView === "diagram" && (
+        <FunnelFlowDiagram funnelId={funnelId} onEditPage={onEditPage} />
+      )}
+
       {/* Pages as sortable connected flow */}
+      {pageView === "list" && (
       <DndContext sensors={pageSensors} collisionDetection={closestCenter} onDragEnd={handlePageDragEnd}>
         <SortableContext items={localPages.map(p => p.id)} strategy={verticalListSortingStrategy}>
           <div className="space-y-3">
@@ -634,6 +664,7 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
           </div>
         </SortableContext>
       </DndContext>
+      )}
 
       {/* Add Page Dialog */}
       {showAddPage && (

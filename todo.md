@@ -1725,3 +1725,14 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Admin UI: Rule priority ordering (drag-to-reorder)
 - [x] Public: Checkout form passes context (productId, bumpIds, email, price, sourceUrl) to next-page resolver
 - [x] Public: PublicFunnelPage evaluates branch rules on page load for redirect
+
+## Funnel Flow Diagram (May 14)
+- [x] FunnelFlowDiagram component: pages as nodes, branch rules as labeled arrows
+- [x] Auto-layout algorithm (top-down DAG layout)
+- [x] SVG-based rendering with pan/zoom support
+- [x] Node click navigates to page editor
+- [x] Edge labels show rule name and condition summary
+- [x] Default next-page edges shown as dashed arrows
+- [x] Branch rule edges shown as solid colored arrows
+- [x] Toggle between List view and Diagram view in FunnelBuilder
+- [x] Diagram fetches branch rules for all pages in the funnel
