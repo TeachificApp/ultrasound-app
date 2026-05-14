@@ -20,7 +20,7 @@ import {
   Block, BlockType, BLOCK_CATALOG, CATALOG_CATEGORIES, BlockPreview, BlockSettings, SortableBlock, uid,
 } from "@/pages/admin/LandingPageBuilder";
 import {
-  X, Plus, Save, ChevronDown, ChevronUp, Trash2, Eye, EyeOff,
+  X, Plus, Save, Trash2, Eye, EyeOff,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +31,7 @@ interface LessonBlockEditorProps {
   initialObjectives: string[];
   onClose: () => void;
   onSaved: () => void;
+  onSavedAndClose?: () => void;
 }
 
 export default function LessonBlockEditor({
@@ -40,6 +41,7 @@ export default function LessonBlockEditor({
   initialObjectives,
   onClose,
   onSaved,
+  onSavedAndClose,
 }: LessonBlockEditorProps) {
   const [blocks, setBlocks] = useState<Block[]>(initialBlocks);
   const [objectives, setObjectives] = useState<string[]>(initialObjectives.length ? initialObjectives : [""]);
@@ -90,7 +92,7 @@ export default function LessonBlockEditor({
     setSelectedBlockId(copy.id);
   };
 
-  const handleSave = async () => {
+  const handleSave = async (andClose = false) => {
     setSaving(true);
     try {
       const cleanObjectives = objectives.filter(o => o.trim());
@@ -100,7 +102,11 @@ export default function LessonBlockEditor({
         learningObjectives: JSON.stringify(cleanObjectives),
       });
       toast.success("Lesson content saved!");
-      onSaved();
+      if (andClose && onSavedAndClose) {
+        onSavedAndClose();
+      } else {
+        onSaved();
+      }
     } catch (e: any) {
       toast.error(`Save failed: ${e.message}`);
     } finally {
@@ -111,14 +117,14 @@ export default function LessonBlockEditor({
   const selectedBlock = blocks.find(b => b.id === selectedBlockId) ?? null;
 
   return (
-    <div className="fixed inset-0 z-50 flex bg-black/60">
+    <div className="fixed inset-0 z-50 flex bg-black/40">
       {/* Main editor panel */}
-      <div className="flex flex-col w-full max-w-6xl mx-auto bg-[#0a2a2f] shadow-2xl overflow-hidden">
+      <div className="flex flex-col w-full max-w-6xl mx-auto bg-white shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 bg-[#071e22] border-b border-teal-900/50 shrink-0">
+        <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-gray-200 shrink-0">
           <div className="flex items-center gap-3">
-            <span className="text-teal-300 font-bold text-sm uppercase tracking-wide">Lesson Content Editor</span>
-            <span className="text-gray-500 text-xs">WYSIWYG — blocks appear below the video in the player</span>
+            <span className="text-teal-700 font-bold text-sm uppercase tracking-wide">Lesson Content Editor</span>
+            <span className="text-gray-400 text-xs">Blocks appear below the video in the player</span>
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -126,8 +132,8 @@ export default function LessonBlockEditor({
               variant="outline"
               onClick={() => setPreviewMode(p => !p)}
               className={cn(
-                "text-xs h-7 border-teal-700 bg-transparent",
-                previewMode ? "text-teal-300 bg-teal-900/30" : "text-gray-400 hover:text-teal-300"
+                "text-xs h-7",
+                previewMode ? "border-teal-500 text-teal-700 bg-teal-50" : "text-gray-500 hover:text-teal-700"
               )}
             >
               {previewMode ? <EyeOff className="w-3 h-3 mr-1" /> : <Eye className="w-3 h-3 mr-1" />}
@@ -135,14 +141,23 @@ export default function LessonBlockEditor({
             </Button>
             <Button
               size="sm"
-              className="bg-teal-500 hover:bg-teal-400 text-white text-xs h-7 font-semibold"
-              onClick={handleSave}
+              variant="outline"
+              className="border-teal-300 text-teal-700 hover:bg-teal-50 text-xs h-7 font-semibold"
+              onClick={() => handleSave(false)}
               disabled={saving}
             >
               <Save className="w-3 h-3 mr-1" />
               {saving ? "Saving..." : "Save"}
             </Button>
-            <button onClick={onClose} className="text-gray-400 hover:text-white ml-1">
+            <Button
+              size="sm"
+              className="bg-teal-600 hover:bg-teal-700 text-white text-xs h-7 font-semibold"
+              onClick={() => handleSave(true)}
+              disabled={saving}
+            >
+              {saving ? "Saving..." : "Save & Close"}
+            </Button>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-700 ml-1">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -150,16 +165,16 @@ export default function LessonBlockEditor({
 
         <div className="flex flex-1 overflow-hidden">
           {/* Left: Canvas */}
-          <div className="flex-1 overflow-y-auto bg-[#0c2e33] p-4">
+          <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
             {/* Learning Objectives section */}
-            <div className="mb-6 bg-teal-900/20 border border-teal-800/40 rounded-xl p-4">
+            <div className="mb-6 bg-teal-50 border border-teal-200 rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-teal-300 text-xs font-bold uppercase tracking-wide">
+                <h3 className="text-teal-700 text-xs font-bold uppercase tracking-wide">
                   "In This Lesson" Objectives
                 </h3>
                 <button
                   onClick={() => setObjectives(o => [...o, ""])}
-                  className="text-teal-400 hover:text-teal-300 text-xs flex items-center gap-1"
+                  className="text-teal-600 hover:text-teal-800 text-xs flex items-center gap-1"
                 >
                   <Plus className="w-3 h-3" /> Add
                 </button>
@@ -176,11 +191,11 @@ export default function LessonBlockEditor({
                         setObjectives(next);
                       }}
                       placeholder={`Objective ${i + 1}...`}
-                      className="h-7 text-xs bg-white/5 border-teal-800/50 text-white placeholder:text-gray-600 flex-1"
+                      className="h-7 text-xs bg-white border-teal-200 text-gray-800 placeholder:text-gray-400 flex-1"
                     />
                     <button
                       onClick={() => setObjectives(o => o.filter((_, j) => j !== i))}
-                      className="text-gray-600 hover:text-red-400"
+                      className="text-gray-400 hover:text-red-500"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -193,12 +208,12 @@ export default function LessonBlockEditor({
             {previewMode ? (
               <div className="space-y-4">
                 {blocks.map(block => (
-                  <div key={block.id} className="bg-white rounded-xl overflow-hidden">
+                  <div key={block.id} className="bg-white rounded-xl overflow-hidden shadow-sm">
                     <BlockPreview block={block} />
                   </div>
                 ))}
                 {blocks.length === 0 && (
-                  <div className="text-center text-gray-500 py-12">No content blocks yet. Switch to Edit mode to add blocks.</div>
+                  <div className="text-center text-gray-400 py-12">No content blocks yet. Switch to Edit mode to add blocks.</div>
                 )}
               </div>
             ) : (
@@ -223,15 +238,15 @@ export default function LessonBlockEditor({
               <div className="mt-4">
                 <button
                   onClick={() => setAddMenuOpen(o => !o)}
-                  className="w-full border-2 border-dashed border-teal-800/50 hover:border-teal-500/60 rounded-xl py-3 text-teal-500 hover:text-teal-400 text-sm flex items-center justify-center gap-2 transition-colors"
+                  className="w-full border-2 border-dashed border-teal-300 hover:border-teal-500 rounded-xl py-3 text-teal-600 hover:text-teal-700 text-sm flex items-center justify-center gap-2 transition-colors bg-white"
                 >
                   <Plus className="w-4 h-4" /> Add Block
                 </button>
 
                 {addMenuOpen && (
-                  <div className="mt-2 bg-[#071e22] border border-teal-900/50 rounded-xl overflow-hidden shadow-2xl">
+                  <div className="mt-2 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-lg">
                     {/* Category tabs */}
-                    <div className="flex border-b border-teal-900/40 overflow-x-auto">
+                    <div className="flex border-b border-gray-200 overflow-x-auto bg-gray-50">
                       {CATALOG_CATEGORIES.map(cat => (
                         <button
                           key={cat}
@@ -239,8 +254,8 @@ export default function LessonBlockEditor({
                           className={cn(
                             "px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors",
                             activeCategory === cat
-                              ? "text-teal-300 border-b-2 border-teal-400 bg-teal-900/20"
-                              : "text-gray-500 hover:text-gray-300"
+                              ? "text-teal-700 border-b-2 border-teal-500 bg-white"
+                              : "text-gray-500 hover:text-gray-700"
                           )}
                         >
                           {cat}
@@ -253,9 +268,9 @@ export default function LessonBlockEditor({
                         <button
                           key={b.type}
                           onClick={() => addBlock(b.type)}
-                          className="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-teal-900/30 text-gray-400 hover:text-teal-300 transition-colors text-center"
+                          className="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-teal-50 text-gray-600 hover:text-teal-700 transition-colors text-center"
                         >
-                          <span className="text-teal-500">{b.icon}</span>
+                          <span className="text-teal-600">{b.icon}</span>
                           <span className="text-[10px] leading-tight">{b.label}</span>
                         </button>
                       ))}
@@ -268,10 +283,10 @@ export default function LessonBlockEditor({
 
           {/* Right: Settings panel */}
           {!previewMode && selectedBlock && (
-            <div className="w-72 shrink-0 bg-[#071e22] border-l border-teal-900/40 overflow-y-auto">
-              <div className="px-4 py-3 border-b border-teal-900/40 flex items-center justify-between">
-                <span className="text-teal-300 text-xs font-bold uppercase tracking-wide">Block Settings</span>
-                <button onClick={() => setSelectedBlockId(null)} className="text-gray-500 hover:text-white">
+            <div className="w-72 shrink-0 bg-white border-l border-gray-200 overflow-y-auto">
+              <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+                <span className="text-gray-700 text-xs font-bold uppercase tracking-wide">Block Settings</span>
+                <button onClick={() => setSelectedBlockId(null)} className="text-gray-400 hover:text-gray-700">
                   <X className="w-4 h-4" />
                 </button>
               </div>

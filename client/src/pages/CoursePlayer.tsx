@@ -212,7 +212,7 @@ export default function CoursePlayer() {
   const utils = trpc.useUtils();
 
   const { data, isLoading } = trpc.lmsLearner.getCoursePlayer.useQuery(
-    { slug: slug!, preview: isPreviewMode || adminPreviewStudent },
+    { slug: slug!, preview: isPreviewMode || adminPreviewStudent || isAdmin },
     { enabled: !!slug && !!user }
   );
   const { data: lessonData, isLoading: lessonLoading, refetch: refetchLesson } = trpc.lmsLearner.getLesson.useQuery(
@@ -276,6 +276,8 @@ export default function CoursePlayer() {
   };
 
   if (!user) { navigate("/login"); return null; }
+  // Admins always bypass the enrollment gate — they can preview any course directly
+  const adminBypass = isAdmin && !adminPreviewStudent;
 
   if (isLoading) {
     return (
@@ -291,7 +293,7 @@ export default function CoursePlayer() {
     );
   }
 
-  if (!data?.enrollment && !isPreviewMode && !adminPreviewStudent) {
+  if (!data?.enrollment && !isPreviewMode && !adminPreviewStudent && !adminBypass) {
     return (
       <div className="text-center py-20 bg-gray-50 min-h-screen">
         <Lock className="w-12 h-12 mx-auto mb-3 text-teal-500" />
@@ -857,6 +859,9 @@ export default function CoursePlayer() {
             initialObjectives={learningObjectives}
             onClose={() => setShowBlockEditor(false)}
             onSaved={() => {
+              refetchLesson();
+            }}
+            onSavedAndClose={() => {
               setShowBlockEditor(false);
               refetchLesson();
             }}

@@ -1736,3 +1736,17 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Branch rule edges shown as solid colored arrows
 - [x] Toggle between List view and Diagram view in FunnelBuilder
 - [x] Diagram fetches branch rules for all pages in the funnel
+
+## LMS Editor Save & Close (May 14)
+- [x] Lesson editor: add "Save" and "Save & Close" buttons
+- [x] Course content editor: add "Save" and "Save & Close" buttons
+- [x] Module editor: keep "Save" only (no Save & Close)
+
+## LMS Editor Save & Close + Admin Preview (May 14)
+- [x] LessonEditorPage settings tab: add "Save" and "Save & Close" buttons
+- [x] LessonBlockEditor content tab: add "Save" and "Save & Close" buttons
+- [x] Module (section) editor: keep "Save" only — no Save & Close
+- [x] Admin preview bypass: admins can preview courses/lessons without login prompt
+- [x] CoursePlayer: skip auth gate when user is admin (render as preview mode)
+- [x] Lesson viewer: skip premium/enrollment gate when user is admin
+- [x] LessonBlockEditor: retheme from dark to light color scheme (white/gray background, dark text)

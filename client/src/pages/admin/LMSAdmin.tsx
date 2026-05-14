@@ -746,7 +746,7 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
         <ImportMediaAsLessonDialog sectionId={importMediaSection} courseId={courseId} onClose={() => setImportMediaSection(null)} onCreated={() => { setImportMediaSection(null); refetch(); }} />
       )}
       {editLesson && (
-        <LessonEditorPage lesson={editLesson} onClose={() => setEditLesson(null)} onSaved={() => { setEditLesson(null); refetch(); }} />
+        <LessonEditorPage lesson={editLesson} onClose={() => setEditLesson(null)} onSaved={() => { refetch(); }} onSavedAndClose={() => { setEditLesson(null); refetch(); }} />
       )}
       {quizLesson && (
         <QuizBuilderDialog lesson={quizLesson} onClose={() => setQuizLesson(null)} />
@@ -1647,7 +1647,7 @@ function AddLessonDialog({ courseId, sectionId, onClose, onCreated }: {
 
 // ─── Full-Screen Lesson Editor Page ─────────────────────────────────────────
 
-function LessonEditorPage({ lesson, onClose, onSaved }: { lesson: any; onClose: () => void; onSaved: () => void }) {
+function LessonEditorPage({ lesson, onClose, onSaved, onSavedAndClose }: { lesson: any; onClose: () => void; onSaved: () => void; onSavedAndClose?: () => void }) {
   const [activeTab, setActiveTab] = useState<"settings" | "content" | "quiz">("settings");
   const [title, setTitle] = useState(lesson.title);
   const [content, setContent] = useState(lesson.content ?? "");
@@ -1661,11 +1661,11 @@ function LessonEditorPage({ lesson, onClose, onSaved }: { lesson: any; onClose: 
   const [selectedAsset, setSelectedAsset] = useState<{ id: number; title: string; s3Url: string; mediaType: string } | null>(null);
 
   const update = trpc.lmsAdmin.updateLesson.useMutation({
-    onSuccess: () => { toast.success("Lesson saved"); onSaved(); },
+    onSuccess: () => { toast.success("Lesson saved"); },
     onError: e => toast.error(`Error: ${e.message}`),
   });
 
-  const handleSave = () => {
+  const handleSave = (andClose = false) => {
     update.mutate({
       id: lesson.id,
       title: title.trim(),
@@ -1677,6 +1677,8 @@ function LessonEditorPage({ lesson, onClose, onSaved }: { lesson: any; onClose: 
       videoContent: lesson.type === "video_text" ? (videoContent || null) : undefined,
       embedUrl: lesson.type === "embed" ? (embedUrl || null) : undefined,
       mediaAssetId: selectedAsset?.id ?? undefined,
+    }, {
+      onSuccess: () => { if (andClose && onSavedAndClose) { onSavedAndClose(); } else { onSaved(); } },
     });
   };
 
@@ -1841,11 +1843,19 @@ function LessonEditorPage({ lesson, onClose, onSaved }: { lesson: any; onClose: 
         <div className="flex justify-end gap-2 pt-2 border-t">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button
+            variant="outline"
+            className="border-teal-300 text-teal-700 hover:bg-teal-50"
+            disabled={update.isPending}
+            onClick={() => handleSave(false)}
+          >
+            {update.isPending ? "Saving..." : "Save"}
+          </Button>
+          <Button
             className="bg-teal-600 hover:bg-teal-700 text-white"
             disabled={update.isPending}
-            onClick={handleSave}
+            onClick={() => handleSave(true)}
           >
-            {update.isPending ? "Saving..." : "Save Lesson"}
+            {update.isPending ? "Saving..." : "Save & Close"}
           </Button>
         </div>
       </div>
@@ -1862,6 +1872,7 @@ function LessonEditorPage({ lesson, onClose, onSaved }: { lesson: any; onClose: 
             initialObjectives={lesson.learningObjectives ? (typeof lesson.learningObjectives === "string" ? JSON.parse(lesson.learningObjectives) : lesson.learningObjectives) as string[] : []}
             onClose={() => setActiveTab("settings")}
             onSaved={() => { onSaved(); }}
+            onSavedAndClose={() => { if (onSavedAndClose) onSavedAndClose(); else onSaved(); }}
           />
         </div>
       )}
