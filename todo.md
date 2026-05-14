@@ -1824,3 +1824,16 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Show text preview (first few words) for each block in "Copy from other lessons" picker — strips HTML, handles all block types
 - [x] Display blocks in position order in the picker (server orders by position, client preserves order)
 - [x] Show block type icon + catalog label in picker row for quick identification
+
+## Bugs (May 14 — Priority)
+- [ ] Fix "Preview as Student" — redirects to dashboard instead of course player
+- [ ] Fix "Preview Course" button — gives 404
+- [ ] Fix section rename delay — add optimistic update so title updates instantly
+- [ ] Fix lesson add/duplicate delay — add optimistic update so new lesson appears instantly
+- [x] Fix up/down arrows in LessonBlockEditor being blocked/covered by overlapping elements — moved inside SortableBlock toolbar
+- [x] Add "Add Block" button to top toolbar of LessonBlockEditor
+- [x] Fix Preview Course button route (/course/ → /learn/) and open in new tab
+- [x] Optimistic update for section rename — instant title update without refetch delay
+- [x] Optimistic update for add section — immediately append new section row
+- [x] Section rename: single-click pencil icon triggers inline edit (not just double-click)
+- [ ] Add "Add Block" button to top toolbar of LessonBlockEditor

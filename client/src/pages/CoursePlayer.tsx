@@ -198,7 +198,7 @@ export default function CoursePlayer() {
   const searchString = useSearch();
   const isPreviewMode = searchString.includes("preview=student");
   const [, navigate] = useLocation();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const isAdmin = user?.role === "admin";
 
   const [selectedLessonId, setSelectedLessonId] = useState<number | null>(null);
@@ -275,6 +275,20 @@ export default function CoursePlayer() {
     if (nextLesson) setSelectedLessonId(nextLesson.id);
   };
 
+  // Wait for auth to finish loading before redirecting — avoids false redirect on initial render
+  if (authLoading) {
+    return (
+      <div className="flex h-screen bg-gray-50">
+        <div className="w-72 border-r border-gray-200 p-4 space-y-3">
+          {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+        </div>
+        <div className="flex-1 p-8 space-y-4">
+          <Skeleton className="h-8 w-1/2" />
+          <Skeleton className="h-96 w-full" />
+        </div>
+      </div>
+    );
+  }
   if (!user) { navigate("/login"); return null; }
   // Admins always bypass the enrollment gate — they can preview any course directly
   const adminBypass = isAdmin && !adminPreviewStudent;

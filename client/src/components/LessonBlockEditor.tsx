@@ -23,7 +23,7 @@ import {
   Block, BlockType, BLOCK_CATALOG, CATALOG_CATEGORIES, BlockPreview, BlockSettings, SortableBlock, uid,
 } from "@/pages/admin/LandingPageBuilder";
 import {
-  X, Plus, Save, Eye, EyeOff, ChevronUp, ChevronDown, Copy, BookOpen, Search,
+  X, Plus, Save, Eye, EyeOff, Copy, BookOpen, Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -285,6 +285,15 @@ export default function LessonBlockEditor({
             <span className="text-gray-400 text-xs">Blocks appear below the video in the player</span>
           </div>
           <div className="flex items-center gap-2">
+            {!previewMode && (
+              <Button
+                size="sm"
+                className="bg-teal-500 hover:bg-teal-600 text-white text-xs h-7 font-semibold"
+                onClick={() => setAddMenuOpen(true)}
+              >
+                <Plus className="w-3 h-3 mr-1" /> Add Block
+              </Button>
+            )}
             <Button
               size="sm"
               variant="outline"
@@ -323,7 +332,7 @@ export default function LessonBlockEditor({
 
         <div className="flex flex-1 overflow-hidden">
           {/* Left: Canvas */}
-          <div className="flex-1 overflow-y-auto bg-gray-50 p-4 pl-10">
+          <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
             {/* Blocks canvas */}
             {previewMode ? (
               <div className="space-y-4">
@@ -340,34 +349,16 @@ export default function LessonBlockEditor({
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
                   {blocks.map((block, idx) => (
-                    <div key={block.id} className="relative group/blockrow">
-                      {/* Up/Down arrow buttons */}
-                      <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-7 flex flex-col gap-0.5 opacity-0 group-hover/blockrow:opacity-100 transition-opacity z-10">
-                        <button
-                          disabled={idx === 0}
-                          onClick={() => moveBlock(block.id, -1)}
-                          className="w-5 h-5 flex items-center justify-center rounded bg-white border border-gray-200 text-gray-400 hover:text-teal-600 hover:border-teal-300 disabled:opacity-30 disabled:cursor-not-allowed shadow-sm"
-                          title="Move up"
-                        >
-                          <ChevronUp className="w-3 h-3" />
-                        </button>
-                        <button
-                          disabled={idx === blocks.length - 1}
-                          onClick={() => moveBlock(block.id, 1)}
-                          className="w-5 h-5 flex items-center justify-center rounded bg-white border border-gray-200 text-gray-400 hover:text-teal-600 hover:border-teal-300 disabled:opacity-30 disabled:cursor-not-allowed shadow-sm"
-                          title="Move down"
-                        >
-                          <ChevronDown className="w-3 h-3" />
-                        </button>
-                      </div>
-                      <SortableBlock
-                        block={block}
-                        isSelected={block.id === selectedBlockId}
-                        onSelect={() => setSelectedBlockId(block.id === selectedBlockId ? null : block.id)}
-                        onDelete={() => deleteBlock(block.id)}
-                        onDuplicate={() => duplicateBlock(block.id)}
-                      />
-                    </div>
+                    <SortableBlock
+                      key={block.id}
+                      block={block}
+                      isSelected={block.id === selectedBlockId}
+                      onSelect={() => setSelectedBlockId(block.id === selectedBlockId ? null : block.id)}
+                      onDelete={() => deleteBlock(block.id)}
+                      onDuplicate={() => duplicateBlock(block.id)}
+                      onMoveUp={idx > 0 ? () => moveBlock(block.id, -1) : undefined}
+                      onMoveDown={idx < blocks.length - 1 ? () => moveBlock(block.id, 1) : undefined}
+                    />
                   ))}
                 </SortableContext>
               </DndContext>

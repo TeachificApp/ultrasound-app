@@ -653,12 +653,16 @@ function SortableSectionRow({ section, children, onAddLesson, onDrip, onDelete, 
           />
         ) : (
           <span
-            className="font-medium text-sm text-gray-800 flex-1 cursor-pointer hover:text-teal-700 group/title"
-            title="Click to rename"
+            className="font-medium text-sm text-gray-800 flex-1 cursor-pointer hover:text-teal-700 group/title flex items-center gap-1"
+            title="Click pencil or double-click to rename"
             onDoubleClick={() => { setTitleDraft(section.title); setEditingTitle(true); }}
           >
-            {section.title}
-            <Pencil className="inline w-3 h-3 ml-1.5 text-gray-300 group-hover/title:text-teal-400 transition-colors" />
+            <span>{section.title}</span>
+            <Pencil
+              className="w-3 h-3 text-gray-300 group-hover/title:text-teal-400 transition-colors shrink-0 cursor-pointer hover:text-teal-600"
+              onClick={(e) => { e.stopPropagation(); setTitleDraft(section.title); setEditingTitle(true); }}
+              title="Rename section"
+            />
           </span>
         )}
         <Button size="sm" variant="ghost" className="h-7 text-xs text-teal-600" onClick={onAddLesson}>
@@ -882,7 +886,7 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
         <Button
           size="sm" variant="outline"
           className="h-8 text-xs text-teal-600 border-teal-300"
-          onClick={() => navigate(`/course/${course.slug}/player`)}
+          onClick={() => window.open(`/learn/${course.slug}/player`, '_blank')}
         >
           <Eye className="w-3 h-3 mr-1" /> Preview Course
         </Button>
@@ -967,7 +971,11 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
                       onDelete={() => { if (confirm(`Delete section "${section.title}" and all its lessons?`)) deleteSection.mutate({ id: section.id }); }}
                       onMoveUp={si > 0 ? () => setLocalSections(prev => { const r = arrayMove(prev, si, si - 1); reorderSections.mutate({ sections: r.map((s: any, i: number) => ({ id: s.id, position: i })) }); return r; }) : undefined}
                       onMoveDown={si < localSections.length - 1 ? () => setLocalSections(prev => { const r = arrayMove(prev, si, si + 1); reorderSections.mutate({ sections: r.map((s: any, i: number) => ({ id: s.id, position: i })) }); return r; }) : undefined}
-                      onRenameSection={(newTitle) => updateSection.mutate({ id: section.id, title: newTitle })}
+                      onRenameSection={(newTitle) => {
+                        // Optimistic update — update title immediately in local state
+                        setLocalSections(prev => prev.map(s => s.id === section.id ? { ...s, title: newTitle } : s));
+                        updateSection.mutate({ id: section.id, title: newTitle });
+                      }}
                     >
                       <SortableContext items={section.lessons.map((l: any) => l.id)} strategy={verticalListSortingStrategy}>
                         <div className="divide-y divide-gray-100">
@@ -1023,7 +1031,12 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
       </Tabs>
 
       {/* Dialogs */}
-      <AddSectionDialog open={addSectionOpen} courseId={courseId} onClose={() => setAddSectionOpen(false)} onCreated={() => { setAddSectionOpen(false); refetch(); }} />
+      <AddSectionDialog open={addSectionOpen} courseId={courseId} onClose={() => setAddSectionOpen(false)} onCreated={(newSection) => {
+        setAddSectionOpen(false);
+        // Optimistic append — immediately show the new section without waiting for refetch
+        setLocalSections(prev => [...prev, { ...newSection, position: prev.length, lessons: [], isPreview: false, dripDays: 0 }]);
+        refetch();
+      }} />
       {editSectionDrip && (
         <SectionDripDialog
           section={editSectionDrip}
@@ -1761,11 +1774,10 @@ function SectionDripDialog({ section, onClose, onSave }: { section: any; onClose
   );
 }
 // ─── Add Section Dialog ───────────────────────────────────────────────────────
-function AddSectionDialog({ open, courseId, onClose, onCreated }: { open: boolean; courseId: number; onClose: () => void; onCreated: () => void }) {
-  
+function AddSectionDialog({ open, courseId, onClose, onCreated }: { open: boolean; courseId: number; onClose: () => void; onCreated: (section: { id: number; title: string }) => void }) {
   const [title, setTitle] = useState("");
   const create = trpc.lmsAdmin.createSection.useMutation({
-    onSuccess: () => { toast.success("Section added"); setTitle(""); onCreated(); },
+    onSuccess: (data) => { toast.success("Section added"); const t = title.trim(); setTitle(""); onCreated({ id: data.id, title: t }); },
     onError: e => toast.error(`Error: ${e.message}`),
   });
   return (
