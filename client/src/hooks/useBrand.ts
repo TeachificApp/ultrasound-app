@@ -29,7 +29,7 @@ const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
   },
   iheartecho: {
     brand: "iheartecho",
-    name: "iHeartEcho",
+    name: "iHeartEcho™",
     shortName: "EchoAssist",
     tagline: "Echocardiography Clinical Intelligence",
     primaryColor: "#189aa1", // teal brand

@@ -101,7 +101,7 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
         <div className="px-4 py-5 flex items-center gap-2.5 border-b border-white/10">
           <div className="flex items-center gap-1 flex-shrink-0">
             <img src={AAUS_LOGO} alt="All About Ultrasound" className="w-9 h-9 rounded-full" />
-            <img src={IHE_LOGO} alt="iHeartEcho" className="w-9 h-9 rounded-full" />
+            <img src={IHE_LOGO} alt="iHeartEcho™" className="w-9 h-9 rounded-full" />
           </div>
           <div className="flex flex-col min-w-0">
             <span className="text-white text-[11px] font-medium leading-tight">All About Ultrasound <span className="text-white/50">|</span> iHeartEcho</span>

@@ -102,7 +102,7 @@ export default function Login() {
               ? <img src={LOGO} alt="All About Ultrasound™" className="w-16 h-16 object-contain drop-shadow-lg" />
               : null
             }
-            {isCombined && !isIHE && <img src={IHE_LOGO} alt="iHeartEcho" className="w-16 h-16 object-contain drop-shadow-lg" />}
+            {isCombined && !isIHE && <img src={IHE_LOGO} alt="iHeartEcho™" className="w-16 h-16 object-contain drop-shadow-lg" />}
             {!LOGO && !isCombined && !isIHE && (
               <div className="w-20 h-20 rounded-full flex items-center justify-center" style={{ background: "rgba(24,154,161,0.3)" }}>
                 <Stethoscope className="w-10 h-10 text-white" />
@@ -157,7 +157,7 @@ export default function Login() {
               ? <img src={LOGO} alt="All About Ultrasound™" className="w-10 h-10 object-contain" />
               : <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#189aa1" }}><Stethoscope className="w-5 h-5 text-white" /></div>
             }
-            {isCombined && !isIHE && <img src={IHE_LOGO} alt="iHeartEcho" className="w-10 h-10 object-contain" />}
+            {isCombined && !isIHE && <img src={IHE_LOGO} alt="iHeartEcho™" className="w-10 h-10 object-contain" />}
             <div className="text-xl font-black" style={{ fontFamily: "Merriweather, serif", color: "#0e1e2e" }}>{BRAND_NAME}</div>
           </div>
 

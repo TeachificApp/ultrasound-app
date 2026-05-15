@@ -20,7 +20,7 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
 
 const BRAND_LABELS: Record<string, string> = {
   aaus: "All About Ultrasound",
-  iheartecho: "iHeartEcho",
+  iheartecho: "iHeartEcho™",
 };
 
 function CourseCard({ course }: { course: any }) {

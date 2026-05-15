@@ -611,7 +611,7 @@ export default function CourseLanding() {
                 {TYPE_ICONS[course.type]} {course.type.charAt(0).toUpperCase() + course.type.slice(1)}
               </Badge>
               <Badge variant="outline" className="border-teal-400 text-teal-200">
-                {course.brand === "aaus" ? "All About Ultrasound™" : "iHeartEcho"}
+                {course.brand === "aaus" ? "All About Ultrasound™" : "iHeartEcho™"}
               </Badge>
             </div>
             <h1 className="text-3xl font-bold leading-tight">{lp?.heroTitle ?? course.title}</h1>

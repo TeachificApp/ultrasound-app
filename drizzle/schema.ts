@@ -2741,7 +2741,15 @@ export const lmsCourses = mysqlTable("lms_courses", {
   // Hide the progress bar/percentage from students in the course player and overview
   hideProgress: boolean("hide_progress").default(false).notNull(),
   // Block editor content for the Course Overview page (JSON array of Block objects)
+  // courseOverviewTopBlocks: shown ABOVE the progress bar
+  // courseOverviewBlocks: shown BETWEEN progress bar and curriculum (middle zone)
+  // courseOverviewBottomBlocks: shown BELOW the curriculum outline
+  courseOverviewTopBlocks: longtext("course_overview_top_blocks"),
   courseOverviewBlocks: longtext("course_overview_blocks"),
+  courseOverviewBottomBlocks: longtext("course_overview_bottom_blocks"),
+  // Send a welcome/enrollment confirmation email to the student when they enroll in this course
+  // Can be overridden per-course; also subject to the platform-wide enrollmentEmailEnabled setting
+  sendEnrollmentEmail: boolean("send_enrollment_email").default(true).notNull(),
   // Course color scheme — applied to player sidebar, overview curriculum, landing page curriculum block
   // primaryColor: main brand color (buttons, active states, section headers)
   // accentColor: secondary/highlight color
@@ -3673,3 +3681,22 @@ export const funnelBranchConditions = mysqlTable("funnel_branch_conditions", {
 });
 export type FunnelBranchCondition = typeof funnelBranchConditions.$inferSelect;
 export type InsertFunnelBranchCondition = typeof funnelBranchConditions.$inferInsert;
+
+// ─── Platform Settings ────────────────────────────────────────────────────────
+// Singleton table (always exactly one row, id=1).
+// Stores platform-wide configuration toggles and defaults.
+
+export const platformSettings = mysqlTable("platform_settings", {
+  id: int("id").primaryKey().default(1),
+  // ── Email / Notification toggles ──
+  // Master switch: if false, no enrollment emails are sent regardless of per-course setting
+  enrollmentEmailEnabled: boolean("enrollment_email_enabled").default(true).notNull(),
+  // Custom subject line override (null = use the default template subject)
+  enrollmentEmailSubject: varchar("enrollment_email_subject", { length: 255 }),
+  // Optional custom intro paragraph prepended to the enrollment email body (plain text / HTML)
+  enrollmentEmailIntro: text("enrollment_email_intro"),
+  // ── Future platform-wide toggles go here ──
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+
+export type PlatformSettings = typeof platformSettings.$inferSelect;

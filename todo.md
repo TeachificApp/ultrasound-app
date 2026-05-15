@@ -1910,3 +1910,13 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Fix CourseOverview WYSIWYG editor to show full page preview (header, progress bar, curriculum)
 - [ ] Fix desktop sidebar notes/bookmarks panels in CoursePlayer
 - [x] Fix LessonNoteEditor to invalidate notes query after saving (already correct — getCourseNotes.invalidate in onSuccess)
+
+## Enrollment Email Notifications (May 15)
+- [ ] Add sendEnrollmentEmail boolean column to lms_courses (per-course toggle, default true)
+- [ ] Add platform_settings table with enrollmentEmailEnabled boolean (platform-wide toggle)
+- [ ] Build enrollment email HTML template (welcome to course, CTA to start learning)
+- [ ] Build sendEnrollmentEmail() server helper using SendGrid
+- [ ] Wire enrollment email into: admin manual enroll, Stripe checkout.session.completed, group seat assignment
+- [ ] Add platform email settings UI in Admin panel (toggle + test send button)
+- [ ] Add per-course enrollment email toggle to Course Settings tab in LMS Admin
+- [ ] Tests for enrollment email logic

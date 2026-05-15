@@ -37,7 +37,7 @@ export default function GetAppBanner() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [location] = useLocation();
   const isIHE = useMemo(() => isIHeartEchoDomain(), []);
-  const appName = isIHE ? "iHeartEcho" : "UltrasoundAssist\u2122";
+  const appName = isIHE ? "iHeartEcho™" : "UltrasoundAssist™";
   const appIcon = isIHE ? IHE_ICON : AAUS_ICON;
 
   useEffect(() => {

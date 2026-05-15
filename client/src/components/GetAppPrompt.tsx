@@ -129,7 +129,7 @@ export default function GetAppPrompt() {
           {/* App icon */}
           <img
             src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/icon-192_df958e9b.png"
-            alt="iHeartEcho"
+            alt="iHeartEcho™"
             className="w-12 h-12 rounded-xl flex-shrink-0 shadow-md"
           />
 
@@ -186,7 +186,7 @@ export default function GetAppPrompt() {
             <div className="flex items-center gap-3 mb-5">
               <img
                 src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/icon-192_df958e9b.png"
-                alt="iHeartEcho"
+                alt="iHeartEcho™"
                 className="w-12 h-12 rounded-xl shadow-md"
               />
               <div>

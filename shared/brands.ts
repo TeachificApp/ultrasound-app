@@ -65,11 +65,11 @@ export function getBrandDisplayConfig(mode: BrandMode): BrandDisplayConfig {
     case "iheartecho":
       return {
         brandMode: "iheartecho",
-        displayName: "iHeartEcho",
-        shortName: "iHeartEcho",
+        displayName: "iHeartEcho™",
+        shortName: "iHeartEcho™",
         tagline: "Echocardiography Clinical Intelligence",
         senderEmail: "noreply@iheartecho.com",
-        senderName: "iHeartEcho",
+        senderName: "iHeartEcho™",
         supportEmail: "support@iheartecho.com",
         websiteUrl: "https://www.iheartecho.com",
         appUrl: "https://app.iheartecho.com",
@@ -81,11 +81,11 @@ export function getBrandDisplayConfig(mode: BrandMode): BrandDisplayConfig {
     case "combined":
       return {
         brandMode: "combined",
-        displayName: "All About Ultrasound | iHeartEcho",
+        displayName: "All About Ultrasound | iHeartEcho™",
         shortName: "All About Ultrasound",
         tagline: "General, Vascular & Cardiac Ultrasound Clinical Intelligence",
         senderEmail: "noreply@allaboutultrasound.com",
-        senderName: "All About Ultrasound | iHeartEcho",
+        senderName: "All About Ultrasound | iHeartEcho™",
         supportEmail: "support@allaboutultrasound.com",
         websiteUrl: "https://www.allaboutultrasound.com",
         appUrl: "https://members.allaboutultrasound.com",

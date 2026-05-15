@@ -86,8 +86,8 @@ async function startServer() {
 
     const IHE_MANIFEST = {
       id: "https://app.iheartecho.com/",
-      name: "iHeartEcho",
-      short_name: "iHeartEcho",
+      name: "iHeartEcho™",
+      short_name: "iHeartEcho™",
       description: "Echocardiography Clinical Intelligence \u2014 real-time echo interpretation and measurement assistant for cardiac ultrasound students, sonographers, echocardiographers, cardiologists, physicians, residents, ACS professionals, and echo educators.",
       start_url: "/",
       scope: "/",

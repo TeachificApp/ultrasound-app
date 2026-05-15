@@ -63,15 +63,15 @@ describe("Brand Display Config", () => {
 
   it("returns iHeartEcho config for iheartecho mode", () => {
     const config = getBrandDisplayConfig("iheartecho");
-    expect(config.displayName).toBe("iHeartEcho");
-    expect(config.senderName).toContain("iHeartEcho");
+    expect(config.displayName).toBe("iHeartEcho™");
+    expect(config.senderName).toContain("iHeartEcho™");
     expect(config.primaryColor).toBe("#189aa1");
   });
 
   it("returns combined config for combined mode", () => {
     const config = getBrandDisplayConfig("combined");
     expect(config.displayName).toContain("All About Ultrasound");
-    expect(config.displayName).toContain("iHeartEcho");
+    expect(config.displayName).toContain("iHeartEcho™");
     expect(config.senderName).toContain("All About Ultrasound");
   });
 });
