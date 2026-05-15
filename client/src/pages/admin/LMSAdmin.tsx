@@ -13,6 +13,7 @@
  */
 import { useState, useEffect, useCallback, useRef } from "react";
 import type React from "react";
+import { cn } from "@/lib/utils";
 import {
   DndContext, DragOverlay, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent,
 } from "@dnd-kit/core";
