@@ -34,6 +34,7 @@ import { toast } from "sonner";
 import RichTextEditor from "@/components/RichTextEditor";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import { FUNNEL_TEMPLATES, getFunnelTemplateBlocks } from "@/lib/funnelTemplates";
+import { BlockPreview } from "@/components/BlockPreview";
 import {
   ArrowLeft, Save, Eye, Plus, Trash2, GripVertical, Type, Image, Video,
   List, Quote, CreditCard, Minus, Columns, X, Palette, AlignLeft,
@@ -46,7 +47,7 @@ import {
 
 // ─── Block Types & BlockPreview (re-exported from shared component) ─────────
 export type { BlockType, Block } from "@/components/BlockPreview";
-export { BlockPreview } from "@/components/BlockPreview";
+export { BlockPreview };
 
 export function uid() { return Math.random().toString(36).slice(2, 10); }
 

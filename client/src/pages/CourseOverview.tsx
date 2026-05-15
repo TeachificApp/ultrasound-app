@@ -10,23 +10,20 @@
  *   - "Continue Learning" button that navigates to the player
  *   - Admin: "Edit Overview" button to open the block editor
  */
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
 import {
   Award, BookOpen, CheckCircle, ChevronDown, ChevronRight, Clock, Edit3,
   Lock, PlayCircle, User, FileText, HelpCircle, Download, Monitor,
-  ArrowRight, ListChecks,
+  ArrowRight, ListChecks, ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
-
-const LessonBlockEditor = lazy(() => import("@/components/LessonBlockEditor"));
 
 const LOGO = import.meta.env.VITE_APP_LOGO as string;
 
@@ -42,55 +39,37 @@ function LessonTypeIcon({ type }: { type: string }) {
   }
 }
 
-// ─── Overview Block Editor (admin only) ───────────────────────────────────────
+// ─── Overview Block Editor (admin only) ─ redirects to LMS Admin Overview tab ─
 function OverviewBlockEditor({
   courseId,
-  initialBlocks,
   onClose,
-  onSaved,
 }: {
   courseId: number;
   initialBlocks: Block[];
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [blocks, setBlocks] = useState<Block[]>(initialBlocks);
-  const updateCourse = trpc.lmsAdmin.updateCourse.useMutation({
-    onSuccess: () => { toast.success("Overview saved"); onSaved(); onClose(); },
-    onError: (e) => toast.error(`Save failed: ${e.message}`),
-  });
-
-  const handleSave = () => {
-    updateCourse.mutate({ id: courseId, courseOverviewBlocks: JSON.stringify(blocks) });
-  };
-
+  const [, navigate] = useLocation();
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex flex-col">
-      <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between shrink-0">
-        <h2 className="font-semibold text-gray-900">Edit Course Overview</h2>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
-          <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={handleSave} disabled={updateCourse.isPending}>
-            {updateCourse.isPending ? "Saving..." : "Save Overview"}
-          </Button>
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center">
+      <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 text-center">
+        <div className="w-14 h-14 rounded-full bg-teal-50 flex items-center justify-center mx-auto mb-4">
+          <Edit3 className="w-7 h-7 text-teal-600" />
         </div>
-      </div>
-      <div className="flex-1 overflow-auto bg-gray-50 p-6">
-        <Suspense fallback={<div className="text-center py-20 text-gray-500">Loading editor...</div>}>
-          {/* We reuse LessonBlockEditor but pass a dummy lessonId — saving is handled by handleSave above */}
-          {/* Instead, render a simple block list preview + note */}
-          <div className="max-w-3xl mx-auto space-y-4">
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
-              <strong>Overview blocks</strong> are rendered above the curriculum accordion on the Course Overview page.
-              Use the full Lesson Block Editor to edit these blocks — open any lesson and use "Copy from other lessons" to reuse blocks.
-            </div>
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <p className="text-sm text-gray-500">
-                To edit overview blocks, use the <strong>Course Settings → Overview</strong> tab in the LMS Admin panel.
-              </p>
-            </div>
-          </div>
-        </Suspense>
+        <h2 className="text-lg font-bold text-gray-900 mb-2">Edit Course Overview</h2>
+        <p className="text-sm text-gray-500 mb-6">
+          The Course Overview editor is available in the LMS Admin panel under the <strong>Course Overview</strong> tab.
+          It provides a full drag-and-drop block editor with live preview.
+        </p>
+        <div className="flex flex-col gap-2">
+          <Button
+            className="bg-teal-600 hover:bg-teal-700 text-white w-full"
+            onClick={() => { navigate(`/admin/lms/${courseId}?tab=overview`); onClose(); }}
+          >
+            <ExternalLink className="w-4 h-4 mr-2" /> Open in Admin Panel
+          </Button>
+          <Button variant="outline" className="w-full" onClick={onClose}>Cancel</Button>
+        </div>
       </div>
     </div>
   );

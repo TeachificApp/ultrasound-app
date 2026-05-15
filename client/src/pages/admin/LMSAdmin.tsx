@@ -695,9 +695,10 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
   
   const utils = trpc.useUtils();
   const { data: course, isLoading, refetch } = trpc.lmsAdmin.getCourse.useQuery({ id: courseId });
-  const [activeTab, setActiveTab] = useState("settings");
+  const initialTab = (() => { try { return new URLSearchParams(window.location.search).get("tab") ?? "settings"; } catch { return "settings"; } })();
+  const [activeTab, setActiveTab] = useState(initialTab);
   // Track which tabs have been visited to lazy-mount heavy editors
-  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set(["settings"]));
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set([initialTab]));
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
     setVisitedTabs(prev => { const next = new Set(prev); next.add(tab); return next; });
@@ -899,18 +900,6 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
         >
           <Eye className="w-3 h-3 mr-1" /> Preview Course
         </Button>
-        <Button
-          size="sm" variant="ghost"
-          className="h-8 text-xs text-gray-500 hover:text-teal-600"
-          onClick={() => navigate(`/admin/lms/${courseId}/landing-builder`)}
-        >
-          <LinkIcon className="w-3 h-3 mr-1" /> Edit Landing Page
-        </Button>
-        <a href={`/learn/${course.slug}?preview=admin`} target="_blank" rel="noopener noreferrer">
-          <Button size="sm" variant="ghost" className="h-8 text-xs text-gray-400 hover:text-gray-600">
-            <Eye className="w-3 h-3 mr-1" /> Preview Landing Page
-          </Button>
-        </a>
         <a href={`/learn/${course.slug}/player?preview=student`} target="_blank" rel="noopener noreferrer">
           <Button size="sm" variant="outline" className="h-8 text-xs text-purple-600 border-purple-300 hover:bg-purple-50">
             <Users className="w-3 h-3 mr-1" /> Preview as Student
@@ -1031,6 +1020,20 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
 
         {/* Landing Page Tab — lazy-mounted on first visit to avoid parsing the large builder on load */}
         <TabsContent value="landing" className="mt-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Button
+              size="sm" variant="outline"
+              className="h-8 text-xs text-teal-600 border-teal-300 hover:bg-teal-50"
+              onClick={() => navigate(`/admin/lms/${courseId}/landing-builder`)}
+            >
+              <LinkIcon className="w-3 h-3 mr-1" /> Edit Landing Page (Full Builder)
+            </Button>
+            <a href={`/learn/${course.slug}?preview=admin`} target="_blank" rel="noopener noreferrer">
+              <Button size="sm" variant="ghost" className="h-8 text-xs text-gray-500 hover:text-teal-600">
+                <Eye className="w-3 h-3 mr-1" /> Preview Landing Page
+              </Button>
+            </a>
+          </div>
           {visitedTabs.has("landing") ? (
             <LandingPageEditor courseId={courseId} landingPage={course.landingPage} courseType={course.type} onSave={data => updateLandingPage.mutate({ courseId, ...data })} saving={updateLandingPage.isPending} />
           ) : (
@@ -1576,7 +1579,11 @@ function CourseOverviewEditor({
   initialBlocks: Block[];
   onSaved: () => void;
 }) {
-  const [blocks, setBlocks] = useState<Block[]>(initialBlocks);
+  const DEFAULT_OVERVIEW_BLOCKS: Block[] = [
+    { id: uid(), type: "text", data: { content: "<h2>Welcome to the Course Overview</h2><p>This section is visible to enrolled students. Use it to introduce the course, set expectations, and motivate learners before they dive into the curriculum.</p>", align: "left" } },
+    { id: uid(), type: "bullets", data: { headline: "What You'll Learn", items: ["Key skill or concept one", "Key skill or concept two", "Key skill or concept three"], iconColor: "#179ca3", bgColor: "#f8fffe" } },
+  ];
+  const [blocks, setBlocks] = useState<Block[]>(initialBlocks.length > 0 ? initialBlocks : DEFAULT_OVERVIEW_BLOCKS);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState(CATALOG_CATEGORIES[0]);

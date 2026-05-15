@@ -1899,3 +1899,7 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix TDZ ReferenceError in CoursePlayer bundle — extracted BlockPreview into shared component to break circular dependency with LandingPageBuilder
 - [x] Fix checkout buttons returning "Service Unavailable" JSON error — changed Stripe API version from beta "2026-03-25.dahlia" to stable "2024-06-20"
 - [x] Fix TDZ ReferenceError in CoursePlayer — moved dripBypassed/showStudentView declarations before prereqLockedIds block where they are first used (line 524)
+- [x] Move Edit/Preview Landing Page buttons from global header into the Landing Page tab
+- [x] CourseOverview WYSIWYG editor — default blocks shown when empty, redirects to LMS Admin Overview tab for editing
+- [x] LandingPageBuilder BlockPreview import fix — moved import to top of file to prevent 'BlockPreview is not defined' error
+- [x] CourseEditor reads ?tab= URL param to auto-open correct tab
