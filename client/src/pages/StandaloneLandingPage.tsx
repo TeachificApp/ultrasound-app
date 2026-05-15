@@ -86,7 +86,7 @@ import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { ArrowRight, CheckCircle, Globe, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import type { Block } from "./admin/LandingPageBuilder";
+import type { Block } from "@/components/BlockPreview";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import CheckoutFormBlock from "@/components/CheckoutFormBlock";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";

@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import LessonEffectPlayer, { fireLessonCompleteEffect } from "@/components/LessonEffectPlayer";
-import { BlockPreview, type Block } from "@/pages/admin/LandingPageBuilder";
+import { BlockPreview, type Block } from "@/components/BlockPreview";
 
 // Lazy-load the heavy editor so it doesn't bloat the initial bundle
 const LessonBlockEditor = lazy(() => import("@/components/LessonBlockEditor"));

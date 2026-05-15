@@ -24,16 +24,8 @@ import {
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import {
-  type Block,
-  type BlockType,
-  uid,
-  BLOCK_CATALOG,
-  CATALOG_CATEGORIES,
-  BlockPreview,
-  BlockSettings,
-  SortableBlock,
-} from "./LandingPageBuilder";
+import { type Block, type BlockType, BlockPreview } from "@/components/BlockPreview";
+import { uid, BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, SortableBlock } from "./LandingPageBuilder";
 import {
   ArrowLeft, Save, Eye, Plus, Palette, X, Layers,
 } from "lucide-react";

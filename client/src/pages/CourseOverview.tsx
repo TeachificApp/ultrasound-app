@@ -24,7 +24,7 @@ import {
   ArrowRight, ListChecks,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { BlockPreview, type Block } from "@/pages/admin/LandingPageBuilder";
+import { BlockPreview, type Block } from "@/components/BlockPreview";
 
 const LessonBlockEditor = lazy(() => import("@/components/LessonBlockEditor"));
 

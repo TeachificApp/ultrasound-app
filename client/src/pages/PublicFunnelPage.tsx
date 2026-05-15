@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Loader2, ArrowRight, CheckCircle, Globe, Users } from "lucide-react";
-import type { Block } from "./admin/LandingPageBuilder";
+import type { Block } from "@/components/BlockPreview";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import CheckoutFormBlock from "@/components/CheckoutFormBlock";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";

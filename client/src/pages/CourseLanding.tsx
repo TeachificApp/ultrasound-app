@@ -17,7 +17,7 @@ import { BookOpen, CheckCircle, ChevronRight, Clock, Download, HelpCircle, Lock,
 import OrderBumpOffer from "@/components/OrderBumpOffer";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
-import type { Block } from "./admin/LandingPageBuilder";
+import type { Block } from "@/components/BlockPreview";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

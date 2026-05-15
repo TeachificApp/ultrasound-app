@@ -19,9 +19,8 @@ import { toast } from "sonner";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Block, BlockType, BLOCK_CATALOG, CATALOG_CATEGORIES, BlockPreview, BlockSettings, SortableBlock, uid,
-} from "@/pages/admin/LandingPageBuilder";
+import { Block, BlockType, BlockPreview } from "@/components/BlockPreview";
+import { BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, SortableBlock, uid } from "@/pages/admin/LandingPageBuilder";
 import {
   X, Plus, Save, Eye, EyeOff, Copy, BookOpen, Search,
 } from "lucide-react";

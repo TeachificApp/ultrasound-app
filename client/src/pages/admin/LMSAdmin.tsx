@@ -44,9 +44,8 @@ import LessonEffectEditor from "@/components/LessonEffectEditor";
 import DigitalDownloadsAdmin from "./DigitalDownloadsAdmin";
 import OrderBumpsAdmin from "./OrderBumpsAdmin";
 import LessonBlockEditor from "@/components/LessonBlockEditor";
-import {
-  Block, BlockType, BLOCK_CATALOG, CATALOG_CATEGORIES, BlockPreview, BlockSettings, SortableBlock, uid,
-} from "@/pages/admin/LandingPageBuilder";
+import { Block, BlockType, BlockPreview } from "@/components/BlockPreview";
+import { BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, SortableBlock, uid } from "@/pages/admin/LandingPageBuilder";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

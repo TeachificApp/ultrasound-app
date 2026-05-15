@@ -1,4 +1,4 @@
-import type { Block } from "@/pages/admin/LandingPageBuilder";
+import type { Block } from "@/components/BlockPreview";
 
 function uid() {
   return Math.random().toString(36).slice(2, 10);

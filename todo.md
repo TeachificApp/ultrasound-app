@@ -1894,3 +1894,6 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Rewrite CourseOverview gating: same logic for accordion curriculum
 - [ ] Auto-enforce video completion when lesson isPrerequisite = true
 - [ ] If no Mark Complete button, prerequisite is satisfied by opening the lesson (or video completion if video exists)
+
+## Bug Fixes
+- [x] Fix TDZ ReferenceError in CoursePlayer bundle — extracted BlockPreview into shared component to break circular dependency with LandingPageBuilder
