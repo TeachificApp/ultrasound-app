@@ -1898,3 +1898,4 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 ## Bug Fixes
 - [x] Fix TDZ ReferenceError in CoursePlayer bundle — extracted BlockPreview into shared component to break circular dependency with LandingPageBuilder
 - [x] Fix checkout buttons returning "Service Unavailable" JSON error — changed Stripe API version from beta "2026-03-25.dahlia" to stable "2024-06-20"
+- [x] Fix TDZ ReferenceError in CoursePlayer — moved dripBypassed/showStudentView declarations before prereqLockedIds block where they are first used (line 524)

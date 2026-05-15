@@ -519,6 +519,9 @@ export default function CoursePlayer() {
   //   - Otherwise (no explicit completion mechanism): the gate is satisfied when
   //     the student has OPENED the lesson (i.e. it exists in progress, even without completedAt).
   const openedIds = new Set(progress.map((p: any) => p.lessonId));
+  // Drip bypass: must be declared BEFORE prereqLockedIds which uses it
+  const showStudentView = adminPreviewStudent || !isAdmin;
+  const dripBypassed = isAdmin && !showStudentView;
   // Prerequisite gating is independent of drip — always applies (admins bypass via dripBypassed)
   const prereqLockedIds = new Set<number>();
   if (!dripBypassed) {
@@ -574,10 +577,6 @@ export default function CoursePlayer() {
       return [];
     } catch { return []; }
   })();
-
-  const showStudentView = adminPreviewStudent || !isAdmin;
-  // Drip: admins not in student-view mode bypass all drip locks
-  const dripBypassed = isAdmin && !showStudentView;
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-gray-50">
