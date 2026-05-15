@@ -626,7 +626,7 @@ export const lmsLearnerRouter = router({
       if (pricingType === "free") throw new TRPCError({ code: "BAD_REQUEST", message: "Use enrollFree for free courses" });
 
       const Stripe = (await import("stripe")).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2026-03-25.dahlia" });
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
 
       const orderBumpCheckout = await buildOrderBumpCheckoutLine(db, {
         orderBumpId: input.orderBumpId,
@@ -768,10 +768,10 @@ export const lmsLearnerRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Unknown pricing type" });
       }
 
+      if (!session) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create checkout session" });
       await db.update(lmsOrders).set({ stripeSessionId: session.id }).where(eq(lmsOrders.id, orderResult.id));
       return { checkoutUrl: session.url };
     }),
-
   /** Accept group seat invite */
   acceptGroupInvite: protectedProcedure
     .input(z.object({ token: z.string() }))
