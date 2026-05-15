@@ -127,6 +127,17 @@ export default function CourseOverview() {
   }
 
   const { course, sections, topLevelLessons, progress, instructors } = data as any;
+  // ── Course Color Scheme ──────────────────────────────────────────────────────
+  const primaryColor = course.primaryColor ?? "#0d9488";
+  const accentColor = course.accentColor ?? "#0f766e";
+  const gradientStart = course.gradientFrom ?? primaryColor;
+  const gradientEnd = course.gradientTo ?? accentColor;
+  const gradientDirection = course.gradientDirection ?? "to right";
+  const gradientStyle = course.gradientFrom && course.gradientTo
+    ? { background: `linear-gradient(${gradientDirection}, ${gradientStart}, ${gradientEnd})` }
+    : { backgroundColor: primaryColor };
+  const primaryText = { color: primaryColor };
+  const primaryBg = { backgroundColor: primaryColor };
   const completedIds = new Set(
     (progress ?? []).filter((p: any) => p.completedAt).map((p: any) => p.lessonId)
   );
@@ -238,7 +249,7 @@ export default function CourseOverview() {
           {locked ? (
             <Lock className="w-4 h-4 text-gray-400" />
           ) : showDone ? (
-            <CheckCircle className="w-4 h-4 text-teal-500" />
+            <CheckCircle className="w-4 h-4" style={primaryText} />
           ) : (
             <LessonTypeIcon type={lesson.type} />
           )}
@@ -284,7 +295,8 @@ export default function CourseOverview() {
             {continueLesson && (
               <Button
                 size="sm"
-                className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5"
+                className="text-white gap-1.5"
+                style={gradientStyle}
                 onClick={() => navigate(`/learn/${slug}/player?lesson=${continueLesson.id}`)}
               >
                 {!course.hideProgress && completedCount > 0 ? "Continue" : "Start"} <ArrowRight className="w-3.5 h-3.5" />
@@ -300,12 +312,12 @@ export default function CourseOverview() {
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-gray-700">Your Progress</span>
-              <span className="text-sm font-bold text-teal-700">{progressPct}%</span>
+              <span className="text-sm font-bold" style={primaryText}>{progressPct}%</span>
             </div>
             <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
               <div
-                className="h-full bg-teal-500 rounded-full transition-all duration-500"
-                style={{ width: `${progressPct}%` }}
+                className="h-full rounded-full transition-all duration-500"
+                style={{ width: `${progressPct}%`, ...gradientStyle }}
               />
             </div>
             <p className="text-xs text-gray-500 mt-2">{completedCount} of {totalLessons} lessons completed</p>
@@ -324,7 +336,7 @@ export default function CourseOverview() {
         {/* Curriculum accordion */}
         <div>
           <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <ListChecks className="w-5 h-5 text-teal-600" /> Course Curriculum
+            <ListChecks className="w-5 h-5" style={primaryText} /> <span style={primaryText}>Course Curriculum</span>
           </h2>
 
           {/* Top-level lessons (no section) */}
@@ -363,7 +375,7 @@ export default function CourseOverview() {
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-[10px] text-gray-500">{sectionTotal} lesson{sectionTotal !== 1 ? "s" : ""}</span>
                       {sectionDone > 0 && !course.hideProgress && (
-                        <span className="text-[10px] text-teal-600 font-medium">{sectionDone}/{sectionTotal} done</span>
+                        <span className="text-[10px] font-medium" style={primaryText}>{sectionDone}/{sectionTotal} done</span>
                       )}
                       {sectionDripLocked && sectionUnlockDate && (
                         <span className="text-[10px] text-amber-600 flex items-center gap-1">
@@ -424,11 +436,11 @@ export default function CourseOverview() {
 
         {/* Certificate badge */}
         {course.hasCertificate && (
-          <div className="bg-teal-50 border border-teal-200 rounded-xl p-5 flex items-center gap-4">
-            <Award className="w-10 h-10 text-teal-600 shrink-0" />
+          <div className="rounded-xl p-5 flex items-center gap-4 border" style={{ backgroundColor: `${primaryColor}10`, borderColor: `${primaryColor}40` }}>
+            <Award className="w-10 h-10 shrink-0" style={primaryText} />
             <div>
-              <p className="font-semibold text-teal-900">Certificate of Completion</p>
-              <p className="text-sm text-teal-700">Complete all lessons to earn your certificate.</p>
+              <p className="font-semibold text-gray-900">Certificate of Completion</p>
+              <p className="text-sm text-gray-600">Complete all lessons to earn your certificate.</p>
             </div>
           </div>
         )}

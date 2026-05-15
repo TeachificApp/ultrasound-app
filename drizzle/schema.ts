@@ -2742,6 +2742,17 @@ export const lmsCourses = mysqlTable("lms_courses", {
   hideProgress: boolean("hide_progress").default(false).notNull(),
   // Block editor content for the Course Overview page (JSON array of Block objects)
   courseOverviewBlocks: longtext("course_overview_blocks"),
+  // Course color scheme — applied to player sidebar, overview curriculum, landing page curriculum block
+  // primaryColor: main brand color (buttons, active states, section headers)
+  // accentColor: secondary/highlight color
+  // gradientFrom/gradientTo: gradient start/end colors (used for section headers, progress bars)
+  // gradientDirection: CSS gradient direction (e.g. "to right", "135deg")
+  primaryColor: varchar("primary_color", { length: 20 }).default("#179ca3"),
+  accentColor: varchar("accent_color", { length: 20 }).default("#0d9488"),
+  gradientFrom: varchar("gradient_from", { length: 20 }).default("#179ca3"),
+  gradientTo: varchar("gradient_to", { length: 20 }).default("#0d9488"),
+  gradientDirection: varchar("gradient_direction", { length: 30 }).default("135deg"),
+  thumbnailUrl: text("thumbnail_url"),
   createdByUserId: int("created_by_user_id").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),

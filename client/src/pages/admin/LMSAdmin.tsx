@@ -37,7 +37,7 @@ import {
   Users, DollarSign, BarChart2, GripVertical, CheckCircle, AlertCircle,
   Link as LinkIcon, UserCheck, ArrowLeft, Upload, ImageIcon,
   Sparkles, Loader2, Eye, EyeOff, Save, X, FolderOpen, Monitor, Video, FileText, CheckSquare, Settings2,
-  User, Lock,
+  User, Lock, ListChecks, Award, PlayCircle, ArrowRight,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import LessonEffectEditor from "@/components/LessonEffectEditor";
@@ -661,11 +661,14 @@ function SortableSectionRow({ section, children, onAddLesson, onDrip, onDelete, 
             onDoubleClick={() => { setTitleDraft(section.title); setEditingTitle(true); }}
           >
             <span>{section.title}</span>
-            <Pencil
-              className="w-3 h-3 text-gray-300 group-hover/title:text-teal-400 transition-colors shrink-0 cursor-pointer hover:text-teal-600"
+            <button
+              type="button"
+              className="shrink-0 cursor-pointer"
               onClick={(e) => { e.stopPropagation(); setTitleDraft(section.title); setEditingTitle(true); }}
               title="Rename section"
-            />
+            >
+              <Pencil className="w-3 h-3 text-gray-300 group-hover/title:text-teal-400 transition-colors hover:text-teal-600" />
+            </button>
           </span>
         )}
         <Button size="sm" variant="ghost" className="h-7 text-xs text-teal-600" onClick={onAddLesson}>
@@ -916,6 +919,8 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
           <TabsTrigger value="landing" className="text-xs">Landing Page</TabsTrigger>
           <TabsTrigger value="overview" className="text-xs">Course Overview</TabsTrigger>
           <TabsTrigger value="instructors" className="text-xs">Instructors</TabsTrigger>
+          <TabsTrigger value="users" className="text-xs">Students</TabsTrigger>
+          <TabsTrigger value="analytics" className="text-xs">Analytics</TabsTrigger>
         </TabsList>
 
         {/* Settings Tab */}
@@ -1047,6 +1052,10 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
             <CourseOverviewEditor
               courseId={courseId}
               courseSlug={course.slug}
+              courseTitle={course.title}
+              courseThumbnail={course.thumbnailUrl ?? null}
+              sections={course.sections ?? []}
+              topLevelLessons={course.topLevelLessons ?? []}
               initialBlocks={course.courseOverviewBlocks ? (typeof course.courseOverviewBlocks === "string" ? JSON.parse(course.courseOverviewBlocks) : course.courseOverviewBlocks) : []}
               onSaved={() => refetch()}
             />
@@ -1058,6 +1067,16 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
         {/* Instructors Tab */}
         <TabsContent value="instructors" className="mt-4">
           <CourseInstructorsEditor courseId={courseId} courseInstructors={course.courseInstructors} onSaved={() => refetch()} />
+        </TabsContent>
+
+        {/* Students Tab */}
+        <TabsContent value="users" className="mt-4">
+          <CourseUsersTab courseId={courseId} />
+        </TabsContent>
+
+        {/* Analytics Tab */}
+        <TabsContent value="analytics" className="mt-4">
+          <CourseAnalyticsTab courseId={courseId} />
         </TabsContent>
       </Tabs>
 
@@ -1163,7 +1182,14 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
   const [slug, setSlug] = useState(course.slug ?? "");
   const [metaTitle, setMetaTitle] = useState(course.metaTitle ?? "");
   const [metaDescription, setMetaDescription] = useState(course.metaDescription ?? "");
-  const updateCourseSettings = trpc.lmsAdmin.updateCourseSettings.useMutation({
+  // Color scheme
+  const [primaryColor, setPrimaryColor] = useState(course.primaryColor ?? "#0d9488");
+  const [accentColor, setAccentColor] = useState(course.accentColor ?? "#0f766e");
+  const [gradientStart, setGradientStart] = useState(course.gradientFrom ?? "");
+  const [gradientEnd, setGradientEnd] = useState(course.gradientTo ?? "");
+  const [gradientDirection, setGradientDirection] = useState(course.gradientDirection ?? "to right");
+  const [useGradient, setUseGradient] = useState(!!(course.gradientFrom && course.gradientTo));
+  const updateCourseSettings = trpc.lmsGroup.updateCourseSettings.useMutation({
     onSuccess: () => toast.success("URL & SEO settings saved"),
     onError: (e) => toast.error(e.message),
   });
@@ -1408,6 +1434,66 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
         </div>
       </div>
 
+      {/* Color Scheme Section */}
+      <div className="border border-gray-200 rounded-lg p-4 space-y-4 bg-gray-50">
+        <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">🎨 Course Color Scheme</h3>
+        <p className="text-xs text-gray-500">These colors are applied to the course player sidebar, course overview curriculum, and landing page curriculum block.</p>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label className="text-sm">Primary Color</Label>
+            <div className="mt-1 flex items-center gap-2">
+              <input type="color" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} className="w-10 h-9 rounded border border-gray-300 cursor-pointer p-0.5" />
+              <Input value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} placeholder="#0d9488" className="flex-1 font-mono text-xs" maxLength={20} />
+            </div>
+          </div>
+          <div>
+            <Label className="text-sm">Accent Color</Label>
+            <div className="mt-1 flex items-center gap-2">
+              <input type="color" value={accentColor} onChange={e => setAccentColor(e.target.value)} className="w-10 h-9 rounded border border-gray-300 cursor-pointer p-0.5" />
+              <Input value={accentColor} onChange={e => setAccentColor(e.target.value)} placeholder="#0f766e" className="flex-1 font-mono text-xs" maxLength={20} />
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch checked={useGradient} onCheckedChange={setUseGradient} id="use-gradient-switch" />
+          <Label htmlFor="use-gradient-switch" className="text-sm">Use gradient header</Label>
+        </div>
+        {useGradient && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm">Gradient Start</Label>
+                <div className="mt-1 flex items-center gap-2">
+                  <input type="color" value={gradientStart || "#0d9488"} onChange={e => setGradientStart(e.target.value)} className="w-10 h-9 rounded border border-gray-300 cursor-pointer p-0.5" />
+                  <Input value={gradientStart} onChange={e => setGradientStart(e.target.value)} placeholder="#0d9488" className="flex-1 font-mono text-xs" maxLength={20} />
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm">Gradient End</Label>
+                <div className="mt-1 flex items-center gap-2">
+                  <input type="color" value={gradientEnd || "#0f766e"} onChange={e => setGradientEnd(e.target.value)} className="w-10 h-9 rounded border border-gray-300 cursor-pointer p-0.5" />
+                  <Input value={gradientEnd} onChange={e => setGradientEnd(e.target.value)} placeholder="#0f766e" className="flex-1 font-mono text-xs" maxLength={20} />
+                </div>
+              </div>
+            </div>
+            <div>
+              <Label className="text-sm">Gradient Direction</Label>
+              <select value={gradientDirection} onChange={e => setGradientDirection(e.target.value)} className="mt-1 w-full text-sm border border-gray-200 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                <option value="to right">Left → Right</option>
+                <option value="to left">Right → Left</option>
+                <option value="to bottom">Top → Bottom</option>
+                <option value="to top">Bottom → Top</option>
+                <option value="to bottom right">Top-Left → Bottom-Right</option>
+                <option value="to bottom left">Top-Right → Bottom-Left</option>
+              </select>
+            </div>
+            <div className="rounded-lg overflow-hidden h-12 border border-gray-200" style={{ background: `linear-gradient(${gradientDirection}, ${gradientStart || primaryColor}, ${gradientEnd || accentColor})` }}>
+              <div className="h-full flex items-center justify-center text-white text-xs font-medium opacity-80">Preview</div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* URL & SEO Section */}
       <div className="border border-gray-200 rounded-lg p-4 space-y-4 bg-gray-50">
         <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2"><LinkIcon className="w-4 h-4 text-teal-600" /> URL &amp; SEO Settings</h3>
@@ -1456,6 +1542,11 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
           trialDays: pricingType === "trial_then_subscription" ? (trialDays ? parseInt(trialDays) : null) : null,
           accessDurationDays: accessDurationDays ? parseInt(accessDurationDays) : null,
           coverImageUrl: coverImageUrl.trim() || undefined,
+          primaryColor: primaryColor || null,
+          accentColor: accentColor || null,
+          gradientFrom: useGradient ? (gradientStart || null) : null,
+          gradientTo: useGradient ? (gradientEnd || null) : null,
+          gradientDirection: gradientDirection || null,
         })}
       >
         {saving ? "Saving..." : "Save Settings"}
@@ -1571,19 +1662,23 @@ function LandingPageEditor({ courseId, landingPage, courseType, onSave, saving }
 function CourseOverviewEditor({
   courseId,
   courseSlug,
+  courseTitle,
+  courseThumbnail,
+  sections,
+  topLevelLessons,
   initialBlocks,
   onSaved,
 }: {
   courseId: number;
   courseSlug: string;
+  courseTitle: string;
+  courseThumbnail: string | null;
+  sections: any[];
+  topLevelLessons: any[];
   initialBlocks: Block[];
   onSaved: () => void;
 }) {
-  const DEFAULT_OVERVIEW_BLOCKS: Block[] = [
-    { id: uid(), type: "text", data: { content: "<h2>Welcome to the Course Overview</h2><p>This section is visible to enrolled students. Use it to introduce the course, set expectations, and motivate learners before they dive into the curriculum.</p>", align: "left" } },
-    { id: uid(), type: "bullets", data: { headline: "What You'll Learn", items: ["Key skill or concept one", "Key skill or concept two", "Key skill or concept three"], iconColor: "#179ca3", bgColor: "#f8fffe" } },
-  ];
-  const [blocks, setBlocks] = useState<Block[]>(initialBlocks.length > 0 ? initialBlocks : DEFAULT_OVERVIEW_BLOCKS);
+  const [blocks, setBlocks] = useState<Block[]>(initialBlocks);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState(CATALOG_CATEGORIES[0]);
@@ -1692,46 +1787,122 @@ function CourseOverviewEditor({
         </div>
       </div>
 
-      <div className="flex overflow-hidden" style={{ minHeight: 480 }}>
-        {/* Canvas */}
-        <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
-          {previewMode ? (
-            <div className="space-y-4">
-              {blocks.map(block => (
-                <div key={block.id} className="bg-white rounded-xl overflow-hidden shadow-sm">
-                  <BlockPreview block={block} />
+      <div className="flex overflow-hidden" style={{ minHeight: 600 }}>
+        {/* Canvas — full WYSIWYG page preview */}
+        <div className="flex-1 overflow-y-auto bg-gray-100">
+          {/* ── Read-only page chrome: Header ── */}
+          <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between gap-4 opacity-70 pointer-events-none select-none">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="min-w-0">
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Course Overview</p>
+                <h1 className="font-bold text-gray-900 text-base leading-tight truncate">{courseTitle}</h1>
+              </div>
+            </div>
+            <div className="shrink-0">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-teal-600 text-white text-xs font-medium">
+                Start <ArrowRight className="w-3.5 h-3.5" />
+              </span>
+            </div>
+          </div>
+
+          <div className="max-w-4xl mx-auto px-6 py-6 space-y-5">
+            {/* ── Read-only: Progress bar ── */}
+            <div className="bg-white rounded-xl border border-gray-200 p-5 opacity-60 pointer-events-none select-none">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-700">Your Progress</span>
+                <span className="text-sm font-bold text-teal-700">0%</span>
+              </div>
+              <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-full bg-teal-500 rounded-full" style={{ width: "0%" }} />
+              </div>
+              <p className="text-xs text-gray-500 mt-2">0 of {[...(topLevelLessons ?? []), ...(sections ?? []).flatMap((s: any) => s.lessons ?? [])].length} lessons completed</p>
+            </div>
+
+            {/* ── Editable content blocks (between progress and curriculum) ── */}
+            <div className="rounded-xl border-2 border-dashed border-teal-300 overflow-hidden bg-white">
+              <div className="px-4 py-2 bg-teal-50 border-b border-teal-200 flex items-center justify-between">
+                <span className="text-xs font-semibold text-teal-700 uppercase tracking-wide">✏️ Editable Content Area</span>
+                <span className="text-[10px] text-teal-500">Drag blocks below to reorder</span>
+              </div>
+              {previewMode ? (
+                <div>
+                  {blocks.map(block => (
+                    <div key={block.id}>
+                      <BlockPreview block={block} />
+                    </div>
+                  ))}
+                  {blocks.length === 0 && <div className="text-center text-gray-400 py-8 text-sm">No content blocks yet.</div>}
+                </div>
+              ) : (
+                <div className="p-3">
+                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                    <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
+                      {blocks.map((block, idx) => (
+                        <SortableBlock
+                          key={block.id}
+                          block={block}
+                          isSelected={block.id === selectedBlockId}
+                          onSelect={() => setSelectedBlockId(block.id === selectedBlockId ? null : block.id)}
+                          onDelete={() => deleteBlock(block.id)}
+                          onDuplicate={() => duplicateBlock(block.id)}
+                          onMoveUp={idx > 0 ? () => moveBlock(block.id, -1) : undefined}
+                          onMoveDown={idx < blocks.length - 1 ? () => moveBlock(block.id, 1) : undefined}
+                        />
+                      ))}
+                    </SortableContext>
+                  </DndContext>
+                  <button
+                    onClick={() => setAddMenuOpen(true)}
+                    className="w-full border-2 border-dashed border-teal-200 hover:border-teal-400 rounded-xl py-3 text-teal-500 hover:text-teal-700 text-sm flex items-center justify-center gap-2 transition-colors mt-2"
+                  >
+                    <Plus className="w-4 h-4" /> Add Block
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* ── Read-only: Curriculum outline ── */}
+            <div className="opacity-60 pointer-events-none select-none">
+              <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <ListChecks className="w-5 h-5 text-teal-600" /> Course Curriculum
+              </h2>
+              {(topLevelLessons ?? []).length > 0 && (
+                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-3 shadow-sm">
+                  {(topLevelLessons ?? []).map((lesson: any) => (
+                    <div key={lesson.id} className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 last:border-b-0">
+                      <PlayCircle className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                      <span className="text-sm text-gray-700">{lesson.title}</span>
+                      {lesson.durationMinutes && <span className="text-[10px] text-gray-400 ml-auto">{lesson.durationMinutes}m</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {(sections ?? []).map((section: any) => (
+                <div key={section.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-3 shadow-sm">
+                  <div className="flex items-center gap-3 px-5 py-4 bg-gray-50 border-b border-gray-200">
+                    <BookOpen className="w-4 h-4 text-teal-600 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 text-sm">{section.title}</p>
+                      <p className="text-[10px] text-gray-500">{(section.lessons ?? []).length} lessons</p>
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
+                  </div>
+                  <div>
+                    {(section.lessons ?? []).slice(0, 3).map((lesson: any) => (
+                      <div key={lesson.id} className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 last:border-b-0">
+                        <PlayCircle className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                        <span className="text-sm text-gray-700">{lesson.title}</span>
+                        {lesson.durationMinutes && <span className="text-[10px] text-gray-400 ml-auto">{lesson.durationMinutes}m</span>}
+                      </div>
+                    ))}
+                    {(section.lessons ?? []).length > 3 && (
+                      <div className="px-4 py-2 text-xs text-gray-400 italic">+{(section.lessons ?? []).length - 3} more lessons…</div>
+                    )}
+                  </div>
                 </div>
               ))}
-              {blocks.length === 0 && <div className="text-center text-gray-400 py-12">No content blocks yet.</div>}
             </div>
-          ) : (
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-              <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
-                {blocks.map((block, idx) => (
-                  <SortableBlock
-                    key={block.id}
-                    block={block}
-                    isSelected={block.id === selectedBlockId}
-                    onSelect={() => setSelectedBlockId(block.id === selectedBlockId ? null : block.id)}
-                    onDelete={() => deleteBlock(block.id)}
-                    onDuplicate={() => duplicateBlock(block.id)}
-                    onMoveUp={idx > 0 ? () => moveBlock(block.id, -1) : undefined}
-                    onMoveDown={idx < blocks.length - 1 ? () => moveBlock(block.id, 1) : undefined}
-                  />
-                ))}
-              </SortableContext>
-            </DndContext>
-          )}
-          {!previewMode && (
-            <div className="mt-4">
-              <button
-                onClick={() => setAddMenuOpen(true)}
-                className="w-full border-2 border-dashed border-teal-300 hover:border-teal-500 rounded-xl py-3 text-teal-600 hover:text-teal-700 text-sm flex items-center justify-center gap-2 transition-colors bg-white"
-              >
-                <Plus className="w-4 h-4" /> Add Block
-              </button>
-            </div>
-          )}
+          </div>
         </div>
 
         {/* Right: Block settings */}
@@ -1777,7 +1948,7 @@ function CourseOverviewEditor({
                   <span className="text-lg shrink-0">{item.icon}</span>
                   <div>
                     <p className="text-xs font-semibold text-gray-800 group-hover:text-teal-700">{item.label}</p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">{item.description}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">{(item as any).description ?? item.label}</p>
                   </div>
                 </button>
               ))}
@@ -4124,5 +4295,370 @@ function CollectionFormDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ─── Course Users Tab ─────────────────────────────────────────────────────────
+
+function CourseUsersTab({ courseId }: { courseId: number }) {
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [enrollDialogOpen, setEnrollDialogOpen] = useState(false);
+
+  // Debounce search
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const { data, isLoading, refetch } = trpc.lmsAdmin.getCourseUsers.useQuery({
+    courseId, page, pageSize: 25, search: debouncedSearch || undefined,
+  });
+
+  const removeEnrollment = trpc.lmsAdmin.removeEnrollment.useMutation({
+    onSuccess: () => { toast.success("Enrollment removed"); refetch(); },
+    onError: e => toast.error(e.message),
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <Input
+          value={search}
+          onChange={e => { setSearch(e.target.value); setPage(1); }}
+          placeholder="Search by name or email..."
+          className="max-w-xs h-8 text-sm"
+        />
+        <div className="flex items-center gap-2">
+          {data && <span className="text-sm text-gray-500">{data.total} student{data.total !== 1 ? "s" : ""}</span>}
+          <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white h-8" onClick={() => setEnrollDialogOpen(true)}>
+            <Plus className="w-4 h-4 mr-1" /> Enroll Student
+          </Button>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-lg" />)}</div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600">Student</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600">Enrolled</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600">Progress</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600">Last Active</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600">Access</th>
+                <th className="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {(data?.enrollments ?? []).map((e: any) => (
+                <tr key={e.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-3">
+                    <div>
+                      <p className="font-medium text-gray-900 text-sm">{e.user?.displayName || e.user?.name || "Unknown"}</p>
+                      <p className="text-xs text-gray-400">{e.user?.email ?? "—"}</p>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-gray-600">
+                    {e.enrolledAt ? new Date(e.enrolledAt).toLocaleDateString() : "—"}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-20 bg-gray-200 rounded-full h-1.5">
+                        <div className="h-1.5 bg-teal-500 rounded-full" style={{ width: `${e.progressPct ?? 0}%` }} />
+                      </div>
+                      <span className="text-xs text-gray-600">{e.progressPct ?? 0}%</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-gray-600">
+                    {e.lastActivityAt ? new Date(e.lastActivityAt).toLocaleDateString() : "—"}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge className={`text-xs ${e.accessType === "group" ? "bg-blue-100 text-blue-700" : e.accessType === "free" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
+                      {e.accessType ?? "direct"}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Button
+                      size="sm" variant="ghost"
+                      className="h-7 text-red-400 hover:bg-red-50 text-xs"
+                      onClick={() => { if (confirm(`Remove enrollment for ${e.user?.displayName || e.user?.name || "this student"}?`)) removeEnrollment.mutate({ id: e.id }); }}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+              {(data?.enrollments ?? []).length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-12 text-center text-gray-400 text-sm">
+                    <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                    No students enrolled yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {(data?.total ?? 0) > 25 && (
+        <div className="flex justify-center gap-2">
+          <Button size="sm" variant="outline" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Previous</Button>
+          <Button size="sm" variant="outline" disabled={page * 25 >= (data?.total ?? 0)} onClick={() => setPage(p => p + 1)}>Next</Button>
+        </div>
+      )}
+
+      <EnrollStudentDialog
+        open={enrollDialogOpen}
+        courseId={courseId}
+        onClose={() => setEnrollDialogOpen(false)}
+        onEnrolled={() => { setEnrollDialogOpen(false); refetch(); }}
+      />
+    </div>
+  );
+}
+
+function EnrollStudentDialog({ open, courseId, onClose, onEnrolled }: { open: boolean; courseId: number; onClose: () => void; onEnrolled: () => void }) {
+  const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query), 400);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  const { data: searchResults } = trpc.lmsAdmin.searchUsers.useQuery(
+    { query: debouncedQuery },
+    { enabled: debouncedQuery.length >= 2 }
+  );
+
+  const addEnrollment = trpc.lmsAdmin.addEnrollment.useMutation({
+    onSuccess: (result) => {
+      if (result.alreadyEnrolled) {
+        toast.info("Student is already enrolled in this course");
+      } else {
+        toast.success("Student enrolled successfully!");
+        onEnrolled();
+      }
+    },
+    onError: e => toast.error(e.message),
+  });
+
+  const handleEnroll = () => {
+    if (!selectedUser) return;
+    addEnrollment.mutate({ userId: selectedUser.id, courseId });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Enroll a Student</DialogTitle>
+          <DialogDescription>Search for an existing user to enroll them in this course.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div>
+            <Label className="text-sm">Search by name or email</Label>
+            <Input
+              value={query}
+              onChange={e => { setQuery(e.target.value); setSelectedUser(null); }}
+              placeholder="Type at least 2 characters..."
+              className="mt-1"
+            />
+          </div>
+          {searchResults && searchResults.length > 0 && !selectedUser && (
+            <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-48 overflow-y-auto">
+              {searchResults.map((u: any) => (
+                <button
+                  key={u.id}
+                  onClick={() => { setSelectedUser(u); setQuery(u.displayName || u.name || u.email); }}
+                  className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition-colors"
+                >
+                  <p className="text-sm font-medium text-gray-900">{u.displayName || u.name}</p>
+                  <p className="text-xs text-gray-400">{u.email}</p>
+                </button>
+              ))}
+            </div>
+          )}
+          {debouncedQuery.length >= 2 && searchResults?.length === 0 && (
+            <p className="text-sm text-gray-400 text-center py-3">No users found matching "{debouncedQuery}"</p>
+          )}
+          {selectedUser && (
+            <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-teal-200 flex items-center justify-center shrink-0">
+                <User className="w-4 h-4 text-teal-700" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900">{selectedUser.displayName || selectedUser.name}</p>
+                <p className="text-xs text-gray-500">{selectedUser.email}</p>
+              </div>
+              <button onClick={() => { setSelectedUser(null); setQuery(""); }} className="text-gray-400 hover:text-gray-700">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button
+            className="bg-teal-600 hover:bg-teal-700 text-white"
+            disabled={!selectedUser || addEnrollment.isPending}
+            onClick={handleEnroll}
+          >
+            {addEnrollment.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+            Enroll Student
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Course Analytics Tab ─────────────────────────────────────────────────────
+
+function CourseAnalyticsTab({ courseId }: { courseId: number }) {
+  const { data, isLoading } = trpc.lmsAdmin.getCourseAnalytics.useQuery({ courseId });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
+        </div>
+        <Skeleton className="h-64 rounded-xl" />
+      </div>
+    );
+  }
+
+  if (!data) return <div className="text-center py-12 text-gray-400">No analytics data available.</div>;
+
+  const completionRate = data.totalEnrollments > 0
+    ? Math.round((data.completedEnrollments / data.totalEnrollments) * 100)
+    : 0;
+
+  return (
+    <div className="space-y-6">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <p className="text-xs text-gray-500 mb-1">Total Enrollments</p>
+          <p className="text-2xl font-bold text-gray-900">{data.totalEnrollments}</p>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <p className="text-xs text-gray-500 mb-1">Completions</p>
+          <p className="text-2xl font-bold text-green-600">{data.completedEnrollments}</p>
+          <p className="text-xs text-gray-400 mt-0.5">{completionRate}% completion rate</p>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <p className="text-xs text-gray-500 mb-1">Active Students</p>
+          <p className="text-2xl font-bold text-blue-600">{data.activeEnrollments}</p>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <p className="text-xs text-gray-500 mb-1">Revenue</p>
+          <p className="text-2xl font-bold text-teal-600">${(data.totalRevenue / 100).toFixed(0)}</p>
+          <p className="text-xs text-gray-400 mt-0.5">{data.orders.length} orders</p>
+        </div>
+      </div>
+
+      {/* Avg Progress */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <p className="text-sm font-semibold text-gray-700 mb-3">Average Student Progress</p>
+        <div className="flex items-center gap-3">
+          <div className="flex-1 bg-gray-200 rounded-full h-3">
+            <div className="h-3 bg-teal-500 rounded-full transition-all" style={{ width: `${data.avgProgress}%` }} />
+          </div>
+          <span className="text-sm font-bold text-teal-700 w-10 text-right">{data.avgProgress}%</span>
+        </div>
+      </div>
+
+      {/* Monthly Enrollments */}
+      {data.monthlyEnrollments.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <p className="text-sm font-semibold text-gray-700 mb-3">Monthly Enrollments (Last 12 Months)</p>
+          <div className="flex items-end gap-1.5 h-24">
+            {data.monthlyEnrollments.map((m: any) => {
+              const maxCount = Math.max(...data.monthlyEnrollments.map((x: any) => Number(x.count)));
+              const pct = maxCount > 0 ? (Number(m.count) / maxCount) * 100 : 0;
+              return (
+                <div key={m.month} className="flex-1 flex flex-col items-center gap-1 min-w-0">
+                  <span className="text-[9px] text-gray-500">{m.count}</span>
+                  <div className="w-full bg-teal-500 rounded-t" style={{ height: `${Math.max(pct, 4)}%`, minHeight: "4px" }} />
+                  <span className="text-[9px] text-gray-400 truncate w-full text-center">{m.month.slice(5)}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Lesson Completion Rates */}
+      {data.lessonStats.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-200">
+            <p className="text-sm font-semibold text-gray-700">Lesson Completion Rates</p>
+            <p className="text-xs text-gray-400 mt-0.5">Number of students who completed each lesson</p>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {data.lessonStats.map((section: any) => (
+              <div key={section.id}>
+                <div className="px-4 py-2 bg-gray-50">
+                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">{section.title}</p>
+                </div>
+                {section.lessons.map((lesson: any) => (
+                  <div key={lesson.id} className="px-4 py-2.5 flex items-center gap-3">
+                    <span className="text-xs text-gray-600 flex-1 truncate">{lesson.title}</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="w-24 bg-gray-200 rounded-full h-1.5">
+                        <div
+                          className="h-1.5 bg-teal-500 rounded-full"
+                          style={{ width: `${lesson.views > 0 ? Math.round((lesson.completions / lesson.views) * 100) : 0}%` }}
+                        />
+                      </div>
+                      <span className="text-xs text-gray-500 w-16 text-right">
+                        {lesson.completions}/{lesson.views} views
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Recent Orders */}
+      {data.orders.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-200">
+            <p className="text-sm font-semibold text-gray-700">Recent Orders</p>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-600">Date</th>
+                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-600">Amount</th>
+                <th className="text-left px-4 py-2 text-xs font-semibold text-gray-600">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {data.orders.slice(0, 20).map((o: any, i: number) => (
+                <tr key={i} className="hover:bg-gray-50">
+                  <td className="px-4 py-2 text-xs text-gray-600">{new Date(o.createdAt).toLocaleDateString()}</td>
+                  <td className="px-4 py-2 text-xs font-medium text-gray-900">${(o.amount / 100).toFixed(2)}</td>
+                  <td className="px-4 py-2">
+                    <Badge className="text-xs bg-green-100 text-green-700">{o.status}</Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }

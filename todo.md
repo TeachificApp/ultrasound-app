@@ -1903,3 +1903,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] CourseOverview WYSIWYG editor — default blocks shown when empty, redirects to LMS Admin Overview tab for editing
 - [x] LandingPageBuilder BlockPreview import fix — moved import to top of file to prevent 'BlockPreview is not defined' error
 - [x] CourseEditor reads ?tab= URL param to auto-open correct tab
+- [x] Add course color scheme picker (primary, accent, gradient) to Course Settings
+- [x] Apply course color scheme to CoursePlayer sidebar, CourseOverview curriculum, landing page curriculum block
+- [x] Add Users tab to course editor (enrolled students, access logs, enroll new student, deep link to student profile)
+- [x] Add Analytics tab to course editor (sales data, lesson progress, completion rates)
+- [ ] Fix CourseOverview WYSIWYG editor to show full page preview (header, progress bar, curriculum)
+- [ ] Fix desktop sidebar notes/bookmarks panels in CoursePlayer
+- [x] Fix LessonNoteEditor to invalidate notes query after saving (already correct — getCourseNotes.invalidate in onSuccess)

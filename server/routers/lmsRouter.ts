@@ -1108,6 +1108,13 @@ export const lmsAdminRouter = router({
       courseOverviewBlocks: z.string().nullable().optional(), // JSON array of Block objects
       metaTitle: z.string().optional(),
       metaDescription: z.string().optional(),
+      // Course color scheme
+      primaryColor: z.string().max(20).optional(),
+      accentColor: z.string().max(20).optional(),
+      gradientFrom: z.string().max(20).optional(),
+      gradientTo: z.string().max(20).optional(),
+      gradientDirection: z.string().max(30).optional(),
+      thumbnailUrl: z.string().nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -2662,6 +2669,123 @@ Generate 3-6 sections with 2-5 lessons each. Lesson types can be: text, video (f
         ))
         .orderBy(asc(lmsLessons.position));
       return lessons;
+    }),
+
+  /** Search users by name or email (for enroll dialog) */
+  searchUsers: protectedProcedure
+    .input(z.object({ query: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const q = `%${input.query}%`;
+      const results = await db.select({
+        id: users.id,
+        name: users.name,
+        displayName: users.displayName,
+        email: users.email,
+      }).from(users)
+        .where(sql`(${users.name} LIKE ${q} OR ${users.displayName} LIKE ${q} OR ${users.email} LIKE ${q})`)
+        .limit(20);
+      return results;
+    }),
+
+  /** Get all enrolled users for a course with their progress details */
+  getCourseUsers: protectedProcedure
+    .input(z.object({
+      courseId: z.number(),
+      page: z.number().int().min(1).default(1),
+      pageSize: z.number().int().min(1).max(100).default(25),
+      search: z.string().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const offset = (input.page - 1) * input.pageSize;
+      const enrollments = await db.select().from(lmsEnrollments)
+        .where(eq(lmsEnrollments.courseId, input.courseId))
+        .orderBy(desc(lmsEnrollments.enrolledAt))
+        .limit(input.pageSize).offset(offset);
+      const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(lmsEnrollments).where(eq(lmsEnrollments.courseId, input.courseId));
+      const enriched = await Promise.all(enrollments.map(async (e) => {
+        const [u] = await db.select({ id: users.id, displayName: users.displayName, name: users.name, email: users.email, createdAt: users.createdAt }).from(users).where(eq(users.id, e.userId)).limit(1);
+        // Count completed lessons
+        const [{ completedCount }] = await db.select({ completedCount: sql<number>`count(*)` }).from(lmsLessonProgress)
+          .where(and(eq(lmsLessonProgress.enrollmentId, e.id), isNotNull(lmsLessonProgress.completedAt)));
+        // Last activity
+        const [lastActivity] = await db.select({ updatedAt: lmsLessonProgress.updatedAt })
+          .from(lmsLessonProgress).where(eq(lmsLessonProgress.enrollmentId, e.id))
+          .orderBy(desc(lmsLessonProgress.updatedAt)).limit(1);
+        return {
+          ...e,
+          user: u ?? null,
+          completedLessons: Number(completedCount),
+          lastActivityAt: lastActivity?.updatedAt ?? null,
+        };
+      }));
+      // Filter by search after enrichment
+      const filtered = input.search
+        ? enriched.filter(e => {
+            const q = input.search!.toLowerCase();
+            return (e.user?.displayName ?? "").toLowerCase().includes(q) ||
+              (e.user?.name ?? "").toLowerCase().includes(q) ||
+              (e.user?.email ?? "").toLowerCase().includes(q);
+          })
+        : enriched;
+      return { enrollments: filtered, total: Number(count) };
+    }),
+
+  /** Get analytics for a specific course */
+  getCourseAnalytics: protectedProcedure
+    .input(z.object({ courseId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Total enrollments
+      const [{ totalEnrollments }] = await db.select({ totalEnrollments: sql<number>`count(*)` }).from(lmsEnrollments).where(eq(lmsEnrollments.courseId, input.courseId));
+      // Completed enrollments
+      const [{ completedEnrollments }] = await db.select({ completedEnrollments: sql<number>`count(*)` }).from(lmsEnrollments).where(and(eq(lmsEnrollments.courseId, input.courseId), isNotNull(lmsEnrollments.completedAt)));
+      // Active (started but not completed)
+      const [{ activeEnrollments }] = await db.select({ activeEnrollments: sql<number>`count(*)` }).from(lmsEnrollments).where(and(eq(lmsEnrollments.courseId, input.courseId), sql`${lmsEnrollments.progressPct} > 0`, isNull(lmsEnrollments.completedAt)));
+      // Revenue from orders
+      const orders = await db.select({ amount: lmsOrders.amount, createdAt: lmsOrders.createdAt, status: lmsOrders.status })
+        .from(lmsOrders).where(and(eq(lmsOrders.courseId, input.courseId), eq(lmsOrders.status, "paid")));
+      const totalRevenue = orders.reduce((sum, o) => sum + (o.amount ?? 0), 0);
+      // Enrollments by month (last 12 months)
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+      const monthlyEnrollments = await db.select({
+        month: sql<string>`DATE_FORMAT(${lmsEnrollments.enrolledAt}, '%Y-%m')`,
+        count: sql<number>`count(*)`,
+      }).from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.courseId, input.courseId), sql`${lmsEnrollments.enrolledAt} >= ${twelveMonthsAgo.toISOString().slice(0, 10)}`));
+      // Lesson completion rates
+      const sections = await db.select({ id: lmsSections.id, title: lmsSections.title, position: lmsSections.position }).from(lmsSections).where(eq(lmsSections.courseId, input.courseId)).orderBy(asc(lmsSections.position));
+      const lessonStats = await Promise.all(sections.map(async (s) => {
+        const lessons = await db.select({ id: lmsLessons.id, title: lmsLessons.title, position: lmsLessons.position }).from(lmsLessons).where(eq(lmsLessons.sectionId, s.id)).orderBy(asc(lmsLessons.position));
+        const lessonsWithStats = await Promise.all(lessons.map(async (l) => {
+          const [{ completions }] = await db.select({ completions: sql<number>`count(*)` }).from(lmsLessonProgress)
+            .where(and(eq(lmsLessonProgress.lessonId, l.id), isNotNull(lmsLessonProgress.completedAt)));
+          const [{ views }] = await db.select({ views: sql<number>`count(*)` }).from(lmsLessonProgress)
+            .where(eq(lmsLessonProgress.lessonId, l.id));
+          return { ...l, completions: Number(completions), views: Number(views) };
+        }));
+        return { ...s, lessons: lessonsWithStats };
+      }));
+      // Average progress
+      const [{ avgProgress }] = await db.select({ avgProgress: sql<number>`AVG(${lmsEnrollments.progressPct})` }).from(lmsEnrollments).where(eq(lmsEnrollments.courseId, input.courseId));
+      return {
+        totalEnrollments: Number(totalEnrollments),
+        completedEnrollments: Number(completedEnrollments),
+        activeEnrollments: Number(activeEnrollments),
+        totalRevenue,
+        orders: orders.slice(0, 50),
+        monthlyEnrollments,
+        lessonStats,
+        avgProgress: Math.round(Number(avgProgress ?? 0)),
+      };
     }),
 });
 

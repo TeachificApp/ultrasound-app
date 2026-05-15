@@ -134,8 +134,13 @@ function LessonIcon({ type, done, locked }: { type: string; done: boolean; locke
 function LessonNoteEditor({ lessonId, courseSlug, initialNote }: { lessonId: number; courseSlug: string; initialNote?: string }) {
   const [note, setNote] = useState(initialNote ?? "");
   const [saved, setSaved] = useState(false);
+  const utils = trpc.useUtils();
   const saveNote = trpc.lmsLearner.saveNote.useMutation({
-    onSuccess: () => { setSaved(true); setTimeout(() => setSaved(false), 2000); },
+    onSuccess: () => {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      utils.lmsLearner.getCourseNotes.invalidate({ courseSlug });
+    },
     onError: (e) => toast.error(`Failed to save note: ${e.message}`),
   });
   return (
@@ -496,7 +501,22 @@ export default function CoursePlayer() {
     );
   }
 
+  if (!data) return null;
   const { course, sections } = data;
+  // ── Course Color Scheme ──────────────────────────────────────────────────────
+  const primaryColor = course.primaryColor ?? "#0d9488";
+  const accentColor = course.accentColor ?? "#0f766e";
+  const gradientStart = course.gradientFrom ?? primaryColor;
+  const gradientEnd = course.gradientTo ?? accentColor;
+  const gradientDirection = course.gradientDirection ?? "to right";
+  const gradientStyle = course.gradientFrom && course.gradientTo
+    ? { background: `linear-gradient(${gradientDirection}, ${gradientStart}, ${gradientEnd})` }
+    : { backgroundColor: primaryColor };
+  const primaryBg = { backgroundColor: primaryColor };
+  const primaryText = { color: primaryColor };
+  const primaryBorder = { borderColor: primaryColor };
+  const primaryLightBg = { backgroundColor: `${primaryColor}18` };
+  const primaryLightText = { color: primaryColor };
   const progress = data.progress ?? [];
   const topLevelLessons: any[] = (data as any).topLevelLessons ?? [];
   const completedIds = new Set([...progress.filter((p: any) => p.completedAt).map((p: any) => p.lessonId), ...optimisticCompleted]);
@@ -573,7 +593,7 @@ export default function CoursePlayer() {
   const learningObjectives: string[] = (() => {
     try {
       if (lessonData?.learningObjectives) return JSON.parse(lessonData.learningObjectives);
-      if (lessonData?.description) return lessonData.description.split("\n").filter((l: string) => l.trim()).slice(0, 6);
+      if ((lessonData as any)?.description) return (lessonData as any).description.split("\n").filter((l: string) => l.trim()).slice(0, 6);
       return [];
     } catch { return []; }
   })();
@@ -629,29 +649,14 @@ export default function CoursePlayer() {
               <span className="text-gray-500 text-xs">Your Progress</span>
               <div className="w-36 bg-gray-200 rounded-full h-2 overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-teal-500 to-teal-400 rounded-full transition-all duration-500"
-                  style={{ width: `${data.enrollment?.progressPct ?? 0}%` }}
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{ width: `${data.enrollment?.progressPct ?? 0}%`, ...gradientStyle }}
                 />
               </div>
-              <span className="text-teal-600 font-bold text-xs">{data.enrollment?.progressPct ?? 0}%</span>
+              <span className="font-bold text-xs" style={primaryText}>{data.enrollment?.progressPct ?? 0}%</span>
             </div>
           )}
-          {/* Admin controls */}
-          {isAdmin && !isPreviewMode && (
-            <button
-              onClick={() => setAdminPreviewStudent(p => !p)}
-              title={adminPreviewStudent ? "Exit student preview" : "Preview as student"}
-              className={cn(
-                "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors border",
-                adminPreviewStudent
-                  ? "bg-purple-100 border-purple-400 text-purple-700"
-                  : "border-gray-300 text-gray-500 hover:text-teal-700 hover:border-teal-400"
-              )}
-            >
-              <Eye className="w-3.5 h-3.5" />
-              {adminPreviewStudent ? "Student View" : "Preview"}
-            </button>
-          )}
+
           {/* Welcome */}
           <div className="flex items-center gap-2 text-gray-600">
             <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center">
@@ -679,7 +684,7 @@ export default function CoursePlayer() {
         )}>
           {/* Mobile sidebar close button */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 shrink-0">
-            <h3 className="text-teal-700 text-[11px] font-extrabold uppercase tracking-widest">Course Modules</h3>
+            <h3 className="text-[11px] font-extrabold uppercase tracking-widest" style={primaryText}>Course Modules</h3>
             <button onClick={() => setMobileSidebarOpen(false)} className="text-gray-400 hover:text-gray-700">
               <X className="w-4 h-4" />
             </button>
@@ -729,17 +734,70 @@ export default function CoursePlayer() {
             >
               <ChevronLeft className="w-3 h-3" /> Back to Library
             </button>
-            <button
-              className="text-teal-500 text-[10px] font-medium flex items-center gap-1 mb-2 hover:text-teal-700 transition-colors"
-              onClick={() => navigate(`/learn/${slug}/overview`)}
-            >
-              <BookOpen className="w-3 h-3" /> Course Overview
-            </button>
-            <h3 className="text-teal-700 text-[11px] font-extrabold uppercase tracking-widest">Course Modules</h3>
+            {sidebarTab === "lessons" && (
+              <>
+                <button
+                  className="text-teal-500 text-[10px] font-medium flex items-center gap-1 mb-2 hover:text-teal-700 transition-colors"
+                  onClick={() => navigate(`/learn/${slug}/overview`)}
+                >
+                  <BookOpen className="w-3 h-3" /> Course Overview
+                </button>
+                <h3 className="text-teal-700 text-[11px] font-extrabold uppercase tracking-widest">Course Modules</h3>
+              </>
+            )}
+            {sidebarTab === "notes" && <h3 className="text-[11px] font-extrabold uppercase tracking-widest flex items-center gap-1.5 mt-1" style={primaryText}><StickyNote className="w-3.5 h-3.5" /> My Notes</h3>}
+            {sidebarTab === "bookmarks" && <h3 className="text-[11px] font-extrabold uppercase tracking-widest flex items-center gap-1.5 mt-1" style={primaryText}><Bookmark className="w-3.5 h-3.5" /> Saved Lessons</h3>}
           </div>
 
-          {/* Module List */}
-          <div className="flex-1 overflow-y-auto py-1">
+          {/* Notes Panel */}
+          {sidebarTab === "notes" && (
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {(notesData ?? []).length === 0 ? (
+                <div className="text-center py-8">
+                  <StickyNote className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                  <p className="text-xs text-gray-400">No notes yet.</p>
+                  <p className="text-[10px] text-gray-400 mt-1">Open a lesson and use the Notes tab to add notes.</p>
+                </div>
+              ) : (notesData ?? []).map((n: any) => (
+                <div key={n.id} className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-[10px] font-semibold text-amber-700 truncate flex-1">{n.lessonTitle}</p>
+                    <button
+                      onClick={() => setSelectedLessonId(n.lessonId)}
+                      className="text-[9px] text-teal-600 hover:text-teal-800 ml-2 shrink-0"
+                    >Go to lesson</button>
+                  </div>
+                  <p className="text-xs text-gray-700 whitespace-pre-wrap line-clamp-5">{n.note}</p>
+                  <p className="text-[9px] text-gray-400 mt-1">{new Date(n.updatedAt).toLocaleDateString()}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Bookmarks Panel */}
+          {sidebarTab === "bookmarks" && (
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {(bookmarksData ?? []).length === 0 ? (
+                <div className="text-center py-8">
+                  <Bookmark className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                  <p className="text-xs text-gray-400">No saved lessons yet.</p>
+                  <p className="text-[10px] text-gray-400 mt-1">Click the bookmark icon on any lesson to save it here.</p>
+                </div>
+              ) : (bookmarksData ?? []).map((b: any) => (
+                <button
+                  key={b.id}
+                  onClick={() => setSelectedLessonId(b.lessonId)}
+                  className="w-full text-left bg-white border border-gray-200 rounded-lg p-3 hover:border-teal-400 transition-colors"
+                >
+                  <p className="text-xs font-medium text-gray-800 truncate">{b.lessonTitle}</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">{new Date(b.createdAt).toLocaleDateString()}</p>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Module List — only shown when lessons tab is active */}
+          {sidebarTab === "lessons" && <div className="flex-1 overflow-y-auto py-1">
             {/* Top-level lessons */}
             {topLevelLessons.map((lesson: any, idx: number) => {
               const done = completedIds.has(lesson.id);
@@ -756,18 +814,20 @@ export default function CoursePlayer() {
                   className={cn(
                     "w-full text-left px-3 py-2.5 flex items-center gap-3 text-xs transition-all border-l-4",
                     active
-                      ? "bg-teal-50 text-teal-900 border-teal-500"
+                      ? "text-gray-900"
                       : lessonLocked
                         ? "text-gray-400 cursor-not-allowed border-transparent"
                         : done
                           ? "text-gray-500 hover:bg-gray-50 border-transparent"
                           : "text-gray-700 hover:bg-gray-50 border-transparent",
                   )}
+                  style={active ? { backgroundColor: `${primaryColor}12`, borderColor: primaryColor } : undefined}
                 >
                   <span className={cn(
                     "w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-extrabold shrink-0",
-                    active ? "bg-teal-500 text-white" : lessonLocked ? "bg-gray-100 text-gray-400" : done ? "bg-teal-100 text-teal-700" : "bg-gray-100 text-gray-500"
-                  )}>
+                    active ? "text-white" : lessonLocked ? "bg-gray-100 text-gray-400" : done ? "text-teal-700" : "bg-gray-100 text-gray-500"
+                  )}
+                  style={active ? primaryBg : done ? { backgroundColor: `${primaryColor}25` } : undefined}>
                     {lessonLocked ? <Lock className="w-3 h-3" /> : done ? "✓" : String(idx + 1).padStart(2, "0")}
                   </span>
                   <div className="flex-1 min-w-0">
@@ -798,18 +858,20 @@ export default function CoursePlayer() {
                     className={cn(
                       "w-full text-left px-3 py-2.5 flex items-center gap-3 text-xs transition-all border-l-4",
                       isSectionActive
-                        ? "bg-teal-50 text-teal-900 border-teal-500"
+                        ? "text-gray-900"
                         : allSectionDone
                           ? "text-gray-500 hover:bg-gray-50 border-transparent"
                           : sectionLocked
                             ? "text-gray-400 cursor-not-allowed border-transparent"
                             : "text-gray-700 hover:bg-gray-50 border-transparent",
                     )}
+                    style={isSectionActive ? { backgroundColor: `${primaryColor}12`, borderColor: primaryColor } : undefined}
                   >
                     <span className={cn(
                       "w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-extrabold shrink-0",
-                      isSectionActive ? "bg-teal-500 text-white" : allSectionDone ? "bg-teal-100 text-teal-700" : sectionLocked ? "bg-gray-100 text-gray-400" : "bg-gray-100 text-gray-500"
-                    )}>
+                      isSectionActive ? "text-white" : allSectionDone ? "text-teal-700" : sectionLocked ? "bg-gray-100 text-gray-400" : "bg-gray-100 text-gray-500"
+                    )}
+                    style={isSectionActive ? primaryBg : allSectionDone ? { backgroundColor: `${primaryColor}25` } : undefined}>
                       {sectionLocked ? <Lock className="w-3 h-3" /> : allSectionDone ? "✓" : String(sectionNum).padStart(2, "0")}
                     </span>
                     <div className="flex-1 min-w-0">
@@ -819,7 +881,7 @@ export default function CoursePlayer() {
                       )}
                     </div>
                     {isSectionActive && !sectionLocked && (
-                      <ChevronDown className="w-3 h-3 text-teal-500 shrink-0" />
+                      <ChevronDown className="w-3 h-3 shrink-0" style={primaryText} />
                     )}
                   </button>
 
@@ -840,8 +902,9 @@ export default function CoursePlayer() {
                             disabled={lessonLocked}
                             className={cn(
                               "w-full text-left px-2 py-1.5 flex items-center gap-2 text-[11px] transition-colors rounded",
-                              active ? "text-teal-700 bg-teal-50 font-semibold" : lessonLocked ? "text-gray-400 cursor-not-allowed" : done ? "text-gray-400" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50",
+                              active ? "font-semibold" : lessonLocked ? "text-gray-400 cursor-not-allowed" : done ? "text-gray-400" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50",
                             )}
+                            style={active ? { color: primaryColor, backgroundColor: `${primaryColor}12` } : undefined}
                           >
                             <LessonIcon type={lesson.type} done={done} locked={lessonLocked} />
                             <div className="flex-1 min-w-0">
@@ -858,8 +921,7 @@ export default function CoursePlayer() {
                 </div>
               );
             })}
-          </div>
-
+          </div>}
           {/* Sidebar Footer Tabs */}
           <div className="flex border-t border-gray-200 shrink-0">
             {([
@@ -872,8 +934,9 @@ export default function CoursePlayer() {
                 onClick={() => setSidebarTab(key)}
                 className={cn(
                   "flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[10px] transition-colors",
-                  sidebarTab === key ? "text-teal-600 border-t-2 border-teal-500 bg-teal-50" : "text-gray-500 hover:text-gray-700"
+                  sidebarTab === key ? "border-t-2" : "text-gray-500 hover:text-gray-700"
                 )}
+                style={sidebarTab === key ? { color: primaryColor, borderColor: primaryColor, backgroundColor: `${primaryColor}10` } : undefined}
               >
                 <Icon className="w-3.5 h-3.5" />
                 {label}
@@ -890,7 +953,7 @@ export default function CoursePlayer() {
               {sidebarOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
             </button>
             {moduleNum > 0 && (
-              <span className="text-teal-600 text-xs font-bold uppercase tracking-widest shrink-0">
+              <span className="text-xs font-bold uppercase tracking-widest shrink-0" style={primaryText}>
                 Module {String(moduleNum).padStart(2, "0")}
               </span>
             )}
