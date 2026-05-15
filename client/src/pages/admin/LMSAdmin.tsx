@@ -1178,6 +1178,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
   const [isFeatured, setIsFeatured] = useState(course.isFeatured ?? false);
   const [isDrip, setIsDrip] = useState(course.isDrip ?? false);
   const [hideProgress, setHideProgress] = useState(course.hideProgress ?? false);
+  const [sendEnrollmentEmail, setSendEnrollmentEmail] = useState(course.sendEnrollmentEmail ?? true);
   const [coverImageUrl, setCoverImageUrl] = useState(course.coverImageUrl ?? "");
   const [slug, setSlug] = useState(course.slug ?? "");
   const [metaTitle, setMetaTitle] = useState(course.metaTitle ?? "");
@@ -1521,6 +1522,23 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
         </Button>
       </div>
 
+      {/* Pricing Options Section */}
+      <CoursePricingOptionsEditor courseId={course.id} />
+
+      {/* Enrollment Email Toggle */}
+      <div className="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
+        <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+          <span className="text-base">📧</span> Enrollment Notifications
+        </h3>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-700">Send enrollment welcome email</p>
+            <p className="text-xs text-gray-400 mt-0.5">Send a welcome email to students when they enroll in this course. Platform-level setting must also be enabled.</p>
+          </div>
+          <Switch checked={sendEnrollmentEmail} onCheckedChange={setSendEnrollmentEmail} />
+        </div>
+      </div>
+
       <Button
         className="bg-teal-600 hover:bg-teal-700 text-white"
         disabled={saving}
@@ -1547,6 +1565,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
           gradientFrom: useGradient ? (gradientStart || null) : null,
           gradientTo: useGradient ? (gradientEnd || null) : null,
           gradientDirection: gradientDirection || null,
+          sendEnrollmentEmail,
         })}
       >
         {saving ? "Saving..." : "Save Settings"}
@@ -2776,9 +2795,17 @@ function LessonEditorPage({ lesson, onClose, onSaved, onSavedAndClose }: { lesso
           )}
 
           {/* Preview toggle */}
-          <div className="flex items-center gap-2">
-            <Switch checked={isPreview} onCheckedChange={setIsPreview} id="edit-preview" />
-            <Label htmlFor="edit-preview" className="text-sm">Free preview (requires login)</Label>
+          <div className="border border-teal-100 rounded-lg p-4 space-y-2 bg-teal-50/30">
+            <div className="flex items-center gap-2">
+              <Switch checked={isPreview} onCheckedChange={setIsPreview} id="edit-preview" />
+              <Label htmlFor="edit-preview" className="text-sm font-semibold text-teal-800">Free Preview Lesson</Label>
+            </div>
+            <p className="text-xs text-teal-700 leading-relaxed">
+              When enabled, registered (but not enrolled) students can access this lesson for free.
+              Preview access <strong>supersedes drip and prerequisite rules</strong>.
+              Students will be prompted to upgrade to full access when entering or exiting a preview lesson,
+              and when attempting to navigate to non-preview content.
+            </p>
           </div>
 
           {/* Completion toggles */}
@@ -4658,6 +4685,264 @@ function CourseAnalyticsTab({ courseId }: { courseId: number }) {
             </tbody>
           </table>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Pricing Options Editor ────────────────────────────────────────────────────
+// Shown inside CourseSettingsForm — allows admin to add/edit/delete secondary
+// pricing options (payment plans, group rates, etc.)
+
+type PricingOption = {
+  id: number;
+  label: string;
+  sublabel: string | null;
+  pricingType: "one_time" | "subscription" | "payment_plan" | "free";
+  price: number;
+  stripePriceId: string | null;
+  subscriptionInterval: "monthly" | "quarterly" | "annual" | null;
+  downPayment: number | null;
+  installmentCount: number | null;
+  installmentAmount: number | null;
+  installmentIntervalDays: number | null;
+  ctaLabel: string | null;
+  sortOrder: number;
+  isActive: boolean;
+};
+
+function PricingOptionForm({
+  initial,
+  onSave,
+  onCancel,
+  saving,
+}: {
+  initial?: Partial<PricingOption>;
+  onSave: (data: Omit<PricingOption, "id" | "sortOrder">) => void;
+  onCancel: () => void;
+  saving: boolean;
+}) {
+  const [label, setLabel] = useState(initial?.label ?? "");
+  const [sublabel, setSublabel] = useState(initial?.sublabel ?? "");
+  const [pricingType, setPricingType] = useState<PricingOption["pricingType"]>(initial?.pricingType ?? "one_time");
+  const [price, setPrice] = useState(String(((initial?.price ?? 0) / 100).toFixed(2)));
+  const [stripePriceId, setStripePriceId] = useState(initial?.stripePriceId ?? "");
+  const [subscriptionInterval, setSubscriptionInterval] = useState<"monthly" | "quarterly" | "annual">(initial?.subscriptionInterval ?? "monthly");
+  const [downPayment, setDownPayment] = useState(String(((initial?.downPayment ?? 0) / 100).toFixed(2)));
+  const [installmentCount, setInstallmentCount] = useState(String(initial?.installmentCount ?? ""));
+  const [installmentAmount, setInstallmentAmount] = useState(String(((initial?.installmentAmount ?? 0) / 100).toFixed(2)));
+  const [installmentIntervalDays, setInstallmentIntervalDays] = useState(String(initial?.installmentIntervalDays ?? 30));
+  const [ctaLabel, setCtaLabel] = useState(initial?.ctaLabel ?? "");
+  const [isActive, setIsActive] = useState(initial?.isActive ?? true);
+
+  return (
+    <div className="border border-teal-200 rounded-lg p-4 bg-teal-50/30 space-y-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <Label className="text-xs font-medium">Label *</Label>
+          <Input value={label} onChange={e => setLabel(e.target.value)} placeholder="e.g. 3-Month Payment Plan" className="mt-1 h-8 text-sm" />
+        </div>
+        <div>
+          <Label className="text-xs font-medium">Sub-label</Label>
+          <Input value={sublabel} onChange={e => setSublabel(e.target.value)} placeholder="e.g. 3 × $99/month" className="mt-1 h-8 text-sm" />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <Label className="text-xs font-medium">Pricing Type</Label>
+          <Select value={pricingType} onValueChange={v => setPricingType(v as any)}>
+            <SelectTrigger className="mt-1 h-8 text-sm"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="free">Free</SelectItem>
+              <SelectItem value="one_time">One-Time Purchase</SelectItem>
+              <SelectItem value="subscription">Subscription</SelectItem>
+              <SelectItem value="payment_plan">Payment Plan</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {pricingType !== "free" && pricingType !== "payment_plan" && (
+          <div>
+            <Label className="text-xs font-medium">Price (USD)</Label>
+            <Input type="number" step="0.01" min="0" value={price} onChange={e => setPrice(e.target.value)} className="mt-1 h-8 text-sm" />
+          </div>
+        )}
+        {pricingType === "subscription" && (
+          <div>
+            <Label className="text-xs font-medium">Billing Interval</Label>
+            <Select value={subscriptionInterval} onValueChange={v => setSubscriptionInterval(v as any)}>
+              <SelectTrigger className="mt-1 h-8 text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="monthly">Monthly</SelectItem>
+                <SelectItem value="quarterly">Quarterly (every 3 months)</SelectItem>
+                <SelectItem value="annual">Annual</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </div>
+      {pricingType === "payment_plan" && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div>
+            <Label className="text-xs font-medium">Down Payment ($)</Label>
+            <Input type="number" step="0.01" min="0" value={downPayment} onChange={e => setDownPayment(e.target.value)} className="mt-1 h-8 text-sm" />
+          </div>
+          <div>
+            <Label className="text-xs font-medium">Installments</Label>
+            <Input type="number" min="0" value={installmentCount} onChange={e => setInstallmentCount(e.target.value)} className="mt-1 h-8 text-sm" />
+          </div>
+          <div>
+            <Label className="text-xs font-medium">Amount Each ($)</Label>
+            <Input type="number" step="0.01" min="0" value={installmentAmount} onChange={e => setInstallmentAmount(e.target.value)} className="mt-1 h-8 text-sm" />
+          </div>
+          <div>
+            <Label className="text-xs font-medium">Interval (days)</Label>
+            <Input type="number" min="1" value={installmentIntervalDays} onChange={e => setInstallmentIntervalDays(e.target.value)} className="mt-1 h-8 text-sm" />
+          </div>
+        </div>
+      )}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <Label className="text-xs font-medium">CTA Button Label (optional)</Label>
+          <Input value={ctaLabel} onChange={e => setCtaLabel(e.target.value)} placeholder="e.g. Start Payment Plan" className="mt-1 h-8 text-sm" />
+        </div>
+        <div>
+          <Label className="text-xs font-medium">Stripe Price ID (optional)</Label>
+          <Input value={stripePriceId} onChange={e => setStripePriceId(e.target.value)} placeholder="price_..." className="mt-1 h-8 text-sm font-mono" />
+          <p className="text-xs text-gray-400 mt-0.5">If set, this Stripe Price is used directly at checkout.</p>
+        </div>
+      </div>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Switch checked={isActive} onCheckedChange={setIsActive} />
+          <Label className="text-xs">Active (visible on landing page)</Label>
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={onCancel} className="h-7 text-xs">Cancel</Button>
+          <Button
+            size="sm"
+            className="h-7 text-xs bg-teal-600 hover:bg-teal-700 text-white"
+            disabled={saving || !label.trim()}
+            onClick={() => onSave({
+              label: label.trim(),
+              sublabel: sublabel.trim() || null,
+              pricingType,
+              price: pricingType === "free" ? 0 : Math.round(parseFloat(price || "0") * 100),
+              stripePriceId: stripePriceId.trim() || null,
+              subscriptionInterval: pricingType === "subscription" ? subscriptionInterval : null,
+              downPayment: pricingType === "payment_plan" ? Math.round(parseFloat(downPayment || "0") * 100) : null,
+              installmentCount: pricingType === "payment_plan" ? parseInt(installmentCount || "0") : null,
+              installmentAmount: pricingType === "payment_plan" ? Math.round(parseFloat(installmentAmount || "0") * 100) : null,
+              installmentIntervalDays: pricingType === "payment_plan" ? parseInt(installmentIntervalDays || "30") : null,
+              ctaLabel: ctaLabel.trim() || null,
+              isActive,
+            })}
+          >
+            {saving ? "Saving..." : "Save Option"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CoursePricingOptionsEditor({ courseId }: { courseId: number }) {
+  const utils = trpc.useUtils();
+  const [showAdd, setShowAdd] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+
+  const { data: options = [], isLoading } = trpc.lmsGroup.listPricingOptions.useQuery({ courseId });
+
+  const createOption = trpc.lmsGroup.createPricingOption.useMutation({
+    onSuccess: () => { toast.success("Pricing option added"); setShowAdd(false); utils.lmsGroup.listPricingOptions.invalidate({ courseId }); },
+    onError: e => toast.error(e.message),
+  });
+
+  const updateOption = trpc.lmsGroup.updatePricingOption.useMutation({
+    onSuccess: () => { toast.success("Pricing option updated"); setEditingId(null); utils.lmsGroup.listPricingOptions.invalidate({ courseId }); },
+    onError: e => toast.error(e.message),
+  });
+
+  const deleteOption = trpc.lmsGroup.deletePricingOption.useMutation({
+    onSuccess: () => { toast.success("Pricing option removed"); utils.lmsGroup.listPricingOptions.invalidate({ courseId }); },
+    onError: e => toast.error(e.message),
+  });
+
+  const toggleActive = (opt: PricingOption) => {
+    updateOption.mutate({ id: opt.id, isActive: !opt.isActive });
+  };
+
+  const formatPrice = (opt: PricingOption) => {
+    if (opt.pricingType === "free") return "Free";
+    if (opt.pricingType === "payment_plan") {
+      const dp = ((opt.downPayment ?? 0) / 100).toFixed(2);
+      const inst = ((opt.installmentAmount ?? 0) / 100).toFixed(2);
+      const n = opt.installmentCount ?? 0;
+      return `$${dp} down + ${n}×$${inst}`;
+    }
+    if (opt.pricingType === "subscription") {
+      return `$${(opt.price / 100).toFixed(2)}/${opt.subscriptionInterval ?? "month"}`;
+    }
+    return `$${(opt.price / 100).toFixed(2)}`;
+  };
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+          <DollarSign className="w-4 h-4 text-teal-600" /> Secondary Pricing Options
+        </h3>
+        <Button size="sm" variant="outline" className="h-7 text-xs border-teal-300 text-teal-600 hover:bg-teal-50" onClick={() => { setShowAdd(true); setEditingId(null); }}>
+          <Plus className="w-3 h-3 mr-1" /> Add Option
+        </Button>
+      </div>
+      <p className="text-xs text-gray-400">Add payment plans, group rates, or alternate pricing. The primary course price is always the default CTA. These appear as selectable alternatives on the landing page.</p>
+
+      {isLoading ? (
+        <div className="space-y-2">{[0,1].map(i => <Skeleton key={i} className="h-10 w-full rounded" />)}</div>
+      ) : options.length === 0 && !showAdd ? (
+        <p className="text-xs text-gray-400 italic py-2">No secondary pricing options yet.</p>
+      ) : (
+        <div className="space-y-2">
+          {(options as PricingOption[]).map((opt) => (
+            <div key={opt.id}>
+              {editingId === opt.id ? (
+                <PricingOptionForm
+                  initial={opt}
+                  onSave={(data) => updateOption.mutate({ id: opt.id, label: data.label, sublabel: data.sublabel, pricingType: data.pricingType, price: data.price, stripePriceId: data.stripePriceId, subscriptionInterval: data.subscriptionInterval, downPayment: data.downPayment ?? undefined, installmentCount: data.installmentCount ?? undefined, installmentAmount: data.installmentAmount ?? undefined, installmentIntervalDays: data.installmentIntervalDays ?? undefined, ctaLabel: data.ctaLabel, isActive: data.isActive })}
+                  onCancel={() => setEditingId(null)}
+                  saving={updateOption.isPending}
+                />
+              ) : (
+                <div className={`flex items-center gap-3 bg-white rounded-lg border px-3 py-2 ${opt.isActive ? "border-gray-200" : "border-gray-100 opacity-60"}`}>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-800 truncate">{opt.label}</p>
+                    <p className="text-xs text-gray-400">{formatPrice(opt)}{opt.sublabel ? ` · ${opt.sublabel}` : ""}{opt.ctaLabel ? ` · CTA: "${opt.ctaLabel}"` : ""}</p>
+                  </div>
+                  <Badge className={`text-xs ${opt.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                    {opt.isActive ? "Active" : "Hidden"}
+                  </Badge>
+                  <button onClick={() => toggleActive(opt)} className="text-xs text-gray-400 hover:text-gray-600 p-1" title={opt.isActive ? "Hide" : "Show"}>
+                    {opt.isActive ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                  <button onClick={() => { setEditingId(opt.id); setShowAdd(false); }} className="text-xs text-teal-500 hover:text-teal-700 p-1">
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button onClick={() => { if (confirm("Delete this pricing option?")) deleteOption.mutate({ id: opt.id }); }} className="text-xs text-red-400 hover:text-red-600 p-1">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showAdd && (
+        <PricingOptionForm
+          onSave={(data) => createOption.mutate({ courseId, label: data.label, sublabel: data.sublabel ?? undefined, pricingType: data.pricingType, price: data.price, stripePriceId: data.stripePriceId ?? undefined, subscriptionInterval: data.subscriptionInterval ?? undefined, downPayment: data.downPayment ?? undefined, installmentCount: data.installmentCount ?? undefined, installmentAmount: data.installmentAmount ?? undefined, installmentIntervalDays: data.installmentIntervalDays ?? undefined, ctaLabel: data.ctaLabel ?? undefined, isActive: data.isActive, sortOrder: (options as PricingOption[]).length })}
+          onCancel={() => setShowAdd(false)}
+          saving={createOption.isPending}
+        />
       )}
     </div>
   );

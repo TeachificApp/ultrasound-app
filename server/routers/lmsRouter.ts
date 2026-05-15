@@ -46,6 +46,8 @@ import {
   users,
   mediaAssets,
   mediaVersions,
+  lmsPricingOptions,
+  platformSettings,
 } from "../../drizzle/schema";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -296,7 +298,12 @@ export const lmsPublicRouter = router({
       // Landing page
       const [landingPage] = await db.select().from(lmsLandingPages).where(eq(lmsLandingPages.courseId, course.id)).limit(1);
 
-      return { ...course, sections: sectionsWithLessons, instructors: instructors.filter(Boolean), landingPage: landingPage ?? null };
+      // Pricing options (secondary pricing plans)
+      const pricingOptions = await db.select().from(lmsPricingOptions)
+        .where(and(eq(lmsPricingOptions.courseId, course.id), eq(lmsPricingOptions.isActive, true)))
+        .orderBy(asc(lmsPricingOptions.sortOrder));
+
+      return { ...course, sections: sectionsWithLessons, instructors: instructors.filter(Boolean), landingPage: landingPage ?? null, pricingOptions };
     }),
 
   /** Get instructor public profile */
@@ -616,13 +623,43 @@ export const lmsLearnerRouter = router({
       seats: z.number().int().min(1).default(1),
       origin: z.string(),
       orderBumpId: z.number().optional(),
+      // Optional: ID of a secondary pricing option (from lms_pricing_options)
+      // When provided, the checkout uses that option's price/type instead of the course primary price
+      pricingOptionId: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
-      const pricingType = course.pricingType ?? (course.isFree ? "free" : "one_time");
+
+      // Resolve pricing: secondary option overrides primary course pricing
+      let pricingType: string = course.pricingType ?? (course.isFree ? "free" : "one_time");
+      let effectivePrice = course.price;
+      let effectiveDownPayment = course.downPayment ?? 0;
+      let effectiveInstallmentAmount = course.installmentAmount ?? 0;
+      let effectiveInstallmentCount = course.installmentCount ?? 0;
+      let effectiveInstallmentIntervalDays = course.installmentIntervalDays ?? 30;
+      let effectiveStripePriceId = course.stripePriceId;
+      let effectiveSubscriptionInterval = course.subscriptionInterval ?? "monthly";
+      let pricingOptionLabel: string | null = null;
+
+      if (input.pricingOptionId) {
+        const [opt] = await db.select().from(lmsPricingOptions)
+          .where(and(eq(lmsPricingOptions.id, input.pricingOptionId), eq(lmsPricingOptions.courseId, course.id), eq(lmsPricingOptions.isActive, true)))
+          .limit(1);
+        if (!opt) throw new TRPCError({ code: "NOT_FOUND", message: "Pricing option not found" });
+        pricingType = opt.pricingType;
+        effectivePrice = opt.price;
+        effectiveDownPayment = opt.downPayment ?? 0;
+        effectiveInstallmentAmount = opt.installmentAmount ?? 0;
+        effectiveInstallmentCount = opt.installmentCount ?? 0;
+        effectiveInstallmentIntervalDays = opt.installmentIntervalDays ?? 30;
+        effectiveStripePriceId = opt.stripePriceId ?? null;
+        effectiveSubscriptionInterval = opt.subscriptionInterval ?? "monthly";
+        pricingOptionLabel = opt.label;
+      }
+
       if (pricingType === "free") throw new TRPCError({ code: "BAD_REQUEST", message: "Use enrollFree for free courses" });
 
       const Stripe = (await import("stripe")).default;
@@ -638,10 +675,10 @@ export const lmsLearnerRouter = router({
         ? { shipping_address_collection: { allowed_countries: ["US", "CA"] as any } }
         : {};
 
-      // Create order record
+      // Create order record (use effective pricing — may come from secondary option)
       const orderAmount = (pricingType === "payment_plan"
-        ? (course.downPayment ?? 0)
-        : course.price * input.seats) + (orderBumpCheckout?.amount ?? 0);
+        ? effectiveDownPayment
+        : effectivePrice * input.seats) + (orderBumpCheckout?.amount ?? 0);
       const [orderResult] = await db.insert(lmsOrders).values({
         userId: ctx.user.id, courseId: course.id,
         amount: orderAmount,
@@ -663,45 +700,56 @@ export const lmsLearnerRouter = router({
 
       let session: any;
 
+      const productName = pricingOptionLabel ? `${course.title} — ${pricingOptionLabel}` : course.title;
+
       if (pricingType === "one_time") {
+        // If the option has a pre-created Stripe Price ID, use it directly
+        const lineItem = effectiveStripePriceId
+          ? { price: effectiveStripePriceId, quantity: input.seats }
+          : {
+              price_data: {
+                currency: course.currency,
+                product_data: { name: productName, description: course.subtitle ?? undefined },
+                unit_amount: effectivePrice,
+              },
+              quantity: input.seats,
+            };
         session = await stripe.checkout.sessions.create({
           mode: "payment",
           customer_email: ctx.user.email ?? undefined,
           allow_promotion_codes: true,
-          line_items: [{
-            price_data: {
-              currency: course.currency,
-              product_data: { name: course.title, description: course.subtitle ?? undefined },
-              unit_amount: course.price,
-            },
-            quantity: input.seats,
-          }, ...(orderBumpCheckout ? [orderBumpCheckout.lineItem] : [])],
+          line_items: [lineItem, ...(orderBumpCheckout ? [orderBumpCheckout.lineItem] : [])],
           success_url: successUrl, cancel_url: cancelUrl,
           client_reference_id: ctx.user.id.toString(),
-          metadata: commonMeta,
+          metadata: { ...commonMeta, pricing_option_id: input.pricingOptionId?.toString() ?? "" },
           ...shippingOptions,
         });
 
       } else if (pricingType === "subscription") {
-        // Create or reuse a Stripe Price for this course subscription
-        let stripePriceId = course.stripePriceId;
+        // Create or reuse a Stripe Price for this subscription option
+        let stripePriceId = effectiveStripePriceId;
         if (!stripePriceId) {
           const intervalMap: Record<string, "month" | "year"> = { monthly: "month", quarterly: "month", annual: "year" };
           const intervalCountMap: Record<string, number> = { monthly: 1, quarterly: 3, annual: 1 };
-          const interval = course.subscriptionInterval ?? "monthly";
+          const interval = effectiveSubscriptionInterval;
           const stripeProduct = await stripe.products.create({
-            name: course.title,
+            name: productName,
             description: course.subtitle ?? undefined,
             metadata: { course_id: course.id.toString() },
           });
           const stripePrice = await stripe.prices.create({
             product: stripeProduct.id,
-            unit_amount: course.price,
+            unit_amount: effectivePrice,
             currency: course.currency,
             recurring: { interval: intervalMap[interval], interval_count: intervalCountMap[interval] },
           });
           stripePriceId = stripePrice.id;
-          await db.update(lmsCourses).set({ stripePriceId }).where(eq(lmsCourses.id, course.id));
+          // Cache on the option row (or course if primary)
+          if (input.pricingOptionId) {
+            await db.update(lmsPricingOptions).set({ stripePriceId }).where(eq(lmsPricingOptions.id, input.pricingOptionId));
+          } else {
+            await db.update(lmsCourses).set({ stripePriceId }).where(eq(lmsCourses.id, course.id));
+          }
         }
         session = await stripe.checkout.sessions.create({
           mode: "subscription",
@@ -710,34 +758,32 @@ export const lmsLearnerRouter = router({
           line_items: [{ price: stripePriceId, quantity: 1 }, ...(orderBumpCheckout ? [orderBumpCheckout.lineItem] : [])],
           success_url: successUrl, cancel_url: cancelUrl,
           client_reference_id: ctx.user.id.toString(),
-          metadata: commonMeta,
+          metadata: { ...commonMeta, pricing_option_id: input.pricingOptionId?.toString() ?? "" },
           ...shippingOptions,
         });
 
       } else if (pricingType === "payment_plan") {
         // Charge down payment now; installments handled via subscription
-        const downPayment = course.downPayment ?? 0;
-        const installmentAmount = course.installmentAmount ?? 0;
-        const installmentCount = course.installmentCount ?? 0;
-        const intervalDays = course.installmentIntervalDays ?? 30;
+        const downPayment = effectiveDownPayment;
+        const installmentAmount = effectiveInstallmentAmount;
+        const installmentCount = effectiveInstallmentCount;
+        const intervalDays = effectiveInstallmentIntervalDays;
         const lineItems: any[] = [];
         if (downPayment > 0) {
           lineItems.push({
             price_data: {
               currency: course.currency,
-              product_data: { name: `${course.title} — Down Payment` },
+              product_data: { name: `${productName} — Down Payment` },
               unit_amount: downPayment,
             },
             quantity: 1,
           });
         }
         if (installmentAmount > 0 && installmentCount > 0) {
-          // Add installments as additional line items (Stripe doesn't natively support deferred installments
-          // in a single checkout; we model them as a subscription with a fixed billing cycle count)
-          let stripePriceId = course.stripePriceId;
+          let stripePriceId = effectiveStripePriceId;
           if (!stripePriceId) {
             const stripeProduct = await stripe.products.create({
-              name: `${course.title} — Installment`,
+              name: `${productName} — Installment`,
               metadata: { course_id: course.id.toString() },
             });
             const intervalMonths = Math.round(intervalDays / 30) || 1;
@@ -748,11 +794,14 @@ export const lmsLearnerRouter = router({
               recurring: { interval: "month", interval_count: intervalMonths },
             });
             stripePriceId = stripePrice.id;
-            await db.update(lmsCourses).set({ stripePriceId }).where(eq(lmsCourses.id, course.id));
+            if (input.pricingOptionId) {
+              await db.update(lmsPricingOptions).set({ stripePriceId }).where(eq(lmsPricingOptions.id, input.pricingOptionId));
+            } else {
+              await db.update(lmsCourses).set({ stripePriceId }).where(eq(lmsCourses.id, course.id));
+            }
           }
           lineItems.push({ price: stripePriceId, quantity: 1 });
         }
-        // Use payment mode for down-payment-only, subscription mode when installments exist
         const hasInstallments = installmentAmount > 0 && installmentCount > 0;
         session = await stripe.checkout.sessions.create({
           mode: hasInstallments ? "subscription" : "payment",
@@ -761,7 +810,7 @@ export const lmsLearnerRouter = router({
           line_items: [...lineItems, ...(orderBumpCheckout ? [orderBumpCheckout.lineItem] : [])],
           success_url: successUrl, cancel_url: cancelUrl,
           client_reference_id: ctx.user.id.toString(),
-          metadata: { ...commonMeta, installment_count: installmentCount.toString() },
+          metadata: { ...commonMeta, installment_count: installmentCount.toString(), pricing_option_id: input.pricingOptionId?.toString() ?? "" },
           ...shippingOptions,
         });
       } else {
@@ -1454,7 +1503,7 @@ export const lmsAdminRouter = router({
       if (isPrerequisite !== undefined) updates.isPrerequisite = isPrerequisite;
       // Convert null dripDays to 0 (no drip)
       if (updates.dripDays === null) updates.dripDays = 0;
-      if (Object.keys(updates).length > 0) await db.update(lmsLessons).set(updates).where(eq(lmsLessons.id, id));
+      if (Object.keys(updates).length > 0) await db.update(lmsLessons).set(updates as any).where(eq(lmsLessons.id, id));
       return { success: true };
     }),
 
@@ -2713,15 +2762,15 @@ Generate 3-6 sections with 2-5 lessons each. Lesson types can be: text, video (f
         // Count completed lessons
         const [{ completedCount }] = await db.select({ completedCount: sql<number>`count(*)` }).from(lmsLessonProgress)
           .where(and(eq(lmsLessonProgress.enrollmentId, e.id), isNotNull(lmsLessonProgress.completedAt)));
-        // Last activity
-        const [lastActivity] = await db.select({ updatedAt: lmsLessonProgress.updatedAt })
+        // Last activity (use completedAt as proxy since lmsLessonProgress has no updatedAt)
+        const [lastActivity] = await db.select({ completedAt: lmsLessonProgress.completedAt })
           .from(lmsLessonProgress).where(eq(lmsLessonProgress.enrollmentId, e.id))
-          .orderBy(desc(lmsLessonProgress.updatedAt)).limit(1);
+          .orderBy(desc(lmsLessonProgress.completedAt)).limit(1);
         return {
           ...e,
           user: u ?? null,
           completedLessons: Number(completedCount),
-          lastActivityAt: lastActivity?.updatedAt ?? null,
+          lastActivityAt: lastActivity?.completedAt ?? null,
         };
       }));
       // Filter by search after enrichment
@@ -2831,6 +2880,160 @@ export const lmsGroupRouter = router({
       const [group] = await db.select().from(lmsGroups).where(and(eq(lmsGroups.id, seat.groupId), eq(lmsGroups.managerId, ctx.user.id))).limit(1);
       if (!group) throw new TRPCError({ code: "FORBIDDEN" });
       await db.delete(lmsGroupSeats).where(eq(lmsGroupSeats.id, input.seatId));
+      return { success: true };
+    }),
+
+  // ─── Pricing Options CRUD ───────────────────────────────────────────────────
+
+  /** List all pricing options for a course (admin) */
+  listPricingOptions: protectedProcedure
+    .input(z.object({ courseId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      return db.select().from(lmsPricingOptions)
+        .where(eq(lmsPricingOptions.courseId, input.courseId))
+        .orderBy(asc(lmsPricingOptions.sortOrder));
+    }),
+
+  /** Create a new pricing option */
+  createPricingOption: protectedProcedure
+    .input(z.object({
+      courseId: z.number().int().positive(),
+      label: z.string().min(1).max(255),
+      sublabel: z.string().max(500).optional(),
+      pricingType: z.enum(["one_time", "subscription", "payment_plan", "free"]),
+      price: z.number().int().min(0),
+      stripePriceId: z.string().optional(),
+      subscriptionInterval: z.enum(["monthly", "quarterly", "annual"]).optional(),
+      downPayment: z.number().int().min(0).optional(),
+      installmentCount: z.number().int().min(0).optional(),
+      installmentAmount: z.number().int().min(0).optional(),
+      installmentIntervalDays: z.number().int().min(1).optional(),
+      ctaLabel: z.string().max(100).optional(),
+      sortOrder: z.number().int().min(0).default(0),
+      isActive: z.boolean().default(true),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [result] = await db.insert(lmsPricingOptions).values({
+        courseId: input.courseId,
+        label: input.label,
+        sublabel: input.sublabel ?? null,
+        pricingType: input.pricingType,
+        price: input.price,
+        stripePriceId: input.stripePriceId ?? null,
+        subscriptionInterval: input.subscriptionInterval ?? null,
+        downPayment: input.downPayment ?? 0,
+        installmentCount: input.installmentCount ?? 0,
+        installmentAmount: input.installmentAmount ?? 0,
+        installmentIntervalDays: input.installmentIntervalDays ?? 30,
+        ctaLabel: input.ctaLabel ?? null,
+        sortOrder: input.sortOrder,
+        isActive: input.isActive,
+      }).$returningId();
+      return { id: result.id };
+    }),
+
+  /** Update an existing pricing option */
+  updatePricingOption: protectedProcedure
+    .input(z.object({
+      id: z.number().int().positive(),
+      label: z.string().min(1).max(255).optional(),
+      sublabel: z.string().max(500).nullable().optional(),
+      pricingType: z.enum(["one_time", "subscription", "payment_plan", "free"]).optional(),
+      price: z.number().int().min(0).optional(),
+      stripePriceId: z.string().nullable().optional(),
+      subscriptionInterval: z.enum(["monthly", "quarterly", "annual"]).nullable().optional(),
+      downPayment: z.number().int().min(0).optional(),
+      installmentCount: z.number().int().min(0).optional(),
+      installmentAmount: z.number().int().min(0).optional(),
+      installmentIntervalDays: z.number().int().min(1).optional(),
+      ctaLabel: z.string().max(100).nullable().optional(),
+      sortOrder: z.number().int().min(0).optional(),
+      isActive: z.boolean().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { id, ...fields } = input;
+      const updates: Record<string, any> = {};
+      for (const [k, v] of Object.entries(fields)) { if (v !== undefined) updates[k] = v; }
+      if (Object.keys(updates).length > 0) {
+        await db.update(lmsPricingOptions).set(updates).where(eq(lmsPricingOptions.id, id));
+      }
+      return { success: true };
+    }),
+
+  /** Delete a pricing option */
+  deletePricingOption: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(lmsPricingOptions).where(eq(lmsPricingOptions.id, input.id));
+      return { success: true };
+    }),
+
+  /** Reorder pricing options */
+  reorderPricingOptions: protectedProcedure
+    .input(z.object({ orderedIds: z.array(z.number().int().positive()) }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await Promise.all(input.orderedIds.map((id, idx) =>
+        db.update(lmsPricingOptions).set({ sortOrder: idx }).where(eq(lmsPricingOptions.id, id))
+      ));
+      return { success: true };
+    }),
+
+  // ─── Platform Settings ────────────────────────────────────────────────────
+
+  /** Get platform settings (admin) */
+  getPlatformSettings: protectedProcedure.query(async ({ ctx }) => {
+    if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const [settings] = await db.select().from(platformSettings).where(eq(platformSettings.id, 1)).limit(1);
+    return settings ?? { id: 1, enrollmentEmailEnabled: true, enrollmentEmailSubject: null, enrollmentEmailIntro: null };
+  }),
+
+  /** Update platform settings (admin) */
+  updatePlatformSettings: protectedProcedure
+    .input(z.object({
+      enrollmentEmailEnabled: z.boolean().optional(),
+      enrollmentEmailSubject: z.string().max(255).nullable().optional(),
+      enrollmentEmailIntro: z.string().nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const updates: Record<string, any> = {};
+      for (const [k, v] of Object.entries(input)) { if (v !== undefined) updates[k] = v; }
+      if (Object.keys(updates).length > 0) {
+        await db.update(platformSettings).set(updates).where(eq(platformSettings.id, 1));
+      }
+      return { success: true };
+    }),
+
+  /** Update course sendEnrollmentEmail toggle */
+  updateCourseEnrollmentEmail: protectedProcedure
+    .input(z.object({
+      courseId: z.number().int().positive(),
+      sendEnrollmentEmail: z.boolean(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(lmsCourses).set({ sendEnrollmentEmail: input.sendEnrollmentEmail }).where(eq(lmsCourses.id, input.courseId));
       return { success: true };
     }),
 

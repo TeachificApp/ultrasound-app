@@ -1920,3 +1920,25 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Add platform email settings UI in Admin panel (toggle + test send button)
 - [ ] Add per-course enrollment email toggle to Course Settings tab in LMS Admin
 - [ ] Tests for enrollment email logic
+
+## Secondary Pricing Options + Preview Lessons (May 15)
+
+### Secondary Pricing Options
+- [x] Add lms_pricing_options table (courseId, label, pricingType, price, stripePriceId, sortOrder, isActive, customCta)
+- [x] Add pricing options CRUD procedures to lmsAdmin router
+- [x] Add getPricingOptions to lmsPublic/lmsLearner router
+- [x] Build Pricing Options editor in Course Settings tab (add/edit/reorder/delete options)
+- [x] Update Course Landing Page CTA: primary pricing default + selectable alternate options
+- [x] Add "Pricing Options" content block to landing page block editor (shows all active options with labels)
+- [x] Wire Stripe checkout to accept pricingOptionId so alternate options use correct price/plan
+
+### Preview Lessons
+- [x] Add isPreview boolean column to lms_lessons (already existed)
+- [x] Add previewLessons to getCoursePlayer query (bypass enrollment check for preview lessons)
+- [x] Add isPreview toggle to Lesson Settings panel in LMS Admin (enhanced label)
+- [x] Preview lessons: bypass drip and prerequisite rules in getCoursePlayer
+- [x] CoursePlayer: show preview badge on preview lessons in sidebar
+- [x] CoursePlayer: upgrade prompt modal on entry to non-preview content (not enrolled)
+- [x] CoursePlayer: upgrade prompt on exit from last preview lesson
+- [x] CoursePlayer: show preview lessons in curriculum even when not enrolled
+- [ ] CourseOverview: show preview lessons as accessible in curriculum outline

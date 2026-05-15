@@ -49,6 +49,23 @@ function formatPrice(c: any): string {
   return `$${(c.price / 100).toFixed(0)}`;
 }
 
+function formatPricingOption(opt: any): string {
+  const pt = opt.pricingType ?? "one_time";
+  if (pt === "free") return "Free";
+  if (pt === "subscription") {
+    const intervalLabel: Record<string, string> = { monthly: "/mo", quarterly: "/qtr", annual: "/yr" };
+    return `$${(opt.price / 100).toFixed(0)}${intervalLabel[opt.subscriptionInterval ?? "monthly"] ?? "/mo"}`;
+  }
+  if (pt === "payment_plan") {
+    const dp = opt.downPayment ? `$${(opt.downPayment / 100).toFixed(0)} down` : "";
+    const inst = opt.installmentCount && opt.installmentAmount
+      ? ` + ${opt.installmentCount}\u00d7$${(opt.installmentAmount / 100).toFixed(0)}`
+      : "";
+    return dp + inst || `$${(opt.price / 100).toFixed(0)}`;
+  }
+  return `$${(opt.price / 100).toFixed(0)}`;
+}
+
 function accessLabel(c: any): string {
   const days = c?.accessDurationDays;
   if (!days || days === 0) return "Full lifetime access";
@@ -86,8 +103,10 @@ function CountdownTimer({ targetDate, textColor }: { targetDate: string; textCol
 
 // ─── Block Renderer ────────────────────────────────────────────────────────────
 
-function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price }: {
+function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selectedPricingOptionId, onSelectPricingOption, slug }: {
   block: Block; course: any; onEnroll: () => void; enrolling: boolean; ctaText: string; price: string;
+  selectedPricingOptionId?: number; onSelectPricingOption?: (id: number | undefined) => void;
+  slug?: string;
 }) {
   const d = block.data;
   switch (block.type) {
@@ -394,21 +413,62 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price }: {
           </div>
         </div>
       );
-    case "pricing_options_auto":
+    case "pricing_options_auto": {
+      const pricingOptions: any[] = course.pricingOptions ?? [];
+      const allOptions = [
+        // Primary option (always first)
+        {
+          id: undefined as number | undefined,
+          label: d.primaryLabel ?? course.title,
+          sublabel: d.primarySublabel ?? null,
+          pricingType: course.pricingType ?? (course.isFree ? "free" : "one_time"),
+          price: course.price,
+          ctaLabel: d.primaryCtaLabel ?? null,
+          isPrimary: true,
+        },
+        // Active secondary options
+        ...pricingOptions.filter((o: any) => o.isActive).map((o: any) => ({ ...o, isPrimary: false })),
+      ];
+      const currentSelected = selectedPricingOptionId;
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
           {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
-          <div className="flex justify-center max-w-sm mx-auto">
-            <div className="w-full border-2 border-teal-500 rounded-xl p-6 text-center shadow-lg">
-              <h3 className="font-bold text-gray-900 mb-2">{course.title}</h3>
-              <p className="text-3xl font-bold text-teal-600 mb-4">{price}</p>
-              <button onClick={onEnroll} disabled={enrolling} className="w-full py-3 rounded-lg font-semibold text-white disabled:opacity-60" style={{ backgroundColor: "#179ca3" }}>
-                {enrolling ? "Processing…" : ctaText}
-              </button>
-            </div>
+          <div className={`grid gap-4 max-w-4xl mx-auto ${allOptions.length === 1 ? "max-w-sm" : allOptions.length === 2 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-3"}`}>
+            {allOptions.map((opt: any, i: number) => {
+              const isSelected = opt.id === undefined ? currentSelected === undefined : currentSelected === opt.id;
+              const optPrice = opt.isPrimary ? price : formatPricingOption(opt);
+              const optCta = opt.ctaLabel ?? (opt.isPrimary ? ctaText : `Enroll — ${opt.label}`);
+              return (
+                <div
+                  key={i}
+                  onClick={() => onSelectPricingOption?.(opt.id)}
+                  className={`rounded-xl p-6 text-center cursor-pointer transition-all border-2 ${
+                    isSelected
+                      ? "border-teal-500 bg-white shadow-lg ring-2 ring-teal-200"
+                      : "border-gray-200 bg-white hover:border-teal-300 hover:shadow"
+                  }`}
+                >
+                  {opt.isPrimary && <div className="text-xs font-semibold text-teal-600 uppercase tracking-wide mb-2">Most Popular</div>}
+                  <h3 className="font-bold text-gray-900 mb-1">{opt.label}</h3>
+                  {opt.sublabel && <p className="text-xs text-gray-500 mb-3">{opt.sublabel}</p>}
+                  <p className="text-3xl font-bold text-teal-600 mb-4">{optPrice}</p>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onSelectPricingOption?.(opt.id); onEnroll(); }}
+                    disabled={enrolling}
+                    className={`w-full py-3 rounded-lg font-semibold text-white disabled:opacity-60 transition-opacity hover:opacity-90 ${
+                      isSelected ? "" : "opacity-80"
+                    }`}
+                    style={{ backgroundColor: d.ctaColor ?? "#179ca3" }}
+                  >
+                    {enrolling && isSelected ? "Processing\u2026" : optCta}
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
       );
+    }
     case "divider":
       return <div style={{ padding: `${d.spacing ?? 32}px 32px` }}><hr style={{ borderTop: `${d.thickness ?? 1}px ${d.style ?? "solid"} ${d.color ?? "#e5e7eb"}`, borderRadius: d.borderRadius ? `${d.borderRadius}px` : undefined }} /></div>;
     case "two_column":
@@ -491,6 +551,7 @@ export default function CourseLanding() {
   const { user } = useAuth();
   const [enrolling, setEnrolling] = useState(false);
   const [selectedOrderBumpId, setSelectedOrderBumpId] = useState<number | undefined>();
+  const [selectedPricingOptionId, setSelectedPricingOptionId] = useState<number | undefined>();
   const isPreview = new URLSearchParams(window.location.search).get("preview") === "admin";
   const autoCheckout = new URLSearchParams(window.location.search).get("checkout") === "1";
 
@@ -512,9 +573,12 @@ export default function CourseLanding() {
     if (enrollment) { navigate(`/learn/${slug}/player`); return; }
     setEnrolling(true);
     try {
-      const pt = course?.pricingType ?? (course?.isFree ? "free" : "one_time");
-      if (pt === "free") await enrollFree.mutateAsync({ courseSlug: slug! });
-      else await createCheckout.mutateAsync({ courseSlug: slug!, seats: 1, origin: window.location.origin, orderBumpId: selectedOrderBumpId });
+      // If a secondary pricing option is selected, use it; otherwise use primary course pricing
+      const resolvedPricingType = selectedPricingOptionId
+        ? (course?.pricingOptions?.find((o: any) => o.id === selectedPricingOptionId)?.pricingType ?? course?.pricingType)
+        : (course?.pricingType ?? (course?.isFree ? "free" : "one_time"));
+      if (resolvedPricingType === "free") await enrollFree.mutateAsync({ courseSlug: slug! });
+      else await createCheckout.mutateAsync({ courseSlug: slug!, seats: 1, origin: window.location.origin, orderBumpId: selectedOrderBumpId, pricingOptionId: selectedPricingOptionId });
     } finally { setEnrolling(false); }
   };
 
@@ -568,7 +632,7 @@ export default function CourseLanding() {
       <div className="min-h-screen bg-white">
         {blocks.map(block => (
           <div key={block.id} style={{ marginTop: block.data?.marginTop ? `${block.data.marginTop}px` : undefined, marginBottom: block.data?.marginBottom ? `${block.data.marginBottom}px` : undefined, paddingTop: block.data?.paddingTop ? `${block.data.paddingTop}px` : undefined, paddingBottom: block.data?.paddingBottom ? `${block.data.paddingBottom}px` : undefined, paddingLeft: block.data?.paddingLeft ? `${block.data.paddingLeft}px` : undefined, paddingRight: block.data?.paddingRight ? `${block.data.paddingRight}px` : undefined }}>
-            <RenderBlock block={block} course={course} onEnroll={handleEnroll} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} />
+            <RenderBlock block={block} course={course} onEnroll={handleEnroll} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} />
           </div>
         ))}
         {/* Before-checkout order bump */}
@@ -637,6 +701,44 @@ export default function CourseLanding() {
           {/* Enrollment card */}
           <div className="bg-white rounded-xl shadow-xl p-6 text-gray-900 space-y-4">
             {course.coverImageUrl && <img src={course.coverImageUrl} alt={course.title} className="w-full h-36 object-cover rounded-lg" />}
+            {/* Secondary pricing options selector */}
+            {(course.pricingOptions ?? []).filter((o: any) => o.isActive).length > 0 && !enrollment && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Choose your plan</p>
+                {/* Primary option */}
+                <button
+                  onClick={() => setSelectedPricingOptionId(undefined)}
+                  className={`w-full text-left px-3 py-2.5 rounded-lg border-2 transition-colors ${
+                    selectedPricingOptionId === undefined
+                      ? "border-teal-500 bg-teal-50"
+                      : "border-gray-200 hover:border-teal-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-gray-800">Full Access</span>
+                    <span className="text-sm font-bold text-teal-700">{price}</span>
+                  </div>
+                </button>
+                {/* Secondary options */}
+                {(course.pricingOptions ?? []).filter((o: any) => o.isActive).map((opt: any) => (
+                  <button
+                    key={opt.id}
+                    onClick={() => setSelectedPricingOptionId(opt.id)}
+                    className={`w-full text-left px-3 py-2.5 rounded-lg border-2 transition-colors ${
+                      selectedPricingOptionId === opt.id
+                        ? "border-teal-500 bg-teal-50"
+                        : "border-gray-200 hover:border-teal-300"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-gray-800">{opt.label}</span>
+                      <span className="text-sm font-bold text-teal-700">{formatPricingOption(opt)}</span>
+                    </div>
+                    {opt.sublabel && <p className="text-xs text-gray-500 mt-0.5">{opt.sublabel}</p>}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="space-y-1">
               <div className="text-3xl font-bold text-teal-700">{price}</div>
               {pricingType === "trial_then_subscription" && (
@@ -736,12 +838,45 @@ export default function CourseLanding() {
         {/* Sidebar */}
         <div className="hidden lg:block">
           <div className="sticky top-6 bg-white rounded-xl border border-gray-200 p-6 space-y-4">
-            <div className="text-2xl font-bold text-teal-700">{price}</div>
+            {/* Secondary pricing options in sidebar */}
+            {(course.pricingOptions ?? []).filter((o: any) => o.isActive).length > 0 && !enrollment ? (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Choose your plan</p>
+                <button
+                  onClick={() => setSelectedPricingOptionId(undefined)}
+                  className={`w-full text-left px-3 py-2.5 rounded-lg border-2 transition-colors ${
+                    selectedPricingOptionId === undefined ? "border-teal-500 bg-teal-50" : "border-gray-200 hover:border-teal-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-gray-800">Full Access</span>
+                    <span className="text-sm font-bold text-teal-700">{price}</span>
+                  </div>
+                </button>
+                {(course.pricingOptions ?? []).filter((o: any) => o.isActive).map((opt: any) => (
+                  <button
+                    key={opt.id}
+                    onClick={() => setSelectedPricingOptionId(opt.id)}
+                    className={`w-full text-left px-3 py-2.5 rounded-lg border-2 transition-colors ${
+                      selectedPricingOptionId === opt.id ? "border-teal-500 bg-teal-50" : "border-gray-200 hover:border-teal-300"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-gray-800">{opt.label}</span>
+                      <span className="text-sm font-bold text-teal-700">{formatPricingOption(opt)}</span>
+                    </div>
+                    {opt.sublabel && <p className="text-xs text-gray-500 mt-0.5">{opt.sublabel}</p>}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="text-2xl font-bold text-teal-700">{price}</div>
+            )}
             {pricingType === "trial_then_subscription" && (
               <p className="text-xs text-gray-500">{course.trialDays ?? 7}-day free trial, then billed {course.subscriptionInterval ?? "monthly"}</p>
             )}
             <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold" size="lg" onClick={handleEnroll} disabled={enrolling || enrollFree.isPending || createCheckout.isPending}>
-              {enrolling ? "Processing..." : ctaText}
+              {enrolling ? "Processing..." : (selectedPricingOptionId ? (course.pricingOptions?.find((o: any) => o.id === selectedPricingOptionId)?.ctaLabel ?? ctaText) : ctaText)}
             </Button>
             <ul className="space-y-2 text-sm text-gray-600">
               {totalLessons > 0 && <li className="flex items-center gap-2"><BookOpen className="w-4 h-4 text-teal-500" />{totalLessons} lessons</li>}

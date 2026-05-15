@@ -15,6 +15,13 @@
       "when": 1773860584629,
       "tag": "0001_nosy_vapor",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1778820333761,
+      "tag": "0002_salty_pepper_potts",
+      "breakpoints": true
     }
   ]
 }

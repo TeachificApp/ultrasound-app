@@ -3700,3 +3700,40 @@ export const platformSettings = mysqlTable("platform_settings", {
 });
 
 export type PlatformSettings = typeof platformSettings.$inferSelect;
+
+// ─── LMS Pricing Options ──────────────────────────────────────────────────────
+// Secondary pricing options for courses/products (payment plans, group rates, etc.)
+// Each course has one primary price (on lmsCourses) plus N secondary options here.
+// The CTA on the landing page defaults to the primary price but allows selection.
+
+export const lmsPricingOptions = mysqlTable("lms_pricing_options", {
+  id: int("id").autoincrement().primaryKey(),
+  courseId: int("course_id").notNull(),
+  // Display label shown to students (e.g. "3-Month Payment Plan", "Group Rate")
+  label: varchar("label", { length: 255 }).notNull(),
+  // Optional sub-label / description shown below the label (e.g. "3 × $99/month")
+  sublabel: varchar("sublabel", { length: 500 }),
+  // Pricing type for this option
+  pricingType: mysqlEnum("pricing_type", ["one_time", "subscription", "payment_plan", "free"]).default("one_time").notNull(),
+  // Price in cents (total for payment_plan, per-period for subscription, full for one_time)
+  price: int("price").default(0).notNull(),
+  // Stripe Price ID — if set, used directly; otherwise a price is created on-the-fly
+  stripePriceId: varchar("stripe_price_id", { length: 255 }),
+  // Subscription interval (only for pricingType=subscription)
+  subscriptionInterval: mysqlEnum("subscription_interval", ["monthly", "quarterly", "annual"]),
+  // Payment plan fields (only for pricingType=payment_plan)
+  downPayment: int("down_payment").default(0), // cents — charged immediately
+  installmentCount: int("installment_count").default(0),
+  installmentAmount: int("installment_amount").default(0), // cents per installment
+  installmentIntervalDays: int("installment_interval_days").default(30),
+  // Custom CTA button text override (null = use default "Enroll Now" / "Buy Now")
+  ctaLabel: varchar("cta_label", { length: 100 }),
+  // Sort order in the pricing options list (lower = shown first)
+  sortOrder: int("sort_order").default(0).notNull(),
+  // Whether this option is currently shown on the landing page
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+
+export type LmsPricingOption = typeof lmsPricingOptions.$inferSelect;

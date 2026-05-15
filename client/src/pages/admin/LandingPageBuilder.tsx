@@ -823,7 +823,22 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
     case "curriculum_auto":
       return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Section Headline" field="headline" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div className="flex items-center gap-2"><input type="checkbox" checked={d.showLocked ?? true} onChange={e => set("showLocked", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show locked lessons</label></div></div>);
     case "pricing_options_auto":
-      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Section Headline" field="headline" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /></div>);
+      return (
+        <div className="space-y-3">
+          <BSTextField data={d} onSet={set} label="Section Headline" field="headline" />
+          <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
+          <BSColorField data={d} onSet={set} label="CTA Button Color" field="ctaColor" />
+          <div className="border-t pt-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Primary Option Labels</p>
+            <div className="space-y-2">
+              <BSTextField data={d} onSet={set} label="Primary Card Label" field="primaryLabel" placeholder="Full Access" />
+              <BSTextField data={d} onSet={set} label="Primary Card Sublabel" field="primarySublabel" placeholder="One-time payment, lifetime access" />
+              <BSTextField data={d} onSet={set} label="Primary CTA Button Text" field="primaryCtaLabel" placeholder="Enroll Now" />
+            </div>
+          </div>
+          <p className="text-xs text-gray-500 bg-gray-50 p-2 rounded">Secondary pricing option labels are managed in Course Settings → Pricing Options. Each option's label, sublabel, and CTA text can be set there.</p>
+        </div>
+      );
     case "related_products":
       return (
         <div className="space-y-3">

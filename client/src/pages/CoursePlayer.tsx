@@ -352,6 +352,8 @@ export default function CoursePlayer() {
   const [showCertDialog, setShowCertDialog] = useState(false);
   const [showBlockEditor, setShowBlockEditor] = useState(false);
   const [adminPreviewStudent, setAdminPreviewStudent] = useState(isPreviewMode);
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+  const [upgradePromptReason, setUpgradePromptReason] = useState<"entry" | "exit" | "locked_lesson">("entry");
   const videoRef = useRef<HTMLVideoElement>(null);
   const utils = trpc.useUtils();
 
@@ -404,11 +406,27 @@ export default function CoursePlayer() {
       const lessonParam = params.get("lesson");
       const topLevel = (data as any).topLevelLessons ?? [];
       const allL = [...topLevel, ...data.sections.flatMap((s: any) => s.lessons)];
+      const isEnrolled = !!data.enrollment;
       if (lessonParam) {
         const paramId = parseInt(lessonParam);
         const found = allL.find((l: any) => l.id === paramId);
         if (found) {
+          // If not enrolled and lesson is not preview, redirect to first preview lesson
+          if (!isEnrolled && !found.isPreview && !adminBypass) {
+            const firstPreview = allL.find((l: any) => l.isPreview);
+            if (firstPreview) { setSelectedLessonId(firstPreview.id); return; }
+          }
           setSelectedLessonId(found.id);
+          return;
+        }
+      }
+      // For unenrolled users, start on first preview lesson; show upgrade prompt on entry
+      if (!isEnrolled && !adminBypass) {
+        const firstPreview = allL.find((l: any) => l.isPreview);
+        if (firstPreview) {
+          setSelectedLessonId(firstPreview.id);
+          // Show upgrade prompt on entry to preview mode
+          setTimeout(() => { setUpgradePromptReason("entry"); setShowUpgradePrompt(true); }, 800);
           return;
         }
       }
@@ -491,7 +509,13 @@ export default function CoursePlayer() {
   // Admins always bypass the enrollment gate — they can preview any course directly
   const adminBypass = isAdmin && !adminPreviewStudent;
 
-  if (!data?.enrollment && !isPreviewMode && !adminPreviewStudent && !adminBypass) {
+  // Check if course has any preview lessons — unenrolled registered users can access the player in preview mode
+  const hasPreviewLessons = data ? [
+    ...((data as any).topLevelLessons ?? []),
+    ...(data.sections ?? []).flatMap((s: any) => s.lessons ?? []),
+  ].some((l: any) => l.isPreview) : false;
+
+  if (!data?.enrollment && !isPreviewMode && !adminPreviewStudent && !adminBypass && !hasPreviewLessons) {
     return (
       <div className="text-center py-20 bg-gray-50 min-h-screen">
         <Lock className="w-12 h-12 mx-auto mb-3 text-teal-500" />
@@ -568,12 +592,32 @@ export default function CoursePlayer() {
   }
   // ────────────────────────────────────────────────────────────────────────────
 
+  const isEnrolled = !!data.enrollment;
+  const isPreviewLesson = selectedLessonId ? allLessons.find((l: any) => l.id === selectedLessonId)?.isPreview : false;
+
+  // Helper: select a lesson, gating non-preview lessons for unenrolled users
+  const handleLessonSelect = (lessonId: number) => {
+    const lesson = allLessons.find((l: any) => l.id === lessonId);
+    if (!isEnrolled && !adminBypass && lesson && !lesson.isPreview) {
+      // Show upgrade prompt when trying to access non-preview content
+      setUpgradePromptReason("locked_lesson");
+      setShowUpgradePrompt(true);
+      return;
+    }
+    // If leaving a preview lesson and going to another preview lesson, show exit prompt
+    if (!isEnrolled && !adminBypass && isPreviewLesson && lesson?.isPreview && lessonId !== selectedLessonId) {
+      setSelectedLessonId(lessonId);
+      return;
+    }
+    setSelectedLessonId(lessonId);
+  };
+
   const currentIdx = allLessons.findIndex((l: any) => l.id === selectedLessonId);
   const prevLesson = currentIdx > 0 ? allLessons[currentIdx - 1] : null;
   const nextLesson = currentIdx < allLessons.length - 1 ? allLessons[currentIdx + 1] : null;
 
   const currentSection = sections.find((s: any) => s.lessons.some((l: any) => l.id === selectedLessonId));
-  const currentSectionIdx = sections.indexOf(currentSection);
+  const currentSectionIdx = currentSection ? sections.indexOf(currentSection) : -1;
   const moduleNum = currentSection
     ? topLevelLessons.length + currentSectionIdx + 1
     : topLevelLessons.findIndex((l: any) => l.id === selectedLessonId) + 1;
@@ -600,6 +644,57 @@ export default function CoursePlayer() {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-gray-50">
+      {/* Upgrade Prompt Dialog for preview lesson users */}
+      <Dialog open={showUpgradePrompt} onOpenChange={setShowUpgradePrompt}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {upgradePromptReason === "locked_lesson" ? (
+                <><Lock className="w-5 h-5 text-teal-600" /> Full Access Required</>
+              ) : upgradePromptReason === "exit" ? (
+                <><Award className="w-5 h-5 text-teal-600" /> Enjoying the Preview?</>
+              ) : (
+                <><PlayCircle className="w-5 h-5 text-teal-600" /> You're in Preview Mode</>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {upgradePromptReason === "locked_lesson" ? (
+              <p className="text-sm text-gray-600">This lesson is part of the full course. Enroll to unlock all {allLessons.length} lessons, track your progress, and earn your certificate.</p>
+            ) : upgradePromptReason === "exit" ? (
+              <p className="text-sm text-gray-600">You've been exploring the free preview lessons. Ready to unlock the full course and continue your learning journey?</p>
+            ) : (
+              <p className="text-sm text-gray-600">You have free access to the preview lessons in this course. Enroll to unlock all content, track your progress, and earn your certificate of completion.</p>
+            )}
+            <div className="flex gap-3">
+              <Button
+                className="flex-1 bg-teal-600 hover:bg-teal-700 text-white"
+                onClick={() => { setShowUpgradePrompt(false); navigate(`/learn/${slug}`); }}
+              >
+                View Course &amp; Enroll
+              </Button>
+              <Button variant="outline" className="flex-1" onClick={() => setShowUpgradePrompt(false)}>
+                {upgradePromptReason === "locked_lesson" ? "Stay in Preview" : "Continue Preview"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Free Preview Banner for unenrolled users */}
+      {!isEnrolled && !adminBypass && hasPreviewLessons && (
+        <div className="bg-teal-600 text-white text-center py-2 px-4 text-sm font-medium flex items-center justify-center gap-2 shrink-0 z-50">
+          <PlayCircle className="w-4 h-4" />
+          <span>You're viewing a free preview — <button className="underline font-semibold" onClick={() => navigate(`/learn/${slug}`)}>enroll for full access</button></span>
+          <button
+            onClick={() => { setUpgradePromptReason("exit"); setShowUpgradePrompt(true); }}
+            className="ml-4 px-2 py-0.5 bg-teal-700 hover:bg-teal-800 rounded text-xs"
+          >
+            Upgrade
+          </button>
+        </div>
+      )}
+
       {/* Admin Preview Banner */}
       {(isPreviewMode || adminPreviewStudent) && (
         <div className="bg-purple-700 text-white text-center py-2 px-4 text-sm font-medium flex items-center justify-center gap-2 shrink-0 z-50">
@@ -710,7 +805,7 @@ export default function CoursePlayer() {
             sidebarTab={sidebarTab}
             setSidebarTab={setSidebarTab}
             selectedLessonId={selectedLessonId}
-            setSelectedLessonId={(id) => { setSelectedLessonId(id); setMobileSidebarOpen(false); }}
+            setSelectedLessonId={(id) => { handleLessonSelect(id); setMobileSidebarOpen(false); }}
             completedIds={completedIds}
             notesData={notesData}
             bookmarksData={bookmarksData}
@@ -763,7 +858,7 @@ export default function CoursePlayer() {
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-[10px] font-semibold text-amber-700 truncate flex-1">{n.lessonTitle}</p>
                     <button
-                      onClick={() => setSelectedLessonId(n.lessonId)}
+                      onClick={() => handleLessonSelect(n.lessonId)}
                       className="text-[9px] text-teal-600 hover:text-teal-800 ml-2 shrink-0"
                     >Go to lesson</button>
                   </div>
@@ -786,7 +881,7 @@ export default function CoursePlayer() {
               ) : (bookmarksData ?? []).map((b: any) => (
                 <button
                   key={b.id}
-                  onClick={() => setSelectedLessonId(b.lessonId)}
+                  onClick={() => handleLessonSelect(b.lessonId)}
                   className="w-full text-left bg-white border border-gray-200 rounded-lg p-3 hover:border-teal-400 transition-colors"
                 >
                   <p className="text-xs font-medium text-gray-800 truncate">{b.lessonTitle}</p>
@@ -809,7 +904,7 @@ export default function CoursePlayer() {
               return (
                 <button
                   key={lesson.id}
-                  onClick={() => { if (!lessonLocked) setSelectedLessonId(lesson.id); }}
+                  onClick={() => { if (!lessonLocked) handleLessonSelect(lesson.id); }}
                   disabled={lessonLocked}
                   className={cn(
                     "w-full text-left px-3 py-2.5 flex items-center gap-3 text-xs transition-all border-l-4",
@@ -853,7 +948,7 @@ export default function CoursePlayer() {
                 <div key={section.id}>
                   {/* Section header */}
                   <button
-                    onClick={() => { if (!sectionLocked && section.lessons[0]) setSelectedLessonId(section.lessons[0].id); }}
+                    onClick={() => { if (!sectionLocked && section.lessons[0]) handleLessonSelect(section.lessons[0].id); }}
                     disabled={sectionLocked}
                     className={cn(
                       "w-full text-left px-3 py-2.5 flex items-center gap-3 text-xs transition-all border-l-4",
@@ -898,7 +993,7 @@ export default function CoursePlayer() {
                         return (
                           <button
                             key={lesson.id}
-                            onClick={() => { if (!lessonLocked) setSelectedLessonId(lesson.id); }}
+                            onClick={() => { if (!lessonLocked) handleLessonSelect(lesson.id); }}
                             disabled={lessonLocked}
                             className={cn(
                               "w-full text-left px-2 py-1.5 flex items-center gap-2 text-[11px] transition-colors rounded",
@@ -981,12 +1076,12 @@ export default function CoursePlayer() {
                 </button>
               )}
               {prevLesson && (
-                <Button size="sm" variant="outline" onClick={() => setSelectedLessonId(prevLesson.id)} className="text-xs h-7 border-teal-400 text-teal-700 hover:bg-teal-50">
+                <Button size="sm" variant="outline" onClick={() => handleLessonSelect(prevLesson.id)} className="text-xs h-7 border-teal-400 text-teal-700 hover:bg-teal-50">
                   <ChevronLeft className="w-3 h-3 mr-1" /> Prev
                 </Button>
               )}
               {nextLesson && (
-                <Button size="sm" variant="outline" onClick={() => setSelectedLessonId(nextLesson.id)} className="text-xs h-7 border-teal-400 text-teal-700 hover:bg-teal-50">
+                <Button size="sm" variant="outline" onClick={() => handleLessonSelect(nextLesson.id)} className="text-xs h-7 border-teal-400 text-teal-700 hover:bg-teal-50">
                   Next <ChevronRight className="w-3 h-3 ml-1" />
                 </Button>
               )}
@@ -1096,7 +1191,7 @@ export default function CoursePlayer() {
                   {lessonData.type !== "quiz" && (
                     <div className="mt-auto pt-5 pb-4 flex items-center justify-end gap-3 flex-wrap">
                       {nextLesson && (
-                        <Button variant="outline" onClick={() => setSelectedLessonId(nextLesson.id)} className="border-teal-400 text-teal-700 hover:bg-teal-50 text-sm">
+                        <Button variant="outline" onClick={() => handleLessonSelect(nextLesson.id)} className="border-teal-400 text-teal-700 hover:bg-teal-50 text-sm">
                           Next Lesson <ChevronRight className="w-4 h-4 ml-1" />
                         </Button>
                       )}
@@ -1184,7 +1279,7 @@ export default function CoursePlayer() {
                           return (
                             <button
                               key={lesson.id}
-                              onClick={() => setSelectedLessonId(lesson.id)}
+                              onClick={() => handleLessonSelect(lesson.id)}
                               className={cn(
                                 "w-full text-left flex items-start gap-2 py-1 text-[11px] transition-colors",
                                 active ? "text-teal-700 font-semibold" : done ? "text-gray-400 line-through" : "text-gray-600 hover:text-gray-900"
