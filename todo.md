@@ -2122,3 +2122,11 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] AudioBlockPlayer: scrub-position indicator (playhead line on waveform)
 - [x] AudioBlockPlayer: click-to-seek on waveform canvas
 - [x] AudioBlockPlayer: fallback scrubber shown when waveform decode fails
+
+## Admin User Detail Page & Post-Purchase Redirect
+- [x] adminUserRouter: getUserDetail, enrollCourse, unenrollCourse, grantMembership, revokeMembership, cancelSubscription, refundPayment, issueCertificate, removeCertificate, updateUserRole
+- [x] AdminUserDetailPage: admin mirror of StudentDashboard with Profile/Content/Subscriptions/Certificates tabs
+- [x] AdminUserDetailPage: action buttons (Enroll, Unenroll, Grant/Revoke Membership, Cancel Sub, Refund, Issue/Remove Certificate, Change Role)
+- [x] AdminUserDetailPage: route /admin/users/:userId registered in App.tsx
+- [x] UserAnalytics: "Manage →" button on each user row navigates to AdminUserDetailPage
+- [x] InlineCheckoutBlock: successRedirect URL field already present in all block editor cases

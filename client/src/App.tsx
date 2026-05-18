@@ -238,6 +238,7 @@ const PhysicianOverReadForm = lazy(() => import("./pages/PhysicianOverReadForm")
 
 // ── Analytics Reporting ──────────────────────────────────────────────────────
 const UserAnalytics = lazy(() => import("./pages/admin/UserAnalytics"));
+const AdminUserDetailPage = lazy(() => import("./pages/admin/AdminUserDetailPage"));
 
 function Router() {
   usePageViewTracker();
@@ -409,6 +410,7 @@ function Router() {
         <Route path="/admin/email">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><EmailAdmin /></RoleGuard>}</Route>
         <Route path="/admin/sharing-monitor">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><SharingMonitor /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/user-analytics">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><UserAnalytics /></RoleGuard>}</Route>
+        <Route path="/admin/users/:userId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminUserDetailPage /></RoleGuard>}</Route>
         <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
         <Route path="/educator-assist">{() => <EducatorAssist />}</Route>
         {/* ── SonoQuiz (admin-only during testing) ──────────────────────── */}

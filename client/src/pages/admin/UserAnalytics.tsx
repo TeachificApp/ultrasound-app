@@ -4,6 +4,7 @@
  * videos watched, quizzes, and downloads — per user.
  */
 import { useState, useMemo } from "react";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -175,6 +176,7 @@ function OverviewTab({ from, to }: { from: string; to: string }) {
 type SortKey = "lastLogin" | "logins" | "pageViews" | "videoPlays" | "quizAttempts" | "downloads" | "name";
 
 function UserListTab({ onSelectUser }: { onSelectUser: (id: number) => void }) {
+  const [, navigate] = useLocation();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -291,9 +293,16 @@ function UserListTab({ onSelectUser }: { onSelectUser: (id: number) => void }) {
                     <span className="text-xs text-gray-500">{u.completedCourseCount}/{u.enrollmentCount}</span>
                   </td>
                   <td className="px-3 py-2.5 text-right">
-                    <Button size="sm" variant="ghost" className="h-6 text-xs text-teal-600 hover:bg-teal-50 px-2">
-                      View →
-                    </Button>
+                    <div className="flex items-center gap-1 justify-end">
+                      <Button size="sm" variant="ghost" className="h-6 text-xs text-teal-600 hover:bg-teal-50 px-2"
+                        onClick={(e) => { e.stopPropagation(); onSelectUser(u.id); }}>
+                        Analytics
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-6 text-xs text-purple-600 hover:bg-purple-50 px-2"
+                        onClick={(e) => { e.stopPropagation(); navigate(`/admin/users/${u.id}`); }}>
+                        Manage →
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
