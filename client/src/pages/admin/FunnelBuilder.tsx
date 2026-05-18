@@ -520,6 +520,7 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
   const updatePage = trpc.funnel.updatePage.useMutation({ onSuccess: () => { refetch(); toast.success("Page updated"); } });
   const saveAsTemplate = trpc.funnel.saveAsTemplate.useMutation({ onSuccess: () => { toast.success("Saved as template! It will appear in the template list when creating new funnels."); } });
   const reorderPages = trpc.funnel.reorderPages.useMutation({ onError: () => { refetch(); toast.error("Failed to save order"); } });
+  const { data: flowData } = trpc.funnel.getFlowDiagram.useQuery({ funnelId });
 
   const pageSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -557,12 +558,21 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
   };
 
   const handleAutoConnect = () => {
-    // Auto-connect pages in order
     const pages = funnel.pages;
-    for (let i = 0; i < pages.length - 1; i++) {
-      connectPages.mutate({ fromPageId: pages[i].id, toPageId: pages[i + 1].id });
+    const allConnected = pages.length > 1 && pages.slice(0, -1).every((p, i) => p.nextPageId === pages[i + 1].id);
+    if (allConnected) {
+      // Disconnect all pages
+      for (let i = 0; i < pages.length - 1; i++) {
+        connectPages.mutate({ fromPageId: pages[i].id, toPageId: null });
+      }
+      toast.success("Pages disconnected");
+    } else {
+      // Connect pages in order
+      for (let i = 0; i < pages.length - 1; i++) {
+        connectPages.mutate({ fromPageId: pages[i].id, toPageId: pages[i + 1].id });
+      }
+      toast.success("Pages connected in sequence");
     }
-    toast.success("Pages connected in sequence");
   };
 
   return (
@@ -594,9 +604,27 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
           )}
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleAutoConnect} className="gap-1.5 text-xs">
-            <Zap size={14} /> Auto-Connect
-          </Button>
+          {(() => {
+            const pages = funnel.pages;
+            const allConnected = pages.length > 1 && pages.slice(0, -1).every((p, i) => p.nextPageId === pages[i + 1].id);
+            return (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleAutoConnect}
+                className={`gap-1.5 text-xs ${
+                  allConnected
+                    ? "text-teal-700 border-teal-300 bg-teal-50 hover:bg-teal-100"
+                    : "text-gray-600 border-gray-200 hover:bg-gray-50"
+                }`}
+                title={allConnected ? "Pages are connected in sequence" : "Click to auto-connect pages in order"}
+              >
+                <Zap size={14} className={allConnected ? "fill-teal-500 text-teal-600" : ""} />
+                Auto-Connect
+                {allConnected && <span className="ml-1 text-[10px] font-normal text-teal-600">ON</span>}
+              </Button>
+            );
+          })()}
           <Button variant="outline" size="sm" onClick={handleStatusToggle} className={`gap-1.5 text-xs ${funnel.status === "active" ? "text-green-700 border-green-200 bg-green-50" : "text-yellow-700 border-yellow-200 bg-yellow-50"}`}>
             <Globe size={14} /> {funnel.status === "active" ? "Live" : "Draft"}
           </Button>
@@ -691,6 +719,7 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
                   onDuplicate={() => duplicatePage.mutate({ id: page.id })}
                   onCopyPage={() => setCopyPageDialog({ pageId: page.id, pageTitle: page.title })}
                   onRename={() => { const newTitle = prompt("Page title:", page.title); if (newTitle && newTitle !== page.title) updatePage.mutate({ id: page.id, title: newTitle }); }}
+                  onEditSlug={(newSlug: string) => updatePage.mutate({ id: page.id, slug: newSlug })}
                   onDelete={() => { if (confirm("Delete this page?")) deletePage.mutate({ id: page.id }); }}
                   onMoveUp={idx > 0 ? () => setLocalPages(prev => { const r = arrayMove(prev, idx, idx - 1); reorderPages.mutate({ funnelId, pageIds: r.map(p => p.id) }); return r; }) : undefined}
                   onMoveDown={idx < localPages.length - 1 ? () => setLocalPages(prev => { const r = arrayMove(prev, idx, idx + 1); reorderPages.mutate({ funnelId, pageIds: r.map(p => p.id) }); return r; }) : undefined}
@@ -700,6 +729,70 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
           </div>
         </SortableContext>
       </DndContext>
+      )}
+
+      {/* Branch Patterns Summary */}
+      {pageView === "list" && flowData && flowData.some((p: any) => p.branchRules?.some((r: any) => r.isActive)) && (
+        <div className="mt-6 bg-white border border-amber-200 rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <GitBranch size={16} className="text-amber-600" />
+            <h3 className="text-sm font-semibold text-gray-800">Conditional Branch Patterns</h3>
+            <span className="text-xs text-gray-400 ml-1">— rules evaluated before the default next step</span>
+          </div>
+          <div className="space-y-4">
+            {flowData.filter((p: any) => p.branchRules?.some((r: any) => r.isActive)).map((p: any) => (
+              <div key={p.id} className="border border-gray-100 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs font-semibold text-gray-700 bg-gray-100 px-2 py-0.5 rounded">{p.title}</span>
+                  <span className="text-xs text-gray-400">/{p.slug}</span>
+                </div>
+                <div className="space-y-2">
+                  {p.branchRules.filter((r: any) => r.isActive).map((rule: any, ri: number) => {
+                    const targetPage = flowData.find((tp: any) => tp.id === rule.targetPageId);
+                    return (
+                      <div key={rule.id} className="flex items-start gap-2 text-xs">
+                        <span className="shrink-0 w-5 h-5 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-[10px]">{ri + 1}</span>
+                        <div className="flex-1">
+                          <span className="font-medium text-gray-700">{rule.name}</span>
+                          {rule.conditions.length > 0 && (
+                            <div className="mt-1 space-y-0.5">
+                              {rule.conditions.map((c: any, ci: number) => (
+                                <div key={c.id} className="text-gray-500">
+                                  {ci > 0 && <span className="text-amber-600 font-medium mr-1">{rule.matchMode === "all" ? "AND" : "OR"}</span>}
+                                  <span className="font-mono bg-gray-50 px-1 rounded">{c.variable.replace(/_/g, " ")}</span>
+                                  <span className="mx-1 text-gray-400">{c.operator.replace(/_/g, " ")}</span>
+                                  <span className="font-mono bg-gray-50 px-1 rounded">{c.value || "—"}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <div className="mt-1 flex items-center gap-1">
+                            <span className="text-gray-400">→</span>
+                            {targetPage ? (
+                              <span className="text-teal-700 font-medium">{targetPage.title}</span>
+                            ) : rule.targetUrl ? (
+                              <a href={rule.targetUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline truncate max-w-xs">{rule.targetUrl}</a>
+                            ) : (
+                              <span className="text-red-400 italic">No target set</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div className="flex items-center gap-2 text-xs text-gray-400 pl-7 pt-1 border-t border-gray-100 mt-2">
+                    <span className="text-gray-300">↓ default:</span>
+                    {p.nextPageId ? (
+                      <span className="text-gray-500">{flowData.find((tp: any) => tp.id === p.nextPageId)?.title ?? "Unknown"}</span>
+                    ) : (
+                      <span className="italic">end of funnel</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Copy Page Dialog */}
@@ -801,7 +894,7 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
 // ─── Sortable Funnel Page Row ────────────────────────────────────────────────
 
 function SortableFunnelPageRow({
-  page, idx, meta, nextPage, isLast, funnelId, onEditPage, onDuplicate, onCopyPage, onRename, onDelete, onMoveUp, onMoveDown,
+  page, idx, meta, nextPage, isLast, funnelId, onEditPage, onDuplicate, onCopyPage, onRename, onEditSlug, onDelete, onMoveUp, onMoveDown,
 }: {
   page: FunnelPage;
   idx: number;
@@ -813,10 +906,13 @@ function SortableFunnelPageRow({
   onDuplicate: () => void;
   onCopyPage: () => void;
   onRename: () => void;
+  onEditSlug: (newSlug: string) => void;
   onDelete: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
 }) {
+  const [editingSlug, setEditingSlug] = useState(false);
+  const [slugValue, setSlugValue] = useState(page.slug);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: page.id });
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -852,7 +948,40 @@ function SortableFunnelPageRow({
               {meta.label}
             </div>
             <h3 className="font-medium text-gray-900">{page.title}</h3>
-            <span className="text-xs text-gray-400">/{page.slug}</span>
+            {editingSlug ? (
+              <form
+                className="flex items-center gap-1"
+                onSubmit={e => {
+                  e.preventDefault();
+                  const clean = slugValue.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+                  if (clean && clean !== page.slug) onEditSlug(clean);
+                  setEditingSlug(false);
+                }}
+              >
+                <span className="text-xs text-gray-400">/</span>
+                <input
+                  autoFocus
+                  value={slugValue}
+                  onChange={e => setSlugValue(e.target.value)}
+                  onBlur={() => {
+                    const clean = slugValue.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+                    if (clean && clean !== page.slug) onEditSlug(clean);
+                    setEditingSlug(false);
+                  }}
+                  onKeyDown={e => { if (e.key === "Escape") { setSlugValue(page.slug); setEditingSlug(false); } }}
+                  className="text-xs border border-teal-300 rounded px-1.5 py-0.5 w-40 focus:outline-none focus:ring-1 focus:ring-teal-400"
+                />
+              </form>
+            ) : (
+              <button
+                onClick={() => { setSlugValue(page.slug); setEditingSlug(true); }}
+                className="text-xs text-gray-400 hover:text-teal-600 hover:underline flex items-center gap-0.5 group/slug"
+                title="Click to edit URL slug"
+              >
+                /{page.slug}
+                <Pencil size={10} className="opacity-0 group-hover/slug:opacity-100 transition-opacity ml-0.5" />
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
             <button onClick={() => onEditPage(funnelId, page.id)} className="text-xs text-teal-600 hover:text-teal-700 flex items-center gap-1 bg-teal-50 px-2 py-1 rounded-lg">

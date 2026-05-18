@@ -2000,3 +2000,13 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Copy options: (1) within same funnel, (2) to another funnel (picker), (3) as standalone landing page
 - [ ] Backend: copyFunnelPage procedure supporting all three destinations
 - [ ] Remove any subtext/description from the copy action UI
+
+## Slug Editing
+- [ ] Allow editing the URL slug of funnel pages inline from the funnel page list
+- [ ] Allow editing the URL slug of standalone landing pages
+- [ ] Backend: updatePage procedure must accept and validate slug changes (unique, URL-safe)
+
+## Funnel Branch Visualization
+- [x] Show conditional branching patterns on the main funnel settings/overview page
+- [x] Display which pages branch to which based on branch rules (conditions, targets)
+- [x] Integrate with existing FunnelFlowDiagram or add a branch summary panel
