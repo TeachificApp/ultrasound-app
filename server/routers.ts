@@ -27,7 +27,7 @@ import { lmsPublicRouter, lmsLearnerRouter, lmsAdminRouter, lmsGroupRouter } fro
 import { downloadsPublicRouter, downloadsLearnerRouter, downloadsAdminRouter } from "./routers/downloadsRouter";
 import { orderBumpsAdminRouter, orderBumpsPublicRouter } from "./routers/orderBumpsRouter";
 import { socialContentRouter } from "./routers/socialContentRouter";
-import { funnelRouter, funnelPublicRouter } from "./routers/funnelRouter";
+import { funnelRouter, funnelPublicRouter, funnelAdminRouter } from "./routers/funnelRouter";
 import { sharingMonitorRouter } from "./routers/sharingMonitorRouter";
 import { analyticsTrackRouter, analyticsAdminRouter } from "./routers/analyticsRouter";
 import { soundBytesRouter } from "./routers/soundBytesRouter";
@@ -1863,6 +1863,7 @@ export const appRouter = router({
   socialContent: socialContentRouter,
   funnel: funnelRouter,
   funnelPublic: funnelPublicRouter,
+  funnelAdmin: funnelAdminRouter,
   sharingMonitor: sharingMonitorRouter,
   analyticsTrack: analyticsTrackRouter,
   analyticsAdmin: analyticsAdminRouter,

@@ -1295,6 +1295,10 @@ export const funnelPublicRouter = router({
                 targetUrl: result.targetUrl,
       };
     }),
+});
+
+// ─── Funnel Admin Extended Router ─────────────────────────────────────────────
+export const funnelAdminRouter = router({
 
   /** List pages that can be imported into a funnel (standalone landing pages + pages from other funnels) */
   listImportablePages: protectedProcedure

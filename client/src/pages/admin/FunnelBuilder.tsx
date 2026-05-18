@@ -525,11 +525,11 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
   const saveAsTemplate = trpc.funnel.saveAsTemplate.useMutation({ onSuccess: () => { toast.success("Saved as template! It will appear in the template list when creating new funnels."); } });
   const reorderPages = trpc.funnel.reorderPages.useMutation({ onError: () => { refetch(); toast.error("Failed to save order"); } });
   const { data: flowData } = trpc.funnel.getFlowDiagram.useQuery({ funnelId });
-  const { data: analyticsData } = trpc.funnel.getFunnelAnalytics.useQuery({ funnelId }, { enabled: activeTab === "analytics" });
+  const { data: analyticsData } = trpc.funnelAdmin.getFunnelAnalytics.useQuery({ funnelId }, { enabled: activeTab === "analytics" });
   const { data: leadsData, refetch: refetchLeads } = trpc.funnel.listLeads.useQuery({ funnelId, page: leadPage, limit: 50, search: leadSearch || undefined }, { enabled: activeTab === "contacts" });
-  const { data: csvData, refetch: fetchCSV } = trpc.funnel.exportFunnelLeadsCSV.useQuery({ funnelId }, { enabled: false });
-  const { data: importablePages } = trpc.funnel.listImportablePages.useQuery({ excludeFunnelId: funnelId }, { enabled: showAddPage });
-  const importPage = trpc.funnel.importPageToFunnel.useMutation({ onSuccess: () => { refetch(); setShowAddPage(false); toast.success("Page imported!"); } });
+  const { data: csvData, refetch: fetchCSV } = trpc.funnelAdmin.exportFunnelLeadsCSV.useQuery({ funnelId }, { enabled: false });
+  const { data: importablePages } = trpc.funnelAdmin.listImportablePages.useQuery({ excludeFunnelId: funnelId }, { enabled: showAddPage });
+  const importPage = trpc.funnelAdmin.importPageToFunnel.useMutation({ onSuccess: () => { refetch(); setShowAddPage(false); toast.success("Page imported!"); } });
   const [importTab, setImportTab] = useState<"new" | "import">("new");
   const [selectedSourceIdx, setSelectedSourceIdx] = useState<number | null>(null);
 
