@@ -1942,3 +1942,18 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] CoursePlayer: upgrade prompt on exit from last preview lesson
 - [x] CoursePlayer: show preview lessons in curriculum even when not enrolled
 - [ ] CourseOverview: show preview lessons as accessible in curriculum outline
+
+## Bug Fixes (May 17)
+- [x] Fix Course Overview block editor crash when adding blocks (JS error / stack trace on screen)
+- [x] Fix Enroll Student modal: allow creating a new user account + enrolling when email not found
+
+## LMS Features (May 18)
+- [x] Add createAndEnrollUser procedure to lmsAdminRouter (create user + enroll in course in one call)
+- [x] Update EnrollStudentDialog to support Create & Enroll flow (email validation, create account option)
+- [x] Build enrollment email notifications end-to-end (sendEnrollmentEmail helper, platform settings UI, email template)
+- [x] Add Course Overview topBlocks/bottomBlocks editing and rendering (three-zone layout: above progress bar, below curriculum, main zone)
+- [x] CourseOverview: Parse and render courseOverviewTopBlocks (above progress bar)
+- [x] CourseOverview: Parse and render courseOverviewBottomBlocks (below curriculum outline)
+- [x] LMSAdmin CourseOverviewEditor: Add zone tabs to switch between top/main/bottom zones
+- [x] LMSAdmin CourseOverviewEditor: Render all three zones in canvas with zone-specific add buttons
+- [x] PlatformAdmin: Add EnrollmentEmailSettingsPanel for customizing enrollment email subject/intro/footer

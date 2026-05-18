@@ -53,7 +53,7 @@ export const soundBytesRouter = router({
       const db = await getDb();
       if (!db) return [];
       const conditions: ReturnType<typeof eq>[] = [
-        eq(soundBytes.isActive, true),
+        eq(soundBytes.status, "published"),
         eq(soundBytes.brand, ctx.brand as "aaus" | "iheartecho"),
       ];
       if (input.category) {
@@ -108,7 +108,7 @@ export const soundBytesRouter = router({
       const [row] = await db
         .select()
         .from(soundBytes)
-        .where(and(eq(soundBytes.id, input.id), eq(soundBytes.isActive, true), eq(soundBytes.brand, brand)))
+        .where(and(eq(soundBytes.id, input.id), eq(soundBytes.status, "published"), eq(soundBytes.brand, brand)))
         .limit(1);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "SoundByte not found" });
 
@@ -117,7 +117,7 @@ export const soundBytesRouter = router({
       const allPublished = await db
         .select({ id: soundBytes.id })
         .from(soundBytes)
-        .where(and(eq(soundBytes.isActive, true), eq(soundBytes.brand, brand)))
+        .where(and(eq(soundBytes.status, "published"), eq(soundBytes.brand, brand)))
         .orderBy(soundBytes.sortOrder, desc(soundBytes.publishedAt));
       const freeIds = new Set(allPublished.slice(0, FREE_ITEM_COUNT).map((r) => r.id));
       const isFree = freeIds.has(row.id);

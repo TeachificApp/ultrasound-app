@@ -20,6 +20,7 @@ import { getDb } from "../db";
 import { invokeLLM } from "../_core/llm";
 import { generateCertificatePdf } from "../lib/certificateGenerator";
 import { sendCertificateEmail } from "../lib/certificateEmail";
+import { sendEnrollmentEmail } from "../lib/enrollmentEmail";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import {
   lmsCourses,
@@ -1155,6 +1156,8 @@ export const lmsAdminRouter = router({
       showInstructor: z.boolean().optional(),
       hideProgress: z.boolean().optional(),
       courseOverviewBlocks: z.string().nullable().optional(), // JSON array of Block objects
+      courseOverviewTopBlocks: z.string().nullable().optional(), // JSON array — above progress bar
+      courseOverviewBottomBlocks: z.string().nullable().optional(), // JSON array — below curriculum
       metaTitle: z.string().optional(),
       metaDescription: z.string().optional(),
       // Course color scheme
@@ -2072,6 +2075,27 @@ Rules:
       const [existing] = await db.select().from(lmsEnrollments).where(and(eq(lmsEnrollments.userId, input.userId), eq(lmsEnrollments.courseId, input.courseId))).limit(1);
       if (existing) return { enrollmentId: existing.id, alreadyEnrolled: true };
       const [result] = await db.insert(lmsEnrollments).values({ userId: input.userId, courseId: input.courseId }).$returningId();
+      // Fire enrollment email asynchronously (non-blocking)
+      void (async () => {
+        try {
+          const [settings] = await db.select().from(platformSettings).where(eq(platformSettings.id, 1)).limit(1);
+          const platformEnabled = settings?.enrollmentEmailEnabled !== false;
+          if (!platformEnabled) return;
+          const [course] = await db.select({ title: lmsCourses.title, slug: lmsCourses.slug, sendEnrollmentEmail: lmsCourses.sendEnrollmentEmail }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+          if (!course?.sendEnrollmentEmail) return;
+          const [user] = await db.select({ name: users.name, displayName: users.displayName, email: users.email }).from(users).where(eq(users.id, input.userId)).limit(1);
+          if (!user?.email) return;
+          await sendEnrollmentEmail({
+            to: { name: user.displayName || user.name || "Student", email: user.email },
+            courseTitle: course.title,
+            courseSlug: course.slug,
+            customSubject: settings?.enrollmentEmailSubject,
+            customIntro: settings?.enrollmentEmailIntro,
+          });
+        } catch (e) {
+          console.error("[enrollment-email] Failed to send:", e);
+        }
+      })();
       return { enrollmentId: result.id, alreadyEnrolled: false };
     }),
 
@@ -2835,6 +2859,63 @@ Generate 3-6 sections with 2-5 lessons each. Lesson types can be: text, video (f
         lessonStats,
         avgProgress: Math.round(Number(avgProgress ?? 0)),
       };
+    }),
+  /** Create a new user account and immediately enroll them in a course */
+  createAndEnrollUser: protectedProcedure
+    .input(z.object({
+      courseId: z.number(),
+      name: z.string().min(1).max(100),
+      email: z.string().email(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Check if user already exists with this email
+      const [existing] = await db.select({ id: users.id }).from(users)
+        .where(sql`LOWER(${users.email}) = LOWER(${input.email})`).limit(1);
+      let userId: number;
+      let isNewUser = false;
+      if (existing) {
+        userId = existing.id;
+      } else {
+        // Create a new user with a placeholder openId (they can link via OAuth later)
+        const openId = `manual_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        const [inserted] = await db.insert(users).values({
+          openId,
+          name: input.name,
+          displayName: input.name,
+          email: input.email,
+          role: "user",
+        }).$returningId();
+        userId = inserted.id;
+        isNewUser = true;
+      }
+      // Enroll the user
+      const [existingEnrollment] = await db.select().from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, input.courseId))).limit(1);
+      if (existingEnrollment) return { enrollmentId: existingEnrollment.id, alreadyEnrolled: true, isNewUser };
+      const [result] = await db.insert(lmsEnrollments).values({ userId, courseId: input.courseId }).$returningId();
+      // Fire enrollment email asynchronously (non-blocking)
+      void (async () => {
+        try {
+          const [settings] = await db.select().from(platformSettings).where(eq(platformSettings.id, 1)).limit(1);
+          const platformEnabled = settings?.enrollmentEmailEnabled !== false;
+          if (!platformEnabled) return;
+          const [course] = await db.select({ title: lmsCourses.title, slug: lmsCourses.slug, sendEnrollmentEmail: lmsCourses.sendEnrollmentEmail }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+          if (!course?.sendEnrollmentEmail) return;
+          await sendEnrollmentEmail({
+            to: { name: input.name, email: input.email },
+            courseTitle: course.title,
+            courseSlug: course.slug,
+            customSubject: settings?.enrollmentEmailSubject,
+            customIntro: settings?.enrollmentEmailIntro,
+          });
+        } catch (e) {
+          console.error("[enrollment-email] Failed to send:", e);
+        }
+      })();
+      return { enrollmentId: result.id, alreadyEnrolled: false, isNewUser };
     }),
 });
 

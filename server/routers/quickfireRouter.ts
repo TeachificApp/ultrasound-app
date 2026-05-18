@@ -1878,16 +1878,14 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
   // ─── Admin: Challenge Queue Management ──────────────────────────────────────
 
   /** List all challenges in the queue (draft + scheduled + live) */
-  adminListChallenges: adminProcedure
+    adminListChallenges: adminProcedure
     .input(z.object({ includeArchived: z.boolean().default(false) }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-
       const statuses = input.includeArchived
         ? ["draft", "scheduled", "live", "archived"]
         : ["draft", "scheduled", "live"];
-
       const rows = await db.select().from(quickfireChallenges)
         .where(and(inArray(quickfireChallenges.status, statuses as any[]), eq(quickfireChallenges.brand, ctx.brand)))
         .orderBy(quickfireChallenges.priority, desc(quickfireChallenges.createdAt));

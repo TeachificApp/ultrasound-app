@@ -30,6 +30,9 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Shield,
   Users,
@@ -810,6 +813,109 @@ function DemoModePanel() {
   );
 }
 
+// ─── Enrollment Email Settings Panel ─────────────────────────────────────────
+
+function EnrollmentEmailSettingsPanel() {
+  const { data: settings, isLoading, refetch } = trpc.lmsAdmin.getPlatformSettings.useQuery();
+  const [emailEnabled, setEmailEnabled] = useState<boolean>(true);
+  const [subject, setSubject] = useState("");
+  const [intro, setIntro] = useState("");
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    if (settings) {
+      setEmailEnabled(settings.enrollmentEmailEnabled ?? true);
+      setSubject(settings.enrollmentEmailSubject ?? "");
+      setIntro(settings.enrollmentEmailIntro ?? "");
+      setDirty(false);
+    }
+  }, [settings]);
+
+  const updateSettings = trpc.lmsAdmin.updatePlatformSettings.useMutation({
+    onSuccess: () => {
+      toast.success("Enrollment email settings saved.");
+      setDirty(false);
+      refetch();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const handleSave = () => {
+    updateSettings.mutate({
+      enrollmentEmailEnabled: emailEnabled,
+      enrollmentEmailSubject: subject.trim() || null,
+      enrollmentEmailIntro: intro.trim() || null,
+    });
+  };
+
+  return (
+    <Card className="mb-6 border-0 shadow-sm">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-semibold text-gray-800 flex items-center gap-2">
+          <Mail className="w-4 h-4 text-teal-600" />
+          Enrollment Email Settings
+        </CardTitle>
+        <p className="text-xs text-gray-500 mt-1">
+          Configure the welcome email sent to students when they enroll in a course.
+          This is the platform-level master switch — individual courses can also opt out.
+        </p>
+      </CardHeader>
+      <CardContent className="pt-0 space-y-5">
+        {isLoading ? (
+          <div className="h-24 bg-gray-50 rounded-lg animate-pulse" />
+        ) : (
+          <>
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div>
+                <Label className="text-sm font-medium text-gray-800">Enable Enrollment Emails</Label>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Master switch — when off, no enrollment emails are sent regardless of per-course settings.
+                </p>
+              </div>
+              <Switch
+                checked={emailEnabled}
+                onCheckedChange={(v) => { setEmailEnabled(v); setDirty(true); }}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium text-gray-700">Custom Subject Line</Label>
+              <Input
+                value={subject}
+                onChange={e => { setSubject(e.target.value); setDirty(true); }}
+                placeholder={`e.g. "Welcome to {course name}! Here's how to get started"`}
+                className="text-sm"
+                disabled={!emailEnabled}
+              />
+              <p className="text-xs text-gray-400">Leave blank to use the default subject.</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium text-gray-700">Custom Intro Paragraph</Label>
+              <Textarea
+                value={intro}
+                onChange={e => { setIntro(e.target.value); setDirty(true); }}
+                placeholder="Optional custom intro paragraph prepended to the enrollment email body (HTML supported)."
+                className="text-sm min-h-[80px]"
+                disabled={!emailEnabled}
+              />
+              <p className="text-xs text-gray-400">Leave blank to use the default intro text. HTML is supported.</p>
+            </div>
+            <div className="flex justify-end">
+              <Button
+                onClick={handleSave}
+                disabled={!dirty || updateSettings.isPending}
+                className="bg-teal-600 hover:bg-teal-700 text-white"
+                size="sm"
+              >
+                {updateSettings.isPending ? "Saving…" : "Save Settings"}
+              </Button>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function PlatformAdmin() {
@@ -1458,6 +1564,9 @@ export default function PlatformAdmin() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Enrollment Email Settings */}
+        <EnrollmentEmailSettingsPanel />
 
         {/* DIY Organizations */}
         <DIYOrgsPanel />

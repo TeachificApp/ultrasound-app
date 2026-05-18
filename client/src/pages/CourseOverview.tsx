@@ -146,9 +146,17 @@ export default function CourseOverview() {
   const daysSinceEnroll = Math.floor((Date.now() - enrolledAt.getTime()) / (1000 * 60 * 60 * 24));
   const dripBypassed = isAdmin;
 
-  // Parse overview blocks
+  // Parse overview blocks (three zones)
   const overviewBlocks: Block[] = (() => {
     try { return course.courseOverviewBlocks ? JSON.parse(course.courseOverviewBlocks) : []; }
+    catch { return []; }
+  })();
+  const overviewTopBlocks: Block[] = (() => {
+    try { return (course as any).courseOverviewTopBlocks ? JSON.parse((course as any).courseOverviewTopBlocks) : []; }
+    catch { return []; }
+  })();
+  const overviewBottomBlocks: Block[] = (() => {
+    try { return (course as any).courseOverviewBottomBlocks ? JSON.parse((course as any).courseOverviewBottomBlocks) : []; }
     catch { return []; }
   })();
 
@@ -307,6 +315,15 @@ export default function CourseOverview() {
       </header>
 
       <div className="max-w-5xl mx-auto px-6 py-8 space-y-8">
+        {/* Top Zone blocks (above progress bar) */}
+        {overviewTopBlocks.length > 0 && (
+          <div className="bg-white rounded-xl overflow-hidden shadow-sm border border-gray-200">
+            {overviewTopBlocks.map((block: Block) => (
+              <BlockPreview key={block.id} block={block} />
+            ))}
+          </div>
+        )}
+
         {/* Progress bar — hidden when course.hideProgress is enabled */}
         {totalLessons > 0 && !course.hideProgress && (
           <div className="bg-white rounded-xl border border-gray-200 p-5">
@@ -406,6 +423,15 @@ export default function CourseOverview() {
             );
           })}
         </div>
+
+        {/* Bottom Zone blocks (below curriculum) */}
+        {overviewBottomBlocks.length > 0 && (
+          <div className="bg-white rounded-xl overflow-hidden shadow-sm border border-gray-200">
+            {overviewBottomBlocks.map((block: Block) => (
+              <BlockPreview key={block.id} block={block} />
+            ))}
+          </div>
+        )}
 
         {/* Instructor profiles */}
         {course.showInstructor && instructors?.length > 0 && (

@@ -37,7 +37,7 @@ import {
   Users, DollarSign, BarChart2, GripVertical, CheckCircle, AlertCircle,
   Link as LinkIcon, UserCheck, ArrowLeft, Upload, ImageIcon,
   Sparkles, Loader2, Eye, EyeOff, Save, X, FolderOpen, Monitor, Video, FileText, CheckSquare, Settings2,
-  User, Lock, ListChecks, Award, PlayCircle, ArrowRight,
+  User, Lock, ListChecks, Award, PlayCircle, ArrowRight, UserPlus,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import LessonEffectEditor from "@/components/LessonEffectEditor";
@@ -1057,6 +1057,8 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
               sections={course.sections ?? []}
               topLevelLessons={course.topLevelLessons ?? []}
               initialBlocks={course.courseOverviewBlocks ? (typeof course.courseOverviewBlocks === "string" ? JSON.parse(course.courseOverviewBlocks) : course.courseOverviewBlocks) : []}
+              initialTopBlocks={course.courseOverviewTopBlocks ? (typeof course.courseOverviewTopBlocks === "string" ? JSON.parse(course.courseOverviewTopBlocks) : course.courseOverviewTopBlocks) : []}
+              initialBottomBlocks={course.courseOverviewBottomBlocks ? (typeof course.courseOverviewBottomBlocks === "string" ? JSON.parse(course.courseOverviewBottomBlocks) : course.courseOverviewBottomBlocks) : []}
               onSaved={() => refetch()}
             />
           ) : (
@@ -1686,6 +1688,8 @@ function CourseOverviewEditor({
   sections,
   topLevelLessons,
   initialBlocks,
+  initialTopBlocks,
+  initialBottomBlocks,
   onSaved,
 }: {
   courseId: number;
@@ -1695,21 +1699,40 @@ function CourseOverviewEditor({
   sections: any[];
   topLevelLessons: any[];
   initialBlocks: Block[];
+  initialTopBlocks: Block[];
+  initialBottomBlocks: Block[];
   onSaved: () => void;
 }) {
+  // Three block zones: main (between progress bar and curriculum), top (above progress bar), bottom (below curriculum)
+  const [activeZone, setActiveZone] = useState<"main" | "top" | "bottom">("main");
   const [blocks, setBlocks] = useState<Block[]>(initialBlocks);
+  const [topBlocks, setTopBlocks] = useState<Block[]>(initialTopBlocks);
+  const [bottomBlocks, setBottomBlocks] = useState<Block[]>(initialBottomBlocks);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState(CATALOG_CATEGORIES[0]);
   const [previewMode, setPreviewMode] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Helpers to get/set the active zone's blocks
+  const activeBlocks = activeZone === "main" ? blocks : activeZone === "top" ? topBlocks : bottomBlocks;
+  const setActiveBlocks = (fn: (prev: Block[]) => Block[]) => {
+    if (activeZone === "main") setBlocks(fn);
+    else if (activeZone === "top") setTopBlocks(fn);
+    else setBottomBlocks(fn);
+  };
+
   const updateCourse = trpc.lmsAdmin.updateCourse.useMutation();
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await updateCourse.mutateAsync({ id: courseId, courseOverviewBlocks: JSON.stringify(blocks) });
+      await updateCourse.mutateAsync({
+        id: courseId,
+        courseOverviewBlocks: JSON.stringify(blocks),
+        courseOverviewTopBlocks: JSON.stringify(topBlocks),
+        courseOverviewBottomBlocks: JSON.stringify(bottomBlocks),
+      });
       toast.success("Course Overview saved!");
       onSaved();
     } catch (e: any) {
@@ -1723,30 +1746,30 @@ function CourseOverviewEditor({
     const catalog = BLOCK_CATALOG.find(c => c.type === type);
     if (!catalog) return;
     const newBlock: Block = { id: uid(), type, data: { ...catalog.defaultData } };
-    setBlocks(bs => [...bs, newBlock]);
+    setActiveBlocks(bs => [...bs, newBlock]);
     setSelectedBlockId(newBlock.id);
     setAddMenuOpen(false);
   };
 
   const updateBlock = (id: string, data: Record<string, any>) => {
-    setBlocks(bs => bs.map(b => b.id === id ? { ...b, data: { ...b.data, ...data } } : b));
+    setActiveBlocks(bs => bs.map(b => b.id === id ? { ...b, data: { ...b.data, ...data } } : b));
   };
 
   const deleteBlock = (id: string) => {
-    setBlocks(bs => bs.filter(b => b.id !== id));
+    setActiveBlocks(bs => bs.filter(b => b.id !== id));
     if (selectedBlockId === id) setSelectedBlockId(null);
   };
 
   const duplicateBlock = (id: string) => {
-    const idx = blocks.findIndex(b => b.id === id);
+    const idx = activeBlocks.findIndex(b => b.id === id);
     if (idx < 0) return;
-    const copy: Block = { ...blocks[idx], id: uid() };
-    setBlocks(bs => [...bs.slice(0, idx + 1), copy, ...bs.slice(idx + 1)]);
+    const copy: Block = { ...activeBlocks[idx], id: uid() };
+    setActiveBlocks(bs => [...bs.slice(0, idx + 1), copy, ...bs.slice(idx + 1)]);
     setSelectedBlockId(copy.id);
   };
 
   const moveBlock = (id: string, dir: -1 | 1) => {
-    setBlocks(bs => {
+    setActiveBlocks(bs => {
       const idx = bs.findIndex(b => b.id === id);
       const newIdx = idx + dir;
       if (newIdx < 0 || newIdx >= bs.length) return bs;
@@ -1759,15 +1782,22 @@ function CourseOverviewEditor({
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
-      setBlocks(bs => {
+      setActiveBlocks(bs => {
         const oldIdx = bs.findIndex(b => b.id === active.id);
         const newIdx = bs.findIndex(b => b.id === over.id);
         return arrayMove(bs, oldIdx, newIdx);
       });
     }
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeZone]);
 
-  const selectedBlock = blocks.find(b => b.id === selectedBlockId) ?? null;
+  const selectedBlock = activeBlocks.find(b => b.id === selectedBlockId) ?? null;
+
+  const ZONE_LABELS: Record<"main" | "top" | "bottom", { label: string; desc: string; color: string }> = {
+    top: { label: "Top Zone", desc: "Above progress bar", color: "#7c3aed" },
+    main: { label: "Main Zone", desc: "Between progress bar and curriculum", color: "#0d9488" },
+    bottom: { label: "Bottom Zone", desc: "Below curriculum outline", color: "#0891b2" },
+  };
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -1806,6 +1836,33 @@ function CourseOverviewEditor({
         </div>
       </div>
 
+      {/* Zone Selector Tabs */}
+      <div className="flex border-b border-gray-200 bg-gray-50">
+        {(["top", "main", "bottom"] as const).map(zone => {
+          const z = ZONE_LABELS[zone];
+          const count = zone === "top" ? topBlocks.length : zone === "main" ? blocks.length : bottomBlocks.length;
+          return (
+            <button
+              key={zone}
+              onClick={() => { setActiveZone(zone); setSelectedBlockId(null); }}
+              className={cn(
+                "flex-1 px-4 py-2.5 text-xs font-semibold transition-colors border-b-2",
+                activeZone === zone
+                  ? "border-current text-white"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+              )}
+              style={activeZone === zone ? { background: z.color, borderColor: z.color } : {}}
+            >
+              {z.label}
+              <span className={cn("ml-1.5 px-1.5 py-0.5 rounded-full text-[10px]", activeZone === zone ? "bg-white/20" : "bg-gray-200 text-gray-600")}>
+                {count}
+              </span>
+              <span className={cn("block text-[10px] font-normal mt-0.5", activeZone === zone ? "text-white/80" : "text-gray-400")}>{z.desc}</span>
+            </button>
+          );
+        })}
+      </div>
+
       <div className="flex overflow-hidden" style={{ minHeight: 600 }}>
         {/* Canvas — full WYSIWYG page preview */}
         <div className="flex-1 overflow-y-auto bg-gray-100">
@@ -1825,6 +1882,46 @@ function CourseOverviewEditor({
           </div>
 
           <div className="max-w-4xl mx-auto px-6 py-6 space-y-5">
+            {/* ── Top Zone (above progress bar) ── */}
+            <div className={cn("rounded-xl border-2 overflow-hidden bg-white", activeZone === "top" ? "border-purple-400" : "border-dashed border-purple-200")}>
+              <div className="px-4 py-2 flex items-center justify-between" style={{ background: activeZone === "top" ? "#7c3aed" : "#f5f3ff" }}>
+                <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: activeZone === "top" ? "#fff" : "#7c3aed" }}>🔝 Top Zone — Above Progress Bar</span>
+                {activeZone !== "top" && <button onClick={() => { setActiveZone("top"); setSelectedBlockId(null); }} className="text-[10px] text-purple-500 hover:text-purple-700 font-medium">Edit this zone</button>}
+              </div>
+              {topBlocks.length === 0 && activeZone !== "top" ? (
+                <div className="text-center text-gray-400 py-4 text-xs italic">No blocks in Top Zone</div>
+              ) : activeZone === "top" ? (
+                previewMode ? (
+                  <div>
+                    {topBlocks.map(block => <div key={block.id}><BlockPreview block={block} /></div>)}
+                    {topBlocks.length === 0 && <div className="text-center text-gray-400 py-8 text-sm">No content blocks yet.</div>}
+                  </div>
+                ) : (
+                  <div className="p-3">
+                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                      <SortableContext items={topBlocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
+                        {topBlocks.map((block, idx) => (
+                          <SortableBlock key={block.id} block={block} isSelected={block.id === selectedBlockId}
+                            onSelect={() => setSelectedBlockId(block.id === selectedBlockId ? null : block.id)}
+                            onDelete={() => deleteBlock(block.id)} onDuplicate={() => duplicateBlock(block.id)}
+                            onMoveUp={idx > 0 ? () => moveBlock(block.id, -1) : undefined}
+                            onMoveDown={idx < topBlocks.length - 1 ? () => moveBlock(block.id, 1) : undefined}
+                          />
+                        ))}
+                      </SortableContext>
+                    </DndContext>
+                    <button onClick={() => setAddMenuOpen(true)} className="w-full border-2 border-dashed border-purple-200 hover:border-purple-400 rounded-xl py-3 text-purple-500 hover:text-purple-700 text-sm flex items-center justify-center gap-2 transition-colors mt-2">
+                      <Plus className="w-4 h-4" /> Add Block to Top Zone
+                    </button>
+                  </div>
+                )
+              ) : (
+                <div>
+                  {topBlocks.map(block => <div key={block.id}><BlockPreview block={block} /></div>)}
+                </div>
+              )}
+            </div>
+
             {/* ── Read-only: Progress bar ── */}
             <div className="bg-white rounded-xl border border-gray-200 p-5 opacity-60 pointer-events-none select-none">
               <div className="flex items-center justify-between mb-2">
@@ -1837,45 +1934,42 @@ function CourseOverviewEditor({
               <p className="text-xs text-gray-500 mt-2">0 of {[...(topLevelLessons ?? []), ...(sections ?? []).flatMap((s: any) => s.lessons ?? [])].length} lessons completed</p>
             </div>
 
-            {/* ── Editable content blocks (between progress and curriculum) ── */}
-            <div className="rounded-xl border-2 border-dashed border-teal-300 overflow-hidden bg-white">
-              <div className="px-4 py-2 bg-teal-50 border-b border-teal-200 flex items-center justify-between">
-                <span className="text-xs font-semibold text-teal-700 uppercase tracking-wide">✏️ Editable Content Area</span>
-                <span className="text-[10px] text-teal-500">Drag blocks below to reorder</span>
+            {/* ── Main Zone (between progress bar and curriculum) ── */}
+            <div className={cn("rounded-xl border-2 overflow-hidden bg-white", activeZone === "main" ? "border-teal-400" : "border-dashed border-teal-200")}>
+              <div className="px-4 py-2 bg-teal-50 border-b border-teal-200 flex items-center justify-between" style={{ background: activeZone === "main" ? "#0d9488" : undefined }}>
+                <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: activeZone === "main" ? "#fff" : "#0d9488" }}>✏️ Main Zone — Between Progress Bar and Curriculum</span>
+                {activeZone !== "main" && <button onClick={() => { setActiveZone("main"); setSelectedBlockId(null); }} className="text-[10px] text-teal-500 hover:text-teal-700 font-medium">Edit this zone</button>}
               </div>
-              {previewMode ? (
-                <div>
-                  {blocks.map(block => (
-                    <div key={block.id}>
-                      <BlockPreview block={block} />
-                    </div>
-                  ))}
-                  {blocks.length === 0 && <div className="text-center text-gray-400 py-8 text-sm">No content blocks yet.</div>}
-                </div>
+              {blocks.length === 0 && activeZone !== "main" ? (
+                <div className="text-center text-gray-400 py-4 text-xs italic">No blocks in Main Zone</div>
+              ) : activeZone === "main" ? (
+                previewMode ? (
+                  <div>
+                    {blocks.map(block => <div key={block.id}><BlockPreview block={block} /></div>)}
+                    {blocks.length === 0 && <div className="text-center text-gray-400 py-8 text-sm">No content blocks yet.</div>}
+                  </div>
+                ) : (
+                  <div className="p-3">
+                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                      <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
+                        {blocks.map((block, idx) => (
+                          <SortableBlock key={block.id} block={block} isSelected={block.id === selectedBlockId}
+                            onSelect={() => setSelectedBlockId(block.id === selectedBlockId ? null : block.id)}
+                            onDelete={() => deleteBlock(block.id)} onDuplicate={() => duplicateBlock(block.id)}
+                            onMoveUp={idx > 0 ? () => moveBlock(block.id, -1) : undefined}
+                            onMoveDown={idx < blocks.length - 1 ? () => moveBlock(block.id, 1) : undefined}
+                          />
+                        ))}
+                      </SortableContext>
+                    </DndContext>
+                    <button onClick={() => setAddMenuOpen(true)} className="w-full border-2 border-dashed border-teal-200 hover:border-teal-400 rounded-xl py-3 text-teal-500 hover:text-teal-700 text-sm flex items-center justify-center gap-2 transition-colors mt-2">
+                      <Plus className="w-4 h-4" /> Add Block to Main Zone
+                    </button>
+                  </div>
+                )
               ) : (
-                <div className="p-3">
-                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                    <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
-                      {blocks.map((block, idx) => (
-                        <SortableBlock
-                          key={block.id}
-                          block={block}
-                          isSelected={block.id === selectedBlockId}
-                          onSelect={() => setSelectedBlockId(block.id === selectedBlockId ? null : block.id)}
-                          onDelete={() => deleteBlock(block.id)}
-                          onDuplicate={() => duplicateBlock(block.id)}
-                          onMoveUp={idx > 0 ? () => moveBlock(block.id, -1) : undefined}
-                          onMoveDown={idx < blocks.length - 1 ? () => moveBlock(block.id, 1) : undefined}
-                        />
-                      ))}
-                    </SortableContext>
-                  </DndContext>
-                  <button
-                    onClick={() => setAddMenuOpen(true)}
-                    className="w-full border-2 border-dashed border-teal-200 hover:border-teal-400 rounded-xl py-3 text-teal-500 hover:text-teal-700 text-sm flex items-center justify-center gap-2 transition-colors mt-2"
-                  >
-                    <Plus className="w-4 h-4" /> Add Block
-                  </button>
+                <div>
+                  {blocks.map(block => <div key={block.id}><BlockPreview block={block} /></div>)}
                 </div>
               )}
             </div>
@@ -1920,6 +2014,46 @@ function CourseOverviewEditor({
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* ── Bottom Zone (below curriculum) ── */}
+            <div className={cn("rounded-xl border-2 overflow-hidden bg-white", activeZone === "bottom" ? "border-blue-400" : "border-dashed border-blue-200")}>
+              <div className="px-4 py-2 flex items-center justify-between" style={{ background: activeZone === "bottom" ? "#0891b2" : "#eff6ff" }}>
+                <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: activeZone === "bottom" ? "#fff" : "#0891b2" }}>🔚 Bottom Zone — Below Curriculum</span>
+                {activeZone !== "bottom" && <button onClick={() => { setActiveZone("bottom"); setSelectedBlockId(null); }} className="text-[10px] text-blue-500 hover:text-blue-700 font-medium">Edit this zone</button>}
+              </div>
+              {bottomBlocks.length === 0 && activeZone !== "bottom" ? (
+                <div className="text-center text-gray-400 py-4 text-xs italic">No blocks in Bottom Zone</div>
+              ) : activeZone === "bottom" ? (
+                previewMode ? (
+                  <div>
+                    {bottomBlocks.map(block => <div key={block.id}><BlockPreview block={block} /></div>)}
+                    {bottomBlocks.length === 0 && <div className="text-center text-gray-400 py-8 text-sm">No content blocks yet.</div>}
+                  </div>
+                ) : (
+                  <div className="p-3">
+                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                      <SortableContext items={bottomBlocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
+                        {bottomBlocks.map((block, idx) => (
+                          <SortableBlock key={block.id} block={block} isSelected={block.id === selectedBlockId}
+                            onSelect={() => setSelectedBlockId(block.id === selectedBlockId ? null : block.id)}
+                            onDelete={() => deleteBlock(block.id)} onDuplicate={() => duplicateBlock(block.id)}
+                            onMoveUp={idx > 0 ? () => moveBlock(block.id, -1) : undefined}
+                            onMoveDown={idx < bottomBlocks.length - 1 ? () => moveBlock(block.id, 1) : undefined}
+                          />
+                        ))}
+                      </SortableContext>
+                    </DndContext>
+                    <button onClick={() => setAddMenuOpen(true)} className="w-full border-2 border-dashed border-blue-200 hover:border-blue-400 rounded-xl py-3 text-blue-500 hover:text-blue-700 text-sm flex items-center justify-center gap-2 transition-colors mt-2">
+                      <Plus className="w-4 h-4" /> Add Block to Bottom Zone
+                    </button>
+                  </div>
+                )
+              ) : (
+                <div>
+                  {bottomBlocks.map(block => <div key={block.id}><BlockPreview block={block} /></div>)}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -4453,6 +4587,10 @@ function EnrollStudentDialog({ open, courseId, onClose, onEnrolled }: { open: bo
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selectedUser, setSelectedUser] = useState<any>(null);
+  // Create & Enroll mode
+  const [createMode, setCreateMode] = useState(false);
+  const [newUserName, setNewUserName] = useState("");
+  const [newUserEmail, setNewUserEmail] = useState("");
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(query), 400);
@@ -4476,70 +4614,166 @@ function EnrollStudentDialog({ open, courseId, onClose, onEnrolled }: { open: bo
     onError: e => toast.error(e.message),
   });
 
+  const createAndEnroll = trpc.lmsAdmin.createAndEnrollUser.useMutation({
+    onSuccess: (result) => {
+      if (result.alreadyEnrolled) {
+        toast.info("This user is already enrolled in this course");
+      } else if (result.isNewUser) {
+        toast.success("New user created and enrolled successfully!");
+      } else {
+        toast.success("Existing user enrolled successfully!");
+      }
+      onEnrolled();
+    },
+    onError: e => toast.error(e.message),
+  });
+
   const handleEnroll = () => {
     if (!selectedUser) return;
     addEnrollment.mutate({ userId: selectedUser.id, courseId });
   };
 
+  const handleCreateAndEnroll = () => {
+    if (!newUserName.trim() || !newUserEmail.trim()) return;
+    createAndEnroll.mutate({ courseId, name: newUserName.trim(), email: newUserEmail.trim() });
+  };
+
+  const handleClose = () => {
+    setQuery("");
+    setDebouncedQuery("");
+    setSelectedUser(null);
+    setCreateMode(false);
+    setNewUserName("");
+    setNewUserEmail("");
+    onClose();
+  };
+
+  const showNoResults = debouncedQuery.length >= 2 && searchResults?.length === 0 && !selectedUser;
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Enroll a Student</DialogTitle>
-          <DialogDescription>Search for an existing user to enroll them in this course.</DialogDescription>
+          <DialogDescription>
+            {createMode
+              ? "Enter the new user's details. They can log in later via OAuth."
+              : "Search for an existing user to enroll them in this course."}
+          </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 py-2">
-          <div>
-            <Label className="text-sm">Search by name or email</Label>
-            <Input
-              value={query}
-              onChange={e => { setQuery(e.target.value); setSelectedUser(null); }}
-              placeholder="Type at least 2 characters..."
-              className="mt-1"
-            />
-          </div>
-          {searchResults && searchResults.length > 0 && !selectedUser && (
-            <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-48 overflow-y-auto">
-              {searchResults.map((u: any) => (
-                <button
-                  key={u.id}
-                  onClick={() => { setSelectedUser(u); setQuery(u.displayName || u.name || u.email); }}
-                  className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition-colors"
-                >
-                  <p className="text-sm font-medium text-gray-900">{u.displayName || u.name}</p>
-                  <p className="text-xs text-gray-400">{u.email}</p>
+
+        {!createMode ? (
+          <div className="space-y-4 py-2">
+            <div>
+              <Label className="text-sm">Search by name or email</Label>
+              <Input
+                value={query}
+                onChange={e => { setQuery(e.target.value); setSelectedUser(null); }}
+                placeholder="Type at least 2 characters..."
+                className="mt-1"
+              />
+            </div>
+            {searchResults && searchResults.length > 0 && !selectedUser && (
+              <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-48 overflow-y-auto">
+                {searchResults.map((u: any) => (
+                  <button
+                    key={u.id}
+                    onClick={() => { setSelectedUser(u); setQuery(u.displayName || u.name || u.email); }}
+                    className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition-colors"
+                  >
+                    <p className="text-sm font-medium text-gray-900">{u.displayName || u.name}</p>
+                    <p className="text-xs text-gray-400">{u.email}</p>
+                  </button>
+                ))}
+              </div>
+            )}
+            {selectedUser && (
+              <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-teal-200 flex items-center justify-center shrink-0">
+                  <User className="w-4 h-4 text-teal-700" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900">{selectedUser.displayName || selectedUser.name}</p>
+                  <p className="text-xs text-gray-500">{selectedUser.email}</p>
+                </div>
+                <button onClick={() => { setSelectedUser(null); setQuery(""); }} className="text-gray-400 hover:text-gray-700">
+                  <X className="w-4 h-4" />
                 </button>
-              ))}
-            </div>
-          )}
-          {debouncedQuery.length >= 2 && searchResults?.length === 0 && (
-            <p className="text-sm text-gray-400 text-center py-3">No users found matching "{debouncedQuery}"</p>
-          )}
-          {selectedUser && (
-            <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-teal-200 flex items-center justify-center shrink-0">
-                <User className="w-4 h-4 text-teal-700" />
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900">{selectedUser.displayName || selectedUser.name}</p>
-                <p className="text-xs text-gray-500">{selectedUser.email}</p>
+            )}
+            {showNoResults && (
+              <div className="border border-amber-200 bg-amber-50 rounded-lg p-3 text-center">
+                <p className="text-sm text-amber-700 font-medium">No users found for "{debouncedQuery}"</p>
+                <p className="text-xs text-amber-600 mt-1">This user doesn't have an account yet.</p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-2 border-amber-300 text-amber-700 hover:bg-amber-100"
+                  onClick={() => {
+                    setCreateMode(true);
+                    // Pre-fill email if the query looks like an email
+                    if (debouncedQuery.includes("@")) setNewUserEmail(debouncedQuery);
+                  }}
+                >
+                  <UserPlus className="w-3.5 h-3.5 mr-1.5" />
+                  Create & Enroll New User
+                </Button>
               </div>
-              <button onClick={() => { setSelectedUser(null); setQuery(""); }} className="text-gray-400 hover:text-gray-700">
-                <X className="w-4 h-4" />
-              </button>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-4 py-2">
+            <div>
+              <Label className="text-sm">Full Name <span className="text-red-500">*</span></Label>
+              <Input
+                value={newUserName}
+                onChange={e => setNewUserName(e.target.value)}
+                placeholder="e.g. Jane Smith"
+                className="mt-1"
+              />
             </div>
+            <div>
+              <Label className="text-sm">Email Address <span className="text-red-500">*</span></Label>
+              <Input
+                type="email"
+                value={newUserEmail}
+                onChange={e => setNewUserEmail(e.target.value)}
+                placeholder="e.g. jane@example.com"
+                className="mt-1"
+              />
+            </div>
+            <p className="text-xs text-gray-400">
+              A new account will be created. The user can sign in later using the same email address via OAuth.
+            </p>
+          </div>
+        )}
+
+        <DialogFooter className="gap-2">
+          {createMode ? (
+            <>
+              <Button variant="outline" onClick={() => setCreateMode(false)}>Back to Search</Button>
+              <Button
+                className="bg-teal-600 hover:bg-teal-700 text-white"
+                disabled={!newUserName.trim() || !newUserEmail.trim() || createAndEnroll.isPending}
+                onClick={handleCreateAndEnroll}
+              >
+                {createAndEnroll.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <UserPlus className="w-4 h-4 mr-1" />}
+                Create & Enroll
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" onClick={handleClose}>Cancel</Button>
+              <Button
+                className="bg-teal-600 hover:bg-teal-700 text-white"
+                disabled={!selectedUser || addEnrollment.isPending}
+                onClick={handleEnroll}
+              >
+                {addEnrollment.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                Enroll Student
+              </Button>
+            </>
           )}
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button
-            className="bg-teal-600 hover:bg-teal-700 text-white"
-            disabled={!selectedUser || addEnrollment.isPending}
-            onClick={handleEnroll}
-          >
-            {addEnrollment.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
-            Enroll Student
-          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
