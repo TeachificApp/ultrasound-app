@@ -69,7 +69,14 @@ export async function createContext(
     }
   }
 
-  const hostname = opts.req.hostname || opts.req.headers.host || "";
+  // Behind a reverse proxy (trust proxy=1), req.hostname may return the internal host.
+  // Use X-Forwarded-Host first so brand detection works correctly on production domains
+  // (e.g. app.iheartecho.com vs app.allaboutultrasound.com).
+  const forwardedHost = opts.req.headers["x-forwarded-host"];
+  const hostname = (Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost)
+    || opts.req.headers.host
+    || opts.req.hostname
+    || "";
   const brand = detectBrand(hostname);
   const brandMode = detectBrandMode(hostname);
 

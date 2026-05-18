@@ -2325,8 +2325,12 @@ export const appRouter = router({
 
   stats: router({
     /** Total user count (active + pending) — refreshed by the client daily */
-    userCount: publicProcedure.query(async () => {
-      const total = await countUsers();
+    userCount: publicProcedure.query(async ({ ctx }) => {
+      const rawTotal = await countUsers();
+      // Brand-specific display offset: iHeartEcho shows a cosmetic offset
+      // to reflect the broader echo community (Thinkific + legacy members)
+      const displayOffset = ctx.brand === "iheartecho" ? 3997 : 0;
+      const total = rawTotal + displayOffset;
       return { total };
     }),
   }),

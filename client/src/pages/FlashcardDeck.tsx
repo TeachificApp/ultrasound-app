@@ -34,7 +34,7 @@ import { isIHeartEchoDomain } from "@/hooks/useSubdomain";
 
 const isIHE = isIHeartEchoDomain();
 type StudyMode = "sequential" | "spaced";
-type EchoCategory = "all" | "abdominal" | "pelvic_gyn" | "obstetric_1st" | "obstetric_2nd_3rd" | "fetal_echo" | "venous" | "arterial" | "abdominal_vascular" | "extracranial_carotid" | "intracranial_tcd" | "pocus" | "physics" | "thyroid" | "scrotum" | "breast" | "msk" | "adult_echo" | "pediatric_echo" | "tee" | "valvular" | "cardiomyopathy" | "structural_heart" | "echo_physics";
+type EchoCategory = "all" | "abdominal" | "pelvic_gyn" | "obstetric_1st" | "obstetric_2nd_3rd" | "fetal_echo" | "venous" | "arterial" | "abdominal_vascular" | "extracranial_carotid" | "intracranial_tcd" | "pocus" | "physics" | "thyroid" | "scrotum" | "breast" | "msk" | "adult" | "pediatric_congenital" | "fetal" | "acs" | "tee" | "valvular" | "cardiomyopathy" | "structural_heart" | "echo_physics";
 
 const AAUS_CATEGORIES: { value: EchoCategory; label: string }[] = [
   { value: "all", label: "All" },
@@ -57,15 +57,11 @@ const AAUS_CATEGORIES: { value: EchoCategory; label: string }[] = [
 ];
 const IHE_CATEGORIES: { value: EchoCategory; label: string }[] = [
   { value: "all", label: "All" },
-  { value: "adult_echo", label: "Adult TTE" },
-  { value: "tee", label: "TEE" },
-  { value: "pediatric_echo", label: "Pediatric Echo" },
-  { value: "fetal_echo", label: "Fetal Echo" },
-  { value: "valvular", label: "Valvular Disease" },
-  { value: "cardiomyopathy", label: "Cardiomyopathy" },
-  { value: "structural_heart", label: "Structural Heart" },
-  { value: "pocus", label: "POCUS Echo" },
-  { value: "echo_physics", label: "Echo Physics" },
+  { value: "adult", label: "Adult Echo" },
+  { value: "pocus", label: "POCUS" },
+  { value: "acs", label: "ACS" },
+  { value: "pediatric_congenital", label: "Pediatric/CHD" },
+  { value: "fetal", label: "Fetal Echo" },
 ];
 const CATEGORIES = isIHE ? IHE_CATEGORIES : AAUS_CATEGORIES;
 

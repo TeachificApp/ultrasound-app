@@ -99,6 +99,10 @@
 - [x] Points-based leaderboard
 - [x] User rankings with medals
 - [x] Streak display
+- [x] Redesign leaderboard: category tabs (Overall/Challenge/Cases/Flashcards), period tabs (All Time/Month/Week), points display, How Points Work sidebar
+- [x] Backend: getLeaderboard uses userPointsTotals (all-time) and userPointsLog (month/week) with category filters
+- [x] Fix FlashcardDeck.tsx IHE_CATEGORIES to use actual DB echoCategory values (adult, pocus, acs, pediatric_congenital, fetal)
+- [x] Add brand-specific display offset to stats.userCount (iHeartEcho +3997)
 
 ## Learn Fetal Echo
 - [x] Course listing page with premium gating

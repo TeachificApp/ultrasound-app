@@ -31,6 +31,8 @@ import {
   quickfireAttempts,
   quickfireChallenges,
   users,
+  userPointsTotals,
+  userPointsLog,
 } from "../../drizzle/schema";
 import { eq, and, desc, sql, gte, lte, count, inArray, isNull } from "drizzle-orm";
 import { sendStreakReminders } from "../streakReminders";
@@ -703,84 +705,122 @@ getUserStats: protectedProcedure.query(async ({ ctx }) => {
     return { total, correct, accuracy, streak, bestStreak, categoryStats, recentHistory, bonusPoints, approvedSubmissionCount };
   }),
 
-  /** Leaderboard with period filter and current user rank */
+  /** Leaderboard with category + period filters, points-based ranking */
   getLeaderboard: protectedProcedure
-    .input(z.object({ period: z.enum(["7d", "30d", "allTime"]).default("30d") }).optional())
+    .input(z.object({
+      category: z.enum(["overall", "challenge", "cases", "flashcards"]).default("overall"),
+      period: z.enum(["all", "month", "week"]).default("all"),
+    }).optional())
     .query(async ({ ctx, input }) => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-    const period = input?.period ?? "30d";
+    const category = input?.category ?? "overall";
+    const period = input?.period ?? "all";
+    const currentUserId = ctx.user.id;
     const brand = ctx.brand as "aaus" | "iheartecho";
-    let cutoff: string | null = null;
-    if (period === "7d") { const d = new Date(); d.setDate(d.getDate() - 7); cutoff = d.toISOString().slice(0, 10); }
-    else if (period === "30d") { const d = new Date(); d.setDate(d.getDate() - 30); cutoff = d.toISOString().slice(0, 10); }
-    // Build WHERE clause: filter by brand (via join with quickfireDailySets) and optionally by period
-    const brandCondition = eq(quickfireDailySets.brand, brand);
-    const whereClause = cutoff
-      ? and(brandCondition, gte(quickfireAttempts.setDate, cutoff))
-      : brandCondition;
-    const results = await db
-      .select({
-        userId: quickfireAttempts.userId,
-        correct: sql<number>`SUM(CASE WHEN ${quickfireAttempts.isCorrect} = 1 THEN 1 ELSE 0 END)`,
-        total: count(quickfireAttempts.id),
-      })
-      .from(quickfireAttempts)
-      .innerJoin(quickfireDailySets, and(eq(quickfireAttempts.setDate, quickfireDailySets.setDate), eq(quickfireDailySets.brand, brand)))
-      .where(whereClause)
-      .groupBy(quickfireAttempts.userId)
-      .orderBy(desc(sql`SUM(CASE WHEN ${quickfireAttempts.isCorrect} = 1 THEN 1 ELSE 0 END)`))
-      .limit(50);
-    const userIds = results.map((r) => r.userId);
-    // NOTE: Do NOT early-return when userIds is empty — virtual entries must still be shown
+    const ownerBrandName = brand === "iheartecho" ? "iHeartEcho" : "All About Ultrasound";
+
+    // Map category to activityTypes for time-period queries
+    const activityTypes: Record<string, string[]> = {
+      overall: ["daily_challenge_correct", "daily_challenge_streak", "case_submission", "case_approved", "flashcard_session", "flashcard_card_viewed", "admin_adjustment"],
+      challenge: ["daily_challenge_correct", "daily_challenge_streak"],
+      cases: ["case_submission", "case_approved"],
+      flashcards: ["flashcard_session", "flashcard_card_viewed"],
+    };
+
+    let realEntries: { userId: number; points: number }[] = [];
+
+    if (period === "all") {
+      // Use pre-computed totals for fast all-time queries
+      const colExpr = category === "challenge" ? userPointsTotals.challengePoints
+        : category === "cases" ? userPointsTotals.casePoints
+        : category === "flashcards" ? userPointsTotals.flashcardPoints
+        : userPointsTotals.totalPoints;
+      const rows = await db
+        .select({ userId: userPointsTotals.userId, points: colExpr })
+        .from(userPointsTotals)
+        .orderBy(desc(colExpr))
+        .limit(100);
+      realEntries = rows.map(r => ({ userId: r.userId, points: Number(r.points) }));
+    } else {
+      // Sum from userPointsLog filtered by time period
+      const cutoffDate = new Date();
+      if (period === "month") cutoffDate.setDate(cutoffDate.getDate() - 30);
+      else cutoffDate.setDate(cutoffDate.getDate() - 7);
+      const types = activityTypes[category];
+      const rows = await db
+        .select({
+          userId: userPointsLog.userId,
+          points: sql<number>`SUM(${userPointsLog.points})`,
+        })
+        .from(userPointsLog)
+        .where(and(
+          gte(userPointsLog.createdAt, cutoffDate),
+          sql`${userPointsLog.activityType} IN (${sql.join(types.map(t => sql`${t}`), sql`, `)})`
+        ))
+        .groupBy(userPointsLog.userId)
+        .orderBy(desc(sql`SUM(${userPointsLog.points})`))
+        .limit(100);
+      realEntries = rows.map(r => ({ userId: r.userId, points: Number(r.points) }));
+    }
+
+    // Fetch user details
+    const userIds = realEntries.map(r => r.userId);
     const userList = userIds.length > 0 ? await db
-      .select({ id: users.id, displayName: users.displayName, name: users.name, avatarUrl: users.avatarUrl, openId: users.openId })
+      .select({ id: users.id, displayName: users.displayName, name: users.name, avatarUrl: users.avatarUrl, openId: users.openId, credentials: users.credentials })
       .from(users)
       .where(inArray(users.id, userIds)) : [];
-    const currentUserId = ctx.user.id;
-    const allEntries = results.map((r, i) => {
-      const u = userList.find((u) => u.id === r.userId);
-      const rawName = u?.displayName || u?.name || "Anonymous";
-      const ownerBrandName = brand === "iheartecho" ? "iHeartEcho" : "All About Ultrasound";
-      const maskedName = (u?.openId && ENV.ownerOpenId && u.openId === ENV.ownerOpenId)
-        ? ownerBrandName
-        : rawName;
-      return {
-        rank: i + 1,
-        userId: r.userId,
-        displayName: maskedName,
-        avatarUrl: u?.avatarUrl ?? null,
-        correct: Number(r.correct),
-        total: Number(r.total),
-        accuracy: r.total > 0 ? Math.round((Number(r.correct) / Number(r.total)) * 100) : 0,
-        isCurrentUser: r.userId === currentUserId,
-      };
-    });
-    // Merge real users with virtual seeded entries
-    const virtualEntries = generateVirtualLeaderboard(1200, period);
-    // Convert real entries to same shape as virtual
+
     type LeaderEntry = {
       rank: number;
       userId: string | number;
       displayName: string;
+      credentials: string | null;
       avatarUrl: string | null;
-      correct: number;
-      total: number;
-      accuracy: number;
+      points: number;
+      challengePoints?: number;
+      casePoints?: number;
+      flashcardPoints?: number;
       isCurrentUser: boolean;
       isVirtual?: boolean;
       city?: string;
     };
-    const realMapped: LeaderEntry[] = allEntries.map((e) => ({ ...e, isVirtual: false }));
-    // Combine and sort by correct desc
-    const combined: LeaderEntry[] = [...realMapped, ...virtualEntries]
-      .sort((a, b) => b.correct - a.correct || b.accuracy - a.accuracy);
-    // Assign ranks
+
+    const realMapped: LeaderEntry[] = realEntries.map((r) => {
+      const u = userList.find(u => u.id === r.userId);
+      const rawName = u?.displayName || u?.name || "Anonymous";
+      const maskedName = (u?.openId && ENV.ownerOpenId && u.openId === ENV.ownerOpenId)
+        ? ownerBrandName : rawName;
+      return {
+        rank: 0,
+        userId: r.userId,
+        displayName: maskedName,
+        credentials: u?.credentials ?? null,
+        avatarUrl: u?.avatarUrl ?? null,
+        points: r.points,
+        isCurrentUser: r.userId === currentUserId,
+        isVirtual: false,
+      };
+    });
+
+    // Virtual entries — map to correct points column for the selected category
+    const legacyPeriod = period === "week" ? "7d" : period === "month" ? "30d" : "allTime";
+    const virtualEntries = generateVirtualLeaderboard(1200, legacyPeriod);
+    const virtualMapped: LeaderEntry[] = virtualEntries.map(v => ({
+      ...v,
+      credentials: v.credentials ?? null,
+      points: category === "challenge" ? (v.challengePoints ?? v.points)
+            : category === "cases" ? (v.casePoints ?? v.points)
+            : category === "flashcards" ? (v.flashcardPoints ?? v.points)
+            : v.points,
+    }));
+
+    const combined: LeaderEntry[] = [...realMapped, ...virtualMapped]
+      .sort((a, b) => b.points - a.points);
     combined.forEach((e, i) => { e.rank = i + 1; });
-    // Find current user
-    const currentUserEntry = combined.find((e) => e.userId === currentUserId || String(e.userId) === String(currentUserId)) ?? null;
+
+    const currentUserEntry = combined.find(e => e.userId === currentUserId || String(e.userId) === String(currentUserId)) ?? null;
     const currentUserRank = currentUserEntry?.rank ?? null;
-    // Return top 50 + current user if outside top 50
     const top50 = combined.slice(0, 50);
     const entries = [...top50];
     if (currentUserEntry && currentUserRank && currentUserRank > 50) entries.push(currentUserEntry);
