@@ -2053,3 +2053,14 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Handle physical_product type in Stripe webhook handler (handlePhysicalProductCheckoutCompleted)
 - [x] Fix field name mismatches (shopifyUrl→shopifyProductUrl, shopifyEmbed→shopifyEmbedCode)
 - [x] Write vitest tests for Products module (4 tests passing)
+
+## Student Dashboard (Cross-Brand Unified)
+- [x] dashboardRouter: getMyContent aggregates LMS enrollments from both AAUS and iHeartEcho brands
+- [x] dashboardRouter: getMySubscriptions returns brandMemberships for both brands with brand label
+- [x] dashboardRouter: getMyCertificates returns certs from both brands
+- [x] StudentDashboardPage: My Content tab shows brand badge (AAUS / iHeartEcho) on each item
+- [x] StudentDashboardPage: Subscriptions tab shows brand label and manages both brands
+- [x] StudentDashboardPage: Certificates tab shows brand badge on each cert
+- [x] StudentDashboardPage: support ?tab= URL param to deep-link to a specific tab
+- [x] /my-dashboard route accessible from all layouts (Layout.tsx, LMSLayout.tsx)
+- [x] Vitest: dashboardRouter procedures covered

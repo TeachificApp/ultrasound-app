@@ -36,6 +36,7 @@ import { abTestRouter } from "./routers/abTestRouter";
 import { engagementRouter } from "./routers/engagementRouter";
 import { brandMembershipRouter } from "./routers/brandMembershipRouter";
 import { productsPublicRouter, productsLearnerRouter, productsAdminRouter } from "./routers/productsRouter";
+import { dashboardRouter } from "./routers/dashboardRouter";
 import {
   getUserById,
   getUsersByIds,
@@ -1874,6 +1875,9 @@ export const appRouter = router({
   engagement: engagementRouter,
   // ─── Brand Membership (multi-tenant premium) ─────────────────────────────────
   brandMembership: brandMembershipRouter,
+
+  // ─── Student Dashboard ───────────────────────────────────────────────────────
+  dashboard: dashboardRouter,
 
   // ─── Physician Over-Read Workflow (Step 1 & Step 2) ──────────────────────────
   physicianOverRead: router({

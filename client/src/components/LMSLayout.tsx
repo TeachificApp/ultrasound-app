@@ -212,6 +212,9 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setAccountOpen(false)} />
                     <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                      <Link href="/my-dashboard" onClick={() => setAccountOpen(false)}>
+                        <div className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer flex items-center gap-2"><GraduationCap className="w-3.5 h-3.5 text-teal-600" /> My Dashboard</div>
+                      </Link>
                       <Link href="/profile" onClick={() => setAccountOpen(false)}>
                         <div className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">My Profile</div>
                       </Link>

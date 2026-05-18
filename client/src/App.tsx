@@ -227,6 +227,7 @@ const Leaderboard = lazy(() => import("./pages/Leaderboard"));
 const LabAdmin = lazy(() => import("./pages/iheartecho/LabAdmin"));
 const EducatorAdmin = lazy(() => import("./pages/iheartecho/EducatorAdmin"));
 const StudentDashboard = lazy(() => import("./pages/iheartecho/StudentDashboard"));
+const StudentDashboardPage = lazy(() => import("./pages/StudentDashboardPage"));
 const SoundBytesPage = lazy(() => import("./pages/SoundBytes"));
 
 // ── CME Hub ─────────────────────────────────────────────────────────────────────────
@@ -264,6 +265,7 @@ function Router() {
         <Route path="/upgrade-success" component={UpgradeSuccess} />
         <Route path="/premium" component={Premium} />
         <Route path="/profile" component={Profile} />
+        <Route path="/my-dashboard" component={StudentDashboardPage} />
 
         {/* ── UltrasoundAssist™ Hub ───────────────────────────────────── */}
         <Route path="/ultrasound-assist" component={UltrasoundAssistHub} />
@@ -483,6 +485,7 @@ function LMSRouter() {
         <Route path="/login" component={Login} />
         <Route path="/register" component={Register} />
         <Route path="/profile" component={Profile} />
+        <Route path="/my-dashboard" component={StudentDashboardPage} />
 
         <Route path="/media/:slug/:action" component={MediaRedirect} />
         <Route path="/media/:slug" component={MediaRedirect} />
@@ -522,6 +525,7 @@ function IHeartEchoRouter() {
         <Route path="/upgrade-success" component={UpgradeSuccess} />
         <Route path="/premium" component={Premium} />
         <Route path="/profile" component={Profile} />
+        <Route path="/my-dashboard" component={StudentDashboardPage} />
 
         {/* ── EchoAssist™ Hub ────────────────────────────────────────── */}
         <Route path="/echo-assist-hub" component={EchoAssistHub} />
