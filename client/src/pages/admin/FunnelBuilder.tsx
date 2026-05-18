@@ -18,7 +18,8 @@ import {
   Globe, FileText, CreditCard, Gift, ThumbsUp, Layers, ArrowRight,
   ExternalLink, BarChart3, Pencil, Check, X, ChevronDown, ChevronLeft, Zap,
   LayoutTemplate, ShoppingCart, Download, BookOpen, Package, GripVertical,
-  GitBranch, List, ChevronUp,
+  GitBranch, List, ChevronUp, Users, TrendingDown, AlertTriangle, AlertCircle,
+  Mail, Phone, Tag, Search, Filter,
 } from "lucide-react";
 import {
   DndContext,
@@ -506,6 +507,9 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
   const [pageView, setPageView] = useState<"list" | "diagram">("list");
   const [copyPageDialog, setCopyPageDialog] = useState<{ pageId: number; pageTitle: string } | null>(null);
   const [copyTargetFunnelId, setCopyTargetFunnelId] = useState<string>("");
+  const [activeTab, setActiveTab] = useState<"pages" | "settings" | "contacts" | "analytics">("pages");
+  const [leadSearch, setLeadSearch] = useState("");
+  const [leadPage, setLeadPage] = useState(1);
 
   const updateFunnel = trpc.funnel.update.useMutation({ onSuccess: () => { refetch(); toast.success("Updated"); } });
   const deleteFunnel = trpc.funnel.delete.useMutation({ onSuccess: () => { toast.success("Funnel deleted"); onBack(); } });
@@ -521,6 +525,12 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
   const saveAsTemplate = trpc.funnel.saveAsTemplate.useMutation({ onSuccess: () => { toast.success("Saved as template! It will appear in the template list when creating new funnels."); } });
   const reorderPages = trpc.funnel.reorderPages.useMutation({ onError: () => { refetch(); toast.error("Failed to save order"); } });
   const { data: flowData } = trpc.funnel.getFlowDiagram.useQuery({ funnelId });
+  const { data: analyticsData } = trpc.funnel.getFunnelAnalytics.useQuery({ funnelId }, { enabled: activeTab === "analytics" });
+  const { data: leadsData, refetch: refetchLeads } = trpc.funnel.listLeads.useQuery({ funnelId, page: leadPage, limit: 50, search: leadSearch || undefined }, { enabled: activeTab === "contacts" });
+  const { data: csvData, refetch: fetchCSV } = trpc.funnel.exportFunnelLeadsCSV.useQuery({ funnelId }, { enabled: false });
+  const { data: importablePages } = trpc.funnel.listImportablePages.useQuery({ excludeFunnelId: funnelId }, { enabled: showAddPage });
+  const importPage = trpc.funnel.importPageToFunnel.useMutation({ onSuccess: () => { refetch(); setShowAddPage(false); toast.success("Page imported!"); } });
+  const [importTab, setImportTab] = useState<"new" | "import">("new");
 
   const pageSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -546,6 +556,20 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
   if (isLoading || !funnel) {
     return <div className="flex items-center justify-center h-64 text-gray-400">Loading funnel...</div>;
   }
+
+  const handleExportCSV = async () => {
+    const result = await fetchCSV();
+    if (result.data?.csvContent) {
+      const blob = new Blob([result.data.csvContent], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${funnel.name.replace(/\s+/g, "-").toLowerCase()}-leads.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Exported ${result.data.total} leads`);
+    }
+  };
 
   const handleStatusToggle = () => {
     const newStatus = funnel.status === "active" ? "draft" : "active";
@@ -641,7 +665,7 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
       </div>
 
       {/* Funnel Info Bar */}
-      <div className="bg-gray-50 rounded-xl p-4 mb-6 flex items-center justify-between">
+      <div className="bg-gray-50 rounded-xl p-4 mb-4 flex items-center justify-between">
         <div className="flex items-center gap-6 text-sm text-gray-600">
           <span className="flex items-center gap-1.5"><Eye size={14} /> {funnel.totalViews} views</span>
           <span className="flex items-center gap-1.5"><BarChart3 size={14} /> {funnel.totalConversions} conversions</span>
@@ -651,16 +675,32 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
             </a>
           )}
         </div>
-        <button onClick={() => setShowSettings(!showSettings)} className="text-sm text-gray-500 hover:text-teal-700 flex items-center gap-1.5">
-          <Settings size={14} /> Settings
-        </button>
       </div>
 
-      {/* Settings Panel (collapsible) */}
-      {showSettings && (
-        <FunnelSettingsPanel funnel={funnel} funnelId={funnelId} onUpdate={updateFunnel} />
-      )}
+      {/* Four-Tab Navigation */}
+      <div className="flex items-center gap-1 border-b border-gray-200 mb-6">
+        {([
+          { id: "pages", label: "Pages", icon: <List size={14} /> },
+          { id: "settings", label: "Settings", icon: <Settings size={14} /> },
+          { id: "contacts", label: "Contacts", icon: <Users size={14} /> },
+          { id: "analytics", label: "Analytics", icon: <BarChart3 size={14} /> },
+        ] as const).map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === tab.id
+                ? "border-teal-600 text-teal-700"
+                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+            }`}
+          >
+            {tab.icon} {tab.label}
+          </button>
+        ))}
+      </div>
 
+      {/* ── PAGES TAB ── */}
+      {activeTab === "pages" && (<>
       {/* Page Flow Visualization */}
       <div className="mb-4 flex items-center justify-between">
         <div>
@@ -864,27 +904,306 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
       {/* Add Page Dialog */}
       {showAddPage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-gray-900">Add Page</h3>
               <button onClick={() => setShowAddPage(false)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
             </div>
-            <div className="space-y-2">
-              {(Object.entries(PAGE_TYPE_META) as [PageType, typeof PAGE_TYPE_META[PageType]][]).map(([type, meta]) => (
-                <button
-                  key={type}
-                  onClick={() => handleAddPage(type)}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-all text-left"
-                >
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${meta.color}`}>{meta.icon}</div>
-                  <div>
-                    <h4 className="font-medium text-gray-900 text-sm">{meta.label}</h4>
-                    <p className="text-xs text-gray-500">{meta.description}</p>
-                  </div>
-                </button>
-              ))}
+            {/* Tab switcher */}
+            <div className="flex items-center gap-1 border-b border-gray-200 mb-4">
+              <button
+                onClick={() => setImportTab("new")}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  importTab === "new" ? "border-teal-600 text-teal-700" : "border-transparent text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                Create New
+              </button>
+              <button
+                onClick={() => setImportTab("import")}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  importTab === "import" ? "border-teal-600 text-teal-700" : "border-transparent text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                Import Existing
+              </button>
             </div>
+
+            {importTab === "new" && (
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {(Object.entries(PAGE_TYPE_META) as [PageType, typeof PAGE_TYPE_META[PageType]][]).map(([type, meta]) => (
+                  <button
+                    key={type}
+                    onClick={() => handleAddPage(type)}
+                    className="w-full flex items-center gap-3 p-3 rounded-xl border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-all text-left"
+                  >
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${meta.color}`}>{meta.icon}</div>
+                    <div>
+                      <h4 className="font-medium text-gray-900 text-sm">{meta.label}</h4>
+                      <p className="text-xs text-gray-500">{meta.description}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {importTab === "import" && (
+              <div className="max-h-96 overflow-y-auto space-y-4">
+                {/* Standalone landing pages */}
+                {importablePages?.standalone && importablePages.standalone.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Standalone Landing Pages</p>
+                    <div className="space-y-1.5">
+                      {importablePages.standalone.map((p: any) => (
+                        <button
+                          key={p.id}
+                          onClick={() => importPage.mutate({ sourcePageId: p.id, targetFunnelId: funnelId })}
+                          disabled={importPage.isPending}
+                          className="w-full flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-all text-left"
+                        >
+                          <div>
+                            <span className="text-sm font-medium text-gray-900">{p.title}</span>
+                            <span className="ml-2 text-xs text-gray-400">/{p.slug}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-400">{p.views} views</span>
+                            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full capitalize">{p.pageType.replace(/_/g, " ")}</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Pages from other funnels */}
+                {importablePages?.fromFunnels && importablePages.fromFunnels.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Pages from Other Funnels</p>
+                    <div className="space-y-1.5">
+                      {importablePages.fromFunnels.map((p: any) => (
+                        <button
+                          key={p.id}
+                          onClick={() => importPage.mutate({ sourcePageId: p.id, targetFunnelId: funnelId })}
+                          disabled={importPage.isPending}
+                          className="w-full flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-all text-left"
+                        >
+                          <div>
+                            <span className="text-sm font-medium text-gray-900">{p.title}</span>
+                            <span className="ml-2 text-xs text-gray-400">/{p.slug}</span>
+                            <span className="ml-2 text-xs text-blue-500">{p.funnelName}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-400">{p.views} views</span>
+                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full capitalize">{p.pageType.replace(/_/g, " ")}</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {(!importablePages || (importablePages.standalone.length === 0 && importablePages.fromFunnels.length === 0)) && (
+                  <div className="text-center py-8 text-gray-400">
+                    <Layers size={32} className="mx-auto mb-2 opacity-40" />
+                    <p className="text-sm">No existing pages to import</p>
+                    <p className="text-xs mt-1">Create pages in other funnels or as standalone landing pages first</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
+        </div>
+      )}
+      </>)}
+
+      {/* ── SETTINGS TAB ── */}
+      {activeTab === "settings" && (
+        <FunnelSettingsPanel funnel={funnel} funnelId={funnelId} onUpdate={updateFunnel} />
+      )}
+
+      {/* ── CONTACTS TAB ── */}
+      {activeTab === "contacts" && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Contacts & Leads</h2>
+              <p className="text-xs text-gray-400 mt-0.5">{leadsData?.total ?? 0} total contacts captured</p>
+            </div>
+            <Button onClick={handleExportCSV} variant="outline" size="sm" className="gap-1.5 text-xs">
+              <Download size={14} /> Export CSV
+            </Button>
+          </div>
+          {/* Search */}
+          <div className="relative mb-4">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search by name, email, or phone..."
+              value={leadSearch}
+              onChange={e => { setLeadSearch(e.target.value); setLeadPage(1); }}
+              className="w-full h-9 pl-8 pr-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+            />
+          </div>
+          {/* Leads table */}
+          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Contact</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Phone</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Source Page</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Tags</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Captured</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {leadsData?.leads.map((lead: any) => (
+                  <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-gray-900">{lead.name || <span className="text-gray-400 italic">No name</span>}</div>
+                      <div className="text-xs text-gray-500 flex items-center gap-1"><Mail size={11} /> {lead.email}</div>
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 text-xs">{lead.phone || <span className="text-gray-300">—</span>}</td>
+                    <td className="px-4 py-3 text-xs text-gray-500">{lead.sourcePage || <span className="text-gray-300">—</span>}</td>
+                    <td className="px-4 py-3">
+                      {lead.tags ? (
+                        <div className="flex flex-wrap gap-1">
+                          {lead.tags.split(",").map((t: string) => (
+                            <span key={t} className="text-xs bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-full">{t.trim()}</span>
+                          ))}
+                        </div>
+                      ) : <span className="text-gray-300 text-xs">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-400">{new Date(lead.createdAt).toLocaleDateString()}</td>
+                  </tr>
+                ))}
+                {(!leadsData?.leads || leadsData.leads.length === 0) && (
+                  <tr><td colSpan={5} className="text-center py-12 text-gray-400">
+                    <Users size={32} className="mx-auto mb-2 opacity-30" />
+                    <p className="text-sm">No contacts yet</p>
+                    <p className="text-xs mt-1">Contacts appear when visitors submit lead capture forms in your funnel</p>
+                  </td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          {/* Pagination */}
+          {leadsData && leadsData.totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4">
+              <span className="text-xs text-gray-400">Page {leadPage} of {leadsData.totalPages}</span>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" disabled={leadPage <= 1} onClick={() => setLeadPage(p => p - 1)} className="text-xs">Previous</Button>
+                <Button variant="outline" size="sm" disabled={leadPage >= leadsData.totalPages} onClick={() => setLeadPage(p => p + 1)} className="text-xs">Next</Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── ANALYTICS TAB ── */}
+      {activeTab === "analytics" && (
+        <div>
+          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Funnel Analytics</h2>
+          {!analyticsData ? (
+            <div className="flex items-center justify-center h-40 text-gray-400">Loading analytics...</div>
+          ) : (
+            <div className="space-y-6">
+              {/* Overview KPIs */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="bg-white border border-gray-200 rounded-xl p-4">
+                  <p className="text-xs text-gray-500 mb-1">Total Views</p>
+                  <p className="text-2xl font-bold text-gray-900">{analyticsData.totalViews.toLocaleString()}</p>
+                </div>
+                <div className="bg-white border border-gray-200 rounded-xl p-4">
+                  <p className="text-xs text-gray-500 mb-1">Total Leads</p>
+                  <p className="text-2xl font-bold text-teal-700">{analyticsData.totalLeads.toLocaleString()}</p>
+                </div>
+                <div className="bg-white border border-gray-200 rounded-xl p-4">
+                  <p className="text-xs text-gray-500 mb-1">Overall Conversion</p>
+                  <p className="text-2xl font-bold text-green-700">{analyticsData.overallConversionRate}%</p>
+                </div>
+              </div>
+
+              {/* Critical Issues */}
+              {analyticsData.issues.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <AlertTriangle size={16} className="text-amber-600" />
+                    <h3 className="text-sm font-semibold text-amber-800">Sales Workflow Issues ({analyticsData.issues.length})</h3>
+                  </div>
+                  <div className="space-y-2">
+                    {analyticsData.issues.map((issue: any, i: number) => (
+                      <div key={i} className="flex items-start gap-2 text-xs">
+                        {issue.severity === "error" ? (
+                          <AlertCircle size={13} className="text-red-500 mt-0.5 shrink-0" />
+                        ) : (
+                          <AlertTriangle size={13} className="text-amber-500 mt-0.5 shrink-0" />
+                        )}
+                        <div>
+                          <span className="font-medium text-gray-800">{issue.pageTitle}</span>
+                          <span className="text-gray-500 ml-1">— {issue.issue}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Per-Page Funnel Analysis */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Page-by-Page Breakdown</h3>
+                <div className="space-y-3">
+                  {analyticsData.pageStats.map((page: any, idx: number) => (
+                    <div key={page.id} className="bg-white border border-gray-200 rounded-xl p-4">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center text-xs font-bold">{idx + 1}</span>
+                          <div>
+                            <span className="font-medium text-gray-900 text-sm">{page.title}</span>
+                            {page.isBuyPoint && <span className="ml-2 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">Buy Point</span>}
+                            {page.isHidden && <span className="ml-2 text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">Hidden</span>}
+                          </div>
+                        </div>
+                        <span className="text-xs text-gray-400">/{page.slug}</span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-3 text-center">
+                        <div>
+                          <p className="text-xs text-gray-400">Views</p>
+                          <p className="text-lg font-bold text-gray-900">{page.views.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-400">Conversions</p>
+                          <p className="text-lg font-bold text-teal-700">{page.conversions.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-400">Conv. Rate</p>
+                          <p className={`text-lg font-bold ${page.conversionRate >= 10 ? "text-green-700" : page.conversionRate >= 3 ? "text-yellow-600" : "text-gray-500"}`}>{page.conversionRate}%</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-400">Drop-off</p>
+                          <p className={`text-lg font-bold flex items-center justify-center gap-1 ${page.dropOffRate > 70 ? "text-red-600" : page.dropOffRate > 40 ? "text-amber-600" : "text-gray-500"}`}>
+                            {idx > 0 && <TrendingDown size={14} />}{page.dropOffRate > 0 ? `${page.dropOffRate}%` : "—"}
+                          </p>
+                        </div>
+                      </div>
+                      {/* Drop-off bar */}
+                      {idx > 0 && page.views > 0 && (
+                        <div className="mt-3">
+                          <div className="w-full bg-gray-100 rounded-full h-1.5">
+                            <div
+                              className={`h-1.5 rounded-full transition-all ${
+                                page.dropOffRate > 70 ? "bg-red-400" : page.dropOffRate > 40 ? "bg-amber-400" : "bg-teal-400"
+                              }`}
+                              style={{ width: `${100 - page.dropOffRate}%` }}
+                            />
+                          </div>
+                          <p className="text-xs text-gray-400 mt-1">{100 - page.dropOffRate}% of previous page visitors reached this page</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

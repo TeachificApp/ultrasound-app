@@ -1292,8 +1292,207 @@ export const funnelPublicRouter = router({
         targetPageId: result.targetPageId,
         targetPageSlug,
         targetFunnelSlug,
-        targetUrl: result.targetUrl,
+                targetUrl: result.targetUrl,
       };
     }),
 
+  /** List pages that can be imported into a funnel (standalone landing pages + pages from other funnels) */
+  listImportablePages: protectedProcedure
+    .input(z.object({ excludeFunnelId: z.number().optional() }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+
+      // All standalone landing pages
+      const standalonePages = await db
+        .select({ id: funnelPages.id, title: funnelPages.title, slug: funnelPages.slug, pageType: funnelPages.pageType, funnelId: funnelPages.funnelId, views: funnelPages.views })
+        .from(funnelPages)
+        .where(eq(funnelPages.isStandaloneLanding, true))
+        .orderBy(desc(funnelPages.views));
+
+      // Pages from other funnels (checkout, upsell, downsell, thank_you)
+      const otherFunnelPages = await db
+        .select({ id: funnelPages.id, title: funnelPages.title, slug: funnelPages.slug, pageType: funnelPages.pageType, funnelId: funnelPages.funnelId, views: funnelPages.views })
+        .from(funnelPages)
+        .where(input.excludeFunnelId
+          ? and(eq(funnelPages.isStandaloneLanding, false), sql`${funnelPages.funnelId} != ${input.excludeFunnelId}`)
+          : eq(funnelPages.isStandaloneLanding, false)
+        )
+        .orderBy(desc(funnelPages.views))
+        .limit(100);
+
+      // Get funnel names for context
+      const allFunnelsList = await db.select({ id: funnels.id, name: funnels.name }).from(funnels);
+      const funnelNameMap = new Map(allFunnelsList.map(f => [f.id, f.name]));
+
+      return {
+        standalone: standalonePages.map(p => ({ ...p, funnelName: null })),
+        fromFunnels: otherFunnelPages.map(p => ({ ...p, funnelName: funnelNameMap.get(p.funnelId) ?? "Unknown" })),
+      };
+    }),
+
+  /** Import (copy) an existing page into a funnel */
+  importPageToFunnel: protectedProcedure
+    .input(z.object({ sourcePageId: z.number(), targetFunnelId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+
+      const [original] = await db.select().from(funnelPages).where(eq(funnelPages.id, input.sourcePageId));
+      if (!original) throw new TRPCError({ code: "NOT_FOUND" });
+
+      // Generate unique slug
+      const baseSlug = original.slug.replace(/-copy.*$/, "").replace(/-standalone.*$/, "");
+      const suffix = Date.now().toString(36).slice(-4);
+      const newSlug = `${baseSlug}-imported-${suffix}`;
+
+      // Get max sort order
+      const existing = await db.select({ sortOrder: funnelPages.sortOrder }).from(funnelPages).where(eq(funnelPages.funnelId, input.targetFunnelId)).orderBy(desc(funnelPages.sortOrder)).limit(1);
+      const nextOrder = (existing[0]?.sortOrder ?? 0) + 1;
+
+      const [inserted] = await db.insert(funnelPages).values({
+        funnelId: input.targetFunnelId,
+        pageType: original.pageType,
+        title: original.title + " (Imported)",
+        slug: newSlug,
+        blocks: original.blocks,
+        productType: original.productType,
+        productId: original.productId,
+        customPrice: original.customPrice,
+        customPriceLabel: original.customPriceLabel,
+        sortOrder: nextOrder,
+        isActive: true,
+        isHidden: false,
+        isStandaloneLanding: false,
+        showNavigationButton: original.showNavigationButton,
+      });
+
+      return { id: (inserted as any).insertId, slug: newSlug };
+    }),
+
+  /** Get per-page analytics with drop-off rates and sales issue detection */
+  getFunnelAnalytics: protectedProcedure
+    .input(z.object({ funnelId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+
+      // Get funnel
+      const [funnel] = await db.select().from(funnels).where(eq(funnels.id, input.funnelId));
+      if (!funnel) throw new TRPCError({ code: "NOT_FOUND" });
+
+      // Get pages in order
+      const pages = await db
+        .select()
+        .from(funnelPages)
+        .where(eq(funnelPages.funnelId, input.funnelId))
+        .orderBy(asc(funnelPages.sortOrder));
+
+      // Get total leads for this funnel
+      const [leadCount] = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(funnelLeads)
+        .where(eq(funnelLeads.funnelId, input.funnelId));
+      const totalLeads = Number(leadCount?.count ?? 0);
+
+      // Build per-page analytics with drop-off
+      const pageStats = pages.map((page, idx) => {
+        const prevPage = idx > 0 ? pages[idx - 1] : null;
+        const entryViews = idx === 0 ? page.views : (prevPage?.views ?? 0);
+        const dropOffRate = entryViews > 0 ? Math.round(((entryViews - page.views) / entryViews) * 100) : 0;
+        const conversionRate = page.views > 0 ? Math.round((page.conversions / page.views) * 100) : 0;
+        const isBuyPoint = page.pageType === "checkout" || page.pageType === "upsell" || page.pageType === "downsell";
+        return {
+          id: page.id,
+          title: page.title,
+          slug: page.slug,
+          pageType: page.pageType,
+          views: page.views,
+          conversions: page.conversions,
+          dropOffRate: idx === 0 ? 0 : dropOffRate,
+          conversionRate,
+          isBuyPoint,
+          hasProduct: !!page.productId || !!page.productType,
+          hasNextStep: !!page.nextPageId,
+          isHidden: page.isHidden,
+        };
+      });
+
+      // Detect critical sales workflow issues
+      const issues: Array<{ severity: "error" | "warning"; pageId: number; pageTitle: string; issue: string }> = [];
+
+      for (const page of pages) {
+        // Checkout/upsell pages without a product
+        if ((page.pageType === "checkout" || page.pageType === "upsell") && !page.productId && !page.productType) {
+          issues.push({ severity: "error", pageId: page.id, pageTitle: page.title, issue: "Checkout/upsell page has no product attached" });
+        }
+        // Pages without a next step (except last page and thank_you)
+        const isLast = pages[pages.length - 1].id === page.id;
+        if (!isLast && page.pageType !== "thank_you" && !page.nextPageId) {
+          issues.push({ severity: "warning", pageId: page.id, pageTitle: page.title, issue: "No next step configured — visitors will be stuck" });
+        }
+        // High drop-off on buy points
+        const stat = pageStats.find(s => s.id === page.id);
+        if (stat && stat.isBuyPoint && stat.dropOffRate > 70) {
+          issues.push({ severity: "warning", pageId: page.id, pageTitle: page.title, issue: `High drop-off rate (${stat.dropOffRate}%) on buy point` });
+        }
+        // Landing pages with 0 views
+        if (page.pageType === "landing" && page.views === 0) {
+          issues.push({ severity: "warning", pageId: page.id, pageTitle: page.title, issue: "Landing page has no views yet — check your traffic source" });
+        }
+      }
+
+      // Overall funnel stats
+      const entryViews = pages[0]?.views ?? 0;
+      const exitConversions = pages[pages.length - 1]?.conversions ?? 0;
+      const overallConversionRate = entryViews > 0 ? Math.round((exitConversions / entryViews) * 100) : 0;
+
+      return {
+        funnelName: funnel.name,
+        totalViews: funnel.totalViews,
+        totalLeads,
+        overallConversionRate,
+        pageStats,
+        issues,
+      };
+    }),
+
+  /** Export funnel leads as CSV data */
+  exportFunnelLeadsCSV: protectedProcedure
+    .input(z.object({ funnelId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+
+      const leads = await db
+        .select()
+        .from(funnelLeads)
+        .where(eq(funnelLeads.funnelId, input.funnelId))
+        .orderBy(desc(funnelLeads.createdAt));
+
+      // Get page titles for reference
+      const pages = await db.select({ id: funnelPages.id, title: funnelPages.title }).from(funnelPages).where(eq(funnelPages.funnelId, input.funnelId));
+      const pageMap = new Map(pages.map(p => [p.id, p.title]));
+
+      // Build CSV rows
+      const headers = ["ID", "Email", "Name", "Phone", "Page", "Source", "Tags", "Referrer", "Timezone", "Created At"];
+      const rows = leads.map(l => [
+        l.id,
+        l.email,
+        l.name ?? "",
+        l.phone ?? "",
+        pageMap.get(l.funnelPageId) ?? l.funnelPageId,
+        l.source ?? "",
+        l.tags ?? "",
+        l.referrer ?? "",
+        l.timezone ?? "",
+        l.createdAt ? new Date(l.createdAt).toISOString() : "",
+      ]);
+
+      const csvContent = [headers, ...rows]
+        .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+        .join("\n");
+
+      return { csvContent, total: leads.length };
+    }),
 });

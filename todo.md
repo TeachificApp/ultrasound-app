@@ -2010,3 +2010,14 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Show conditional branching patterns on the main funnel settings/overview page
 - [x] Display which pages branch to which based on branch rules (conditions, targets)
 - [x] Integrate with existing FunnelFlowDiagram or add a branch summary panel
+
+## Funnel Overview Tabs (Pages / Settings / Contacts / Analytics)
+- [x] Restructure FunnelDetailView into four tabs: Pages, Settings, Contacts, Analytics
+- [x] Analytics tab: per-page views, drop-off rates, conversion rates, buy points, critical issues
+- [x] Contacts tab: leads/contacts from lead forms, exportable CSV
+- [x] Backend: getFunnelAnalytics procedure (per-page stats, drop-off, conversions)
+- [x] Backend: getFunnelLeads procedure with pagination
+- [x] Backend: exportFunnelLeadsCSV procedure
+- [x] Backend: detectSalesIssues procedure (missing product, no next step, broken branch targets)
+- [x] Add Page dialog: import existing product/course/download page into funnel
+- [x] Backend: listImportablePages procedure (standalone landing pages + product pages)
