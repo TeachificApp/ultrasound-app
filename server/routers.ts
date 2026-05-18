@@ -37,6 +37,7 @@ import { engagementRouter } from "./routers/engagementRouter";
 import { brandMembershipRouter } from "./routers/brandMembershipRouter";
 import { productsPublicRouter, productsLearnerRouter, productsAdminRouter } from "./routers/productsRouter";
 import { dashboardRouter } from "./routers/dashboardRouter";
+import { embeddedCheckoutRouter } from "./routers/embeddedCheckoutRouter";
 import {
   getUserById,
   getUsersByIds,
@@ -1878,6 +1879,7 @@ export const appRouter = router({
 
   // ─── Student Dashboard ───────────────────────────────────────────────────────
   dashboard: dashboardRouter,
+  embeddedCheckout: embeddedCheckoutRouter,
 
   // ─── Physician Over-Read Workflow (Step 1 & Step 2) ──────────────────────────
   physicianOverRead: router({

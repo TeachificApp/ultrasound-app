@@ -16,7 +16,7 @@
  */
 import type { Express, Request, Response } from "express";
 import { getDb, getUserByEmail } from "../db";
-import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders } from "../../drizzle/schema";
+import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases } from "../../drizzle/schema";
 import { and, eq } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
@@ -532,19 +532,85 @@ async function handleBrandSubscriptionLifecycle(subscription: Record<string, unk
  */
 async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, unknown>) {
   const meta = (paymentIntent.metadata ?? {}) as Record<string, string>;
-  if (meta.type !== "funnel_form_purchase") return; // Not a funnel form purchase
+  // Handle both funnel_form_purchase and embedded_checkout_purchase
+  const validTypes = ["funnel_form_purchase", "embedded_checkout_purchase"];
+  if (!validTypes.includes(meta.type)) return;
 
   const funnelId = meta.funnel_id ? parseInt(meta.funnel_id) : null;
   const funnelPageId = meta.funnel_page_id ? parseInt(meta.funnel_page_id) : null;
+  const landingPageId = meta.landing_page_id ? parseInt(meta.landing_page_id) : null;
+  const lmsLessonId = meta.lms_lesson_id ? parseInt(meta.lms_lesson_id) : null;
   const customerEmail = meta.customer_email;
   const customerName = meta.customer_name;
+  const customerPhone = meta.customer_phone ?? null;
+  const userId = meta.user_id ? parseInt(meta.user_id) : null;
+  const productName = meta.product_name ?? "Unknown Product";
+  const productType = (meta.product_type ?? "other") as "course" | "download" | "physical" | "membership" | "bundle" | "other";
+  const bumpsAdded = meta.bumps_added ?? "";
+  const bumpTitles = meta.bump_titles ?? "";
+  const bumpPrices = meta.bump_prices ?? "";
   const amount = paymentIntent.amount as number;
   const piId = paymentIntent.id as string;
+  // Shipping address (only for physical products)
+  const shippingName = meta.shipping_name ?? null;
+  const shippingLine1 = meta.shipping_line1 ?? null;
+  const shippingLine2 = meta.shipping_line2 ?? null;
+  const shippingCity = meta.shipping_city ?? null;
+  const shippingState = meta.shipping_state ?? null;
+  const shippingPostalCode = meta.shipping_postal_code ?? null;
+  const shippingCountry = meta.shipping_country ?? null;
 
-  console.log(`[Stripe] payment_intent.succeeded — funnel form purchase — email: ${customerEmail}, amount: ${amount}, PI: ${piId}`);
+  console.log(`[Stripe] payment_intent.succeeded — ${meta.type} — email: ${customerEmail}, amount: ${amount}, PI: ${piId}`);
 
   const db = await getDb();
   if (!db) return;
+
+  // Idempotency check
+  const [existingPurchase] = await db.select({ id: funnelPurchases.id })
+    .from(funnelPurchases)
+    .where(eq(funnelPurchases.stripePaymentIntentId, piId))
+    .limit(1);
+
+  if (!existingPurchase) {
+    // Build order bumps JSON
+    let orderBumpsJson: string | null = null;
+    if (bumpsAdded) {
+      const bumpTitleArr = bumpTitles ? bumpTitles.split("|") : [];
+      const bumpPriceArr = bumpPrices ? bumpPrices.split("|").map(Number) : [];
+      const bumps = bumpTitleArr.map((t, i) => ({ title: t, price: bumpPriceArr[i] ?? 0 }));
+      orderBumpsJson = JSON.stringify(bumps);
+    }
+
+    // Determine source type
+    const sourceType = funnelId ? "funnel" : landingPageId ? "landing_page" : lmsLessonId ? "lms_lesson" : "other";
+
+    await db.insert(funnelPurchases).values({
+      userId: userId || null,
+      email: customerEmail || "",
+      name: customerName || null,
+      phone: customerPhone || null,
+      productName,
+      productType,
+      orderBumps: orderBumpsJson,
+      amountPaid: amount,
+      currency: "usd",
+      stripePaymentIntentId: piId,
+      sourceType: sourceType as any,
+      sourceFunnelId: funnelId,
+      sourceFunnelPageId: funnelPageId,
+      sourceLandingPageId: landingPageId,
+      sourceLmsLessonId: lmsLessonId,
+      shippingName,
+      shippingLine1,
+      shippingLine2,
+      shippingCity,
+      shippingState,
+      shippingPostalCode,
+      shippingCountry,
+      status: "paid",
+    });
+    console.log(`[Stripe] Funnel purchase recorded: user ${userId}, product "${productName}", PI: ${piId}`);
+  }
 
   // Track conversion on the funnel page
   if (funnelPageId) {
@@ -554,8 +620,8 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
 
   // Notify owner
   await notifyOwner({
-    title: "💰 New Funnel Payment (Inline Checkout)",
-    content: `Funnel form payment succeeded.\nEmail: ${customerEmail}\nName: ${customerName}\nAmount: $${((amount ?? 0) / 100).toFixed(2)}\nFunnel ID: ${funnelId}\nPage ID: ${funnelPageId}\nPaymentIntent: ${piId}`,
+    title: "💰 New Embedded Checkout Purchase",
+    content: `Payment succeeded.\nProduct: ${productName}\nEmail: ${customerEmail}\nName: ${customerName}\nAmount: $${((amount ?? 0) / 100).toFixed(2)}\nType: ${meta.type}\nPaymentIntent: ${piId}`,
   });
 }
 

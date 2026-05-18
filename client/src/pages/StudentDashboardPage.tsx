@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import {
   User, BookOpen, CreditCard, Award, Camera, Save, Lock, Eye, EyeOff,
   ExternalLink, Download, Play, FileText, Package, AlertCircle, CheckCircle2,
-  Clock, XCircle, RefreshCw, Loader2, ChevronRight, ClipboardCheck,
+  Clock, XCircle, RefreshCw, Loader2, ChevronRight, ClipboardCheck, ShoppingCart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -365,7 +365,7 @@ function ProfileTab() {
 
 // ─── My Content Tab ───────────────────────────────────────────────────────────
 
-type ContentSubTab = "courses" | "quizzes" | "downloads" | "products";
+type ContentSubTab = "courses" | "quizzes" | "downloads" | "products" | "purchases";
 
 function MyContentTab() {
   const { data, isLoading } = trpc.dashboard.getMyContent.useQuery();
@@ -378,6 +378,7 @@ function MyContentTab() {
     { key: "quizzes",   label: "Quizzes",   icon: ClipboardCheck, count: data?.quizzes.length ?? 0 },
     { key: "downloads", label: "Downloads", icon: Download,       count: data?.downloads.length ?? 0 },
     { key: "products",  label: "Products",  icon: Package,        count: data?.physicalProducts.length ?? 0 },
+    { key: "purchases", label: "Purchases",  icon: ShoppingCart,   count: data?.funnelPurchases?.length ?? 0 },
   ];
 
   return (
@@ -497,6 +498,28 @@ function MyContentTab() {
                 trackingInfo={p.trackingNumber ? `${p.trackingCarrier ?? ""} ${p.trackingNumber}`.trim() : undefined}
                 actions={[
                   { label: "View Product", icon: ExternalLink, href: `/products/${p.productSlug}` },
+                ]}
+              />
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Funnel / Embedded Checkout Purchases */}
+      {contentTab === "purchases" && (
+        <div className="space-y-3">
+          {(data?.funnelPurchases?.length ?? 0) === 0 ? (
+            <EmptyState icon={ShoppingCart} title="No purchases yet" description="Complete a checkout to see your purchases here." />
+          ) : (
+            (data?.funnelPurchases ?? []).map((p: any) => (
+              <ContentCard
+                key={p.id}
+                title={p.productName}
+                subtitle={`Purchased ${formatDate(p.purchasedAt)} · ${formatCurrency(p.amountPaid, p.currency)}`}
+                badge={p.productType ?? "Purchase"}
+                badgeColor="teal"
+                actions={[
+                  { label: "View Receipt", icon: FileText, href: `/my-dashboard?tab=content` },
                 ]}
               />
             ))

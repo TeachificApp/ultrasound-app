@@ -3836,3 +3836,46 @@ export const physicalProductOrders = mysqlTable("physical_product_orders", {
 });
 export type PhysicalProductOrder = typeof physicalProductOrders.$inferSelect;
 export type InsertPhysicalProductOrder = typeof physicalProductOrders.$inferInsert;
+
+// ─── Funnel / Embedded Checkout Block Purchases ───────────────────────────────
+// Records every completed payment from any embedded_checkout or checkout_form block
+// across all page builders (funnels, landing pages, product pages, LMS lessons).
+export const funnelPurchases = mysqlTable("funnel_purchases", {
+  id: int("id").autoincrement().primaryKey(),
+  // Who paid
+  userId: int("user_id"), // null if guest checkout
+  email: varchar("email", { length: 320 }).notNull(),
+  name: varchar("name", { length: 255 }),
+  phone: varchar("phone", { length: 50 }),
+  // What was purchased
+  productName: varchar("product_name", { length: 500 }).notNull(),
+  productType: mysqlEnum("product_type", ["course", "download", "physical", "membership", "bundle", "other"]).default("other").notNull(),
+  // Order bumps (JSON array of {title, price})
+  orderBumps: longtext("order_bumps"),
+  // Amounts
+  amountPaid: int("amount_paid").notNull(), // cents
+  currency: varchar("currency", { length: 8 }).default("usd").notNull(),
+  // Stripe refs
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
+  stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 255 }),
+  // Source context
+  sourceType: mysqlEnum("source_type", ["funnel", "landing_page", "product_page", "lms_lesson", "other"]).default("other").notNull(),
+  sourceFunnelId: int("source_funnel_id"),
+  sourceFunnelPageId: int("source_funnel_page_id"),
+  sourceLandingPageId: int("source_landing_page_id"),
+  sourceLmsLessonId: int("source_lms_lesson_id"),
+  // Shipping address (only for physical products)
+  shippingName: varchar("shipping_name", { length: 255 }),
+  shippingLine1: varchar("shipping_line1", { length: 255 }),
+  shippingLine2: varchar("shipping_line2", { length: 255 }),
+  shippingCity: varchar("shipping_city", { length: 100 }),
+  shippingState: varchar("shipping_state", { length: 100 }),
+  shippingPostalCode: varchar("shipping_postal_code", { length: 20 }),
+  shippingCountry: varchar("shipping_country", { length: 10 }),
+  // Status
+  status: mysqlEnum("status", ["pending", "paid", "failed", "refunded"]).default("pending").notNull(),
+  purchasedAt: timestamp("purchased_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type FunnelPurchase = typeof funnelPurchases.$inferSelect;
+export type InsertFunnelPurchase = typeof funnelPurchases.$inferInsert;

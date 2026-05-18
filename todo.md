@@ -2064,3 +2064,21 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] StudentDashboardPage: support ?tab= URL param to deep-link to a specific tab
 - [x] /my-dashboard route accessible from all layouts (Layout.tsx, LMSLayout.tsx)
 - [x] Vitest: dashboardRouter procedures covered
+
+## Embedded Checkout Block (Stripe)
+
+- [x] funnelPurchases DB table created (tracks all embedded-checkout purchases)
+- [x] embeddedCheckoutRouter: createPaymentIntent procedure (with order bumps, address, source context)
+- [x] embeddedCheckoutRouter: confirmPayment procedure
+- [x] EmbeddedCheckoutBlock component: two-step flow (details → payment → success)
+- [x] EmbeddedCheckoutBlock: animated order bumps (pulse/glow/shake/bounce via IntersectionObserver)
+- [x] EmbeddedCheckoutBlock: address collection toggle (auto-enabled for physical products)
+- [x] EmbeddedCheckoutBlock: contact info collection (name, email, phone)
+- [x] EmbeddedCheckoutBlock: Stripe PaymentElement (inline, no redirect)
+- [x] embedded_checkout block type added to BLOCK_CATALOG in LandingPageBuilder (auto-available in FunnelBuilder + ProductLandingPageBuilder)
+- [x] embedded_checkout case added to BlockPreview
+- [x] embedded_checkout case added to PublicFunnelPage renderer
+- [x] embedded_checkout case added to StandaloneLandingPage renderer
+- [x] Order bump CSS animations added to index.css
+- [x] dashboardRouter: getMyContent now includes funnelPurchases
+- [x] StudentDashboardPage: My Content → Purchases tab shows funnel/checkout purchases

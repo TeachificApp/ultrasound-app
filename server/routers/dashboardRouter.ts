@@ -25,11 +25,12 @@ import {
   physicalProductOrders,
   physicalProducts,
   brandMemberships,
+  funnelPurchases,
 } from "../../drizzle/schema";
 import { eq, and, desc } from "drizzle-orm";
 import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "", { apiVersion: "2025-01-27.acacia" });
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "", { apiVersion: "2024-06-20" as any });
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -148,6 +149,23 @@ export const dashboardRouter = router({
       .where(eq(physicalProductOrders.userId, ctx.user.id))
       .orderBy(desc(physicalProductOrders.orderedAt));
 
+    // 4. Funnel / embedded-checkout purchases
+    const funnelPurchaseRows = await db
+      .select({
+        id: funnelPurchases.id,
+        productName: funnelPurchases.productName,
+        productType: funnelPurchases.productType,
+        amountPaid: funnelPurchases.amountPaid,
+        currency: funnelPurchases.currency,
+        purchasedAt: funnelPurchases.purchasedAt,
+        orderBumps: funnelPurchases.orderBumps,
+        status: funnelPurchases.status,
+        sourceType: funnelPurchases.sourceType,
+      })
+      .from(funnelPurchases)
+      .where(eq(funnelPurchases.userId, ctx.user.id))
+      .orderBy(desc(funnelPurchases.purchasedAt));
+
     // Separate courses from quiz-type LMS items
     const courses = enrollments.filter(e => e.courseType === "course");
     const quizzes = enrollments.filter(e => e.courseType === "quiz");
@@ -161,6 +179,7 @@ export const dashboardRouter = router({
         ...digitalPurchaseRows,
       ],
       physicalProducts: physicalOrders,
+      funnelPurchases: funnelPurchaseRows,
     };
   }),
 
@@ -191,8 +210,8 @@ export const dashboardRouter = router({
 
         if (m.stripeSubscriptionId && m.source && ["stripe", "stripe_dual"].includes(m.source)) {
           try {
-            const sub = await stripe.subscriptions.retrieve(m.stripeSubscriptionId);
-            const item = sub.items.data[0];
+            const sub = await stripe.subscriptions.retrieve(m.stripeSubscriptionId) as any;
+            const item = sub.items?.data?.[0];
             stripeData = {
               status: sub.status,
               currentPeriodEnd: sub.current_period_end ? new Date(sub.current_period_end * 1000) : null,

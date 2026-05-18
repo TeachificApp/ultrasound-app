@@ -14,6 +14,7 @@ import { Loader2, ArrowRight, CheckCircle, Globe, Users } from "lucide-react";
 import type { Block } from "@/components/BlockPreview";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import CheckoutFormBlock from "@/components/CheckoutFormBlock";
+import EmbeddedCheckoutBlock from "@/components/EmbeddedCheckoutBlock";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 
 // ─── Opt-Out Link Component ─────────────────────────────────────────────────
@@ -492,6 +493,8 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
       );
     case "checkout_form":
       return <CheckoutFormBlock data={d} funnelId={funnelId} pageId={pageId} funnelSlug={funnelSlug} />;
+    case "embedded_checkout":
+      return <EmbeddedCheckoutBlock data={d} pageSlug={funnelSlug} />;
     case "logo_strip": {
       const logoAlign = d.align ?? "center";
       return (

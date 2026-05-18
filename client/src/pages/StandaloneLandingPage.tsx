@@ -89,6 +89,7 @@ import { Input } from "@/components/ui/input";
 import type { Block } from "@/components/BlockPreview";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import CheckoutFormBlock from "@/components/CheckoutFormBlock";
+import EmbeddedCheckoutBlock from "@/components/EmbeddedCheckoutBlock";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 
 function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block: Block; funnelId: number; pageId: number; funnelSlug: string }) {
@@ -105,6 +106,8 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
           funnelSlug={funnelSlug}
         />
       );
+    case "embedded_checkout":
+      return <EmbeddedCheckoutBlock data={d} pageSlug={funnelSlug} />;
     case "hero": {
       const bgStyle: React.CSSProperties = {};
       if (d.bgType === "gradient") {
