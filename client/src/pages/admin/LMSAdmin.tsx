@@ -34,7 +34,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import RichTextEditor from "@/components/RichTextEditor";
 import {
   BookOpen, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Clock, Copy, Download, Edit2, HelpCircle, Pencil, Plus, Trash2,
-  Users, DollarSign, BarChart2, GripVertical, CheckCircle, AlertCircle,
+  Users, DollarSign, BarChart2, GripVertical, CheckCircle, AlertCircle, AlertTriangle,
   Link as LinkIcon, UserCheck, ArrowLeft, Upload, ImageIcon,
   Sparkles, Loader2, Eye, EyeOff, Save, X, FolderOpen, Monitor, Video, FileText, CheckSquare, Settings2,
   User, Lock, ListChecks, Award, PlayCircle, ArrowRight, UserPlus,
@@ -4466,6 +4466,7 @@ function CourseUsersTab({ courseId }: { courseId: number }) {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [enrollDialogOpen, setEnrollDialogOpen] = useState(false);
+  const [unenrollTarget, setUnenrollTarget] = useState<{ id: number; name: string } | null>(null);
 
   // Debounce search
   useEffect(() => {
@@ -4478,7 +4479,7 @@ function CourseUsersTab({ courseId }: { courseId: number }) {
   });
 
   const removeEnrollment = trpc.lmsAdmin.removeEnrollment.useMutation({
-    onSuccess: () => { toast.success("Enrollment removed"); refetch(); },
+    onSuccess: () => { toast.success("Student unenrolled successfully"); setUnenrollTarget(null); refetch(); },
     onError: e => toast.error(e.message),
   });
 
@@ -4545,10 +4546,11 @@ function CourseUsersTab({ courseId }: { courseId: number }) {
                   <td className="px-4 py-3">
                     <Button
                       size="sm" variant="ghost"
-                      className="h-7 text-red-400 hover:bg-red-50 text-xs"
-                      onClick={() => { if (confirm(`Remove enrollment for ${e.user?.displayName || e.user?.name || "this student"}?`)) removeEnrollment.mutate({ id: e.id }); }}
+                      className="h-7 w-7 p-0 text-red-400 hover:bg-red-50 hover:text-red-600"
+                      title="Unenroll student"
+                      onClick={() => setUnenrollTarget({ id: e.id, name: e.user?.displayName || e.user?.name || e.user?.email || "this student" })}
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   </td>
                 </tr>
@@ -4579,6 +4581,35 @@ function CourseUsersTab({ courseId }: { courseId: number }) {
         onClose={() => setEnrollDialogOpen(false)}
         onEnrolled={() => { setEnrollDialogOpen(false); refetch(); }}
       />
+
+      {/* Unenroll Confirmation Dialog */}
+      <Dialog open={!!unenrollTarget} onOpenChange={(v) => { if (!v) setUnenrollTarget(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="w-5 h-5" /> Unenroll Student?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
+            <p className="text-sm text-gray-600">
+              Remove <strong>{unenrollTarget?.name}</strong> from this course?
+            </p>
+            <p className="text-xs text-gray-400 mt-2">
+              Their progress data will be preserved but they will lose access to the course.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUnenrollTarget(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => unenrollTarget && removeEnrollment.mutate({ id: unenrollTarget.id })}
+              disabled={removeEnrollment.isPending}
+            >
+              {removeEnrollment.isPending ? "Removing..." : "Yes, Unenroll"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

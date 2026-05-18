@@ -18,8 +18,10 @@ import {
 import {
   Users, LogIn, Eye, PlayCircle, HelpCircle, Download, ArrowLeft,
   ChevronLeft, ChevronRight, TrendingUp, BookOpen, CheckCircle, Clock,
-  Search, SortAsc, SortDesc,
+  Search, SortAsc, SortDesc, Trash2, AlertTriangle,
 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 // ─── Date helpers ────────────────────────────────────────────────────────────
 function fmtDate(d: Date | null | undefined) {
@@ -325,8 +327,13 @@ function UserListTab({ onSelectUser }: { onSelectUser: (id: number) => void }) {
 
 // ─── User Detail Drill-Down ──────────────────────────────────────────────────
 function UserDetailView({ userId, onBack }: { userId: number; onBack: () => void }) {
-  const { data, isLoading } = trpc.analyticsAdmin.userDetail.useQuery({ userId });
+  const { data, isLoading, refetch } = trpc.analyticsAdmin.userDetail.useQuery({ userId });
   const [tab, setTab] = useState("overview");
+  const [unenrollTarget, setUnenrollTarget] = useState<{ enrollmentId: number; courseTitle: string } | null>(null);
+  const removeEnrollment = trpc.lmsAdmin.removeEnrollment.useMutation({
+    onSuccess: () => { toast.success("Student unenrolled successfully"); setUnenrollTarget(null); refetch(); },
+    onError: e => toast.error(e.message),
+  });
 
   if (isLoading) return (
     <div className="space-y-4">
@@ -413,6 +420,7 @@ function UserDetailView({ userId, onBack }: { userId: number; onBack: () => void
                       <th className="text-right px-3 py-2.5 text-xs font-semibold text-gray-600">Quizzes</th>
                       <th className="text-right px-3 py-2.5 text-xs font-semibold text-gray-600">Avg Score</th>
                       <th className="text-right px-3 py-2.5 text-xs font-semibold text-gray-600">Completed</th>
+                      <th className="px-3 py-2.5"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -441,6 +449,16 @@ function UserDetailView({ userId, onBack }: { userId: number; onBack: () => void
                           ) : (
                             <Clock className="w-4 h-4 text-gray-300 ml-auto" />
                           )}
+                        </td>
+                        <td className="px-3 py-2.5 text-right">
+                          <Button
+                            size="sm" variant="ghost"
+                            className="h-7 w-7 p-0 text-red-400 hover:bg-red-50 hover:text-red-600"
+                            title="Unenroll from this course"
+                            onClick={() => setUnenrollTarget({ enrollmentId: e.enrollmentId, courseTitle: e.courseTitle })}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
                         </td>
                       </tr>
                     ))}
@@ -630,6 +648,36 @@ function UserDetailView({ userId, onBack }: { userId: number; onBack: () => void
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Unenroll Confirmation Dialog */}
+      <Dialog open={!!unenrollTarget} onOpenChange={(v) => { if (!v) setUnenrollTarget(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="w-5 h-5" /> Unenroll Student?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
+            <p className="text-sm text-gray-600">
+              This will remove <strong>{data?.user?.name || data?.user?.email}</strong> from
+              <strong> {unenrollTarget?.courseTitle}</strong>.
+            </p>
+            <p className="text-xs text-gray-400 mt-2">
+              Their progress data will be preserved but they will lose access to the course.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUnenrollTarget(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => unenrollTarget && removeEnrollment.mutate({ id: unenrollTarget.enrollmentId })}
+              disabled={removeEnrollment.isPending}
+            >
+              {removeEnrollment.isPending ? "Removing..." : "Yes, Unenroll"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

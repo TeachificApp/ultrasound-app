@@ -1983,3 +1983,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add GrantDownloadAccessDialog to DigitalDownloadsAdmin (search user, create if not found, grant access + email)
 - [x] Add GrantBundleAccessDialog to BundlesAdmin (search user, create if not found, grant access + email)
 - [x] Quizzes: already covered via CourseUsersTab EnrollStudentDialog (same course editor flow)
+
+## Unenroll Student Feature (May 18)
+- [x] CourseUsersTab: Replace confirm() with proper AlertTriangle confirmation dialog for unenroll
+- [x] CourseUsersTab: Add AlertTriangle to lucide-react imports in LMSAdmin.tsx
+- [x] UserDetailView (student profile): Add Trash2 unenroll button to each course row in Courses tab
+- [x] UserDetailView: Add unenroll confirmation dialog with student name and course title
+- [x] UserDetailView: Wire removeEnrollment mutation with refetch on success
