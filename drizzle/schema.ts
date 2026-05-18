@@ -2807,6 +2807,8 @@ export const lmsLessons = mysqlTable("lms_lessons", {
   effectSoundUrl: varchar("effect_sound_url", { length: 500 }),
   effectConfetti: boolean("effect_confetti").default(false),
   effectConfettiColors: varchar("effect_confetti_colors", { length: 500 }),
+  // Banner display duration in seconds (default 5)
+  effectBannerDuration: int("effect_banner_duration").default(5),
   // Page builder blocks for rich lesson content (JSON array of Block objects)
   contentBlocks: longtext("content_blocks"),
   // Lesson learning objectives shown in "In This Lesson" panel (JSON array of strings)
@@ -3881,3 +3883,114 @@ export const funnelPurchases = mysqlTable("funnel_purchases", {
 });
 export type FunnelPurchase = typeof funnelPurchases.$inferSelect;
 export type InsertFunnelPurchase = typeof funnelPurchases.$inferInsert;
+
+// ─── General Form Builder ─────────────────────────────────────────────────────
+// A general-purpose form builder (separate from the DIY Accreditation form builder).
+// Supports: public URL with editable slug, embed code, branding/theme, optional score,
+// import by URL, analytics, conditional branching, and Stripe payments.
+
+export const generalFormTemplates = mysqlTable("generalFormTemplates", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 200 }).notNull(),
+  description: text("description"),
+  formType: varchar("formType", { length: 100 }).notNull().default("general"),
+  status: mysqlEnum("status", ["open", "closed", "draft"]).default("draft").notNull(),
+  publicSlug: varchar("publicSlug", { length: 200 }).unique(),
+  isPublic: boolean("isPublic").default(false).notNull(),
+  scoreEnabled: boolean("scoreEnabled").default(false).notNull(),
+  scoreLabel: varchar("scoreLabel", { length: 100 }).default("Score"),
+  themeSettings: longtext("themeSettings"),
+  successMessage: text("successMessage"),
+  successRedirectUrl: varchar("successRedirectUrl", { length: 500 }),
+  notifyEmail: varchar("notifyEmail", { length: 255 }),
+  openAt: timestamp("openAt"),
+  closeAt: timestamp("closeAt"),
+  maxSubmissions: int("maxSubmissions"),
+  importedFromUrl: varchar("importedFromUrl", { length: 1000 }),
+  stripeEnabled: boolean("stripeEnabled").default(false).notNull(),
+  stripeProductId: varchar("stripeProductId", { length: 255 }),
+  stripePriceId: varchar("stripePriceId", { length: 255 }),
+  stripeAmount: int("stripeAmount"),
+  createdByUserId: int("createdByUserId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+export type GeneralFormTemplate = typeof generalFormTemplates.$inferSelect;
+export type InsertGeneralFormTemplate = typeof generalFormTemplates.$inferInsert;
+
+export const generalFormSections = mysqlTable("generalFormSections", {
+  id: int("id").autoincrement().primaryKey(),
+  templateId: int("templateId").notNull(),
+  title: varchar("title", { length: 200 }).notNull(),
+  description: text("description"),
+  sortOrder: int("sortOrder").default(0).notNull(),
+  isCollapsible: boolean("isCollapsible").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type GeneralFormSection = typeof generalFormSections.$inferSelect;
+export type InsertGeneralFormSection = typeof generalFormSections.$inferInsert;
+
+export const generalFormItems = mysqlTable("generalFormItems", {
+  id: int("id").autoincrement().primaryKey(),
+  sectionId: int("sectionId").notNull(),
+  templateId: int("templateId").notNull(),
+  itemType: varchar("itemType", { length: 50 }).notNull(),
+  label: varchar("label", { length: 500 }).notNull(),
+  helpText: text("helpText"),
+  placeholder: varchar("placeholder", { length: 300 }),
+  isRequired: boolean("isRequired").default(false).notNull(),
+  sortOrder: int("sortOrder").default(0).notNull(),
+  scoreWeight: int("scoreWeight").default(0).notNull(),
+  richTextContent: longtext("richTextContent"),
+  validationRegex: varchar("validationRegex", { length: 500 }),
+  minValue: int("minValue"),
+  maxValue: int("maxValue"),
+  extraConfig: longtext("extraConfig"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type GeneralFormItem = typeof generalFormItems.$inferSelect;
+export type InsertGeneralFormItem = typeof generalFormItems.$inferInsert;
+
+export const generalFormOptions = mysqlTable("generalFormOptions", {
+  id: int("id").autoincrement().primaryKey(),
+  itemId: int("itemId").notNull(),
+  label: varchar("label", { length: 300 }).notNull(),
+  value: varchar("value", { length: 300 }).notNull(),
+  sortOrder: int("sortOrder").default(0).notNull(),
+  scoreValue: int("scoreValue").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type GeneralFormOption = typeof generalFormOptions.$inferSelect;
+export type InsertGeneralFormOption = typeof generalFormOptions.$inferInsert;
+
+export const generalFormBranchRules = mysqlTable("generalFormBranchRules", {
+  id: int("id").autoincrement().primaryKey(),
+  templateId: int("templateId").notNull(),
+  targetType: varchar("targetType", { length: 20 }).notNull().default("item"),
+  targetId: int("targetId").notNull(),
+  action: varchar("action", { length: 10 }).notNull().default("show"),
+  logicOperator: varchar("logicOperator", { length: 10 }).notNull().default("any"),
+  conditions: longtext("conditions").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type GeneralFormBranchRule = typeof generalFormBranchRules.$inferSelect;
+export type InsertGeneralFormBranchRule = typeof generalFormBranchRules.$inferInsert;
+
+export const generalFormSubmissions = mysqlTable("generalFormSubmissions", {
+  id: int("id").autoincrement().primaryKey(),
+  templateId: int("templateId").notNull(),
+  submittedByUserId: int("submittedByUserId"),
+  responses: longtext("responses").notNull(),
+  score: int("score").default(0).notNull(),
+  maxScore: int("maxScore").default(0).notNull(),
+  status: mysqlEnum("status", ["draft", "submitted", "reviewed"]).default("submitted").notNull(),
+  stripePaymentIntentId: varchar("stripePaymentIntentId", { length: 255 }),
+  stripePaymentStatus: varchar("stripePaymentStatus", { length: 50 }),
+  ipAddress: varchar("ipAddress", { length: 64 }),
+  userAgent: varchar("userAgent", { length: 500 }),
+  referrer: varchar("referrer", { length: 500 }),
+  submittedAt: timestamp("submittedAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+export type GeneralFormSubmission = typeof generalFormSubmissions.$inferSelect;
+export type InsertGeneralFormSubmission = typeof generalFormSubmissions.$inferInsert;

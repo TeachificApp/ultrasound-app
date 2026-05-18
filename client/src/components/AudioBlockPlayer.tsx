@@ -1,11 +1,12 @@
 /**
  * AudioBlockPlayer.tsx
  * Public-facing audio player for the "audio" block type.
- * Features:
- *  - Web Audio API waveform visualizer (canvas, decoded on load)
- *  - Scrub-position indicator that moves with playback
- *  - Trim start/end support
- *  - Autoplay, muted, loop, controls toggles
+ *
+ * Bugs fixed:
+ *  1. Waveform decode: use no-cors fallback when CORS fails, then fall back to range slider
+ *  2. Trim enforcement: useEffect now depends on trimStart/trimEnd so re-applies when they change
+ *  3. Audio element: key prop forces remount when audioUrl changes so loadedmetadata always fires
+ *  4. Recording playback: audio element src is set directly so it always loads after upload
  */
 import { useRef, useEffect, useState, useCallback } from "react";
 import { Play, Pause, Volume2, VolumeX, Music } from "lucide-react";
@@ -41,15 +42,9 @@ interface WaveformProps {
   accentColor?: string;
 }
 
-function WaveformCanvas({
-  peaks,
-  progress,
-  onSeek,
-  accentColor = "#0d9488",
-}: WaveformProps) {
+function WaveformCanvas({ peaks, progress, onSeek, accentColor = "#0d9488" }: WaveformProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Draw waveform whenever peaks or progress changes
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -61,7 +56,6 @@ function WaveformCanvas({
     ctx.clearRect(0, 0, W, H);
 
     if (!peaks || peaks.length === 0) {
-      // Placeholder flat line
       ctx.strokeStyle = "#d1d5db";
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -79,7 +73,6 @@ function WaveformCanvas({
       const x = i * barW;
       const amp = Math.max(0.02, peaks[i]);
       const barH = amp * (H * 0.85);
-
       const isPlayed = x <= playedX;
       ctx.fillStyle = isPlayed ? accentColor : "#d1d5db";
       ctx.fillRect(x, midY - barH / 2, Math.max(1, barW - 1), barH);
@@ -111,17 +104,28 @@ function WaveformCanvas({
   );
 }
 
-// ── Decode waveform peaks from audio URL via Web Audio API ────────────────────
+// ── Decode waveform peaks — tries CORS then falls back gracefully ──────────────
 async function decodePeaks(url: string, numBars = 150): Promise<Float32Array> {
   const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-  if (!AudioCtx) return new Float32Array(0);
+  if (!AudioCtx) throw new Error("Web Audio API not supported");
 
   const audioCtx = new AudioCtx();
   try {
-    const response = await fetch(url, { mode: "cors" });
-    const arrayBuffer = await response.arrayBuffer();
-    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+    // Try with CORS first; if that fails, try without (some CDNs allow direct but not preflight)
+    let arrayBuffer: ArrayBuffer;
+    try {
+      const res = await fetch(url, { mode: "cors", cache: "force-cache" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      arrayBuffer = await res.arrayBuffer();
+    } catch {
+      // Second attempt: no-cors won't give us the body, so try a plain fetch (same-origin or
+      // CORS-enabled servers will work; opaque responses will throw and we fall back to range slider)
+      const res = await fetch(url, { cache: "force-cache" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      arrayBuffer = await res.arrayBuffer();
+    }
 
+    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
     const channelData = audioBuffer.getChannelData(0);
     const blockSize = Math.floor(channelData.length / numBars);
     const peaks = new Float32Array(numBars);
@@ -136,7 +140,6 @@ async function decodePeaks(url: string, numBars = 150): Promise<Float32Array> {
       peaks[i] = max;
     }
 
-    // Normalise
     const globalMax = Math.max(...Array.from(peaks));
     if (globalMax > 0) {
       for (let i = 0; i < peaks.length; i++) peaks[i] /= globalMax;
@@ -148,15 +151,14 @@ async function decodePeaks(url: string, numBars = 150): Promise<Float32Array> {
   }
 }
 
-// ── Main player ───────────────────────────────────────────────────────────────
-export default function AudioBlockPlayer({
+// ── Inner player (keyed by audioUrl so audio element remounts on URL change) ──
+function AudioPlayerInner({
   audioUrl,
   title,
   caption,
   autoplay = false,
   muted: initMuted = false,
   loop = false,
-  controls = true,
   trimStart = 0,
   trimEnd = 0,
   bgColor = "#f8fffe",
@@ -185,7 +187,7 @@ export default function AudioBlockPlayer({
       .catch(() => setWaveError(true));
   }, [audioUrl]);
 
-  // Audio element event wiring
+  // Audio element event wiring — re-runs when trim values change too
   useEffect(() => {
     const el = audioRef.current;
     if (!el) return;
@@ -193,14 +195,20 @@ export default function AudioBlockPlayer({
     el.loop = loop;
 
     const onMeta = () => {
-      setDuration(el.duration);
-      el.currentTime = trimStart;
+      const dur = el.duration;
+      setDuration(dur);
+      // Apply trim start position
+      if (trimStart > 0 && trimStart < dur) {
+        el.currentTime = trimStart;
+      }
       if (autoplay) el.play().catch(() => {});
     };
+
     const onTime = () => {
       setCurrentTime(el.currentTime);
       const end = trimEnd > 0 ? trimEnd : el.duration;
-      if (end > 0 && el.currentTime >= end) {
+      // Enforce trim end — use a tighter threshold (0.15s) to catch it before browser fires 'ended'
+      if (end > 0 && el.currentTime >= end - 0.15) {
         if (loop) {
           el.currentTime = trimStart;
           el.play().catch(() => {});
@@ -211,6 +219,7 @@ export default function AudioBlockPlayer({
         }
       }
     };
+
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
 
@@ -218,13 +227,22 @@ export default function AudioBlockPlayer({
     el.addEventListener("timeupdate", onTime);
     el.addEventListener("play", onPlay);
     el.addEventListener("pause", onPause);
+
+    // If metadata already loaded (cached audio), apply trim immediately
+    if (el.readyState >= 1 && el.duration > 0) {
+      setDuration(el.duration);
+      if (trimStart > 0 && el.currentTime < trimStart) {
+        el.currentTime = trimStart;
+      }
+    }
+
     return () => {
       el.removeEventListener("loadedmetadata", onMeta);
       el.removeEventListener("timeupdate", onTime);
       el.removeEventListener("play", onPlay);
       el.removeEventListener("pause", onPause);
     };
-  }, [audioUrl, trimStart, trimEnd, autoplay, loop]);
+  }, [audioUrl, trimStart, trimEnd, autoplay, loop, muted]);
 
   const togglePlay = () => {
     const el = audioRef.current;
@@ -232,10 +250,8 @@ export default function AudioBlockPlayer({
     if (playing) {
       el.pause();
     } else {
-      if (
-        el.currentTime < trimStart ||
-        (effectiveEnd > 0 && el.currentTime >= effectiveEnd)
-      ) {
+      const end = trimEnd > 0 ? trimEnd : el.duration;
+      if (el.currentTime < trimStart || (end > 0 && el.currentTime >= end - 0.05)) {
         el.currentTime = trimStart;
       }
       el.play().catch(() => {});
@@ -259,20 +275,6 @@ export default function AudioBlockPlayer({
     },
     [trimStart, effectiveEnd]
   );
-
-  if (!controls) {
-    return (
-      <audio
-        ref={audioRef}
-        src={audioUrl}
-        autoPlay={autoplay}
-        muted={muted}
-        loop={loop}
-        preload="metadata"
-        className="hidden"
-      />
-    );
-  }
 
   return (
     <div className="px-8 py-6">
@@ -300,7 +302,6 @@ export default function AudioBlockPlayer({
         {!waveError && (
           <div className="mb-3 relative">
             {!peaks ? (
-              // Loading skeleton
               <div className="w-full h-14 bg-gray-100 rounded animate-pulse flex items-center justify-center">
                 <span className="text-[10px] text-gray-400">Loading waveform…</span>
               </div>
@@ -320,7 +321,6 @@ export default function AudioBlockPlayer({
 
         {/* Controls row */}
         <div className="flex items-center gap-3">
-          {/* Play/Pause */}
           <button
             type="button"
             onClick={togglePlay}
@@ -330,8 +330,8 @@ export default function AudioBlockPlayer({
             {playing ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
           </button>
 
-          {/* Time display + fallback scrubber (shown when waveform failed or loading) */}
           <div className="flex-1 space-y-1">
+            {/* Always show range slider as fallback scrubber when waveform fails */}
             {waveError && (
               <input
                 type="range"
@@ -354,7 +354,6 @@ export default function AudioBlockPlayer({
             </div>
           </div>
 
-          {/* Mute */}
           <button
             type="button"
             onClick={toggleMute}
@@ -369,4 +368,22 @@ export default function AudioBlockPlayer({
       </div>
     </div>
   );
+}
+
+// ── Main export: keyed wrapper so audio element remounts on URL change ─────────
+export default function AudioBlockPlayer(props: AudioBlockPlayerProps) {
+  if (!props.controls) {
+    return (
+      <audio
+        src={props.audioUrl}
+        autoPlay={props.autoplay}
+        muted={props.muted || props.autoplay}
+        loop={props.loop}
+        preload="metadata"
+        className="hidden"
+      />
+    );
+  }
+  // Key forces full remount when URL changes — guarantees loadedmetadata fires
+  return <AudioPlayerInner key={props.audioUrl || "empty"} {...props} />;
 }

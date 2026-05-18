@@ -17,6 +17,7 @@ import { mediaRepoRouter } from "./routers/mediaRepoRouter";
 import { diyRouter } from "./routers/diyRouter";
 import { meetingRouter } from "./routers/meetingRouter";
 import { formBuilderRouter } from "./routers/formBuilderRouter";
+import { generalFormRouter } from "./routers/generalFormRouter";
 import { accreditationManagerRouter } from "./routers/accreditationManagerRouter";
 import { educatorRouter } from "./routers/educatorRouter";
 import { sonoQuizRouter } from "./routers/sonoQuizRouter";
@@ -1816,6 +1817,7 @@ export const appRouter = router({
   // ─── Platform Admin & Seat Management ────────────────────────────────────
   platformAdmin: platformAdminRouter,
   formBuilder: formBuilderRouter,
+  generalForm: generalFormRouter,
   labSeats: labSeatsRouter,
 
   // ─── CME Hub (Thinkific Catalog) ──────────────────────────────────────────────

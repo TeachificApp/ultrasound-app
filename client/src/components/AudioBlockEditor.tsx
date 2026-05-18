@@ -1,20 +1,19 @@
 /**
  * AudioBlockEditor.tsx
  * Block editor panel for the "audio" block type.
- * Features:
- *  - Upload mp3/wav/ogg/m4a/webm audio files (via existing handleFileUpload)
- *  - In-browser microphone recording (MediaRecorder API)
- *  - Autoplay toggle (muted by default for browser policy)
- *  - Loop toggle
- *  - Show/hide native controls
- *  - Trim: set start and end time with a dual-thumb range slider
- *  - Title / caption fields
- *  - Background colour
+ *
+ * Fixes applied:
+ *  1. Recording: create an object URL immediately after stop so the preview
+ *     works before the S3 upload completes.
+ *  2. Duration detection: use the previewRef audio element directly (avoids
+ *     creating a second Audio() that may be blocked by CORS). Falls back to
+ *     multiple events (loadedmetadata, canplay, durationchange).
+ *  3. Trim: trimEnd is initialised to full duration when a new file is loaded.
+ *  4. Upload: passes the blob file directly; the server handles any mime type.
  */
 import { useRef, useState, useEffect, useCallback } from "react";
 import { Mic, Square, Upload, Play, Pause, Scissors, X, RotateCcw } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 interface AudioBlockEditorProps {
@@ -24,8 +23,8 @@ interface AudioBlockEditorProps {
   uploading: string | null;
 }
 
-/** Format seconds → mm:ss */
 function fmt(s: number) {
+  if (!isFinite(s) || s < 0) return "0:00";
   const m = Math.floor(s / 60);
   const sec = Math.floor(s % 60);
   return `${m}:${sec.toString().padStart(2, "0")}`;
@@ -41,41 +40,107 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
   const [recSeconds, setRecSeconds] = useState(0);
   const recTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // blobPreviewUrl: temporary object URL created immediately after recording stops,
+  // so the user can preview/trim before the S3 upload finishes.
+  const [blobPreviewUrl, setBlobPreviewUrl] = useState<string | null>(null);
+  const blobUrlRef = useRef<string | null>(null);
+
   const [duration, setDuration] = useState<number>(0);
   const [previewPlaying, setPreviewPlaying] = useState(false);
 
   const audioUrl: string = d.audioUrl ?? "";
   const trimStart: number = d.trimStart ?? 0;
-  const trimEnd: number = d.trimEnd ?? 0; // 0 = use full duration
+  const trimEnd: number = d.trimEnd ?? 0;
 
-  // ── Load duration when URL changes ──────────────────────────────────────
+  // The URL to use for the preview audio element — prefer the uploaded S3 URL,
+  // fall back to the local blob URL while uploading.
+  const activePreviewUrl = audioUrl || blobPreviewUrl || "";
+
+  // ── Duration detection via the preview audio element ──────────────────────
   useEffect(() => {
-    if (!audioUrl) { setDuration(0); return; }
-    const a = new Audio(audioUrl);
-    a.addEventListener("loadedmetadata", () => {
-      setDuration(a.duration || 0);
-      if (!d.trimEnd || d.trimEnd === 0) set("trimEnd", a.duration);
-    });
-    a.load();
+    if (!activePreviewUrl) { setDuration(0); return; }
+
+    const el = previewRef.current;
+    if (!el) return;
+
+    const applyDuration = () => {
+      const dur = el.duration;
+      if (isFinite(dur) && dur > 0) {
+        setDuration(dur);
+        // Auto-set trimEnd to full duration when a new file is loaded
+        // (only if trimEnd is 0 or not yet set)
+        if (!d.trimEnd || d.trimEnd === 0) {
+          set("trimEnd", dur);
+        }
+      }
+    };
+
+    el.addEventListener("loadedmetadata", applyDuration);
+    el.addEventListener("durationchange", applyDuration);
+    el.addEventListener("canplay", applyDuration);
+
+    // If already loaded (e.g. cached)
+    if (el.readyState >= 1 && isFinite(el.duration) && el.duration > 0) {
+      applyDuration();
+    }
+
+    return () => {
+      el.removeEventListener("loadedmetadata", applyDuration);
+      el.removeEventListener("durationchange", applyDuration);
+      el.removeEventListener("canplay", applyDuration);
+    };
+  }, [activePreviewUrl]);
+
+  // Revoke blob URL when the real S3 URL arrives
+  useEffect(() => {
+    if (audioUrl && blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+      setBlobPreviewUrl(null);
+    }
   }, [audioUrl]);
 
-  // ── Recording ────────────────────────────────────────────────────────────
+  // Cleanup blob URL on unmount
+  useEffect(() => {
+    return () => {
+      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+    };
+  }, []);
+
+  // ── Recording ─────────────────────────────────────────────────────────────
   const startRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/ogg" });
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm")
+        ? "audio/webm"
+        : "audio/ogg";
+      const mr = new MediaRecorder(stream, { mimeType });
       chunksRef.current = [];
       mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       mr.onstop = () => {
         stream.getTracks().forEach(t => t.stop());
         const blob = new Blob(chunksRef.current, { type: mr.mimeType });
+
+        // Create a local blob URL immediately so the user can preview/trim
+        if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+        const blobUrl = URL.createObjectURL(blob);
+        blobUrlRef.current = blobUrl;
+        setBlobPreviewUrl(blobUrl);
+        // Reset trim so it re-detects duration from the new blob
+        set("trimStart", 0);
+        set("trimEnd", 0);
+
+        // Upload to S3 in the background
         const file = new File([blob], `recording-${Date.now()}.webm`, { type: mr.mimeType });
         handleFileUpload(file, "audioUrl", "audio-recording");
+
         setRecording(false);
         if (recTimerRef.current) clearInterval(recTimerRef.current);
         setRecSeconds(0);
       };
-      mr.start();
+      mr.start(250); // collect data every 250ms
       mediaRecorderRef.current = mr;
       setRecording(true);
       setRecSeconds(0);
@@ -83,18 +148,20 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
     } catch {
       toast.error("Microphone access denied. Please allow microphone permissions.");
     }
-  }, [handleFileUpload]);
+  }, [handleFileUpload, set]);
 
   const stopRecording = useCallback(() => {
     mediaRecorderRef.current?.stop();
   }, []);
 
-  // ── Preview playback ─────────────────────────────────────────────────────
+  // ── Preview playback ──────────────────────────────────────────────────────
   const togglePreview = () => {
     const el = previewRef.current;
     if (!el) return;
-    if (previewPlaying) { el.pause(); setPreviewPlaying(false); }
-    else {
+    if (previewPlaying) {
+      el.pause();
+      setPreviewPlaying(false);
+    } else {
       if (trimStart > 0) el.currentTime = trimStart;
       el.play().then(() => setPreviewPlaying(true)).catch(() => {});
     }
@@ -106,14 +173,24 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
     if (!el) return;
     const check = () => {
       const end = d.trimEnd && d.trimEnd > 0 ? d.trimEnd : duration;
-      if (end > 0 && el.currentTime >= end) { el.pause(); el.currentTime = d.trimStart ?? 0; setPreviewPlaying(false); }
+      if (end > 0 && el.currentTime >= end - 0.1) {
+        el.pause();
+        el.currentTime = d.trimStart ?? 0;
+        setPreviewPlaying(false);
+      }
     };
+    const onEnded = () => setPreviewPlaying(false);
     el.addEventListener("timeupdate", check);
-    el.addEventListener("ended", () => setPreviewPlaying(false));
-    return () => { el.removeEventListener("timeupdate", check); };
+    el.addEventListener("ended", onEnded);
+    return () => {
+      el.removeEventListener("timeupdate", check);
+      el.removeEventListener("ended", onEnded);
+    };
   }, [duration, d.trimStart, d.trimEnd]);
 
-  const effectiveTrimEnd = (d.trimEnd && d.trimEnd > 0 && duration > 0) ? d.trimEnd : duration;
+  const effectiveTrimEnd = (d.trimEnd && d.trimEnd > 0 && duration > 0)
+    ? Math.min(d.trimEnd, duration)
+    : duration;
 
   return (
     <div className="space-y-3">
@@ -128,10 +205,10 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
         />
       </div>
 
-      {/* ── Upload ── */}
+      {/* ── Upload / Record ── */}
       <div>
         <label className="text-xs text-gray-500 block mb-1">Audio File</label>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <input
             ref={fileRef}
             type="file"
@@ -141,6 +218,9 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
               const f = e.target.files?.[0];
               if (f) {
                 if (f.size > 100 * 1024 * 1024) { toast.error("Audio file must be under 100 MB"); return; }
+                // Reset trim so duration re-detects for the new file
+                set("trimStart", 0);
+                set("trimEnd", 0);
                 handleFileUpload(f, "audioUrl", "audio-block");
               }
               e.target.value = "";
@@ -155,7 +235,7 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
             <Upload size={12} />
             {uploading === "audioUrl" ? "Uploading…" : "Upload Audio"}
           </button>
-          {/* ── Record ── */}
+
           {!recording ? (
             <button
               type="button"
@@ -176,6 +256,11 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
           )}
         </div>
         <p className="text-[10px] text-gray-400 mt-1">Supported: mp3, wav, ogg, m4a, webm, aac, flac · Max 100 MB</p>
+
+        {/* Upload status indicator */}
+        {uploading === "audioUrl" && blobPreviewUrl && (
+          <p className="text-[10px] text-teal-600 mt-1 animate-pulse">⬆ Uploading to cloud… you can trim while waiting.</p>
+        )}
       </div>
 
       {/* ── URL override ── */}
@@ -184,26 +269,44 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
         <div className="flex gap-1">
           <Input
             value={audioUrl}
-            onChange={e => set("audioUrl", e.target.value)}
+            onChange={e => {
+              set("audioUrl", e.target.value);
+              set("trimStart", 0);
+              set("trimEnd", 0);
+            }}
             className="h-8 text-xs flex-1"
             placeholder="https://example.com/audio.mp3"
           />
           {audioUrl && (
-            <button type="button" onClick={() => { set("audioUrl", ""); set("trimStart", 0); set("trimEnd", 0); }} className="text-gray-400 hover:text-red-500">
+            <button
+              type="button"
+              onClick={() => { set("audioUrl", ""); set("trimStart", 0); set("trimEnd", 0); setBlobPreviewUrl(null); }}
+              className="text-gray-400 hover:text-red-500"
+            >
               <X size={14} />
             </button>
           )}
         </div>
       </div>
 
-      {/* ── Hidden audio for preview / duration detection ── */}
-      {audioUrl && <audio ref={previewRef} src={audioUrl} preload="metadata" className="hidden" />}
+      {/* ── Hidden audio element for preview / duration detection ── */}
+      {activePreviewUrl && (
+        <audio
+          ref={previewRef}
+          src={activePreviewUrl}
+          preload="metadata"
+          className="hidden"
+          crossOrigin="anonymous"
+        />
+      )}
 
       {/* ── Trim controls ── */}
-      {audioUrl && duration > 0 && (
+      {activePreviewUrl && duration > 0 && (
         <div className="border border-gray-100 rounded p-2 space-y-2">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-gray-600 flex items-center gap-1"><Scissors size={11} /> Trim Clip</p>
+            <p className="text-xs font-semibold text-gray-600 flex items-center gap-1">
+              <Scissors size={11} /> Trim Clip
+            </p>
             <div className="flex gap-1">
               <button
                 type="button"
@@ -216,22 +319,20 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
               <button
                 type="button"
                 onClick={() => { set("trimStart", 0); set("trimEnd", duration); }}
-                className="flex items-center gap-1 px-2 py-0.5 text-xs text-gray-500 rounded border border-gray-200 hover:bg-gray-50"
+                className="flex items-center gap-1 px-2 py.5 text-xs text-gray-500 rounded border border-gray-200 hover:bg-gray-50"
               >
                 <RotateCcw size={10} /> Reset
               </button>
             </div>
           </div>
 
-          {/* Dual range slider */}
           <div className="space-y-1">
             <div className="flex justify-between text-[10px] text-gray-400">
               <span>Start: {fmt(trimStart)}</span>
               <span>End: {fmt(effectiveTrimEnd)}</span>
-              <span>Duration: {fmt(effectiveTrimEnd - trimStart)}</span>
+              <span>Clip: {fmt(Math.max(0, effectiveTrimEnd - trimStart))}</span>
             </div>
 
-            {/* Start slider */}
             <div>
               <label className="text-[10px] text-gray-400 block mb-0.5">Start time</label>
               <input
@@ -248,7 +349,6 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
               />
             </div>
 
-            {/* End slider */}
             <div>
               <label className="text-[10px] text-gray-400 block mb-0.5">End time</label>
               <input
@@ -302,7 +402,7 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
         ))}
       </div>
 
-      {/* ── Styling ── */}
+      {/* ── Caption / Styling ── */}
       <div>
         <label className="text-xs text-gray-500 block mb-1">Caption / Description</label>
         <Input

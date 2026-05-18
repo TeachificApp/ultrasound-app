@@ -2,11 +2,16 @@
  * LessonEffectPlayer
  * Renders the learner-facing lesson effect: banner overlay, sound, and confetti cannon.
  * Mount this component inside CoursePlayer and pass the current lesson's effect data.
- * Call `fire()` to trigger the effect manually (e.g., on lesson start or lesson complete).
+ *
+ * Bugs fixed:
+ * - Canvas was conditionally rendered so canvasRef.current was null when fire() ran → always render canvas
+ * - Confetti ran on hidden canvas before state update → use imperative canvas ref, never hide it
+ * - firedRef prevented re-fire when effect data arrived late (async getLesson) → track readiness properly
+ * - Banner duration is now configurable via effectBannerDuration (seconds, default 5)
+ * - Sound autoplay: for lesson_start (no user gesture), we attempt play and silently ignore block
  */
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { X } from "lucide-react";
-import { useState } from "react";
 
 // ─── Confetti engine (canvas-based, no external deps) ─────────────────────────
 
@@ -23,17 +28,17 @@ interface Particle {
 
 function createParticles(canvas: HTMLCanvasElement, colors: string[]): Particle[] {
   const particles: Particle[] = [];
-  const count = Math.min(220, Math.floor((canvas.width * canvas.height) / 4000));
+  const count = Math.min(250, Math.floor((canvas.width * canvas.height) / 3500));
   for (let i = 0; i < count; i++) {
     particles.push({
       x: Math.random() * canvas.width,
-      y: -10 - Math.random() * 100,
-      vx: (Math.random() - 0.5) * 4,
-      vy: 2 + Math.random() * 4,
+      y: -10 - Math.random() * 120,
+      vx: (Math.random() - 0.5) * 5,
+      vy: 2 + Math.random() * 5,
       color: colors[Math.floor(Math.random() * colors.length)],
-      size: 6 + Math.random() * 8,
+      size: 6 + Math.random() * 9,
       rotation: Math.random() * Math.PI * 2,
-      rotationSpeed: (Math.random() - 0.5) * 0.15,
+      rotationSpeed: (Math.random() - 0.5) * 0.18,
       shape: Math.random() > 0.4 ? "rect" : "circle",
       alpha: 1,
     });
@@ -43,10 +48,11 @@ function createParticles(canvas: HTMLCanvasElement, colors: string[]): Particle[
 
 function runConfetti(canvas: HTMLCanvasElement, colors: string[], onDone: () => void) {
   const ctx = canvas.getContext("2d");
-  if (!ctx) return;
+  if (!ctx) { onDone(); return; }
   const particles = createParticles(canvas, colors);
   let frame = 0;
-  const maxFrames = 180;
+  const maxFrames = 200;
+  let rafId: number;
 
   function tick() {
     ctx!.clearRect(0, 0, canvas.width, canvas.height);
@@ -54,9 +60,9 @@ function runConfetti(canvas: HTMLCanvasElement, colors: string[], onDone: () => 
     for (const p of particles) {
       p.x += p.vx;
       p.y += p.vy;
-      p.vy += 0.08; // gravity
+      p.vy += 0.07; // gravity
       p.rotation += p.rotationSpeed;
-      if (frame > maxFrames - 60) p.alpha = Math.max(0, p.alpha - 0.02);
+      if (frame > maxFrames - 60) p.alpha = Math.max(0, p.alpha - 0.018);
       if (p.y < canvas.height + 20 && p.alpha > 0) alive = true;
 
       ctx!.save();
@@ -75,13 +81,15 @@ function runConfetti(canvas: HTMLCanvasElement, colors: string[], onDone: () => 
     }
     frame++;
     if (alive && frame < maxFrames + 60) {
-      requestAnimationFrame(tick);
+      rafId = requestAnimationFrame(tick);
     } else {
       ctx!.clearRect(0, 0, canvas.width, canvas.height);
       onDone();
     }
   }
-  requestAnimationFrame(tick);
+  rafId = requestAnimationFrame(tick);
+  // Return cancel function
+  return () => { cancelAnimationFrame(rafId); ctx.clearRect(0, 0, canvas.width, canvas.height); };
 }
 
 // ─── Default colors ────────────────────────────────────────────────────────────
@@ -93,17 +101,30 @@ function parseColors(colorsStr: string | null | undefined): string[] {
   return parsed.length > 0 ? parsed : DEFAULT_COLORS;
 }
 
+// ─── Sound presets (must match LessonEffectEditor.tsx) ───────────────────────
+const SOUND_PRESET_URLS: Record<string, string> = {
+  applause: "https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3",
+  cheer: "https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3",
+  ding: "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3",
+  fanfare: "https://assets.mixkit.co/active_storage/sfx/2018/2018-preview.mp3",
+  success: "https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3",
+  levelup: "https://assets.mixkit.co/active_storage/sfx/1997/1997-preview.mp3",
+  notification: "https://assets.mixkit.co/active_storage/sfx/2355/2355-preview.mp3",
+};
+
 // ─── Sound player ──────────────────────────────────────────────────────────────
 function playSound(url: string) {
   if (!url) return;
   try {
     const audio = new Audio(url);
-    audio.volume = 0.6;
-    audio.play().catch(() => {});
+    audio.volume = 0.65;
+    // Browsers may block autoplay without a user gesture — we catch and ignore silently
+    const promise = audio.play();
+    if (promise) promise.catch(() => {});
   } catch {}
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface LessonEffect {
   effectEnabled?: boolean | null;
@@ -115,6 +136,7 @@ export interface LessonEffect {
   effectSoundUrl?: string | null;
   effectConfetti?: boolean | null;
   effectConfettiColors?: string | null;
+  effectBannerDuration?: number | null;
 }
 
 interface LessonEffectPlayerProps {
@@ -122,47 +144,71 @@ interface LessonEffectPlayerProps {
   trigger: "lesson_start" | "lesson_complete";
 }
 
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export default function LessonEffectPlayer({ effect, trigger }: LessonEffectPlayerProps) {
   const [bannerVisible, setBannerVisible] = useState(false);
   const [confettiActive, setConfettiActive] = useState(false);
+  // Always render the canvas so canvasRef.current is always available
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // Track whether we've already fired for this lesson+trigger combination
   const firedRef = useRef(false);
+  // Track the effect identity so we can re-fire if the lesson changes
+  const effectIdRef = useRef<string>("");
+  const cancelConfettiRef = useRef<(() => void) | undefined>(undefined);
 
   const fire = useCallback(() => {
     if (!effect?.effectEnabled) return;
     if (effect.effectTrigger !== trigger) return;
 
-    // Play sound
-    const soundUrl = effect.effectSoundUrl ?? "";
+    // Play sound — resolve preset URL if effectSoundUrl is not explicitly stored
+    const soundUrl = effect.effectSoundUrl
+      || (effect.effectSound && effect.effectSound !== "none" && effect.effectSound !== "custom"
+          ? SOUND_PRESET_URLS[effect.effectSound] ?? ""
+          : "");
     if (soundUrl) playSound(soundUrl);
 
     // Show banner
     if (effect.effectBannerText) {
       setBannerVisible(true);
-      setTimeout(() => setBannerVisible(false), 5000);
+      const duration = (effect.effectBannerDuration ?? 5) * 1000;
+      setTimeout(() => setBannerVisible(false), duration);
     }
 
-    // Fire confetti
-    if (effect.effectConfetti && canvasRef.current) {
+    // Fire confetti — always use the canvas ref directly (it's always mounted)
+    if (effect.effectConfetti) {
       const canvas = canvasRef.current;
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      setConfettiActive(true);
-      const colors = parseColors(effect.effectConfettiColors);
-      runConfetti(canvas, colors, () => setConfettiActive(false));
+      if (canvas) {
+        // Cancel any previous confetti run
+        cancelConfettiRef.current?.();
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        setConfettiActive(true);
+        const colors = parseColors(effect.effectConfettiColors);
+        const cancel = runConfetti(canvas, colors, () => {
+          setConfettiActive(false);
+          cancelConfettiRef.current = undefined;
+        });
+        cancelConfettiRef.current = cancel;
+      }
     }
   }, [effect, trigger]);
 
-  // Auto-fire when mounted (trigger === lesson_start fires on mount)
+  // Auto-fire on mount for lesson_start; also re-fire if the lesson changes
   useEffect(() => {
-    if (firedRef.current) return;
+    const effectKey = `${effect?.effectEnabled}-${effect?.effectTrigger}-${trigger}`;
+    if (firedRef.current && effectIdRef.current === effectKey) return;
     firedRef.current = true;
-    // Small delay to let the player render first
-    const t = setTimeout(fire, 400);
-    return () => clearTimeout(t);
-  }, [fire]);
+    effectIdRef.current = effectKey;
 
-  // Expose fire function via a custom event so CoursePlayer can call it on lesson_complete
+    // Only auto-fire for lesson_start on mount; lesson_complete is fired via event
+    if (trigger !== "lesson_start") return;
+
+    const t = setTimeout(fire, 500);
+    return () => clearTimeout(t);
+  }, [fire, effect, trigger]);
+
+  // Listen for lesson_complete event dispatched by CoursePlayer
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail as { trigger: string };
@@ -172,23 +218,32 @@ export default function LessonEffectPlayer({ effect, trigger }: LessonEffectPlay
     return () => window.removeEventListener("lesson-effect-fire", handler);
   }, [fire, trigger]);
 
-  if (!effect?.effectEnabled) return null;
-  if (effect.effectTrigger !== trigger) return null;
+  // Cleanup confetti on unmount
+  useEffect(() => {
+    return () => {
+      cancelConfettiRef.current?.();
+    };
+  }, []);
+
+  const isActive = effect?.effectEnabled && effect?.effectTrigger === trigger;
 
   return (
     <>
-      {/* Confetti canvas — full-screen overlay, pointer-events none */}
-      {confettiActive && (
-        <canvas
-          ref={canvasRef}
-          className="fixed inset-0 z-[9999] pointer-events-none"
-          style={{ width: "100vw", height: "100vh" }}
-        />
-      )}
-      {!confettiActive && <canvas ref={canvasRef} className="hidden" />}
+      {/* Confetti canvas — always in DOM so canvasRef.current is always available.
+          Visible only when confetti is active; pointer-events none so it doesn't block clicks. */}
+      <canvas
+        ref={canvasRef}
+        className="fixed inset-0 pointer-events-none"
+        style={{
+          zIndex: 9999,
+          width: "100vw",
+          height: "100vh",
+          display: confettiActive ? "block" : "none",
+        }}
+      />
 
-      {/* Banner */}
-      {bannerVisible && effect.effectBannerText && (
+      {/* Banner — only render when active and visible */}
+      {isActive && bannerVisible && effect?.effectBannerText && (
         <div
           className="fixed top-0 left-0 right-0 z-[9998] flex items-center justify-between px-6 py-4 shadow-lg animate-in slide-in-from-top duration-300"
           style={{
@@ -212,7 +267,7 @@ export default function LessonEffectPlayer({ effect, trigger }: LessonEffectPlay
 
 /**
  * Helper to fire the lesson_complete effect from anywhere in CoursePlayer.
- * Call this after marking a lesson as complete.
+ * Call this after marking a lesson as complete (it IS a user gesture, so sound will play).
  */
 export function fireLessonCompleteEffect() {
   window.dispatchEvent(new CustomEvent("lesson-effect-fire", { detail: { trigger: "lesson_complete" } }));

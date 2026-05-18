@@ -1,6 +1,12 @@
 /**
  * LessonEffectEditor — Admin panel for configuring per-lesson effects:
- * banner message, sound effect, and confetti cannon.
+ * banner message (with duration), sound effect, and confetti cannon.
+ *
+ * Changes:
+ * - Added effectBannerDuration slider (1–30 seconds)
+ * - Added key-based re-sync when initialData changes (parent passes key={fullLesson ? 'full' : 'shallow'})
+ * - Live banner preview reflects active saved state
+ * - Fixed: confettiTheme sync runs on every initialData change, not just mount
  */
 import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
@@ -12,8 +18,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
-import { Sparkles, Volume2, Megaphone, Save, Play } from "lucide-react";
+import { Sparkles, Volume2, Megaphone, Save, Play, Clock, CheckCircle2 } from "lucide-react";
 
 // ─── Built-in sound presets ────────────────────────────────────────────────────
 export const SOUND_PRESETS: { value: string; label: string; url: string }[] = [
@@ -49,6 +56,7 @@ interface LessonEffectEditorProps {
     effectSoundUrl?: string | null;
     effectConfetti?: boolean | null;
     effectConfettiColors?: string | null;
+    effectBannerDuration?: number | null;
   };
   onSaved?: () => void;
 }
@@ -61,25 +69,54 @@ export default function LessonEffectEditor({ lessonId, initialData, onSaved }: L
   const [bannerText, setBannerText] = useState(initialData?.effectBannerText ?? "");
   const [bannerBg, setBannerBg] = useState(initialData?.effectBannerBgColor ?? "#179ca3");
   const [bannerTextColor, setBannerTextColor] = useState(initialData?.effectBannerTextColor ?? "#ffffff");
+  const [bannerDuration, setBannerDuration] = useState(initialData?.effectBannerDuration ?? 5);
   const [soundPreset, setSoundPreset] = useState(initialData?.effectSound ?? "none");
   const [customSoundUrl, setCustomSoundUrl] = useState(initialData?.effectSoundUrl ?? "");
   const [confetti, setConfetti] = useState(initialData?.effectConfetti ?? false);
   const [confettiTheme, setConfettiTheme] = useState("rainbow");
   const [customColors, setCustomColors] = useState(initialData?.effectConfettiColors ?? "");
+  const [savedState, setSavedState] = useState<typeof initialData | null>(initialData ?? null);
 
-  // Sync confetti theme from saved colors
+  // Sync all state when initialData changes (e.g. when fullLesson arrives from getLessonAdmin)
   useEffect(() => {
+    setEnabled(initialData?.effectEnabled ?? false);
+    setTrigger((initialData?.effectTrigger as "lesson_start" | "lesson_complete") ?? "lesson_start");
+    setBannerText(initialData?.effectBannerText ?? "");
+    setBannerBg(initialData?.effectBannerBgColor ?? "#179ca3");
+    setBannerTextColor(initialData?.effectBannerTextColor ?? "#ffffff");
+    setBannerDuration(initialData?.effectBannerDuration ?? 5);
+    setSoundPreset(initialData?.effectSound ?? "none");
+    setCustomSoundUrl(initialData?.effectSoundUrl ?? "");
+    setConfetti(initialData?.effectConfetti ?? false);
+    setSavedState(initialData ?? null);
+
+    // Sync confetti theme from saved colors
     if (initialData?.effectConfettiColors) {
       const saved = initialData.effectConfettiColors;
       const match = CONFETTI_THEMES.find(t => t.colors.join(",") === saved);
       if (match) setConfettiTheme(match.value);
       else { setConfettiTheme("custom"); setCustomColors(saved); }
+    } else {
+      setConfettiTheme("rainbow");
+      setCustomColors("");
     }
-  }, []);
+  }, [initialData]);
 
   const updateEffect = trpc.lmsAdmin.updateLessonEffect.useMutation({
     onSuccess: () => {
-      toast.success("Effect saved — lesson effect settings updated.");
+      toast.success("Effect settings saved.");
+      setSavedState({
+        effectEnabled: enabled,
+        effectTrigger: trigger,
+        effectBannerText: bannerText || undefined,
+        effectBannerBgColor: bannerBg,
+        effectBannerTextColor: bannerTextColor,
+        effectSound: soundPreset !== "none" ? soundPreset : undefined,
+        effectSoundUrl: soundPreset === "custom" ? customSoundUrl : (SOUND_PRESETS.find(p => p.value === soundPreset)?.url ?? undefined),
+        effectConfetti: confetti,
+        effectConfettiColors: confetti ? (confettiTheme === "custom" ? customColors : (CONFETTI_THEMES.find(t => t.value === confettiTheme)?.colors.join(",") ?? "")) : undefined,
+        effectBannerDuration: bannerDuration,
+      });
       onSaved?.();
     },
     onError: (e) => toast.error(`Error: ${e.message}`),
@@ -100,6 +137,7 @@ export default function LessonEffectEditor({ lessonId, initialData, onSaved }: L
       effectSoundUrl: soundPreset === "custom" ? customSoundUrl : (SOUND_PRESETS.find(p => p.value === soundPreset)?.url ?? undefined),
       effectConfetti: confetti,
       effectConfettiColors: confetti ? colorsStr : undefined,
+      effectBannerDuration: bannerDuration,
     });
   };
 
@@ -110,7 +148,7 @@ export default function LessonEffectEditor({ lessonId, initialData, onSaved }: L
     if (!url) return;
     const audio = new Audio(url);
     audio.volume = 0.6;
-    audio.play().catch(() => {});
+    audio.play().catch(() => toast.error("Could not play audio — check the URL."));
   };
 
   return (
@@ -123,6 +161,19 @@ export default function LessonEffectEditor({ lessonId, initialData, onSaved }: L
         </div>
         <Switch checked={enabled} onCheckedChange={setEnabled} />
       </div>
+
+      {/* Active effect status badge */}
+      {savedState?.effectEnabled && (
+        <div className="flex items-center gap-2 text-xs text-teal-700 bg-teal-50 border border-teal-200 rounded-md px-3 py-2">
+          <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+          <span>
+            Effect active: fires on <strong>{savedState.effectTrigger === "lesson_complete" ? "lesson complete" : "lesson start"}</strong>
+            {savedState.effectBannerText ? ` · banner "${savedState.effectBannerText.slice(0, 40)}${savedState.effectBannerText.length > 40 ? "…" : ""}"` : ""}
+            {savedState.effectSound && savedState.effectSound !== "none" ? ` · sound: ${savedState.effectSound}` : ""}
+            {savedState.effectConfetti ? " · confetti 🎉" : ""}
+          </span>
+        </div>
+      )}
 
       {enabled && (
         <>
@@ -182,6 +233,33 @@ export default function LessonEffectEditor({ lessonId, initialData, onSaved }: L
                 </div>
               </div>
             </div>
+
+            {/* Banner duration */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5 text-teal-600" />
+                  <Label className="text-xs font-medium">Banner Display Duration</Label>
+                </div>
+                <span className="text-xs font-semibold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200">
+                  {bannerDuration}s
+                </span>
+              </div>
+              <Slider
+                min={1}
+                max={30}
+                step={1}
+                value={[bannerDuration]}
+                onValueChange={([v]) => setBannerDuration(v)}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>1s</span>
+                <span>15s</span>
+                <span>30s</span>
+              </div>
+            </div>
+
             {/* Banner preview */}
             {bannerText && (
               <div

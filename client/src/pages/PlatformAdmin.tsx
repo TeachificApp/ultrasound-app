@@ -1076,7 +1076,8 @@ export default function PlatformAdmin() {
   const DUAL_TOOLS_DEFAULT: ToolCard[] = [
     { id: "email", href: "/admin/email", icon: Mail, label: "Email Campaigns", description: "Create and send email campaigns to members", color: "#189aa1" },
     { id: "sharing-monitor", href: "/admin/sharing-monitor", icon: Activity, label: "Sharing Monitor", description: "Track and review shared content access", color: "#7c3aed" },
-    { id: "form-builder", href: "/admin/form-builder", icon: ClipboardList, label: "Form Builder", description: "Build custom forms and surveys", color: "#0891b2" },
+    { id: "form-builder", href: "/admin/form-builder", icon: ClipboardList, label: "DIY Accreditation Forms", description: "Build accreditation review forms for DIY organizations", color: "#0891b2" },
+    { id: "general-form-builder", href: "/admin/general-forms", icon: ClipboardList, label: "General Form Builder", description: "Build public forms, surveys, and quizzes with branding, analytics, and share links", color: "#0e7490" },
     { id: "media-repository", href: "/admin/media-repository", icon: HardDrive, label: "Media Repository", description: "Shared media library with AAUS/IHE brand tags", color: "#0f766e" },
     { id: "downloads", href: "/admin/downloads", icon: FileDown, label: "Digital Downloads", description: "Manage downloadable products and files", color: "#b45309" },
     { id: "lms", href: "/admin/lms", icon: Library, label: "Education Library", description: "Manage courses, videos, and learning content", color: "#1d4ed8" },

@@ -3084,6 +3084,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
           <div className="border-t pt-4">
             <p className="text-sm font-semibold text-teal-700 mb-3 flex items-center gap-1.5"><Sparkles className="h-4 w-4" /> Lesson Effect</p>
             <LessonEffectEditor
+              key={`effect-${lesson.id}-${fullLesson ? 'full' : 'shallow'}`}
               lessonId={lesson.id}
               initialData={{
                 effectEnabled: lesson.effectEnabled,
@@ -3091,6 +3092,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
                 effectBannerText: lesson.effectBannerText,
                 effectBannerBgColor: lesson.effectBannerBgColor,
                 effectBannerTextColor: lesson.effectBannerTextColor,
+                effectBannerDuration: (lesson as any).effectBannerDuration ?? 5,
                 effectSound: lesson.effectSound,
                 effectSoundUrl: lesson.effectSoundUrl,
                 effectConfetti: lesson.effectConfetti,
