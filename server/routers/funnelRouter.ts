@@ -7,7 +7,7 @@ import { z } from "zod";
 import { router, protectedProcedure, publicProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
-import { funnels, funnelPages, funnelLeads, funnelTemplates, lmsCourses, digitalProducts, digitalBundles, funnelBranchRules, funnelBranchConditions } from "../../drizzle/schema";
+import { funnels, funnelPages, funnelLeads, funnelTemplates, lmsCourses, lmsLandingPages, digitalProducts, digitalBundles, funnelBranchRules, funnelBranchConditions } from "../../drizzle/schema";
 import { eq, and, asc, desc, sql } from "drizzle-orm";
 import { evaluateBranchRules, type VisitorContext } from "../lib/funnelBranchEngine";
 
@@ -1441,13 +1441,16 @@ export const funnelAdminRouter = router({
       if (input.sourceType === "course") {
         const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.id, input.sourcePageId));
         if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+        // Fetch the landing page blocks from lmsLandingPages
+        const [landingPage] = await db.select({ blocks: lmsLandingPages.blocks }).from(lmsLandingPages).where(eq(lmsLandingPages.courseId, course.id)).limit(1);
+        const blocks = landingPage?.blocks ?? null;
         const newSlug = `${course.slug}-funnel-${suffix}`;
         const [inserted] = await db.insert(funnelPages).values({
           funnelId: input.targetFunnelId,
           pageType: "landing",
           title: course.title + " (Imported)",
           slug: newSlug,
-          blocks: null, // course landing pages use their own builder; start blank
+          blocks,
           productType: "course",
           productId: course.id,
           sortOrder: nextOrder,

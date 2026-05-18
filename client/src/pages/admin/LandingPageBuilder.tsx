@@ -1558,12 +1558,13 @@ export function SortableBlock({ block, isSelected, onSelect, onDelete, onDuplica
 
 // ─── Template Library Panel ───────────────────────────────────────────────────
 
-function TemplateLibrary({ blocks, onInsert, onClose }: {
+function TemplateLibrary({ blocks, onInsert, onClose, initialTab }: {
   blocks: Block[];
   onInsert: (tplBlocks: Block[]) => void;
   onClose: () => void;
+  initialTab?: "page" | "block";
 }) {
-  const [tab, setTab] = useState<"page" | "block">("page");
+  const [tab, setTab] = useState<"page" | "block">(initialTab ?? "page");
   const [saveName, setSaveName] = useState("");
   const [saveDesc, setSaveDesc] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -1664,6 +1665,7 @@ export default function LandingPageBuilder() {
   const [hasLoaded, setHasLoaded] = useState(false);
   const [courseInfo, setCourseInfo] = useState<{ title: string; slug: string; price?: number } | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [templatesInitialTab, setTemplatesInitialTab] = useState<"page" | "block">("page");
    const [activeCat, setActiveCat] = useState<string>("Layout");
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -1769,8 +1771,11 @@ export default function LandingPageBuilder() {
           <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Page Editor</span>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowTemplates(true)} className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-teal-700 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors">
+          <button onClick={() => { setTemplatesInitialTab("page"); setShowTemplates(true); }} className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-teal-700 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors">
             <FolderOpen size={14} /> Templates
+          </button>
+          <button onClick={() => { setTemplatesInitialTab("page"); setShowTemplates(true); }} className="flex items-center gap-1.5 text-sm text-amber-600 hover:text-amber-700 border border-amber-200 bg-amber-50 hover:bg-amber-100 rounded-lg px-3 py-1.5 transition-colors" title="Save current page as a reusable template">
+            <Bookmark size={14} /> Save as Template
           </button>
           {courseInfo?.slug && (
             <a href={`/learn/${courseInfo.slug}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-teal-700 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors">
@@ -1863,7 +1868,7 @@ export default function LandingPageBuilder() {
 
       {/* Template Library Modal */}
       {showTemplates && (
-        <TemplateLibrary blocks={blocks} onInsert={insertTemplateBlocks} onClose={() => setShowTemplates(false)} />
+        <TemplateLibrary blocks={blocks} onInsert={insertTemplateBlocks} onClose={() => setShowTemplates(false)} initialTab={templatesInitialTab} />
       )}
     </div>
   );

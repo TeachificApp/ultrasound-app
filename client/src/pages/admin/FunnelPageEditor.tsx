@@ -25,7 +25,7 @@ import { toast } from "sonner";
 import { type Block, type BlockType, BlockPreview } from "@/components/BlockPreview";
 import { uid, BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, SortableBlock } from "./LandingPageBuilder";
 import {
-  ArrowLeft, Save, Eye, Plus, Palette, X, FolderOpen, Layers, Settings, GitBranch, Trash2, ChevronDown, ChevronUp, GripVertical,
+  ArrowLeft, Save, Eye, Plus, Palette, X, FolderOpen, Layers, Settings, GitBranch, Trash2, ChevronDown, ChevronUp, GripVertical, Bookmark,
 } from "lucide-react";
 
 // ─── Main Editor ─────────────────────────────────────────────────────────────
@@ -151,6 +151,23 @@ export default function FunnelPageEditor() {
   // Branch rules state
   const [showBranchRules, setShowBranchRules] = useState(false);
   const [editingRule, setEditingRule] = useState<any | null>(null);
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [saveTemplateName, setSaveTemplateName] = useState("");
+  const [saveTemplateDesc, setSaveTemplateDesc] = useState("");
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+  const savePageTemplateMutation = trpc.lmsAdmin.savePageTemplate.useMutation({
+    onSuccess: () => { toast.success("Page saved as template!"); setShowSaveTemplate(false); setSaveTemplateName(""); setSaveTemplateDesc(""); },
+    onError: (e: any) => toast.error(`Save failed: ${e.message}`),
+  });
+  const handleSavePageAsTemplate = async () => {
+    if (!saveTemplateName.trim()) { toast.error("Please enter a template name"); return; }
+    setIsSavingTemplate(true);
+    try {
+      await savePageTemplateMutation.mutateAsync({ name: saveTemplateName, description: saveTemplateDesc, templateType: "page", blocks });
+    } finally {
+      setIsSavingTemplate(false);
+    }
+  };
   const utils = trpc.useUtils();
 
   const { data: branchRules = [] } = trpc.funnel.listBranchRules.useQuery(
@@ -261,6 +278,13 @@ export default function FunnelPageEditor() {
               <Eye size={14} /> Preview
             </a>
           )}
+          <button
+            onClick={() => { setSaveTemplateName(currentPage?.name ? `${currentPage.name} Template` : ""); setShowSaveTemplate(true); }}
+            className="flex items-center gap-1.5 text-sm text-amber-600 hover:text-amber-700 border border-amber-200 bg-amber-50 hover:bg-amber-100 rounded-lg px-3 py-1.5 transition-colors"
+            title="Save current page as a reusable template"
+          >
+            <Bookmark size={14} /> Save as Template
+          </button>
           <Button
             onClick={handleSave}
             disabled={isSaving}
@@ -270,6 +294,47 @@ export default function FunnelPageEditor() {
           </Button>
         </div>
       </div>
+
+      {/* Save as Template Dialog */}
+      {showSaveTemplate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowSaveTemplate(false)}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-gray-900 flex items-center gap-2"><Bookmark size={18} className="text-amber-500" /> Save Page as Template</h2>
+              <button onClick={() => setShowSaveTemplate(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Template Name *</label>
+                <input
+                  type="text"
+                  value={saveTemplateName}
+                  onChange={e => setSaveTemplateName(e.target.value)}
+                  placeholder="e.g. Webinar Registration Page"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Description (optional)</label>
+                <input
+                  type="text"
+                  value={saveTemplateDesc}
+                  onChange={e => setSaveTemplateDesc(e.target.value)}
+                  placeholder="Brief description of this template"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+              </div>
+              <p className="text-xs text-gray-500">This will save all {blocks.length} block{blocks.length !== 1 ? "s" : ""} on this page as a reusable page template.</p>
+            </div>
+            <div className="flex justify-end gap-2 mt-5">
+              <button onClick={() => setShowSaveTemplate(false)} className="text-sm text-gray-600 hover:text-gray-800 px-4 py-2 rounded-lg border border-gray-200 transition-colors">Cancel</button>
+              <button onClick={handleSavePageAsTemplate} disabled={isSavingTemplate} className="text-sm bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-60">
+                {isSavingTemplate ? "Saving…" : "Save Template"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Editor Area */}
       <div className="flex flex-1 overflow-hidden">

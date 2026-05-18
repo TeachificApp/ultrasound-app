@@ -2150,3 +2150,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] CTA block (pricing_cta): item picker auto-fills ctaUrl and currentPrice when a course/download/quiz is selected
 - [x] Lesson Editor: Preview button opens course player in new window at correct lesson
 - [x] Lesson Editor: Add Block scrolls canvas to newly added block
+
+## Import Page to Funnel & Save as Template (May 18)
+- [x] importPageToFunnel: fixed course sourceType to fetch blocks from lmsLandingPages table (blocks were missing on import)
+- [x] LandingPageBuilder: added "Save as Template" button in top bar (amber, opens TemplateLibrary with page tab pre-selected)
+- [x] LandingPageBuilder: TemplateLibrary now accepts initialTab prop to open directly on the correct tab
+- [x] FunnelPageEditor: added "Save as Template" button in top bar (amber) with inline modal dialog (name + description fields)
+- [x] FunnelPageEditor: save page template calls trpc.lmsAdmin.savePageTemplate with all current blocks
