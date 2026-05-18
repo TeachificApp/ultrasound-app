@@ -41,7 +41,7 @@ import {
   AlignCenter, AlignRight, HelpCircle, Users, Star, Globe, Timer,
   AlertTriangle, CheckSquare, LayoutGrid, Layers, BookOpen, Tag,
   ChevronDown, ChevronUp, Copy, FolderOpen, BookMarked, Upload, Code,
-  ShoppingCart, Package, Link, Mail, Phone, MapPin,
+  ShoppingCart, Package, Link, Mail, Phone, MapPin, Bookmark,
 } from "lucide-react";
 
 
@@ -1175,8 +1175,8 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
 }
 // ─── Sortable Block Card ──────────────────────────────────────────────────────
 
-export function SortableBlock({ block, isSelected, onSelect, onDelete, onDuplicate, onMoveUp, onMoveDown, coursePrice, courseTitle }: {
-  block: Block; isSelected: boolean; onSelect: () => void; onDelete: () => void; onDuplicate: () => void; onMoveUp?: () => void; onMoveDown?: () => void; coursePrice?: number; courseTitle?: string;
+export function SortableBlock({ block, isSelected, onSelect, onDelete, onDuplicate, onMoveUp, onMoveDown, onSaveAsTemplate, coursePrice, courseTitle }: {
+  block: Block; isSelected: boolean; onSelect: () => void; onDelete: () => void; onDuplicate: () => void; onMoveUp?: () => void; onMoveDown?: () => void; onSaveAsTemplate?: (block: Block) => void; coursePrice?: number; courseTitle?: string;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
@@ -1185,6 +1185,7 @@ export function SortableBlock({ block, isSelected, onSelect, onDelete, onDuplica
       className={`relative group cursor-pointer border-2 transition-all ${isSelected ? "border-teal-500 shadow-lg shadow-teal-100" : "border-transparent hover:border-teal-200"}`}>
       <div className={`absolute top-2 right-2 z-10 flex gap-1 ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity`}>
         <button onClick={e => { e.stopPropagation(); onDuplicate(); }} className="w-7 h-7 bg-white border border-gray-200 rounded shadow text-gray-500 hover:text-teal-600 flex items-center justify-center" title="Duplicate"><Copy size={12} /></button>
+        {onSaveAsTemplate && <button onClick={e => { e.stopPropagation(); onSaveAsTemplate(block); }} className="w-7 h-7 bg-white border border-gray-200 rounded shadow text-gray-500 hover:text-amber-500 flex items-center justify-center" title="Save as Global Template"><Bookmark size={12} /></button>}
         <button onClick={e => { e.stopPropagation(); onDelete(); }} className="w-7 h-7 bg-white border border-gray-200 rounded shadow text-gray-500 hover:text-red-500 flex items-center justify-center" title="Delete"><Trash2 size={12} /></button>
       </div>
       {/* Up/Down arrow buttons */}
@@ -1388,6 +1389,17 @@ export default function LandingPageBuilder() {
     setBlocks(prev => [...prev, ...tplBlocks]);
   }, []);
 
+  const saveBlockTemplateMutation = trpc.lmsAdmin.savePageTemplate.useMutation({
+    onSuccess: () => toast.success("Block saved as global template!"),
+    onError: (e: any) => toast.error(`Save failed: ${e.message}`),
+  });
+
+  const handleSaveBlockAsTemplate = useCallback((block: Block) => {
+    const label = BLOCK_CATALOG.find(c => c.type === block.type)?.label ?? block.type;
+    const name = `${label} — ${new Date().toLocaleDateString()}`;
+    saveBlockTemplateMutation.mutate({ name, description: `Saved from page builder`, templateType: "block", blocks: [block] });
+  }, [saveBlockTemplateMutation]);
+
   const selectedBlock = blocks.find(b => b.id === selectedId);
   const catalogByCat = BLOCK_CATALOG.filter(c => c.category === activeCat);
 
@@ -1458,6 +1470,7 @@ export default function LandingPageBuilder() {
                     <SortableBlock key={block.id} block={block} isSelected={selectedId === block.id}
                       onSelect={() => setSelectedId(block.id)} onDelete={() => deleteBlock(block.id)}
                       onDuplicate={() => duplicateBlock(block.id)} coursePrice={courseInfo?.price} courseTitle={courseInfo?.title}
+                      onSaveAsTemplate={handleSaveBlockAsTemplate}
                       onMoveUp={idx > 0 ? () => setBlocks(prev => arrayMove(prev, idx, idx - 1)) : undefined}
                       onMoveDown={idx < blocks.length - 1 ? () => setBlocks(prev => arrayMove(prev, idx, idx + 1)) : undefined} />
                   ))}

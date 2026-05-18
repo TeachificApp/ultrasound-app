@@ -217,6 +217,13 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
         <Badge variant={product.status === "published" ? "default" : "outline"}>{product.status}</Badge>
       </div>
 
+      {/* Top Save Button */}
+      <div className="flex justify-end pb-2 border-b border-gray-100">
+        <Button onClick={handleSave} disabled={updateMut.isPending} className="bg-teal-600 hover:bg-teal-700 text-white">
+          {updateMut.isPending ? "Saving..." : "Save Settings"}
+        </Button>
+      </div>
+
       {/* Quick Actions */}
       <div className="flex items-center gap-2 flex-wrap">
         <Button
@@ -263,7 +270,10 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
               minHeight={120}
             />
           </div>
-          <div className="space-y-3">
+
+          {/* Pricing (primary + secondary together) */}
+          <div className="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
+            <h4 className="text-sm font-semibold text-gray-700">Pricing</h4>
             <div className="grid grid-cols-2 gap-4 items-end">
               <div>
                 <Label>Price ($)</Label>

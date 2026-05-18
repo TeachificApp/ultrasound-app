@@ -570,6 +570,13 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
         <StatusBadge status={product.status} />
       </div>
 
+      {/* Top Save Button */}
+      <div className="flex justify-end pb-2 border-b border-gray-100">
+        <Button onClick={handleSave} disabled={updateMut.isPending} className="bg-teal-600 hover:bg-teal-700 text-white">
+          {updateMut.isPending ? "Saving..." : "Save Settings"}
+        </Button>
+      </div>
+
       {/* Quick Actions */}
       <div className="flex items-center gap-2 flex-wrap">
         <Button size="sm" variant="outline" className="text-xs"

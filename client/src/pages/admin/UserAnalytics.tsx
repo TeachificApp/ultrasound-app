@@ -703,6 +703,11 @@ export default function UserAnalytics() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
+          <nav className="flex items-center gap-1.5 text-xs text-gray-400 mb-1">
+            <a href="/admin" className="hover:text-teal-600 transition-colors">Platform Admin</a>
+            <span>/</span>
+            <span className="text-gray-600 font-medium">User Analytics</span>
+          </nav>
           <h2 className="text-xl font-bold text-gray-900">User Analytics</h2>
           <p className="text-sm text-gray-500">Logins, page views, course activity, videos, quizzes, and downloads</p>
         </div>

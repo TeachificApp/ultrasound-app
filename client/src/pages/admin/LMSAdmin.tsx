@@ -1200,6 +1200,40 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+      {/* Top Save Button */}
+      <div className="flex justify-end pb-2 border-b border-gray-100">
+        <Button
+          className="bg-teal-600 hover:bg-teal-700 text-white"
+          disabled={saving}
+          onClick={() => onSave({
+            title: title.trim(), subtitle: subtitle.trim() || undefined,
+            description: description || undefined, status, brand,
+            pricingType,
+            isFree: pricingType === "free",
+            hasCertificate,
+            isFeatured,
+            isDrip,
+            hideProgress,
+            price: pricingType === "free" ? 0 : Math.round(parseFloat(price || "0") * 100),
+            subscriptionInterval: pricingType === "subscription" ? subscriptionInterval : null,
+            downPayment: pricingType === "payment_plan" ? Math.round(parseFloat(downPayment || "0") * 100) : null,
+            installmentCount: pricingType === "payment_plan" ? parseInt(installmentCount || "0") : null,
+            installmentAmount: pricingType === "payment_plan" ? Math.round(parseFloat(installmentAmount || "0") * 100) : null,
+            installmentIntervalDays: pricingType === "payment_plan" ? parseInt(installmentIntervalDays || "30") : null,
+            trialDays: pricingType === "trial_then_subscription" ? (trialDays ? parseInt(trialDays) : null) : null,
+            accessDurationDays: accessDurationDays ? parseInt(accessDurationDays) : null,
+            coverImageUrl: coverImageUrl.trim() || undefined,
+            primaryColor: primaryColor || null,
+            accentColor: accentColor || null,
+            gradientFrom: useGradient ? (gradientStart || null) : null,
+            gradientTo: useGradient ? (gradientEnd || null) : null,
+            gradientDirection: gradientDirection || null,
+            sendEnrollmentEmail,
+          })}
+        >
+          {saving ? "Saving..." : "Save Settings"}
+        </Button>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <Label className="text-sm">Title *</Label>
@@ -1406,6 +1440,9 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
             </div>
           </div>
         )}
+
+        {/* Additional Pricing Options */}
+        <CoursePricingOptionsEditor courseId={course.id} />
       </div>
 
             <div className="flex items-center gap-2">
@@ -1524,9 +1561,6 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
           {updateCourseSettings.isPending ? "Saving..." : "Save URL & SEO"}
         </Button>
       </div>
-
-      {/* Pricing Options Section */}
-      <CoursePricingOptionsEditor courseId={course.id} />
 
       {/* Enrollment Email Toggle */}
       <div className="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">

@@ -39,7 +39,7 @@ export default function FunnelPageEditor() {
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [hasLoaded, setHasLoaded] = useState(false);
+  const [loadedPageId, setLoadedPageId] = useState<number | null>(null);
   const [activeCat, setActiveCat] = useState<string>("Layout");
 
   // Auto-scroll preview canvas to the selected block
@@ -56,24 +56,22 @@ export default function FunnelPageEditor() {
     { enabled: !isNaN(numericPageId) }
   );
 
-  // Load blocks from page data
-  if (pageData && !hasLoaded) {
-    setHasLoaded(true);
+  // Load blocks from page data — keyed on pageId so navigating to a copied/different page always reloads
+  useEffect(() => {
+    if (!pageData || loadedPageId === numericPageId) return;
+    setLoadedPageId(numericPageId);
+    setSelectedId(null);
     if (pageData.page.blocks) {
       try {
         const parsed = JSON.parse(pageData.page.blocks);
         if (Array.isArray(parsed) && parsed.length > 0) {
           setBlocks(parsed as Block[]);
-        } else {
-          setBlocks(getDefaultBlocks(pageData.page.pageType, pageData.page.title));
+          return;
         }
-      } catch {
-        setBlocks(getDefaultBlocks(pageData.page.pageType, pageData.page.title));
-      }
-    } else {
-      setBlocks(getDefaultBlocks(pageData.page.pageType, pageData.page.title));
+      } catch { /* fall through to defaults */ }
     }
-  }
+    setBlocks(getDefaultBlocks(pageData.page.pageType, pageData.page.title));
+  }, [pageData, numericPageId, loadedPageId]);
 
   // Save blocks
   const updatePage = trpc.funnel.updatePage.useMutation({
@@ -133,6 +131,17 @@ export default function FunnelPageEditor() {
 
   const selectedBlock = blocks.find(b => b.id === selectedId);
   const catalogByCat = BLOCK_CATALOG.filter(c => c.category === activeCat);
+
+  const saveBlockTemplateMutation = trpc.lmsAdmin.savePageTemplate.useMutation({
+    onSuccess: () => toast.success("Block saved as global template!"),
+    onError: (e: any) => toast.error(`Save failed: ${e.message}`),
+  });
+
+  const handleSaveBlockAsTemplate = useCallback((block: Block) => {
+    const label = BLOCK_CATALOG.find(c => c.type === block.type)?.label ?? block.type;
+    const name = `${label} — ${new Date().toLocaleDateString()}`;
+    saveBlockTemplateMutation.mutate({ name, description: `Saved from funnel page builder`, templateType: "block", blocks: [block] });
+  }, [saveBlockTemplateMutation]);
 
   // Page navigation sidebar
   const allPages = pageData?.allPages ?? [];
@@ -568,6 +577,7 @@ export default function FunnelPageEditor() {
                       onSelect={() => setSelectedId(block.id)}
                       onDelete={() => deleteBlock(block.id)}
                       onDuplicate={() => duplicateBlock(block.id)}
+                      onSaveAsTemplate={handleSaveBlockAsTemplate}
                       onMoveUp={idx > 0 ? () => setBlocks(prev => arrayMove(prev, idx, idx - 1)) : undefined}
                       onMoveDown={idx < blocks.length - 1 ? () => setBlocks(prev => arrayMove(prev, idx, idx + 1)) : undefined}
                     />
