@@ -1994,3 +1994,9 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] UserDetailView (student profile): Add Trash2 unenroll button to each course row in Courses tab
 - [x] UserDetailView: Add unenroll confirmation dialog with student name and course title
 - [x] UserDetailView: Wire removeEnrollment mutation with refetch on success
+
+## Funnel Page Copy Feature
+- [ ] Add "Copy Page" action to each funnel page item in the funnel sidebar (not inside Page Settings)
+- [ ] Copy options: (1) within same funnel, (2) to another funnel (picker), (3) as standalone landing page
+- [ ] Backend: copyFunnelPage procedure supporting all three destinations
+- [ ] Remove any subtext/description from the copy action UI
