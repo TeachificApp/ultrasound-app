@@ -354,6 +354,11 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
           <button onClick={onEnroll} disabled={enrolling} className="px-10 py-4 rounded-xl font-bold text-lg shadow-lg disabled:opacity-60 transition-opacity hover:opacity-90" style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
             {enrolling ? "Processing…" : (d.ctaText ?? ctaText)}
           </button>
+          {d.buttonSubtext && (
+            <p className="mt-3 text-xs text-gray-500">
+              {d.buttonSubtextUrl ? <a href={d.buttonSubtextUrl} className="underline hover:text-gray-700">{d.buttonSubtext}</a> : d.buttonSubtext}
+            </p>
+          )}
         </div>
       );
     case "cta_standalone":
@@ -365,6 +370,11 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
             className="inline-block px-8 py-3 rounded-lg font-semibold shadow disabled:opacity-60 transition-opacity hover:opacity-90" style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
             {d.ctaText ?? ctaText}
           </button>
+          {d.buttonSubtext && (
+            <p className="mt-3 text-xs text-gray-500">
+              {d.buttonSubtextUrl ? <a href={d.buttonSubtextUrl} className="underline hover:text-gray-700">{d.buttonSubtext}</a> : d.buttonSubtext}
+            </p>
+          )}
         </div>
       );
     case "lead_capture":

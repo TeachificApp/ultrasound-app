@@ -273,6 +273,13 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
               style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#ffffff" }}>
               {d.ctaText ?? "Get Started"}
             </button>
+            {d.buttonSubtext && (
+              <p className="mt-3 text-xs text-gray-500">
+                {d.buttonSubtextUrl
+                  ? <a href={d.buttonSubtextUrl} className="underline hover:text-gray-700">{d.buttonSubtext}</a>
+                  : d.buttonSubtext}
+              </p>
+            )}
             <OptOutLink d={d} />
           </div>
         </div>
@@ -287,6 +294,13 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
               style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#ffffff" }}>
               {d.ctaText ?? "Get Started"}
             </a>
+            {d.buttonSubtext && (
+              <p className="mt-3 text-xs text-gray-500">
+                {d.buttonSubtextUrl
+                  ? <a href={d.buttonSubtextUrl} className="underline hover:text-gray-700">{d.buttonSubtext}</a>
+                  : d.buttonSubtext}
+              </p>
+            )}
             <OptOutLink d={d} />
           </div>
         </div>
@@ -810,8 +824,8 @@ function FunnelPageContent({ data }: { data: { funnel: any; page: any; nextPage:
         </div>
       ))}
 
-      {/* Next page navigation — show resolved URL once branch evaluation is done */}
-      {branchResolved && resolvedNextUrl && (
+      {/* Next page navigation — only shown when showNavigationButton is explicitly ON */}
+      {page.showNavigationButton && branchResolved && resolvedNextUrl && (
         <div className="px-8 py-8 bg-gray-50 border-t border-gray-200">
           <div className="max-w-3xl mx-auto text-center">
             <a
@@ -823,8 +837,8 @@ function FunnelPageContent({ data }: { data: { funnel: any; page: any; nextPage:
           </div>
         </div>
       )}
-      {/* Fallback: show default next page while branch evaluation is pending */}
-      {!branchResolved && nextPage && (
+      {/* Fallback: show default next page while branch evaluation is pending — only when showNavigationButton is ON */}
+      {page.showNavigationButton && !branchResolved && nextPage && (
         <div className="px-8 py-8 bg-gray-50 border-t border-gray-200">
           <div className="max-w-3xl mx-auto text-center">
             <a

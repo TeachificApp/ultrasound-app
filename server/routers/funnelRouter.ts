@@ -321,6 +321,7 @@ export const funnelRouter = router({
         isActive: z.boolean().optional(),
         isHidden: z.boolean().optional(),
         isStandaloneLanding: z.boolean().optional(),
+        showNavigationButton: z.boolean().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {

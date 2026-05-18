@@ -199,6 +199,11 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug }: {
           >
             {buying ? "Processing…" : hasPurchased ? "Access Your Files" : (d.ctaText ?? `Buy Now — ${price}`)}
           </button>
+          {d.buttonSubtext && (
+            <p className="mt-3 text-xs text-gray-500">
+              {d.buttonSubtextUrl ? <a href={d.buttonSubtextUrl} className="underline hover:text-gray-700">{d.buttonSubtext}</a> : d.buttonSubtext}
+            </p>
+          )}
         </div>
       );
     case "funnel_workflow":
@@ -214,10 +219,15 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug }: {
             onClick={d.link ? () => { window.location.href = d.link; } : hasPurchased ? () => { window.location.href = `/downloads/${slug}/files`; } : onBuy}
             disabled={buying}
             className={`inline-block px-8 py-3 rounded-lg font-semibold shadow disabled:opacity-60 transition-opacity hover:opacity-90 ${d.size === "lg" ? "text-lg px-10 py-4" : ""}`}
-            style={{ backgroundColor: d.color ?? "#179ca3", color: d.textColor ?? "#fff" }}
+            style={{ backgroundColor: d.color ?? d.ctaColor ?? "#179ca3", color: d.textColor ?? d.ctaTextColor ?? "#fff" }}
           >
-            {hasPurchased ? "Access Files" : (d.text ?? "Buy Now")}
+            {hasPurchased ? "Access Files" : (d.text ?? d.ctaText ?? "Buy Now")}
           </button>
+          {d.buttonSubtext && (
+            <p className="mt-3 text-xs text-gray-500">
+              {d.buttonSubtextUrl ? <a href={d.buttonSubtextUrl} className="underline hover:text-gray-700">{d.buttonSubtext}</a> : d.buttonSubtext}
+            </p>
+          )}
         </div>
       );
     case "faq":

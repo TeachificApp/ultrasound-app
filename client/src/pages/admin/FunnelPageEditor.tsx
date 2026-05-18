@@ -321,6 +321,33 @@ export default function FunnelPageEditor() {
                 />
                 <span>Standalone page</span>
               </label>
+              {/* Auto-connect toggle — controls whether the "Continue to..." button appears at the bottom of the rendered page */}
+              <div className="mt-1">
+                <button
+                  type="button"
+                  onClick={() => updatePage.mutate({ id: numericPageId, showNavigationButton: !(currentPage?.showNavigationButton ?? false) })}
+                  className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                    (currentPage?.showNavigationButton ?? false)
+                      ? "bg-teal-50 border-teal-300 text-teal-700"
+                      : "bg-gray-50 border-gray-200 text-gray-500"
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5">
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                      (currentPage?.showNavigationButton ?? false) ? "bg-teal-500" : "bg-gray-300"
+                    }`} />
+                    Auto-connect button
+                  </span>
+                  <span className="text-[10px] font-normal">
+                    {(currentPage?.showNavigationButton ?? false) ? "ON" : "OFF"}
+                  </span>
+                </button>
+                <p className="text-[10px] text-gray-400 mt-0.5 px-1">
+                  {(currentPage?.showNavigationButton ?? false)
+                    ? "\"Continue to...\" button shown at page bottom"
+                    : "No auto-connect button — use a CTA block instead"}
+                </p>
+              </div>
               {currentPage?.isStandaloneLanding && (
                 <p className="text-[10px] text-blue-600 bg-blue-50 rounded px-1.5 py-1">
                   Accessible at /p/{currentPage.slug}
