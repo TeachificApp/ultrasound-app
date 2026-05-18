@@ -46,6 +46,17 @@ export const BRAND_PRODUCTS: Record<Brand, {
   },
 };
 
+/**
+ * Dual Membership product — grants premium access to BOTH brands.
+ * $12.99/month, billed monthly only.
+ */
+export const DUAL_MEMBERSHIP_PRODUCT = {
+  name: "All Access Dual Membership — UltrasoundAssist™ + EchoAssist™",
+  description: "Full premium access to both All About Ultrasound™ (UltrasoundAssist™) and iHeartEcho™ (EchoAssist™) platforms.",
+  monthlyPrice: 1299, // $12.99/month
+  currency: "usd",
+} as const;
+
 /** Admin check helper */
 function assertAdmin(ctx: { user: { role?: string } | null }) {
   if (!ctx.user || ctx.user.role !== "admin") {
@@ -146,6 +157,48 @@ export const brandMembershipRouter = router({
           brand,
           type: "brand_membership_upgrade",
           interval: input.interval,
+        },
+      });
+
+      return { checkoutUrl: session.url };
+    }),
+
+  /**
+   * Create a Stripe Checkout session for the Dual Membership (both brands, $12.99/mo).
+   */
+  createDualMembershipCheckout: protectedProcedure
+    .input(z.object({
+      origin: z.string().url(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+
+      const session = await stripe.checkout.sessions.create({
+        mode: "subscription",
+        customer_email: ctx.user.email ?? undefined,
+        allow_promotion_codes: true,
+        line_items: [{
+          price_data: {
+            currency: DUAL_MEMBERSHIP_PRODUCT.currency,
+            product_data: {
+              name: DUAL_MEMBERSHIP_PRODUCT.name,
+              description: DUAL_MEMBERSHIP_PRODUCT.description,
+              metadata: { type: "dual_membership" },
+            },
+            unit_amount: DUAL_MEMBERSHIP_PRODUCT.monthlyPrice,
+            recurring: { interval: "month", interval_count: 1 },
+          },
+          quantity: 1,
+        }],
+        success_url: `${input.origin}/upgrade-success?dual=1&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${input.origin}/premium`,
+        client_reference_id: ctx.user.id.toString(),
+        metadata: {
+          user_id: ctx.user.id.toString(),
+          customer_email: ctx.user.email ?? "",
+          customer_name: ctx.user.name ?? "",
+          type: "dual_membership",
         },
       });
 

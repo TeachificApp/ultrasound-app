@@ -46,7 +46,7 @@ export function registerOAuthRoutes(app: Express) {
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
-      // Track login event (fire-and-forget, non-blocking)
+      // Track login event + Thinkific free-member sync (fire-and-forget, non-blocking)
       db.getUserByOpenId(userInfo.openId).then(async (user) => {
         if (!user) return;
         const dbConn = await getDb();
@@ -58,6 +58,22 @@ export function registerOAuthRoutes(app: Express) {
           ipAddress: ip ? ip.substring(0, 64) : null,
           userAgent: req.headers["user-agent"]?.substring(0, 500) ?? null,
         });
+
+        // Sync user to Thinkific free membership if not already enrolled
+        if (user.email && !user.thinkificEnrolledAt) {
+          try {
+            const { enrollInFreeMembership } = await import("../thinkific");
+            const { markThinkificEnrolled } = await import("../db");
+            const nameParts = (user.name ?? "").trim().split(" ");
+            const firstName = nameParts[0] ?? "Member";
+            const lastName = nameParts.slice(1).join(" ");
+            await enrollInFreeMembership(user.email, firstName, lastName);
+            await markThinkificEnrolled(user.id);
+            console.log(`[OAuth] Thinkific free membership synced for user ${user.id} (${user.email})`);
+          } catch (err) {
+            console.error(`[OAuth] Thinkific sync failed for user ${user.id}:`, err);
+          }
+        }
       }).catch(() => { /* silent */ });
 
       res.redirect(302, "/");

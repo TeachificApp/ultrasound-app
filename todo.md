@@ -2027,3 +2027,13 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Add Grant Access + Save buttons at top of overview page (already at bottom)
 - [ ] Add tab navigation to course admin: Settings, Landing Page, Students, Analytics, Curriculum
 - [ ] Add tab navigation to download admin: Settings, Landing Page, Students, Analytics
+
+## Dual Membership & Thinkific Sync
+- [x] Add DUAL_MEMBERSHIP product config to brandMembershipRouter.ts (both brands, $12.99/mo)
+- [x] Add createDualMembershipCheckout procedure to brandMembershipRouter
+- [x] Handle dual membership webhook in stripe.ts (grant both aaus + iheartecho brandMemberships)
+- [x] Handle dual membership subscription lifecycle (cancellation cancels both brands)
+- [x] Add Thinkific sync on dual membership purchase
+- [x] Add Thinkific sync for free members on OAuth login (auth.me) if not yet enrolled
+- [x] Add Dual Membership pricing card to Premium.tsx
+- [x] Add Dual Membership card to iHeartEcho premium page (shared Premium.tsx)

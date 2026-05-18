@@ -337,6 +337,83 @@ async function handleBrandMembershipCheckoutCompleted(session: Record<string, un
 }
 
 /**
+ * Handle dual membership checkout completion.
+ * Grants premium access to BOTH aaus and iheartecho brands.
+ * Also syncs the user to Thinkific.
+ */
+async function handleDualMembershipCheckoutCompleted(session: Record<string, unknown>) {
+  const meta = (session.metadata ?? {}) as Record<string, string>;
+  if (meta.type !== "dual_membership") return;
+
+  const userId = parseInt(meta.user_id, 10);
+  const subscriptionId = session.subscription as string | undefined;
+  const customerId = session.customer as string | undefined;
+
+  if (!userId) {
+    console.warn("[Stripe] Dual membership checkout missing userId in metadata");
+    return;
+  }
+
+  const db = await getDb();
+  if (!db) return;
+
+  const brands: ("aaus" | "iheartecho")[] = ["aaus", "iheartecho"];
+  for (const brand of brands) {
+    const [existing] = await db
+      .select()
+      .from(brandMemberships)
+      .where(and(eq(brandMemberships.userId, userId), eq(brandMemberships.brand, brand)))
+      .limit(1);
+
+    if (existing) {
+      await db.update(brandMemberships)
+        .set({
+          tier: "premium",
+          status: "active",
+          source: "stripe_dual",
+          stripeSubscriptionId: subscriptionId ?? null,
+          stripeCustomerId: customerId ?? null,
+          grantedAt: new Date(),
+        })
+        .where(eq(brandMemberships.id, existing.id));
+    } else {
+      await db.insert(brandMemberships).values({
+        userId,
+        brand,
+        tier: "premium",
+        status: "active",
+        source: "stripe_dual",
+        stripeSubscriptionId: subscriptionId ?? null,
+        stripeCustomerId: customerId ?? null,
+      });
+    }
+  }
+
+  // Sync user to Thinkific
+  try {
+    const user = await getUserByEmail(meta.customer_email);
+    if (user) {
+      const { findOrCreateThinkificUser } = await import("../thinkific");
+      await findOrCreateThinkificUser(
+        meta.customer_email,
+        meta.customer_name?.split(" ")[0] ?? "Member",
+        meta.customer_name?.split(" ").slice(1).join(" ") ?? ""
+      );
+      console.log(`[Stripe] Dual membership: Thinkific user ensured for ${meta.customer_email}`);
+    }
+  } catch (err) {
+    console.error("[Stripe] Dual membership Thinkific sync failed:", err);
+  }
+
+  await notifyOwner({
+    title: "⭐⭐ New Dual Membership Subscription",
+    content: `User ID ${userId} (${meta.customer_email}) subscribed to the All Access Dual Membership ($12.99/mo). Both AAUS + iHeartEcho premium granted. Subscription: ${subscriptionId ?? "N/A"}.`,
+  });
+
+  console.log(`[Stripe] Dual membership recorded: user ${userId}, both brands, subscription ${subscriptionId}`);
+}
+
+/**
  * Handle subscription lifecycle events (cancellation, updates).
  * Updates the brandMemberships table when a subscription is cancelled or changes status.
  */
@@ -498,6 +575,7 @@ export function registerStripeWebhook(app: Express) {
           await handleDigitalDownloadCheckoutCompleted(sessionObj);
           await handleDigitalBundleCheckoutCompleted(sessionObj);
           await handleBrandMembershipCheckoutCompleted(sessionObj);
+          await handleDualMembershipCheckoutCompleted(sessionObj);
         } else if (eventType === "payment_intent.succeeded") {
           await handleFunnelPaymentIntentSucceeded(sessionObj);
         } else if (eventType === "customer.subscription.deleted" || eventType === "customer.subscription.updated") {
