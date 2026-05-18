@@ -3743,3 +3743,96 @@ export const lmsPricingOptions = mysqlTable("lms_pricing_options", {
 });
 
 export type LmsPricingOption = typeof lmsPricingOptions.$inferSelect;
+
+// ─── Physical Products ────────────────────────────────────────────────────────
+// A "product" is a physical (or external) item that can be sold on the platform.
+// It mirrors the digitalProducts structure but has no downloadable file requirement.
+// Supports native Stripe checkout (with shipping address) and Shopify embeds/URLs.
+
+export const physicalProducts = mysqlTable("physical_products", {
+  id: int("id").autoincrement().primaryKey(),
+  slug: varchar("slug", { length: 255 }).notNull().unique(),
+  title: varchar("title", { length: 255 }).notNull(),
+  subtitle: varchar("subtitle", { length: 500 }),
+  description: longtext("description"),       // Rich text product description
+  details: longtext("details"),               // Rich text product details / specs
+  thumbnailUrl: text("thumbnail_url"),
+  // Pricing
+  price: int("price").default(0).notNull(),   // cents — primary / default price
+  compareAtPrice: int("compare_at_price"),    // cents — original/crossed-out price
+  isFree: boolean("is_free").default(false).notNull(),
+  currency: varchar("currency", { length: 8 }).default("usd").notNull(),
+  // Checkout mode
+  checkoutMode: mysqlEnum("checkout_mode", ["native", "shopify", "external"]).default("native").notNull(),
+  // Shopify integration
+  shopifyProductUrl: text("shopify_product_url"),   // Paste a Shopify product URL
+  shopifyEmbedCode: longtext("shopify_embed_code"), // Paste a Shopify Buy Button embed
+  shopifyProductId: varchar("shopify_product_id", { length: 255 }),
+  // External checkout URL (for non-Shopify external links)
+  externalCheckoutUrl: text("external_checkout_url"),
+  // Shipping
+  requiresShipping: boolean("requires_shipping").default(true).notNull(),
+  shippingCountries: text("shipping_countries"),   // JSON array of ISO country codes; null = worldwide
+  // Status / visibility
+  status: mysqlEnum("status", ["draft", "published", "hidden", "private", "archived"]).default("draft").notNull(),
+  // Landing page content (page builder — same structure as digitalProducts)
+  landingHeadline: varchar("landing_headline", { length: 500 }),
+  landingBody: longtext("landing_body"),
+  landingFeatures: longtext("landing_features"),   // JSON array of feature strings
+  landingBlocks: longtext("landing_blocks"),        // JSON array of page builder blocks
+  // SEO
+  metaTitle: varchar("meta_title", { length: 255 }),
+  metaDescription: text("meta_description"),
+  // Stats
+  orderCount: int("order_count").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type PhysicalProduct = typeof physicalProducts.$inferSelect;
+export type InsertPhysicalProduct = typeof physicalProducts.$inferInsert;
+
+// Multiple pricing options per product (mirrors lmsPricingOptions)
+export const physicalProductPricingOptions = mysqlTable("physical_product_pricing_options", {
+  id: int("id").autoincrement().primaryKey(),
+  productId: int("product_id").notNull(),
+  label: varchar("label", { length: 255 }).notNull(),
+  sublabel: varchar("sublabel", { length: 500 }),
+  pricingType: mysqlEnum("pricing_type", ["one_time", "free"]).default("one_time").notNull(),
+  price: int("price").default(0).notNull(), // cents
+  compareAtPrice: int("compare_at_price"),  // cents
+  stripePriceId: varchar("stripe_price_id", { length: 255 }),
+  ctaLabel: varchar("cta_label", { length: 100 }),
+  sortOrder: int("sort_order").default(0).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type PhysicalProductPricingOption = typeof physicalProductPricingOptions.$inferSelect;
+
+// Orders for physical products (native Stripe checkout)
+export const physicalProductOrders = mysqlTable("physical_product_orders", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  productId: int("product_id").notNull(),
+  pricingOptionId: int("pricing_option_id"),
+  amountPaid: int("amount_paid").default(0).notNull(), // cents
+  currency: varchar("currency", { length: 8 }).default("usd").notNull(),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
+  stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 255 }),
+  // Shipping address (required for native physical checkout)
+  shippingName: varchar("shipping_name", { length: 255 }),
+  shippingLine1: varchar("shipping_line1", { length: 255 }),
+  shippingLine2: varchar("shipping_line2", { length: 255 }),
+  shippingCity: varchar("shipping_city", { length: 100 }),
+  shippingState: varchar("shipping_state", { length: 100 }),
+  shippingPostalCode: varchar("shipping_postal_code", { length: 20 }),
+  shippingCountry: varchar("shipping_country", { length: 10 }),
+  // Fulfillment
+  fulfillmentStatus: mysqlEnum("fulfillment_status", ["pending", "processing", "shipped", "delivered", "cancelled", "refunded"]).default("pending").notNull(),
+  trackingNumber: varchar("tracking_number", { length: 255 }),
+  trackingCarrier: varchar("tracking_carrier", { length: 100 }),
+  notes: text("notes"),
+  orderedAt: timestamp("ordered_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type PhysicalProductOrder = typeof physicalProductOrders.$inferSelect;
+export type InsertPhysicalProductOrder = typeof physicalProductOrders.$inferInsert;

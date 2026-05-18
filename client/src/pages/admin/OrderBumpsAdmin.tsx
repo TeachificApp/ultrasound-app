@@ -17,7 +17,7 @@ import {
 
 type OrderBump = {
   id: number;
-  triggerType: "course" | "download" | "bundle";
+  triggerType: "course" | "download" | "bundle" | "physical";
   triggerProductId: number;
   bumpType: "course" | "download" | "bundle" | "physical";
   bumpProductId: number;
@@ -54,7 +54,9 @@ export default function OrderBumpsAdmin() {
   // Get product names for display
   const { data: coursesResult } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", page: 1, pageSize: 200 });
   const { data: downloads } = trpc.downloadsAdmin.list.useQuery();
+  const { data: physicalProductsData } = trpc.productsAdmin.list.useQuery();
   const courses = coursesResult?.courses ?? [];
+  const physicalProducts = physicalProductsData ?? [];
 
   const deleteMutation = trpc.orderBumpsAdmin.delete.useMutation({
     onSuccess: () => { toast.success("Order bump deleted"); utils.orderBumpsAdmin.list.invalidate(); },
@@ -79,7 +81,10 @@ export default function OrderBumpsAdmin() {
       const dl = downloads?.find((d: any) => d.id === id);
       return dl?.title ?? `Download #${id}`;
     }
-    if (type === "physical") return `Physical item #${id}`;
+    if (type === "physical") {
+      const prod = physicalProducts?.find((p: any) => p.id === id);
+      return prod?.title ?? `Physical Product #${id}`;
+    }
     return `Bundle #${id}`;
   }
 
@@ -96,6 +101,7 @@ export default function OrderBumpsAdmin() {
         bump={editingBump}
         courses={courses ?? []}
         downloads={downloads ?? []}
+        physicalProducts={physicalProducts ?? []}
         onClose={() => { setIsCreating(false); setEditingBump(null); }}
         onSaved={() => { setIsCreating(false); setEditingBump(null); utils.orderBumpsAdmin.list.invalidate(); }}
       />
@@ -160,16 +166,17 @@ export default function OrderBumpsAdmin() {
 }
 
 // ─── Order Bump Editor ───────────────────────────────────────────────────────
-function OrderBumpEditor({ bump, courses, downloads, onClose, onSaved }: {
+function OrderBumpEditor({ bump, courses, downloads, physicalProducts, onClose, onSaved }: {
   bump: OrderBump | null;
   courses: any[];
   downloads: any[];
+  physicalProducts: any[];
   onClose: () => void;
   onSaved: () => void;
 }) {
   const isNew = !bump;
   const [form, setForm] = useState({
-    triggerType: bump?.triggerType ?? "course" as "course" | "download" | "bundle",
+    triggerType: bump?.triggerType ?? "course" as "course" | "download" | "bundle" | "physical",
     triggerProductId: bump?.triggerProductId ?? 0,
     bumpType: bump?.bumpType ?? "download" as "course" | "download" | "bundle" | "physical",
     bumpProductId: bump?.bumpProductId ?? 0,
@@ -209,9 +216,11 @@ function OrderBumpEditor({ bump, courses, downloads, onClose, onSaved }: {
   }
 
   const triggerProducts = form.triggerType === "course" ? courses.filter((c: any) => c.type === "course") :
-    form.triggerType === "download" ? downloads : [];
+    form.triggerType === "download" ? downloads :
+    form.triggerType === "physical" ? physicalProducts : [];
   const bumpProducts = form.bumpType === "course" ? courses.filter((c: any) => c.type === "course") :
-    form.bumpType === "download" ? downloads : form.bumpType === "physical" ? [{ id: form.bumpProductId || 1, title: form.headline || "Physical add-on" }] : [];
+    form.bumpType === "download" ? downloads :
+    form.bumpType === "physical" ? physicalProducts : [];
 
   return (
     <div className="space-y-6">
@@ -229,7 +238,7 @@ function OrderBumpEditor({ bump, courses, downloads, onClose, onSaved }: {
             <option value="course">Course</option>
             <option value="download">Download</option>
             <option value="bundle">Bundle</option>
-            <option value="physical">Physical Item</option>
+            <option value="physical">Physical Product</option>
           </select>
           <select value={form.triggerProductId} onChange={e => setForm({ ...form, triggerProductId: Number(e.target.value) })}
             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
@@ -244,6 +253,7 @@ function OrderBumpEditor({ bump, courses, downloads, onClose, onSaved }: {
             <option value="course">Course</option>
             <option value="download">Download</option>
             <option value="bundle">Bundle</option>
+            <option value="physical">Physical Product</option>
           </select>
           <select value={form.bumpProductId} onChange={e => setForm({ ...form, bumpProductId: Number(e.target.value) })}
             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">

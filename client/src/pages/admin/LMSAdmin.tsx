@@ -42,6 +42,7 @@ import {
 import { Link, useLocation } from "wouter";
 import LessonEffectEditor from "@/components/LessonEffectEditor";
 import DigitalDownloadsAdmin from "./DigitalDownloadsAdmin";
+import PhysicalProductsAdmin from "./PhysicalProductsAdmin";
 import OrderBumpsAdmin from "./OrderBumpsAdmin";
 import LessonBlockEditor from "@/components/LessonBlockEditor";
 import { Block, BlockType, BlockPreview } from "@/components/BlockPreview";
@@ -4192,7 +4193,8 @@ export default function LMSAdmin() {
   const urlTab = urlParams?.get("tab") ?? null;
   const urlEditCourse = urlParams?.get("editCourse") ?? null;
   const urlEditDownload = urlParams?.get("editDownload") ?? null;
-  const [activeTab, setActiveTab] = useState(urlTab || (urlEditDownload ? "downloads" : "courses"));
+  const urlEditProduct = urlParams?.get("editProduct") ?? null;
+  const [activeTab, setActiveTab] = useState(urlTab || (urlEditDownload ? "downloads" : urlEditProduct ? "products" : "courses"));
   const [editingCourseId, setEditingCourseId] = useState<number | null>(urlEditCourse ? Number(urlEditCourse) : null);
 
   return (
@@ -4220,6 +4222,7 @@ export default function LMSAdmin() {
             <TabsTrigger value="courses" className="text-xs">Courses</TabsTrigger>
             <TabsTrigger value="quizzes" className="text-xs">Quizzes</TabsTrigger>
             <TabsTrigger value="downloads" className="text-xs">Downloads</TabsTrigger>
+            <TabsTrigger value="products" className="text-xs">Products</TabsTrigger>
             <TabsTrigger value="enrollments" className="text-xs">Enrollments</TabsTrigger>
             <TabsTrigger value="groups" className="text-xs">Groups</TabsTrigger>
             <TabsTrigger value="instructors" className="text-xs">Instructors</TabsTrigger>
@@ -4231,6 +4234,7 @@ export default function LMSAdmin() {
           <TabsContent value="courses" className="mt-4"><CoursesTab onEdit={setEditingCourseId} typeFilter="course" /></TabsContent>
           <TabsContent value="quizzes" className="mt-4"><CoursesTab onEdit={setEditingCourseId} typeFilter="quiz" /></TabsContent>
           <TabsContent value="downloads" className="mt-4"><DigitalDownloadsAdmin initialEditId={urlEditDownload ? Number(urlEditDownload) : undefined} /></TabsContent>
+          <TabsContent value="products" className="mt-4"><PhysicalProductsAdmin initialEditId={urlEditProduct ? Number(urlEditProduct) : undefined} /></TabsContent>
           <TabsContent value="enrollments" className="mt-4"><EnrollmentsTab /></TabsContent>
           <TabsContent value="groups" className="mt-4"><GroupsTab /></TabsContent>
           <TabsContent value="instructors" className="mt-4"><InstructorsTab /></TabsContent>

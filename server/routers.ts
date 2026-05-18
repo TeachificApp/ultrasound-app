@@ -35,6 +35,7 @@ import { leaderboardRouter } from "./routers/leaderboardRouter";
 import { abTestRouter } from "./routers/abTestRouter";
 import { engagementRouter } from "./routers/engagementRouter";
 import { brandMembershipRouter } from "./routers/brandMembershipRouter";
+import { productsPublicRouter, productsLearnerRouter, productsAdminRouter } from "./routers/productsRouter";
 import {
   getUserById,
   getUsersByIds,
@@ -1842,6 +1843,9 @@ export const appRouter = router({
   downloads: downloadsPublicRouter,
   downloadsLearner: downloadsLearnerRouter,
   downloadsAdmin: downloadsAdminRouter,
+  products: productsPublicRouter,
+  productsLearner: productsLearnerRouter,
+  productsAdmin: productsAdminRouter,
   orderBumpsAdmin: orderBumpsAdminRouter,
   orderBumps: orderBumpsPublicRouter,
   socialContent: socialContentRouter,

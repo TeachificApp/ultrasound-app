@@ -59,6 +59,8 @@ const DownloadFiles = lazy(() => import("./pages/DownloadFiles"));
 const DownloadLandingPageBuilder = lazy(() => import("./pages/admin/DownloadLandingPageBuilder"));
 const MyDownloads = lazy(() => import("./pages/MyDownloads"));
 const BundleLanding = lazy(() => import("./pages/BundleLanding"));
+const ProductLanding = lazy(() => import("./pages/ProductLanding"));
+const ProductLandingPageBuilder = lazy(() => import("./pages/admin/ProductLandingPageBuilder"));
 
 // ── UltrasoundAssist™ Hub ────────────────────────────────────────────────────
 const UltrasoundAssistHub = lazy(() => import("./pages/UltrasoundAssistHub"));
@@ -383,6 +385,9 @@ function Router() {
         <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
         <Route path="/admin/lms/:courseId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/downloads/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><DownloadLandingPageBuilder /></RoleGuard>}</Route>
+        {/* ── Physical Products ───────────────────────────────────────────────── */}
+        <Route path="/products/:slug" component={ProductLanding} />
+        <Route path="/admin/products/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ProductLandingPageBuilder /></RoleGuard>}</Route>
 
         {/* ── Admin ───────────────────────────────────────────────────────────── */}
         <Route path="/admin/cases">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminCaseManagement /></RoleGuard>}</Route>
@@ -469,6 +474,9 @@ function LMSRouter() {
         <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
         <Route path="/admin/lms/:courseId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/downloads/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><DownloadLandingPageBuilder /></RoleGuard>}</Route>
+        {/* ── Physical Products ───────────────────────────────────────────────── */}
+        <Route path="/products/:slug" component={ProductLanding} />
+        <Route path="/admin/products/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ProductLandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/media-repository">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MediaRepository /></RoleGuard>}</Route>
 
         {/* Auth pages (needed for login flow) */}

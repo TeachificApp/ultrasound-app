@@ -16,7 +16,7 @@
  */
 import type { Express, Request, Response } from "express";
 import { getDb, getUserByEmail } from "../db";
-import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships } from "../../drizzle/schema";
+import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders } from "../../drizzle/schema";
 import { and, eq } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
@@ -273,6 +273,73 @@ async function handleDigitalBundleCheckoutCompleted(session: Record<string, unkn
     triggerOrderType: "bundle",
   });
   console.log(`[Stripe] Digital bundle purchase recorded: user ${userId}, bundle ${bundleId}`);
+}
+
+/**
+ * Handle physical product checkout completion.
+ * Triggered when a user completes a Stripe checkout for a native physical product.
+ * Records the order with shipping address from the Stripe session.
+ */
+async function handlePhysicalProductCheckoutCompleted(session: Record<string, unknown>) {
+  const meta = (session.metadata ?? {}) as Record<string, string>;
+  if (meta.type !== "physical_product") return;
+
+  const productId = meta.product_id ? parseInt(meta.product_id, 10) : null;
+  const userId = meta.user_id ? parseInt(meta.user_id, 10) : null;
+  const pricingOptionId = meta.pricing_option_id ? parseInt(meta.pricing_option_id, 10) : null;
+  if (!productId || !userId) {
+    console.warn("[Stripe] Physical product checkout missing productId or userId in metadata");
+    return;
+  }
+
+  const db = await getDb();
+  if (!db) return;
+
+  // Idempotency check — don't double-record
+  const [existing] = await db.select({ id: physicalProductOrders.id })
+    .from(physicalProductOrders)
+    .where(and(
+      eq(physicalProductOrders.userId, userId),
+      eq(physicalProductOrders.productId, productId),
+      eq(physicalProductOrders.stripeCheckoutSessionId, session.id as string),
+    )).limit(1);
+  if (existing) {
+    console.log(`[Stripe] Physical product order already recorded: user ${userId}, product ${productId}`);
+    return;
+  }
+
+  // Extract shipping address from Stripe session
+  const shippingDetails = (session.shipping_details ?? session.shipping) as Record<string, any> | null;
+  const addr = shippingDetails?.address ?? null;
+  const shippingAddress = addr ? JSON.stringify({
+    name: shippingDetails?.name ?? "",
+    line1: addr.line1 ?? "",
+    line2: addr.line2 ?? "",
+    city: addr.city ?? "",
+    state: addr.state ?? "",
+    postalCode: addr.postal_code ?? "",
+    country: addr.country ?? "",
+  }) : null;
+
+  const amountPaid = (session.amount_total as number) ?? 0;
+
+  await db.insert(physicalProductOrders).values({
+    userId,
+    productId,
+    pricingOptionId: pricingOptionId || null,
+    stripeCheckoutSessionId: session.id as string,
+    amountPaid,
+    currency: (session.currency as string) ?? "usd",
+    shippingAddress,
+    fulfillmentStatus: "pending",
+  });
+
+  await notifyOwner({
+    title: "📦 New Physical Product Order",
+    content: `User ID ${userId} (${meta.customer_email}) ordered physical product ID ${productId}. Amount: $${(amountPaid / 100).toFixed(2)}. Shipping: ${shippingAddress ? JSON.parse(shippingAddress).line1 + ", " + JSON.parse(shippingAddress).city : "N/A"}.`,
+  });
+
+  console.log(`[Stripe] Physical product order recorded: user ${userId}, product ${productId}, session ${session.id}`);
 }
 
 /**
@@ -576,6 +643,7 @@ export function registerStripeWebhook(app: Express) {
           await handleDigitalBundleCheckoutCompleted(sessionObj);
           await handleBrandMembershipCheckoutCompleted(sessionObj);
           await handleDualMembershipCheckoutCompleted(sessionObj);
+          await handlePhysicalProductCheckoutCompleted(sessionObj);
         } else if (eventType === "payment_intent.succeeded") {
           await handleFunnelPaymentIntentSucceeded(sessionObj);
         } else if (eventType === "customer.subscription.deleted" || eventType === "customer.subscription.updated") {

@@ -2037,3 +2037,19 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add Thinkific sync for free members on OAuth login (auth.me) if not yet enrolled
 - [x] Add Dual Membership pricing card to Premium.tsx
 - [x] Add Dual Membership card to iHeartEcho premium page (shared Premium.tsx)
+
+## Physical Products Module
+- [x] Add physicalProducts, physicalProductPricingOptions, physicalProductOrders tables to schema.ts
+- [x] Apply DB migration (CREATE TABLE physical_products, physical_product_pricing_options, physical_product_orders)
+- [x] Build productsRouter (productsPublicRouter, productsLearnerRouter, productsAdminRouter) with full CRUD, checkout, page builder procedures
+- [x] Register productsRouter in routers.ts
+- [x] Build PhysicalProductsAdmin.tsx admin UI (list, create, edit, pricing options, Shopify fields, image upload, page builder link)
+- [x] Add Products tab to LMSAdmin.tsx
+- [x] Build ProductLandingPageBuilder.tsx (page builder for product sales pages)
+- [x] Build ProductLanding.tsx (public-facing sales page with Shopify embed/URL support and native Stripe checkout)
+- [x] Add product routes to App.tsx for both AAUS and IHE route trees
+- [x] Wire physical products into OrderBumpsAdmin (trigger + bump type, product name resolution)
+- [x] Extend orderBumpsRouter triggerType enum to include "physical"
+- [x] Handle physical_product type in Stripe webhook handler (handlePhysicalProductCheckoutCompleted)
+- [x] Fix field name mismatches (shopifyUrl→shopifyProductUrl, shopifyEmbed→shopifyEmbedCode)
+- [x] Write vitest tests for Products module (4 tests passing)
