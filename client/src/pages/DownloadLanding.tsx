@@ -6,6 +6,7 @@
  */
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { ButtonSubtext } from "@/lib/ctaSubtext";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -199,11 +200,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug }: {
           >
             {buying ? "Processing…" : hasPurchased ? "Access Your Files" : (d.ctaText ?? `Buy Now — ${price}`)}
           </button>
-          {d.buttonSubtext && (
-            <p className="mt-3 text-xs text-gray-500">
-              {d.buttonSubtextUrl ? <a href={d.buttonSubtextUrl} className="underline hover:text-gray-700">{d.buttonSubtext}</a> : d.buttonSubtext}
-            </p>
-          )}
+          <ButtonSubtext d={d} />
         </div>
       );
     case "funnel_workflow":
@@ -223,11 +220,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug }: {
           >
             {hasPurchased ? "Access Files" : (d.text ?? d.ctaText ?? "Buy Now")}
           </button>
-          {d.buttonSubtext && (
-            <p className="mt-3 text-xs text-gray-500">
-              {d.buttonSubtextUrl ? <a href={d.buttonSubtextUrl} className="underline hover:text-gray-700">{d.buttonSubtext}</a> : d.buttonSubtext}
-            </p>
-          )}
+          <ButtonSubtext d={d} />
         </div>
       );
     case "faq":

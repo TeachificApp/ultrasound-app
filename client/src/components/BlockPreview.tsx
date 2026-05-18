@@ -7,6 +7,7 @@ import { ChevronDown, Globe, Image, Package, Video } from "lucide-react";
 import { Users } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
+import { ButtonSubtext } from "@/lib/ctaSubtext";
 
 export type BlockType =
   | "hero" | "text" | "image" | "video" | "bullets" | "testimonial"
@@ -282,11 +283,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
           {d.subtext && <p className="text-gray-600 mb-6 max-w-xl mx-auto" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           {d.showPrice && coursePrice !== undefined && <div className="mb-6">{d.showOriginalPrice && d.originalPrice && <p className="text-xl text-gray-400 line-through mb-1">${d.originalPrice}</p>}<p className="text-4xl font-bold" style={{ color: d.ctaColor ?? "#179ca3" }}>{coursePrice === 0 ? "Free" : `$${(coursePrice / 100).toFixed(2)}`}</p></div>}
           <button className={`px-10 py-4 rounded-xl font-bold text-lg shadow-lg ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`} style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>{d.ctaText ?? "Enroll Now"}</button>
-          {d.buttonSubtext && (
-            <p className="mt-3 text-xs text-gray-500">
-              {d.buttonSubtextUrl ? <a href={d.buttonSubtextUrl} className="underline hover:text-gray-700">{d.buttonSubtext}</a> : d.buttonSubtext}
-            </p>
-          )}
+          <ButtonSubtext d={d} />
         </div>
       );
     case "cta_standalone":
@@ -295,11 +292,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
           {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           <a href={d.ctaLink ?? "#"} className={`inline-block px-8 py-3 rounded-lg font-semibold shadow ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`} style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>{d.ctaText ?? "Get Started"}</a>
-          {d.buttonSubtext && (
-            <p className="mt-3 text-xs text-gray-500">
-              {d.buttonSubtextUrl ? <a href={d.buttonSubtextUrl} className="underline hover:text-gray-700">{d.buttonSubtext}</a> : d.buttonSubtext}
-            </p>
-          )}
+          <ButtonSubtext d={d} />
         </div>
       );
     case "lead_capture":
