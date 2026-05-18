@@ -2141,3 +2141,7 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add missing dual-app admin routes to IHeartEchoRouter (funnels, contacts, user-analytics, sharing-monitor, lms, downloads, admin/users)
 - [x] Media Repository: brand tag (AAUS/IHE) added to uploaded items; filter by brand in UI
 - [x] analyticsTrack.myActivity: self-service procedure returning login history, page views, enrollments, downloads for current user
+
+## Lesson Editor Fixes (May 18)
+- [x] Lesson Editor: Preview button opens course player in new window at the correct lesson (/learn/{courseSlug}/player?lesson={id}&preview=admin)
+- [x] Lesson Editor: Add Block / Copy Block scrolls canvas to the newly added block automatically

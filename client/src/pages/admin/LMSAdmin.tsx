@@ -3135,7 +3135,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
               key={`blocks-${lesson.id}-${fullLesson ? 'full' : 'shallow'}`}
               lessonId={lesson.id}
               courseId={lesson.courseId}
-              courseSlug={""}
+              courseSlug={courseData?.slug ?? ""}
               initialBlocks={lesson.contentBlocks ? (typeof lesson.contentBlocks === "string" ? JSON.parse(lesson.contentBlocks) : lesson.contentBlocks) as Block[] : []}
               onClose={() => setActiveTab("settings")}
               onSaved={() => { onSaved(); }}

@@ -5,7 +5,7 @@
  * Reuses the same Block system (BLOCK_CATALOG, BlockPreview, BlockSettings, SortableBlock)
  * as the LandingPageBuilder.
  */
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent,
 } from "@dnd-kit/core";
@@ -22,7 +22,7 @@ import {
 import { Block, BlockType, BlockPreview } from "@/components/BlockPreview";
 import { BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, SortableBlock, uid } from "@/pages/admin/LandingPageBuilder";
 import {
-  X, Plus, Save, Eye, EyeOff, Copy, BookOpen, Search,
+  X, Plus, Save, Eye, EyeOff, Copy, BookOpen, Search, ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -55,6 +55,10 @@ export default function LessonBlockEditor({
   const [pickerTab, setPickerTab] = useState<PickerTab>("catalog");
   const [previewMode, setPreviewMode] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Refs for scroll-to-new-block
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const blockRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   // Block-from-lessons state
   const [selectedSourceCourseId, setSelectedSourceCourseId] = useState<number | null>(courseId ?? null);
@@ -112,6 +116,18 @@ export default function LessonBlockEditor({
     }
   }, []);
 
+  /** Scroll the canvas to a specific block id after a short delay (for React to render it first) */
+  const scrollToBlock = (blockId: string) => {
+    setTimeout(() => {
+      const el = blockRefs.current.get(blockId);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      } else if (canvasRef.current) {
+        canvasRef.current.scrollTo({ top: canvasRef.current.scrollHeight, behavior: "smooth" });
+      }
+    }, 80);
+  };
+
   const addBlock = (type: BlockType) => {
     const catalog = BLOCK_CATALOG.find(c => c.type === type);
     if (!catalog) return;
@@ -119,13 +135,16 @@ export default function LessonBlockEditor({
     setBlocks(bs => [...bs, newBlock]);
     setSelectedBlockId(newBlock.id);
     setAddMenuOpen(false);
+    scrollToBlock(newBlock.id);
   };
 
   const copyBlockFromLesson = (block: Block) => {
     const copy: Block = { ...block, id: uid() };
     setBlocks(bs => [...bs, copy]);
+    setSelectedBlockId(copy.id);
     toast.success("Block copied!");
     setAddMenuOpen(false);
+    scrollToBlock(copy.id);
   };
 
   const copyAllBlocksFromLesson = () => {
@@ -134,6 +153,7 @@ export default function LessonBlockEditor({
     setBlocks(bs => [...bs, ...copies]);
     toast.success(`${copies.length} block${copies.length > 1 ? "s" : ""} copied!`);
     setAddMenuOpen(false);
+    if (copies.length > 0) scrollToBlock(copies[copies.length - 1].id);
   };
 
   const updateBlock = (id: string, data: Record<string, any>) => {
@@ -151,6 +171,7 @@ export default function LessonBlockEditor({
     const copy: Block = { ...blocks[idx], id: uid() };
     setBlocks(bs => [...bs.slice(0, idx + 1), copy, ...bs.slice(idx + 1)]);
     setSelectedBlockId(copy.id);
+    scrollToBlock(copy.id);
   };
 
   const handleSave = async (andClose = false) => {
@@ -293,6 +314,21 @@ export default function LessonBlockEditor({
                 <Plus className="w-3 h-3 mr-1" /> Add Block
               </Button>
             )}
+            {/* Preview in course player — opens new window at this lesson */}
+            {courseSlug && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const url = `${window.location.origin}/learn/${courseSlug}/player?lesson=${lessonId}&preview=admin`;
+                  window.open(url, "_blank", "noopener,noreferrer");
+                }}
+                className="text-xs h-7 border-teal-300 text-teal-700 hover:bg-teal-50"
+                title="Open lesson in course player (new window)"
+              >
+                <ExternalLink className="w-3 h-3 mr-1" /> Preview
+              </Button>
+            )}
             <Button
               size="sm"
               variant="outline"
@@ -303,7 +339,7 @@ export default function LessonBlockEditor({
               )}
             >
               {previewMode ? <EyeOff className="w-3 h-3 mr-1" /> : <Eye className="w-3 h-3 mr-1" />}
-              {previewMode ? "Edit" : "Preview"}
+              {previewMode ? "Edit" : "Preview Blocks"}
             </Button>
             <Button
               size="sm"
@@ -331,7 +367,7 @@ export default function LessonBlockEditor({
 
         <div className="flex flex-1 overflow-hidden">
           {/* Left: Canvas */}
-          <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
+          <div ref={canvasRef} className="flex-1 overflow-y-auto bg-gray-50 p-4">
             {/* Blocks canvas */}
             {previewMode ? (
               <div className="space-y-4">
@@ -348,16 +384,23 @@ export default function LessonBlockEditor({
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
                   {blocks.map((block, idx) => (
-                    <SortableBlock
+                    <div
                       key={block.id}
-                      block={block}
-                      isSelected={block.id === selectedBlockId}
-                      onSelect={() => setSelectedBlockId(block.id === selectedBlockId ? null : block.id)}
-                      onDelete={() => deleteBlock(block.id)}
-                      onDuplicate={() => duplicateBlock(block.id)}
-                      onMoveUp={idx > 0 ? () => moveBlock(block.id, -1) : undefined}
-                      onMoveDown={idx < blocks.length - 1 ? () => moveBlock(block.id, 1) : undefined}
-                    />
+                      ref={el => {
+                        if (el) blockRefs.current.set(block.id, el);
+                        else blockRefs.current.delete(block.id);
+                      }}
+                    >
+                      <SortableBlock
+                        block={block}
+                        isSelected={block.id === selectedBlockId}
+                        onSelect={() => setSelectedBlockId(block.id === selectedBlockId ? null : block.id)}
+                        onDelete={() => deleteBlock(block.id)}
+                        onDuplicate={() => duplicateBlock(block.id)}
+                        onMoveUp={idx > 0 ? () => moveBlock(block.id, -1) : undefined}
+                        onMoveDown={idx < blocks.length - 1 ? () => moveBlock(block.id, 1) : undefined}
+                      />
+                    </div>
                   ))}
                 </SortableContext>
               </DndContext>
