@@ -281,7 +281,7 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
                     <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="aaus">All About Ultrasound</SelectItem>
-                      <SelectItem value="iheartecho">iHeartEcho</SelectItem>
+                      <SelectItem value="iheartecho">iHeartEcho™</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -394,8 +394,8 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
                       <Select value={brand} onValueChange={v => setBrand(v as any)}>
                         <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="aaus">All About Ultrasound</SelectItem>
-                          <SelectItem value="iheartecho">iHeartEcho</SelectItem>
+                          <SelectItem value="aaus">All About Ultrasound™</SelectItem>
+                          <SelectItem value="iheartecho">iHeartEcho™</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1227,7 +1227,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
             <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="aaus">All About Ultrasound™</SelectItem>
-              <SelectItem value="iheartecho">iHeartEcho</SelectItem>
+              <SelectItem value="iheartecho">iHeartEcho™</SelectItem>
             </SelectContent>
           </Select>
         </div>

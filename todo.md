@@ -1960,3 +1960,8 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 
 ## Bug Fixes (May 18 — continued)
 - [x] Fix FunnelBuilder: Add missing ChevronUp import from lucide-react
+
+## Branding Fixes (May 18 — continued)
+- [x] Add TM symbol to iHeartEcho™ in LMS course brand selector (3 locations in LMSAdmin.tsx)
+- [x] Add TM symbol to iHeartEcho™ in Login page combined branding
+- [x] Add TM symbol to iHeartEcho™ in LMSLayout header comment

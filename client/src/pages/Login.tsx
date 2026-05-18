@@ -23,7 +23,7 @@ const isIHE = isIHeartEchoDomain();
 const BRAND_NAME = isIHE
   ? "iHeartEcho™"
   : isCombined
-  ? "All About Ultrasound™ | iHeartEcho"
+  ? "All About Ultrasound™ | iHeartEcho™"
   : "All About Ultrasound™";
 const BRAND_SUBTITLE = isIHE
   ? "EchoAssist™ Clinical Intelligence"

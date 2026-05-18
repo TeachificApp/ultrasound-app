@@ -97,7 +97,7 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
         }`}
         style={{ background: "linear-gradient(180deg, #0e1e2e 0%, #0e4a50 60%, #189aa1 100%)" }}
       >
-        {/* Header — combined "All About Ultrasound | iHeartEcho" branding */}
+        {/* Header — combined "All About Ultrasound™ | iHeartEcho™" branding */}
         <div className="px-4 py-5 flex items-center gap-2.5 border-b border-white/10">
           <div className="flex items-center gap-1 flex-shrink-0">
             <img src={AAUS_LOGO} alt="All About Ultrasound" className="w-9 h-9 rounded-full" />
