@@ -54,6 +54,7 @@ import { isIHeartEchoDomain } from "@/hooks/useSubdomain";
 const isIHE = isIHeartEchoDomain();
 
 const MODALITY_COLORS: Record<string, string> = {
+  // AAUS modalities
   Abdominal: "bg-blue-100 text-blue-700",
   Vascular: "bg-purple-100 text-purple-700",
   "OB/Gyn": "bg-pink-100 text-pink-700",
@@ -63,12 +64,14 @@ const MODALITY_COLORS: Record<string, string> = {
   Breast: "bg-rose-100 text-rose-700",
   Renal: "bg-cyan-100 text-cyan-700",
   "Fetal Echo": "bg-emerald-100 text-emerald-700",
-  "Adult TTE": "bg-blue-100 text-blue-700",
-  "TEE": "bg-violet-100 text-violet-700",
-  "Pediatric Echo": "bg-pink-100 text-pink-700",
-  "Valvular Disease": "bg-red-100 text-red-700",
-  "Cardiomyopathy": "bg-orange-100 text-orange-700",
-  "Structural Heart": "bg-indigo-100 text-indigo-700",
+  // iHeartEcho modalities (actual DB values)
+  TTE: "bg-blue-100 text-blue-700",
+  TEE: "bg-violet-100 text-violet-700",
+  Stress: "bg-amber-100 text-amber-700",
+  Pediatric: "bg-pink-100 text-pink-700",
+  HOCM: "bg-red-100 text-red-700",
+  ICE: "bg-indigo-100 text-indigo-700",
+  Fetal: "bg-emerald-100 text-emerald-700",
   Other: "bg-gray-100 text-gray-600",
 };
 
@@ -91,7 +94,8 @@ const STATUS_ICONS: Record<string, React.ElementType> = {
 };
 
 const AAUS_MODALITIES = ["All", "Abdominal", "Vascular", "OB/Gyn", "MSK", "POCUS", "Thyroid", "Breast", "Renal", "Fetal Echo", "Other"];
-const IHE_MODALITIES = ["All", "Adult TTE", "TEE", "Pediatric Echo", "Fetal Echo", "Valvular Disease", "Cardiomyopathy", "Structural Heart", "POCUS", "Other"];
+// iHeartEcho modality values must match actual DB values in echoLibraryCases.modality
+const IHE_MODALITIES = ["All", "TTE", "TEE", "Stress", "Pediatric", "HOCM", "ICE", "Fetal", "Other"];
 const MODALITIES = isIHE ? IHE_MODALITIES : AAUS_MODALITIES;
 const DIFFICULTIES = ["All", "beginner", "intermediate", "advanced"];
 

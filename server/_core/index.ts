@@ -125,6 +125,14 @@ async function startServer() {
     res.json(manifest);
   });
 
+  // Debug endpoint to check brand detection from hostname
+  app.get("/api/debug/brand", (req, res) => {
+    const hostname = req.hostname || req.headers.host?.split(":")[0] || "";
+    const xForwardedHost = req.headers["x-forwarded-host"] || "";
+    const brand = detectBrandFromHostname(hostname);
+    const brandMode = detectBrandMode(hostname);
+    res.json({ hostname, xForwardedHost, brand, brandMode });
+  });
   // Build version debug endpoint to verify deployed code
   app.get("/api/debug/build-version", (_req, res) => {
     res.json({ version: "2026-05-14-v2-api-media", deployedAt: new Date().toISOString(), spaRegex: "^/(?!media/|api/|manus-storage/).*" });
