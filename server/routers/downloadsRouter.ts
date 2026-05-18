@@ -12,9 +12,11 @@ import {
   digitalBundles,
   digitalBundleItems,
   digitalBundlePurchases,
+  users,
 } from "../../drizzle/schema";
 import { sendEmail } from "../_core/email";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
+import { sendDownloadAccessEmail, sendBundleAccessEmail } from "../lib/enrollmentEmail";
 
 // ─── Public Router ──────────────────────────────────────────────────────────
 export const downloadsPublicRouter = router({
@@ -819,6 +821,114 @@ export const downloadsAdminRouter = router({
       if (existing) throw new TRPCError({ code: "CONFLICT", message: "A bundle with this slug already exists" });
       await db.update(digitalBundles).set({ slug: input.slug }).where(eq(digitalBundles.id, input.bundleId));
       return { success: true };
+    }),
+
+  /** Admin: create a new user account (if needed) and grant them access to a digital product */
+  createAndGrantDownloadAccess: protectedProcedure
+    .input(z.object({
+      productId: z.number(),
+      name: z.string().min(1).max(100),
+      email: z.string().email(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Find or create user
+      const [existing] = await db.select({ id: users.id }).from(users)
+        .where(sql`LOWER(${users.email}) = LOWER(${input.email})`).limit(1);
+      let userId: number;
+      let isNewUser = false;
+      if (existing) {
+        userId = existing.id;
+      } else {
+        const openId = `manual_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        const [inserted] = await db.insert(users).values({
+          openId,
+          name: input.name,
+          displayName: input.name,
+          email: input.email,
+          role: "user",
+        }).$returningId();
+        userId = inserted.id;
+        isNewUser = true;
+      }
+      // Check if already has access
+      const [existingPurchase] = await db.select({ id: digitalPurchases.id }).from(digitalPurchases)
+        .where(and(eq(digitalPurchases.userId, userId), eq(digitalPurchases.productId, input.productId))).limit(1);
+      if (existingPurchase) return { purchaseId: existingPurchase.id, alreadyGranted: true, isNewUser };
+      // Grant access
+      const [result] = await db.insert(digitalPurchases).values({ userId, productId: input.productId }).$returningId();
+      // Send email asynchronously
+      void (async () => {
+        try {
+          const [product] = await db.select({ title: digitalProducts.title, slug: digitalProducts.slug })
+            .from(digitalProducts).where(eq(digitalProducts.id, input.productId)).limit(1);
+          if (!product) return;
+          await sendDownloadAccessEmail({
+            to: { name: input.name, email: input.email },
+            productTitle: product.title,
+            productSlug: product.slug,
+          });
+        } catch (e) {
+          console.error("[download-access-email] Failed:", e);
+        }
+      })();
+      return { purchaseId: result.id, alreadyGranted: false, isNewUser };
+    }),
+
+  /** Admin: create a new user account (if needed) and grant them access to a bundle */
+  createAndGrantBundleAccess: protectedProcedure
+    .input(z.object({
+      bundleId: z.number(),
+      name: z.string().min(1).max(100),
+      email: z.string().email(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Find or create user
+      const [existing] = await db.select({ id: users.id }).from(users)
+        .where(sql`LOWER(${users.email}) = LOWER(${input.email})`).limit(1);
+      let userId: number;
+      let isNewUser = false;
+      if (existing) {
+        userId = existing.id;
+      } else {
+        const openId = `manual_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        const [inserted] = await db.insert(users).values({
+          openId,
+          name: input.name,
+          displayName: input.name,
+          email: input.email,
+          role: "user",
+        }).$returningId();
+        userId = inserted.id;
+        isNewUser = true;
+      }
+      // Check if already has access
+      const [existingPurchase] = await db.select({ id: digitalBundlePurchases.id }).from(digitalBundlePurchases)
+        .where(and(eq(digitalBundlePurchases.userId, userId), eq(digitalBundlePurchases.bundleId, input.bundleId))).limit(1);
+      if (existingPurchase) return { purchaseId: existingPurchase.id, alreadyGranted: true, isNewUser };
+      // Grant access
+      const [result] = await db.insert(digitalBundlePurchases).values({ userId, bundleId: input.bundleId }).$returningId();
+      // Send email asynchronously
+      void (async () => {
+        try {
+          const [bundle] = await db.select({ title: digitalBundles.title, slug: digitalBundles.slug })
+            .from(digitalBundles).where(eq(digitalBundles.id, input.bundleId)).limit(1);
+          if (!bundle) return;
+          await sendBundleAccessEmail({
+            to: { name: input.name, email: input.email },
+            bundleTitle: bundle.title,
+            bundleSlug: bundle.slug,
+          });
+        } catch (e) {
+          console.error("[bundle-access-email] Failed:", e);
+        }
+      })();
+      return { purchaseId: result.id, alreadyGranted: false, isNewUser };
     }),
 });
 

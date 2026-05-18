@@ -1965,3 +1965,21 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add TM symbol to iHeartEcho™ in LMS course brand selector (3 locations in LMSAdmin.tsx)
 - [x] Add TM symbol to iHeartEcho™ in Login page combined branding
 - [x] Add TM symbol to iHeartEcho™ in LMSLayout header comment
+
+## Enrollment Email Extension (May 18)
+- [ ] Extend sendEnrollmentEmail helper to support all content types (course, download, bundle, quiz)
+- [ ] Add createAndEnrollUser procedure to downloadsAdminRouter (digital products)
+- [ ] Add createAndEnrollUser procedure to downloadsAdminRouter (bundles)
+- [ ] Add createAndEnrollUser procedure to sonoQuizRouter (quizzes)
+- [ ] Add EnrollStudentDialog to DigitalDownloadsAdmin page
+- [ ] Add EnrollStudentDialog to BundlesAdmin page
+- [ ] Add EnrollStudentDialog to SonoQuiz admin section in LMSAdmin
+
+## Enrollment Email Extension (May 18)
+- [x] Rewrite enrollmentEmail.ts to support all content types (course, download, bundle, quiz)
+- [x] Add createAndGrantDownloadAccess procedure to downloadsAdminRouter
+- [x] Add createAndGrantBundleAccess procedure to downloadsAdminRouter
+- [x] Add createAndInviteQuizUser procedure to sonoQuizRouter
+- [x] Add GrantDownloadAccessDialog to DigitalDownloadsAdmin (search user, create if not found, grant access + email)
+- [x] Add GrantBundleAccessDialog to BundlesAdmin (search user, create if not found, grant access + email)
+- [x] Quizzes: already covered via CourseUsersTab EnrollStudentDialog (same course editor flow)

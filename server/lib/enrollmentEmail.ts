@@ -1,12 +1,15 @@
 /**
  * enrollmentEmail.ts
- * Sends a welcome/enrollment confirmation email to a student when they enroll in a course.
- * Respects both the platform-level master switch and the per-course toggle.
+ * Sends welcome/enrollment confirmation emails when a student is granted access to
+ * any content type: course, digital download, bundle, or quiz.
+ * Respects both the platform-level master switch and per-item toggles.
  */
 
 const SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send";
 const brandColor = "#0d9488";
 const brandDark = "#0e4a50";
+
+export type ContentType = "course" | "download" | "bundle" | "quiz";
 
 function emailWrapper(content: string): string {
   return `<!DOCTYPE html>
@@ -14,7 +17,7 @@ function emailWrapper(content: string): string {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Welcome to Your Course</title>
+  <title>Welcome</title>
 </head>
 <body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px;">
@@ -50,6 +53,45 @@ function emailWrapper(content: string): string {
 </html>`;
 }
 
+async function deliverEmail(opts: {
+  to: { name: string; email: string };
+  subject: string;
+  htmlBody: string;
+}): Promise<boolean> {
+  const apiKey = process.env.SENDGRID_API_KEY;
+  const senderEmail = process.env.SENDGRID_FROM_EMAIL || "noreply@allaboutultrasound.com";
+  const senderName = process.env.SENDGRID_FROM_NAME || "All About Ultrasound™";
+  if (!apiKey) {
+    console.warn("[enrollment-email] SENDGRID_API_KEY not set — skipping email");
+    return false;
+  }
+  const payload = {
+    personalizations: [{ to: [{ name: opts.to.name, email: opts.to.email }], subject: opts.subject }],
+    from: { name: senderName, email: senderEmail },
+    reply_to: { name: senderName, email: senderEmail },
+    content: [{ type: "text/html", value: opts.htmlBody }],
+    tracking_settings: { click_tracking: { enable: false }, open_tracking: { enable: false } },
+  };
+  try {
+    const res = await fetch(SENDGRID_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error(`[enrollment-email] SendGrid error ${res.status}: ${text}`);
+      return false;
+    }
+    console.log(`[enrollment-email] Sent enrollment email to ${opts.to.email}`);
+    return true;
+  } catch (err) {
+    console.error("[enrollment-email] Failed:", err);
+    return false;
+  }
+}
+
+// ─── Course Enrollment Email ──────────────────────────────────────────────────
 export async function sendEnrollmentEmail(opts: {
   to: { name: string; email: string };
   courseTitle: string;
@@ -57,25 +99,12 @@ export async function sendEnrollmentEmail(opts: {
   customSubject?: string | null;
   customIntro?: string | null;
 }): Promise<boolean> {
-  const apiKey = process.env.SENDGRID_API_KEY;
-  const senderEmail = process.env.SENDGRID_FROM_EMAIL || "noreply@allaboutultrasound.com";
-  const senderName = process.env.SENDGRID_FROM_NAME || "All About Ultrasound™";
-
-  if (!apiKey) {
-    console.warn("[enrollment-email] SENDGRID_API_KEY not set — skipping email");
-    return false;
-  }
-
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
   const subject = opts.customSubject || `Welcome to "${opts.courseTitle}" 🎉`;
-
-  // Build the course URL — use the production domain
   const courseUrl = `https://learn.allaboutultrasound.com/courses/${opts.courseSlug}`;
-
   const introHtml = opts.customIntro
     ? `<div style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.6;">${opts.customIntro}</div>`
     : "";
-
   const htmlBody = emailWrapper(`
     <h2 style="margin:0 0 8px;font-size:22px;color:${brandDark};font-family:Georgia,serif;">
       Welcome, ${firstName}! 🎉
@@ -103,41 +132,133 @@ export async function sendEnrollmentEmail(opts: {
       If you have any questions, reply to this email or visit our help center.
     </p>
   `);
+  return deliverEmail({ to: opts.to, subject, htmlBody });
+}
 
-  const payload = {
-    personalizations: [
-      {
-        to: [{ name: opts.to.name, email: opts.to.email }],
-        subject,
-      },
-    ],
-    from: { name: senderName, email: senderEmail },
-    reply_to: { name: senderName, email: senderEmail },
-    content: [{ type: "text/html", value: htmlBody }],
-    tracking_settings: {
-      click_tracking: { enable: false },
-      open_tracking: { enable: false },
-    },
-  };
+// ─── Digital Download Access Email ───────────────────────────────────────────
+export async function sendDownloadAccessEmail(opts: {
+  to: { name: string; email: string };
+  productTitle: string;
+  productSlug: string;
+  customSubject?: string | null;
+  customIntro?: string | null;
+}): Promise<boolean> {
+  const firstName = opts.to.name.split(" ")[0] || opts.to.name;
+  const subject = opts.customSubject || `Your download is ready: "${opts.productTitle}"`;
+  const filesUrl = `https://app.allaboutultrasound.com/downloads/${opts.productSlug}/files`;
+  const introHtml = opts.customIntro
+    ? `<div style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.6;">${opts.customIntro}</div>`
+    : "";
+  const htmlBody = emailWrapper(`
+    <h2 style="margin:0 0 8px;font-size:22px;color:${brandDark};font-family:Georgia,serif;">
+      Hi ${firstName}, your download is ready! 📥
+    </h2>
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
+      You've been granted access to <strong style="color:${brandDark};">${opts.productTitle}</strong>.
+    </p>
+    ${introHtml}
+    <div style="background:#f0fbfc;border-left:3px solid ${brandColor};padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">
+      <p style="margin:0;font-size:14px;color:#0e4a50;font-weight:600;">Accessing your files:</p>
+      <ul style="margin:8px 0 0;padding-left:20px;font-size:14px;color:#475569;">
+        <li style="margin:4px 0;">Click the button below to access your download files</li>
+        <li style="margin:4px 0;">Files are available anytime from your account</li>
+        <li style="margin:4px 0;">Contact support if you experience any issues</li>
+      </ul>
+    </div>
+    <div style="text-align:center;margin:28px 0;">
+      <a href="${filesUrl}"
+        style="display:inline-block;background:linear-gradient(135deg,${brandColor},#4ad9e0);color:#ffffff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;">
+        Access Your Files
+      </a>
+    </div>
+    <p style="margin:0;font-size:13px;color:#94a3b8;text-align:center;">
+      If you have any questions, reply to this email or visit our help center.
+    </p>
+  `);
+  return deliverEmail({ to: opts.to, subject, htmlBody });
+}
 
-  try {
-    const res = await fetch(SENDGRID_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) {
-      const text = await res.text();
-      console.error(`[enrollment-email] SendGrid error ${res.status}: ${text}`);
-      return false;
-    }
-    console.log(`[enrollment-email] Sent enrollment email for "${opts.courseTitle}" to ${opts.to.email}`);
-    return true;
-  } catch (err) {
-    console.error("[enrollment-email] Failed:", err);
-    return false;
-  }
+// ─── Bundle Access Email ──────────────────────────────────────────────────────
+export async function sendBundleAccessEmail(opts: {
+  to: { name: string; email: string };
+  bundleTitle: string;
+  bundleSlug: string;
+  customSubject?: string | null;
+  customIntro?: string | null;
+}): Promise<boolean> {
+  const firstName = opts.to.name.split(" ")[0] || opts.to.name;
+  const subject = opts.customSubject || `You've been granted access to "${opts.bundleTitle}"`;
+  const bundleUrl = `https://app.allaboutultrasound.com/downloads/bundle/${opts.bundleSlug}`;
+  const introHtml = opts.customIntro
+    ? `<div style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.6;">${opts.customIntro}</div>`
+    : "";
+  const htmlBody = emailWrapper(`
+    <h2 style="margin:0 0 8px;font-size:22px;color:${brandDark};font-family:Georgia,serif;">
+      Hi ${firstName}, your bundle is ready! 📦
+    </h2>
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
+      You've been granted access to the <strong style="color:${brandDark};">${opts.bundleTitle}</strong> bundle.
+    </p>
+    ${introHtml}
+    <div style="background:#f0fbfc;border-left:3px solid ${brandColor};padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">
+      <p style="margin:0;font-size:14px;color:#0e4a50;font-weight:600;">What's included:</p>
+      <ul style="margin:8px 0 0;padding-left:20px;font-size:14px;color:#475569;">
+        <li style="margin:4px 0;">Access all products in this bundle from your account</li>
+        <li style="margin:4px 0;">Download files are available immediately</li>
+        <li style="margin:4px 0;">Contact support if you need assistance</li>
+      </ul>
+    </div>
+    <div style="text-align:center;margin:28px 0;">
+      <a href="${bundleUrl}"
+        style="display:inline-block;background:linear-gradient(135deg,${brandColor},#4ad9e0);color:#ffffff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;">
+        Access Your Bundle
+      </a>
+    </div>
+    <p style="margin:0;font-size:13px;color:#94a3b8;text-align:center;">
+      If you have any questions, reply to this email or visit our help center.
+    </p>
+  `);
+  return deliverEmail({ to: opts.to, subject, htmlBody });
+}
+
+// ─── Quiz Access Email ────────────────────────────────────────────────────────
+export async function sendQuizAccessEmail(opts: {
+  to: { name: string; email: string };
+  quizTitle: string;
+  customSubject?: string | null;
+  customIntro?: string | null;
+}): Promise<boolean> {
+  const firstName = opts.to.name.split(" ")[0] || opts.to.name;
+  const subject = opts.customSubject || `You've been invited to "${opts.quizTitle}"`;
+  const appUrl = `https://app.allaboutultrasound.com`;
+  const introHtml = opts.customIntro
+    ? `<div style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.6;">${opts.customIntro}</div>`
+    : "";
+  const htmlBody = emailWrapper(`
+    <h2 style="margin:0 0 8px;font-size:22px;color:${brandDark};font-family:Georgia,serif;">
+      Hi ${firstName}, you've been invited! 🎯
+    </h2>
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
+      You've been invited to participate in <strong style="color:${brandDark};">${opts.quizTitle}</strong>.
+    </p>
+    ${introHtml}
+    <div style="background:#f0fbfc;border-left:3px solid ${brandColor};padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">
+      <p style="margin:0;font-size:14px;color:#0e4a50;font-weight:600;">How to join:</p>
+      <ul style="margin:8px 0 0;padding-left:20px;font-size:14px;color:#475569;">
+        <li style="margin:4px 0;">Log in to your account when the quiz session starts</li>
+        <li style="margin:4px 0;">Your instructor will share the session link</li>
+        <li style="margin:4px 0;">Compete in real-time with other participants</li>
+      </ul>
+    </div>
+    <div style="text-align:center;margin:28px 0;">
+      <a href="${appUrl}"
+        style="display:inline-block;background:linear-gradient(135deg,${brandColor},#4ad9e0);color:#ffffff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;">
+        Go to Platform
+      </a>
+    </div>
+    <p style="margin:0;font-size:13px;color:#94a3b8;text-align:center;">
+      If you have any questions, reply to this email or visit our help center.
+    </p>
+  `);
+  return deliverEmail({ to: opts.to, subject, htmlBody });
 }

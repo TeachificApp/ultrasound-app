@@ -694,4 +694,52 @@ export const sonoQuizRouter = router({
         .limit(20);
       return sessions;
     }),
+
+  /** Admin: create a new user account (if needed) and send them a quiz invitation email */
+  createAndInviteQuizUser: protectedProcedure
+    .input(z.object({
+      quizId: z.number(),
+      name: z.string().min(1).max(100),
+      email: z.string().email(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requireAdmin(ctx.user.id);
+      const db = (await getDb())!;
+      // Find or create user
+      const [existing] = await db.select({ id: users.id }).from(users)
+        .where(sql`LOWER(${users.email}) = LOWER(${input.email})`).limit(1);
+      let userId: number;
+      let isNewUser = false;
+      if (existing) {
+        userId = existing.id;
+      } else {
+        const openId = `manual_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        const [inserted] = await db.insert(users).values({
+          openId,
+          name: input.name,
+          displayName: input.name,
+          email: input.email,
+          role: "user",
+        }).$returningId();
+        userId = inserted.id;
+        isNewUser = true;
+      }
+      // Get quiz details
+      const [quiz] = await db.select({ title: sonoQuizzes.title }).from(sonoQuizzes)
+        .where(eq(sonoQuizzes.id, input.quizId)).limit(1);
+      if (!quiz) throw new TRPCError({ code: "NOT_FOUND", message: "Quiz not found" });
+      // Send invitation email asynchronously
+      void (async () => {
+        try {
+          const { sendQuizAccessEmail } = await import("../lib/enrollmentEmail");
+          await sendQuizAccessEmail({
+            to: { name: input.name, email: input.email },
+            quizTitle: quiz.title,
+          });
+        } catch (e) {
+          console.error("[quiz-invite-email] Failed:", e);
+        }
+      })();
+      return { userId, isNewUser };
+    }),
 });

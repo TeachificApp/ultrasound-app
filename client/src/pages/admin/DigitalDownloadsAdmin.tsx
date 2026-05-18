@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Copy, Upload, FileIcon, GripVertical, ArrowLeft, ExternalLink, Eye, EyeOff, Image as ImageIcon, Link as LinkIcon, Users } from "lucide-react";
+import { Plus, Pencil, Trash2, Copy, Upload, FileIcon, GripVertical, ArrowLeft, ExternalLink, Eye, EyeOff, Image as ImageIcon, Link as LinkIcon, Users, UserPlus, Loader2 } from "lucide-react";
 import RichTextEditor from "@/components/RichTextEditor";
 
 // ─── Product List View ──────────────────────────────────────────────────────
@@ -129,6 +129,7 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
   const { data: product, isLoading } = trpc.downloadsAdmin.get.useQuery({ id: productId });
   const [, navigate] = useLocation();
   const utils = trpc.useUtils();
+  const [showGrantDialog, setShowGrantDialog] = useState(false);
   const updateMut = trpc.downloadsAdmin.update.useMutation({
     onSuccess: () => { utils.downloadsAdmin.get.invalidate({ id: productId }); utils.downloadsAdmin.list.invalidate(); toast.success("Saved"); },
     onError: (e) => toast.error(e.message),
@@ -396,13 +397,91 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
         </CardContent>
       </Card>
 
-      <div className="flex justify-end gap-2">
-        <Button variant="outline" onClick={onBack}>Cancel</Button>
-        <Button onClick={handleSave} disabled={updateMut.isPending}>
-          {updateMut.isPending ? "Saving..." : "Save Changes"}
+      <div className="flex justify-between gap-2">
+        <Button variant="outline" size="sm" className="text-teal-600 border-teal-300 hover:bg-teal-50" onClick={() => setShowGrantDialog(true)}>
+          <UserPlus className="w-4 h-4 mr-1" /> Grant Access to Student
         </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={onBack}>Cancel</Button>
+          <Button onClick={handleSave} disabled={updateMut.isPending}>
+            {updateMut.isPending ? "Saving..." : "Save Changes"}
+          </Button>
+        </div>
       </div>
+      <GrantDownloadAccessDialog open={showGrantDialog} productId={productId} onClose={() => setShowGrantDialog(false)} />
     </div>
+  );
+}
+
+// ─── Grant Download Access Dialog ──────────────────────────────────────────
+function GrantDownloadAccessDialog({ open, productId, onClose }: { open: boolean; productId: number; onClose: () => void }) {
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [searchResult, setSearchResult] = useState<{ id: number; name: string | null; email: string | null } | null | undefined>(undefined);
+  const findUser = trpc.platformAdmin.findUserByEmail.useMutation({
+    onSuccess: (data) => setSearchResult(data as any ?? null),
+    onError: () => setSearchResult(null),
+  });
+  const grantAccess = trpc.downloadsAdmin.createAndGrantDownloadAccess.useMutation({
+    onSuccess: (data) => {
+      if (data.alreadyGranted) {
+        toast.info("This user already has access to this product.");
+      } else {
+        toast.success(data.isNewUser ? "New account created and access granted! Invitation email sent." : "Access granted and notification email sent.");
+      }
+      setEmail(""); setName(""); setSearchResult(undefined); onClose();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const handleSearch = () => {
+    if (!email.trim() || !email.includes("@")) { toast.error("Enter a valid email"); return; }
+    findUser.mutate({ email: email.trim() });
+  };
+  const handleGrant = () => {
+    if (!email.trim()) { toast.error("Email is required"); return; }
+    if (searchResult === null && !name.trim()) { toast.error("Name is required for new accounts"); return; }
+    const resolvedName = (searchResult?.name ?? name.trim()) || email.split("@")[0];
+    grantAccess.mutate({ productId, email: email.trim(), name: resolvedName });
+  };
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle className="flex items-center gap-2"><UserPlus className="w-5 h-5 text-teal-600" /> Grant Download Access</DialogTitle></DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-1">
+            <Label>Student Email</Label>
+            <div className="flex gap-2">
+              <Input type="email" placeholder="student@example.com" value={email} onChange={(e) => { setEmail(e.target.value); setSearchResult(undefined); }} />
+              <Button size="sm" variant="outline" onClick={handleSearch} disabled={findUser.isPending}>
+                {findUser.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Search"}
+              </Button>
+            </div>
+          </div>
+          {searchResult === null && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-3">
+              <p className="text-sm text-amber-800 font-medium">No account found. A new account will be created.</p>
+              <div className="space-y-1">
+                <Label>Full Name (for new account)</Label>
+                <Input placeholder="Jane Smith" value={name} onChange={(e) => setName(e.target.value)} />
+              </div>
+            </div>
+          )}
+          {searchResult && (
+            <div className="bg-teal-50 border border-teal-200 rounded-lg p-3">
+              <p className="text-sm text-teal-800 font-medium">Found: {searchResult.name ?? searchResult.email}</p>
+              <p className="text-xs text-teal-600">{searchResult.email}</p>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleGrant} disabled={grantAccess.isPending || searchResult === undefined}>
+            {grantAccess.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <UserPlus className="w-4 h-4 mr-1" />}
+            {searchResult === null ? "Create & Grant Access" : "Grant Access"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
