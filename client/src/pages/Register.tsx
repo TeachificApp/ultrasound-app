@@ -6,7 +6,7 @@
 import { useEffect } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "wouter";
-import { THINKIFIC_FREE_MEMBERSHIP_URL, THINKIFIC_FREE_MEMBERSHIP_PAGE } from "@/const";
+import { getThinkificFreeUrl } from "@/const";
 import { Loader2, Heart, ExternalLink, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -25,7 +25,7 @@ export default function Register() {
   // Auto-redirect to Thinkific enrollment after a short delay
   useEffect(() => {
     const timer = setTimeout(() => {
-      window.location.href = THINKIFIC_FREE_MEMBERSHIP_URL;
+      window.location.href = getThinkificFreeUrl();
     }, 2500);
     return () => clearTimeout(timer);
   }, []);
@@ -81,7 +81,7 @@ export default function Register() {
         </div>
 
         {/* Manual redirect button */}
-        <a href={THINKIFIC_FREE_MEMBERSHIP_URL} className="block w-full">
+        <a href={getThinkificFreeUrl()} className="block w-full">
           <Button className="w-full gap-2 text-white" style={{ background: BRAND }}>
             <ExternalLink className="w-4 h-4" />
             Go to Free Enrollment Now

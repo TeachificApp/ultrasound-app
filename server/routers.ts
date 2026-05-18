@@ -509,8 +509,19 @@ export const appRouter = router({
         // Determine the openId for session creation
         // Email/password accounts use synthetic openId; OAuth accounts use their real openId
         const openId = user.openId ?? `email:${user.email!.toLowerCase().trim()}`;
-        const name = user.displayName || user.name || user.email || '';
 
+        // Persist openId if this user was created without one (e.g. admin grant-access enrolled users).
+        // Without this, getUserByOpenId fails on every subsequent request and the session
+        // appears to be logged out immediately after the magic link is consumed.
+        if (!user.openId) {
+          const { getDb: _gdb } = await import('./db');
+          const { users: _u } = await import('../drizzle/schema');
+          const { eq: _eq } = await import('drizzle-orm');
+          const _db = await _gdb();
+          if (_db) await _db.update(_u).set({ openId }).where(_eq(_u.id, user.id));
+        }
+
+        const name = user.displayName || user.name || user.email || '';
         const sessionToken = await sdk.createSessionToken(openId, {
           name,
           expiresInMs: ONE_YEAR_MS,

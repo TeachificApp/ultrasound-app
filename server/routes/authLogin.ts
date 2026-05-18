@@ -132,17 +132,26 @@ export function registerAuthLoginRoute(app: Express) {
         return res.status(401).json({ error: "This magic link has expired. Please request a new one." });
       }
 
-      // Consume the token
+      // Consume the token — also persist openId if this user was created without one
+      // (e.g. admin-enrolled users created via grant-access have openId = null)
+      const openId = user.openId ?? emailOpenId(user.email ?? "");
+      const updateFields: Record<string, unknown> = {
+        magicLinkToken: null,
+        magicLinkExpiry: null,
+        emailVerified: true,
+      };
+      if (!user.openId) {
+        updateFields.openId = openId;
+      }
       await db
         .update(users)
-        .set({ magicLinkToken: null, magicLinkExpiry: null, emailVerified: true })
+        .set(updateFields as any)
         .where(eq(users.id, user.id));
 
       // Ensure the user has the base "user" role (idempotent)
       await ensureUserRole(user.id);
 
       // Issue session cookie
-      const openId = user.openId ?? emailOpenId(user.email ?? "");
       const sessionToken = await sdk.createSessionToken(openId, {
         name: user.name ?? user.email ?? "",
         expiresInMs: ONE_YEAR_MS,

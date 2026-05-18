@@ -1,28 +1,110 @@
 /**
- * Premium Access page — explains the $9.97/month or $99.97/year plan and handles checkout redirect.
+ * Premium Access page — brand-aware for AAUS (general ultrasound) and iHeartEcho (echo/cardiac).
+ * Shows the correct copy, features, and Thinkific checkout links per brand.
  * Also handles the post-checkout sync when the user returns from checkout.
  */
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import {
   Crown, Check, Sparkles, ArrowRight, RefreshCw,
-  Stethoscope, BookOpen, Zap, Activity, Users, FileText,
-  Star, Shield, Clock, Layers, Infinity
+  Stethoscope, BookOpen, Zap, Activity, FileText,
+  Star, Shield, Clock, Layers, Infinity, Heart, Waves
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import Layout from "@/components/Layout";
-import { getThinkificPremiumMonthlyUrl, getThinkificPremiumAnnualUrl } from "@/const";
+import { getThinkificPremiumMonthlyUrlBrand, getThinkificPremiumAnnualUrlBrand } from "@/const";
+import { detectBrand } from "@/hooks/useBrand";
 import { toast } from "sonner";
 
-// Dynamic checkout URLs — include redirect_url so users land on /enrolled after purchase
-const CHECKOUT_URL_MONTHLY = typeof window !== "undefined" ? getThinkificPremiumMonthlyUrl() : "https://member.allaboutultrasound.com/enroll/3714929?price_id=4664974";
-const CHECKOUT_URL_ANNUAL = typeof window !== "undefined" ? getThinkificPremiumAnnualUrl() : "https://member.allaboutultrasound.com/enroll/3714929?price_id=4664977";
+// ─── Brand-specific content ───────────────────────────────────────────────────
 
-const PREMIUM_FEATURES = [
+const AAUS_PREMIUM_FEATURES = [
+  {
+    icon: Waves,
+    title: "Abdominal & Vascular Navigators",
+    description: "Aorta, IVC, renal, hepatic, portal, and mesenteric vessel protocols with ScanCoach guidance.",
+  },
+  {
+    icon: Activity,
+    title: "OB/GYN Advanced Modules",
+    description: "2nd/3rd trimester ScanCoach, fetal echo ScanCoach, and pelvic/GYN advanced scanning protocols.",
+  },
   {
     icon: Stethoscope,
+    title: "MSK & Small Parts Navigators",
+    description: "Thyroid, breast, scrotum, appendix, and invasive procedure ScanCoaches with premium scan guidance.",
+  },
+  {
+    icon: Activity,
+    title: "POCUS RUSH & Lung POCUS Modules",
+    description: "RUSH protocol navigator and ScanCoach, Lung POCUS 8-zone protocol, B-lines, BLUE protocol, and pleural assessment.",
+  },
+  {
+    icon: Zap,
+    title: "UltrasoundAssist™ Premium Engines",
+    description: "Advanced vascular resistance, hemodynamic calculators, and specialty-specific clinical decision tools.",
+  },
+  {
+    icon: FileText,
+    title: "Report Builder",
+    description: "Generate complete, structured ultrasound reports instantly from your measurements with guideline-compliant clinical narratives.",
+  },
+  {
+    icon: BookOpen,
+    title: "Unlimited Case Library",
+    description: "Full access to 500+ ultrasound cases with images, video, and critical thinking questions. Free members get 50 cases.",
+  },
+  {
+    icon: Layers,
+    title: "Unlimited Ultrasound Flashcards",
+    description: "Unlimited daily flashcard access with random rotation. Free members get 10 per day, resetting at midnight.",
+  },
+  {
+    icon: Activity,
+    title: "Daily Challenge Archive",
+    description: "Full archive of past daily challenges. Free members get today's challenge only — premium unlocks the complete history.",
+  },
+  {
+    icon: Shield,
+    title: "Accreditation Navigator",
+    description: "IAC standards guide with search across all ultrasound modality accreditation requirements.",
+  },
+];
+
+const AAUS_FREE_FEATURES = [
+  "Ultrasound Case Library — 50 cases (mix of image/video and text-based)",
+  "Daily Challenge — today's challenge only (no archive access)",
+  "Ultrasound Flashcards — 10 per day, random rotation, resets at midnight",
+  "Abdominal Navigator (liver, gallbladder, pancreas, spleen, kidneys)",
+  "OB 1st Trimester Navigator & ScanCoach",
+  "Pelvic/GYN Navigator",
+  "Thyroid, Breast, Scrotum Navigators",
+  "Vascular Navigator (DVT, carotid, aorta)",
+  "Cardiac POCUS, eFAST Navigator & ScanCoach",
+  "UltrasoundAssist™ core clinical engines",
+  "Community Hub access",
+];
+
+const AAUS_PREMIUM_ONLY_LABELS = [
+  "Abdominal & Vascular ScanCoaches (premium scanning guidance)",
+  "OB 2nd/3rd Trimester ScanCoach",
+  "Fetal Echo ScanCoach",
+  "Pelvic/GYN, Thyroid, Breast, Scrotum ScanCoaches",
+  "MSK & Invasive Procedure ScanCoaches",
+  "POCUS RUSH & Lung POCUS Modules",
+  "UltrasoundAssist™ advanced clinical engines",
+  "Report Builder",
+  "Unlimited Case Library (500+ cases)",
+  "Unlimited Ultrasound Flashcards (no daily limit)",
+  "Daily Challenge Archive (full history)",
+  "Accreditation Navigator",
+];
+
+const IHE_PREMIUM_FEATURES = [
+  {
+    icon: Heart,
     title: "Stress Echo Navigator & ScanCoach",
     description: "Exercise and DSE protocols, 17-segment WMSI scorer, StressEchoAssist™ engine, and interpretation criteria.",
   },
@@ -32,7 +114,7 @@ const PREMIUM_FEATURES = [
     description: "Right heart and pulmonary pressure assessment, PH probability, RVSP, RV function, PE echo signs, and risk stratification.",
   },
   {
-    icon: Stethoscope,
+    icon: Heart,
     title: "HOCM Navigator & ScanCoach",
     description: "HOCM morphology, SAM grading, resting and provoked LVOT gradients, Valsalva, MR evaluation, and HOCM LVOT Gradient calculator.",
   },
@@ -42,7 +124,7 @@ const PREMIUM_FEATURES = [
     description: "ME, TG, and UE views with angle/depth guidance, clinical applications, and intraoperative checklist.",
   },
   {
-    icon: Stethoscope,
+    icon: Heart,
     title: "ICE Navigator & ScanCoach",
     description: "Intracardiac echo views, procedural checklists, and key measurements for structural interventions.",
   },
@@ -88,7 +170,7 @@ const PREMIUM_FEATURES = [
   },
 ];
 
-const FREE_FEATURES = [
+const IHE_FREE_FEATURES = [
   "Echo Case Library — 50 cases (mix of image/video and text-based)",
   "Daily Challenge — today's challenge only (no archive access)",
   "Ultrasound Flashcards — 10 per day, random rotation, resets at midnight",
@@ -104,7 +186,7 @@ const FREE_FEATURES = [
   "Community Hub access",
 ];
 
-const PREMIUM_ONLY_LABELS = [
+const IHE_PREMIUM_ONLY_LABELS = [
   "Stress Echo, Pulmonary HTN, HOCM, TEE, ICE & Structural Heart Navigators",
   "Stress Echo, HOCM, TEE, ICE & Structural Heart ScanCoaches",
   "POCUS RUSH & Lung POCUS Modules",
@@ -119,11 +201,45 @@ const PREMIUM_ONLY_LABELS = [
   "OB 2nd/3rd Trimester ScanCoach",
 ];
 
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export default function Premium() {
   const { user, loading: authLoading } = useAuth();
   const [, navigate] = useLocation();
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+
+  const brand = detectBrand();
+  const isIHE = brand === "iheartecho";
+
+  // Brand-specific content
+  const premiumFeatures = isIHE ? IHE_PREMIUM_FEATURES : AAUS_PREMIUM_FEATURES;
+  const freeFeatures = isIHE ? IHE_FREE_FEATURES : AAUS_FREE_FEATURES;
+  const premiumOnlyLabels = isIHE ? IHE_PREMIUM_ONLY_LABELS : AAUS_PREMIUM_ONLY_LABELS;
+
+  const heroTitle = isIHE
+    ? "The Complete Echo Clinical Suite"
+    : "The Complete Ultrasound Clinical Suite";
+
+  const heroSubtitle = isIHE
+    ? "Everything a sonographer, echocardiographer, or echo professional needs — protocols, calculators, cases, and AI tools — in one guideline-based platform."
+    : "Everything a sonographer or ultrasound professional needs — protocols, calculators, cases, and AI tools — in one guideline-based platform.";
+
+  const badgeLabel = isIHE
+    ? "iHeartEcho™ Premium Access"
+    : "All About Ultrasound™ Premium Access";
+
+  const everythingIncludedSubtitle = isIHE
+    ? "All echo tools, all protocols, all cases — one subscription."
+    : "All ultrasound tools, all protocols, all cases — one subscription.";
+
+  // Brand-aware Thinkific checkout URLs (computed once on mount to avoid SSR issues)
+  const [checkoutMonthly, setCheckoutMonthly] = useState("");
+  const [checkoutAnnual, setCheckoutAnnual] = useState("");
+  useEffect(() => {
+    setCheckoutMonthly(getThinkificPremiumMonthlyUrlBrand());
+    setCheckoutAnnual(getThinkificPremiumAnnualUrlBrand());
+  }, []);
 
   const { data: status, isLoading: statusLoading, refetch } = trpc.premium.getStatus.useQuery(
     undefined,
@@ -186,17 +302,16 @@ export default function Premium() {
           <div className="max-w-2xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 mb-5">
               <Crown className="w-4 h-4 text-amber-400" />
-              <span className="text-sm text-white/90 font-medium">All About Ultrasound™ Premium Access</span>
+              <span className="text-sm text-white/90 font-medium">{badgeLabel}</span>
             </div>
             <h1
               className="text-3xl md:text-5xl font-black text-white leading-tight mb-4"
               style={{ fontFamily: "Merriweather, serif" }}
             >
-              The Complete Echo Clinical Suite
+              {heroTitle}
             </h1>
             <p className="text-white/70 text-base md:text-lg leading-relaxed mb-8 max-w-xl mx-auto">
-              Everything a sonographer, cardiologist, or ACS professional needs — protocols,
-              calculators, cases, and AI tools — in one guideline-based platform.
+              {heroSubtitle}
             </p>
 
             {/* Pricing cards */}
@@ -218,7 +333,7 @@ export default function Premium() {
                     <Check className="w-4 h-4" /> Active
                   </div>
                 ) : user ? (
-                  <a href={CHECKOUT_URL_MONTHLY} target="_blank" rel="noopener noreferrer">
+                  <a href={checkoutMonthly} target="_blank" rel="noopener noreferrer">
                     <Button className="bg-[#189aa1] hover:bg-[#147a80] text-white font-bold px-6 py-2.5 text-sm rounded-xl w-full">
                       <Crown className="w-4 h-4 mr-1.5" /> Get Monthly
                     </Button>
@@ -252,7 +367,7 @@ export default function Premium() {
                     <Check className="w-4 h-4" /> Active
                   </div>
                 ) : user ? (
-                  <a href={CHECKOUT_URL_ANNUAL} target="_blank" rel="noopener noreferrer">
+                  <a href={checkoutAnnual} target="_blank" rel="noopener noreferrer">
                     <Button className="bg-[#189aa1] hover:bg-[#147a80] text-white font-bold px-6 py-2.5 text-sm rounded-xl w-full">
                       <Crown className="w-4 h-4 mr-1.5" /> Get Annual
                     </Button>
@@ -265,6 +380,7 @@ export default function Premium() {
                   </a>
                 )}
               </div>
+
               {/* Dual Membership — highlighted with gradient border */}
               <div className="bg-white rounded-2xl shadow-xl px-7 py-6 text-center flex-1 max-w-xs border-2 border-amber-400 relative">
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-[#189aa1] to-amber-400 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider whitespace-nowrap">
@@ -348,11 +464,11 @@ export default function Premium() {
           <h2 className="text-2xl font-bold text-gray-800 mb-2" style={{ fontFamily: "Merriweather, serif" }}>
             Everything Included in Premium
           </h2>
-          <p className="text-gray-500 text-sm">All tools, all protocols, all cases — one subscription.</p>
+          <p className="text-gray-500 text-sm">{everythingIncludedSubtitle}</p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-12">
-          {PREMIUM_FEATURES.map(({ icon: Icon, title, description }) => (
+          {premiumFeatures.map(({ icon: Icon, title, description }) => (
             <div
               key={title}
               className="bg-white rounded-xl border border-gray-100 p-5 hover:border-[#189aa1]/30 hover:shadow-md transition-all"
@@ -378,7 +494,7 @@ export default function Premium() {
             <div className="rounded-xl border border-gray-200 p-5">
               <div className="font-bold text-gray-500 text-sm mb-4 uppercase tracking-wider">Free</div>
               <ul className="space-y-2.5">
-                {FREE_FEATURES.map((f) => (
+                {freeFeatures.map((f) => (
                   <li key={f} className="flex items-start gap-2 text-sm text-gray-500">
                     <Check className="w-4 h-4 text-gray-300 mt-0.5 flex-shrink-0" />
                     {f}
@@ -395,7 +511,7 @@ export default function Premium() {
                 <Crown className="w-3.5 h-3.5" /> Premium
               </div>
               <ul className="space-y-2.5">
-                {PREMIUM_ONLY_LABELS.map((label) => (
+                {premiumOnlyLabels.map((label) => (
                   <li key={label} className="flex items-start gap-2 text-sm text-gray-700">
                     <Check className="w-4 h-4 text-[#189aa1] mt-0.5 flex-shrink-0" />
                     {label}
@@ -415,14 +531,14 @@ export default function Premium() {
           <div className="mt-12 text-center">
             {user ? (
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <a href={CHECKOUT_URL_MONTHLY} target="_blank" rel="noopener noreferrer">
+                <a href={checkoutMonthly} target="_blank" rel="noopener noreferrer">
                   <Button variant="outline" className="border-[#189aa1] text-[#189aa1] hover:bg-[#189aa1] hover:text-white font-bold px-8 py-3 text-base rounded-xl">
                     <Crown className="w-4 h-4 mr-2" />
                     Monthly — $9.97/mo
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                 </a>
-                <a href={CHECKOUT_URL_ANNUAL} target="_blank" rel="noopener noreferrer">
+                <a href={checkoutAnnual} target="_blank" rel="noopener noreferrer">
                   <Button className="bg-[#189aa1] hover:bg-[#147a80] text-white font-bold px-8 py-3 text-base rounded-xl">
                     <Crown className="w-4 h-4 mr-2" />
                     Annual — $99.97/yr

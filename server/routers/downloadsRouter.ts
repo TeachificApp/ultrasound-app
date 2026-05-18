@@ -841,8 +841,17 @@ export const downloadsAdminRouter = router({
       let isNewUser = false;
       if (existing) {
         userId = existing.id;
+        // Backfill openId for existing users created without one (Thinkific imports, bulk imports).
+        // Without openId the magic-link session lookup fails and the user can never log in.
+        const [existingFull] = await db.select({ openId: users.openId }).from(users)
+          .where(eq(users.id, userId)).limit(1);
+        if (!existingFull?.openId) {
+          const generatedOpenId = `email:${input.email.toLowerCase().trim()}`;
+          await db.update(users).set({ openId: generatedOpenId }).where(eq(users.id, userId));
+        }
       } else {
-        const openId = `manual_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        // New user: generate a stable email-based openId so magic link login works immediately
+        const openId = `email:${input.email.toLowerCase().trim()}`;
         const [inserted] = await db.insert(users).values({
           openId,
           name: input.name,
@@ -895,8 +904,17 @@ export const downloadsAdminRouter = router({
       let isNewUser = false;
       if (existing) {
         userId = existing.id;
+        // Backfill openId for existing users created without one (Thinkific imports, bulk imports).
+        // Without openId the magic-link session lookup fails and the user can never log in.
+        const [existingFull] = await db.select({ openId: users.openId }).from(users)
+          .where(eq(users.id, userId)).limit(1);
+        if (!existingFull?.openId) {
+          const generatedOpenId = `email:${input.email.toLowerCase().trim()}`;
+          await db.update(users).set({ openId: generatedOpenId }).where(eq(users.id, userId));
+        }
       } else {
-        const openId = `manual_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        // New user: generate a stable email-based openId so magic link login works immediately
+        const openId = `email:${input.email.toLowerCase().trim()}`;
         const [inserted] = await db.insert(users).values({
           openId,
           name: input.name,
