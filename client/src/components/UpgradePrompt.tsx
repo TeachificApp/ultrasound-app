@@ -2,12 +2,11 @@
  * UpgradePrompt — brand-aware upgrade nudge for free (non-premium) users.
  *
  * Trigger schedule (free users only, never admins or premium):
- *  1. 3 minutes after first use (once per session)
- *  2. Every 15 minutes after that (recurring)
- *  3. Always on exit-intent (mouse leaves top of viewport) — no cooldown
+ *  1. Once only: 60 seconds after first mount (per session)
+ *  2. On-demand: when a feature behind a paywall is accessed (triggerUpgradePrompt)
  *
+ * No recurring timers. No exit-intent. One passive nudge per session.
  * Dismissal: × button, backdrop click, Escape key, or "Maybe later" link.
- * No "Don't show again" option.
  */
 
 import { useEffect, useRef, useState, useCallback } from "react";
@@ -17,8 +16,7 @@ import { Button } from "@/components/ui/button";
 const PREMIUM_URL =
   "https://member.allaboutultrasound.com/enroll/3714929?price_id=4664974";
 
-const FIRST_USE_DELAY_MS = 3 * 60 * 1000;   // 3 minutes
-const RECURRING_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
+const FIRST_USE_DELAY_MS = 60 * 1000; // 60 seconds — shown once per session
 
 // ── Singleton event bus so any component can trigger the prompt ──────────────
 type Listener = (force?: boolean) => void;
@@ -73,21 +71,19 @@ export default function UpgradePrompt({ eligible }: UpgradePromptProps) {
     Math.floor(Math.random() * VALUE_PROPS.length)
   );
 
-  // Track whether a scheduled (non-exit) show is currently "in cooldown"
-  const scheduledCooldownRef = useRef(false);
+  // Track whether the one scheduled nudge has already fired this session
+  const scheduledShownRef = useRef(false);
 
   // ── Core show/dismiss ──────────────────────────────────────────────────────
   const show = useCallback(
-    (force = false) => {
+    (scheduled = false) => {
       if (!eligible) return;
-      // Exit-intent (force=true) always shows; scheduled shows respect cooldown
-      if (!force && scheduledCooldownRef.current) return;
-
-      if (!force) {
-        scheduledCooldownRef.current = true;
+      // Scheduled (timer) nudge fires at most once per session
+      if (scheduled) {
+        if (scheduledShownRef.current) return;
+        scheduledShownRef.current = true;
       }
-
-      // Rotate to a new value prop each time
+      // On-demand (paywall access) always shows regardless of session flag
       setPropIdx((i) => (i + 1) % VALUE_PROPS.length);
       setVisible(true);
     },
@@ -98,45 +94,23 @@ export default function UpgradePrompt({ eligible }: UpgradePromptProps) {
     setVisible(false);
   }, []);
 
-  // ── Timer: 3 min first use, then every 15 min ──────────────────────────────
+  // ── Timer: once only, 60 seconds after mount ─────────────────────────────
   useEffect(() => {
     if (!eligible) return;
 
-    // First fire: 3 minutes after mount
+    // Fire once, 60 seconds after the component mounts (i.e. after login)
     const firstTimer = setTimeout(() => {
-      show(false);
-
-      // After first fire, set up recurring every 15 min
-      const recurringTimer = setInterval(() => {
-        scheduledCooldownRef.current = false; // reset cooldown so next interval fires
-        show(false);
-      }, RECURRING_INTERVAL_MS);
-
-      // Cleanup recurring on unmount
-      return () => clearInterval(recurringTimer);
+      show(true); // scheduled=true → fires at most once per session
     }, FIRST_USE_DELAY_MS);
 
     return () => clearTimeout(firstTimer);
   }, [eligible, show]);
 
-  // ── Exit-intent: mouse leaves top of viewport (desktop) ───────────────────
-  useEffect(() => {
-    if (!eligible) return;
-
-    const handleMouseLeave = (e: MouseEvent) => {
-      if (e.clientY <= 0) {
-        show(true); // force = true, always fires
-      }
-    };
-
-    document.addEventListener("mouseleave", handleMouseLeave);
-    return () => document.removeEventListener("mouseleave", handleMouseLeave);
-  }, [eligible, show]);
-
   // ── Singleton bus for contextual triggers ─────────────────────────────────
   useEffect(() => {
     if (!eligible) return;
-    const handler = (force?: boolean) => show(force ?? false);
+    // On-demand paywall triggers always show (scheduled=false)
+    const handler = () => show(false);
     listeners.add(handler);
     return () => {
       listeners.delete(handler);
