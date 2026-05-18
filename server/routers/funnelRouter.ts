@@ -29,12 +29,12 @@ export const funnelRouter = router({
     const [courses, downloads, bundles] = await Promise.all([
       db.select({ id: lmsCourses.id, title: lmsCourses.title, price: lmsCourses.price, thumbnailUrl: lmsCourses.thumbnailUrl }).from(lmsCourses).orderBy(asc(lmsCourses.title)),
       db.select({ id: digitalProducts.id, title: digitalProducts.title, price: digitalProducts.price, thumbnailUrl: digitalProducts.thumbnailUrl }).from(digitalProducts).orderBy(asc(digitalProducts.title)),
-      db.select({ id: digitalBundles.id, name: digitalBundles.name, price: digitalBundles.price, thumbnailUrl: digitalBundles.thumbnailUrl }).from(digitalBundles).orderBy(asc(digitalBundles.name)),
+      db.select({ id: digitalBundles.id, title: digitalBundles.title, price: digitalBundles.discountPrice, thumbnailUrl: digitalBundles.thumbnailUrl }).from(digitalBundles).orderBy(asc(digitalBundles.title)),
     ]);
     return [
       ...courses.map(c => ({ id: c.id, type: "course" as const, name: c.title, price: c.price ?? 0, imageUrl: c.thumbnailUrl ?? "" })),
       ...downloads.map(d => ({ id: d.id, type: "download" as const, name: d.title, price: d.price ?? 0, imageUrl: d.thumbnailUrl ?? "" })),
-      ...bundles.map(b => ({ id: b.id, type: "bundle" as const, name: b.name, price: b.price ?? 0, imageUrl: b.thumbnailUrl ?? "" })),
+      ...bundles.map(b => ({ id: b.id, type: "bundle" as const, name: b.title, price: b.price ?? 0, imageUrl: b.thumbnailUrl ?? "" })),
     ];
   }),
 
@@ -137,6 +137,7 @@ export const funnelRouter = router({
         accentColor: z.string().optional(),
         bgColor: z.string().optional(),
         logoUrl: z.string().nullable().optional(),
+        customDomain: z.string().max(255).nullable().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -358,6 +359,71 @@ export const funnelRouter = router({
         isActive: original.isActive,
       });
       return { id: result[0].insertId };
+    }),
+
+  /** Copy a funnel page to a different funnel */
+  copyPageToFunnel: protectedProcedure
+    .input(z.object({ pageId: z.number(), targetFunnelId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      const [original] = await db.select().from(funnelPages).where(eq(funnelPages.id, input.pageId));
+      if (!original) throw new TRPCError({ code: "NOT_FOUND" });
+      const [targetFunnel] = await db.select({ id: funnels.id }).from(funnels).where(eq(funnels.id, input.targetFunnelId));
+      if (!targetFunnel) throw new TRPCError({ code: "NOT_FOUND", message: "Target funnel not found" });
+      const pageSlug = original.slug + "-copy-" + Date.now().toString(36).slice(-4);
+      const [maxOrder] = await db
+        .select({ max: sql<number>`COALESCE(MAX(sort_order), -1)` })
+        .from(funnelPages)
+        .where(eq(funnelPages.funnelId, input.targetFunnelId));
+      const sortOrder = (maxOrder?.max ?? -1) + 1;
+      const result = await db.insert(funnelPages).values({
+        funnelId: input.targetFunnelId,
+        pageType: original.pageType,
+        title: original.title + " (Copy)",
+        slug: pageSlug,
+        blocks: original.blocks,
+        productType: original.productType,
+        productId: original.productId,
+        customPrice: original.customPrice,
+        customPriceLabel: original.customPriceLabel,
+        orderBumpId: original.orderBumpId,
+        sortOrder,
+        isActive: original.isActive,
+      });
+      return { id: result[0].insertId };
+    }),
+
+  /** Copy a funnel page as a standalone landing page (isStandaloneLanding = true) */
+  copyPageAsStandalone: protectedProcedure
+    .input(z.object({ pageId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      const [original] = await db.select().from(funnelPages).where(eq(funnelPages.id, input.pageId));
+      if (!original) throw new TRPCError({ code: "NOT_FOUND" });
+      const pageSlug = original.slug + "-standalone-" + Date.now().toString(36).slice(-4);
+      const [maxOrder] = await db
+        .select({ max: sql<number>`COALESCE(MAX(sort_order), -1)` })
+        .from(funnelPages)
+        .where(eq(funnelPages.funnelId, original.funnelId));
+      const sortOrder = (maxOrder?.max ?? -1) + 1;
+      const result = await db.insert(funnelPages).values({
+        funnelId: original.funnelId,
+        pageType: original.pageType,
+        title: original.title + " (Standalone)",
+        slug: pageSlug,
+        blocks: original.blocks,
+        productType: original.productType,
+        productId: original.productId,
+        customPrice: original.customPrice,
+        customPriceLabel: original.customPriceLabel,
+        orderBumpId: original.orderBumpId,
+        sortOrder,
+        isActive: original.isActive,
+        isStandaloneLanding: true,
+      });
+      return { id: result[0].insertId, slug: pageSlug };
     }),
 
   /** Delete a funnel page */

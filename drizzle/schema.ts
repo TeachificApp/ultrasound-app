@@ -3219,6 +3219,8 @@ export const funnels = mysqlTable("funnels", {
   totalConversions: int("total_conversions").default(0).notNull(),
   totalRevenue: int("total_revenue").default(0).notNull(), // cents
   sortOrder: int("sort_order").default(0).notNull(),
+  // Domain/subdomain this funnel is published on (null = use default app domain)
+  customDomain: varchar("custom_domain", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -3448,24 +3450,24 @@ export type AccreditationChecklist = typeof accreditationChecklist.$inferSelect;
 export type InsertAccreditationChecklist = typeof accreditationChecklist.$inferInsert;
 
 // ─── SoundBytes Micro-Lessons ─────────────────────────────────────────────────
-export const soundBytes = mysqlTable("soundBytes", {
+export const soundBytes = mysqlTable("soundbytes", {
   id: int("id").autoincrement().primaryKey(),
   // Brand this SoundByte belongs to
   brand: mysqlEnum("brand", ["aaus", "iheartecho"]).default("iheartecho").notNull(),
-  title: varchar("title", { length: 255 }).notNull(),
-  body: longtext("body"),
+  title: text("title").notNull(),
+  description: text("description"),
   videoUrl: text("videoUrl").notNull(),
   thumbnailUrl: text("thumbnailUrl"),
   category: mysqlEnum("category", [
-    "acs", "adult_echo", "pediatric_echo", "fetal_echo", "pocus", "physics", "ecg",
+    "abdominal", "pelvic_gyn", "obstetric_1st", "obstetric_2nd_3rd", "thyroid",
+    "scrotum", "breast", "venous", "arterial", "abdominal_vascular",
+    "extracranial_carotid", "intracranial_tcd", "msk", "pocus", "physics",
+    "fetal_echo", "acs", "adult_echo", "pediatric_echo", "ecg", "general",
   ]).notNull(),
-  status: mysqlEnum("status", ["draft", "published"]).default("draft").notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
   sortOrder: int("sortOrder").default(0).notNull(),
-  displayViews: int("displayViews").default(0).notNull(),
-  createdByUserId: int("createdByUserId"),
-  publishedAt: timestamp("publishedAt"),
+  durationSeconds: int("durationSeconds"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 export type SoundByte = typeof soundBytes.$inferSelect;
 export type InsertSoundByte = typeof soundBytes.$inferInsert;
@@ -3695,10 +3697,13 @@ export const platformSettings = mysqlTable("platform_settings", {
   enrollmentEmailSubject: varchar("enrollment_email_subject", { length: 255 }),
   // Optional custom intro paragraph prepended to the enrollment email body (plain text / HTML)
   enrollmentEmailIntro: text("enrollment_email_intro"),
+    // ── Custom domains list (JSON array of domain strings) ──
+  // e.g. ["app.allaboutultrasound.com", "iheartecho.com", "courses.mysite.com"]
+  // Used by funnel domain selector to populate available domains dynamically
+  customDomains: text("custom_domains"),
   // ── Future platform-wide toggles go here ──
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
-
 export type PlatformSettings = typeof platformSettings.$inferSelect;
 
 // ─── LMS Pricing Options ──────────────────────────────────────────────────────

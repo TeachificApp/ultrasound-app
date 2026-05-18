@@ -66,6 +66,7 @@ import {
   GraduationCap,
   FileDown,
   LayoutTemplate,
+  Globe,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import BulkCsvUploadPanel, { type BulkResult } from "@/components/BulkCsvUploadPanel";
@@ -815,8 +816,79 @@ function DemoModePanel() {
 
 // ─── Enrollment Email Settings Panel ─────────────────────────────────────────
 
+function DomainManagementPanel() {
+  const { data, isLoading, refetch } = trpc.lmsAdmin.getCustomDomains.useQuery();
+  const [newDomain, setNewDomain] = useState("");
+  const updateDomains = trpc.lmsAdmin.updateCustomDomains.useMutation({
+    onSuccess: () => { refetch(); setNewDomain(""); toast.success("Domains updated"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const domains: string[] = data?.domains ?? [];
+
+  const addDomain = () => {
+    const d = newDomain.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "");
+    if (!d) return;
+    if (domains.includes(d)) { toast.error("Domain already added"); return; }
+    updateDomains.mutate({ domains: [...domains, d] });
+  };
+
+  const removeDomain = (d: string) => {
+    updateDomains.mutate({ domains: domains.filter(x => x !== d) });
+  };
+
+  return (
+    <Card className="border border-gray-200 shadow-sm">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          <Globe className="w-4 h-4 text-teal-600" /> Domain Management
+        </CardTitle>
+        <p className="text-xs text-gray-500">Add custom domains and subdomains. These appear in the funnel domain selector automatically.</p>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {isLoading ? (
+          <p className="text-xs text-gray-400">Loading...</p>
+        ) : (
+          <>
+            {domains.length === 0 && (
+              <p className="text-xs text-gray-400 italic">No custom domains added yet.</p>
+            )}
+            {domains.map(d => (
+              <div key={d} className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <Globe className="w-3.5 h-3.5 text-teal-500" />
+                  <span className="text-sm font-mono">{d}</span>
+                </div>
+                <button
+                  onClick={() => removeDomain(d)}
+                  disabled={updateDomains.isPending}
+                  className="text-red-400 hover:text-red-600 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+            <div className="flex gap-2 pt-1">
+              <Input
+                value={newDomain}
+                onChange={e => setNewDomain(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && addDomain()}
+                placeholder="e.g. app.allaboutultrasound.com"
+                className="h-8 text-sm flex-1"
+              />
+              <Button size="sm" onClick={addDomain} disabled={updateDomains.isPending || !newDomain.trim()} className="bg-teal-600 hover:bg-teal-700 text-white">
+                <Plus className="w-3.5 h-3.5 mr-1" /> Add
+              </Button>
+            </div>
+            <p className="text-xs text-gray-400">Enter domain without protocol (e.g. app.allaboutultrasound.com). Press Enter or click Add.</p>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function EnrollmentEmailSettingsPanel() {
-  const { data: settings, isLoading, refetch } = trpc.lmsAdmin.getPlatformSettings.useQuery();
+  const { data: settings, isLoading, refetch } = trpc.lmsGroup.getPlatformSettings.useQuery();
   const [emailEnabled, setEmailEnabled] = useState<boolean>(true);
   const [subject, setSubject] = useState("");
   const [intro, setIntro] = useState("");
@@ -831,13 +903,13 @@ function EnrollmentEmailSettingsPanel() {
     }
   }, [settings]);
 
-  const updateSettings = trpc.lmsAdmin.updatePlatformSettings.useMutation({
+  const updateSettings = trpc.lmsGroup.updatePlatformSettings.useMutation({
     onSuccess: () => {
       toast.success("Enrollment email settings saved.");
       setDirty(false);
       refetch();
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e: { message: string }) => toast.error(e.message),
   });
 
   const handleSave = () => {
@@ -1564,6 +1636,9 @@ export default function PlatformAdmin() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Domain Management */}
+        <DomainManagementPanel />
 
         {/* Enrollment Email Settings */}
         <EnrollmentEmailSettingsPanel />

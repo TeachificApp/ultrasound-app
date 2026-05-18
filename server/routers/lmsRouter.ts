@@ -2917,6 +2917,25 @@ Generate 3-6 sections with 2-5 lessons each. Lesson types can be: text, video (f
       })();
       return { enrollmentId: result.id, alreadyEnrolled: false, isNewUser };
     }),
+  /** Get custom domains list */
+  getCustomDomains: protectedProcedure.query(async ({ ctx }) => {
+    if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const [settings] = await db.select({ customDomains: platformSettings.customDomains }).from(platformSettings).where(eq(platformSettings.id, 1)).limit(1);
+    return { domains: settings?.customDomains ? (JSON.parse(settings.customDomains) as string[]) : [] };
+  }),
+  /** Update custom domains list */
+  updateCustomDomains: protectedProcedure
+    .input(z.object({ domains: z.array(z.string().min(1).max(255)) }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const json = JSON.stringify(input.domains);
+      await db.insert(platformSettings).values({ id: 1, customDomains: json } as any).onDuplicateKeyUpdate({ set: { customDomains: json } });
+      return { success: true };
+    }),
 });
 
 // ─── Group Manager Router ─────────────────────────────────────────────────────
@@ -3082,7 +3101,11 @@ export const lmsGroupRouter = router({
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     const [settings] = await db.select().from(platformSettings).where(eq(platformSettings.id, 1)).limit(1);
-    return settings ?? { id: 1, enrollmentEmailEnabled: true, enrollmentEmailSubject: null, enrollmentEmailIntro: null };
+    const raw = settings ?? { id: 1, enrollmentEmailEnabled: true, enrollmentEmailSubject: null, enrollmentEmailIntro: null, customDomains: null };
+    return {
+      ...raw,
+      customDomainsList: raw.customDomains ? (JSON.parse(raw.customDomains) as string[]) : [],
+    };
   }),
 
   /** Update platform settings (admin) */

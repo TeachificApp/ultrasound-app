@@ -710,10 +710,15 @@ getUserStats: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const period = input?.period ?? "30d";
+    const brand = ctx.brand as "aaus" | "iheartecho";
     let cutoff: string | null = null;
     if (period === "7d") { const d = new Date(); d.setDate(d.getDate() - 7); cutoff = d.toISOString().slice(0, 10); }
     else if (period === "30d") { const d = new Date(); d.setDate(d.getDate() - 30); cutoff = d.toISOString().slice(0, 10); }
-    const whereClause = cutoff ? gte(quickfireAttempts.setDate, cutoff) : undefined;
+    // Build WHERE clause: filter by brand (via join with quickfireDailySets) and optionally by period
+    const brandCondition = eq(quickfireDailySets.brand, brand);
+    const whereClause = cutoff
+      ? and(brandCondition, gte(quickfireAttempts.setDate, cutoff))
+      : brandCondition;
     const results = await db
       .select({
         userId: quickfireAttempts.userId,
@@ -721,6 +726,7 @@ getUserStats: protectedProcedure.query(async ({ ctx }) => {
         total: count(quickfireAttempts.id),
       })
       .from(quickfireAttempts)
+      .innerJoin(quickfireDailySets, and(eq(quickfireAttempts.setDate, quickfireDailySets.setDate), eq(quickfireDailySets.brand, brand)))
       .where(whereClause)
       .groupBy(quickfireAttempts.userId)
       .orderBy(desc(sql`SUM(CASE WHEN ${quickfireAttempts.isCorrect} = 1 THEN 1 ELSE 0 END)`))
@@ -735,8 +741,9 @@ getUserStats: protectedProcedure.query(async ({ ctx }) => {
     const allEntries = results.map((r, i) => {
       const u = userList.find((u) => u.id === r.userId);
       const rawName = u?.displayName || u?.name || "Anonymous";
+      const ownerBrandName = brand === "iheartecho" ? "iHeartEcho" : "All About Ultrasound";
       const maskedName = (u?.openId && ENV.ownerOpenId && u.openId === ENV.ownerOpenId)
-        ? "All About Ultrasound"
+        ? ownerBrandName
         : rawName;
       return {
         rank: i + 1,
@@ -1583,7 +1590,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
 
   generateDailySet: adminProcedure
     .input(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const date = input.date ?? todayDateStr();
@@ -2252,7 +2259,14 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
   getFlashcardDeck: publicProcedure
     .input(z.object({
       topic: z.string().optional(),
-      echoCategory: z.enum(["abdominal", "pelvic_gyn", "obstetric_1st", "obstetric_2nd_3rd", "fetal_echo", "venous", "arterial", "abdominal_vascular", "extracranial_carotid", "intracranial_tcd", "pocus", "physics", "thyroid", "scrotum", "breast", "msk"]).optional(),
+      echoCategory: z.enum([
+        // AAUS categories
+        "abdominal", "pelvic_gyn", "obstetric_1st", "obstetric_2nd_3rd", "fetal_echo",
+        "venous", "arterial", "abdominal_vascular", "extracranial_carotid", "intracranial_tcd",
+        "pocus", "physics", "thyroid", "scrotum", "breast", "msk",
+        // iHeartEcho categories
+        "acs", "adult", "pediatric_congenital", "fetal", "general",
+      ]).optional(),
       limit: z.number().int().min(1).max(200).default(50),
     }))
     .query(async ({ ctx, input }) => {

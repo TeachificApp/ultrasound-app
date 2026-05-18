@@ -1,6 +1,7 @@
 /**
  * SoundBytes™ Router
  * Premium micro-lesson video feature with category filtering and admin management.
+ * DB table: soundbytes (lowercase), uses isActive boolean (not status enum).
  */
 import { z } from "zod";
 import { eq, desc, and, sql } from "drizzle-orm";
@@ -23,26 +24,21 @@ import { TRPCError } from "@trpc/server";
  */
 function getPhantomViews(id: number, realViews: number): number {
   if (realViews > 3092) return realViews;
-  // Deterministic seed per ID so the number is stable across requests
-  // Range: 2351–3092 = 742 possible values
   const seed = ((id * 2654435761) >>> 0) % 742; // 0–741
   return 2351 + seed;
 }
 
 const CATEGORY_VALUES = [
-  "acs",
-  "adult_echo",
-  "pediatric_echo",
-  "fetal_echo",
-  "pocus",
-  "physics",
-  "ecg",
+  "abdominal", "pelvic_gyn", "obstetric_1st", "obstetric_2nd_3rd", "thyroid",
+  "scrotum", "breast", "venous", "arterial", "abdominal_vascular",
+  "extracranial_carotid", "intracranial_tcd", "msk", "pocus", "physics",
+  "fetal_echo", "acs", "adult_echo", "pediatric_echo", "ecg", "general",
 ] as const;
 
 export const soundBytesRouter = router({
   // ── Public / Member ──────────────────────────────────────────────────────────
 
-  /** List published SoundBytes, optionally filtered by category */
+  /** List active SoundBytes, optionally filtered by category */
   list: publicProcedure
     .input(
       z.object({
@@ -53,7 +49,7 @@ export const soundBytesRouter = router({
       const db = await getDb();
       if (!db) return [];
       const conditions: ReturnType<typeof eq>[] = [
-        eq(soundBytes.status, "published"),
+        eq(soundBytes.isActive, true),
         eq(soundBytes.brand, ctx.brand as "aaus" | "iheartecho"),
       ];
       if (input.category) {
@@ -63,15 +59,17 @@ export const soundBytesRouter = router({
         .select({
           id: soundBytes.id,
           title: soundBytes.title,
+          description: soundBytes.description,
           thumbnailUrl: soundBytes.thumbnailUrl,
+          videoUrl: soundBytes.videoUrl,
           category: soundBytes.category,
           sortOrder: soundBytes.sortOrder,
-          displayViews: soundBytes.displayViews,
-          publishedAt: soundBytes.publishedAt,
+          durationSeconds: soundBytes.durationSeconds,
+          createdAt: soundBytes.createdAt,
         })
         .from(soundBytes)
         .where(and(...conditions))
-        .orderBy(soundBytes.sortOrder, desc(soundBytes.publishedAt));
+        .orderBy(soundBytes.sortOrder, desc(soundBytes.createdAt));
 
       // Fetch real view counts for phantom calculation
       const viewCounts = await db
@@ -84,8 +82,6 @@ export const soundBytesRouter = router({
       const viewMap = new Map(viewCounts.map((v) => [v.soundByteId, v.total]));
 
       // Tag the FIRST item in each category as free-tier (1 free video per category).
-      // When a category filter is active, the first item in the filtered result is free.
-      // When showing "all" categories, the first item per category (by sort order) is free.
       const seenCategories = new Set<string>();
       return rows.map((r) => {
         const isFirstInCategory = !seenCategories.has(r.category);
@@ -98,7 +94,7 @@ export const soundBytesRouter = router({
       });
     }),
 
-  /** Get a single published SoundByte by ID (includes body + videoUrl) */
+  /** Get a single active SoundByte by ID (includes description + videoUrl) */
   getById: publicProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ input, ctx }) => {
@@ -108,18 +104,18 @@ export const soundBytesRouter = router({
       const [row] = await db
         .select()
         .from(soundBytes)
-        .where(and(eq(soundBytes.id, input.id), eq(soundBytes.status, "published"), eq(soundBytes.brand, brand)))
+        .where(and(eq(soundBytes.id, input.id), eq(soundBytes.isActive, true), eq(soundBytes.brand, brand)))
         .limit(1);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "SoundByte not found" });
 
       // Determine if this item is in the free-tier (first 4 by sort order)
       const FREE_ITEM_COUNT = 4;
-      const allPublished = await db
+      const allActive = await db
         .select({ id: soundBytes.id })
         .from(soundBytes)
-        .where(and(eq(soundBytes.status, "published"), eq(soundBytes.brand, brand)))
-        .orderBy(soundBytes.sortOrder, desc(soundBytes.publishedAt));
-      const freeIds = new Set(allPublished.slice(0, FREE_ITEM_COUNT).map((r) => r.id));
+        .where(and(eq(soundBytes.isActive, true), eq(soundBytes.brand, brand)))
+        .orderBy(soundBytes.sortOrder, desc(soundBytes.createdAt));
+      const freeIds = new Set(allActive.slice(0, FREE_ITEM_COUNT).map((r) => r.id));
       const isFree = freeIds.has(row.id);
 
       // Compute real view count for phantom calculation
@@ -177,7 +173,7 @@ export const soundBytesRouter = router({
 
   // ── Admin ─────────────────────────────────────────────────────────────────────
 
-  /** Admin: list all SoundBytes (all statuses) with view analytics */
+  /** Admin: list all SoundBytes (all active states) with view analytics */
   adminList: protectedProcedure.query(async ({ ctx }) => {
     if (ctx.user.role !== "admin") {
       throw new TRPCError({ code: "FORBIDDEN" });
@@ -189,13 +185,14 @@ export const soundBytesRouter = router({
       .select({
         id: soundBytes.id,
         title: soundBytes.title,
+        description: soundBytes.description,
         category: soundBytes.category,
-        status: soundBytes.status,
+        isActive: soundBytes.isActive,
         sortOrder: soundBytes.sortOrder,
-        displayViews: soundBytes.displayViews,
-        publishedAt: soundBytes.publishedAt,
+        durationSeconds: soundBytes.durationSeconds,
+        videoUrl: soundBytes.videoUrl,
+        thumbnailUrl: soundBytes.thumbnailUrl,
         createdAt: soundBytes.createdAt,
-        updatedAt: soundBytes.updatedAt,
       })
       .from(soundBytes)
       .where(eq(soundBytes.brand, brand))
@@ -241,30 +238,30 @@ export const soundBytesRouter = router({
     .input(
       z.object({
         title: z.string().min(1).max(255),
-        body: z.string().default(""),
+        description: z.string().default(""),
         videoUrl: z.string().min(1),
         thumbnailUrl: z.string().min(1).optional(),
         category: z.enum(CATEGORY_VALUES),
         sortOrder: z.number().int().default(0),
-        displayViews: z.number().int().min(0).default(0),
-        status: z.enum(["draft", "published"]).default("draft"),
+        durationSeconds: z.number().int().min(0).optional(),
+        isActive: z.boolean().default(true),
       })
     )
     .mutation(async ({ input, ctx }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const brand = ctx.brand as "aaus" | "iheartecho";
       const [result] = await db.insert(soundBytes).values({
         title: input.title,
-        body: input.body || null,
+        description: input.description || null,
         videoUrl: input.videoUrl,
         thumbnailUrl: input.thumbnailUrl ?? null,
         category: input.category,
         sortOrder: input.sortOrder,
-        displayViews: input.displayViews,
-        status: input.status,
-        createdByUserId: ctx.user.id,
-        publishedAt: input.status === "published" ? new Date() : null,
+        durationSeconds: input.durationSeconds ?? null,
+        isActive: input.isActive,
+        brand,
       });
       return { id: (result as any).insertId as number };
     }),
@@ -275,13 +272,13 @@ export const soundBytesRouter = router({
       z.object({
         id: z.number(),
         title: z.string().min(1).max(255).optional(),
-        body: z.string().optional(),
+        description: z.string().optional(),
         videoUrl: z.string().min(1).optional(),
         thumbnailUrl: z.string().min(1).nullable().optional(),
         category: z.enum(CATEGORY_VALUES).optional(),
         sortOrder: z.number().int().optional(),
-        displayViews: z.number().int().min(0).optional(),
-        status: z.enum(["draft", "published"]).optional(),
+        durationSeconds: z.number().int().min(0).nullable().optional(),
+        isActive: z.boolean().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -289,24 +286,7 @@ export const soundBytesRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const { id, ...fields } = input;
-
-      // Set publishedAt when publishing for the first time
-      let publishedAt: Date | null | undefined = undefined;
-      if (fields.status === "published") {
-        const [existing] = await db
-          .select({ publishedAt: soundBytes.publishedAt })
-          .from(soundBytes)
-          .where(eq(soundBytes.id, id))
-          .limit(1);
-        if (existing && !existing.publishedAt) {
-          publishedAt = new Date();
-        }
-      }
-
-      const updateData: Record<string, unknown> = { ...fields };
-      if (publishedAt !== undefined) updateData.publishedAt = publishedAt;
-
-      await db.update(soundBytes).set(updateData).where(eq(soundBytes.id, id));
+      await db.update(soundBytes).set(fields as Record<string, unknown>).where(eq(soundBytes.id, id));
       return { ok: true };
     }),
 
@@ -573,12 +553,10 @@ export const soundBytesRouter = router({
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
 
       const MIME_TO_EXT: Record<string, string> = {
-        // Images
         "image/jpeg": "jpg",
         "image/png": "png",
         "image/gif": "gif",
         "image/webp": "webp",
-        // Videos
         "video/mp4": "mp4",
         "video/webm": "webm",
         "video/ogg": "ogv",

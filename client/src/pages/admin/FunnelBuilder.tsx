@@ -77,6 +77,8 @@ interface Funnel {
   createdAt: string;
   updatedAt: string;
   pages: FunnelPage[];
+  customDomain?: string | null;
+  sortOrder?: number;
 }
 
 const PAGE_TYPE_META: Record<PageType, { label: string; icon: React.ReactNode; color: string; description: string }> = {
@@ -97,7 +99,7 @@ function FunnelListView({ onSelect, onCreate }: { onSelect: (id: number) => void
   const listSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   useEffect(() => {
-    if (funnelList) setLocalFunnels(funnelList as Funnel[]);
+    if (funnelList) setLocalFunnels(funnelList as unknown as Funnel[]);
   }, [funnelList]);
 
   const handleFunnelDragEnd = (event: DragEndEvent) => {
@@ -410,6 +412,7 @@ function FunnelSettingsPanel({ funnel, funnelId, onUpdate }: { funnel: any; funn
   const [metaTitle, setMetaTitle] = useState(funnel.metaTitle ?? "");
   const [metaDescription, setMetaDescription] = useState(funnel.metaDescription ?? "");
   const [thankYouUrl, setThankYouUrl] = useState(funnel.thankYouUrl ?? "");
+  const { data: domainsData } = trpc.lmsAdmin.getCustomDomains.useQuery();
   const updateFunnelSettings = trpc.funnel.updateFunnelSettings.useMutation({
     onSuccess: () => toast.success("Funnel settings saved"),
     onError: (e: any) => toast.error(e.message),
@@ -437,6 +440,24 @@ function FunnelSettingsPanel({ funnel, funnelId, onUpdate }: { funnel: any; funn
       <div>
         <label className="text-xs text-gray-500 block mb-1">Description</label>
         <Textarea defaultValue={funnel.description || ""} onBlur={e => onUpdate.mutate({ id: funnelId, description: e.target.value || null })} className="text-sm min-h-[60px]" />
+      </div>
+      {/* Domain Selector */}
+      <div className="border-t border-gray-100 pt-4 space-y-3">
+        <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Published Domain</h4>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Domain / Subdomain</label>
+          <select
+            className="w-full h-8 text-sm border border-gray-200 rounded-md px-2 bg-white"
+            value={funnel.customDomain ?? ""}
+            onChange={e => onUpdate.mutate({ id: funnelId, customDomain: e.target.value || null })}
+          >
+            <option value="">Default (app domain)</option>
+            {(domainsData?.domains ?? []).map((d: string) => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-400 mt-1">Domains are managed in Platform Admin → Domains. New domains appear here automatically.</p>
+        </div>
       </div>
       {/* URL & SEO */}
       <div className="border-t border-gray-100 pt-4 space-y-3">
@@ -483,6 +504,8 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
   const [showSettings, setShowSettings] = useState(false);
   const [localPages, setLocalPages] = useState<FunnelPage[]>([]);
   const [pageView, setPageView] = useState<"list" | "diagram">("list");
+  const [copyPageDialog, setCopyPageDialog] = useState<{ pageId: number; pageTitle: string } | null>(null);
+  const [copyTargetFunnelId, setCopyTargetFunnelId] = useState<string>("");
 
   const updateFunnel = trpc.funnel.update.useMutation({ onSuccess: () => { refetch(); toast.success("Updated"); } });
   const deleteFunnel = trpc.funnel.delete.useMutation({ onSuccess: () => { toast.success("Funnel deleted"); onBack(); } });
@@ -490,6 +513,9 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
   const addPage = trpc.funnel.addPage.useMutation({ onSuccess: () => { refetch(); setShowAddPage(false); toast.success("Page added"); } });
   const deletePage = trpc.funnel.deletePage.useMutation({ onSuccess: () => { refetch(); toast.success("Page deleted"); } });
   const duplicatePage = trpc.funnel.duplicatePage.useMutation({ onSuccess: () => { refetch(); toast.success("Page duplicated"); } });
+  const copyPageToFunnel = trpc.funnel.copyPageToFunnel.useMutation({ onSuccess: () => { refetch(); setCopyPageDialog(null); toast.success("Page copied to funnel!"); } });
+  const copyPageAsStandalone = trpc.funnel.copyPageAsStandalone.useMutation({ onSuccess: (d) => { refetch(); setCopyPageDialog(null); toast.success(`Standalone page created at /p/${d.slug}`); } });
+  const { data: allFunnels } = trpc.funnel.list.useQuery();
   const connectPages = trpc.funnel.connectPages.useMutation({ onSuccess: () => { refetch(); } });
   const updatePage = trpc.funnel.updatePage.useMutation({ onSuccess: () => { refetch(); toast.success("Page updated"); } });
   const saveAsTemplate = trpc.funnel.saveAsTemplate.useMutation({ onSuccess: () => { toast.success("Saved as template! It will appear in the template list when creating new funnels."); } });
@@ -500,7 +526,7 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
   useEffect(() => {
     if (funnel) {
       setNameValue(funnel.name);
-      setLocalPages(funnel.pages as FunnelPage[]);
+      setLocalPages(funnel.pages as unknown as FunnelPage[]);
     }
   }, [funnel]);
 
@@ -663,6 +689,7 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
                   funnelId={funnelId}
                   onEditPage={onEditPage}
                   onDuplicate={() => duplicatePage.mutate({ id: page.id })}
+                  onCopyPage={() => setCopyPageDialog({ pageId: page.id, pageTitle: page.title })}
                   onRename={() => { const newTitle = prompt("Page title:", page.title); if (newTitle && newTitle !== page.title) updatePage.mutate({ id: page.id, title: newTitle }); }}
                   onDelete={() => { if (confirm("Delete this page?")) deletePage.mutate({ id: page.id }); }}
                   onMoveUp={idx > 0 ? () => setLocalPages(prev => { const r = arrayMove(prev, idx, idx - 1); reorderPages.mutate({ funnelId, pageIds: r.map(p => p.id) }); return r; }) : undefined}
@@ -673,6 +700,72 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
           </div>
         </SortableContext>
       </DndContext>
+      )}
+
+      {/* Copy Page Dialog */}
+      {copyPageDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-gray-900">Copy Page</h3>
+              <button onClick={() => setCopyPageDialog(null)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+            </div>
+            <p className="text-sm text-gray-500 mb-4">Copying: <span className="font-medium text-gray-800">{copyPageDialog.pageTitle}</span></p>
+            <div className="space-y-3">
+              {/* Option 1: Duplicate within same funnel */}
+              <button
+                onClick={() => { duplicatePage.mutate({ id: copyPageDialog.pageId }); setCopyPageDialog(null); }}
+                className="w-full flex items-center gap-3 p-3 rounded-xl border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-all text-left"
+              >
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-teal-100 text-teal-600"><Copy size={16} /></div>
+                <div>
+                  <h4 className="font-medium text-gray-900 text-sm">Copy within this funnel</h4>
+                  <p className="text-xs text-gray-500">Duplicate the page and add it to the end of this funnel</p>
+                </div>
+              </button>
+              {/* Option 2: Copy to another funnel */}
+              <div className="p-3 rounded-xl border border-gray-200 space-y-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-100 text-blue-600"><ArrowLeft size={16} className="rotate-180" /></div>
+                  <div>
+                    <h4 className="font-medium text-gray-900 text-sm">Copy to another funnel</h4>
+                    <p className="text-xs text-gray-500">Add this page to a different funnel</p>
+                  </div>
+                </div>
+                <select
+                  className="w-full h-8 text-sm border border-gray-200 rounded-md px-2 bg-white"
+                  value={copyTargetFunnelId}
+                  onChange={e => setCopyTargetFunnelId(e.target.value)}
+                >
+                  <option value="">Select a funnel...</option>
+                  {(allFunnels ?? []).filter((f: any) => f.id !== funnelId).map((f: any) => (
+                    <option key={f.id} value={f.id}>{f.name}</option>
+                  ))}
+                </select>
+                <Button
+                  size="sm"
+                  disabled={!copyTargetFunnelId || copyPageToFunnel.isPending}
+                  onClick={() => copyPageToFunnel.mutate({ pageId: copyPageDialog.pageId, targetFunnelId: parseInt(copyTargetFunnelId) })}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {copyPageToFunnel.isPending ? "Copying..." : "Copy to Selected Funnel"}
+                </Button>
+              </div>
+              {/* Option 3: Copy as standalone landing page */}
+              <button
+                onClick={() => copyPageAsStandalone.mutate({ pageId: copyPageDialog.pageId })}
+                disabled={copyPageAsStandalone.isPending}
+                className="w-full flex items-center gap-3 p-3 rounded-xl border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-all text-left"
+              >
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-purple-100 text-purple-600"><Eye size={16} /></div>
+                <div>
+                  <h4 className="font-medium text-gray-900 text-sm">Copy as standalone landing page</h4>
+                  <p className="text-xs text-gray-500">Publish at /p/[slug] — accessible without going through the funnel</p>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Add Page Dialog */}
@@ -708,7 +801,7 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
 // ─── Sortable Funnel Page Row ────────────────────────────────────────────────
 
 function SortableFunnelPageRow({
-  page, idx, meta, nextPage, isLast, funnelId, onEditPage, onDuplicate, onRename, onDelete, onMoveUp, onMoveDown,
+  page, idx, meta, nextPage, isLast, funnelId, onEditPage, onDuplicate, onCopyPage, onRename, onDelete, onMoveUp, onMoveDown,
 }: {
   page: FunnelPage;
   idx: number;
@@ -718,6 +811,7 @@ function SortableFunnelPageRow({
   funnelId: number;
   onEditPage: (funnelId: number, pageId: number) => void;
   onDuplicate: () => void;
+  onCopyPage: () => void;
   onRename: () => void;
   onDelete: () => void;
   onMoveUp?: () => void;
@@ -766,6 +860,9 @@ function SortableFunnelPageRow({
             </button>
             <button onClick={onDuplicate} className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 bg-blue-50 px-2 py-1 rounded-lg">
               <Copy size={12} /> Duplicate
+            </button>
+            <button onClick={onCopyPage} className="text-xs text-purple-600 hover:text-purple-700 flex items-center gap-1 bg-purple-50 px-2 py-1 rounded-lg">
+              <Copy size={12} /> Copy To...
             </button>
             <button onClick={onRename} className="text-xs text-gray-600 hover:text-gray-700 flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-lg">
               <Settings size={12} /> Rename

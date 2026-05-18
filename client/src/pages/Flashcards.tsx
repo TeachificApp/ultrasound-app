@@ -34,10 +34,14 @@ import { Link } from "wouter";
 import { Lock, Zap } from "lucide-react";
 import FlashcardsBanner from "@/components/FlashcardsBanner";
 
-type StudyMode = "sequential" | "spaced";
-type EchoCategory = "all" | "abdominal" | "pelvic_gyn" | "obstetric_1st" | "obstetric_2nd_3rd" | "fetal_echo" | "venous" | "arterial" | "abdominal_vascular" | "extracranial_carotid" | "intracranial_tcd" | "pocus" | "physics" | "thyroid" | "scrotum" | "breast" | "msk";
+import { isIHeartEchoDomain } from "@/hooks/useSubdomain";
 
-const CATEGORIES: { value: EchoCategory; label: string }[] = [
+const isIHE = isIHeartEchoDomain();
+
+type StudyMode = "sequential" | "spaced";
+type EchoCategory = "all" | "abdominal" | "pelvic_gyn" | "obstetric_1st" | "obstetric_2nd_3rd" | "fetal_echo" | "venous" | "arterial" | "abdominal_vascular" | "extracranial_carotid" | "intracranial_tcd" | "pocus" | "physics" | "thyroid" | "scrotum" | "breast" | "msk" | "acs" | "adult" | "pediatric_congenital" | "fetal" | "general";
+
+const AAUS_CATEGORIES: { value: EchoCategory; label: string }[] = [
   { value: "all", label: "All" },
   { value: "abdominal", label: "Abdominal" },
   { value: "pelvic_gyn", label: "Pelvic/Gyn" },
@@ -56,6 +60,17 @@ const CATEGORIES: { value: EchoCategory; label: string }[] = [
   { value: "breast", label: "Breast" },
   { value: "msk", label: "MSK" },
 ];
+
+const IHE_CATEGORIES: { value: EchoCategory; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "adult", label: "Adult Echo" },
+  { value: "pocus", label: "POCUS" },
+  { value: "acs", label: "ACS / Hemodynamics" },
+  { value: "pediatric_congenital", label: "Pediatric / CHD" },
+  { value: "fetal", label: "Fetal Echo" },
+];
+
+const CATEGORIES = isIHE ? IHE_CATEGORIES : AAUS_CATEGORIES;
 
 export default function Flashcards() {
   const { isAuthenticated } = useAuth();
