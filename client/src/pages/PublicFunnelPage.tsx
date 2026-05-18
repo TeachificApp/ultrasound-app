@@ -17,6 +17,7 @@ import CheckoutFormBlock from "@/components/CheckoutFormBlock";
 import EmbeddedCheckoutBlock from "@/components/EmbeddedCheckoutBlock";
 import InlineCheckoutBlock from "@/components/InlineCheckoutBlock";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
+import AudioBlockPlayer from "@/components/AudioBlockPlayer";
 
 // ─── Opt-Out Link Component ─────────────────────────────────────────────────
 
@@ -201,19 +202,41 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
           </div>
         </div>
       );
-    case "video":
+    case "video": {
+      const isDirectVid = d.embedUrl && /\.(mp4|webm|ogg|mov)([?#]|$)/i.test(d.embedUrl);
+      const vidContainerStyle: React.CSSProperties = { paddingBottom: d.height ? undefined : (isDirectVid ? undefined : "56.25%"), height: d.height || undefined, borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined };
       return (
         <div className="px-8 py-8">
           <div className="mx-auto" style={{ maxWidth: d.maxWidth ?? "56rem" }}>
             {d.embedUrl && (
-              <div className="relative w-full overflow-hidden shadow-lg" style={{ paddingBottom: d.height ? undefined : "56.25%", height: d.height || undefined, borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem",border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined }}>
-                <iframe src={d.embedUrl} className="absolute inset-0 w-full h-full" allowFullScreen />
-              </div>
+              isDirectVid ? (
+                <div className="overflow-hidden shadow-lg" style={vidContainerStyle}>
+                  <video
+                    src={d.embedUrl}
+                    autoPlay={d.autoplay ?? false}
+                    muted={d.muted ?? true}
+                    loop={d.loop ?? false}
+                    controls={d.controls ?? true}
+                    playsInline
+                    className="w-full"
+                  />
+                </div>
+              ) : (
+                <div className="relative w-full overflow-hidden shadow-lg" style={vidContainerStyle}>
+                  <iframe
+                    src={d.autoplay ? `${d.embedUrl}${d.embedUrl.includes('?') ? '&' : '?'}autoplay=1${d.muted !== false ? '&mute=1' : ''}${d.loop ? '&loop=1' : ''}` : d.embedUrl}
+                    className="absolute inset-0 w-full h-full"
+                    allowFullScreen
+                    allow="autoplay; fullscreen"
+                  />
+                </div>
+              )
             )}
             {d.caption && <p className="text-sm text-gray-500 mt-2 text-center">{d.caption}</p>}
           </div>
         </div>
       );
+    }
     case "bullets":
       return (
         <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
@@ -450,6 +473,21 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
       return <PriceStackBlock data={d} funnelSlug={funnelSlug} nextPage={nextPage} />;
     case "urgency_offer":
       return <UrgencyOfferBlock data={d} funnelSlug={funnelSlug} nextPage={nextPage} />;
+    case "audio":
+      return (
+        <AudioBlockPlayer
+          audioUrl={d.audioUrl ?? ""}
+          title={d.title}
+          caption={d.caption}
+          autoplay={d.autoplay ?? false}
+          muted={d.muted ?? false}
+          loop={d.loop ?? false}
+          controls={d.controls ?? true}
+          trimStart={d.trimStart ?? 0}
+          trimEnd={d.trimEnd ?? 0}
+          bgColor={d.bgColor ?? "#f8fffe"}
+        />
+      );
     case "embed":
       return (
         <div className="px-8 py-8">

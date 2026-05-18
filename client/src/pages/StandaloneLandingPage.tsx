@@ -91,6 +91,7 @@ import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } fro
 import CheckoutFormBlock from "@/components/CheckoutFormBlock";
 import EmbeddedCheckoutBlock from "@/components/EmbeddedCheckoutBlock";
 import InlineCheckoutBlock from "@/components/InlineCheckoutBlock";
+import AudioBlockPlayer from "@/components/AudioBlockPlayer";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 
 function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block: Block; funnelId: number; pageId: number; funnelSlug: string }) {
@@ -166,9 +167,50 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
         </div>
       ) : null;
     case "video":
-      return d.embedUrl ? (
-        <div className="px-8 py-6"><div className="max-w-4xl mx-auto aspect-video rounded-xl overflow-hidden shadow-lg"><iframe src={d.embedUrl} className="w-full h-full" allowFullScreen /></div>{d.caption && <p className="text-sm text-gray-500 mt-2 text-center">{d.caption}</p>}</div>
-      ) : null;
+      if (!d.embedUrl) return null;
+      const isDirectVidSL = /\.(mp4|webm|ogg|mov)([?#]|$)/i.test(d.embedUrl);
+      return (
+        <div className="px-8 py-6">
+          <div className="max-w-4xl mx-auto rounded-xl overflow-hidden shadow-lg">
+            {isDirectVidSL ? (
+              <video
+                src={d.embedUrl}
+                autoPlay={d.autoplay ?? false}
+                muted={d.muted ?? true}
+                loop={d.loop ?? false}
+                controls={d.controls ?? true}
+                playsInline
+                className="w-full"
+              />
+            ) : (
+              <div className="aspect-video">
+                <iframe
+                  src={d.autoplay ? `${d.embedUrl}${d.embedUrl.includes('?') ? '&' : '?'}autoplay=1${d.muted !== false ? '&mute=1' : ''}${d.loop ? '&loop=1' : ''}` : d.embedUrl}
+                  className="w-full h-full"
+                  allowFullScreen
+                  allow="autoplay; fullscreen"
+                />
+              </div>
+            )}
+          </div>
+          {d.caption && <p className="text-sm text-gray-500 mt-2 text-center">{d.caption}</p>}
+        </div>
+      );
+    case "audio":
+      return (
+        <AudioBlockPlayer
+          audioUrl={d.audioUrl ?? ""}
+          title={d.title}
+          caption={d.caption}
+          autoplay={d.autoplay ?? false}
+          muted={d.muted ?? false}
+          loop={d.loop ?? false}
+          controls={d.controls ?? true}
+          trimStart={d.trimStart ?? 0}
+          trimEnd={d.trimEnd ?? 0}
+          bgColor={d.bgColor ?? "#f8fffe"}
+        />
+      );
     case "bullets":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor || "#f8fffe" }}>

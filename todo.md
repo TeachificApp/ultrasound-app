@@ -2103,3 +2103,13 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] inline_checkout rendered in BlockPreview, PublicFunnelPage, StandaloneLandingPage
 - [x] Purchases recorded to funnelPurchases table and surfaced in My Dashboard → My Content
 - [x] Build passes cleanly
+
+## Audio Block & Media Trim (Sprint 8)
+- [x] Audio block type added to BLOCK_CATALOG (all page builders)
+- [x] AudioBlockEditor: upload mp3/wav/ogg/m4a/webm, in-browser microphone recording
+- [x] AudioBlockPlayer: custom player with play/pause, progress bar, mute, trim support
+- [x] Audio block: autoplay, muted, loop, show/hide controls toggles
+- [x] Audio block: in-browser trim (start/end time dual-range slider with visual track)
+- [x] Audio block wired into BlockPreview, PublicFunnelPage, StandaloneLandingPage
+- [x] Video block: autoplay, muted, loop, controls toggles added to editor
+- [x] Video block: trim support (HTML5 media fragment #t=start,end) for direct video files

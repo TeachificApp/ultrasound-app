@@ -5,13 +5,14 @@
  */
 import { ChevronDown, Globe, Image, Package, Video } from "lucide-react";
 import InlineCheckoutBlock from "@/components/InlineCheckoutBlock";
+import AudioBlockPlayer from "@/components/AudioBlockPlayer";
 import { Users } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import { ButtonSubtext } from "@/lib/ctaSubtext";
 
 export type BlockType =
-  | "hero" | "text" | "image" | "video" | "bullets" | "testimonial"
+  | "hero" | "text" | "image" | "video" | "audio" | "bullets" | "testimonial"
   | "pricing_cta" | "divider" | "two_column" | "divided_columns" | "spacer"
   | "faq" | "image_text" | "gallery" | "icon_grid" | "countdown"
   | "instructor" | "logos" | "reviews" | "embed" | "cta_standalone"
@@ -91,16 +92,55 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
           {d.caption && <p className="text-sm text-gray-500 mt-2">{d.caption}</p>}
         </div>
       );
-    case "video":
+    case "video": {
+      const isDirectVideo = d.embedUrl && /\.(mp4|webm|ogg|mov)([?#]|$)/i.test(d.embedUrl);
+      const containerStyle: React.CSSProperties = { maxWidth: d.maxWidth ?? "100%", height: d.height || undefined, paddingBottom: d.height ? undefined : (isDirectVideo ? undefined : "56.25%"), borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined };
       return (
         <div className="px-8 py-6">
           {d.embedUrl ? (
-            <div className="relative w-full overflow-hidden shadow mx-auto" style={{ maxWidth: d.maxWidth ?? "100%", height: d.height || undefined, paddingBottom: d.height ? undefined : "56.25%", borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined }}>
-              <iframe src={d.embedUrl} className="absolute inset-0 w-full h-full" allowFullScreen title="Video" />
-            </div>
+            isDirectVideo ? (
+              <div className="mx-auto overflow-hidden shadow" style={containerStyle}>
+                <video
+                  src={d.trimStart && d.trimStart > 0 ? `${d.embedUrl}#t=${d.trimStart ?? 0}${d.trimEnd ? `,${d.trimEnd}` : ""}` : d.embedUrl}
+                  autoPlay={d.autoplay ?? false}
+                  muted={d.muted ?? true}
+                  loop={d.loop ?? false}
+                  controls={d.controls ?? true}
+                  playsInline
+                  className="w-full h-full object-cover"
+                  style={{ height: d.height || undefined }}
+                />
+              </div>
+            ) : (
+              <div className="relative w-full overflow-hidden shadow mx-auto" style={containerStyle}>
+                <iframe
+                  src={d.autoplay ? `${d.embedUrl}${d.embedUrl.includes('?') ? '&' : '?'}autoplay=1${d.muted !== false ? '&mute=1' : ''}${d.loop ? '&loop=1' : ''}` : d.embedUrl}
+                  className="absolute inset-0 w-full h-full"
+                  allowFullScreen
+                  title="Video"
+                  allow="autoplay; fullscreen"
+                />
+              </div>
+            )
           ) : <div className="w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400"><Video size={32} /></div>}
           {d.caption && <p className="text-sm text-gray-500 mt-2 text-center">{d.caption}</p>}
         </div>
+      );
+    }
+    case "audio":
+      return (
+        <AudioBlockPlayer
+          audioUrl={d.audioUrl ?? ""}
+          title={d.title}
+          caption={d.caption}
+          autoplay={d.autoplay ?? false}
+          muted={d.muted ?? false}
+          loop={d.loop ?? false}
+          controls={d.controls ?? true}
+          trimStart={d.trimStart ?? 0}
+          trimEnd={d.trimEnd ?? 0}
+          bgColor={d.bgColor ?? "#f8fffe"}
+        />
       );
     case "embed":
       return (
