@@ -151,6 +151,7 @@ export const mediaRepoRouter = router({
       search: z.string().optional(),
       mediaType: z.enum(MEDIA_TYPES).optional(),
       access: z.enum(["public", "private"]).optional(),
+      brand: z.enum(["aaus", "iheartecho"]).optional(),
       page: z.number().int().min(1).default(1),
       pageSize: z.number().int().min(1).max(100).default(24),
     }))
@@ -164,6 +165,7 @@ export const mediaRepoRouter = router({
       const conditions = [isNull(mediaAssets.deletedAt)];
       if (input.mediaType) conditions.push(eq(mediaAssets.mediaType, input.mediaType));
       if (input.access) conditions.push(eq(mediaAssets.access, input.access));
+      if (input.brand) conditions.push(eq(mediaAssets.brand, input.brand));
       if (input.search) {
         conditions.push(
           or(

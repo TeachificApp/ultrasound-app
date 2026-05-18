@@ -26,6 +26,17 @@ import { storagePut } from "../storage";
 import { sdk } from "../_core/sdk";
 import { getDb } from "../db";
 import { mediaAssets, mediaVersions } from "../../drizzle/schema";
+import { detectBrandFromHostname } from "../../shared/brands";
+
+function getBrandFromRequest(req: Request): "aaus" | "iheartecho" {
+  const origin = (req.headers.origin || req.headers.referer || "") as string;
+  try {
+    const hostname = new URL(origin).hostname;
+    return detectBrandFromHostname(hostname);
+  } catch {
+    return "aaus";
+  }
+}
 
 const router = Router();
 
@@ -221,6 +232,7 @@ router.post(
           access: access as any,
           tags,
           folder: folderSlug,
+          brand: getBrandFromRequest(req),
           createdByUserId: user.id,
         });
         const assetId = (assetResult as any).insertId as number;
@@ -307,7 +319,7 @@ router.post(
 
         const [assetResult] = await db.insert(mediaAssets).values({
           slug, title, description, mediaType: mediaType as any, mimeType: mimetype,
-          access: access as any, tags, folder: folderSlug, createdByUserId: user.id,
+          access: access as any, tags, folder: folderSlug, brand: getBrandFromRequest(req), createdByUserId: user.id,
         });
         const assetId = (assetResult as any).insertId as number;
 

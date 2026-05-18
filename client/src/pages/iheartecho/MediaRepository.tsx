@@ -1481,7 +1481,7 @@ export default function MediaRepository() {
       >
         {/* Left: back link + title */}
         <div className="flex items-center gap-3 min-w-0">
-          <Link href="/admin">
+          <Link href="/platform-admin">
             <button className="flex items-center gap-1.5 text-white/70 hover:text-white transition-colors text-xs font-medium">
               <ArrowLeft className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Platform Admin</span>

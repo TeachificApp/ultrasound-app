@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import {
   User, BookOpen, CreditCard, Award, Camera, Save, Lock, Eye, EyeOff,
   ExternalLink, Download, Play, FileText, Package, AlertCircle, CheckCircle2,
-  Clock, XCircle, RefreshCw, Loader2, ChevronRight, ClipboardCheck, ShoppingCart,
+  Clock, XCircle, RefreshCw, Loader2, ChevronRight, ClipboardCheck, ShoppingCart, BarChart2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -97,8 +97,8 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 // ─── Tab types ────────────────────────────────────────────────────────────────
-type Tab = "profile" | "content" | "subscriptions" | "certificates";
-const VALID_TABS: Tab[] = ["profile", "content", "subscriptions", "certificates"];
+type Tab = "profile" | "content" | "subscriptions" | "certificates" | "analytics";
+const VALID_TABS: Tab[] = ["profile", "content", "subscriptions", "certificates", "analytics"];
 
 // ─── Profile Tab ─────────────────────────────────────────────────────────────
 
@@ -856,6 +856,130 @@ function ContentCard({
   );
 }
 
+// ─── Analytics Tab ───────────────────────────────────────────────────────────
+
+function AnalyticsTab() {
+  const { data, isLoading } = trpc.analyticsTrack.myActivity.useQuery();
+
+  if (isLoading) return <LoadingSpinner />;
+  if (!data) return null;
+
+  const { summary, logins, pageViews, enrollments, downloads } = data;
+
+  function fmtDateTime(d: Date | null | undefined) {
+    if (!d) return "—";
+    return new Date(d).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Summary stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        {[
+          { label: "Logins", value: summary.logins, color: "bg-blue-50 text-blue-600" },
+          { label: "Page Views", value: summary.pageViews, color: "bg-purple-50 text-purple-600" },
+          { label: "Video Plays", value: summary.videoPlays, color: "bg-orange-50 text-orange-600" },
+          { label: "Quiz Attempts", value: summary.quizAttempts, color: "bg-pink-50 text-pink-600" },
+          { label: "Downloads", value: summary.downloads, color: "bg-green-50 text-green-600" },
+        ].map(({ label, value, color }) => (
+          <div key={label} className={`rounded-xl p-4 ${color.split(" ")[0]} flex flex-col gap-1`}>
+            <span className={`text-2xl font-bold ${color.split(" ")[1]}`}>{value.toLocaleString()}</span>
+            <span className="text-xs text-gray-500">{label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Login history */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
+        <div className="px-5 py-4 border-b border-gray-100">
+          <h3 className="text-sm font-bold text-gray-700">Recent Logins</h3>
+          <p className="text-xs text-gray-400 mt-0.5">Last 30 login events including IP and device info</p>
+        </div>
+        <div className="divide-y divide-gray-50 max-h-64 overflow-y-auto">
+          {logins.length === 0 ? (
+            <p className="text-xs text-gray-400 text-center py-6">No login events recorded yet.</p>
+          ) : logins.map((l: any) => (
+            <div key={l.id} className="px-5 py-3 flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-gray-700 truncate">{l.userAgent ? l.userAgent.slice(0, 60) : "Unknown device"}</p>
+                <p className="text-xs text-gray-400">{l.ip ?? "IP not recorded"}</p>
+              </div>
+              <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">{fmtDateTime(l.createdAt)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Course progress */}
+      {enrollments.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
+          <div className="px-5 py-4 border-b border-gray-100">
+            <h3 className="text-sm font-bold text-gray-700">Course Progress</h3>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {enrollments.map((e: any) => (
+              <div key={e.enrollmentId} className="px-5 py-3 flex items-center gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800 truncate">{e.courseTitle}</p>
+                  <div className="flex items-center gap-3 mt-1">
+                    <div className="flex-1 bg-gray-100 rounded-full h-1.5 max-w-[120px]">
+                      <div className="bg-[#189aa1] h-1.5 rounded-full" style={{ width: `${Math.min(100, Number(e.progressPct ?? 0))}%` }} />
+                    </div>
+                    <span className="text-xs text-gray-500">{Number(e.progressPct ?? 0)}%</span>
+                  </div>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  {e.completedAt ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">
+                      <CheckCircle2 className="w-3 h-3" /> Completed
+                    </span>
+                  ) : (
+                    <span className="text-xs text-gray-400">{Number(e.videosCompleted ?? 0)} videos done</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Top pages visited */}
+      {pageViews.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
+          <div className="px-5 py-4 border-b border-gray-100">
+            <h3 className="text-sm font-bold text-gray-700">Most Visited Pages</h3>
+          </div>
+          <div className="divide-y divide-gray-50 max-h-48 overflow-y-auto">
+            {pageViews.map((p: any) => (
+              <div key={p.path} className="px-5 py-2.5 flex items-center justify-between gap-4">
+                <span className="text-xs text-gray-600 font-mono truncate flex-1">{p.path}</span>
+                <span className="text-xs text-purple-600 font-semibold flex-shrink-0">{Number(p.views)} views</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Downloads */}
+      {downloads.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
+          <div className="px-5 py-4 border-b border-gray-100">
+            <h3 className="text-sm font-bold text-gray-700">Download History</h3>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {downloads.map((d: any) => (
+              <div key={d.id} className="px-5 py-3 flex items-center justify-between gap-4">
+                <span className="text-sm text-gray-700 truncate flex-1">{d.productTitle ?? "Unknown product"}</span>
+                <span className="text-xs text-gray-400 flex-shrink-0">{fmtDateTime(d.createdAt)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Dashboard Page ──────────────────────────────────────────────────────
 
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
@@ -863,6 +987,7 @@ const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: "content",       label: "My Content",    icon: BookOpen },
   { key: "subscriptions", label: "Subscriptions", icon: CreditCard },
   { key: "certificates",  label: "Certificates",  icon: Award },
+  { key: "analytics",     label: "Analytics",     icon: BarChart2 },
 ];
 
 export default function StudentDashboardPage() {
@@ -943,6 +1068,7 @@ export default function StudentDashboardPage() {
           {activeTab === "content"       && <MyContentTab />}
           {activeTab === "subscriptions" && <SubscriptionsTab />}
           {activeTab === "certificates"  && <CertificatesTab />}
+          {activeTab === "analytics"     && <AnalyticsTab />}
         </div>
       </div>
     </Layout>

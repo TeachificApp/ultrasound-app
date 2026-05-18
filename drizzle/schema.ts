@@ -2605,6 +2605,8 @@ export const mediaAssets = mysqlTable("mediaAssets", {
   folder: varchar("folder", { length: 255 }),
   // Thumbnail URL (auto-generated for images; manually set for video/other)
   thumbnailUrl: text("thumbnailUrl"),
+  // Brand tag — which app uploaded this asset ("aaus" or "iheartecho")
+  brand: mysqlEnum("brand", ["aaus", "iheartecho"]).default("aaus"),
   // Soft-delete
   deletedAt: timestamp("deletedAt"),
   createdByUserId: int("createdByUserId").notNull(),

@@ -8,7 +8,24 @@
   - Stats overview
 */
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  rectSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import Layout from "@/components/Layout";
@@ -67,9 +84,13 @@ import {
   FileDown,
   LayoutTemplate,
   Globe,
+  GripVertical,
+  Volume2,
+  Activity,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import BulkCsvUploadPanel, { type BulkResult } from "@/components/BulkCsvUploadPanel";
+import { isIHeartEchoDomain } from "@/hooks/useSubdomain";
 
 type AppRole = "user" | "premium_user" | "diy_admin" | "diy_user" | "platform_admin" | "accreditation_manager";
 
@@ -988,17 +1009,141 @@ function EnrollmentEmailSettingsPanel() {
   );
 }
 
+// ─── Tool Card Types ─────────────────────────────────────────────────────────
+
+type ToolCard = {
+  id: string;
+  href: string;
+  icon: React.ElementType;
+  label: string;
+  description: string;
+  color: string;
+};
+
+function SortableToolCard({ card }: { card: ToolCard }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : undefined,
+  };
+  const Icon = card.icon;
+  return (
+    <div ref={setNodeRef} style={style} className="relative group">
+      <div
+        {...attributes}
+        {...listeners}
+        className="absolute top-2 right-2 p-1 rounded cursor-grab opacity-0 group-hover:opacity-60 hover:opacity-100 transition-opacity z-10"
+        title="Drag to reorder"
+      >
+        <GripVertical className="w-3.5 h-3.5 text-gray-400" />
+      </div>
+      <Link href={card.href}>
+        <div className="flex flex-col gap-3 p-4 rounded-xl border border-gray-100 bg-white shadow-sm hover:shadow-md hover:border-gray-200 cursor-pointer transition-all h-full">
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: card.color + "18" }}>
+            <Icon className="w-4.5 h-4.5" style={{ color: card.color }} />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-gray-800 mb-0.5">{card.label}</p>
+            <p className="text-xs text-gray-400 leading-relaxed">{card.description}</p>
+          </div>
+          <div className="flex items-center gap-1 text-xs font-medium group-hover:gap-2 transition-all" style={{ color: card.color }}>
+            Open <ChevronRight className="w-3 h-3" />
+          </div>
+        </div>
+      </Link>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function PlatformAdmin() {
   const { user, isAuthenticated, loading } = useAuth();
+  const isIHE = isIHeartEchoDomain();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [userSearchQuery, setUserSearchQuery] = useState("");
   const [userType, setUserType] = useState<'all'|'pending'|'active'|'premium'|'diy_admin'|'diy_user'|'platform_admin'|'free'>('all');
   const [selectedUser, setSelectedUser] = useState<UserWithRoles | null>(null);
   const [addRoleDialogOpen, setAddRoleDialogOpen] = useState(false);
   const [roleToAdd, setRoleToAdd] = useState<AppRole>("premium_user");
   const [bulkRole, setBulkRole] = useState<AppRole>("premium_user");
+  const [dualBrand, setDualBrand] = useState<"aaus" | "iheartecho">(isIHE ? "iheartecho" : "aaus");
+
+  // Dual App tool cards
+  const DUAL_TOOLS_DEFAULT: ToolCard[] = [
+    { id: "email", href: "/admin/email", icon: Mail, label: "Email Campaigns", description: "Create and send email campaigns to members", color: "#189aa1" },
+    { id: "sharing-monitor", href: "/admin/sharing-monitor", icon: Activity, label: "Sharing Monitor", description: "Track and review shared content access", color: "#7c3aed" },
+    { id: "form-builder", href: "/admin/form-builder", icon: ClipboardList, label: "Form Builder", description: "Build custom forms and surveys", color: "#0891b2" },
+    { id: "media-repository", href: "/admin/media-repository", icon: HardDrive, label: "Media Repository", description: "Shared media library with AAUS/IHE brand tags", color: "#0f766e" },
+    { id: "downloads", href: "/admin/downloads", icon: FileDown, label: "Digital Downloads", description: "Manage downloadable products and files", color: "#b45309" },
+    { id: "lms", href: "/admin/lms", icon: Library, label: "Education Library", description: "Manage courses, videos, and learning content", color: "#1d4ed8" },
+    { id: "funnels", href: "/admin/funnels", icon: LayoutTemplate, label: "Funnel Builder", description: "Build and manage marketing funnels", color: "#be185d" },
+    { id: "contacts", href: "/admin/contacts", icon: Users, label: "Contacts", description: "Manage contacts and audience segments", color: "#059669" },
+    { id: "user-analytics", href: "/admin/user-analytics", icon: BarChart2, label: "User Analytics", description: "Detailed analytics for all platform users", color: "#7c3aed" },
+  ];
+
+  // Per-Brand tool cards (auto-scoped to current brand)
+  const PER_BRAND_TOOLS_DEFAULT: ToolCard[] = [
+    { id: "cases", href: "/admin/cases", icon: ClipboardList, label: "Case Management", description: "Manage clinical case submissions and reviews", color: "#189aa1" },
+    { id: "quickfire", href: "/admin/quickfire", icon: Zap, label: "Daily Challenge", description: "Manage daily quiz challenges and questions", color: "#f59e0b" },
+    { id: "scancoach", href: "/admin/scancoach", icon: Scan, label: "ScanCoach Editor", description: "Edit ScanCoach protocols and content", color: "#0891b2" },
+    { id: "navigator", href: "/admin/navigator", icon: Globe, label: "Navigator Editor", description: "Edit Navigator pathways and content", color: "#7c3aed" },
+    { id: "thinkific-webhook", href: "/admin/thinkific-webhook", icon: Webhook, label: "Thinkific Webhook", description: "Configure Thinkific course sync webhooks", color: "#be185d" },
+    { id: "challenge-cards", href: "/admin/challenge-cards", icon: GraduationCap, label: "Challenge Card Generator", description: "Generate visual challenge cards for social media", color: "#059669" },
+    { id: "social-content", href: "/admin/social-content", icon: Image, label: "Social Content Generator", description: "Create branded social media content", color: "#f97316" },
+    { id: "soundbytes", href: "/admin/soundbytes", icon: Volume2, label: "SoundBytes Admin", description: "Manage SoundBytes audio content and playlists", color: "#7c3aed" },
+  ];
+
+  // IHE-only tool cards
+  const IHE_ONLY_TOOLS_DEFAULT: ToolCard[] = [
+    { id: "engagement", href: "/admin/engagement", icon: BarChart2, label: "Engagement Dashboard", description: "iHeartEcho engagement metrics and analytics", color: "#be185d" },
+    { id: "image-quality", href: "/image-quality-review", icon: Image, label: "Image Quality Review", description: "Review and rate echo image quality submissions", color: "#0891b2" },
+  ];
+
+  const [dualToolOrder, setDualToolOrder] = useState<string[]>(() => DUAL_TOOLS_DEFAULT.map(t => t.id));
+  const [perBrandToolOrder, setPerBrandToolOrder] = useState<string[]>(() => PER_BRAND_TOOLS_DEFAULT.map(t => t.id));
+  const [iheOnlyToolOrder, setIheOnlyToolOrder] = useState<string[]>(() => IHE_ONLY_TOOLS_DEFAULT.map(t => t.id));
+
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleDualDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setDualToolOrder(prev => {
+        const oldIdx = prev.indexOf(active.id as string);
+        const newIdx = prev.indexOf(over.id as string);
+        return arrayMove(prev, oldIdx, newIdx);
+      });
+    }
+  }, []);
+
+  const handlePerBrandDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setPerBrandToolOrder(prev => {
+        const oldIdx = prev.indexOf(active.id as string);
+        const newIdx = prev.indexOf(over.id as string);
+        return arrayMove(prev, oldIdx, newIdx);
+      });
+    }
+  }, []);
+
+  const handleIheOnlyDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setIheOnlyToolOrder(prev => {
+        const oldIdx = prev.indexOf(active.id as string);
+        const newIdx = prev.indexOf(over.id as string);
+        return arrayMove(prev, oldIdx, newIdx);
+      });
+    }
+  }, []);
 
   const bulkAssignRoleMutation = trpc.platformAdmin.bulkAssignRole.useMutation({
     onSuccess: () => refetchUsers(),
@@ -1185,141 +1330,97 @@ export default function PlatformAdmin() {
           ))}
         </div>
 
-        {/* Admin Tools Hub */}
+        {/* ── Dual App Tools ────────────────────────────────────────── */}
         <div className="mb-8">
-          <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Admin Tools</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
-              {
-                href: "/admin/cases",
-                icon: Library,
-                label: "Case Management",
-                description: "Review, approve, and manage submitted ultrasound cases",
-                color: "#189aa1",
-              },
-              {
-                href: "/admin/quickfire",
-                icon: Zap,
-                label: "Daily Challenge",
-                description: "Question bank, challenge queue, and AI generator",
-                color: "#7c3aed",
-              },
-              {
-                href: "/admin/scancoach",
-                icon: Scan,
-                label: "ScanCoach Editor",
-                description: "Edit scan coach views, anatomy, and Doppler guidance",
-                color: "#0d9488",
-              },
-              {
-                href: "/admin/navigator",
-                icon: ClipboardList,
-                label: "Navigator Editor",
-                description: "Edit protocol checklists, probe descriptions, and reference items for all Navigator modules",
-                color: "#0891b2",
-              },
-              {
-                href: "/admin/thinkific-webhook",
-                icon: Webhook,
-                label: "Thinkific Webhook",
-                description: "Manage course sync, webhook events, and enrollment",
-                color: "#d97706",
-              },
-              {
-                href: "/admin/form-builder",
-                icon: ClipboardList,
-                label: "Form Builder",
-                description: "Create and edit accreditation review forms with branching logic and quality scoring",
-                color: "#0891b2",
-              },
-              {
-                href: "/admin/email",
-                icon: Mail,
-                label: "Email Campaigns",
-                description: "Compose and send targeted emails to users filtered by interest, role, and subscription",
-                color: "#7c3aed",
-              },
-              {
-                href: "/admin/challenge-cards",
-                icon: Image,
-                label: "Challenge Card Generator",
-                description: "Generate social media cards for Daily Challenge questions",
-                color: "#189aa1",
-              },
-              {
-                href: "/admin/social-content",
-                icon: Image,
-                label: "Social Content Generator",
-                description: "AI-powered memes, clinical pearls, tips & social posts for ultrasound",
-                color: "#7c3aed",
-              },
-              {
-                href: "/admin/media-repository",
-                icon: HardDrive,
-                label: "Media Repository",
-                description: "Upload and manage media files with version history, access control, and embed links",
-                color: "#0f766e",
-              },
-              {
-                href: "/admin/lms",
-                icon: GraduationCap,
-                label: "Education Library",
-                description: "Course creator, quiz builder, enrollments, group seats, instructors, and affiliate management",
-                color: "#0d9488",
-              },
-              {
-                href: "/admin/lms?tab=downloads",
-                icon: FileDown,
-                label: "Digital Downloads",
-                description: "Manage downloadable products, bundles, analytics, and file delivery",
-                color: "#0891b2",
-              },
-              {
-                href: "/admin/funnels",
-                icon: LayoutTemplate,
-                label: "Funnel Builder",
-                description: "Landing pages, order bumps, and sales funnels for courses and downloads",
-                color: "#e11d48",
-              },
-              {
-                href: "/admin/contacts",
-                icon: Users,
-                label: "Contacts",
-                description: "View and manage funnel leads, checkout submissions, and contact details",
-                color: "#0d9488",
-              },
-              {
-                href: "/admin/sharing-monitor",
-                icon: Shield,
-                label: "Sharing Monitor",
-                description: "Detect account sharing abuse via multi-IP monitoring for paid content",
-                color: "#dc2626",
-              },
-              {
-                href: "/admin/user-analytics",
-                icon: BarChart2,
-                label: "User Analytics",
-                description: "Per-user reporting: logins, page views, course progress, videos, quizzes, and downloads",
-                color: "#7c3aed",
-              },
-            ].map(({ href, icon: Icon, label, description, color }) => (
-              <Link key={href} href={href}>
-                <div className="group flex flex-col gap-3 p-4 rounded-xl border border-gray-100 bg-white shadow-sm hover:shadow-md hover:border-gray-200 cursor-pointer transition-all h-full">
-                  <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: color + "18" }}>
-                    <Icon className="w-4.5 h-4.5" style={{ color }} />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-gray-800 mb-0.5">{label}</p>
-                    <p className="text-xs text-gray-400 leading-relaxed">{description}</p>
-                  </div>
-                  <div className="flex items-center gap-1 text-xs font-medium group-hover:gap-2 transition-all" style={{ color }}>
-                    Open <ChevronRight className="w-3 h-3" />
-                  </div>
-                </div>
-              </Link>
-            ))}
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Dual App Tools</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Shared database — accessible from both platforms. Drag cards to reorder.</p>
+            </div>
+            {/* Brand toggle */}
+            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setDualBrand("aaus")}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                  dualBrand === "aaus"
+                    ? "bg-white shadow text-[#189aa1]"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                All About Ultrasound
+              </button>
+              <button
+                onClick={() => setDualBrand("iheartecho")}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                  dualBrand === "iheartecho"
+                    ? "bg-white shadow text-[#be185d]"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                iHeartEcho
+              </button>
+            </div>
           </div>
+          <div className="mb-2 flex items-center gap-2">
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+              dualBrand === "aaus" ? "bg-teal-50 text-teal-700" : "bg-pink-50 text-pink-700"
+            }`}>
+              <Globe className="w-3 h-3" />
+              Viewing as: {dualBrand === "aaus" ? "All About Ultrasound" : "iHeartEcho"}
+            </span>
+          </div>
+          <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleDualDragEnd}>
+            <SortableContext items={dualToolOrder} strategy={rectSortingStrategy}>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {dualToolOrder.map(id => {
+                  const card = DUAL_TOOLS_DEFAULT.find(t => t.id === id);
+                  if (!card) return null;
+                  return <SortableToolCard key={card.id} card={card} />;
+                })}
+              </div>
+            </SortableContext>
+          </DndContext>
         </div>
+
+        {/* ── Per-Brand Tools ───────────────────────────────────────── */}
+        <div className="mb-8">
+          <div className="mb-3">
+            <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Per-Brand Tools</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Available on both platforms — each operates for the current brand. Drag cards to reorder.</p>
+          </div>
+          <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handlePerBrandDragEnd}>
+            <SortableContext items={perBrandToolOrder} strategy={rectSortingStrategy}>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {perBrandToolOrder.map(id => {
+                  const card = PER_BRAND_TOOLS_DEFAULT.find(t => t.id === id);
+                  if (!card) return null;
+                  return <SortableToolCard key={card.id} card={card} />;
+                })}
+              </div>
+            </SortableContext>
+          </DndContext>
+        </div>
+
+        {/* ── iHeartEcho Only Tools ─────────────────────────────────── */}
+        {isIHE && (
+          <div className="mb-8">
+            <div className="mb-3">
+              <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider">iHeartEcho Only</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Exclusive to the iHeartEcho platform. Drag cards to reorder.</p>
+            </div>
+            <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleIheOnlyDragEnd}>
+              <SortableContext items={iheOnlyToolOrder} strategy={rectSortingStrategy}>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {iheOnlyToolOrder.map(id => {
+                    const card = IHE_ONLY_TOOLS_DEFAULT.find(t => t.id === id);
+                    if (!card) return null;
+                    return <SortableToolCard key={card.id} card={card} />;
+                  })}
+                </div>
+              </SortableContext>
+            </DndContext>
+          </div>
+        )}
 
         {/* Sidebar Learn Links */}
         <MenuLinksPanel />
@@ -1506,112 +1607,49 @@ export default function PlatformAdmin() {
           </CardContent>
         </Card>
 
-        {/* User List */}
+        {/* User Search → User Analytics */}
         <Card className="border-0 shadow-sm">
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <CardTitle className="text-base font-semibold text-gray-800 flex items-center gap-2">
-                <Users className="w-4 h-4 text-[#189aa1]" />
-                All Users ({filteredUsers.length})
-              </CardTitle>
-              <div className="relative w-64">
+            <CardTitle className="text-base font-semibold text-gray-800 flex items-center gap-2">
+              <Users className="w-4 h-4 text-[#189aa1]" />
+              User Search
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <p className="text-sm text-gray-500 mb-3">Search for a user to open their full profile in User Analytics.</p>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (userSearchQuery.trim()) {
+                  window.location.href = `/admin/user-analytics?search=${encodeURIComponent(userSearchQuery.trim())}`;
+                } else {
+                  window.location.href = "/admin/user-analytics";
+                }
+              }}
+              className="flex gap-2"
+            >
+              <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <Input
                   placeholder="Search by name or email…"
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  className="pl-9 h-8 text-sm"
+                  value={userSearchQuery}
+                  onChange={e => setUserSearchQuery(e.target.value)}
+                  className="pl-9 h-9 text-sm"
                 />
               </div>
+              <Button type="submit" style={{ background: "#189aa1" }} className="text-white h-9 px-4 text-sm gap-1.5">
+                <BarChart2 className="w-4 h-4" />
+                Open in Analytics
+              </Button>
+            </form>
+            <div className="mt-3">
+              <Link href="/admin/user-analytics">
+                <Button variant="outline" size="sm" className="text-xs gap-1.5">
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  View All Users in User Analytics
+                </Button>
+              </Link>
             </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {loadingUsers ? (
-              <div className="flex items-center justify-center py-12">
-                <RefreshCw className="w-5 h-5 animate-spin text-[#189aa1]" />
-              </div>
-            ) : filteredUsers.length === 0 ? (
-              <div className="text-center py-12 text-gray-400 text-sm">
-                {search ? "No users match your search." : "No users found."}
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-100">
-                {filteredUsers.map((u) => (
-                  <div key={u.id} className="py-3 flex items-start gap-4">
-                    {/* Avatar */}
-                    <div
-                      className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-white text-sm font-bold"
-                      style={{ background: (u as UserWithRoles).isPending ? "#9ca3af" : "#189aa1" }}
-                    >
-                      {(u as UserWithRoles).isPending
-                        ? <Clock className="w-4 h-4" />
-                        : (u.displayName ?? u.name ?? "?")[0]?.toUpperCase()}
-                    </div>
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-gray-900 text-sm">
-                          {u.displayName ?? u.name ?? "Unknown User"}
-                        </span>
-                        {u.role === "admin" && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
-                            <Crown className="w-3 h-3" />
-                            Owner
-                          </span>
-                        )}
-                        {(u as UserWithRoles).isPending && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
-                            <Clock className="w-3 h-3" />
-                            Pending Sign-In
-                          </span>
-                        )}
-                        {(u as UserWithRoles).isDemo && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
-                            <FlaskConical className="w-3 h-3" />
-                            Demo
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-gray-400 mt-0.5">{u.email ?? "No email"}</div>
-                      <div className="flex flex-wrap gap-1.5 mt-2">
-                        {u.roles.map(role => (
-                          <RoleBadge
-                            key={role}
-                            role={role}
-                            onRemove={
-                              role !== "user" && u.role !== "admin"
-                                ? () => handleRemoveRole(u.id, role)
-                                : undefined
-                            }
-                          />
-                        ))}
-                        {u.roles.length === 0 && (
-                          <span className="text-xs text-gray-400 italic">No roles assigned</span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Add Role button */}
-                    {u.role !== "admin" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-shrink-0 h-7 text-xs gap-1"
-                        onClick={() => {
-                          setSelectedUser(u as UserWithRoles);
-                          setRoleToAdd("premium_user");
-                          setAddRoleDialogOpen(true);
-                        }}
-                      >
-                        <Plus className="w-3 h-3" />
-                        Add Role
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
           </CardContent>
         </Card>
 

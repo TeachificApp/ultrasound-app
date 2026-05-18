@@ -60,7 +60,7 @@ export default function SharingMonitor() {
       <div className="bg-white border-b sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center gap-3 mb-1">
-            <Link href="/admin" className="text-sm text-teal-700 hover:underline flex items-center gap-1">
+            <Link href="/platform-admin" className="text-sm text-teal-700 hover:underline flex items-center gap-1">
               <ChevronLeft className="w-4 h-4" /> Platform Admin
             </Link>
           </div>

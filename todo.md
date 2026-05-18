@@ -2130,3 +2130,14 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] AdminUserDetailPage: route /admin/users/:userId registered in App.tsx
 - [x] UserAnalytics: "Manage →" button on each user row navigates to AdminUserDetailPage
 - [x] InlineCheckoutBlock: successRedirect URL field already present in all block editor cases
+
+## Platform Admin Restructure (May 2026)
+- [x] Analytics/Logs tab on Student Dashboard — login history, page views, IP details (self-service)
+- [x] Platform Admin: Dual App group with brand toggle (Email Campaigns, Sharing Monitor, Form Builder, Media Repository, Downloads, Education Library, Funnel Builder, Contacts, User Analytics)
+- [x] Platform Admin: Per-Brand Tools group (Case Management, Daily Challenge, ScanCoach Editor, Navigator Editor, Thinkific Webhook, Challenge Card Generator, Social Content Generator, SoundBytes Admin)
+- [x] Platform Admin: iHeartEcho Only group (Engagement Dashboard, Image Quality Review)
+- [x] Platform Admin: drag-and-drop reordering of admin tool cards within each group
+- [x] Platform Admin: compact user search → navigates to User Analytics with pre-filled search (full user list removed from dashboard)
+- [x] Add missing dual-app admin routes to IHeartEchoRouter (funnels, contacts, user-analytics, sharing-monitor, lms, downloads, admin/users)
+- [x] Media Repository: brand tag (AAUS/IHE) added to uploaded items; filter by brand in UI
+- [x] analyticsTrack.myActivity: self-service procedure returning login history, page views, enrollments, downloads for current user

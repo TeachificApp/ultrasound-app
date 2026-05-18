@@ -175,10 +175,10 @@ function OverviewTab({ from, to }: { from: string; to: string }) {
 // ─── User List Tab ────────────────────────────────────────────────────────────
 type SortKey = "lastLogin" | "logins" | "pageViews" | "videoPlays" | "quizAttempts" | "downloads" | "name";
 
-function UserListTab({ onSelectUser }: { onSelectUser: (id: number) => void }) {
+function UserListTab({ onSelectUser, initialSearch = "" }: { onSelectUser: (id: number) => void; initialSearch?: string }) {
   const [, navigate] = useLocation();
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [search, setSearch] = useState(initialSearch);
+  const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
   const [page, setPage] = useState(1);
   const [sortBy, setSortBy] = useState<SortKey>("lastLogin");
   const PAGE_SIZE = 25;
@@ -694,7 +694,11 @@ function UserDetailView({ userId, onBack }: { userId: number; onBack: () => void
 // ─── Main Page ───────────────────────────────────────────────────────────────
 export default function UserAnalytics() {
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
-  const [mainTab, setMainTab] = useState("overview");
+  const initialSearch = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("search") ?? "";
+  }, []);
+  const [mainTab, setMainTab] = useState(() => initialSearch ? "users" : "overview");
   const [dateRange, setDateRange] = useState("30d");
 
   const { from, to } = useMemo(() => {
@@ -713,7 +717,7 @@ export default function UserAnalytics() {
       <div className="flex items-center justify-between">
         <div>
           <nav className="flex items-center gap-1.5 text-xs text-gray-400 mb-1">
-            <a href="/admin" className="hover:text-teal-600 transition-colors">Platform Admin</a>
+            <a href="/platform-admin" className="hover:text-teal-600 transition-colors">Platform Admin</a>
             <span>/</span>
             <span className="text-gray-600 font-medium">User Analytics</span>
           </nav>
@@ -748,7 +752,7 @@ export default function UserAnalytics() {
         </TabsContent>
 
         <TabsContent value="users" className="mt-4">
-          <UserListTab onSelectUser={id => setSelectedUserId(id)} />
+          <UserListTab onSelectUser={id => setSelectedUserId(id)} initialSearch={initialSearch} />
         </TabsContent>
       </Tabs>
     </div>

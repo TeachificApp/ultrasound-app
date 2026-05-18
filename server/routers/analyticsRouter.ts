@@ -70,6 +70,81 @@ export const analyticsTrackRouter = router({
       return { ok: true };
     }),
 
+  /** Self-service: returns the current user's own activity summary (no admin required) */
+  myActivity: protectedProcedure
+    .query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const userId = ctx.user.id;
+      // Login history (last 30)
+      const logins = await db.select({
+        id: userLoginEvents.id,
+        ip: userLoginEvents.ip,
+        userAgent: userLoginEvents.userAgent,
+        createdAt: userLoginEvents.createdAt,
+      }).from(userLoginEvents)
+        .where(eq(userLoginEvents.userId, userId))
+        .orderBy(desc(userLoginEvents.createdAt))
+        .limit(30);
+      // Page views grouped by path (top 30)
+      const pageViews = await db.select({
+        path: userPageViewEvents.path,
+        views: count(),
+        lastViewed: max(userPageViewEvents.createdAt),
+      }).from(userPageViewEvents)
+        .where(eq(userPageViewEvents.userId, userId))
+        .groupBy(userPageViewEvents.path)
+        .orderBy(desc(count()))
+        .limit(30);
+      // Course enrollments with progress
+      const enrollments = await db.execute(sql`
+        SELECT
+          e.id AS enrollmentId,
+          e.enrolled_at AS enrolledAt,
+          e.completed_at AS completedAt,
+          e.progress_pct AS progressPct,
+          c.id AS courseId,
+          c.title AS courseTitle,
+          (SELECT COUNT(*) FROM lms_video_events WHERE user_id = ${userId} AND course_id = c.id AND event_type = 'complete') AS videosCompleted,
+          (SELECT COUNT(*) FROM lms_quiz_attempts WHERE user_id = ${userId} AND course_id = c.id) AS quizAttempts,
+          (SELECT ROUND(AVG(score),1) FROM lms_quiz_attempts WHERE user_id = ${userId} AND course_id = c.id) AS avgQuizScore
+        FROM lms_enrollments e
+        JOIN lms_courses c ON c.id = e.course_id
+        WHERE e.user_id = ${userId}
+        ORDER BY e.enrolled_at DESC
+      `);
+      // Downloads (last 20)
+      const downloads = await db.select({
+        id: digitalDownloadEvents.id,
+        productId: digitalDownloadEvents.productId,
+        productTitle: digitalProducts.title,
+        createdAt: digitalDownloadEvents.downloadedAt,
+      }).from(digitalDownloadEvents)
+        .leftJoin(digitalProducts, eq(digitalProducts.id, digitalDownloadEvents.productId))
+        .where(eq(digitalDownloadEvents.userId, userId))
+        .orderBy(desc(digitalDownloadEvents.downloadedAt))
+        .limit(20);
+      // Summary counts
+      const [loginCount] = await db.select({ c: count() }).from(userLoginEvents).where(eq(userLoginEvents.userId, userId));
+      const [pageViewCount] = await db.select({ c: count() }).from(userPageViewEvents).where(eq(userPageViewEvents.userId, userId));
+      const [videoPlayCount] = await db.select({ c: count() }).from(lmsVideoEvents).where(and(eq(lmsVideoEvents.userId, userId), eq(lmsVideoEvents.eventType, "play")));
+      const [quizCount] = await db.select({ c: count() }).from(lmsQuizAttempts).where(eq(lmsQuizAttempts.userId, userId));
+      const [downloadCount] = await db.select({ c: count() }).from(digitalDownloadEvents).where(eq(digitalDownloadEvents.userId, userId));
+      return {
+        summary: {
+          logins: loginCount?.c ?? 0,
+          pageViews: pageViewCount?.c ?? 0,
+          videoPlays: videoPlayCount?.c ?? 0,
+          quizAttempts: quizCount?.c ?? 0,
+          downloads: downloadCount?.c ?? 0,
+        },
+        logins,
+        pageViews,
+        enrollments: (enrollments as any).rows as any[],
+        downloads,
+      };
+    }),
+
   /** Called when a quiz is submitted */
   quizAttempt: protectedProcedure
     .input(z.object({
