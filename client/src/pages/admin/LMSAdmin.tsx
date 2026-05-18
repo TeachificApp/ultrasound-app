@@ -2750,7 +2750,17 @@ function CopyModuleDialog({
   );
 }
 
-function LessonEditorPage({ lesson, onClose, onSaved, onSavedAndClose }: { lesson: any; onClose: () => void; onSaved: () => void; onSavedAndClose?: () => void }) {
+function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndClose }: { lesson: any; onClose: () => void; onSaved: () => void; onSavedAndClose?: () => void }) {
+  // Fetch the FULL lesson record (including contentBlocks, content, videoContent).
+  // The course list view intentionally strips heavy columns for performance, so we
+  // must re-fetch the full row here before the editor can render existing blocks.
+  const { data: fullLesson, isLoading: lessonLoading } = trpc.lmsAdmin.getLessonAdmin.useQuery(
+    { lessonId: lessonShallow.id },
+    { enabled: !!lessonShallow.id, staleTime: 0 }
+  );
+  // Use the full lesson once loaded; fall back to the shallow object while loading
+  const lesson = fullLesson ?? lessonShallow;
+
   const [activeTab, setActiveTab] = useState<"settings" | "content" | "quiz">("settings");
   const [title, setTitle] = useState(lesson.title);
   const [content, setContent] = useState(lesson.content ?? "");
@@ -2765,6 +2775,15 @@ function LessonEditorPage({ lesson, onClose, onSaved, onSavedAndClose }: { lesso
   const [isPrerequisite, setIsPrerequisite] = useState<boolean>(!!lesson.isPrerequisite);
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<{ id: number; title: string; s3Url: string; mediaType: string } | null>(null);
+
+  // Sync state when full lesson data arrives (content/videoContent/embedUrl may be empty until then)
+  useEffect(() => {
+    if (fullLesson) {
+      setContent(fullLesson.content ?? "");
+      setVideoContent(fullLesson.videoContent ?? "");
+      setEmbedUrl(fullLesson.embedUrl ?? "");
+    }
+  }, [fullLesson]);
 
   // Fetch all lessons in this course for the prerequisite selector
   const { data: courseLessonsData } = trpc.lmsAdmin.getLessonsWithBlocks.useQuery(
@@ -3072,15 +3091,23 @@ function LessonEditorPage({ lesson, onClose, onSaved, onSavedAndClose }: { lesso
       {/* Lesson Editor Tab */}
       {activeTab === "content" && (
         <div className="flex-1 overflow-hidden flex flex-col">
-          <LessonBlockEditor
-            lessonId={lesson.id}
-            courseId={lesson.courseId}
-            courseSlug={""}
-            initialBlocks={lesson.contentBlocks ? (typeof lesson.contentBlocks === "string" ? JSON.parse(lesson.contentBlocks) : lesson.contentBlocks) as Block[] : []}
-            onClose={() => setActiveTab("settings")}
-            onSaved={() => { onSaved(); }}
-            onSavedAndClose={() => { if (onSavedAndClose) onSavedAndClose(); else onSaved(); }}
-          />
+          {lessonLoading && !fullLesson ? (
+            <div className="flex items-center justify-center flex-1 gap-2 text-gray-400">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span className="text-sm">Loading lesson content...</span>
+            </div>
+          ) : (
+            <LessonBlockEditor
+              key={`blocks-${lesson.id}-${fullLesson ? 'full' : 'shallow'}`}
+              lessonId={lesson.id}
+              courseId={lesson.courseId}
+              courseSlug={""}
+              initialBlocks={lesson.contentBlocks ? (typeof lesson.contentBlocks === "string" ? JSON.parse(lesson.contentBlocks) : lesson.contentBlocks) as Block[] : []}
+              onClose={() => setActiveTab("settings")}
+              onSaved={() => { onSaved(); }}
+              onSavedAndClose={() => { if (onSavedAndClose) onSavedAndClose(); else onSaved(); }}
+            />
+          )}
         </div>
       )}
 
