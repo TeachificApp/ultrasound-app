@@ -18,7 +18,7 @@ import {
   Globe, FileText, CreditCard, Gift, ThumbsUp, Layers, ArrowRight,
   ExternalLink, BarChart3, Pencil, Check, X, ChevronDown, ChevronLeft, Zap,
   LayoutTemplate, ShoppingCart, Download, BookOpen, Package, GripVertical,
-  GitBranch, List,
+  GitBranch, List, ChevronUp,
 } from "lucide-react";
 import {
   DndContext,

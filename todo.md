@@ -1957,3 +1957,6 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] LMSAdmin CourseOverviewEditor: Add zone tabs to switch between top/main/bottom zones
 - [x] LMSAdmin CourseOverviewEditor: Render all three zones in canvas with zone-specific add buttons
 - [x] PlatformAdmin: Add EnrollmentEmailSettingsPanel for customizing enrollment email subject/intro/footer
+
+## Bug Fixes (May 18 — continued)
+- [x] Fix FunnelBuilder: Add missing ChevronUp import from lucide-react
