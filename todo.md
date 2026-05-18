@@ -2082,3 +2082,14 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Order bump CSS animations added to index.css
 - [x] dashboardRouter: getMyContent now includes funnelPurchases
 - [x] StudentDashboardPage: My Content → Purchases tab shows funnel/checkout purchases
+
+## Pricing Restructure — Founding Member Positioning
+- [x] Hide annual plans (showAnnual: false) — preserved in code for future re-enable
+- [x] Monthly pricing kept at $9.97/month (single app)
+- [x] Dual app monthly kept at $12.99/month
+- [x] Add lifetime tier: $99.97 one-time (single app Founding Member)
+- [x] Add lifetime tier: $147 one-time (both apps Founding Member)
+- [x] Add createDualLifetimeCheckout procedure to brandMembershipRouter
+- [x] Redesign Premium.tsx with countdown timer, value pillars, urgency banner
+- [x] Four pricing cards: Monthly, Lifetime (featured), Dual Monthly, Dual Lifetime (best value)
+- [x] Remove annual billing references from all components (PremiumModal, PremiumGate, UpgradePrompt, PremiumOverlay, PremiumPearlGate)
