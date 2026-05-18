@@ -14,12 +14,16 @@
  * iHeartEcho subdomain hostnames:
  *   - app.iheartecho.com (production)
  *   - iheartecho-etvpnuid.manus.space (staging)
- *   - Any hostname containing "iheartecho"
+ *   - Any hostname containing "iheartecho" (EXCEPT accreditation.iheartecho.com)
+ *
+ * Accreditation subdomain hostnames:
+ *   - accreditation.iheartecho.com (production)
+ *   - Any hostname starting with "accreditation."
  *
  * Combined branding (learn + members) shows "All About Ultrasound | iHeartEcho".
  *
  * For local development, you can test by adding ?subdomain=learn or ?subdomain=iheartecho
- * or ?subdomain=members to the URL.
+ * or ?subdomain=members or ?subdomain=accreditation to the URL.
  */
 import { useMemo } from "react";
 
@@ -37,14 +41,19 @@ const IHEARTECHO_HOSTNAMES = [
   "iheartecho-etvpnuid.manus.space",
 ];
 
+const ACCREDITATION_HOSTNAMES = [
+  "accreditation.iheartecho.com",
+];
+
 export function useSubdomain() {
   const isLearnSubdomain = useMemo(() => isLearnDomain(), []);
   const isIHeartEchoSubdomain = useMemo(() => isIHeartEchoDomain(), []);
   const isMembersSubdomain = useMemo(() => isMembersDomain(), []);
+  const isAccreditationSubdomain = useMemo(() => isAccreditationDomain(), []);
   /** Combined branding applies to learn and members subdomains */
   const isCombinedBranding = useMemo(() => isLearnDomain() || isMembersDomain(), []);
 
-  return { isLearnSubdomain, isIHeartEchoSubdomain, isMembersSubdomain, isCombinedBranding };
+  return { isLearnSubdomain, isIHeartEchoSubdomain, isMembersSubdomain, isAccreditationSubdomain, isCombinedBranding };
 }
 
 /**
@@ -68,7 +77,18 @@ export function isMembersDomain(): boolean {
   return false;
 }
 
+export function isAccreditationDomain(): boolean {
+  const hostname = window.location.hostname;
+  if (ACCREDITATION_HOSTNAMES.includes(hostname)) return true;
+  if (hostname.startsWith("accreditation.")) return true;
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("subdomain") === "accreditation") return true;
+  return false;
+}
+
 export function isIHeartEchoDomain(): boolean {
+  // accreditation.iheartecho.com is NOT the iHeartEcho app — it's the accreditation division
+  if (isAccreditationDomain()) return false;
   const hostname = window.location.hostname;
   if (IHEARTECHO_HOSTNAMES.includes(hostname)) return true;
   if (hostname.includes("iheartecho")) return true;

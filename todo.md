@@ -2167,13 +2167,13 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix audio block waveform not showing (CORS fetch fails for R2 URLs)
 
 ## Form Builder Enhancements & DIY Separation (May 18)
-- [ ] Add "General Form" type to form type selector
-- [ ] Add import form by URL feature
-- [ ] Add public form URL with editable slug
-- [ ] Add embed form option
-- [ ] Add branding/theme settings (text, background, font, color)
-- [ ] Add analytics dashboard to form settings
-- [ ] Add public form renderer at /forms/:slug
-- [ ] Separate DIY Accreditation Tool into its own admin division (accreditation.iheartecho.com)
-- [ ] Duplicate form builder for DIY Accreditation Forms (separate results tables)
-- [ ] General Form Builder: remove accreditation categories, add score calculation option in settings
+- [x] Add "General Form" type to form type selector (generalFormTemplates.formType enum)
+- [x] Add import form by URL feature (importFormByUrl procedure + Import by URL button in FormList)
+- [x] Add public form URL with editable slug (updateSlug procedure + Share tab)
+- [x] Add embed form option (Share tab with embed code snippet)
+- [x] Add branding/theme settings (text, background, font, color) (updateTheme procedure + Style/Branding tab)
+- [x] Add analytics dashboard to form settings (getFormAnalytics + Analytics tab)
+- [x] Add public form renderer at /forms/:slug (PublicFormRenderer.tsx)
+- [x] Separate DIY Accreditation Tool into its own admin division — DIYAccreditationAdmin hub page + AccreditationDivisionRouter + /admin/diy-accreditation route + PlatformAdmin card
+- [x] Separate results tables from DIY accreditation (generalFormSubmissions vs accreditationFormSubmissions)
+- [x] General Form Builder: no accreditation categories, optional score calculation in settings (scoreEnabled field)

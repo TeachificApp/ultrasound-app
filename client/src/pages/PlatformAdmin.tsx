@@ -87,6 +87,7 @@ import {
   GripVertical,
   Volume2,
   Activity,
+  Award,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import BulkCsvUploadPanel, { type BulkResult } from "@/components/BulkCsvUploadPanel";
@@ -1076,6 +1077,7 @@ export default function PlatformAdmin() {
   const DUAL_TOOLS_DEFAULT: ToolCard[] = [
     { id: "email", href: "/admin/email", icon: Mail, label: "Email Campaigns", description: "Create and send email campaigns to members", color: "#189aa1" },
     { id: "sharing-monitor", href: "/admin/sharing-monitor", icon: Activity, label: "Sharing Monitor", description: "Track and review shared content access", color: "#7c3aed" },
+    { id: "diy-accreditation-admin", href: "/admin/diy-accreditation", icon: Award, label: "DIY Accreditation Admin", description: "Hub for all DIY Accreditation tools: navigator, forms, org management, lab admin", color: "#0891b2" },
     { id: "form-builder", href: "/admin/form-builder", icon: ClipboardList, label: "DIY Accreditation Forms", description: "Build accreditation review forms for DIY organizations", color: "#0891b2" },
     { id: "general-form-builder", href: "/admin/general-forms", icon: ClipboardList, label: "General Form Builder", description: "Build public forms, surveys, and quizzes with branding, analytics, and share links", color: "#0e7490" },
     { id: "media-repository", href: "/admin/media-repository", icon: HardDrive, label: "Media Repository", description: "Shared media library with AAUS/IHE brand tags", color: "#0f766e" },

@@ -292,11 +292,11 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
       {/* ── Hidden audio element for preview / duration detection ── */}
       {activePreviewUrl && (
         <audio
+          key={activePreviewUrl}
           ref={previewRef}
           src={activePreviewUrl}
           preload="metadata"
           className="hidden"
-          crossOrigin="anonymous"
         />
       )}
 

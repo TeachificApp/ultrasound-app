@@ -14,7 +14,7 @@ import GetAppBanner from "./components/GetAppBanner";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { RoleGuard } from "@/components/RoleGuard";
 import LMSLayout from "./components/LMSLayout";
-import { isLearnDomain, isIHeartEchoDomain, isMembersDomain } from "./hooks/useSubdomain";
+import { isLearnDomain, isIHeartEchoDomain, isMembersDomain, isAccreditationDomain } from "./hooks/useSubdomain";
 import UpgradePrompt from "./components/UpgradePrompt";
 import { useAuth } from "./_core/hooks/useAuth";
 import { usePageViewTracker } from "./hooks/useAnalytics";
@@ -168,6 +168,8 @@ const MediaRepository = lazy(() => import("./pages/admin/MediaRepository"));
 const ScanCoachHub = lazy(() => import("./pages/ScanCoachHub"));
 const ThinkificWebhookAdmin = lazy(() => import("./pages/ThinkificWebhookAdmin"));
 const FormBuilderAdmin = lazy(() => import("./pages/FormBuilderAdmin"));
+const GeneralFormBuilder = lazy(() => import("./pages/admin/GeneralFormBuilder"));
+const PublicFormRenderer = lazy(() => import("./pages/PublicFormRenderer"));
 const EmailAdmin = lazy(() => import("./pages/EmailAdmin"));
 const PlatformAdmin = lazy(() => import("./pages/PlatformAdmin"));
 const EducatorAssist = lazy(() => import("./pages/EducatorAssist"));
@@ -183,6 +185,8 @@ const DIYRegister = lazy(() => import("./pages/DIYRegister"));
 const AccreditationNavigator = lazy(() => import("./pages/AccreditationNavigator"));
 const AccreditationTool = lazy(() => import("./pages/AccreditationTool"));
 const AccreditationManager = lazy(() => import("./pages/AccreditationManager"));
+const AccreditationReadiness = lazy(() => import("./pages/AccreditationReadiness"));
+const DIYAccreditationAdmin = lazy(() => import("./pages/admin/DIYAccreditationAdmin"));
 
 // ── Learn Fetal Echo ────────────────────────────────────────────
 const LearnFetalEcho = lazy(() => import("./pages/LearnFetalEcho"));
@@ -407,11 +411,17 @@ function Router() {
         <Route path="/admin/thinkific-webhook">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ThinkificWebhookAdmin /></RoleGuard>}</Route>
         <Route path="/admin/form-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
         <Route path="/admin/form-builder/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/general-forms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><GeneralFormBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/general-forms/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><GeneralFormBuilder /></RoleGuard>}</Route>
+        {/* ── Public Form Renderer (no auth required) ──────────────────────── */}
+        <Route path="/forms/:slug" component={PublicFormRenderer} />
+        <Route path="/forms/:slug/embed" component={PublicFormRenderer} />
         <Route path="/admin/email">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><EmailAdmin /></RoleGuard>}</Route>
         <Route path="/admin/sharing-monitor">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><SharingMonitor /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/user-analytics">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><UserAnalytics /></RoleGuard>}</Route>
         <Route path="/admin/users/:userId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminUserDetailPage /></RoleGuard>}</Route>
         <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/diy-accreditation">{() => <RoleGuard roles={["diy_admin", "platform_admin", "accreditation_manager"]} allowAdmin={true}><DIYAccreditationAdmin /></RoleGuard>}</Route>
         <Route path="/educator-assist">{() => <EducatorAssist />}</Route>
         {/* ── SonoQuiz (admin-only during testing) ──────────────────────── */}
         <Route path="/admin/sonoquiz">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SonoQuizCreator /></RoleGuard>}</Route>
@@ -615,6 +625,11 @@ function IHeartEchoRouter() {
         <Route path="/admin/thinkific-webhook">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ThinkificWebhookAdmin /></RoleGuard>}</Route>
         <Route path="/admin/form-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
         <Route path="/admin/form-builder/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/general-forms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><GeneralFormBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/general-forms/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><GeneralFormBuilder /></RoleGuard>}</Route>
+        {/* ── Public Form Renderer (no auth required) ──────────────────────── */}
+        <Route path="/forms/:slug" component={PublicFormRenderer} />
+        <Route path="/forms/:slug/embed" component={PublicFormRenderer} />
         <Route path="/admin/email">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><EmailAdmin /></RoleGuard>}</Route>
         <Route path="/admin/engagement">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><EngagementDashboard /></RoleGuard>}</Route>
         <Route path="/admin/challenge-cards">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ChallengeCardGenerator /></RoleGuard>}</Route>
@@ -629,6 +644,7 @@ function IHeartEchoRouter() {
         <Route path="/admin/user-analytics">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><UserAnalytics /></RoleGuard>}</Route>
         <Route path="/admin/users/:userId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminUserDetailPage /></RoleGuard>}</Route>
         <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/diy-accreditation">{() => <RoleGuard roles={["diy_admin", "platform_admin", "accreditation_manager"]} allowAdmin={true}><DIYAccreditationAdmin /></RoleGuard>}</Route>
         <Route path="/educator-assist">{() => <RoleGuard roles={["education_manager", "education_admin", "education_student"]} allowAdmin={true}><EducatorAssist /></RoleGuard>}</Route>
         <Route path="/educator-admin">{() => <RoleGuard roles={["education_admin", "education_manager"]} allowAdmin={true}><EducatorAdmin /></RoleGuard>}</Route>
         <Route path="/student-dashboard">{() => <RoleGuard roles={["education_student", "education_admin", "education_manager"]} allowAdmin={true}><StudentDashboard /></RoleGuard>}</Route>
@@ -656,10 +672,53 @@ function UpgradePromptWrapper() {
   return <UpgradePrompt eligible={eligible} />;
 }
 
+/**
+ * AccreditationDivisionRouter — Routes shown only on accreditation.iheartecho.com.
+ * Hub for all DIY Accreditation tools.
+ */
+function AccreditationDivisionRouter() {
+  usePageViewTracker();
+  const pageFallback = (
+    <div className="flex items-center justify-center h-screen">
+      <div className="animate-spin h-8 w-8 border-4 border-cyan-500 border-t-transparent rounded-full" />
+    </div>
+  );
+  return (
+    <Suspense fallback={pageFallback}>
+      <Switch>
+        {/* Auth routes */}
+        <Route path="/login" component={Login} />
+        <Route path="/register" component={Register} />
+        <Route path="/verify-email" component={VerifyEmail} />
+        <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/reset-password" component={ResetPassword} />
+        <Route path="/magic-link" component={MagicLinkRequest} />
+        <Route path="/auth/magic" component={MagicLinkCallback} />
+        {/* DIY Accreditation routes */}
+        <Route path="/accreditation">{() => <RoleGuard roles={["diy_user", "diy_admin"]} allowAdmin={false}><AccreditationTool /></RoleGuard>}</Route>
+        <Route path="/accreditation-navigator">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><AccreditationNavigator /></RoleGuard>}</Route>
+        <Route path="/diy-member">{() => <RoleGuard roles={["diy_user", "diy_admin"]} allowAdmin={false}><DIYMemberPortal /></RoleGuard>}</Route>
+        <Route path="/diy-accreditation-plans" component={DIYAccreditationPlans} />
+        <Route path="/diy-register" component={DIYRegister} />
+        <Route path="/accreditation-manager">{() => <RoleGuard roles={["platform_admin", "accreditation_manager"]} allowAdmin={true}><AccreditationManager /></RoleGuard>}</Route>
+        <Route path="/admin/form-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/form-builder/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
+        <Route path="/lab-admin">{() => <RoleGuard roles={["diy_admin"]} allowAdmin={false}><LabAdmin /></RoleGuard>}</Route>
+        <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/diy-accreditation">{() => <RoleGuard roles={["diy_admin", "platform_admin", "accreditation_manager"]} allowAdmin={true}><DIYAccreditationAdmin /></RoleGuard>}</Route>
+        <Route path="/accreditation-readiness">{() => <RoleGuard roles={["diy_user", "diy_admin"]} allowAdmin={true}><AccreditationReadiness /></RoleGuard>}</Route>
+        {/* Default: DIY Accreditation Admin hub */}
+        <Route>{() => <RoleGuard roles={["diy_admin", "platform_admin", "accreditation_manager"]} allowAdmin={true}><DIYAccreditationAdmin /></RoleGuard>}</Route>
+      </Switch>
+    </Suspense>
+  );
+}
+
 function App() {
   const onLearnSubdomain = isLearnDomain();
   const onMembersSubdomain = isMembersDomain();
   const onIHeartEchoSubdomain = isIHeartEchoDomain();
+  const onAccreditationSubdomain = isAccreditationDomain();
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light">
@@ -667,6 +726,8 @@ function App() {
           <Toaster />
           {(onLearnSubdomain || onMembersSubdomain) ? (
             <LMSRouter />
+          ) : onAccreditationSubdomain ? (
+            <AccreditationDivisionRouter />
           ) : onIHeartEchoSubdomain ? (
             <IHeartEchoRouter />
           ) : (

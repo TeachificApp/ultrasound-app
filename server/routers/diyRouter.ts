@@ -691,7 +691,11 @@ export const diyRouter = router({
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-    if (ctx.user.role !== "admin") {
+    const userRolesList: string[] = (ctx.user as any).roles ?? [];
+    const isAllowed = ctx.user.role === "admin"
+      || userRolesList.includes("platform_admin")
+      || userRolesList.includes("accreditation_manager");
+    if (!isAllowed) {
       throw new TRPCError({ code: "FORBIDDEN" });
     }
 
