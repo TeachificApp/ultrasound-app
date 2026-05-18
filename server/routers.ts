@@ -176,22 +176,6 @@ export const appRouter = router({
             .where(and(eq(brandMemberships.userId, opts.ctx.user.id), eq(brandMemberships.brand, brand), eq(brandMemberships.tier, "premium"), eq(brandMemberships.status, "active")))
             .limit(1);
           brandPremium = !!membership;
-          // Auto-backfill: if user has legacy isPremium but no brandMembership for this brand, create one
-          if (!membership && isPremium) {
-            const [anyExisting] = await brandDb.select().from(brandMemberships)
-              .where(and(eq(brandMemberships.userId, opts.ctx.user.id), eq(brandMemberships.brand, brand)))
-              .limit(1);
-            if (!anyExisting) {
-              await brandDb.insert(brandMemberships).values({
-                userId: opts.ctx.user.id,
-                brand,
-                tier: "premium",
-                status: "active",
-                source: "backfill",
-              });
-              brandPremium = true;
-            }
-          }
         }
       } catch { /* ignore brand membership check failures */ }
       // Include demo mode metadata if active
