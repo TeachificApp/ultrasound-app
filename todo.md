@@ -2021,3 +2021,9 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Backend: detectSalesIssues procedure (missing product, no next step, broken branch targets)
 - [x] Add Page dialog: import existing product/course/download page into funnel
 - [x] Backend: listImportablePages procedure (standalone landing pages + product pages)
+
+## Course/Download Admin Tabs & Fixes
+- [ ] Fix free-product toggle placement bug (floating next to price input instead of its own label)
+- [ ] Add Grant Access + Save buttons at top of overview page (already at bottom)
+- [ ] Add tab navigation to course admin: Settings, Landing Page, Students, Analytics, Curriculum
+- [ ] Add tab navigation to download admin: Settings, Landing Page, Students, Analytics

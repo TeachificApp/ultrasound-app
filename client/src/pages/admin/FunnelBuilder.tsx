@@ -531,6 +531,7 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
   const { data: importablePages } = trpc.funnel.listImportablePages.useQuery({ excludeFunnelId: funnelId }, { enabled: showAddPage });
   const importPage = trpc.funnel.importPageToFunnel.useMutation({ onSuccess: () => { refetch(); setShowAddPage(false); toast.success("Page imported!"); } });
   const [importTab, setImportTab] = useState<"new" | "import">("new");
+  const [selectedSourceIdx, setSelectedSourceIdx] = useState<number | null>(null);
 
   const pageSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -948,64 +949,65 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
             )}
 
             {importTab === "import" && (
-              <div className="max-h-96 overflow-y-auto space-y-4">
-                {/* Standalone landing pages */}
-                {importablePages?.standalone && importablePages.standalone.length > 0 && (
-                  <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Standalone Landing Pages</p>
-                    <div className="space-y-1.5">
-                      {importablePages.standalone.map((p: any) => (
-                        <button
-                          key={p.id}
-                          onClick={() => importPage.mutate({ sourcePageId: p.id, targetFunnelId: funnelId })}
-                          disabled={importPage.isPending}
-                          className="w-full flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-all text-left"
-                        >
-                          <div>
-                            <span className="text-sm font-medium text-gray-900">{p.title}</span>
-                            <span className="ml-2 text-xs text-gray-400">/{p.slug}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-400">{p.views} views</span>
-                            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full capitalize">{p.pageType.replace(/_/g, " ")}</span>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {/* Pages from other funnels */}
-                {importablePages?.fromFunnels && importablePages.fromFunnels.length > 0 && (
-                  <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Pages from Other Funnels</p>
-                    <div className="space-y-1.5">
-                      {importablePages.fromFunnels.map((p: any) => (
-                        <button
-                          key={p.id}
-                          onClick={() => importPage.mutate({ sourcePageId: p.id, targetFunnelId: funnelId })}
-                          disabled={importPage.isPending}
-                          className="w-full flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-all text-left"
-                        >
-                          <div>
-                            <span className="text-sm font-medium text-gray-900">{p.title}</span>
-                            <span className="ml-2 text-xs text-gray-400">/{p.slug}</span>
-                            <span className="ml-2 text-xs text-blue-500">{p.funnelName}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-400">{p.views} views</span>
-                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full capitalize">{p.pageType.replace(/_/g, " ")}</span>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {(!importablePages || (importablePages.standalone.length === 0 && importablePages.fromFunnels.length === 0)) && (
+              <div className="space-y-4">
+                {/* Step 1: Source selector */}
+                {!importablePages ? (
+                  <div className="text-center py-8 text-gray-400"><p className="text-sm">Loading sources...</p></div>
+                ) : importablePages.length === 0 ? (
                   <div className="text-center py-8 text-gray-400">
                     <Layers size={32} className="mx-auto mb-2 opacity-40" />
-                    <p className="text-sm">No existing pages to import</p>
-                    <p className="text-xs mt-1">Create pages in other funnels or as standalone landing pages first</p>
+                    <p className="text-sm">No pages available to import</p>
+                    <p className="text-xs mt-1">Create courses, downloads, or pages in other funnels first</p>
                   </div>
+                ) : (
+                  <>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-1.5">Select Source</label>
+                      <select
+                        className="w-full border rounded-lg px-3 py-2 text-sm bg-background"
+                        value={selectedSourceIdx ?? ""}
+                        onChange={e => setSelectedSourceIdx(e.target.value === "" ? null : Number(e.target.value))}
+                      >
+                        <option value="">— Choose a funnel, course, or product —</option>
+                        {importablePages.map((src: any, idx: number) => (
+                          <option key={`${src.sourceType}-${src.sourceId}`} value={idx}>
+                            {src.sourceType === "funnel" ? "📂" : src.sourceType === "course" ? "🎓" : src.sourceType === "download" ? "📥" : "🔗"}
+                            {" "}{src.sourceName}{" "}
+                            {src.sourceStatus !== "published" && src.sourceStatus !== "public" ? `(${src.sourceStatus})` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Step 2: Page list for selected source */}
+                    {selectedSourceIdx !== null && importablePages[selectedSourceIdx] && (
+                      <div>
+                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-1.5">Select Page</label>
+                        <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                          {importablePages[selectedSourceIdx].pages.map((p: any) => {
+                            const src = importablePages[selectedSourceIdx];
+                            const typeColor = src.sourceType === "funnel" ? "bg-blue-100 text-blue-700" : src.sourceType === "course" ? "bg-green-100 text-green-700" : "bg-purple-100 text-purple-700";
+                            return (
+                              <button
+                                key={`${p.sourceType}-${p.id}`}
+                                onClick={() => importPage.mutate({ sourcePageId: p.id, targetFunnelId: funnelId, sourceType: p.sourceType })}
+                                disabled={importPage.isPending}
+                                className="w-full flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-all text-left"
+                              >
+                                <div className="min-w-0">
+                                  <span className="text-sm font-medium text-gray-900 block truncate">{p.title}</span>
+                                  <span className="text-xs text-gray-400">/{p.slug}</span>
+                                </div>
+                                <span className={`text-xs px-2 py-0.5 rounded-full capitalize ml-2 shrink-0 ${typeColor}`}>
+                                  {p.pageType.replace(/_/g, " ")}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}

@@ -263,20 +263,22 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
               minHeight={120}
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Price ($)</Label>
-              <Input type="number" min={0} step="0.01" value={form.price ?? "0.00"} onChange={(e) => setForm({ ...form, price: e.target.value })} disabled={form.isFree} placeholder="29.99" />
-              <p className="text-xs text-muted-foreground mt-1">{form.isFree ? "Free" : `$${parseFloat(form.price || "0").toFixed(2)}`}</p>
-            </div>
-            <div className="flex items-center gap-2 pt-6">
-              <Switch checked={form.isFree ?? false} onCheckedChange={(v) => setForm({ ...form, isFree: v, price: v ? "0.00" : form.price })} />
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-4 items-end">
+              <div>
+                <Label>Price ($)</Label>
+                <Input type="number" min={0} step="0.01" value={form.price ?? "0.00"} onChange={(e) => setForm({ ...form, price: e.target.value })} disabled={form.isFree} placeholder="29.99" />
+                <p className="text-xs text-muted-foreground mt-1">{form.isFree ? "Free" : `$${parseFloat(form.price || "0").toFixed(2)}`}</p>
+              </div>
+              <div className="flex items-center gap-2 pb-1">
+                <Switch checked={form.isFree ?? false} onCheckedChange={(v) => setForm({ ...form, isFree: v, price: v ? "0.00" : form.price })} />
+                <Label className="cursor-pointer">Free product</Label>
+              </div>
             </div>
             <div className="flex items-center gap-3">
-              <label className="text-sm font-medium">Bundle Only</label>
               <Switch checked={(form as any).bundleOnly ?? false} onCheckedChange={(v) => setForm({ ...form, bundleOnly: v } as any)} />
+              <label className="text-sm font-medium">Bundle Only</label>
               <span className="text-xs text-muted-foreground">If enabled, this product cannot be purchased standalone</span>
-              <Label>Free product</Label>
             </div>
           </div>
           <div>

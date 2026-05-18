@@ -1303,52 +1303,184 @@ export const funnelPublicRouter = router({
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
 
-      // All standalone landing pages
+      // ── Funnels (other than current) with their pages ──
+      const allFunnelsList = await db
+        .select({ id: funnels.id, name: funnels.name, status: funnels.status })
+        .from(funnels)
+        .orderBy(asc(funnels.name));
+
+      const otherFunnels = allFunnelsList.filter(f =>
+        input.excludeFunnelId ? f.id !== input.excludeFunnelId : true
+      );
+
+      const otherFunnelIds = otherFunnels.map(f => f.id);
+      let funnelPagesRows: { id: number; title: string; slug: string; pageType: string; funnelId: number; views: number | null }[] = [];
+      if (otherFunnelIds.length > 0) {
+        funnelPagesRows = await db
+          .select({ id: funnelPages.id, title: funnelPages.title, slug: funnelPages.slug, pageType: funnelPages.pageType, funnelId: funnelPages.funnelId, views: funnelPages.views })
+          .from(funnelPages)
+          .where(sql`${funnelPages.funnelId} IN (${sql.join(otherFunnelIds.map(id => sql`${id}`), sql`, `)})`)
+          .orderBy(asc(funnelPages.sortOrder));
+      }
+
+      const funnelPagesByFunnelId = new Map<number, typeof funnelPagesRows>();
+      for (const p of funnelPagesRows) {
+        if (!funnelPagesByFunnelId.has(p.funnelId)) funnelPagesByFunnelId.set(p.funnelId, []);
+        funnelPagesByFunnelId.get(p.funnelId)!.push(p);
+      }
+
+      const funnelSources = otherFunnels
+        .map(f => ({
+          sourceType: "funnel" as const,
+          sourceId: f.id,
+          sourceName: f.name,
+          sourceStatus: f.status ?? "draft",
+          pages: (funnelPagesByFunnelId.get(f.id) ?? []).map(p => ({
+            id: p.id,
+            title: p.title,
+            slug: p.slug,
+            pageType: p.pageType,
+            views: p.views ?? 0,
+            sourceType: "funnel" as const,
+          })),
+        }))
+        .filter(f => f.pages.length > 0);
+
+      // ── Standalone funnel landing pages ──
       const standalonePages = await db
         .select({ id: funnelPages.id, title: funnelPages.title, slug: funnelPages.slug, pageType: funnelPages.pageType, funnelId: funnelPages.funnelId, views: funnelPages.views })
         .from(funnelPages)
         .where(eq(funnelPages.isStandaloneLanding, true))
         .orderBy(desc(funnelPages.views));
 
-      // Pages from other funnels (checkout, upsell, downsell, thank_you)
-      const otherFunnelPages = await db
-        .select({ id: funnelPages.id, title: funnelPages.title, slug: funnelPages.slug, pageType: funnelPages.pageType, funnelId: funnelPages.funnelId, views: funnelPages.views })
-        .from(funnelPages)
-        .where(input.excludeFunnelId
-          ? and(eq(funnelPages.isStandaloneLanding, false), sql`${funnelPages.funnelId} != ${input.excludeFunnelId}`)
-          : eq(funnelPages.isStandaloneLanding, false)
-        )
-        .orderBy(desc(funnelPages.views))
-        .limit(100);
+      const standaloneSources = standalonePages.length > 0 ? [{
+        sourceType: "standalone" as const,
+        sourceId: 0,
+        sourceName: "Standalone Landing Pages",
+        sourceStatus: "published",
+        pages: standalonePages.map(p => ({
+          id: p.id,
+          title: p.title,
+          slug: p.slug,
+          pageType: p.pageType,
+          views: p.views ?? 0,
+          sourceType: "standalone" as const,
+        })),
+      }] : [];
 
-      // Get funnel names for context
-      const allFunnelsList = await db.select({ id: funnels.id, name: funnels.name }).from(funnels);
-      const funnelNameMap = new Map(allFunnelsList.map(f => [f.id, f.name]));
+      // ── Courses (all statuses) ──
+      const courseRows = await db
+        .select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug, status: lmsCourses.status, type: lmsCourses.type })
+        .from(lmsCourses)
+        .orderBy(asc(lmsCourses.title));
 
-      return {
-        standalone: standalonePages.map(p => ({ ...p, funnelName: null })),
-        fromFunnels: otherFunnelPages.map(p => ({ ...p, funnelName: funnelNameMap.get(p.funnelId) ?? "Unknown" })),
-      };
+      const courseSources = courseRows.map(c => ({
+        sourceType: "course" as const,
+        sourceId: c.id,
+        sourceName: c.title,
+        sourceStatus: c.status,
+        pages: [{
+          id: c.id,
+          title: `${c.title} — Landing Page`,
+          slug: c.slug,
+          pageType: "landing" as string,
+          views: 0,
+          sourceType: "course" as const,
+        }],
+      }));
+
+      // ── Downloads / Digital Products (all statuses) ──
+      const downloadRows = await db
+        .select({ id: digitalProducts.id, title: digitalProducts.title, slug: digitalProducts.slug, status: digitalProducts.status })
+        .from(digitalProducts)
+        .orderBy(asc(digitalProducts.title));
+
+      const downloadSources = downloadRows.map(d => ({
+        sourceType: "download" as const,
+        sourceId: d.id,
+        sourceName: d.title,
+        sourceStatus: d.status,
+        pages: [{
+          id: d.id,
+          title: `${d.title} — Landing Page`,
+          slug: d.slug,
+          pageType: "landing" as string,
+          views: 0,
+          sourceType: "download" as const,
+        }],
+      }));
+
+      return [
+        ...standaloneSources,
+        ...funnelSources,
+        ...courseSources,
+        ...downloadSources,
+      ];
     }),
 
   /** Import (copy) an existing page into a funnel */
   importPageToFunnel: protectedProcedure
-    .input(z.object({ sourcePageId: z.number(), targetFunnelId: z.number() }))
+    .input(z.object({
+      sourcePageId: z.number(),
+      targetFunnelId: z.number(),
+      sourceType: z.enum(["funnel", "standalone", "course", "download"]).default("funnel"),
+    }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
 
-      const [original] = await db.select().from(funnelPages).where(eq(funnelPages.id, input.sourcePageId));
-      if (!original) throw new TRPCError({ code: "NOT_FOUND" });
-
-      // Generate unique slug
-      const baseSlug = original.slug.replace(/-copy.*$/, "").replace(/-standalone.*$/, "");
-      const suffix = Date.now().toString(36).slice(-4);
-      const newSlug = `${baseSlug}-imported-${suffix}`;
-
-      // Get max sort order
+      // Get max sort order for target funnel
       const existing = await db.select({ sortOrder: funnelPages.sortOrder }).from(funnelPages).where(eq(funnelPages.funnelId, input.targetFunnelId)).orderBy(desc(funnelPages.sortOrder)).limit(1);
       const nextOrder = (existing[0]?.sortOrder ?? 0) + 1;
+      const suffix = Date.now().toString(36).slice(-4);
+
+      if (input.sourceType === "course") {
+        const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.id, input.sourcePageId));
+        if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+        const newSlug = `${course.slug}-funnel-${suffix}`;
+        const [inserted] = await db.insert(funnelPages).values({
+          funnelId: input.targetFunnelId,
+          pageType: "landing",
+          title: course.title + " (Imported)",
+          slug: newSlug,
+          blocks: null, // course landing pages use their own builder; start blank
+          productType: "course",
+          productId: course.id,
+          sortOrder: nextOrder,
+          isActive: true,
+          isHidden: false,
+          isStandaloneLanding: false,
+        });
+        return { id: (inserted as any).insertId, slug: newSlug };
+      }
+
+      if (input.sourceType === "download") {
+        const [product] = await db.select().from(digitalProducts).where(eq(digitalProducts.id, input.sourcePageId));
+        if (!product) throw new TRPCError({ code: "NOT_FOUND" });
+        const newSlug = `${product.slug}-funnel-${suffix}`;
+        // Copy landing blocks from the download product if available
+        const blocks = product.landingBlocks ?? null;
+        const [inserted] = await db.insert(funnelPages).values({
+          funnelId: input.targetFunnelId,
+          pageType: "landing",
+          title: product.title + " (Imported)",
+          slug: newSlug,
+          blocks,
+          productType: "download",
+          productId: product.id,
+          sortOrder: nextOrder,
+          isActive: true,
+          isHidden: false,
+          isStandaloneLanding: false,
+        });
+        return { id: (inserted as any).insertId, slug: newSlug };
+      }
+
+      // funnel or standalone page
+      const [original] = await db.select().from(funnelPages).where(eq(funnelPages.id, input.sourcePageId));
+      if (!original) throw new TRPCError({ code: "NOT_FOUND" });
+      const baseSlug = original.slug.replace(/-copy.*$/, "").replace(/-standalone.*$/, "").replace(/-imported.*$/, "");
+      const newSlug = `${baseSlug}-imported-${suffix}`;
 
       const [inserted] = await db.insert(funnelPages).values({
         funnelId: input.targetFunnelId,
