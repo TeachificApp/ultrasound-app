@@ -2093,3 +2093,13 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Redesign Premium.tsx with countdown timer, value pillars, urgency banner
 - [x] Four pricing cards: Monthly, Lifetime (featured), Dual Monthly, Dual Lifetime (best value)
 - [x] Remove annual billing references from all components (PremiumModal, PremiumGate, UpgradePrompt, PremiumOverlay, PremiumPearlGate)
+
+## Inline Checkout Block (Stripe)
+- [x] InlineCheckoutBlock component: contact info, product selector, billing address toggle, Stripe CardElement, order bumps, summary, terms, submit
+- [x] Order bumps with pulse/glow/shake/bounce animations (matching CTA button animations)
+- [x] Address collection toggle (defaults ON for physical products)
+- [x] inline_checkout block type added to BLOCK_CATALOG in LandingPageBuilder
+- [x] inline_checkout editor case in LandingPageBuilder with full product/bump/color controls
+- [x] inline_checkout rendered in BlockPreview, PublicFunnelPage, StandaloneLandingPage
+- [x] Purchases recorded to funnelPurchases table and surfaced in My Dashboard → My Content
+- [x] Build passes cleanly

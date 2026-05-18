@@ -15,6 +15,7 @@ import type { Block } from "@/components/BlockPreview";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import CheckoutFormBlock from "@/components/CheckoutFormBlock";
 import EmbeddedCheckoutBlock from "@/components/EmbeddedCheckoutBlock";
+import InlineCheckoutBlock from "@/components/InlineCheckoutBlock";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 
 // ─── Opt-Out Link Component ─────────────────────────────────────────────────
@@ -493,6 +494,8 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
       );
     case "checkout_form":
       return <CheckoutFormBlock data={d} funnelId={funnelId} pageId={pageId} funnelSlug={funnelSlug} />;
+    case "inline_checkout":
+      return <InlineCheckoutBlock data={d} sourceType="funnel" sourceFunnelId={funnelId} />;
     case "embedded_checkout":
       return <EmbeddedCheckoutBlock data={d} pageSlug={funnelSlug} />;
     case "logo_strip": {

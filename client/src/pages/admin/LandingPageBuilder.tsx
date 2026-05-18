@@ -167,7 +167,29 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
       countdownHeadline: "LIMITED TIME OFFER!",
       bgColor: "#ffffff", textColor: "#0e1e2e", accentColor: "#179ca3", showBorder: true,
     } },
-  { type: "embedded_checkout", label: "Embedded Checkout", icon: <CreditCard size={14} />, category: "Funnel",
+  { type: "inline_checkout", label: "Inline Checkout (Stripe)", icon: <CreditCard size={14} />, category: "Funnel",
+    defaultData: {
+      headerText: "🔒 Lock in your seat now!",
+      headerPrice: "$997",
+      accentColor: "#179ca3",
+      bgColor: "#f9fafb",
+      textColor: "#0e1e2e",
+      showContactInfo: true,
+      showBillingInfo: false,
+      collectShipping: false,
+      showProductSelect: true,
+      products: [
+        { name: "Product Name", description: "Full online access", price: 99700, imageUrl: "", type: "course" }
+      ],
+      orderBumps: [],
+      submitText: "Submit",
+      successRedirect: "",
+      termsText: "I attest that I meet the pre-requisites for this course and I agree to the",
+      termsLinkText: "TERMS OF SERVICE",
+      termsLinkUrl: "/terms",
+      sourceType: "landing_page",
+    } },
+  { type: "embedded_checkout", label: "Embedded Checkout (Legacy)", icon: <CreditCard size={14} />, category: "Funnel",
     defaultData: {
       headerText: "Complete Your Order",
       headerSubtext: "Secure checkout powered by Stripe",
@@ -906,6 +928,76 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
           <OptOutSettings d={d} set={set} />
         </div>
       );
+    case "inline_checkout": {
+      const icProds: Array<{ name: string; description: string; price: number; imageUrl: string; type: string }> = d.products ?? [];
+      const icBumps: Array<{ title: string; headline: string; description: string; price: number; imageUrl: string; ctaText: string; ctaEmoji: string; animation: string }> = d.orderBumps ?? [];
+      return (
+        <div className="space-y-4">
+          <div className="text-xs text-teal-700 bg-teal-50 border border-teal-200 rounded p-2">
+            <strong>Inline Checkout (Stripe)</strong> — Classic card fields embedded directly on the page. Matches the checkout form layout with contact info, product selector, address toggle, order bumps, and submit. Purchases appear in My Dashboard.
+          </div>
+          {/* Header */}
+          <BSTextField data={d} onSet={set} label="Header Text" field="headerText" placeholder="🔒 Lock in your seat now!" />
+          <BSTextField data={d} onSet={set} label="Header Price" field="headerPrice" placeholder="$997" />
+          {/* Options */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2"><input type="checkbox" checked={d.showContactInfo ?? true} onChange={e => set("showContactInfo", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Collect contact info (name, email, phone)</label></div>
+            <div className="flex items-center gap-2"><input type="checkbox" checked={d.showBillingInfo ?? false} onChange={e => set("showBillingInfo", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Collect billing address <span className="text-teal-600">(auto-on for physical products)</span></label></div>
+            <div className="flex items-center gap-2"><input type="checkbox" checked={d.showProductSelect ?? true} onChange={e => set("showProductSelect", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show product selector</label></div>
+          </div>
+          {/* Products */}
+          <div className="border border-gray-200 rounded p-3 space-y-2">
+            <div className="flex items-center justify-between"><span className="text-xs font-semibold text-gray-700">Products ({icProds.length})</span><button onClick={() => set("products", [...icProds, { name: "New Product", description: "", price: 9700, imageUrl: "", type: "other" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div>
+            {icProds.map((p, i) => (
+              <div key={i} className="border border-gray-100 rounded p-2 space-y-1">
+                <div className="flex items-center justify-between"><span className="text-xs text-gray-500">Product {i + 1}</span><button onClick={() => set("products", icProds.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div>
+                <DebouncedInput value={p.name} onChange={v => { const next = [...icProds]; next[i] = { ...next[i], name: v }; set("products", next); }} className="h-7 text-xs" placeholder="Product name" />
+                <DebouncedInput value={p.description} onChange={v => { const next = [...icProds]; next[i] = { ...next[i], description: v }; set("products", next); }} className="h-7 text-xs" placeholder="Description" />
+                <div className="grid grid-cols-2 gap-2">
+                  <div><label className="text-xs text-gray-400">Price (cents)</label><Input type="number" value={p.price} onChange={e => { const next = [...icProds]; next[i] = { ...next[i], price: Number(e.target.value) }; set("products", next); }} className="h-7 text-xs" placeholder="9700 = $97.00" /></div>
+                  <div><label className="text-xs text-gray-400">Type</label><select value={p.type} onChange={e => { const next = [...icProds]; next[i] = { ...next[i], type: e.target.value }; set("products", next); }} className="h-7 w-full text-xs rounded border border-gray-200 px-2"><option value="other">Other / Service</option><option value="course">Course</option><option value="download">Download</option><option value="physical">Physical Product</option><option value="membership">Membership</option></select></div>
+                </div>
+                <DebouncedInput value={p.imageUrl} onChange={v => { const next = [...icProds]; next[i] = { ...next[i], imageUrl: v }; set("products", next); }} className="h-7 text-xs" placeholder="Image URL (optional)" />
+              </div>
+            ))}
+          </div>
+          {/* Order Bumps */}
+          <div className="border border-gray-200 rounded p-3 space-y-2">
+            <div className="flex items-center justify-between"><span className="text-xs font-semibold text-gray-700">Order Bumps ({icBumps.length})</span><button onClick={() => set("orderBumps", [...icBumps, { title: "Add-on Offer", headline: "✦ Special one-time offer!", description: "Enhance your purchase with this exclusive add-on.", price: 2700, imageUrl: "", ctaText: "+ Add", ctaEmoji: "", animation: "pulse" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add Bump</button></div>
+            {icBumps.map((bump: any, i: number) => (
+              <div key={i} className="border border-gray-100 rounded p-2 space-y-1">
+                <div className="flex justify-between items-center"><span className="text-xs font-semibold text-gray-600">Bump {i + 1}</span><button onClick={() => set("orderBumps", icBumps.filter((_: any, j: number) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div>
+                <DebouncedInput value={bump.headline ?? ""} onChange={v => set("orderBumps", icBumps.map((b: any, j: number) => j === i ? { ...b, headline: v } : b))} className="h-7 text-xs" placeholder="Eyebrow (e.g. ✦ Special Add-On!)" />
+                <DebouncedInput value={bump.title ?? ""} onChange={v => set("orderBumps", icBumps.map((b: any, j: number) => j === i ? { ...b, title: v } : b))} className="h-7 text-xs" placeholder="Bump title" />
+                <DebouncedTextarea value={bump.description ?? ""} onChange={v => set("orderBumps", icBumps.map((b: any, j: number) => j === i ? { ...b, description: v } : b))} className="text-xs min-h-[50px]" placeholder="Short description" />
+                <div className="grid grid-cols-2 gap-2">
+                  <div><label className="text-xs text-gray-400">Price (cents)</label><Input type="number" value={bump.price ?? 0} onChange={e => set("orderBumps", icBumps.map((b: any, j: number) => j === i ? { ...b, price: Number(e.target.value) } : b))} className="h-7 text-xs" /></div>
+                  <div><label className="text-xs text-gray-400">Animation</label><select value={bump.animation ?? "pulse"} onChange={e => set("orderBumps", icBumps.map((b: any, j: number) => j === i ? { ...b, animation: e.target.value } : b))} className="h-7 w-full text-xs rounded border border-gray-200 px-2"><option value="pulse">Pulse Border</option><option value="glow">Glow Border</option><option value="shake">Shake</option><option value="bounce">Bounce</option><option value="none">None</option></select></div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div><label className="text-xs text-gray-400">CTA Text</label><DebouncedInput value={bump.ctaText ?? ""} onChange={v => set("orderBumps", icBumps.map((b: any, j: number) => j === i ? { ...b, ctaText: v } : b))} className="h-7 text-xs" placeholder="+ Add" /></div>
+                  <div><label className="text-xs text-gray-400">CTA Emoji</label><DebouncedInput value={bump.ctaEmoji ?? ""} onChange={v => set("orderBumps", icBumps.map((b: any, j: number) => j === i ? { ...b, ctaEmoji: v } : b))} className="h-7 text-xs" placeholder="👍" /></div>
+                </div>
+                <DebouncedInput value={bump.imageUrl ?? ""} onChange={v => set("orderBumps", icBumps.map((b: any, j: number) => j === i ? { ...b, imageUrl: v } : b))} className="h-7 text-xs" placeholder="Image URL (optional)" />
+              </div>
+            ))}
+          </div>
+          {/* Submit & Redirect */}
+          <BSTextField data={d} onSet={set} label="Submit Button Text" field="submitText" placeholder="Submit" />
+          <BSTextField data={d} onSet={set} label="Success Redirect URL" field="successRedirect" placeholder="/thank-you" />
+          {/* Terms */}
+          <div className="grid grid-cols-2 gap-2">
+            <BSTextField data={d} onSet={set} label="Terms Text" field="termsText" placeholder="I agree to the" />
+            <BSTextField data={d} onSet={set} label="Terms Link Text" field="termsLinkText" placeholder="Terms of Service" />
+          </div>
+          <BSTextField data={d} onSet={set} label="Terms Link URL" field="termsLinkUrl" placeholder="/terms" />
+          {/* Colors */}
+          <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />
+          <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
+          <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
+        </div>
+      );
+    }
     case "embedded_checkout": {
       const ecProds: Array<{ name: string; description: string; price: number; imageUrl: string; type: string }> = d.products ?? [];
       const ecBumps: Array<{ title: string; headline: string; description: string; price: number; imageUrl: string; ctaText: string; highlightColor: string; animation: string }> = d.orderBumps ?? [];

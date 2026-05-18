@@ -4,6 +4,7 @@
  * Extracted into its own file to break the circular dependency between CoursePlayer and LandingPageBuilder.
  */
 import { ChevronDown, Globe, Image, Package, Video } from "lucide-react";
+import InlineCheckoutBlock from "@/components/InlineCheckoutBlock";
 import { Users } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
@@ -19,7 +20,7 @@ export type BlockType =
   | "funnel_workflow" | "product_offer_stack" | "order_bump_checkout"
   | "price_stack" | "urgency_offer" | "checkout_form"
   | "footer" | "logo_strip" | "three_column"
-  | "related_products" | "embedded_checkout";
+  | "related_products" | "embedded_checkout" | "inline_checkout";
 
 export interface Block {
   id: string;
@@ -610,84 +611,11 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
         </div>
       );
     }
-    case "embedded_checkout": {
-      const ecProducts = d.products ?? [];
-      const ecBumps = d.orderBumps ?? [];
-      const ecAccent = d.accentColor ?? "#179ca3";
+    case "embedded_checkout":
+    case "inline_checkout": {
       return (
-        <div className="px-4 py-8" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
-          <div className="max-w-lg mx-auto rounded-2xl shadow-xl overflow-hidden bg-white">
-            {(d.headerText || d.headerSubtext) && (
-              <div className="px-6 pt-5 pb-4 text-center border-b border-gray-100">
-                {d.headerText && <h2 className="text-lg font-bold text-gray-900">{d.headerText}</h2>}
-                {d.headerSubtext && <p className="text-sm text-gray-500 mt-1">{d.headerSubtext}</p>}
-              </div>
-            )}
-            <div className="px-6 py-5">
-              {/* Step indicator */}
-              <div className="flex items-center gap-2 mb-5">
-                <div className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full text-white" style={{ backgroundColor: ecAccent }}>1. Your Details</div>
-                <div className="flex-1 h-px bg-gray-200" />
-                <div className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-gray-100 text-gray-400">2. Payment</div>
-              </div>
-              {/* Product preview */}
-              {ecProducts.length > 0 && (
-                <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 bg-gray-50 mb-4">
-                  {ecProducts[0].imageUrl && <img src={ecProducts[0].imageUrl} alt="" className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />}
-                  <div className="flex-1">
-                    <p className="font-bold text-sm text-gray-900">{ecProducts[0].name}</p>
-                    {ecProducts[0].description && <p className="text-xs text-gray-500">{ecProducts[0].description}</p>}
-                  </div>
-                  <span className="font-bold text-base" style={{ color: ecAccent }}>${(ecProducts[0].price / 100).toFixed(2)}</span>
-                </div>
-              )}
-              {/* Contact fields preview */}
-              <div className="space-y-2 mb-4">
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-400">First Name</div>
-                  <div className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-400">Last Name</div>
-                </div>
-                <div className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-400">Email Address *</div>
-              </div>
-              {/* Shipping preview */}
-              {(d.collectShipping || (ecProducts[0]?.type === "physical")) && (
-                <div className="border border-gray-200 rounded-xl p-3 mb-4">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Shipping Address</p>
-                  <div className="space-y-1.5">
-                    <div className="border border-gray-100 rounded px-2 py-1.5 text-xs text-gray-400">Address Line 1</div>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      <div className="border border-gray-100 rounded px-2 py-1.5 text-xs text-gray-400">City</div>
-                      <div className="border border-gray-100 rounded px-2 py-1.5 text-xs text-gray-400">State</div>
-                    </div>
-                  </div>
-                </div>
-              )}
-              {/* Order bumps preview */}
-              {ecBumps.map((bump: any, i: number) => (
-                <div key={i} className="relative border-2 rounded-xl p-4 mb-3" style={{ borderColor: bump.highlightColor ?? ecAccent }}>
-                  <div className="absolute -top-3 left-4 px-3 py-0.5 rounded-full text-xs font-bold text-white" style={{ backgroundColor: bump.highlightColor ?? ecAccent }}>✦ Special Add-On Offer</div>
-                  <div className="flex items-start gap-3 mt-1">
-                    <div className="w-6 h-6 rounded border-2 flex-shrink-0" style={{ borderColor: bump.highlightColor ?? ecAccent }} />
-                    {bump.imageUrl && <img src={bump.imageUrl} alt="" className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />}
-                    <div className="flex-1">
-                      {bump.headline && <p className="text-xs font-bold uppercase tracking-wide mb-0.5" style={{ color: bump.highlightColor ?? ecAccent }}>{bump.headline}</p>}
-                      <p className="font-bold text-sm text-gray-900">{bump.title}</p>
-                      {bump.description && <p className="text-xs text-gray-500 mt-1">{bump.description}</p>}
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="font-bold text-sm" style={{ color: bump.highlightColor ?? ecAccent }}>+${(bump.price / 100).toFixed(2)}</p>
-                      <button type="button" className="mt-1 px-2 py-0.5 rounded text-xs font-bold border-2" style={{ borderColor: bump.highlightColor ?? ecAccent, color: bump.highlightColor ?? ecAccent }}>{bump.ctaText || "+ Add"}</button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {/* Submit button */}
-              <button className="w-full py-3.5 rounded-xl font-bold text-white text-base mt-2" style={{ backgroundColor: ecAccent }}>
-                {d.submitText ?? "Proceed to Payment"}
-              </button>
-              <p className="text-xs text-center text-gray-400 mt-2 flex items-center justify-center gap-1">🔒 Secured by Stripe</p>
-            </div>
-          </div>
+        <div style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
+          <InlineCheckoutBlock data={block.data} sourceType={d.sourceType ?? "other"} />
         </div>
       );
     }
