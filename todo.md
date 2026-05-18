@@ -2113,3 +2113,12 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Audio block wired into BlockPreview, PublicFunnelPage, StandaloneLandingPage
 - [x] Video block: autoplay, muted, loop, controls toggles added to editor
 - [x] Video block: trim support (HTML5 media fragment #t=start,end) for direct video files
+
+## Webhook Auto-Fulfillment & Audio Waveform
+- [x] Webhook: payment_intent.succeeded auto-enrolls buyer in LMS course (fulfillment_course_id metadata)
+- [x] Webhook: payment_intent.succeeded grants brand membership (fulfillment_brand: aaus/iheartecho/both)
+- [x] embeddedCheckoutRouter: lmsCourseId and fulfillmentBrand fields added to createPaymentIntent input
+- [x] AudioBlockPlayer: Web Audio API waveform visualizer with canvas rendering
+- [x] AudioBlockPlayer: scrub-position indicator (playhead line on waveform)
+- [x] AudioBlockPlayer: click-to-seek on waveform canvas
+- [x] AudioBlockPlayer: fallback scrubber shown when waveform decode fails

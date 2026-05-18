@@ -618,10 +618,75 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
     await db.execute(sql`UPDATE funnel_pages SET conversions = conversions + 1 WHERE id = ${funnelPageId}`);
   }
 
+  // ── AUTO-FULFILLMENT ────────────────────────────────────────────────────
+  // 1. LMS course enrollment
+  const fulfillmentCourseId = meta.fulfillment_course_id ? parseInt(meta.fulfillment_course_id) : null;
+  if (fulfillmentCourseId && userId) {
+    try {
+      const [existingEnrollment] = await db
+        .select({ id: lmsEnrollments.id })
+        .from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, fulfillmentCourseId)))
+        .limit(1);
+      if (!existingEnrollment) {
+        await db.insert(lmsEnrollments).values({
+          userId,
+          courseId: fulfillmentCourseId,
+          orderId: null,
+          affiliateCode: null,
+        });
+        console.log(`[Stripe] Auto-enrolled user ${userId} in LMS course ${fulfillmentCourseId} after payment ${piId}`);
+      } else {
+        console.log(`[Stripe] User ${userId} already enrolled in course ${fulfillmentCourseId} — skipping`);
+      }
+    } catch (err) {
+      console.error(`[Stripe] Failed to auto-enroll user ${userId} in course ${fulfillmentCourseId}:`, err);
+    }
+  }
+
+  // 2. Brand membership grant (aaus, iheartecho, or both)
+  const fulfillmentBrand = meta.fulfillment_brand as "aaus" | "iheartecho" | "both" | undefined;
+  if (fulfillmentBrand && userId) {
+    const brandsToGrant: ("aaus" | "iheartecho")[] =
+      fulfillmentBrand === "both" ? ["aaus", "iheartecho"] : [fulfillmentBrand];
+    for (const brand of brandsToGrant) {
+      try {
+        const [existing] = await db
+          .select({ id: brandMemberships.id })
+          .from(brandMemberships)
+          .where(and(eq(brandMemberships.userId, userId), eq(brandMemberships.brand, brand)))
+          .limit(1);
+        if (existing) {
+          await db.update(brandMemberships)
+            .set({ tier: "premium", status: "active", source: "stripe", grantedAt: new Date() })
+            .where(eq(brandMemberships.id, existing.id));
+        } else {
+          await db.insert(brandMemberships).values({
+            userId,
+            brand,
+            tier: "premium",
+            status: "active",
+            source: "stripe",
+            stripeSubscriptionId: null,
+            stripeCustomerId: null,
+          });
+        }
+        console.log(`[Stripe] Granted ${brand} premium membership to user ${userId} after payment ${piId}`);
+      } catch (err) {
+        console.error(`[Stripe] Failed to grant ${brand} membership to user ${userId}:`, err);
+      }
+    }
+  }
+  // ── END AUTO-FULFILLMENT ────────────────────────────────────────────────
+
   // Notify owner
+  const fulfillmentNote = [
+    fulfillmentCourseId ? `Course enrollment: #${fulfillmentCourseId}` : null,
+    fulfillmentBrand ? `Brand access: ${fulfillmentBrand}` : null,
+  ].filter(Boolean).join(", ");
   await notifyOwner({
     title: "💰 New Embedded Checkout Purchase",
-    content: `Payment succeeded.\nProduct: ${productName}\nEmail: ${customerEmail}\nName: ${customerName}\nAmount: $${((amount ?? 0) / 100).toFixed(2)}\nType: ${meta.type}\nPaymentIntent: ${piId}`,
+    content: `Payment succeeded.\nProduct: ${productName}\nEmail: ${customerEmail}\nName: ${customerName}\nAmount: $${((amount ?? 0) / 100).toFixed(2)}\nType: ${meta.type}\nPaymentIntent: ${piId}${fulfillmentNote ? `\nFulfillment: ${fulfillmentNote}` : ""}`,
   });
 }
 
