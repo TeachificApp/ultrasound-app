@@ -550,6 +550,117 @@ function BSLinkField({ data, onSet, label, field, value, onChange }: {
   );
 }
 
+function PricingCtaSettings({ d, set }: { d: Record<string, any>; set: (key: string, val: any) => void }) {
+  const { data: coursesData } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", type: "all", pageSize: 100 });
+  const allItems = (coursesData?.courses ?? []).map((c: any) => ({
+    id: c.id,
+    title: c.title,
+    type: c.type as string,
+    slug: c.slug,
+    price: c.isFree ? 0 : (c.price ?? 0),
+    isFree: c.isFree,
+  }));
+  const priceSource = d.priceSource ?? "manual";
+  const selectedItemId = d.linkedItemId ? Number(d.linkedItemId) : null;
+  const selectedItem = allItems.find((i: any) => i.id === selectedItemId);
+
+  const handleItemSelect = (idStr: string) => {
+    if (!idStr || idStr === "none") {
+      set("linkedItemId", null);
+      set("linkedItemType", null);
+      set("linkedItemSlug", null);
+      return;
+    }
+    const item = allItems.find((i: any) => i.id === Number(idStr));
+    if (!item) return;
+    set("linkedItemId", item.id);
+    set("linkedItemType", item.type);
+    set("linkedItemSlug", item.slug);
+    const urlMap: Record<string, string> = { course: `/learn/${item.slug}`, quiz: `/learn/${item.slug}`, download: `/downloads/${item.slug}`, bundle: `/bundles/${item.slug}`, product: `/products/${item.slug}` };
+    set("ctaUrl", urlMap[item.type] ?? `/learn/${item.slug}`);
+    if (item.isFree) {
+      set("currentPrice", "Free");
+    } else if (item.price > 0) {
+      set("currentPrice", `$${(item.price / 100).toFixed(0)}`);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <label className="text-xs text-gray-500 block mb-1">CTA Button URL</label>
+        <DebouncedInput value={d.ctaUrl ?? ""} onChange={v => set("ctaUrl", v)} className="h-8 text-xs" placeholder="https://... or /learn/course-slug" />
+        <p className="text-[10px] text-gray-400 mt-0.5">Any URL — external site, internal page, checkout, booking link, etc.</p>
+      </div>
+      <div className="border border-gray-200 rounded-lg p-3 space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-medium text-gray-600">Pricing Display</p>
+          <div className="flex items-center gap-2">
+            <input type="checkbox" id="showPriceToggle" checked={d.showPrice ?? false} onChange={e => set("showPrice", e.target.checked)} className="rounded" />
+            <label htmlFor="showPriceToggle" className="text-xs text-gray-600">Show price</label>
+          </div>
+        </div>
+        {(d.showPrice ?? false) && (
+          <>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Price Source</label>
+              <Select value={priceSource} onValueChange={v => set("priceSource", v)}>
+                <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="manual">Manual entry</SelectItem>
+                  <SelectItem value="item">Link to item (course / download / quiz)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {priceSource === "item" && (
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Select Item</label>
+                <Select value={selectedItemId ? String(selectedItemId) : "none"} onValueChange={handleItemSelect}>
+                  <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Choose item…" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— None —</SelectItem>
+                    {allItems.map((item: any) => (
+                      <SelectItem key={item.id} value={String(item.id)}>
+                        [{item.type}] {item.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedItem && (
+                  <p className="text-xs text-teal-600 mt-1">
+                    {(selectedItem as any).isFree ? "Free" : `$${((selectedItem as any).price / 100).toFixed(0)}`} · URL auto-set
+                  </p>
+                )}
+              </div>
+            )}
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Current Price (displayed)</label>
+              <DebouncedInput value={d.currentPrice ?? ""} onChange={v => set("currentPrice", v)} className="h-8 text-xs" placeholder="e.g. $97 or Free" />
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="showStrikethrough" checked={d.showStrikethroughPrice ?? false} onChange={e => set("showStrikethroughPrice", e.target.checked)} className="rounded" />
+              <label htmlFor="showStrikethrough" className="text-xs text-gray-600">Show strikethrough price</label>
+            </div>
+            {(d.showStrikethroughPrice ?? false) && (
+              <DebouncedInput value={d.strikethroughPrice ?? ""} onChange={v => set("strikethroughPrice", v)} className="h-8 text-xs" placeholder="e.g. $197" />
+            )}
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Price Position</label>
+              <Select value={d.pricePosition ?? "above"} onValueChange={v => set("pricePosition", v)}>
+                <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="above">Above button</SelectItem>
+                  <SelectItem value="below">Below button</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function OptOutSettings({ d, set }: { d: Record<string, any>; set: (key: string, val: any) => void }) {
   return (
     <div className="space-y-2 border-t border-gray-100 pt-2 mt-2">
@@ -759,7 +870,53 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
       return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Section Headline" field="headline" /><BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div><div className="flex items-center justify-between mb-2"><label className="text-xs text-gray-500 font-medium">Cards</label><button onClick={() => set("cards", [...cards, { front: "Card Title", back: "Card description" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div><div className="space-y-2">{cards.map((card, i) => (<div key={i} className="border border-gray-200 rounded p-2 space-y-1"><div className="flex justify-between items-center mb-1"><span className="text-xs text-gray-500">Card {i + 1}</span><button onClick={() => set("cards", cards.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div><DebouncedInput value={card.front} onChange={v => { const next = cards.map((c, j) => j === i ? { ...c, front: v } : c); set("cards", next); }} className="h-7 text-xs" placeholder="Front (title)" /><DebouncedTextarea value={card.back} onChange={v => { const next = cards.map((c, j) => j === i ? { ...c, back: v } : c); set("cards", next); }} className="text-xs min-h-[60px]" placeholder="Back (description)" /></div>))}</div></div></div>);
     }
     case "pricing_cta":
-      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Headline" field="headline" /><BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline /><BSTextField data={d} onSet={set} label="CTA Button Text" field="ctaText" /><BSColorField data={d} onSet={set} label="CTA Color" field="ctaColor" /><BSColorField data={d} onSet={set} label="CTA Text Color" field="ctaTextColor" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div><label className="text-xs text-gray-500 block mb-1">Button Animation</label><Select value={d.ctaAnimation ?? "none"} onValueChange={v => set("ctaAnimation", v)}><SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem><SelectItem value="pulse">Pulse</SelectItem><SelectItem value="bounce">Bounce</SelectItem><SelectItem value="shake">Shake</SelectItem><SelectItem value="glow">Glow</SelectItem></SelectContent></Select></div><div className="flex items-center gap-2"><input type="checkbox" checked={d.showPrice ?? true} onChange={e => set("showPrice", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show course price</label></div><div className="flex items-center gap-2"><input type="checkbox" checked={d.showOriginalPrice ?? false} onChange={e => set("showOriginalPrice", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show strikethrough original price</label></div>{d.showOriginalPrice && <BSTextField data={d} onSet={set} label="Original Price (e.g. 299.00)" field="originalPrice" placeholder="299.00" />}<div className="border-t pt-3 mt-1 space-y-2"><p className="text-xs font-medium text-gray-500">Button Subtext (below button)</p><BSTextField data={d} onSet={set} label="Subtext text" field="buttonSubtext" placeholder="e.g. No credit card required" /><BSLinkField label="Subtext URL (optional)" value={d.buttonSubtextUrl ?? ""} onChange={v => set("buttonSubtextUrl", v)} /><BSColorField data={d} onSet={set} label="Subtext Color" field="buttonSubtextColor" /><div><label className="text-xs text-gray-500 block mb-1">Subtext Size</label><select value={d.buttonSubtextSize ?? "xs"} onChange={e => set("buttonSubtextSize", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="xs">Extra Small (xs)</option><option value="sm">Small (sm)</option><option value="base">Base</option><option value="lg">Large (lg)</option></select></div><div><label className="text-xs text-gray-500 block mb-1">Subtext Style</label><div className="flex gap-2"><button type="button" onClick={() => set("buttonSubtextItalic", !(d.buttonSubtextItalic ?? false))} className={`px-2 py-1 text-xs rounded border ${(d.buttonSubtextItalic ?? false) ? "bg-teal-50 border-teal-400 text-teal-700" : "border-gray-200 text-gray-500"}`}><em>Italic</em></button><button type="button" onClick={() => set("buttonSubtextBold", !(d.buttonSubtextBold ?? false))} className={`px-2 py-1 text-xs rounded border ${(d.buttonSubtextBold ?? false) ? "bg-teal-50 border-teal-400 text-teal-700" : "border-gray-200 text-gray-500"}`}><strong>Bold</strong></button></div></div></div><OptOutSettings d={d} set={set} /></div>);
+      return (
+        <div className="space-y-3">
+          <BSTextField data={d} onSet={set} label="Headline" field="headline" />
+          <BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline />
+          <BSTextField data={d} onSet={set} label="CTA Button Text" field="ctaText" />
+          <BSColorField data={d} onSet={set} label="CTA Color" field="ctaColor" />
+          <BSColorField data={d} onSet={set} label="CTA Text Color" field="ctaTextColor" />
+          <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Button Animation</label>
+            <Select value={d.ctaAnimation ?? "none"} onValueChange={v => set("ctaAnimation", v)}>
+              <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="pulse">Pulse</SelectItem>
+                <SelectItem value="bounce">Bounce</SelectItem>
+                <SelectItem value="shake">Shake</SelectItem>
+                <SelectItem value="glow">Glow</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <PricingCtaSettings d={d} set={set} />
+          <div className="border-t pt-3 mt-1 space-y-2">
+            <p className="text-xs font-medium text-gray-500">Button Subtext (below button)</p>
+            <BSTextField data={d} onSet={set} label="Subtext text" field="buttonSubtext" placeholder="e.g. No credit card required" />
+            <BSLinkField label="Subtext URL (optional)" value={d.buttonSubtextUrl ?? ""} onChange={v => set("buttonSubtextUrl", v)} />
+            <BSColorField data={d} onSet={set} label="Subtext Color" field="buttonSubtextColor" />
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Subtext Size</label>
+              <select value={d.buttonSubtextSize ?? "xs"} onChange={e => set("buttonSubtextSize", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+                <option value="xs">Extra Small (xs)</option>
+                <option value="sm">Small (sm)</option>
+                <option value="base">Base</option>
+                <option value="lg">Large (lg)</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Subtext Style</label>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => set("buttonSubtextItalic", !(d.buttonSubtextItalic ?? false))} className={`px-2 py-1 text-xs rounded border ${(d.buttonSubtextItalic ?? false) ? "bg-teal-50 border-teal-400 text-teal-700" : "border-gray-200 text-gray-500"}`}><em>Italic</em></button>
+                <button type="button" onClick={() => set("buttonSubtextBold", !(d.buttonSubtextBold ?? false))} className={`px-2 py-1 text-xs rounded border ${(d.buttonSubtextBold ?? false) ? "bg-teal-50 border-teal-400 text-teal-700" : "border-gray-200 text-gray-500"}`}><strong>Bold</strong></button>
+              </div>
+            </div>
+          </div>
+          <OptOutSettings d={d} set={set} />
+        </div>
+      );
     case "cta_standalone":
       return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Headline" field="headline" /><BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline /><BSTextField data={d} onSet={set} label="Button Text" field="ctaText" /><BSLinkField label="Button Link" value={d.ctaLink ?? ""} onChange={v => set("ctaLink", v)} /><BSColorField data={d} onSet={set} label="Button Color" field="ctaColor" /><BSColorField data={d} onSet={set} label="Button Text Color" field="ctaTextColor" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div><label className="text-xs text-gray-500 block mb-1">Button Animation</label><Select value={d.ctaAnimation ?? "none"} onValueChange={v => set("ctaAnimation", v)}><SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem><SelectItem value="pulse">Pulse</SelectItem><SelectItem value="bounce">Bounce</SelectItem><SelectItem value="shake">Shake</SelectItem><SelectItem value="glow">Glow</SelectItem></SelectContent></Select></div><BSAlignField data={d} onSet={set} label="Text Alignment" field="align" /><div className="border-t pt-3 mt-1 space-y-2"><p className="text-xs font-medium text-gray-500">Button Subtext (below button)</p><BSTextField data={d} onSet={set} label="Subtext text" field="buttonSubtext" placeholder="e.g. No credit card required" /><BSLinkField label="Subtext URL (optional)" value={d.buttonSubtextUrl ?? ""} onChange={v => set("buttonSubtextUrl", v)} /><BSColorField data={d} onSet={set} label="Subtext Color" field="buttonSubtextColor" /><div><label className="text-xs text-gray-500 block mb-1">Subtext Size</label><select value={d.buttonSubtextSize ?? "xs"} onChange={e => set("buttonSubtextSize", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="xs">Extra Small (xs)</option><option value="sm">Small (sm)</option><option value="base">Base</option><option value="lg">Large (lg)</option></select></div><div><label className="text-xs text-gray-500 block mb-1">Subtext Style</label><div className="flex gap-2"><button type="button" onClick={() => set("buttonSubtextItalic", !(d.buttonSubtextItalic ?? false))} className={`px-2 py-1 text-xs rounded border ${(d.buttonSubtextItalic ?? false) ? "bg-teal-50 border-teal-400 text-teal-700" : "border-gray-200 text-gray-500"}`}><em>Italic</em></button><button type="button" onClick={() => set("buttonSubtextBold", !(d.buttonSubtextBold ?? false))} className={`px-2 py-1 text-xs rounded border ${(d.buttonSubtextBold ?? false) ? "bg-teal-50 border-teal-400 text-teal-700" : "border-gray-200 text-gray-500"}`}><strong>Bold</strong></button></div></div></div><OptOutSettings d={d} set={set} /></div>);
     case "lead_capture":

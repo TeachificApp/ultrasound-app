@@ -317,16 +317,38 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
           </div>
         </div>
       );
-    case "pricing_cta":
+    case "pricing_cta": {
+      const priceAbove = (d.pricePosition ?? "above") === "above";
+      const priceBlock = d.showPrice && d.currentPrice ? (
+        <div className="mb-4">
+          {d.showStrikethroughPrice && d.strikethroughPrice && (
+            <p className="text-xl text-gray-400 line-through mb-1">{d.strikethroughPrice}</p>
+          )}
+          <p className="text-4xl font-bold" style={{ color: d.ctaColor ?? "#179ca3" }}>{d.currentPrice}</p>
+        </div>
+      ) : null;
+      const ctaBtn = (
+        <a
+          href={d.ctaUrl ?? "#"}
+          target={d.ctaUrl && d.ctaUrl.startsWith("http") ? "_blank" : undefined}
+          rel={d.ctaUrl && d.ctaUrl.startsWith("http") ? "noopener noreferrer" : undefined}
+          className={`inline-block px-10 py-4 rounded-xl font-bold text-lg shadow-lg ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
+          style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}
+        >
+          {d.ctaText ?? "Get Started"}
+        </a>
+      );
       return (
         <div className="px-8 py-12 text-center" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           {d.headline && <h2 className="text-3xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6 max-w-xl mx-auto" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
-          {d.showPrice && coursePrice !== undefined && <div className="mb-6">{d.showOriginalPrice && d.originalPrice && <p className="text-xl text-gray-400 line-through mb-1">${d.originalPrice}</p>}<p className="text-4xl font-bold" style={{ color: d.ctaColor ?? "#179ca3" }}>{coursePrice === 0 ? "Free" : `$${(coursePrice / 100).toFixed(2)}`}</p></div>}
-          <button className={`px-10 py-4 rounded-xl font-bold text-lg shadow-lg ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`} style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>{d.ctaText ?? "Enroll Now"}</button>
+          {priceAbove && priceBlock}
+          {ctaBtn}
+          {!priceAbove && priceBlock}
           <ButtonSubtext d={d} />
         </div>
       );
+    }
     case "cta_standalone":
       return (
         <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa", textAlign: d.align ?? "center" }}>

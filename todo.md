@@ -2145,3 +2145,8 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 ## Lesson Editor Fixes (May 18)
 - [x] Lesson Editor: Preview button opens course player in new window at the correct lesson (/learn/{courseSlug}/player?lesson={id}&preview=admin)
 - [x] Lesson Editor: Add Block / Copy Block scrolls canvas to the newly added block automatically
+- [x] CTA block (pricing_cta): replaced hard-coded course URL with free-form ctaUrl field (any destination)
+- [x] CTA block (pricing_cta): replaced "show course price" checkbox with flexible Pricing Display panel (manual entry or item-linked, current price, strikethrough price, price position above/below)
+- [x] CTA block (pricing_cta): item picker auto-fills ctaUrl and currentPrice when a course/download/quiz is selected
+- [x] Lesson Editor: Preview button opens course player in new window at correct lesson
+- [x] Lesson Editor: Add Block scrolls canvas to newly added block
