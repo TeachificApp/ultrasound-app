@@ -349,7 +349,7 @@ function LessonNoteEditor({ lessonId, courseSlug, initialNote }: { lessonId: num
         value={note}
         onChange={e => setNote(e.target.value)}
         placeholder="Add a note for this lesson..."
-        className="text-sm min-h-[80px] resize-none bg-white border-gray-200 text-gray-900 placeholder:text-gray-400"
+        className="text-sm min-h-[200px] resize-y bg-white border-gray-200 text-gray-900 placeholder:text-gray-400"
       />
       <Button
         size="sm"

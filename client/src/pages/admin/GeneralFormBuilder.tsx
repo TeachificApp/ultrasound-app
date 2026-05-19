@@ -3,7 +3,7 @@
  * Full-featured General Form Builder admin page.
  * Tabs: Editor | Style/Branding | Share | Settings | Analytics
  */
-import { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -754,13 +754,32 @@ function StyleTab({ formId, template }: { formId: number; template: any }) {
     catch { return DEFAULT_THEME; }
   });
   const [saving, setSaving] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const logoFileRef = useRef<HTMLInputElement>(null);
 
   const updateTheme = trpc.generalForm.updateTheme.useMutation({
     onSuccess: () => { setSaving(false); toast.success("Theme saved"); },
     onError: (e) => { setSaving(false); toast.error(e.message); },
   });
+  const uploadPageMedia = trpc.auth.uploadPageMedia.useMutation();
 
   const set = (key: keyof typeof DEFAULT_THEME, val: any) => setTheme(t => ({ ...t, [key]: val }));
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { toast.error("Logo must be under 10 MB"); return; }
+    setLogoUploading(true);
+    try {
+      const reader = new FileReader();
+      const dataUri = await new Promise<string>((resolve) => { reader.onload = () => resolve(reader.result as string); reader.readAsDataURL(file); });
+      const result = await uploadPageMedia.mutateAsync({ dataUri, mimeType: file.type, fileName: file.name, context: "form_logo" });
+      set("logoUrl", result.url);
+      toast.success("Logo uploaded");
+    } catch (err: any) { toast.error(err.message || "Upload failed"); }
+    setLogoUploading(false);
+    if (logoFileRef.current) logoFileRef.current.value = "";
+  };
 
   const save = () => {
     setSaving(true);
@@ -980,9 +999,25 @@ function StyleTab({ formId, template }: { formId: number; template: any }) {
               <Label htmlFor="show-logo" className="text-xs">Show Logo</Label>
             </div>
             {theme.showLogo && (
-              <div>
-                <Label className="text-xs">Logo URL</Label>
-                <Input value={theme.logoUrl} onChange={e => set("logoUrl", e.target.value)} placeholder="https://…/logo.png" className="mt-1 h-8 text-sm" />
+              <div className="space-y-2">
+                <Label className="text-xs">Logo Image</Label>
+                {theme.logoUrl ? (
+                  <div className="flex items-center gap-2">
+                    <img src={theme.logoUrl} alt="Logo" className="h-10 max-w-[120px] object-contain rounded border border-gray-200 bg-gray-50 p-1" />
+                    <div className="flex flex-col gap-1">
+                      <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => logoFileRef.current?.click()} disabled={logoUploading}>
+                        {logoUploading ? "Uploading…" : "Change"}
+                      </Button>
+                      <Button type="button" size="sm" variant="ghost" className="h-7 text-xs text-red-500" onClick={() => set("logoUrl", "")}>Remove</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button type="button" size="sm" variant="outline" className="h-8 text-xs w-full" onClick={() => logoFileRef.current?.click()} disabled={logoUploading}>
+                    {logoUploading ? "Uploading…" : "Upload Logo"}
+                  </Button>
+                )}
+                <input ref={logoFileRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+                <p className="text-[10px] text-gray-400">PNG, JPG, SVG, WebP — max 10 MB</p>
               </div>
             )}
           </CardContent>
