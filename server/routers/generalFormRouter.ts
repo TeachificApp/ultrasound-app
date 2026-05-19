@@ -31,10 +31,7 @@ import {
   users,
 } from "../../drizzle/schema";
 import { eq, desc, asc, and, sql, like, count, inArray } from "drizzle-orm";
-<<<<<<< Updated upstream
-=======
-import { users } from "../../drizzle/schema";
->>>>>>> Stashed changes
+
 import { invokeLLM } from "../_core/llm";
 
 // ─── Guard ────────────────────────────────────────────────────────────────────
@@ -700,11 +697,6 @@ export const generalFormRouter = router({
       return { id: (result as any).insertId, score, maxScore };
     }),
 
-<<<<<<< Updated upstream
-  // ── Admin preview: get form by slug ignoring isPublic ─────────────────────
-  getFormPreview: protectedProcedure
-    .input(z.object({ slug: z.string() }))
-=======
   // ── PUBLIC: Save draft (auto-save while filling form) ─────────────────────
   saveFormDraft: publicProcedure
     .input(z.object({
@@ -718,13 +710,11 @@ export const generalFormRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const req = (ctx as any).req;
       if (input.draftId) {
-        // Update existing draft
         await db.update(generalFormSubmissions)
           .set({ responses: input.responses, updatedAt: new Date() })
           .where(and(eq(generalFormSubmissions.id, input.draftId), eq(generalFormSubmissions.status, "draft")));
         return { draftId: input.draftId };
       } else {
-        // Create new draft
         const [result] = await db.insert(generalFormSubmissions).values({
           templateId: input.templateId,
           submittedByUserId: input.userId ?? null,
@@ -759,7 +749,6 @@ export const generalFormRouter = router({
         db.select().from(generalFormSubmissions).where(and(...conditions)).orderBy(desc(generalFormSubmissions.submittedAt)).limit(input.pageSize).offset(offset),
         db.select({ total: count() }).from(generalFormSubmissions).where(and(...conditions)),
       ]);
-      // Enrich with user info
       const userIds = submissions.map((s: any) => s.submittedByUserId).filter(Boolean);
       const userMap: Record<number, { name: string | null; email: string | null }> = {};
       if (userIds.length > 0) {
@@ -780,24 +769,10 @@ export const generalFormRouter = router({
       templateId: z.number(),
       status: z.enum(["all", "submitted", "draft", "reviewed"]).default("all"),
     }))
->>>>>>> Stashed changes
     .query(async ({ ctx, input }) => {
       await requireAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-<<<<<<< Updated upstream
-      const [template] = await db.select().from(generalFormTemplates)
-        .where(eq(generalFormTemplates.publicSlug, input.slug))
-        .limit(1);
-      if (!template) throw new TRPCError({ code: "NOT_FOUND", message: "Form not found." });
-      const sections = await db.select().from(generalFormSections).where(eq(generalFormSections.templateId, template.id)).orderBy(asc(generalFormSections.sortOrder));
-      const items = await db.select().from(generalFormItems).where(eq(generalFormItems.templateId, template.id)).orderBy(asc(generalFormItems.sortOrder));
-      const options = items.length > 0
-        ? await db.select().from(generalFormOptions).where(inArray(generalFormOptions.itemId, items.map((i: any) => i.id))).orderBy(asc(generalFormOptions.sortOrder))
-        : [];
-      const branchRules = await db.select().from(generalFormBranchRules).where(eq(generalFormBranchRules.templateId, template.id));
-      return { template, sections, items, options, branchRules };
-=======
       const conditions: any[] = [eq(generalFormSubmissions.templateId, input.templateId)];
       if (input.status !== "all") conditions.push(eq(generalFormSubmissions.status, input.status as any));
       const [submissions, items] = await Promise.all([
@@ -811,6 +786,5 @@ export const generalFormRouter = router({
         for (const u of userRows) userMap[u.id] = { name: u.name, email: u.email };
       }
       return { submissions, items, userMap };
->>>>>>> Stashed changes
     }),
 });

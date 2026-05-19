@@ -1754,14 +1754,9 @@ function FormEditorShell({ formId, onBack }: { formId: number; onBack: () => voi
           variant="outline"
           size="sm"
           className="gap-1"
-<<<<<<< Updated upstream
-          onClick={() => template.publicSlug && window.open(`${window.location.origin}/forms/${template.publicSlug}/preview`, "_blank")}
-          disabled={!template.publicSlug}
-          title={!template.isPublic ? "Admin preview (form is not yet public)" : "Preview form"}
-=======
           onClick={() => template.publicSlug && window.open(getPublicUrl(template.publicSlug, template.hostDomain), "_blank")}
           disabled={!template.publicSlug || !template.isPublic}
->>>>>>> Stashed changes
+          title={!template.isPublic ? "Form must be published to preview" : "Preview form"}
         >
           <Eye className="w-3.5 h-3.5" /> Preview
         </Button>
