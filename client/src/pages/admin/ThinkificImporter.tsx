@@ -142,7 +142,7 @@ export default function ThinkificImporter() {
         <h2 className="text-2xl font-bold text-gray-900">Import from Thinkific</h2>
         <p className="text-gray-500 mt-1">
           Select a course from your Thinkific account to import it as a draft into the LMS builder.
-          Student enrollments are stored as pending and will only activate when you publish the course.
+          Student enrollments are imported directly and visible in the Students tab. No welcome emails are sent.
         </p>
       </div>
 
@@ -361,7 +361,7 @@ export default function ThinkificImporter() {
                   <div>
                     <Label className="font-medium">Import student enrollments</Label>
                     <p className="text-xs text-gray-500">
-                      Store {preview.totalEnrollments} enrollments as pending — they activate when you publish the course
+                      Enroll {preview.totalEnrollments} students now — no welcome emails sent, visible in Students tab immediately
                     </p>
                   </div>
                   <Switch
