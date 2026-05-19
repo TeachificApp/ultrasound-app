@@ -2289,3 +2289,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Add getEnrollments, addEnrollment, removeEnrollment, updateEnrollment procedures for a course
 - [ ] Build Enrollments tab in LMS course admin with student list, sync button, and add/remove/edit actions
 - [ ] Show sync status (last synced, count pulled from Thinkific vs local)
+
+## Thinkific Import: Cover Image & Landing Page Blocks (May 2026)
+- [x] Fix scrapeThinkificSalesPage() to produce properly-wrapped blocks: { id, type, data: { ... } } instead of flat { type, ... }
+- [x] After course creation, insert lmsLandingPages record with scraped blocks (pre-populates page builder)
+- [x] Always append a curriculum_auto block at the end of scraped landing page blocks
+- [x] Add sendEnrollmentEmail to updateCourse input schema (was silently dropped on save)
+- [x] coverImageUrl (from course.card_image_url) saved to lmsCourses on import and displayed in CourseSettingsForm

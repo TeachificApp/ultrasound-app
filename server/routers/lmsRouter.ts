@@ -1319,6 +1319,7 @@ export const lmsAdminRouter = router({
       gradientDirection: z.string().max(30).optional(),
       thumbnailUrl: z.string().nullable().optional(),
       showInLibrary: z.boolean().optional(),
+      sendEnrollmentEmail: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);

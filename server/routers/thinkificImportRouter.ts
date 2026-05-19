@@ -17,6 +17,7 @@ import {
   lmsCourses,
   lmsSections,
   lmsLessons,
+  lmsLandingPages,
   lmsThinkificImports,
   lmsPendingEnrollments,
   lmsEnrollments,
@@ -102,12 +103,19 @@ function buildHeroBannerBlock(title: string): object {
 
 // ─── Scrape Thinkific sales page ──────────────────────────────────────────────
 
-interface ScrapedBlock {
-  type: string;
-  [key: string]: unknown;
+/** Generate a unique block ID */
+function uid(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-async function scrapeThinkificSalesPage(slug: string, subdomain: string): Promise<ScrapedBlock[]> {
+/** A properly-structured landing page block: { id, type, data: { ... } } */
+interface LandingBlock {
+  id: string;
+  type: string;
+  data: Record<string, unknown>;
+}
+
+async function scrapeThinkificSalesPage(slug: string, subdomain: string): Promise<LandingBlock[]> {
   const url = `https://${subdomain}.thinkific.com/courses/${slug}`;
   try {
     const res = await fetch(url, {
@@ -119,29 +127,56 @@ async function scrapeThinkificSalesPage(slug: string, subdomain: string): Promis
     if (!res.ok) return [];
     const html = await res.text();
 
-    const blocks: ScrapedBlock[] = [];
+    const blocks: LandingBlock[] = [];
 
-    // Extract page title / hero
+    // ── 1. Hero block from page <h1> ──
     const titleMatch = html.match(/<h1[^>]*class="[^"]*course-hero[^"]*"[^>]*>([\s\S]*?)<\/h1>/i)
       || html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
     if (titleMatch) {
-      const title = stripHtml(titleMatch[1]);
-      if (title) {
-        blocks.push({ type: "hero", headline1: title, headline2: "", subtext: "", showButtons: false, buttons: [], bgColor: "#149096", textColor: "#ffffff", alignment: "center", padding: "lg" });
+      const headline = stripHtml(titleMatch[1]);
+      if (headline) {
+        // Try to grab a subtitle from the first <h2> or .course-subtitle element
+        const subMatch = html.match(/<[^>]*class="[^"]*(?:course-subtitle|hero-subtitle|tagline)[^"]*"[^>]*>([\s\S]*?)<\/[^>]*>/i)
+          || html.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i);
+        const subheadline = subMatch ? stripHtml(subMatch[1]).slice(0, 200) : "";
+        blocks.push({
+          id: uid(),
+          type: "hero",
+          data: {
+            headline,
+            headline2: "",
+            subheadline,
+            bgType: "color",
+            bgColor: "#149096",
+            textColor: "#ffffff",
+            align: "center",
+            buttons: [{ text: "Enroll Now", color: "#ffffff", textColor: "#149096", link: "", style: "filled" }],
+            showButtons: true,
+          },
+        });
       }
     }
 
-    // Extract description sections
+    // ── 2. Description / body text block ──
     const descMatches = html.matchAll(/<div[^>]*class="[^"]*course-description[^"]*"[^>]*>([\s\S]*?)<\/div>/gi);
     for (const match of descMatches) {
       const text = stripHtml(match[1]);
       if (text && text.length > 30) {
-        blocks.push({ type: "richtext", content: `<p>${text}</p>` });
-        break; // just the first description block
+        blocks.push({
+          id: uid(),
+          type: "text",
+          data: {
+            html: `<p>${text}</p>`,
+            align: "left",
+            bgColor: "#ffffff",
+            textColor: "#1a1a1a",
+          },
+        });
+        break;
       }
     }
 
-    // Extract "What you'll learn" / bullet lists
+    // ── 3. "What you'll learn" bullet list ──
     const learnMatches = html.matchAll(/<ul[^>]*class="[^"]*(?:course-curriculum|what-you|learn)[^"]*"[^>]*>([\s\S]*?)<\/ul>/gi);
     for (const match of learnMatches) {
       const items: string[] = [];
@@ -151,24 +186,63 @@ async function scrapeThinkificSalesPage(slug: string, subdomain: string): Promis
         if (text) items.push(text);
       }
       if (items.length > 0) {
-        blocks.push({ type: "richtext", content: `<ul>${items.map(i => `<li>${i}</li>`).join("")}</ul>` });
+        blocks.push({
+          id: uid(),
+          type: "bullets",
+          data: {
+            headline: "What You'll Learn",
+            items,
+            iconColor: "#149096",
+            bgColor: "#f8fffe",
+          },
+        });
         break;
       }
     }
 
-    // Extract FAQ sections
-    const faqItems: { question: string; answer: string }[] = [];
+    // ── 4. FAQ accordion ──
+    const faqItems: { q: string; a: string }[] = [];
     const faqMatches = html.matchAll(/<div[^>]*class="[^"]*(?:faq|accordion)[^"]*"[^>]*>([\s\S]*?)<\/div>/gi);
     for (const match of faqMatches) {
       const qMatch = match[1].match(/<[^>]*class="[^"]*(?:question|title|heading)[^"]*"[^>]*>([\s\S]*?)<\/[^>]*>/i);
       const aMatch = match[1].match(/<[^>]*class="[^"]*(?:answer|body|content)[^"]*"[^>]*>([\s\S]*?)<\/[^>]*>/i);
       if (qMatch && aMatch) {
-        faqItems.push({ question: stripHtml(qMatch[1]), answer: stripHtml(aMatch[1]) });
+        faqItems.push({ q: stripHtml(qMatch[1]), a: stripHtml(aMatch[1]) });
       }
     }
     if (faqItems.length > 0) {
-      blocks.push({ type: "faq", items: faqItems });
+      blocks.push({
+        id: uid(),
+        type: "faq",
+        data: {
+          headline: "Frequently Asked Questions",
+          items: faqItems,
+          bgColor: "#ffffff",
+          accentColor: "#149096",
+        },
+      });
     }
+
+    // ── 5. Always append a curriculum_auto block at the end ──
+    blocks.push({
+      id: uid(),
+      type: "curriculum_auto",
+      data: {
+        headline: "Course Curriculum",
+        headlineColor: "#111827",
+        bgColor: "#ffffff",
+        showLocked: true,
+        sectionBgColor: "#f9fafb",
+        sectionTextColor: "#1f2937",
+        sectionBorderColor: "#e5e7eb",
+        lessonTextColor: "#374151",
+        lessonLockedIconColor: "#d1d5db",
+        lessonPreviewIconColor: "#14b8a6",
+        lessonCountColor: "#9ca3af",
+        iconStyle: "lock",
+        cornerRadius: 12,
+      },
+    });
 
     return blocks;
   } catch {
@@ -290,7 +364,7 @@ export const thinkificImportRouter = router({
         }
 
         // 3. Scrape sales page if requested
-        let salesPageBlocks: ScrapedBlock[] = [];
+        let salesPageBlocks: LandingBlock[] = [];
         if (input.scrapeSalesPage) {
           const subdomain = input.subdomain || "member";
           salesPageBlocks = await scrapeThinkificSalesPage(course.slug, subdomain);
@@ -323,11 +397,23 @@ export const thinkificImportRouter = router({
           pricingType: "one_time",
           hasCertificate: course.certificate_enabled,
           showInstructor: !!instructorBio,
-          courseOverviewTopBlocks: salesPageBlocks.length > 0 ? JSON.stringify(salesPageBlocks) : undefined,
           createdByUserId: ctx.user.id,
         });
         const lmsCourseId = (courseResult as unknown as { insertId: number }).insertId;
         log.push(`Created LMS course ID: ${lmsCourseId} (draft)`);
+        // 5b. Create landing page record with scraped blocks (so the page builder is pre-populated)
+        if (salesPageBlocks.length > 0) {
+          await db.insert(lmsLandingPages).values({
+            courseId: lmsCourseId,
+            heroTitle: course.name,
+            heroSubtitle: course.subtitle || undefined,
+            heroImageUrl: course.card_image_url || undefined,
+            ctaText: "Enroll Now",
+            isCustom: true,
+            blocks: JSON.stringify(salesPageBlocks),
+          });
+          log.push(`Created landing page with ${salesPageBlocks.length} pre-built blocks`);
+        }
 
         // 6. Fetch chapters and contents
         const chapters = await getChaptersForCourse(input.thinkificCourseId);
