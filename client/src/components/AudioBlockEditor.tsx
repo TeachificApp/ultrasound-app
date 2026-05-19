@@ -378,15 +378,41 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
             </div>
           </div>
 
-          <div className="space-y-1">
-            <div className="flex justify-between text-[10px] text-gray-400">
-              <span>Start: {fmt(trimStart)}</span>
-              <span>End: {fmt(effectiveTrimEnd)}</span>
-              <span>Clip: {fmt(Math.max(0, effectiveTrimEnd - trimStart))}</span>
+          {/* ── Dual-handle trim bar ── */}
+          <div className="space-y-2">
+            {/* Time readout */}
+            <div className="flex justify-between text-[10px] text-gray-500">
+              <span className="font-medium text-teal-700">▶ {fmt(trimStart)}</span>
+              <span className="text-gray-400">Clip length: {fmt(Math.max(0, effectiveTrimEnd - trimStart))}</span>
+              <span className="font-medium text-teal-700">{fmt(effectiveTrimEnd)} ■</span>
             </div>
 
-            <div>
-              <label className="text-[10px] text-gray-400 block mb-0.5">Start time</label>
+            {/* Track with two overlapping range inputs */}
+            <div className="relative" style={{ height: 36 }}>
+              {/* Background track */}
+              <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-2 bg-gray-200 rounded-full" />
+              {/* Selected region highlight */}
+              <div
+                className="absolute top-1/2 -translate-y-1/2 h-2 bg-teal-400 rounded-full"
+                style={{
+                  left: `${(trimStart / duration) * 100}%`,
+                  width: `${((effectiveTrimEnd - trimStart) / duration) * 100}%`,
+                }}
+              />
+              {/* Excluded region — left (before start) */}
+              <div
+                className="absolute top-1/2 -translate-y-1/2 h-2 bg-gray-300 rounded-l-full"
+                style={{ left: 0, width: `${(trimStart / duration) * 100}%` }}
+              />
+              {/* Excluded region — right (after end) */}
+              <div
+                className="absolute top-1/2 -translate-y-1/2 h-2 bg-gray-300 rounded-r-full"
+                style={{
+                  left: `${(effectiveTrimEnd / duration) * 100}%`,
+                  right: 0,
+                }}
+              />
+              {/* Start handle (rendered on top of end handle when at left) */}
               <input
                 type="range"
                 min={0}
@@ -397,12 +423,11 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
                   const v = parseFloat(e.target.value);
                   if (v < effectiveTrimEnd - 0.5) set("trimStart", v);
                 }}
-                className="w-full accent-teal-600 h-1.5"
+                className="absolute inset-0 w-full opacity-0 cursor-pointer"
+                style={{ zIndex: trimStart > duration * 0.9 ? 5 : 3 }}
+                title={`Start: ${fmt(trimStart)}`}
               />
-            </div>
-
-            <div>
-              <label className="text-[10px] text-gray-400 block mb-0.5">End time</label>
+              {/* End handle */}
               <input
                 type="range"
                 min={0}
@@ -413,19 +438,54 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
                   const v = parseFloat(e.target.value);
                   if (v > trimStart + 0.5) set("trimEnd", v);
                 }}
-                className="w-full accent-teal-600 h-1.5"
+                className="absolute inset-0 w-full opacity-0 cursor-pointer"
+                style={{ zIndex: 4 }}
+                title={`End: ${fmt(effectiveTrimEnd)}`}
+              />
+              {/* Visible start handle knob */}
+              <div
+                className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white border-2 border-teal-500 rounded-full shadow-md pointer-events-none"
+                style={{ left: `calc(${(trimStart / duration) * 100}% - 8px)`, zIndex: 6 }}
+              />
+              {/* Visible end handle knob */}
+              <div
+                className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white border-2 border-teal-500 rounded-full shadow-md pointer-events-none"
+                style={{ left: `calc(${(effectiveTrimEnd / duration) * 100}% - 8px)`, zIndex: 6 }}
               />
             </div>
 
-            {/* Visual track */}
-            <div className="relative h-3 bg-gray-200 rounded-full overflow-hidden">
-              <div
-                className="absolute h-full bg-teal-400 rounded-full"
-                style={{
-                  left: `${(trimStart / duration) * 100}%`,
-                  width: `${((effectiveTrimEnd - trimStart) / duration) * 100}%`,
-                }}
-              />
+            {/* Fine-tune number inputs */}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] text-gray-400 block mb-0.5">Start (seconds)</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={effectiveTrimEnd - 0.5}
+                  step={0.1}
+                  value={Math.round(trimStart * 10) / 10}
+                  onChange={e => {
+                    const v = parseFloat(e.target.value);
+                    if (!isNaN(v) && v >= 0 && v < effectiveTrimEnd - 0.5) set("trimStart", v);
+                  }}
+                  className="w-full h-7 text-xs border border-gray-200 rounded px-2 text-center"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-gray-400 block mb-0.5">End (seconds)</label>
+                <input
+                  type="number"
+                  min={trimStart + 0.5}
+                  max={duration}
+                  step={0.1}
+                  value={Math.round(effectiveTrimEnd * 10) / 10}
+                  onChange={e => {
+                    const v = parseFloat(e.target.value);
+                    if (!isNaN(v) && v > trimStart + 0.5 && v <= duration) set("trimEnd", v);
+                  }}
+                  className="w-full h-7 text-xs border border-gray-200 rounded px-2 text-center"
+                />
+              </div>
             </div>
           </div>
         </div>

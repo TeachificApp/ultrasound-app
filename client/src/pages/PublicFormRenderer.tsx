@@ -361,20 +361,17 @@ export default function PublicFormRenderer({ isEmbed = false, isPreview = false 
 
   // ── Main form ──
   return (
-<<<<<<< Updated upstream
-    <div style={{ minHeight: isEmbed ? "auto" : "100vh", background: theme.backgroundColor, fontFamily: theme.fontFamily, fontSize: `${theme.fontSize}px`, color: theme.textColor }}>
-      {/* Admin preview banner */}
-      {isPreview && (
-        <div style={{ background: "#fef3c7", borderBottom: "2px solid #f59e0b", padding: "8px 24px", display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#92400e", fontWeight: 500 }}>
-          <span style={{ fontSize: 16 }}>&#128065;</span>
-          Admin Preview — this form may not be publicly visible yet. Submissions made here are real.
-        </div>
-=======
     <div style={{ minHeight: isEmbed ? "auto" : "100vh", fontFamily: theme.fontFamily, fontSize: `${theme.fontSize}px`, color: theme.textColor, position: "relative", ...bgStyle }}>
       {/* Background image opacity overlay */}
       {theme.bgType === "image" && theme.bgImageUrl && theme.bgOpacity < 100 && (
         <div style={{ position: "absolute", inset: 0, background: "#fff", opacity: 1 - (theme.bgOpacity / 100), pointerEvents: "none", zIndex: 0 }} />
->>>>>>> Stashed changes
+      )}
+      {/* Admin preview banner */}
+      {isPreview && (
+        <div style={{ background: "#fef3c7", borderBottom: "2px solid #f59e0b", padding: "8px 24px", display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#92400e", fontWeight: 500, position: "relative", zIndex: 1 }}>
+          <span style={{ fontSize: 16 }}>&#128065;</span>
+          Admin Preview — this form may not be publicly visible yet. Submissions made here are real.
+        </div>
       )}
       {/* Header */}
       <div style={{
