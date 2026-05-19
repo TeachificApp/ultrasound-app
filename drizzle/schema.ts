@@ -3158,7 +3158,7 @@ export type DigitalBundlePurchase = typeof digitalBundlePurchases.$inferSelect;
 export const orderBumps = mysqlTable("order_bumps", {
   id: int("id").autoincrement().primaryKey(),
   // The trigger product — when a user buys this, the bump is offered
-  triggerType: mysqlEnum("trigger_type", ["course", "download", "bundle"]).notNull(),
+  triggerType: mysqlEnum("trigger_type", ["course", "download", "bundle", "physical"]).notNull(),
   triggerProductId: int("trigger_product_id").notNull(),
   // The bump offer — what product is being offered as the bump
   bumpType: mysqlEnum("bump_type", ["course", "download", "bundle", "physical"]).notNull(),
