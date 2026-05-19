@@ -406,123 +406,143 @@ function MyContentTab() {
 
       {/* Courses */}
       {contentTab === "courses" && (
-        <div className="space-y-3">
+        <div>
           {(data?.courses.length ?? 0) === 0 ? (
             <EmptyState icon={BookOpen} title="No courses yet" description="Enroll in a course to see it here." />
           ) : (
-            data?.courses.map(c => (
-              <ContentCard
-                key={c.enrollmentId}
-                thumbnail={c.courseThumbnail}
-                title={c.courseTitle}
-                brand={c.courseBrand}
-                subtitle={`Enrolled ${formatDate(c.enrolledAt)}`}
-                badge={c.completedAt ? "Completed" : `${c.progressPct ?? 0}% complete`}
-                badgeColor={c.completedAt ? "emerald" : "teal"}
-                actions={[
-                  { label: "Continue Learning", icon: Play, href: `/learn/${c.courseSlug}/player` },
-                  { label: "Overview", icon: FileText, href: `/learn/${c.courseSlug}/overview` },
-                ]}
-              />
-            ))
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {data?.courses.map(c => (
+                <ContentCard
+                  key={c.enrollmentId}
+                  thumbnail={c.courseThumbnail}
+                  title={c.courseTitle}
+                  brand={c.courseBrand}
+                  subtitle={`Enrolled ${formatDate(c.enrolledAt)}`}
+                  badge={c.completedAt ? "Completed" : "In Progress"}
+                  badgeColor={c.completedAt ? "emerald" : "teal"}
+                  progressPct={c.progressPct}
+                  completed={!!c.completedAt}
+                  actions={[
+                    { label: c.completedAt ? "Review Course" : "Continue Learning", icon: Play, href: `/learn/${c.courseSlug}/player` },
+                    { label: "Overview", icon: FileText, href: `/learn/${c.courseSlug}/overview`, secondary: true },
+                  ]}
+                />
+              ))}
+            </div>
           )}
         </div>
       )}
 
       {/* Quizzes */}
       {contentTab === "quizzes" && (
-        <div className="space-y-3">
+        <div>
           {(data?.quizzes.length ?? 0) === 0 ? (
             <EmptyState icon={ClipboardCheck} title="No quizzes yet" description="Purchase or enroll in a quiz to see it here." />
           ) : (
-            data?.quizzes.map(q => (
-              <ContentCard
-                key={q.enrollmentId}
-                thumbnail={q.courseThumbnail}
-                title={q.courseTitle}
-                brand={q.courseBrand}
-                subtitle={`Enrolled ${formatDate(q.enrolledAt)}`}
-                badge={q.completedAt ? "Completed" : "In Progress"}
-                badgeColor={q.completedAt ? "emerald" : "blue"}
-                actions={[
-                  { label: "Take Quiz", icon: Play, href: `/learn/${q.courseSlug}/player` },
-                ]}
-              />
-            ))
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {data?.quizzes.map(q => (
+                <ContentCard
+                  key={q.enrollmentId}
+                  thumbnail={q.courseThumbnail}
+                  title={q.courseTitle}
+                  brand={q.courseBrand}
+                  subtitle={`Enrolled ${formatDate(q.enrolledAt)}`}
+                  badge={q.completedAt ? "Completed" : "In Progress"}
+                  badgeColor={q.completedAt ? "emerald" : "blue"}
+                  progressPct={q.progressPct}
+                  completed={!!q.completedAt}
+                  actions={[
+                    { label: q.completedAt ? "Retake Quiz" : "Take Quiz", icon: Play, href: `/learn/${q.courseSlug}/player` },
+                  ]}
+                />
+              ))}
+            </div>
           )}
         </div>
       )}
 
       {/* Downloads */}
       {contentTab === "downloads" && (
-        <div className="space-y-3">
+        <div>
           {(data?.downloads.length ?? 0) === 0 ? (
             <EmptyState icon={Download} title="No downloads yet" description="Purchase a digital download to see it here." />
           ) : (
-            (data?.downloads ?? []).map((d: any, i: number) => (
-              <ContentCard
-                key={d.enrollmentId ?? d.purchaseId ?? i}
-                thumbnail={d.courseThumbnail ?? d.productThumbnail}
-                title={d.courseTitle ?? d.productTitle}
-                brand={d.courseBrand}
-                subtitle={`Purchased ${formatDate(d.enrolledAt ?? d.purchasedAt)}`}
-                badge="Download"
-                badgeColor="teal"
-                actions={[
-                  {
-                    label: "Access Files",
-                    icon: Download,
-                    href: d.courseSlug ? `/learn/${d.courseSlug}/player` : `/downloads/${d.productSlug}/files`,
-                  },
-                ]}
-              />
-            ))
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {(data?.downloads ?? []).map((d: any, i: number) => (
+                <ContentCard
+                  key={d.enrollmentId ?? d.purchaseId ?? i}
+                  thumbnail={d.courseThumbnail ?? d.productThumbnail}
+                  title={d.courseTitle ?? d.productTitle}
+                  brand={d.courseBrand}
+                  subtitle={`Purchased ${formatDate(d.enrolledAt ?? d.purchasedAt)}`}
+                  badge="Download"
+                  badgeColor="teal"
+                  actions={[
+                    {
+                      label: "Access Files",
+                      icon: Download,
+                      href: d.courseSlug ? `/learn/${d.courseSlug}/player` : `/downloads/${d.productSlug}/files`,
+                    },
+                    {
+                      label: "View Details",
+                      icon: FileText,
+                      href: d.courseSlug ? `/learn/${d.courseSlug}` : `/downloads/${d.productSlug}`,
+                      secondary: true,
+                    },
+                  ]}
+                />
+              ))}
+            </div>
           )}
         </div>
       )}
 
       {/* Physical Products */}
       {contentTab === "products" && (
-        <div className="space-y-3">
+        <div>
           {(data?.physicalProducts.length ?? 0) === 0 ? (
             <EmptyState icon={Package} title="No product orders yet" description="Purchase a physical product to see your orders here." />
           ) : (
-            data?.physicalProducts.map(p => (
-              <ContentCard
-                key={p.orderId}
-                thumbnail={p.productThumbnail}
-                title={p.productTitle}
-                subtitle={`Ordered ${formatDate(p.orderedAt)} · ${formatCurrency(p.amountPaid, p.currency)}`}
-                badge={p.fulfillmentStatus}
-                badgeColor={p.fulfillmentStatus === "delivered" ? "emerald" : p.fulfillmentStatus === "shipped" ? "teal" : "amber"}
-                trackingInfo={p.trackingNumber ? `${p.trackingCarrier ?? ""} ${p.trackingNumber}`.trim() : undefined}
-                actions={[
-                  { label: "View Product", icon: ExternalLink, href: `/products/${p.productSlug}` },
-                ]}
-              />
-            ))
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {data?.physicalProducts.map(p => (
+                <ContentCard
+                  key={p.orderId}
+                  thumbnail={p.productThumbnail}
+                  title={p.productTitle}
+                  subtitle={`Ordered ${formatDate(p.orderedAt)} · ${formatCurrency(p.amountPaid, p.currency)}`}
+                  badge={p.fulfillmentStatus}
+                  badgeColor={p.fulfillmentStatus === "delivered" ? "emerald" : p.fulfillmentStatus === "shipped" ? "teal" : "amber"}
+                  trackingInfo={p.trackingNumber ? `${p.trackingCarrier ?? ""} ${p.trackingNumber}`.trim() : undefined}
+                  actions={[
+                    { label: "View Product", icon: ExternalLink, href: `/products/${p.productSlug}` },
+                  ]}
+                />
+              ))}
+            </div>
           )}
         </div>
       )}
 
       {/* Funnel / Embedded Checkout Purchases */}
       {contentTab === "purchases" && (
-        <div className="space-y-3">
+        <div>
           {(data?.funnelPurchases?.length ?? 0) === 0 ? (
             <EmptyState icon={ShoppingCart} title="No purchases yet" description="Complete a checkout to see your purchases here." />
           ) : (
-            (data?.funnelPurchases ?? []).map((p: any) => (
-              <ContentCard
-                key={p.id}
-                title={p.productName}
-                subtitle={`Purchased ${formatDate(p.purchasedAt)} · ${formatCurrency(p.amountPaid, p.currency)}`}
-                badge={p.productType ?? "Purchase"}
-                badgeColor="teal"
-                actions={[
-                  { label: "View Receipt", icon: FileText, href: `/my-dashboard?tab=content` },
-                ]}
-              />
-            ))
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {(data?.funnelPurchases ?? []).map((p: any) => (
+                <ContentCard
+                  key={p.id}
+                  title={p.productName}
+                  subtitle={`Purchased ${formatDate(p.purchasedAt)} · ${formatCurrency(p.amountPaid, p.currency)}`}
+                  badge={p.productType ?? "Purchase"}
+                  badgeColor="teal"
+                  actions={[
+                    { label: "View Receipt", icon: FileText, href: `/my-dashboard?tab=content` },
+                  ]}
+                />
+              ))}
+            </div>
           )}
         </div>
       )}
@@ -796,7 +816,7 @@ function EmptyState({
 }
 
 function ContentCard({
-  thumbnail, title, brand, subtitle, badge, badgeColor, trackingInfo, actions,
+  thumbnail, title, brand, subtitle, badge, badgeColor, trackingInfo, actions, progressPct, completed,
 }: {
   thumbnail?: string | null;
   title: string;
@@ -805,7 +825,9 @@ function ContentCard({
   badge: string;
   badgeColor: "emerald" | "teal" | "blue" | "amber";
   trackingInfo?: string;
-  actions: { label: string; icon: React.ElementType; href: string }[];
+  progressPct?: number | null;
+  completed?: boolean;
+  actions: { label: string; icon: React.ElementType; href: string; secondary?: boolean }[];
 }) {
   const colorMap = {
     emerald: "bg-emerald-100 text-emerald-700 border-emerald-200",
@@ -813,38 +835,62 @@ function ContentCard({
     blue:    "bg-blue-100 text-blue-700 border-blue-200",
     amber:   "bg-amber-100 text-amber-700 border-amber-200",
   };
+  const pct = Math.min(100, Math.max(0, Number(progressPct ?? 0)));
+  const showProgress = progressPct != null;
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex gap-4 items-start">
-      {thumbnail ? (
-        <img src={thumbnail} alt={title} className="w-16 h-16 rounded-lg object-cover flex-shrink-0 border border-gray-100" />
-      ) : (
-        <div className="w-16 h-16 rounded-lg flex-shrink-0 flex items-center justify-center"
-          style={{ background: "linear-gradient(135deg, #189aa115, #4ad9e015)" }}>
-          <BookOpen className="w-7 h-7 text-[#189aa1]" />
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex flex-col hover:shadow-md hover:border-teal-200 transition-all duration-200">
+      {/* Cover image */}
+      <div className="relative h-36 bg-gradient-to-br from-teal-50 to-teal-100 overflow-hidden flex-shrink-0">
+        {thumbnail ? (
+          <img src={thumbnail} alt={title} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <BookOpen className="w-10 h-10 text-teal-300" />
+          </div>
+        )}
+        <span className={`absolute top-2 right-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border backdrop-blur-sm ${colorMap[badgeColor]}`}>
+          {completed && <CheckCircle2 className="w-3 h-3 mr-1" />}
+          {badge}
+        </span>
+        {brand && (
+          <div className="absolute bottom-2 left-2">
+            <BrandBadge brand={brand} />
+          </div>
+        )}
+      </div>
+      {/* Progress bar */}
+      {showProgress && (
+        <div className="h-1.5 bg-gray-100 w-full">
+          <div
+            className={`h-full transition-all duration-500 ${completed ? "bg-emerald-500" : "bg-[#189aa1]"}`}
+            style={{ width: `${pct}%` }}
+          />
         </div>
       )}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-2 flex-wrap">
-          <h4 className="font-semibold text-gray-800 text-sm leading-tight">{title}</h4>
-          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border flex-shrink-0 ${colorMap[badgeColor]}`}>
-            {badge}
-          </span>
-        </div>
-        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-          {brand && <BrandBadge brand={brand} />}
-          <p className="text-xs text-gray-500">{subtitle}</p>
-        </div>
+      {/* Body */}
+      <div className="p-4 flex flex-col flex-1">
+        <h4 className="font-semibold text-gray-800 text-sm leading-snug line-clamp-2 mb-1">{title}</h4>
+        <p className="text-xs text-gray-400 mb-1">{subtitle}</p>
+        {showProgress && (
+          <p className="text-xs font-medium text-[#189aa1] mb-1">
+            {completed ? "Completed" : `${pct}% complete`}
+          </p>
+        )}
         {trackingInfo && (
-          <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+          <p className="text-xs text-gray-400 mb-2 flex items-center gap-1">
             <Package className="w-3 h-3" /> {trackingInfo}
           </p>
         )}
-        <div className="flex gap-2 mt-3 flex-wrap">
+        <div className="flex gap-2 mt-auto pt-3 flex-wrap">
           {actions.map(a => (
             <a
               key={a.label}
               href={a.href}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#189aa1] text-white hover:bg-[#157f85] transition-colors"
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                a.secondary
+                  ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  : "bg-[#189aa1] text-white hover:bg-[#157f85]"
+              }`}
             >
               <a.icon className="w-3 h-3" />
               {a.label}

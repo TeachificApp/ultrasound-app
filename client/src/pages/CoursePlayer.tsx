@@ -617,9 +617,14 @@ export default function CoursePlayer() {
         const paramId = parseInt(lessonParam);
         const found = allL.find((l: any) => l.id === paramId);
         if (found) {
-          // If not enrolled and lesson is not preview, redirect to first preview lesson
-          if (!isEnrolled && !found.isPreview && !adminBypass) {
-            const firstPreview = allL.find((l: any) => l.isPreview);
+          // If not enrolled and lesson is not accessible, redirect to first accessible preview lesson
+          const foundPm = found.previewMode ?? (found.isPreview ? "preview" : "none");
+          const foundAccessible = foundPm === "preview" || (foundPm === "preview_hide_after_purchase" && !isEnrolled);
+          if (!isEnrolled && !foundAccessible && !adminBypass) {
+            const firstPreview = allL.find((l: any) => {
+              const pm = l.previewMode ?? (l.isPreview ? "preview" : "none");
+              return pm === "preview" || (pm === "preview_hide_after_purchase");
+            });
             if (firstPreview) { setSelectedLessonId(firstPreview.id); return; }
           }
           setSelectedLessonId(found.id);
@@ -628,7 +633,10 @@ export default function CoursePlayer() {
       }
       // For unenrolled users, start on first preview lesson; show upgrade prompt on entry
       if (!isEnrolled && !adminBypass) {
-        const firstPreview = allL.find((l: any) => l.isPreview);
+        const firstPreview = allL.find((l: any) => {
+          const pm = l.previewMode ?? (l.isPreview ? "preview" : "none");
+          return pm === "preview" || pm === "preview_hide_after_purchase";
+        });
         if (firstPreview) {
           setSelectedLessonId(firstPreview.id);
           // Show upgrade prompt on entry to preview mode
@@ -735,7 +743,10 @@ export default function CoursePlayer() {
   const hasPreviewLessons = data ? [
     ...((data as any).topLevelLessons ?? []),
     ...(data.sections ?? []).flatMap((s: any) => s.lessons ?? []),
-  ].some((l: any) => l.isPreview) : false;
+  ].some((l: any) => {
+    const pm = l.previewMode ?? (l.isPreview ? "preview" : "none");
+    return pm === "preview" || (pm === "preview_hide_after_purchase" && !data?.enrollment);
+  }) : false;
 
   if (!data?.enrollment && !isPreviewMode && !adminPreviewStudent && !adminBypass && !hasPreviewLessons) {
     return (
@@ -815,20 +826,20 @@ export default function CoursePlayer() {
   // ────────────────────────────────────────────────────────────────────────────
 
   const isEnrolled = !!data.enrollment;
-  const isPreviewLesson = selectedLessonId ? allLessons.find((l: any) => l.id === selectedLessonId)?.isPreview : false;
-
+    const isPreviewLesson = selectedLessonId ? (() => {
+    const l = allLessons.find((ll: any) => ll.id === selectedLessonId);
+    const pm = l?.previewMode ?? (l?.isPreview ? "preview" : "none");
+    return pm === "preview" || (pm === "preview_hide_after_purchase" && !isEnrolled);
+  })() : false;
   // Helper: select a lesson, gating non-preview lessons for unenrolled users
   const handleLessonSelect = (lessonId: number) => {
     const lesson = allLessons.find((l: any) => l.id === lessonId);
-    if (!isEnrolled && !adminBypass && lesson && !lesson.isPreview) {
+    const pm = lesson?.previewMode ?? (lesson?.isPreview ? "preview" : "none");
+    const isAccessible = pm === "preview" || (pm === "preview_hide_after_purchase" && !isEnrolled);
+    if (!isEnrolled && !adminBypass && lesson && !isAccessible) {
       // Show upgrade prompt when trying to access non-preview content
       setUpgradePromptReason("locked_lesson");
       setShowUpgradePrompt(true);
-      return;
-    }
-    // If leaving a preview lesson and going to another preview lesson, show exit prompt
-    if (!isEnrolled && !adminBypass && isPreviewLesson && lesson?.isPreview && lessonId !== selectedLessonId) {
-      setSelectedLessonId(lessonId);
       return;
     }
     setSelectedLessonId(lessonId);

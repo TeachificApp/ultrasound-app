@@ -2854,7 +2854,9 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
   const [content, setContent] = useState(lesson.content ?? "");
   const [videoContent, setVideoContent] = useState(lesson.videoContent ?? "");
   const [embedUrl, setEmbedUrl] = useState(lesson.embedUrl ?? "");
-  const [isPreview, setIsPreview] = useState(!!lesson.isPreview);
+  const [previewMode, setPreviewMode] = useState<"none" | "preview" | "preview_hide_after_purchase">(
+    (lesson as any).previewMode ?? (lesson.isPreview ? "preview" : "none")
+  );
   const [durationMinutes, setDurationMinutes] = useState(String(lesson.durationMinutes ?? ""));
     const [requireVideoCompletion, setRequireVideoCompletion] = useState(lesson.requireVideoCompletion === 1);
   const [requireManualComplete, setRequireManualComplete] = useState(lesson.requireManualComplete === 1);
@@ -2870,7 +2872,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
     setContent(lessonShallow.content ?? "");
     setVideoContent(lessonShallow.videoContent ?? "");
     setEmbedUrl(lessonShallow.embedUrl ?? "");
-    setIsPreview(!!lessonShallow.isPreview);
+    setPreviewMode((lessonShallow as any).previewMode ?? (lessonShallow.isPreview ? "preview" : "none"));
     setDurationMinutes(String(lessonShallow.durationMinutes ?? ""));
     setRequireVideoCompletion(lessonShallow.requireVideoCompletion === 1);
     setRequireManualComplete(lessonShallow.requireManualComplete === 1);
@@ -2912,7 +2914,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
     update.mutate({
       id: lesson.id,
       title: title.trim(),
-      isPreview,
+      previewMode,
       durationMinutes: durationMinutes ? parseInt(durationMinutes) : null,
       // Auto-enable requireVideoCompletion when lesson is a prerequisite gate (video lessons only)
       requireVideoCompletion: (isPrerequisite && (lesson.type === "video" || lesson.type === "video_text")) ? true : requireVideoCompletion,
@@ -3074,18 +3076,28 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
             </div>
           )}
 
-          {/* Preview toggle */}
-          <div className="border border-teal-100 rounded-lg p-4 space-y-2 bg-teal-50/30">
-            <div className="flex items-center gap-2">
-              <Switch checked={isPreview} onCheckedChange={setIsPreview} id="edit-preview" />
-              <Label htmlFor="edit-preview" className="text-sm font-semibold text-teal-800">Free Preview Lesson</Label>
-            </div>
-            <p className="text-xs text-teal-700 leading-relaxed">
-              When enabled, registered (but not enrolled) students can access this lesson for free.
-              Preview access <strong>supersedes drip and prerequisite rules</strong>.
-              Students will be prompted to upgrade to full access when entering or exiting a preview lesson,
-              and when attempting to navigate to non-preview content.
-            </p>
+          {/* Preview mode selector */}
+          <div className="border border-teal-100 rounded-lg p-4 space-y-3 bg-teal-50/30">
+            <Label className="text-sm font-semibold text-teal-800">Free Preview Setting</Label>
+            <Select value={previewMode} onValueChange={(v) => setPreviewMode(v as typeof previewMode)}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Not a preview — enrolled users only</SelectItem>
+                <SelectItem value="preview">Free preview — always visible to non-enrolled users</SelectItem>
+                <SelectItem value="preview_hide_after_purchase">Free preview → hide after purchase</SelectItem>
+              </SelectContent>
+            </Select>
+            {previewMode === "none" && (
+              <p className="text-xs text-gray-500">This lesson is only accessible to enrolled students.</p>
+            )}
+            {previewMode === "preview" && (
+              <p className="text-xs text-teal-700">Non-enrolled users can view this lesson as a free sample. Preview access supersedes drip and prerequisite rules.</p>
+            )}
+            {previewMode === "preview_hide_after_purchase" && (
+              <p className="text-xs text-amber-700">Shown as a free teaser to non-enrolled users. Once a student purchases the course, this lesson is hidden — useful for "before you buy" teasers that shouldn't clutter the course after purchase.</p>
+            )}
           </div>
 
           {/* Completion toggles */}

@@ -8,7 +8,8 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowRight, BookOpen, CheckCircle, AlertCircle, Loader2, Users, FileText, ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ArrowRight, BookOpen, CheckCircle, AlertCircle, Loader2, Users, FileText, ChevronDown, ChevronRight, ExternalLink, Search } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -54,6 +55,7 @@ export default function ThinkificImporter() {
     courseType: "course" as "course" | "quiz" | "download",
   });
   const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set());
+  const [courseSearch, setCourseSearch] = useState("");
   const [importResult, setImportResult] = useState<{
     success: boolean;
     lmsCourseId: number;
@@ -207,6 +209,18 @@ export default function ThinkificImporter() {
           <CardDescription>Click a course to preview and import it</CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Search */}
+          {courses && courses.length > 0 && (
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                placeholder="Search courses…"
+                value={courseSearch}
+                onChange={(e) => setCourseSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          )}
           {loadingCourses && (
             <div className="flex items-center gap-2 text-gray-500 py-8 justify-center">
               <Loader2 className="w-5 h-5 animate-spin" />
@@ -224,13 +238,23 @@ export default function ThinkificImporter() {
           )}
           {courses && courses.length > 0 && (
             <div className="grid gap-3">
-              {courses.map((course) => {
+              {courses
+                .filter((course) =>
+                  !courseSearch.trim() ||
+                  course.name.toLowerCase().includes(courseSearch.toLowerCase()) ||
+                  (course.subtitle ?? "").toLowerCase().includes(courseSearch.toLowerCase())
+                )
+                .map((course) => {
                 const alreadyImported = imports?.some(i => i.thinkificCourseId === course.id && i.status === "complete");
                 return (
                   <div
                     key={course.id}
-                    className="flex items-center gap-4 p-4 rounded-lg border hover:border-[#149096] hover:bg-teal-50/30 transition-colors cursor-pointer group"
-                    onClick={() => !alreadyImported && handleSelectCourse(course.id)}
+                    className={`flex items-center gap-4 p-4 rounded-lg border transition-colors cursor-pointer group ${
+                      alreadyImported
+                        ? "border-green-200 bg-green-50/40 hover:border-green-400 hover:bg-green-50"
+                        : "hover:border-[#149096] hover:bg-teal-50/30"
+                    }`}
+                    onClick={() => handleSelectCourse(course.id)}
                   >
                     {/* Cover image */}
                     <div className="w-16 h-12 rounded overflow-hidden bg-gray-100 flex-shrink-0">
@@ -264,9 +288,11 @@ export default function ThinkificImporter() {
                     </div>
 
                     {/* Arrow */}
-                    {!alreadyImported && (
-                      <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-[#149096] transition-colors flex-shrink-0" />
-                    )}
+                    <ArrowRight className={`w-4 h-4 transition-colors flex-shrink-0 ${
+                      alreadyImported
+                        ? "text-green-400 group-hover:text-green-600"
+                        : "text-gray-400 group-hover:text-[#149096]"
+                    }`} />
                   </div>
                 );
               })}

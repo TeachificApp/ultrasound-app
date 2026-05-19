@@ -473,12 +473,15 @@ export async function getAllThinkificCourses(): Promise<ThinkificCourse[]> {
 }
 
 export async function getChaptersForCourse(courseId: number): Promise<ThinkificChapter[]> {
-  const all = await fetchAllPages<ThinkificChapter>(`/chapters?course_id=${courseId}`);
+  // Thinkific API v1: chapters are nested under /courses/:id/chapters
+  const all = await fetchAllPages<ThinkificChapter>(`/courses/${courseId}/chapters`);
   return all.sort((a, b) => a.position - b.position);
 }
 
 export async function getContentsForChapter(chapterId: number): Promise<ThinkificContent[]> {
-  const all = await fetchAllPages<ThinkificContent>(`/contents?chapter_id=${chapterId}`);
+  // Thinkific API v1: contents are nested under /chapters/:id/contents
+  // (the old /contents?chapter_id=X endpoint returns 404)
+  const all = await fetchAllPages<ThinkificContent>(`/chapters/${chapterId}/contents`);
   return all.sort((a, b) => a.position - b.position);
 }
 

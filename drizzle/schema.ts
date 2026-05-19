@@ -2795,7 +2795,12 @@ export const lmsLessons = mysqlTable("lms_lessons", {
   embedUrl: varchar("embed_url", { length: 500 }), // iframe src for embed lessons
   mediaAssetId: int("media_asset_id"), // FK to mediaAssets
   position: int("position").default(0).notNull(),
-  isPreview: boolean("is_preview").default(false).notNull(), // visible without enrollment (login required)
+  isPreview: boolean("is_preview").default(false).notNull(), // kept for backward compat; derived from previewMode
+  // Three-state preview mode:
+  //   'none'                        = enrolled users only (default)
+  //   'preview'                     = free preview, always visible to non-enrolled users
+  //   'preview_hide_after_purchase' = free preview for non-enrolled, hidden once user purchases
+  previewMode: mysqlEnum("preview_mode", ["none", "preview", "preview_hide_after_purchase"]).default("none").notNull(),
   dripDays: int("drip_days").default(0).notNull(), // days after enrollment to unlock
   durationMinutes: int("duration_minutes"),
   requireVideoCompletion: int("require_video_completion").default(0).notNull(), // 1 = must watch video before marking complete

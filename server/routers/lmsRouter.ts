@@ -319,7 +319,7 @@ export const lmsPublicRouter = router({
       const sectionsWithLessons = await Promise.all(sections.map(async (s) => {
         const lessons = await db.select({
           id: lmsLessons.id, title: lmsLessons.title, type: lmsLessons.type,
-          position: lmsLessons.position, isPreview: lmsLessons.isPreview, durationMinutes: lmsLessons.durationMinutes,
+          position: lmsLessons.position, isPreview: lmsLessons.isPreview, previewMode: lmsLessons.previewMode, durationMinutes: lmsLessons.durationMinutes,
         }).from(lmsLessons).where(eq(lmsLessons.sectionId, s.id)).orderBy(asc(lmsLessons.position));
         return { ...s, lessons };
       }));
@@ -463,6 +463,7 @@ export const lmsLearnerRouter = router({
           type: lmsLessons.type,
           position: lmsLessons.position,
           isPreview: lmsLessons.isPreview,
+          previewMode: lmsLessons.previewMode,
           dripDays: lmsLessons.dripDays,
           durationMinutes: lmsLessons.durationMinutes,
           requireVideoCompletion: lmsLessons.requireVideoCompletion,
@@ -543,12 +544,20 @@ export const lmsLearnerRouter = router({
         const [section] = await db.select().from(lmsSections).where(eq(lmsSections.id, lesson.sectionId)).limit(1);
         if (section) resolvedCourseId = section.courseId;
       }
-      if (!resolvedCourseId) throw new TRPCError({ code: "NOT_FOUND" });
-
-      if (!lesson.isPreview && ctx.user.role !== "admin") {
+            if (!resolvedCourseId) throw new TRPCError({ code: "NOT_FOUND" });
+      const isAdmin = ctx.user.role === "admin";
+      const pm = lesson.previewMode ?? (lesson.isPreview ? "preview" : "none");
+      if (pm !== "preview" && !isAdmin) {
+        // Check enrollment
         const [enrollment] = await db.select().from(lmsEnrollments)
           .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, resolvedCourseId))).limit(1);
-        if (!enrollment) throw new TRPCError({ code: "FORBIDDEN", message: "Enrollment required" });
+        if (pm === "preview_hide_after_purchase" && enrollment) {
+          // Purchased — hide this lesson (it was a pre-purchase teaser)
+          throw new TRPCError({ code: "FORBIDDEN", message: "This preview lesson is no longer available after purchase" });
+        }
+        if (pm === "none" && !enrollment) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Enrollment required" });
+        }
       }
 
       // Quiz data if quiz lesson
@@ -1390,6 +1399,7 @@ export const lmsAdminRouter = router({
           type: lmsLessons.type,
           position: lmsLessons.position,
           isPreview: lmsLessons.isPreview,
+          previewMode: lmsLessons.previewMode,
           dripDays: lmsLessons.dripDays,
           durationMinutes: lmsLessons.durationMinutes,
           requireVideoCompletion: lmsLessons.requireVideoCompletion,
@@ -1569,6 +1579,7 @@ export const lmsAdminRouter = router({
       mediaAssetId: z.number().nullable().optional(),
       position: z.number().int().optional(),
       isPreview: z.boolean().optional(),
+      previewMode: z.enum(["none", "preview", "preview_hide_after_purchase"]).optional(),
       dripDays: z.number().int().nullable().optional(),
       durationMinutes: z.number().int().nullable().optional(),
       requireVideoCompletion: z.boolean().optional(),
@@ -1592,6 +1603,12 @@ export const lmsAdminRouter = router({
       if (isPrerequisite !== undefined) updates.isPrerequisite = isPrerequisite;
       // Convert null dripDays to 0 (no drip)
       if (updates.dripDays === null) updates.dripDays = 0;
+      // Keep isPreview in sync with previewMode for backward compat
+      if (updates.previewMode !== undefined) {
+        updates.isPreview = updates.previewMode !== "none";
+      } else if (updates.isPreview !== undefined) {
+        updates.previewMode = updates.isPreview ? "preview" : "none";
+      }
       if (Object.keys(updates).length > 0) await db.update(lmsLessons).set(updates as any).where(eq(lmsLessons.id, id));
       return { success: true };
     }),
