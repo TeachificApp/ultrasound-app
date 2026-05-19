@@ -30,6 +30,8 @@ interface RoleGuardProps {
   roles: AppRole[];
   /** Optional: also allow platform_admin through (default: true) */
   allowAdmin?: boolean;
+  /** How many px of content to show as teaser before the gate card. Default 340. Set 0 for no teaser. */
+  teaserHeight?: number;
   children: React.ReactNode;
 }
 
@@ -50,7 +52,7 @@ const ROLE_DESCRIPTIONS: Record<string, string> = {
   accreditation_manager: "Full access to all DIY Accreditation organizations and managed accounts",
 };
 
-export function RoleGuard({ roles, allowAdmin = true, children }: RoleGuardProps) {
+export function RoleGuard({ roles, allowAdmin = true, teaserHeight, children }: RoleGuardProps) {
   const { user, loading, isAuthenticated } = useAuth();
   const [location] = useLocation();
   const [message, setMessage] = useState("");
@@ -89,7 +91,7 @@ export function RoleGuard({ roles, allowAdmin = true, children }: RoleGuardProps
     const hasPremiumRole = roles.includes("premium_user");
     const isDiyOnlyGate = !hasPremiumRole && roles.some(r => ["diy_admin", "diy_user"].includes(r));
     return (
-      <PremiumPearlGate type={isDiyOnlyGate ? "diy" : "login"}>
+      <PremiumPearlGate type={isDiyOnlyGate ? "diy" : "login"} teaserHeight={teaserHeight}>
         {children}
       </PremiumPearlGate>
     );
@@ -109,7 +111,7 @@ export function RoleGuard({ roles, allowAdmin = true, children }: RoleGuardProps
   const isPremiumGate = roles.includes("premium_user");
   if (isPremiumGate) {
     return (
-      <PremiumPearlGate type="premium">
+      <PremiumPearlGate type="premium" teaserHeight={teaserHeight}>
         {children}
       </PremiumPearlGate>
     );
@@ -167,7 +169,7 @@ export function RoleGuard({ roles, allowAdmin = true, children }: RoleGuardProps
   const isDiyGate2 = roles.some(r => ["diy_admin", "diy_user"].includes(r));
   if (isDiyGate2) {
     return (
-      <PremiumPearlGate type="diy">
+      <PremiumPearlGate type="diy" teaserHeight={teaserHeight}>
         {children}
       </PremiumPearlGate>
     );

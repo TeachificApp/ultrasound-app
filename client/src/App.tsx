@@ -187,6 +187,7 @@ const AccreditationTool = lazy(() => import("./pages/AccreditationTool"));
 const AccreditationManager = lazy(() => import("./pages/AccreditationManager"));
 const AccreditationReadiness = lazy(() => import("./pages/AccreditationReadiness"));
 const DIYAccreditationAdmin = lazy(() => import("./pages/admin/DIYAccreditationAdmin"));
+const DIYAccreditationLanding = lazy(() => import("./pages/DIYAccreditationLanding"));
 
 // ── Learn Fetal Echo ────────────────────────────────────────────
 const LearnFetalEcho = lazy(() => import("./pages/LearnFetalEcho"));
@@ -611,8 +612,8 @@ function IHeartEchoRouter() {
         <Route path="/diy-accreditation-plans" component={DIYAccreditationPlans} />
         <Route path="/diy-register" component={DIYRegister} />
         <Route path="/diy-member">{() => <RoleGuard roles={["diy_user", "diy_admin"]} allowAdmin={false}><DIYMemberPortal /></RoleGuard>}</Route>
-        <Route path="/accreditation-navigator">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><AccreditationNavigator /></RoleGuard>}</Route>
-        <Route path="/accreditation">{() => <RoleGuard roles={["diy_user", "diy_admin"]} allowAdmin={false}><AccreditationTool /></RoleGuard>}</Route>
+        <Route path="/accreditation-navigator">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]} teaserHeight={0}><AccreditationNavigator /></RoleGuard>}</Route>
+        <Route path="/accreditation">{() => <RoleGuard roles={["diy_user", "diy_admin"]} allowAdmin={false} teaserHeight={0}><AccreditationTool /></RoleGuard>}</Route>
         <Route path="/lab-admin">{() => <RoleGuard roles={["diy_admin"]} allowAdmin={false}><LabAdmin /></RoleGuard>}</Route>
 
         {/* ── Admin ──────────────────────────────────────────────────── */}
@@ -694,6 +695,8 @@ function AccreditationDivisionRouter() {
         <Route path="/reset-password" component={ResetPassword} />
         <Route path="/magic-link" component={MagicLinkRequest} />
         <Route path="/auth/magic" component={MagicLinkCallback} />
+        {/* Public landing page — root route, no auth required */}
+        <Route path="/" component={DIYAccreditationLanding} />
         {/* DIY Accreditation routes */}
         <Route path="/accreditation">{() => <RoleGuard roles={["diy_user", "diy_admin"]} allowAdmin={false}><AccreditationTool /></RoleGuard>}</Route>
         <Route path="/accreditation-navigator">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><AccreditationNavigator /></RoleGuard>}</Route>
@@ -707,8 +710,8 @@ function AccreditationDivisionRouter() {
         <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
         <Route path="/admin/diy-accreditation">{() => <RoleGuard roles={["diy_admin", "platform_admin", "accreditation_manager"]} allowAdmin={true}><DIYAccreditationAdmin /></RoleGuard>}</Route>
         <Route path="/accreditation-readiness">{() => <RoleGuard roles={["diy_user", "diy_admin"]} allowAdmin={true}><AccreditationReadiness /></RoleGuard>}</Route>
-        {/* Default: DIY Accreditation Admin hub */}
-        <Route>{() => <RoleGuard roles={["diy_admin", "platform_admin", "accreditation_manager"]} allowAdmin={true}><DIYAccreditationAdmin /></RoleGuard>}</Route>
+        {/* Default: public landing page */}
+        <Route component={DIYAccreditationLanding} />
       </Switch>
     </Suspense>
   );

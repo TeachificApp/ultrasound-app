@@ -2184,3 +2184,11 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Remove MediaRecorder timeslice (mr.start(250) → mr.start()) to produce valid single-chunk WebM files
 - [x] Add error handling for empty recordings and missing audio tracks in AudioBlockEditor
 - [x] Use refs for handleFileUpload and set to avoid stale closure issues in recording callbacks
+
+## Gate Consistency & DIY Landing Page (May 2026)
+- [x] Fix compact gate banner on accreditation-navigator — set teaserHeight=0 for RoleGuard on accreditation/navigator routes
+- [x] Add teaserHeight prop to RoleGuard component
+- [x] Create public DIY Accreditation landing/sales page (DIYAccreditationLanding.tsx) — hero, features, how-it-works, pricing teaser, FAQ, CTA
+- [x] Set DIYAccreditationLanding as root route for accreditation.iheartecho.com (no auth required)
+- [x] Replace all ICAEL references with IAC across 5 files
+- [x] Fix Back to Dashboard button in PremiumPearlGate (window.location.href)
