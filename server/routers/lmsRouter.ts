@@ -408,12 +408,13 @@ export const lmsLearnerRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.slug)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
-      // Admin preview mode: bypass enrollment requirement
-      const isAdminPreview = input.preview && ctx.user.role === "admin";
-
-      // Check enrollment
+      // Check enrollment first — must happen before isAdminPreview check
       const [enrollment] = await db.select().from(lmsEnrollments)
         .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, course.id))).limit(1);
+
+      // Admin preview mode: only active when admin is NOT enrolled AND explicitly requested preview.
+      // If the admin IS enrolled, treat them as a regular enrolled user so progress is tracked.
+      const isAdminPreview = input.preview && ctx.user.role === "admin" && !enrollment;
 
       // Fetch sections + ALL lessons for this course in 2 parallel queries (avoids N+1)
       // Select only lightweight columns for the sidebar — heavy content (contentBlocks, content, videoContent)
@@ -490,7 +491,7 @@ export const lmsLearnerRouter = router({
           .where(sql`${lmsInstructors.id} IN (${sql.join(instructorIds.map(id => sql`${id}`), sql`, `)})`);
       }
 
-      return { course, enrollment: effectiveEnrollment, sections: sectionsWithLessons, topLevelLessons, progress, isAdminPreview: !!isAdminPreview, instructors };
+      return { course, enrollment: effectiveEnrollment, sections: sectionsWithLessons, topLevelLessons, progress, isAdminPreview: !!isAdminPreview && !enrollment, instructors };
     }),
 
   /** Get a single lesson (must be enrolled or lesson is preview) */
@@ -1018,11 +1019,14 @@ export const lmsLearnerRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.slug)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
-      const isAdminPreview = input.preview && ctx.user.role === "admin";
 
-      // Check enrollment
+      // Check enrollment first — must happen before isAdminPreview check
       const [enrollment] = await db.select().from(lmsEnrollments)
         .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, course.id))).limit(1);
+
+      // Admin preview mode: only active when admin is NOT enrolled AND explicitly requested preview.
+      // If the admin IS enrolled, treat them as a regular enrolled user so progress is tracked.
+      const isAdminPreview = input.preview && ctx.user.role === "admin" && !enrollment;
       if (!enrollment && !isAdminPreview) throw new TRPCError({ code: "FORBIDDEN", message: "Enrollment required" });
 
       // Fetch sections + lessons
@@ -1059,7 +1063,7 @@ export const lmsLearnerRouter = router({
           .where(sql`${lmsInstructors.id} IN (${sql.join(instructorIds.map(id => sql`${id}`), sql`, `)})`);
       }
 
-      return { course, enrollment: effectiveEnrollment, sections: sectionsWithLessons, topLevelLessons, progress, instructors, isAdminPreview: !!isAdminPreview };
+      return { course, enrollment: effectiveEnrollment, sections: sectionsWithLessons, topLevelLessons, progress, instructors, isAdminPreview: !!isAdminPreview && !enrollment };
     }),
 });
 
