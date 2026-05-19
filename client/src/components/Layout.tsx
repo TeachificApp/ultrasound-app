@@ -10,7 +10,7 @@ import {
   Scan, BookOpen, FileText, Menu, X, ChevronRight,
   Stethoscope, Zap, ExternalLink, ShoppingBag, FlaskConical, MessageCircle, Award, Shield, GraduationCap,
   BookMarked, Library, Plus, Crown, Droplets, Building2, Users, UserPlus,
-  LogIn, LogOut, Settings, ChevronDown, Webhook, Layers, CreditCard, Lock, ClipboardCheck, Brain, Download
+  LogIn, LogOut, Settings, ChevronDown, Webhook, Layers, Lock, ClipboardCheck, Brain
 } from "lucide-react";
 
 import { trpc } from "@/lib/trpc";
@@ -77,7 +77,6 @@ const BASE_NAV_GROUPS = [
       { path: "/soundbytes", label: "SoundBytes™", icon: BookMarked },
       { path: "/cme", label: "CME Hub", icon: GraduationCap },
       { path: "/registry-review", label: "Registry Review Hub", icon: ClipboardCheck },
-      { path: "/my-downloads", label: "My Downloads", icon: Download },
       // Learn links below use __LEARN_FETAL_ECHO_URL__, __LEARN_ECHO_URL__, __LEARN_POCUS_URL__
       // as placeholders — replaced at runtime in the Layout component with DB values
       { path: "__LEARN_FETAL_ECHO_URL__", label: "Learn Fetal Echo", icon: BookOpen, external: true },
@@ -503,13 +502,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                             className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs md:text-sm text-gray-700 hover:bg-[#f0fbfc] hover:text-[#189aa1] transition-all text-left">
                             <Settings className="w-3.5 h-3.5 text-[#189aa1]" />
                             Edit Profile
-                          </button>
-                        </WouterLink>
-                        <WouterLink href="/my-dashboard?tab=subscriptions">
-                          <button onClick={() => setAccountOpen(false)}
-                            className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs md:text-sm text-gray-700 hover:bg-[#f0fbfc] hover:text-[#189aa1] transition-all text-left">
-                            <CreditCard className="w-3.5 h-3.5 text-[#189aa1]" />
-                            My Subscriptions
                           </button>
                         </WouterLink>
                         <WouterLink href="/case-library/submit">

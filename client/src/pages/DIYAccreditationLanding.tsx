@@ -14,7 +14,7 @@ import {
   BookOpen, Zap, Lock, Award, Globe, Clock, TrendingUp,
   CheckSquare, HeartPulse, Layers, Menu, X
 } from "lucide-react";
-import { getLoginUrl } from "@/_core/const";
+import { getLoginUrl } from "@/const";
 
 const BRAND = "#189aa1";
 const BRAND_DARK = "#0e4a50";
