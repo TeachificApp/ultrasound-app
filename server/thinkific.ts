@@ -486,7 +486,8 @@ export async function getContentsForChapter(chapterId: number): Promise<Thinkifi
 }
 
 export async function getEnrollmentsForCourse(courseId: number): Promise<ThinkificEnrollment[]> {
-  return fetchAllPages<ThinkificEnrollment>(`/enrollments?course_id=${courseId}`);
+  // Thinkific API v1 requires query[course_id] to filter enrollments by course
+  return fetchAllPages<ThinkificEnrollment>(`/enrollments?query[course_id]=${courseId}`);
 }
 
 export async function getThinkificInstructor(instructorId: number): Promise<ThinkificInstructor | null> {
