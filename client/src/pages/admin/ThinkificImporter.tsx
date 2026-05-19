@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { ArrowRight, BookOpen, CheckCircle, AlertCircle, Loader2, Users, FileText, ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -45,7 +45,7 @@ interface CoursePreview {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ThinkificImporter() {
-  const { toast } = useToast();
+
   const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [importOptions, setImportOptions] = useState({
@@ -78,21 +78,21 @@ export default function ThinkificImporter() {
       setImportResult(data);
       setPreviewOpen(false);
       setImportResultOpen(true);
-      toast({ title: "Import complete!", description: `${data.lessonsImported} lessons imported as draft.` });
+      toast.success(`Import complete! ${data.lessonsImported} lessons imported as draft.`);
     },
     onError: (err) => {
-      toast({ title: "Import failed", description: err.message, variant: "destructive" });
+      toast.error(`Import failed: ${err.message}`);
     },
   });
 
   const utils = trpc.useUtils();
   const activateEnrollments = trpc.thinkificImport.activatePendingEnrollments.useMutation({
     onSuccess: (data) => {
-      toast({ title: "Enrollments activated", description: `${data.activated} students enrolled, ${data.skipped} skipped (no matching account).` });
+      toast.success(`Enrollments activated: ${data.activated} students enrolled, ${data.skipped} skipped.`);
       utils.thinkificImport.listImports.invalidate();
     },
     onError: (err) => {
-      toast({ title: "Activation failed", description: err.message, variant: "destructive" });
+      toast.error(`Activation failed: ${err.message}`);
     },
   });
 

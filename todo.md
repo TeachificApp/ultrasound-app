@@ -2269,3 +2269,8 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add showInLibrary toggle to LMS admin (courses/quizzes/downloads) — on by default
 - [x] Add showInLibrary toggle to Digital Downloads admin — on by default
 - [x] Add content type selector (Course/Quiz/Download) to Thinkific importer dialog
+- [x] Fix build error: wrong use-toast import in ThinkificImporter.tsx (replaced with sonner)
+- [x] Smart Education Library card routing: non-owners → sales/landing page, owners → access/player page
+  - [x] Courses/quizzes: enrolled → /learn/:slug/player, not enrolled → /learn/:slug
+  - [x] Digital products: purchased → /downloads/:slug/files, not purchased → /downloads/:slug
+  - [x] Owned cards show green checkmark + "Continue Learning / Access Download / Continue Quiz" CTA

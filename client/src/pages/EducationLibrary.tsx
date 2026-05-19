@@ -2,15 +2,16 @@
  * EducationLibrary.tsx
  * Public-facing course catalog for All About Ultrasound™ & iHeartEcho
  */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BookOpen, Download, HelpCircle, Search, Star, Users } from "lucide-react";
+import { BookOpen, Download, HelpCircle, Search, Star, Users, CheckCircle } from "lucide-react";
 
 const TYPE_ICONS: Record<string, React.ReactNode> = {
   course: <BookOpen className="w-4 h-4" />,
@@ -23,9 +24,17 @@ const BRAND_LABELS: Record<string, string> = {
   iheartecho: "iHeartEcho™",
 };
 
-function CourseCard({ course }: { course: any }) {
+function CourseCard({ course, enrolledCourseIds, purchasedProductSlugs }: { course: any; enrolledCourseIds: Set<number>; purchasedProductSlugs: Set<string> }) {
   const price = course.isFree ? "Free" : `$${(course.price / 100).toFixed(0)}`;
-  const href = course._source === "digital_product" ? `/downloads/${course.slug}` : `/learn/${course.slug}`;
+  const isOwned = course._source === "digital_product"
+    ? purchasedProductSlugs.has(course.slug)
+    : enrolledCourseIds.has(course.id);
+  const href = course._source === "digital_product"
+    ? (isOwned ? `/downloads/${course.slug}/files` : `/downloads/${course.slug}`)
+    : (isOwned ? `/learn/${course.slug}/player` : `/learn/${course.slug}`);
+  const ctaLabel = isOwned
+    ? (course.type === "download" ? "Access Download" : course.type === "quiz" ? "Continue Quiz" : "Continue Learning")
+    : (course.type === "quiz" ? "Take Quiz" : course.type === "download" ? "Get Download" : "View Course");
   return (
     <Link href={href}>
       <div className="group bg-white rounded-xl border border-gray-200 hover:border-teal-400 hover:shadow-lg transition-all duration-200 overflow-hidden cursor-pointer flex flex-col h-full">
@@ -67,8 +76,9 @@ function CourseCard({ course }: { course: any }) {
           {/* Footer */}
           <div className="flex items-center justify-between pt-3 border-t border-gray-100 mt-auto">
             <span className="text-sm font-bold text-teal-700">{price}</span>
-            <Button size="sm" variant="outline" className="text-xs h-7 border-teal-300 text-teal-700 hover:bg-teal-50">
-              {course.type === "quiz" ? "Take Quiz" : course.type === "download" ? "Get Download" : "View Course"}
+            <Button size="sm" variant="outline" className={`text-xs h-7 ${isOwned ? "border-green-400 text-green-700 hover:bg-green-50" : "border-teal-300 text-teal-700 hover:bg-teal-50"}`}>
+              {isOwned && <CheckCircle className="w-3 h-3 mr-1" />}
+              {ctaLabel}
             </Button>
           </div>
           {/* Tags below price */}
@@ -115,6 +125,16 @@ export default function EducationLibrary() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [activeCollection, setActiveCollection] = useState<number | null>(null);
+
+  const { user } = useAuth();
+
+  // Fetch ownership data for smart routing (only when logged in)
+  const { data: myCoursesData } = trpc.lmsLearner.getMyCourses.useQuery(undefined, { enabled: !!user });
+  const { data: myPurchasesData } = trpc.downloads.myPurchases.useQuery(undefined, { enabled: !!user });
+
+  // Build fast lookup sets
+  const enrolledCourseIds = useMemo(() => new Set((myCoursesData ?? []).map((e: any) => e.courseId)), [myCoursesData]);
+  const purchasedProductSlugs = useMemo(() => new Set((myPurchasesData ?? []).map((p: any) => p.slug)), [myPurchasesData]);
 
   // Fetch collections for filter tabs
   const { data: collections } = trpc.lms.listCollections.useQuery();
@@ -249,7 +269,7 @@ export default function EducationLibrary() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {courses.map((c: any) => <CourseCard key={c.id} course={c} />)}
+            {courses.map((c: any) => <CourseCard key={c.id} course={c} enrolledCourseIds={enrolledCourseIds} purchasedProductSlugs={purchasedProductSlugs} />)}
           </div>
         )}
 
