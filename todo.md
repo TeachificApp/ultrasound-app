@@ -2233,3 +2233,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Wire onSaveAsTemplate prop to SortableBlock in LessonBlockEditor so Save as Template button appears on each block
 - [x] Verify quiz/flashcard blocks appear at bottom of Content tab (correct — added via push() after other Content items)
 - [x] Add OPTIONS preflight handlers to all /api/media/:slug routes for proper cross-origin CORS support
+
+## Instructor Sidebar & Flashcard Fixes (May 2026)
+- [x] Add "Show instructor profile in lesson sidebar" toggle to Course Settings tab (course-level switch)
+- [x] Wire toggle to updateCourse mutation (both Save buttons) — showInstructor boolean saved to lmsCourses
+- [x] CoursePlayer sidebar reads course.showInstructor and respects lesson-level override (inherit/show/hide)
+- [x] Fix flashcard button defaults: Got It #1ab7b4 / #ffffff, Still Learning #f0fdfa / #189593
+- [x] Add Reflection question style to quiz AI generator

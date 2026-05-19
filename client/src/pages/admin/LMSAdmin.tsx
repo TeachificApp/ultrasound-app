@@ -1200,6 +1200,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
   const [isFeatured, setIsFeatured] = useState(course.isFeatured ?? false);
   const [isDrip, setIsDrip] = useState(course.isDrip ?? false);
   const [hideProgress, setHideProgress] = useState(course.hideProgress ?? false);
+  const [showInstructor, setShowInstructor] = useState(course.showInstructor ?? false);
   const [sendEnrollmentEmail, setSendEnrollmentEmail] = useState(course.sendEnrollmentEmail ?? true);
   const [coverImageUrl, setCoverImageUrl] = useState(course.coverImageUrl ?? "");
   const [slug, setSlug] = useState(course.slug ?? "");
@@ -1233,6 +1234,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
             isFeatured,
             isDrip,
             hideProgress,
+            showInstructor,
             price: pricingType === "free" ? 0 : Math.round(parseFloat(price || "0") * 100),
             subscriptionInterval: pricingType === "subscription" ? subscriptionInterval : null,
             downPayment: pricingType === "payment_plan" ? Math.round(parseFloat(downPayment || "0") * 100) : null,
@@ -1486,6 +1488,13 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
           <p className="text-xs text-gray-400 mt-0.5">When enabled, the progress bar and completion percentage will not be shown to students in the course player or overview page.</p>
         </div>
       </div>
+      <div className="flex items-start gap-2">
+        <Switch checked={showInstructor} onCheckedChange={setShowInstructor} id="show-instructor-switch" className="mt-0.5" />
+        <div>
+          <Label htmlFor="show-instructor-switch" className="text-sm">Show instructor profile in lesson sidebar</Label>
+          <p className="text-xs text-gray-400 mt-0.5">When enabled, the instructor bio and avatar will appear in the Lesson Info panel of the course player. Individual lessons can override this setting.</p>
+        </div>
+      </div>
 
       <div>
         <Label className="text-sm">Description (rich text)</Label>
@@ -1607,6 +1616,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
           isFeatured,
           isDrip,
           hideProgress,
+          showInstructor,
           price: pricingType === "free" ? 0 : Math.round(parseFloat(price || "0") * 100),
           subscriptionInterval: pricingType === "subscription" ? subscriptionInterval : null,
           downPayment: pricingType === "payment_plan" ? Math.round(parseFloat(downPayment || "0") * 100) : null,
