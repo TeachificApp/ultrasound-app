@@ -135,7 +135,7 @@ function ToolbarBtn({
       onMouseDown={(e) => { e.preventDefault(); if (!disabled) onClick(); }}
       className={`w-7 h-7 flex items-center justify-center rounded transition-all text-sm flex-shrink-0 ${
         active
-          ? "bg-[#0891b2] text-white"
+          ? "bg-[#149096] text-white"
           : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
       } ${disabled ? "opacity-30 cursor-not-allowed pointer-events-none" : "cursor-pointer"}`}
     >
@@ -150,7 +150,7 @@ function Sep() {
 
 const TEXT_COLORS = [
   "#000000", "#374151", "#6B7280", "#EF4444", "#F97316",
-  "#EAB308", "#22C55E", "#0891B2", "#3B82F6", "#8B5CF6",
+  "#EAB308", "#22C55E", "#149096", "#3B82F6", "#8B5CF6",
   "#EC4899", "#FFFFFF",
 ];
 
@@ -250,7 +250,7 @@ export default function RichTextEditor({
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
-  const [customColor, setCustomColor] = useState("#179ca3");
+  const [customColor, setCustomColor] = useState("#149096");
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoFileInputRef = useRef<HTMLInputElement>(null);
@@ -267,7 +267,7 @@ export default function RichTextEditor({
       Link.configure({
         openOnClick: false,
         autolink: true,
-        HTMLAttributes: { class: "text-[#0891b2] underline cursor-pointer" },
+        HTMLAttributes: { class: "text-[#149096] underline cursor-pointer" },
       }),
       Youtube.configure({ controls: true, nocookie: true }),
       Placeholder.configure({ placeholder }),
@@ -372,7 +372,7 @@ export default function RichTextEditor({
   return (
     <div
       className={cn(
-        "rich-text-editor border border-gray-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-[#0891b2]/30 focus-within:border-[#0891b2] transition-all",
+        "rich-text-editor border border-gray-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-[#149096]/30 focus-within:border-[#149096] transition-all",
         disabled && "opacity-60 pointer-events-none bg-gray-50",
         className,
       )}
@@ -457,7 +457,7 @@ export default function RichTextEditor({
                       value={customColor}
                       onChange={(e) => setCustomColor(e.target.value)}
                       className="flex-1 h-7 text-xs border border-gray-200 rounded px-2 font-mono"
-                      placeholder="#179ca3"
+                      placeholder="#149096"
                     />
                   </div>
                   <button
@@ -593,14 +593,14 @@ export default function RichTextEditor({
         .rte-content .tiptap ul { list-style: disc; padding-left: 1.4em; margin: 0.4em 0; }
         .rte-content .tiptap ol { list-style: decimal; padding-left: 1.4em; margin: 0.4em 0; }
         .rte-content .tiptap li { margin: 0.15em 0; }
-        .rte-content .tiptap blockquote { border-left: 3px solid #0891b2; padding-left: 0.8em; color: #475569; font-style: italic; margin: 0.5em 0; }
+        .rte-content .tiptap blockquote { border-left: 3px solid #149096; padding-left: 0.8em; color: #475569; font-style: italic; margin: 0.5em 0; }
         .rte-content .tiptap hr { border: none; border-top: 1px solid #e5e7eb; margin: 0.75em 0; }
         .rte-content .tiptap strong { font-weight: 700; }
         .rte-content .tiptap em { font-style: italic; }
         .rte-content .tiptap u { text-decoration: underline; }
         .rte-content .tiptap s { text-decoration: line-through; }
         .rte-content .tiptap p { margin: 0.3em 0; }
-        .rte-content .tiptap a { color: #0891b2; text-decoration: underline; cursor: pointer; }
+        .rte-content .tiptap a { color: #149096; text-decoration: underline; cursor: pointer; }
         .rte-content .tiptap code { background: #f3f4f6; border-radius: 3px; padding: 0.1em 0.3em; font-family: monospace; font-size: 0.85em; }
         .rte-content .tiptap img { max-width: 100%; border-radius: 8px; margin: 0.5em 0; }
         .rte-content .tiptap iframe { max-width: 100%; border-radius: 8px; margin: 0.5em 0; }
@@ -615,7 +615,7 @@ export default function RichTextEditor({
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <ImageIcon className="w-5 h-5 text-[#0891b2]" /> Insert Image
+              <ImageIcon className="w-5 h-5 text-[#149096]" /> Insert Image
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
@@ -639,7 +639,7 @@ export default function RichTextEditor({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setImageDialogOpen(false)}>Cancel</Button>
-            <Button onClick={insertImage} disabled={!imageUrl.trim()} style={{ background: "#0891b2" }} className="text-white">
+            <Button onClick={insertImage} disabled={!imageUrl.trim()} style={{ background: "#149096" }} className="text-white">
               Insert Image
             </Button>
           </DialogFooter>
@@ -651,7 +651,7 @@ export default function RichTextEditor({
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Video className="w-5 h-5 text-[#0891b2]" /> Upload Video
+              <Video className="w-5 h-5 text-[#149096]" /> Upload Video
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -684,7 +684,7 @@ export default function RichTextEditor({
             <Button
               onClick={handleVideoUpload}
               disabled={!videoUploadFile || videoUploading}
-              style={{ background: "#0891b2" }}
+              style={{ background: "#149096" }}
               className="text-white gap-2"
             >
               {videoUploading ? (
@@ -720,7 +720,7 @@ export default function RichTextEditor({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setVideoDialogOpen(false)}>Cancel</Button>
-            <Button onClick={insertVideo} disabled={!videoUrl.trim()} style={{ background: "#0891b2" }} className="text-white">
+            <Button onClick={insertVideo} disabled={!videoUrl.trim()} style={{ background: "#149096" }} className="text-white">
               Embed Video
             </Button>
           </DialogFooter>
@@ -732,7 +732,7 @@ export default function RichTextEditor({
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FileCode className="w-5 h-5 text-[#0891b2]" /> Insert HTML Code
+              <FileCode className="w-5 h-5 text-[#149096]" /> Insert HTML Code
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
@@ -740,7 +740,7 @@ export default function RichTextEditor({
               Paste raw HTML to insert directly into the editor. Use this for custom embeds, iframes, tables, or complex layouts.
             </p>
             <textarea
-              className="w-full min-h-[200px] font-mono text-xs border border-gray-200 rounded-lg p-3 resize-y focus:outline-none focus:ring-2 focus:ring-[#0891b2]/30 bg-gray-50"
+              className="w-full min-h-[200px] font-mono text-xs border border-gray-200 rounded-lg p-3 resize-y focus:outline-none focus:ring-2 focus:ring-[#149096]/30 bg-gray-50"
               placeholder={`<iframe src="https://..." width="100%" height="400" frameborder="0"></iframe>\n\n<!-- or any valid HTML -->`}
               value={rawHtml}
               onChange={e => setRawHtml(e.target.value)}
@@ -752,7 +752,7 @@ export default function RichTextEditor({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setHtmlDialogOpen(false)}>Cancel</Button>
-            <Button onClick={insertHtml} disabled={!rawHtml.trim()} style={{ background: "#0891b2" }} className="text-white">
+            <Button onClick={insertHtml} disabled={!rawHtml.trim()} style={{ background: "#149096" }} className="text-white">
               Insert HTML
             </Button>
           </DialogFooter>
@@ -764,7 +764,7 @@ export default function RichTextEditor({
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <LinkIcon className="w-5 h-5 text-[#0891b2]" /> Insert Link
+              <LinkIcon className="w-5 h-5 text-[#149096]" /> Insert Link
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
@@ -787,7 +787,7 @@ export default function RichTextEditor({
               </Button>
             )}
             <Button variant="outline" onClick={() => setLinkDialogOpen(false)}>Cancel</Button>
-            <Button onClick={insertLink} style={{ background: "#0891b2" }} className="text-white">
+            <Button onClick={insertLink} style={{ background: "#149096" }} className="text-white">
               {linkUrl.trim() ? "Insert Link" : "Remove Link"}
             </Button>
           </DialogFooter>
@@ -821,13 +821,13 @@ export function RichTextDisplay({
         "[&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1",
         "[&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1",
         "[&_li]:my-0.5",
-        "[&_blockquote]:border-l-[3px] [&_blockquote]:border-[#0891b2] [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-gray-500 [&_blockquote]:my-2",
+        "[&_blockquote]:border-l-[3px] [&_blockquote]:border-[#149096] [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-gray-500 [&_blockquote]:my-2",
         "[&_hr]:border-t [&_hr]:border-gray-200 [&_hr]:my-2",
         "[&_strong]:font-bold",
         "[&_em]:italic",
         "[&_u]:underline",
         "[&_s]:line-through",
-        "[&_a]:text-[#0891b2] [&_a]:underline",
+        "[&_a]:text-[#149096] [&_a]:underline",
         "[&_p]:my-1",
         "[&_code]:bg-gray-100 [&_code]:rounded [&_code]:px-1 [&_code]:text-xs [&_code]:font-mono",
         "[&_img]:max-w-full [&_img]:rounded-lg [&_img]:my-2",
