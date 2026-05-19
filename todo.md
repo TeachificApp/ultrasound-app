@@ -1,5 +1,14 @@
 # UltrasoundAssist™ App TODO
 
+## Lesson Quiz & Flashcard Blocks (May 2026)
+- [x] Add lesson_quiz and lesson_flashcard to BlockType union in BlockPreview.tsx
+- [x] Add lesson_quiz and lesson_flashcard to BLOCK_CATALOG in LandingPageBuilder.tsx
+- [x] Create LessonQuizBlockEditor component with AI generation + manual entry + image uploads
+- [x] Create LessonFlashcardBlockEditor component with AI generation + manual entry + image uploads
+- [x] Add generateQuizFromLesson and generateFlashcardsFromLesson tRPC procedures in lmsRouter
+- [x] Add BlockPreview rendering for lesson_quiz and lesson_flashcard block types
+- [x] Add lesson_quiz and lesson_flashcard player in CoursePlayer (student view)
+
 ## Core Structure & Branding
 - [x] Set up AAUS teal/aqua color scheme (#189aa1, #4ad9e0)
 - [x] Configure Google Fonts (Merriweather + Inter)

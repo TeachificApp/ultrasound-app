@@ -44,6 +44,8 @@ import {
   ShoppingCart, Package, Link, Mail, Phone, MapPin, Bookmark, Music,
 } from "lucide-react";
 import AudioBlockEditor from "@/components/AudioBlockEditor";
+import LessonQuizBlockEditor from "@/components/LessonQuizBlockEditor";
+import LessonFlashcardBlockEditor from "@/components/LessonFlashcardBlockEditor";
 
 
 // ─── Block Types & BlockPreview (re-exported from shared component) ─────────
@@ -270,7 +272,13 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
     } },
 ];
 
-export const CATALOG_CATEGORIES = ["Layout", "Content", "Marketing", "Conversion", "Funnel", "Smart"];
+export const CATALOG_CATEGORIES = ["Layout", "Content", "Marketing", "Conversion", "Funnel", "Smart", "Interactive"];
+
+// Lesson interactive blocks (quiz + flashcard) — added to catalog
+BLOCK_CATALOG.push(
+  { type: "lesson_quiz", label: "Lesson Quiz", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>, category: "Interactive", defaultData: { title: "Knowledge Check", questions: [], showExplanations: true, passingScore: 70, shuffleQuestions: false } },
+  { type: "lesson_flashcard", label: "Flashcard Deck", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>, category: "Interactive", defaultData: { title: "Review Flashcards", cards: [], shuffleCards: true, showHints: true } },
+);
 
 // ─── Block Preview ─────────────────────────────────────────────────────────────
 
@@ -679,7 +687,7 @@ function OptOutSettings({ d, set }: { d: Record<string, any>; set: (key: string,
   );
 }
 
-export function BlockSettings({ block, onChange }: { block: Block; onChange: (data: Record<string, any>) => void }) {
+export function BlockSettings({ block, onChange, lessonId }: { block: Block; onChange: (data: Record<string, any>) => void; lessonId?: number }) {
   const d = block.data;
   // Use refs to avoid stale closures with debounced inputs
   const dataRef = useRef(block.data);
@@ -1505,6 +1513,44 @@ export function BlockSettings({ block, onChange }: { block: Block; onChange: (da
         </div>
       );
     }
+    case "lesson_quiz":
+      return (
+        <LessonQuizBlockEditor
+          data={d as any}
+          onChange={(newData) => onChange(newData as any)}
+          lessonId={lessonId}
+          handleFileUpload={async (file, targetField, context) => {
+            if (file.size > 40 * 1024 * 1024) { toast.error("File must be under 40 MB"); return null; }
+            setUploading(targetField);
+            try {
+              const reader = new FileReader();
+              const dataUri = await new Promise<string>((resolve) => { reader.onload = () => resolve(reader.result as string); reader.readAsDataURL(file); });
+              const result = await uploadMedia.mutateAsync({ dataUri, mimeType: file.type, fileName: file.name, context });
+              setUploading(null);
+              return result.url;
+            } catch (err: any) { toast.error(err.message || "Upload failed"); setUploading(null); return null; }
+          }}
+        />
+      );
+    case "lesson_flashcard":
+      return (
+        <LessonFlashcardBlockEditor
+          data={d as any}
+          onChange={(newData) => onChange(newData as any)}
+          lessonId={lessonId}
+          handleFileUpload={async (file, targetField, context) => {
+            if (file.size > 40 * 1024 * 1024) { toast.error("File must be under 40 MB"); return null; }
+            setUploading(targetField);
+            try {
+              const reader = new FileReader();
+              const dataUri = await new Promise<string>((resolve) => { reader.onload = () => resolve(reader.result as string); reader.readAsDataURL(file); });
+              const result = await uploadMedia.mutateAsync({ dataUri, mimeType: file.type, fileName: file.name, context });
+              setUploading(null);
+              return result.url;
+            } catch (err: any) { toast.error(err.message || "Upload failed"); setUploading(null); return null; }
+          }}
+        />
+      );
      default:
       return <p className="text-xs text-gray-400">No settings for this block type.</p>;
   } })();

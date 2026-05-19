@@ -119,6 +119,189 @@ function QuizRunner({ lesson, courseSlug, onComplete }: { lesson: any; courseSlu
   );
 }
 
+// ─── Inline Lesson Quiz (for lesson_quiz content blocks) ────────────────────
+function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[]; showExplanations?: boolean; passingScore?: number; shuffleQuestions?: boolean } }) {
+  const questions = data.questions ?? [];
+  const shuffled = data.shuffleQuestions
+    ? [...questions].sort(() => Math.random() - 0.5)
+    : questions;
+  const [selected, setSelected] = useState<Record<number, number>>({});
+  const [submitted, setSubmitted] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+
+  if (questions.length === 0) return null;
+
+  const score = submitted
+    ? Math.round((shuffled.filter((q, i) => selected[i] === q.correctAnswer).length / shuffled.length) * 100)
+    : 0;
+  const passed = score >= (data.passingScore ?? 70);
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-lg overflow-hidden">
+      <div className="px-5 py-3 bg-gradient-to-r from-teal-600 to-teal-500 flex items-center gap-2">
+        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+        <h3 className="text-white font-semibold text-sm">{data.title || "Knowledge Check"}</h3>
+        <span className="ml-auto text-teal-100 text-xs">{questions.length} question{questions.length !== 1 ? "s" : ""} · Pass: {data.passingScore ?? 70}%</span>
+      </div>
+      <div className="p-5 space-y-5">
+        {submitted && (
+          <div className={`rounded-lg p-3 border text-sm font-semibold ${
+            passed ? "bg-green-50 border-green-300 text-green-700" : "bg-red-50 border-red-300 text-red-700"
+          }`}>
+            {passed ? `✓ Passed! Score: ${score}%` : `✗ Score: ${score}% — ${data.passingScore ?? 70}% required to pass`}
+            {!passed && (
+              <button className="ml-3 text-xs underline" onClick={() => { setSelected({}); setSubmitted(false); setShowResults(false); }}>Retake</button>
+            )}
+          </div>
+        )}
+        {shuffled.map((q: any, i: number) => (
+          <div key={i} className="space-y-2">
+            <p className="font-medium text-gray-900 text-sm">{i + 1}. {q.question}</p>
+            {q.imageUrl && <img src={q.imageUrl} alt="" className="max-h-48 rounded-lg border border-gray-200 object-cover" />}
+            <div className="space-y-1.5">
+              {(q.options ?? []).map((opt: string, j: number) => {
+                const isSelected = selected[i] === j;
+                const isCorrect = submitted && j === q.correctAnswer;
+                const isWrong = submitted && isSelected && j !== q.correctAnswer;
+                return (
+                  <button
+                    key={j}
+                    disabled={submitted}
+                    onClick={() => !submitted && setSelected(s => ({ ...s, [i]: j }))}
+                    className={`w-full text-left px-3.5 py-2.5 rounded-lg border text-sm transition-all ${
+                      isCorrect ? "border-green-500 bg-green-50 text-green-800 font-medium" :
+                      isWrong ? "border-red-400 bg-red-50 text-red-800" :
+                      isSelected ? "border-teal-500 bg-teal-50 text-teal-900" :
+                      "border-gray-200 hover:border-teal-400 hover:bg-teal-50/50 text-gray-700"
+                    }`}
+                  >
+                    <span className="font-semibold mr-2 text-gray-400">{["A","B","C","D"][j]}.</span>{opt}
+                    {isCorrect && <span className="ml-2 text-green-600">✓</span>}
+                    {isWrong && <span className="ml-2 text-red-500">✗</span>}
+                  </button>
+                );
+              })}
+            </div>
+            {submitted && data.showExplanations && q.explanation && (
+              <p className="text-xs text-gray-500 bg-gray-50 rounded p-2 border border-gray-100 italic">{q.explanation}</p>
+            )}
+          </div>
+        ))}
+        {!submitted && (
+          <button
+            className="mt-2 px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
+            disabled={Object.keys(selected).length < shuffled.length}
+            onClick={() => setSubmitted(true)}
+          >
+            Submit Answers
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Inline Lesson Flashcard Deck (for lesson_flashcard content blocks) ───────
+function InlineLessonFlashcardDeck({ data }: { data: { title?: string; cards?: any[]; shuffleCards?: boolean; showHints?: boolean } }) {
+  const cards = data.cards ?? [];
+  const deck = data.shuffleCards ? [...cards].sort(() => Math.random() - 0.5) : cards;
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [flipped, setFlipped] = useState(false);
+  const [known, setKnown] = useState<Set<number>>(new Set());
+  const [showHint, setShowHint] = useState(false);
+
+  if (deck.length === 0) return null;
+
+  const card = deck[currentIndex];
+  const progress = Math.round((known.size / deck.length) * 100);
+
+  const goNext = () => { setFlipped(false); setShowHint(false); setCurrentIndex(i => Math.min(i + 1, deck.length - 1)); };
+  const goPrev = () => { setFlipped(false); setShowHint(false); setCurrentIndex(i => Math.max(i - 1, 0)); };
+  const markKnown = () => { setKnown(k => new Set([...k, currentIndex])); goNext(); };
+  const markUnknown = () => { const next = new Set(known); next.delete(currentIndex); setKnown(next); goNext(); };
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-lg overflow-hidden">
+      <div className="px-5 py-3 bg-gradient-to-r from-purple-600 to-purple-500 flex items-center gap-2">
+        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+        <h3 className="text-white font-semibold text-sm">{data.title || "Flashcard Deck"}</h3>
+        <span className="ml-auto text-purple-100 text-xs">{deck.length} cards · {known.size} known</span>
+      </div>
+      <div className="p-5">
+        {/* Progress bar */}
+        <div className="mb-4">
+          <div className="flex justify-between text-xs text-gray-500 mb-1">
+            <span>Card {currentIndex + 1} of {deck.length}</span>
+            <span>{progress}% known</span>
+          </div>
+          <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+            <div className="h-full bg-purple-500 rounded-full transition-all" style={{ width: `${progress}%` }} />
+          </div>
+        </div>
+        {/* Flashcard */}
+        <div
+          className="relative cursor-pointer select-none"
+          onClick={() => setFlipped(f => !f)}
+          style={{ perspective: "1000px" }}
+        >
+          <div
+            className="relative w-full transition-transform duration-500"
+            style={{ transformStyle: "preserve-3d", transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)", minHeight: "160px" }}
+          >
+            {/* Front */}
+            <div
+              className="absolute inset-0 rounded-xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-teal-50 flex flex-col items-center justify-center p-5 text-center"
+              style={{ backfaceVisibility: "hidden" }}
+            >
+              {card.imageUrl && <img src={card.imageUrl} alt="" className="max-h-24 mb-3 rounded-lg object-cover" />}
+              <p className="font-semibold text-gray-800 text-base">{card.front}</p>
+              {data.showHints && card.hint && !showHint && (
+                <button className="mt-2 text-xs text-purple-500 hover:text-purple-700 underline" onClick={e => { e.stopPropagation(); setShowHint(true); }}>Show hint</button>
+              )}
+              {showHint && card.hint && <p className="mt-2 text-xs text-gray-500 italic">{card.hint}</p>}
+              <p className="mt-3 text-xs text-gray-400">Click to reveal answer</p>
+            </div>
+            {/* Back */}
+            <div
+              className="absolute inset-0 rounded-xl border-2 border-teal-300 bg-gradient-to-br from-teal-50 to-purple-50 flex flex-col items-center justify-center p-5 text-center"
+              style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
+            >
+              {card.backImageUrl && <img src={card.backImageUrl} alt="" className="max-h-24 mb-3 rounded-lg object-cover" />}
+              <p className="text-gray-800 text-base">{card.back}</p>
+              <p className="mt-3 text-xs text-gray-400">Click to flip back</p>
+            </div>
+          </div>
+        </div>
+        {/* Controls */}
+        <div className="flex items-center justify-between mt-4 gap-2">
+          <button
+            onClick={goPrev}
+            disabled={currentIndex === 0}
+            className="px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-colors"
+          >← Prev</button>
+          {flipped && (
+            <div className="flex gap-2">
+              <button onClick={markUnknown} className="px-3 py-1.5 text-xs rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors">Still learning</button>
+              <button onClick={markKnown} className="px-3 py-1.5 text-xs rounded-lg border border-green-300 text-green-700 hover:bg-green-50 transition-colors">Got it ✓</button>
+            </div>
+          )}
+          <button
+            onClick={goNext}
+            disabled={currentIndex === deck.length - 1}
+            className="px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-colors"
+          >Next →</button>
+        </div>
+        {known.size === deck.length && (
+          <div className="mt-3 text-center text-sm text-green-700 font-semibold bg-green-50 rounded-lg py-2 border border-green-200">
+            🎉 You've reviewed all cards!
+            <button className="ml-3 text-xs underline" onClick={() => { setKnown(new Set()); setCurrentIndex(0); setFlipped(false); }}>Start over</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Lesson icon helper ───────────────────────────────────────────────────────
 function LessonIcon({ type, done, locked }: { type: string; done: boolean; locked?: boolean }) {
   if (locked) return <Lock className="w-4 h-4 text-gray-500" />;
@@ -1177,9 +1360,17 @@ export default function CoursePlayer() {
 
                   {/* ── Content Blocks (WYSIWYG) ── */}
                   {contentBlocks.length > 0 && (
-                    <div className="mt-4 space-y-0 bg-white rounded-xl overflow-hidden shadow-lg">
+                    <div className="mt-4 space-y-4">
                       {contentBlocks.map((block: Block) => (
-                        <BlockPreview key={block.id} block={block} />
+                        block.type === "lesson_quiz" ? (
+                          <InlineLessonQuiz key={block.id} data={block.data as any} />
+                        ) : block.type === "lesson_flashcard" ? (
+                          <InlineLessonFlashcardDeck key={block.id} data={block.data as any} />
+                        ) : (
+                          <div key={block.id} className="bg-white rounded-xl overflow-hidden shadow-lg">
+                            <BlockPreview block={block} />
+                          </div>
+                        )
                       ))}
                     </div>
                   )}

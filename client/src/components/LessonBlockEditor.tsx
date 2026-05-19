@@ -432,6 +432,7 @@ export default function LessonBlockEditor({
                 <BlockSettings
                   block={selectedBlock}
                   onChange={data => updateBlock(selectedBlock.id, data)}
+                  lessonId={lessonId}
                 />
               </div>
             </div>

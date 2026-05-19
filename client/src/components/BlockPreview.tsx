@@ -21,7 +21,8 @@ export type BlockType =
   | "funnel_workflow" | "product_offer_stack" | "order_bump_checkout"
   | "price_stack" | "urgency_offer" | "checkout_form"
   | "footer" | "logo_strip" | "three_column"
-  | "related_products" | "embedded_checkout" | "inline_checkout";
+  | "related_products" | "embedded_checkout" | "inline_checkout"
+  | "lesson_quiz" | "lesson_flashcard";
 
 export interface Block {
   id: string;
@@ -678,6 +679,56 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       return (
         <div style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
           <InlineCheckoutBlock data={block.data} sourceType={d.sourceType ?? "other"} />
+        </div>
+      );
+    }
+    case "lesson_quiz": {
+      const questions: any[] = d.questions ?? [];
+      return (
+        <div className="px-6 py-5 bg-white border border-gray-200 rounded-xl">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center">
+              <svg className="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+            </div>
+            <div>
+              <p className="font-semibold text-gray-800 text-sm">{d.title || "Lesson Quiz"}</p>
+              <p className="text-xs text-gray-500">{questions.length} question{questions.length !== 1 ? "s" : ""}</p>
+            </div>
+          </div>
+          {questions.slice(0, 2).map((q: any, i: number) => (
+            <div key={i} className="mb-2 p-2 bg-gray-50 rounded text-xs text-gray-700">
+              <p className="font-medium mb-1">{i + 1}. {q.question}</p>
+              <div className="grid grid-cols-2 gap-1">
+                {(q.options ?? []).slice(0, 4).map((opt: string, j: number) => (
+                  <span key={j} className={`px-2 py-0.5 rounded text-xs ${j === q.correctAnswer ? "bg-teal-100 text-teal-700 font-medium" : "bg-white border border-gray-200 text-gray-500"}`}>{["A","B","C","D"][j]}. {opt}</span>
+                ))}
+              </div>
+            </div>
+          ))}
+          {questions.length > 2 && <p className="text-xs text-gray-400 mt-1">+{questions.length - 2} more questions</p>}
+        </div>
+      );
+    }
+    case "lesson_flashcard": {
+      const cards: any[] = d.cards ?? [];
+      return (
+        <div className="px-6 py-5 bg-white border border-gray-200 rounded-xl">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+              <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+            </div>
+            <div>
+              <p className="font-semibold text-gray-800 text-sm">{d.title || "Flashcard Deck"}</p>
+              <p className="text-xs text-gray-500">{cards.length} card{cards.length !== 1 ? "s" : ""}</p>
+            </div>
+          </div>
+          {cards.slice(0, 2).map((c: any, i: number) => (
+            <div key={i} className="mb-2 p-2 bg-gradient-to-r from-purple-50 to-teal-50 rounded text-xs">
+              <p className="font-medium text-gray-700 mb-0.5">Q: {c.front}</p>
+              <p className="text-gray-500">A: {c.back}</p>
+            </div>
+          ))}
+          {cards.length > 2 && <p className="text-xs text-gray-400 mt-1">+{cards.length - 2} more cards</p>}
         </div>
       );
     }

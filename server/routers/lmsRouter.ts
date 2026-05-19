@@ -3180,4 +3180,152 @@ export const lmsGroupRouter = router({
       await db.update(lmsCourses).set(fields).where(eq(lmsCourses.id, courseId));
       return { success: true };
     }),
+
+  /** AI: Generate quiz questions from lesson content */
+  generateQuizFromLesson: protectedProcedure
+    .input(z.object({
+      lessonId: z.number().int().positive(),
+      count: z.number().int().min(1).max(20).default(5),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [lesson] = await db.select({
+        id: lmsLessons.id,
+        title: lmsLessons.title,
+        content: lmsLessons.content,
+        contentBlocks: lmsLessons.contentBlocks,
+      }).from(lmsLessons).where(eq(lmsLessons.id, input.lessonId)).limit(1);
+      if (!lesson) throw new TRPCError({ code: "NOT_FOUND", message: "Lesson not found" });
+      // Extract text from content blocks
+      let lessonText = lesson.title ?? "";
+      if (lesson.content) lessonText += "\n" + lesson.content;
+      if (lesson.contentBlocks) {
+        try {
+          const blocks = typeof lesson.contentBlocks === "string" ? JSON.parse(lesson.contentBlocks as string) : lesson.contentBlocks;
+          if (Array.isArray(blocks)) {
+            for (const block of blocks) {
+              const d = block.data ?? {};
+              if (d.text) lessonText += "\n" + d.text;
+              if (d.content) lessonText += "\n" + d.content;
+              if (d.title) lessonText += "\n" + d.title;
+              if (d.body) lessonText += "\n" + d.body;
+              if (d.caption) lessonText += "\n" + d.caption;
+            }
+          }
+        } catch { /* ignore parse errors */ }
+      }
+      if (lessonText.trim().length < 20) throw new TRPCError({ code: "BAD_REQUEST", message: "Lesson has insufficient text content to generate questions." });
+      const response = await invokeLLM({
+        messages: [
+          { role: "system", content: "You are a medical ultrasound educator. Generate multiple-choice quiz questions based on the provided lesson content. Each question must have exactly 4 options (A, B, C, D) with one correct answer. Return only valid JSON." },
+          { role: "user", content: `Generate ${input.count} multiple-choice quiz questions based on this lesson content:\n\n${lessonText.slice(0, 6000)}` },
+        ],
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "quiz_questions",
+            strict: true,
+            schema: {
+              type: "object",
+              properties: {
+                questions: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      question: { type: "string", description: "The question text" },
+                      options: { type: "array", items: { type: "string" }, description: "Exactly 4 answer options" },
+                      correctAnswer: { type: "integer", description: "Index (0-3) of the correct option" },
+                      explanation: { type: "string", description: "Brief explanation of the correct answer" },
+                    },
+                    required: ["question", "options", "correctAnswer", "explanation"],
+                    additionalProperties: false,
+                  },
+                },
+              },
+              required: ["questions"],
+              additionalProperties: false,
+            },
+          },
+        } as any,
+      });
+      const raw = response.choices?.[0]?.message?.content ?? "{}";
+      const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+      return { questions: (parsed.questions ?? []).slice(0, input.count) };
+    }),
+
+  /** AI: Generate flashcards from lesson content */
+  generateFlashcardsFromLesson: protectedProcedure
+    .input(z.object({
+      lessonId: z.number().int().positive(),
+      count: z.number().int().min(1).max(30).default(10),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [lesson] = await db.select({
+        id: lmsLessons.id,
+        title: lmsLessons.title,
+        content: lmsLessons.content,
+        contentBlocks: lmsLessons.contentBlocks,
+      }).from(lmsLessons).where(eq(lmsLessons.id, input.lessonId)).limit(1);
+      if (!lesson) throw new TRPCError({ code: "NOT_FOUND", message: "Lesson not found" });
+      let lessonText = lesson.title ?? "";
+      if (lesson.content) lessonText += "\n" + lesson.content;
+      if (lesson.contentBlocks) {
+        try {
+          const blocks = typeof lesson.contentBlocks === "string" ? JSON.parse(lesson.contentBlocks as string) : lesson.contentBlocks;
+          if (Array.isArray(blocks)) {
+            for (const block of blocks) {
+              const d = block.data ?? {};
+              if (d.text) lessonText += "\n" + d.text;
+              if (d.content) lessonText += "\n" + d.content;
+              if (d.title) lessonText += "\n" + d.title;
+              if (d.body) lessonText += "\n" + d.body;
+              if (d.caption) lessonText += "\n" + d.caption;
+            }
+          }
+        } catch { /* ignore parse errors */ }
+      }
+      if (lessonText.trim().length < 20) throw new TRPCError({ code: "BAD_REQUEST", message: "Lesson has insufficient text content to generate flashcards." });
+      const response = await invokeLLM({
+        messages: [
+          { role: "system", content: "You are a medical ultrasound educator. Create flashcards (question/answer pairs) based on the provided lesson content. Each card should have a concise front (term or question) and a clear back (definition or answer). Optionally include a hint. Return only valid JSON." },
+          { role: "user", content: `Generate ${input.count} flashcards based on this lesson content:\n\n${lessonText.slice(0, 6000)}` },
+        ],
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "flashcards",
+            strict: true,
+            schema: {
+              type: "object",
+              properties: {
+                cards: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      front: { type: "string", description: "Term or question on the front of the card" },
+                      back: { type: "string", description: "Definition or answer on the back of the card" },
+                      hint: { type: "string", description: "Optional hint to help recall the answer" },
+                    },
+                    required: ["front", "back", "hint"],
+                    additionalProperties: false,
+                  },
+                },
+              },
+              required: ["cards"],
+              additionalProperties: false,
+            },
+          },
+        } as any,
+      });
+      const raw = response.choices?.[0]?.message?.content ?? "{}";
+      const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+      return { cards: (parsed.cards ?? []).slice(0, input.count) };
+    }),
 });
