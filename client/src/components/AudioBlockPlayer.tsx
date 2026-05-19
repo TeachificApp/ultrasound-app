@@ -223,6 +223,8 @@ function AudioPlayerInner({
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(initMuted || autoplay);
+  const [volume, setVolume] = useState(1); // 0-1
+  const [showVolume, setShowVolume] = useState(false);
   const [currentTime, setCurrentTime] = useState(trimStart);
   const [duration, setDuration] = useState(0);
   const [peaks, setPeaks] = useState<Float32Array | null>(null);
@@ -323,8 +325,27 @@ function AudioPlayerInner({
   const toggleMute = () => {
     const el = audioRef.current;
     if (!el) return;
-    el.muted = !muted;
-    setMuted(!muted);
+    if (muted) {
+      // Unmute — restore volume (if it was 0, set to 0.5)
+      const v = volume > 0 ? volume : 0.5;
+      el.muted = false;
+      el.volume = v;
+      setVolume(v);
+      setMuted(false);
+    } else {
+      el.muted = true;
+      setMuted(true);
+    }
+  };
+
+  const handleVolumeChange = (v: number) => {
+    const el = audioRef.current;
+    setVolume(v);
+    if (el) {
+      el.volume = v;
+      el.muted = v === 0;
+    }
+    setMuted(v === 0);
   };
 
   const seekByRatio = useCallback(
@@ -416,14 +437,37 @@ function AudioPlayerInner({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={toggleMute}
-            className="text-gray-500 hover:text-teal-600 flex-shrink-0 transition-colors"
-            aria-label={muted ? "Unmute" : "Mute"}
+          {/* Volume control */}
+          <div
+            className="relative flex items-center gap-1.5 flex-shrink-0"
+            onMouseEnter={() => setShowVolume(true)}
+            onMouseLeave={() => setShowVolume(false)}
           >
-            {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-          </button>
+            {/* Slider — visible on hover */}
+            <div
+              className="overflow-hidden transition-all duration-200 flex items-center"
+              style={{ width: showVolume ? 72 : 0, opacity: showVolume ? 1 : 0 }}
+            >
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.02}
+                value={muted ? 0 : volume}
+                onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+                className="w-[72px] accent-teal-600 h-1.5 cursor-pointer"
+                aria-label="Volume"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={toggleMute}
+              className="text-gray-500 hover:text-teal-600 transition-colors"
+              aria-label={muted ? "Unmute" : "Mute"}
+            >
+              {muted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
+            </button>
+          </div>
         </div>
 
         {caption && <p className="text-xs text-gray-500 mt-2">{caption}</p>}
