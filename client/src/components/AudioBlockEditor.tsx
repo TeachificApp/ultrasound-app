@@ -59,6 +59,40 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
   const [availableMics, setAvailableMics] = useState<MediaDeviceInfo[]>([]);
   const [selectedMicId, setSelectedMicId] = useState<string>("default");
 
+  // Audio level meter (AnalyserNode)
+  const [audioLevel, setAudioLevel] = useState(0); // 0-100
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const levelRafRef = useRef<number | null>(null);
+
+  const startLevelMeter = useCallback((stream: MediaStream) => {
+    try {
+      const ctx = new AudioContext();
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.6;
+      source.connect(analyser);
+      audioCtxRef.current = ctx;
+      analyserRef.current = analyser;
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      const tick = () => {
+        analyser.getByteFrequencyData(data);
+        const rms = Math.sqrt(data.reduce((s, v) => s + v * v, 0) / data.length);
+        setAudioLevel(Math.min(100, Math.round((rms / 128) * 100)));
+        levelRafRef.current = requestAnimationFrame(tick);
+      };
+      levelRafRef.current = requestAnimationFrame(tick);
+    } catch { /* AudioContext not available */ }
+  }, []);
+
+  const stopLevelMeter = useCallback(() => {
+    if (levelRafRef.current) { cancelAnimationFrame(levelRafRef.current); levelRafRef.current = null; }
+    if (audioCtxRef.current) { audioCtxRef.current.close().catch(() => {}); audioCtxRef.current = null; }
+    analyserRef.current = null;
+    setAudioLevel(0);
+  }, []);
+
   // blobPreviewUrl: temporary object URL created immediately after recording stops
   const [blobPreviewUrl, setBlobPreviewUrl] = useState<string | null>(null);
   const blobUrlRef = useRef<string | null>(null);
@@ -164,6 +198,9 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
         return;
       }
 
+      // Start level meter
+      startLevelMeter(stream);
+
       // Log the actual device being used
       const trackSettings = audioTracks[0].getSettings();
       console.log("[AudioBlockEditor] Recording from:", audioTracks[0].label, "settings:", trackSettings);
@@ -193,6 +230,7 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
 
       mr.onstop = () => {
         stream.getTracks().forEach(t => t.stop());
+        stopLevelMeter();
 
         if (chunksRef.current.length === 0) {
           toast.error("Recording produced no audio data. Please check your microphone.");
@@ -237,6 +275,7 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
       setRecSeconds(0);
       recTimerRef.current = setInterval(() => setRecSeconds(s => s + 1), 1000);
     } catch (err: any) {
+      stopLevelMeter();
       const msg = err?.message ?? "";
       if (msg.includes("Permission") || msg.includes("NotAllowed")) {
         toast.error("Microphone access denied. Please allow microphone permissions.");
@@ -247,11 +286,12 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
         toast.error("Could not start recording: " + msg);
       }
     }
-  }, [openMicDialog]);
+  }, [openMicDialog, startLevelMeter, stopLevelMeter]);
 
   const stopRecording = useCallback(() => {
     mediaRecorderRef.current?.stop();
-  }, []);
+    stopLevelMeter();
+  }, [stopLevelMeter]);
 
   // ── Preview playback ──────────────────────────────────────────────────────
   const togglePreview = () => {
@@ -387,12 +427,48 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
             <button
               type="button"
               onClick={stopRecording}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-red-600 text-white rounded border border-red-700 hover:bg-red-700 animate-pulse"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-red-600 text-white rounded border border-red-700 hover:bg-red-700"
             >
               <Square size={12} /> Stop ({fmt(recSeconds)})
             </button>
           )}
         </div>
+
+        {/* ── Live audio level meter ── */}
+        {recording && (
+          <div className="mt-2 space-y-1.5">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-red-500 font-medium flex items-center gap-1">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                REC {fmt(recSeconds)}
+              </span>
+              <span className="text-[10px] text-gray-400">
+                {audioLevel === 0 ? "No signal" : audioLevel < 15 ? "Signal very low" : audioLevel < 50 ? "Signal OK" : "Signal strong"}
+              </span>
+            </div>
+            {/* 20-segment bar meter */}
+            <div className="flex gap-0.5 items-end h-5">
+              {Array.from({ length: 20 }, (_, i) => {
+                const threshold = (i + 1) * 5;
+                const active = audioLevel >= threshold;
+                const color = i < 12 ? "bg-teal-500" : i < 16 ? "bg-yellow-400" : "bg-red-500";
+                return (
+                  <div
+                    key={i}
+                    className={`flex-1 rounded-sm transition-all duration-75 ${active ? color : "bg-gray-200"}`}
+                    style={{ height: `${40 + i * 3}%` }}
+                  />
+                );
+              })}
+            </div>
+            {audioLevel === 0 && (
+              <p className="text-[10px] text-amber-600">
+                No audio detected — check that the correct microphone is selected and not muted.
+              </p>
+            )}
+          </div>
+        )}
+
         <p className="text-[10px] text-gray-400 mt-1">Supported: mp3, wav, ogg, m4a, webm, aac, flac · Max 100 MB</p>
 
         {uploading === "audioUrl" && blobPreviewUrl && (
