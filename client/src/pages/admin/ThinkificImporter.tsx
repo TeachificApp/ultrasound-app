@@ -62,6 +62,7 @@ export default function ThinkificImporter() {
     sectionsImported: number;
     lessonsImported: number;
     enrollmentsPending: number;
+    enrolledCount?: number;
     log: string[];
   } | null>(null);
   const [importResultOpen, setImportResultOpen] = useState(false);
@@ -167,7 +168,7 @@ export default function ThinkificImporter() {
                       <p className="font-medium text-sm">{imp.thinkificCourseName}</p>
                       <p className="text-xs text-gray-500">
                         {imp.sectionsImported} sections · {imp.lessonsImported} lessons ·{" "}
-                        {imp.enrollmentsPending} pending enrollments
+                        {(imp as any).realEnrollmentCount ?? 0} synced enrollments
                       </p>
                     </div>
                   </div>
@@ -175,7 +176,7 @@ export default function ThinkificImporter() {
                     <Badge variant={imp.status === "complete" ? "default" : imp.status === "failed" ? "destructive" : "secondary"}>
                       {imp.status}
                     </Badge>
-                    {imp.status === "complete" && imp.lmsCourseId && imp.enrollmentsPending > imp.enrollmentsActivated && (
+                    {imp.status === "complete" && imp.lmsCourseId && imp.enrollmentsPending > (imp.enrollmentsActivated ?? 0) && (
                       <Button
                         size="sm"
                         variant="outline"
@@ -183,7 +184,7 @@ export default function ThinkificImporter() {
                         disabled={activateEnrollments.isPending}
                       >
                         <Users className="w-3 h-3 mr-1" />
-                        Activate {imp.enrollmentsPending - imp.enrollmentsActivated} Enrollments
+                        Activate Pending Enrollments
                       </Button>
                     )}
                     {imp.lmsCourseId && (
@@ -470,18 +471,15 @@ export default function ThinkificImporter() {
                   <p className="text-2xl font-bold text-green-700">{importResult.lessonsImported}</p>
                   <p className="text-xs text-green-600">Lessons</p>
                 </div>
-                <div className="p-3 rounded-lg bg-orange-50">
-                  <p className="text-2xl font-bold text-orange-700">{importResult.enrollmentsPending}</p>
-                  <p className="text-xs text-orange-600">Pending Enrollments</p>
+                <div className="p-3 rounded-lg bg-teal-50">
+                  <p className="text-2xl font-bold text-teal-700">{importResult.enrolledCount ?? importResult.enrollmentsPending}</p>
+                  <p className="text-xs text-teal-600">Students Enrolled</p>
                 </div>
               </div>
-
-              {importResult.enrollmentsPending > 0 && (
-                <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-800">
-                  <strong>{importResult.enrollmentsPending} student enrollments</strong> are stored as pending.
-                  They will be activated automatically when you publish the course, or you can activate them manually from the Past Imports list.
-                </div>
-              )}
+              <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 text-sm text-blue-800">
+                Students have been enrolled in this draft course. No welcome emails were sent.
+                You can review and edit enrollments in the <strong>Students</strong> tab before publishing.
+              </div>
 
               <div className="flex justify-end gap-3">
                 <Button variant="outline" onClick={() => setImportResultOpen(false)}>Close</Button>

@@ -23,7 +23,7 @@ import {
   users,
   type LmsPendingEnrollment,
 } from "../../drizzle/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import {
   getAllThinkificCourses,
   getThinkificCourse,
@@ -371,66 +371,79 @@ export const thinkificImportRouter = router({
           log.push(`Imported section "${chapter.name}" with ${contents.length} lessons`);
         }
 
-        // 7. Import enrollments as pending
-        let pendingCount = 0;
+        // 7. Import enrollments directly into lms_enrollments (no welcome emails)
+        let enrolledCount = 0;
         if (input.importEnrollments) {
           const enrollments = await getEnrollmentsForCourse(input.thinkificCourseId);
-          log.push(`Found ${enrollments.length} enrollments to import as pending`);
-
-          // Batch insert pending enrollments
-          const BATCH = 100;
+          log.push(`Found ${enrollments.length} enrollments to import`);
+          const BATCH = 50;
           for (let i = 0; i < enrollments.length; i += BATCH) {
             const batch = enrollments.slice(i, i + BATCH);
             const emails = batch.map((e) => e.user_email.toLowerCase());
-
-            // Find matching LMS users by email
+            // Find existing LMS users by email
             const matchedUsers = await db.select({ id: users.id, email: users.email })
               .from(users)
               .where(inArray(users.email, emails));
-
             const emailToUserId = new Map(
               matchedUsers.map((u: { id: number; email: string | null }) => [
                 (u.email ?? "").toLowerCase(),
                 u.id,
               ])
             );
-
-            await db.insert(lmsPendingEnrollments).values(
-              batch.map((e) => ({
-                importId,
-                lmsCourseId,
-                thinkificUserId: e.user_id,
-                thinkificEmail: e.user_email.toLowerCase(),
-                thinkificName: e.user_name,
-                lmsUserId: emailToUserId.get(e.user_email.toLowerCase()) || undefined,
-                thinkificEnrolledAt: e.created_at ? new Date(e.created_at) : undefined,
-                thinkificCompletedAt: e.completed_at ? new Date(e.completed_at) : undefined,
-                thinkificProgressPct: Math.round(parseFloat(e.percentage_completed || "0") * 100),
-                status: "pending" as const,
-              }))
-            );
-            pendingCount += batch.length;
+            for (const e of batch) {
+              const email = e.user_email.toLowerCase();
+              let userId = emailToUserId.get(email);
+              // Create a real account if not found — no email/notification sent
+              if (!userId) {
+                const displayName = e.user_name || email.split("@")[0];
+                const [newUser] = await db.insert(users).values({
+                  email,
+                  name: displayName,
+                  displayName,
+                  isPending: false,
+                  loginMethod: "email",
+                  emailVerified: false,
+                });
+                userId = (newUser as any).insertId as number;
+                emailToUserId.set(email, userId);
+              }
+              // Check if already enrolled (idempotent)
+              const [existing] = await db.select({ id: lmsEnrollments.id })
+                .from(lmsEnrollments)
+                .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, lmsCourseId)))
+                .limit(1);
+              if (existing) continue;
+              const progressPct = Math.round(parseFloat(e.percentage_completed || "0") * 100);
+              await db.insert(lmsEnrollments).values({
+                userId,
+                courseId: lmsCourseId,
+                enrolledAt: e.created_at ? new Date(e.created_at) : new Date(),
+                completedAt: e.completed && e.completed_at ? new Date(e.completed_at) : null,
+                progressPct,
+              });
+              enrolledCount++;
+            }
           }
-          log.push(`Stored ${pendingCount} pending enrollments (will activate on course publish)`);
+          log.push(`Enrolled ${enrolledCount} students (no welcome emails sent)`);
         }
-
         // 8. Update import record as complete
         await db.update(lmsThinkificImports).set({
           lmsCourseId,
           status: "complete",
           sectionsImported: chapters.length,
           lessonsImported: totalLessons,
-          enrollmentsPending: pendingCount,
+          enrollmentsPending: 0,
+          enrollmentsActivated: enrolledCount,
           importLog: log.join("\n"),
         }).where(eq(lmsThinkificImports.id, importId));
-
         return {
           success: true,
           importId,
           lmsCourseId,
           sectionsImported: chapters.length,
           lessonsImported: totalLessons,
-          enrollmentsPending: pendingCount,
+          enrollmentsPending: 0,
+          enrolledCount,
           log,
         };
       } catch (err) {
@@ -459,12 +472,30 @@ export const thinkificImportRouter = router({
       return record;
     }),
 
-  /** List all past imports */
+  /** List all past imports — enriched with real enrollment count from lms_enrollments */
   listImports: protectedProcedure.query(async ({ ctx }) => {
     adminOnly(ctx.user.role);
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-    return db.select().from(lmsThinkificImports).orderBy(lmsThinkificImports.createdAt);
+    const imports = await db.select().from(lmsThinkificImports).orderBy(lmsThinkificImports.createdAt);
+    // Fetch real enrollment counts from lms_enrollments for each linked course
+    const courseIds = imports.map(i => i.lmsCourseId).filter(Boolean) as number[];
+    const enrollmentCounts: Record<number, number> = {};
+    if (courseIds.length > 0) {
+      const counts = await db
+        .select({ courseId: lmsEnrollments.courseId, count: sql<number>`count(*)` })
+        .from(lmsEnrollments)
+        .where(inArray(lmsEnrollments.courseId, courseIds))
+        .groupBy(lmsEnrollments.courseId);
+      for (const row of counts) {
+        enrollmentCounts[row.courseId] = Number(row.count);
+      }
+    }
+    return imports.map(imp => ({
+      ...imp,
+      // Real synced enrollment count (replaces stale enrollmentsPending / enrollmentsActivated)
+      realEnrollmentCount: imp.lmsCourseId ? (enrollmentCounts[imp.lmsCourseId] ?? 0) : 0,
+    }));
   }),
 
   /** Activate pending enrollments for a course (called when course is published) */

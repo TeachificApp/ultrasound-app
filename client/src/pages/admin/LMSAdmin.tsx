@@ -37,7 +37,7 @@ import {
   Users, DollarSign, BarChart2, GripVertical, CheckCircle, AlertCircle, AlertTriangle,
   Link as LinkIcon, UserCheck, ArrowLeft, Upload, ImageIcon,
   Sparkles, Loader2, Eye, EyeOff, Save, X, FolderOpen, Monitor, Video, FileText, CheckSquare, Settings2,
-  User, Lock, ListChecks, Award, PlayCircle, ArrowRight, UserPlus,
+  User, Lock, ListChecks, Award, PlayCircle, ArrowRight, UserPlus, RefreshCw,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import LessonEffectEditor from "@/components/LessonEffectEditor";
@@ -4641,24 +4641,56 @@ function CourseUsersTab({ courseId }: { courseId: number }) {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [enrollDialogOpen, setEnrollDialogOpen] = useState(false);
   const [unenrollTarget, setUnenrollTarget] = useState<{ id: number; name: string } | null>(null);
-
   // Debounce search
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 400);
     return () => clearTimeout(t);
   }, [search]);
-
   const { data, isLoading, refetch } = trpc.lmsAdmin.getCourseUsers.useQuery({
     courseId, page, pageSize: 25, search: debouncedSearch || undefined,
   });
-
   const removeEnrollment = trpc.lmsAdmin.removeEnrollment.useMutation({
     onSuccess: () => { toast.success("Student unenrolled successfully"); setUnenrollTarget(null); refetch(); },
     onError: e => toast.error(e.message),
   });
-
+  // Thinkific sync
+  const { data: syncInfo } = trpc.lmsAdmin.getThinkificSyncInfo.useQuery({ courseId });
+  const syncEnrollments = trpc.lmsAdmin.syncThinkificEnrollments.useMutation({
+    onSuccess: (result) => {
+      toast.success(`Sync complete: ${result.synced} new enrollment${result.synced !== 1 ? "s" : ""} added, ${result.skipped} already existed.`);
+      refetch();
+    },
+    onError: e => toast.error(`Sync failed: ${e.message}`),
+  });
   return (
     <div className="space-y-4">
+      {/* Thinkific sync banner — only shown for Thinkific-imported courses */}
+      {syncInfo && (
+        <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+          <div className="flex items-center gap-2">
+            <RefreshCw className="w-4 h-4 text-blue-600" />
+            <div>
+              <p className="text-sm font-medium text-blue-800">Thinkific course: <span className="font-semibold">{syncInfo.thinkificCourseName}</span></p>
+              {syncInfo.lastSyncedAt && (
+                <p className="text-xs text-blue-500">Last synced: {new Date(syncInfo.lastSyncedAt).toLocaleString()}</p>
+              )}
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-blue-400 text-blue-700 hover:bg-blue-100 h-8"
+            onClick={() => syncEnrollments.mutate({ courseId })}
+            disabled={syncEnrollments.isPending}
+          >
+            {syncEnrollments.isPending ? (
+              <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Syncing...</>
+            ) : (
+              <><RefreshCw className="w-3 h-3 mr-1" /> Sync from Thinkific</>
+            )}
+          </Button>
+        </div>
+      )}
       <div className="flex items-center justify-between gap-3">
         <Input
           value={search}

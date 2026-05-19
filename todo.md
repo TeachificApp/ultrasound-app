@@ -2283,3 +2283,9 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add Free Preview eye icon + clickable "Free Preview" link in curriculum_auto block (CourseLanding)
 - [x] Hide preview_hide_after_purchase lessons from enrolled users in CourseOverview
 - [x] CoursePlayer: use previewMode for hasPreviewLessons check and lesson access gating
+
+## Thinkific Enrollment Sync & Management (May 2026)
+- [ ] Add syncThinkificEnrollments server procedure (pull enrollments from Thinkific API into lms_enrollments)
+- [ ] Add getEnrollments, addEnrollment, removeEnrollment, updateEnrollment procedures for a course
+- [ ] Build Enrollments tab in LMS course admin with student list, sync button, and add/remove/edit actions
+- [ ] Show sync status (last synced, count pulled from Thinkific vs local)
