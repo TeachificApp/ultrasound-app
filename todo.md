@@ -2187,6 +2187,7 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Separate results tables from DIY accreditation (generalFormSubmissions vs accreditationFormSubmissions)
 - [x] General Form Builder: no accreditation categories, optional score calculation in settings (scoreEnabled field)
 
+<<<<<<< Updated upstream
 ## Audio Recording Fix (May 2026)
 - [x] Fix data URI regex that failed to strip prefix for mime types with semicolons (audio/webm;codecs=opus)
 - [x] Replace regex /^data:[^;]+;base64,/ with indexOf(";base64,") approach in routers.ts and lmsRouter.ts
@@ -2208,3 +2209,41 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix form preview button broken and public form link returns 404 — added getFormPreview admin procedure + /forms/:slug/preview route bypassing isPublic check
 - [x] General Form Builder and DIY Form Builder now open full-screen (no sidebar) with breadcrumb navigation back
 - [x] Fix: General Form public renderer not showing dropdown/multi-select options — root cause: Drizzle sql template IN() treated joined IDs as single parameter; fixed with inArray()
+=======
+## Form Styling System (May 2026)
+- [ ] Add fullPage, stickyHeader, bgType, bgColor, bgGradient, bgImage, bgOpacity, cardShadow, cardBgColor, cardBgOpacity, accentColor fields to generalFormTemplates settings
+- [ ] Add FormStylingPanel to GeneralFormBuilder (layout toggle, background, shadow, accent color)
+- [ ] Apply styling in PublicFormRenderer via inline CSS variables (accent color, background, shadow)
+- [ ] Full-page layout mode: form fills viewport, optional sticky header
+- [ ] Condensed layout (default): centered card with max-width
+- [ ] Fix form builder: rename "Multiple Choice (Radio)" to "Single Choice (Radio)" and "Checkboxes" to "Multiple Choice (Checkboxes)" to clarify single vs multi-select behavior
+
+## Form Styling + Results Tab (May 2026)
+- [ ] Apply new styling fields in PublicFormRenderer: layout mode (condensed/fullpage), sticky header, background (color/gradient/image), card shadow, card opacity, dropdown accent color
+- [ ] Add getFormResults tRPC procedure to generalFormRouter (all submissions incl. drafts)
+- [ ] Build ResultsTab in GeneralFormBuilder: full table, status filter, response detail drawer, CSV export, inline edit
+- [ ] Port styling system to DIY FormBuilderAdmin (StyleTab with same layout/bg/shadow/accent controls)
+- [ ] Apply DIY styling in DynamicFormRenderer
+- [ ] Add getFormResults procedure to formBuilderRouter (DIY submissions)
+- [ ] Build ResultsTab in FormBuilderAdmin: same feature set as General Form ResultsTab
+- [ ] Fix radio/checkbox label rename in DIY FormBuilderAdmin to match General Form Builder
+
+## Form Builder Improvements (May 2026)
+- [x] Lesson Quiz & Flashcard block types with AI generation, manual entry, image uploads
+- [x] Form reorder arrows fixed (correct array swap)
+- [x] Form preview/public link 404 fixed (admin preview route)
+- [x] Full-screen editor layout for both General and DIY form builders
+- [x] Dropdown/multi-select options not loading fixed (Drizzle inArray)
+- [x] Radio/checkbox label rename (Single Choice / Multi-Select)
+- [x] Embed code copy button moved above code block
+- [x] Form styling system in GeneralFormBuilder + PublicFormRenderer (layoutMode, bgType, cardShadow, dropdownAccentColor, stickyHeader)
+- [x] Add saveFormDraft, getFormResults, exportFormResults to generalFormRouter
+- [x] Build ResultsTab in GeneralFormBuilder (status filters, detail drawer, CSV export)
+- [ ] Port styling system to DIY FormBuilderAdmin + DynamicFormRenderer
+- [ ] Add saveFormDraft, getFormResults, exportFormResults to formBuilderRouter (DIY)
+- [ ] Build ResultsTab in FormBuilderAdmin (DIY)
+- [ ] Add hostDomain field to generalFormTemplates + accreditationFormTemplates schema
+- [ ] Add Host Domain dropdown to form settings (both builders) with custom domain list, default app.allaboutultrasound.com
+- [ ] Update getPublicUrl logic to use hostDomain for public form links
+- [ ] Wire debounced auto-save (saveFormDraft) in PublicFormRenderer + DynamicFormRenderer
+>>>>>>> Stashed changes

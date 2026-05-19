@@ -1106,9 +1106,27 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
       {importMediaSection && (
         <ImportMediaAsLessonDialog sectionId={importMediaSection} courseId={courseId} onClose={() => setImportMediaSection(null)} onCreated={() => { setImportMediaSection(null); refetch(); }} />
       )}
-      {editLesson && (
-        <LessonEditorPage lesson={editLesson} onClose={() => setEditLesson(null)} onSaved={() => { refetch(); }} onSavedAndClose={() => { setEditLesson(null); refetch(); }} />
-      )}
+      {editLesson && (() => {
+        // Build a flat ordered list of all lessons in the course for prev/next navigation
+        const flatLessons: any[] = [
+          ...localTopLessons,
+          ...localSections.flatMap((s: any) => s.lessons ?? []),
+        ];
+        const currentIdx = flatLessons.findIndex((l: any) => l.id === editLesson.id);
+        const prevLessonNav = currentIdx > 0 ? flatLessons[currentIdx - 1] : null;
+        const nextLessonNav = currentIdx >= 0 && currentIdx < flatLessons.length - 1 ? flatLessons[currentIdx + 1] : null;
+        return (
+          <LessonEditorPage
+            lesson={editLesson}
+            onClose={() => setEditLesson(null)}
+            onSaved={() => { refetch(); }}
+            onSavedAndClose={() => { setEditLesson(null); refetch(); }}
+            prevLesson={prevLessonNav}
+            nextLesson={nextLessonNav}
+            onNavigateLesson={(l: any) => { refetch(); setEditLesson(l); }}
+          />
+        );
+      })()}
       {quizLesson && (
         <QuizBuilderDialog lesson={quizLesson} onClose={() => setQuizLesson(null)} />
       )}
@@ -2784,7 +2802,7 @@ function CopyModuleDialog({
   );
 }
 
-function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndClose }: { lesson: any; onClose: () => void; onSaved: () => void; onSavedAndClose?: () => void }) {
+function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndClose, prevLesson, nextLesson, onNavigateLesson }: { lesson: any; onClose: () => void; onSaved: () => void; onSavedAndClose?: () => void; prevLesson?: any; nextLesson?: any; onNavigateLesson?: (lesson: any) => void }) {
   // Fetch the FULL lesson record (including contentBlocks, content, videoContent).
   // The course list view intentionally strips heavy columns for performance, so we
   // must re-fetch the full row here before the editor can render existing blocks.
@@ -2867,9 +2885,32 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
         <button onClick={onClose} className="text-gray-400 hover:text-gray-700 mr-1">
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <div className="flex-1">
-          <span className="text-teal-700 font-bold text-sm uppercase tracking-wide">Edit Lesson</span>
-          <span className="ml-3 text-gray-500 text-xs">{LESSON_TYPE_LABELS[lesson.type] ?? lesson.type}</span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-teal-700 font-bold text-sm uppercase tracking-wide shrink-0">Edit Lesson</span>
+            <span className="text-gray-300 text-sm shrink-0">·</span>
+            <span className="text-gray-800 font-semibold text-sm truncate" title={lesson.title}>{lesson.title}</span>
+            <span className="text-gray-400 text-xs shrink-0 ml-1">({LESSON_TYPE_LABELS[lesson.type] ?? lesson.type})</span>
+          </div>
+        </div>
+        {/* Prev / Next lesson navigation */}
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={() => prevLesson && onNavigateLesson?.(prevLesson)}
+            disabled={!prevLesson}
+            title={prevLesson ? `Previous: ${prevLesson.title}` : "No previous lesson"}
+            className="p-1.5 rounded-md text-gray-400 hover:text-teal-600 hover:bg-teal-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => nextLesson && onNavigateLesson?.(nextLesson)}
+            disabled={!nextLesson}
+            title={nextLesson ? `Next: ${nextLesson.title}` : "No next lesson"}
+            className="p-1.5 rounded-md text-gray-400 hover:text-teal-600 hover:bg-teal-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
         <div className="flex gap-1">
           <button
@@ -3084,7 +3125,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
           <div className="border-t pt-4">
             <p className="text-sm font-semibold text-teal-700 mb-3 flex items-center gap-1.5"><Sparkles className="h-4 w-4" /> Lesson Effect</p>
             <LessonEffectEditor
-              key={`effect-${lesson.id}-${fullLesson ? 'full' : 'shallow'}`}
+              key={`effect-${lesson.id}`}
               lessonId={lesson.id}
               initialData={{
                 effectEnabled: lesson.effectEnabled,
@@ -3092,11 +3133,12 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
                 effectBannerText: lesson.effectBannerText,
                 effectBannerBgColor: lesson.effectBannerBgColor,
                 effectBannerTextColor: lesson.effectBannerTextColor,
-                effectBannerDuration: (lesson as any).effectBannerDuration ?? 5,
+                effectBannerDuration: lesson.effectBannerDuration ?? 5,
                 effectSound: lesson.effectSound,
                 effectSoundUrl: lesson.effectSoundUrl,
                 effectConfetti: lesson.effectConfetti,
                 effectConfettiColors: lesson.effectConfettiColors,
+                effectConfettiMode: (lesson as any).effectConfettiMode ?? "fall",
               }}
               onSaved={onSaved}
             />

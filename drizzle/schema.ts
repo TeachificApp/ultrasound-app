@@ -1775,6 +1775,7 @@ export const accreditationFormTemplates = mysqlTable("accreditationFormTemplates
   formType: varchar("formType", { length: 100 }).notNull(), // e.g. "image_quality", "peer_review", "physician_peer_review"
   version: int("version").default(1).notNull(),
   isActive: boolean("isActive").default(true).notNull(),
+  hostDomain: varchar("hostDomain", { length: 255 }).default("app.allaboutultrasound.com"),
   createdByUserId: int("createdByUserId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
@@ -2796,7 +2797,7 @@ export const lmsLessons = mysqlTable("lms_lessons", {
   dripDays: int("drip_days").default(0).notNull(), // days after enrollment to unlock
   durationMinutes: int("duration_minutes"),
   requireVideoCompletion: int("require_video_completion").default(0).notNull(), // 1 = must watch video before marking complete
-  requireManualComplete: int("require_manual_complete").default(0).notNull(), // 1 = show Mark Complete button
+  requireManualComplete: int("require_manual_complete").default(1).notNull(), // 1 = show Mark Complete button (default ON)
   // Lesson Effects
   effectEnabled: boolean("effect_enabled").default(false),
   effectTrigger: varchar("effect_trigger", { length: 20 }).default("lesson_start"),
@@ -2807,8 +2808,13 @@ export const lmsLessons = mysqlTable("lms_lessons", {
   effectSoundUrl: varchar("effect_sound_url", { length: 500 }),
   effectConfetti: boolean("effect_confetti").default(false),
   effectConfettiColors: varchar("effect_confetti_colors", { length: 500 }),
+<<<<<<< Updated upstream
   // Confetti animation mode: "fall" (from top) or "cannon" (burst from bottom corners)
   effectConfettiMode: varchar("effect_confetti_mode", { length: 20 }).default("fall"),
+=======
+  // Confetti mode: 'fall' = gentle falling confetti, 'cannon' = burst from sides
+  effectConfettiMode: mysqlEnum("effect_confetti_mode", ["fall", "cannon"]).default("fall"),
+>>>>>>> Stashed changes
   // Banner display duration in seconds (default 5)
   effectBannerDuration: int("effect_banner_duration").default(5),
   // Page builder blocks for rich lesson content (JSON array of Block objects)
@@ -3913,6 +3919,7 @@ export const generalFormTemplates = mysqlTable("generalFormTemplates", {
   stripeProductId: varchar("stripeProductId", { length: 255 }),
   stripePriceId: varchar("stripePriceId", { length: 255 }),
   stripeAmount: int("stripeAmount"),
+  hostDomain: varchar("hostDomain", { length: 255 }).default("app.allaboutultrasound.com"),
   createdByUserId: int("createdByUserId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),

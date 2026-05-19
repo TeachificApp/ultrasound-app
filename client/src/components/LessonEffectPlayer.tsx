@@ -46,10 +46,50 @@ function createParticles(canvas: HTMLCanvasElement, colors: string[]): Particle[
   return particles;
 }
 
-function runConfetti(canvas: HTMLCanvasElement, colors: string[], onDone: () => void) {
+function createCannonParticles(canvas: HTMLCanvasElement, colors: string[]): Particle[] {
+  const particles: Particle[] = [];
+  const count = 180;
+  // Left cannon (bottom-left corner)
+  for (let i = 0; i < count / 2; i++) {
+    const angle = -Math.PI / 4 + (Math.random() - 0.5) * (Math.PI / 3); // ~-45deg ± 30deg
+    const speed = 8 + Math.random() * 12;
+    particles.push({
+      x: 0,
+      y: canvas.height,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      size: 7 + Math.random() * 8,
+      rotation: Math.random() * Math.PI * 2,
+      rotationSpeed: (Math.random() - 0.5) * 0.25,
+      shape: Math.random() > 0.4 ? "rect" : "circle",
+      alpha: 1,
+    });
+  }
+  // Right cannon (bottom-right corner)
+  for (let i = 0; i < count / 2; i++) {
+    const angle = -Math.PI * 3 / 4 + (Math.random() - 0.5) * (Math.PI / 3); // ~-135deg ± 30deg
+    const speed = 8 + Math.random() * 12;
+    particles.push({
+      x: canvas.width,
+      y: canvas.height,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      size: 7 + Math.random() * 8,
+      rotation: Math.random() * Math.PI * 2,
+      rotationSpeed: (Math.random() - 0.5) * 0.25,
+      shape: Math.random() > 0.4 ? "rect" : "circle",
+      alpha: 1,
+    });
+  }
+  return particles;
+}
+
+function runConfetti(canvas: HTMLCanvasElement, colors: string[], onDone: () => void, mode: "fall" | "cannon" = "fall") {
   const ctx = canvas.getContext("2d");
   if (!ctx) { onDone(); return; }
-  const particles = createParticles(canvas, colors);
+  const particles = mode === "cannon" ? createCannonParticles(canvas, colors) : createParticles(canvas, colors);
   let frame = 0;
   const maxFrames = 200;
   let rafId: number;
@@ -136,6 +176,7 @@ export interface LessonEffect {
   effectSoundUrl?: string | null;
   effectConfetti?: boolean | null;
   effectConfettiColors?: string | null;
+  effectConfettiMode?: string | null;
   effectBannerDuration?: number | null;
 }
 
@@ -185,10 +226,11 @@ export default function LessonEffectPlayer({ effect, trigger }: LessonEffectPlay
         canvas.height = window.innerHeight;
         setConfettiActive(true);
         const colors = parseColors(effect.effectConfettiColors);
+        const confettiMode = (effect.effectConfettiMode === "cannon" ? "cannon" : "fall") as "fall" | "cannon";
         const cancel = runConfetti(canvas, colors, () => {
           setConfettiActive(false);
           cancelConfettiRef.current = undefined;
-        });
+        }, confettiMode);
         cancelConfettiRef.current = cancel;
       }
     }

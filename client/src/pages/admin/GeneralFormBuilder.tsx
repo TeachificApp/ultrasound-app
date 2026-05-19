@@ -91,8 +91,8 @@ const ITEM_TYPES = [
   { value: "date", label: "Date", icon: "📅" },
   { value: "time", label: "Time", icon: "⏰" },
   { value: "dropdown", label: "Dropdown", icon: "▼" },
-  { value: "radio", label: "Multiple Choice (Radio)", icon: "◉" },
-  { value: "checkbox", label: "Checkboxes", icon: "☑" },
+  { value: "radio", label: "Single Choice (Radio)", icon: "◉" },
+  { value: "checkbox", label: "Multiple Choice (Checkboxes)", icon: "☑" },
   { value: "rating", label: "Rating (1–5 stars)", icon: "★" },
   { value: "scale", label: "Scale / Slider", icon: "↔" },
   { value: "yes_no", label: "Yes / No", icon: "Y/N" },
@@ -121,6 +121,21 @@ const DEFAULT_THEME = {
   logoUrl: "",
   headerTitle: "",
   headerSubtitle: "",
+  // Layout
+  layoutMode: "condensed" as "condensed" | "fullpage",
+  stickyHeader: false,
+  // Background
+  bgType: "color" as "color" | "gradient" | "image",
+  bgGradientFrom: "#e0f7fa",
+  bgGradientTo: "#ffffff",
+  bgGradientAngle: 135,
+  bgImageUrl: "",
+  bgOpacity: 100,
+  // Card
+  cardShadow: "md" as "none" | "sm" | "md" | "lg",
+  cardBgOpacity: 100,
+  // Dropdown accent
+  dropdownAccentColor: "#1d6fa4",
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -130,8 +145,20 @@ function statusBadge(status: string) {
   return <Badge className="bg-gray-100 text-gray-600 border-gray-200">Draft</Badge>;
 }
 
-function getPublicUrl(slug: string) {
-  return `${window.location.origin}/forms/${slug}`;
+// All custom domains hosted on this platform
+const CUSTOM_DOMAINS = [
+  "app.allaboutultrasound.com",
+  "members.allaboutultrasound.com",
+  "learn.allaboutultrasound.com",
+  "accreditation.iheartecho.com",
+  "ultrasound-urcfdrve.manus.space",
+  "ultrasoundassist.manus.space",
+];
+const DEFAULT_HOST_DOMAIN = "app.allaboutultrasound.com";
+
+function getPublicUrl(slug: string, hostDomain?: string | null) {
+  const domain = hostDomain || DEFAULT_HOST_DOMAIN;
+  return `https://${domain}/forms/${slug}`;
 }
 
 // ─── Form List ────────────────────────────────────────────────────────────────
@@ -272,7 +299,7 @@ function FormList({ onSelect }: { onSelect: (id: number) => void }) {
                       <Copy className="w-4 h-4 mr-2" /> Duplicate
                     </DropdownMenuItem>
                     {form.publicSlug && (
-                      <DropdownMenuItem onClick={() => window.open(getPublicUrl(form.publicSlug), "_blank")}>
+                      <DropdownMenuItem onClick={() => window.open(getPublicUrl(form.publicSlug, form.hostDomain), "_blank")}>
                         <ExternalLink className="w-4 h-4 mr-2" /> View Public Form
                       </DropdownMenuItem>
                     )}
@@ -763,6 +790,134 @@ function StyleTab({ formId, template }: { formId: number; template: any }) {
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Controls */}
       <div className="space-y-5">
+        {/* ── Layout ─────────────────────────────────────────────────── */}
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Layout Mode</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <Label className="text-xs mb-1 block">Form Layout</Label>
+              <div className="flex gap-2">
+                {(["condensed", "fullpage"] as const).map(mode => (
+                  <button key={mode} type="button"
+                    onClick={() => set("layoutMode", mode)}
+                    className={`flex-1 py-2 px-3 text-xs rounded border font-medium transition-all ${
+                      theme.layoutMode === mode
+                        ? "border-teal-600 bg-teal-50 text-teal-700"
+                        : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                    }`}>
+                    {mode === "condensed" ? "📦 Condensed (Default)" : "🖥 Full Page"}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                {theme.layoutMode === "condensed"
+                  ? "Centered card with max-width — ideal for embeds and landing pages."
+                  : "Form fills the full viewport width — ideal for standalone form pages."}
+              </p>
+            </div>
+            {theme.layoutMode === "fullpage" && (
+              <div className="flex items-center gap-2">
+                <Switch checked={theme.stickyHeader} onCheckedChange={v => set("stickyHeader", v)} id="sticky-header" />
+                <Label htmlFor="sticky-header" className="text-xs">Sticky Header (scrolls with form)</Label>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* ── Background ──────────────────────────────────────────────── */}
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Page Background</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <Label className="text-xs mb-1 block">Background Type</Label>
+              <div className="flex gap-2">
+                {(["color", "gradient", "image"] as const).map(t => (
+                  <button key={t} type="button"
+                    onClick={() => set("bgType", t)}
+                    className={`flex-1 py-1.5 px-2 text-xs rounded border font-medium transition-all capitalize ${
+                      theme.bgType === t
+                        ? "border-teal-600 bg-teal-50 text-teal-700"
+                        : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                    }`}>
+                    {t === "color" ? "🎨 Color" : t === "gradient" ? "🌈 Gradient" : "🖼 Image"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {theme.bgType === "color" && (
+              <ColorField label="Background Color" field="backgroundColor" />
+            )}
+            {theme.bgType === "gradient" && (
+              <>
+                <ColorField label="Gradient From" field="bgGradientFrom" />
+                <ColorField label="Gradient To" field="bgGradientTo" />
+                <div>
+                  <Label className="text-xs">Gradient Angle (°)</Label>
+                  <Input type="number" min={0} max={360} value={theme.bgGradientAngle}
+                    onChange={e => set("bgGradientAngle", parseInt(e.target.value) || 0)}
+                    className="mt-1 h-8 text-sm w-24" />
+                </div>
+              </>
+            )}
+            {theme.bgType === "image" && (
+              <>
+                <div>
+                  <Label className="text-xs">Background Image URL</Label>
+                  <Input value={theme.bgImageUrl} onChange={e => set("bgImageUrl", e.target.value)}
+                    placeholder="https://…/background.jpg" className="mt-1 h-8 text-sm" />
+                </div>
+                <div>
+                  <Label className="text-xs">Image Opacity ({theme.bgOpacity}%)</Label>
+                  <input type="range" min={10} max={100} value={theme.bgOpacity}
+                    onChange={e => set("bgOpacity", parseInt(e.target.value))}
+                    className="w-full mt-1 accent-teal-600" />
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* ── Card Shadow ─────────────────────────────────────────────── */}
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Form Card</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <Label className="text-xs mb-1 block">Card Shadow</Label>
+              <div className="flex gap-2">
+                {(["none", "sm", "md", "lg"] as const).map(s => (
+                  <button key={s} type="button"
+                    onClick={() => set("cardShadow", s)}
+                    className={`flex-1 py-1.5 px-2 text-xs rounded border font-medium transition-all ${
+                      theme.cardShadow === s
+                        ? "border-teal-600 bg-teal-50 text-teal-700"
+                        : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                    }`}>
+                    {s === "none" ? "None" : s === "sm" ? "Soft" : s === "md" ? "Medium" : "Strong"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <ColorField label="Form Card Background" field="formBackground" />
+            <div>
+              <Label className="text-xs">Card Background Opacity ({theme.cardBgOpacity}%)</Label>
+              <input type="range" min={10} max={100} value={theme.cardBgOpacity}
+                onChange={e => set("cardBgOpacity", parseInt(e.target.value))}
+                className="w-full mt-1 accent-teal-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ── Dropdown Accent ─────────────────────────────────────────── */}
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Interactive Elements</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <ColorField label="Dropdown Highlight Color" field="dropdownAccentColor" />
+            <p className="text-xs text-gray-400">Controls the highlight color of selected dropdown options (the blue row).</p>
+            <ColorField label="Primary / Accent Color" field="primaryColor" />
+            <p className="text-xs text-gray-400">Used for radio/checkbox focus rings, submit button, and field borders on focus.</p>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm">Colors</CardTitle></CardHeader>
           <CardContent className="space-y-3">
@@ -921,7 +1076,7 @@ function ShareTab({ formId, template, onRefetch }: { formId: number; template: a
     onError: (e) => toast.error(e.message),
   });
 
-  const publicUrl = template.publicSlug ? getPublicUrl(template.publicSlug) : null;
+  const publicUrl = template.publicSlug ? getPublicUrl(template.publicSlug, template.hostDomain) : null;
   const embedCode = publicUrl ? `<iframe src="${publicUrl}/embed" width="100%" height="600" frameborder="0" style="border:none;border-radius:12px;" title="${template.name}"></iframe>` : null;
 
   const copy = (text: string, key: string) => {
@@ -985,7 +1140,7 @@ function ShareTab({ formId, template, onRefetch }: { formId: number; template: a
             ) : (
               <div className="flex items-center gap-2 mt-1">
                 <div className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg font-mono text-sm text-gray-700">
-                  {template.publicSlug ? `${window.location.origin}/forms/${template.publicSlug}` : <span className="text-gray-400 italic">No slug set</span>}
+                  {template.publicSlug ? getPublicUrl(template.publicSlug, template.hostDomain) : <span className="text-gray-400 italic">No slug set</span>}
                 </div>
                 <Button size="sm" variant="outline" onClick={() => setSlugEditing(true)}>
                   <Edit2 className="w-3.5 h-3.5 mr-1" /> Edit
@@ -1033,18 +1188,19 @@ function ShareTab({ formId, template, onRefetch }: { formId: number; template: a
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Code2 className="w-4 h-4" /> Embed Code</CardTitle></CardHeader>
           <CardContent className="space-y-2">
-            <p className="text-xs text-gray-500">Copy and paste this code into any webpage to embed the form.</p>
-            <div className="relative">
-              <pre className="bg-gray-900 text-green-400 text-xs p-3 rounded-lg overflow-x-auto whitespace-pre-wrap break-all">{embedCode}</pre>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-gray-500">Copy and paste this code into any webpage to embed the form.</p>
               <Button
                 size="sm"
-                variant="ghost"
-                className="absolute top-2 right-2 text-gray-400 hover:text-white"
+                variant="outline"
+                className="gap-1.5 text-xs"
                 onClick={() => copy(embedCode, "embed")}
               >
-                {copied === "embed" ? <CheckCircle2 className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+                {copied === "embed" ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                {copied === "embed" ? "Copied!" : "Copy Code"}
               </Button>
             </div>
+            <pre className="bg-gray-900 text-green-400 text-xs p-3 rounded-lg overflow-x-auto whitespace-pre-wrap break-all">{embedCode}</pre>
             <Button variant="outline" size="sm" className="gap-2" onClick={() => window.open(`${publicUrl}/embed`, "_blank")}>
               <Eye className="w-3.5 h-3.5" /> Preview Embed
             </Button>
@@ -1067,6 +1223,7 @@ function SettingsTab({ formId, template, onRefetch }: { formId: number; template
   const [successRedirectUrl, setSuccessRedirectUrl] = useState(template.successRedirectUrl ?? "");
   const [notifyEmail, setNotifyEmail] = useState(template.notifyEmail ?? "");
   const [maxSubmissions, setMaxSubmissions] = useState(template.maxSubmissions?.toString() ?? "");
+  const [hostDomain, setHostDomain] = useState(template.hostDomain ?? DEFAULT_HOST_DOMAIN);
 
   const updateForm = trpc.generalForm.updateForm.useMutation({
     onSuccess: () => { toast.success("Settings saved"); onRefetch(); },
@@ -1086,6 +1243,7 @@ function SettingsTab({ formId, template, onRefetch }: { formId: number; template
       successRedirectUrl: successRedirectUrl || undefined,
       notifyEmail: notifyEmail || undefined,
       maxSubmissions: maxSubmissions ? parseInt(maxSubmissions) : undefined,
+      hostDomain,
     });
   };
 
@@ -1123,6 +1281,20 @@ function SettingsTab({ formId, template, onRefetch }: { formId: number; template
                 </SelectContent>
               </Select>
             </div>
+          </div>
+          <div>
+            <Label>Host Domain</Label>
+            <p className="text-xs text-gray-400 mb-1">The domain where this form's public URL will be hosted.</p>
+            <Select value={hostDomain} onValueChange={setHostDomain}>
+              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {CUSTOM_DOMAINS.map(d => (
+                  <SelectItem key={d} value={d}>
+                    {d}{d === DEFAULT_HOST_DOMAIN ? " (default)" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
@@ -1169,6 +1341,242 @@ function SettingsTab({ formId, template, onRefetch }: { formId: number; template
         {updateForm.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
         Save Settings
       </Button>
+    </div>
+  );
+}
+
+// ─── Results Tab ─────────────────────────────────────────────────────────────
+function ResultsTab({ formId, template }: { formId: number; template: any }) {
+  const [statusFilter, setStatusFilter] = useState<"all" | "submitted" | "draft" | "reviewed">("all");
+  const [page, setPage] = useState(1);
+  const [selectedSub, setSelectedSub] = useState<any | null>(null);
+  const [exportStatus, setExportStatus] = useState<"all" | "submitted" | "draft" | "reviewed">("all");
+  const utils = trpc.useUtils();
+
+  const { data, isLoading, refetch } = trpc.generalForm.getFormResults.useQuery({
+    templateId: formId,
+    page,
+    pageSize: 50,
+    status: statusFilter,
+  });
+
+  const { data: exportData, refetch: fetchExport } = trpc.generalForm.exportFormResults.useQuery(
+    { templateId: formId, status: exportStatus },
+    { enabled: false }
+  );
+
+  const updateStatus = trpc.generalForm.updateSubmissionStatus.useMutation({
+    onSuccess: () => { toast.success("Status updated"); refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const deleteSubmission = trpc.generalForm.deleteSubmission.useMutation({
+    onSuccess: () => { toast.success("Deleted"); refetch(); setSelectedSub(null); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const handleExport = async () => {
+    const result = await fetchExport();
+    const d = result.data;
+    if (!d) return;
+    const { submissions, items, userMap } = d;
+    const headers = ["ID", "Submitted At", "Status", "User Name", "User Email", "Score", "Max Score",
+      ...items.map((it: any) => it.label || it.itemType)];
+    const rows = submissions.map((s: any) => {
+      const responses = (() => { try { return JSON.parse(s.responses); } catch { return {}; } })();
+      const user = s.submittedByUserId ? (userMap as any)[s.submittedByUserId] : null;
+      return [
+        s.id,
+        new Date(s.submittedAt).toISOString(),
+        s.status,
+        user?.name ?? "",
+        user?.email ?? "",
+        s.score,
+        s.maxScore,
+        ...items.map((it: any) => {
+          const v = responses[it.id.toString()];
+          return Array.isArray(v) ? v.join("; ") : (v ?? "");
+        }),
+      ];
+    });
+    const csv = [headers, ...rows].map(r => r.map((c: any) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${template.name.replace(/\s+/g, "-")}-results.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const STATUS_TABS = [
+    { id: "all", label: "All" },
+    { id: "submitted", label: "Submitted" },
+    { id: "draft", label: "Incomplete" },
+    { id: "reviewed", label: "Reviewed" },
+  ] as const;
+
+  const statusBadgeColor = (s: string) => {
+    if (s === "submitted") return "bg-green-50 text-green-700 border-green-200";
+    if (s === "reviewed") return "bg-blue-50 text-blue-700 border-blue-200";
+    if (s === "draft") return "bg-yellow-50 text-yellow-700 border-yellow-200";
+    return "bg-gray-50 text-gray-600 border-gray-200";
+  };
+
+  const parseResponses = (s: any) => { try { return JSON.parse(s.responses); } catch { return {}; } };
+
+  return (
+    <div className="space-y-4">
+      {/* Header row */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex gap-1 border border-gray-200 rounded-lg p-1 bg-gray-50">
+          {STATUS_TABS.map(t => (
+            <button
+              key={t.id}
+              onClick={() => { setStatusFilter(t.id); setPage(1); }}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                statusFilter === t.id ? "bg-white shadow-sm text-[#0e7490]" : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2">
+          <Select value={exportStatus} onValueChange={v => setExportStatus(v as any)}>
+            <SelectTrigger className="h-8 text-xs w-32"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="submitted">Submitted</SelectItem>
+              <SelectItem value="draft">Incomplete</SelectItem>
+              <SelectItem value="reviewed">Reviewed</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button size="sm" variant="outline" className="gap-1 h-8" onClick={handleExport}>
+            <Download className="w-3.5 h-3.5" /> Export CSV
+          </Button>
+        </div>
+      </div>
+
+      {/* Table */}
+      <Card>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12 text-gray-400"><RefreshCw className="w-4 h-4 animate-spin mr-2" />Loading…</div>
+          ) : !data?.submissions?.length ? (
+            <div className="text-center py-12 text-gray-400">No results found</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50/50">
+                    <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-500">#</th>
+                    <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-500">Submitter</th>
+                    <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-500">Date</th>
+                    <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-500">Status</th>
+                    <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-500">Score</th>
+                    <th className="text-right py-2.5 px-4 text-xs font-medium text-gray-500">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.submissions.map((sub: any) => (
+                    <tr
+                      key={sub.id}
+                      className="border-b border-gray-50 hover:bg-gray-50/50 cursor-pointer"
+                      onClick={() => setSelectedSub(sub)}
+                    >
+                      <td className="py-2.5 px-4 font-mono text-xs text-gray-400">#{sub.id}</td>
+                      <td className="py-2.5 px-4">
+                        <div className="font-medium text-gray-800 text-xs">{sub.userName || <span className="text-gray-400 italic">Anonymous</span>}</div>
+                        {sub.userEmail && <div className="text-xs text-gray-400">{sub.userEmail}</div>}
+                      </td>
+                      <td className="py-2.5 px-4 text-xs text-gray-500">{new Date(sub.submittedAt).toLocaleString()}</td>
+                      <td className="py-2.5 px-4" onClick={e => e.stopPropagation()}>
+                        <Select value={sub.status} onValueChange={v => updateStatus.mutate({ id: sub.id, status: v as any })}>
+                          <SelectTrigger className="h-6 text-xs w-28"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="submitted">Submitted</SelectItem>
+                            <SelectItem value="reviewed">Reviewed</SelectItem>
+                            <SelectItem value="draft">Incomplete</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="py-2.5 px-4 text-xs">
+                        {sub.maxScore > 0 ? (
+                          <span className="font-medium" style={{ color: BRAND }}>{sub.score}/{sub.maxScore}</span>
+                        ) : <span className="text-gray-400">—</span>}
+                      </td>
+                      <td className="py-2.5 px-4 text-right" onClick={e => e.stopPropagation()}>
+                        <Button
+                          variant="ghost" size="sm" className="text-red-400 hover:text-red-600 h-6 w-6 p-0"
+                          onClick={() => { if (confirm("Delete this submission?")) deleteSubmission.mutate({ id: sub.id }); }}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Pagination */}
+      {data && data.total > 50 && (
+        <div className="flex items-center justify-between text-sm text-gray-500">
+          <span>{((page - 1) * 50) + 1}–{Math.min(page * 50, data.total)} of {data.total}</span>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Prev</Button>
+            <Button size="sm" variant="outline" disabled={page * 50 >= data.total} onClick={() => setPage(p => p + 1)}>Next</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Detail drawer */}
+      {selectedSub && (
+        <Dialog open={!!selectedSub} onOpenChange={() => setSelectedSub(null)}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                Submission #{selectedSub.id}
+                <Badge className={`text-xs border ${statusBadgeColor(selectedSub.status)}`}>{selectedSub.status}</Badge>
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div><span className="text-gray-500">Submitter:</span> <span className="font-medium">{selectedSub.userName || "Anonymous"}</span></div>
+                <div><span className="text-gray-500">Email:</span> <span className="font-medium">{selectedSub.userEmail || "—"}</span></div>
+                <div><span className="text-gray-500">Date:</span> <span className="font-medium">{new Date(selectedSub.submittedAt).toLocaleString()}</span></div>
+                <div><span className="text-gray-500">Score:</span> <span className="font-medium">{selectedSub.maxScore > 0 ? `${selectedSub.score}/${selectedSub.maxScore}` : "N/A"}</span></div>
+              </div>
+              <div className="border-t pt-3">
+                <p className="text-xs font-medium text-gray-500 mb-2">Responses</p>
+                <div className="space-y-2">
+                  {Object.entries(parseResponses(selectedSub)).map(([k, v]) => (
+                    <div key={k} className="bg-gray-50 rounded p-2">
+                      <p className="text-xs text-gray-500">Field #{k}</p>
+                      <p className="text-sm font-medium text-gray-800 mt-0.5">
+                        {Array.isArray(v) ? v.join(", ") : String(v)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" size="sm" onClick={() => setSelectedSub(null)}>Close</Button>
+              <Button
+                variant="destructive" size="sm"
+                onClick={() => { if (confirm("Delete this submission?")) deleteSubmission.mutate({ id: selectedSub.id }); }}
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
@@ -1300,7 +1708,7 @@ function AnalyticsTab({ formId, template }: { formId: number; template: any }) {
 
 // ─── Form Editor Shell (tabs) ─────────────────────────────────────────────────
 function FormEditorShell({ formId, onBack }: { formId: number; onBack: () => void }) {
-  const [activeTab, setActiveTab] = useState<"editor" | "style" | "share" | "settings" | "analytics">("editor");
+  const [activeTab, setActiveTab] = useState<"editor" | "style" | "share" | "settings" | "results" | "analytics">("editor");
   const { data: formData, isLoading, refetch } = trpc.generalForm.getForm.useQuery({ id: formId });
 
   const TABS = [
@@ -1308,6 +1716,7 @@ function FormEditorShell({ formId, onBack }: { formId: number; onBack: () => voi
     { id: "style", label: "Style / Branding", icon: Palette },
     { id: "share", label: "Share", icon: Share2 },
     { id: "settings", label: "Settings", icon: Settings },
+    { id: "results", label: "Results", icon: Download },
     { id: "analytics", label: "Analytics", icon: BarChart2 },
   ] as const;
 
@@ -1331,12 +1740,12 @@ function FormEditorShell({ formId, onBack }: { formId: number; onBack: () => voi
             {template.isPublic && <Badge className="bg-blue-50 text-blue-600 border-blue-200 text-xs"><Globe className="w-3 h-3 mr-1" />Public</Badge>}
             {template.publicSlug && (
               <a
-                href={getPublicUrl(template.publicSlug)}
+                href={getPublicUrl(template.publicSlug, template.hostDomain)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs text-gray-400 hover:text-[#0e7490] flex items-center gap-1"
               >
-                /forms/{template.publicSlug} <ExternalLink className="w-3 h-3" />
+                {template.hostDomain || DEFAULT_HOST_DOMAIN}/forms/{template.publicSlug} <ExternalLink className="w-3 h-3" />
               </a>
             )}
           </div>
@@ -1345,9 +1754,14 @@ function FormEditorShell({ formId, onBack }: { formId: number; onBack: () => voi
           variant="outline"
           size="sm"
           className="gap-1"
+<<<<<<< Updated upstream
           onClick={() => template.publicSlug && window.open(`${window.location.origin}/forms/${template.publicSlug}/preview`, "_blank")}
           disabled={!template.publicSlug}
           title={!template.isPublic ? "Admin preview (form is not yet public)" : "Preview form"}
+=======
+          onClick={() => template.publicSlug && window.open(getPublicUrl(template.publicSlug, template.hostDomain), "_blank")}
+          disabled={!template.publicSlug || !template.isPublic}
+>>>>>>> Stashed changes
         >
           <Eye className="w-3.5 h-3.5" /> Preview
         </Button>
@@ -1376,6 +1790,7 @@ function FormEditorShell({ formId, onBack }: { formId: number; onBack: () => voi
       {activeTab === "style" && <StyleTab formId={formId} template={template} />}
       {activeTab === "share" && <ShareTab formId={formId} template={template} onRefetch={refetch} />}
       {activeTab === "settings" && <SettingsTab formId={formId} template={template} onRefetch={refetch} />}
+      {activeTab === "results" && <ResultsTab formId={formId} template={template} />}
       {activeTab === "analytics" && <AnalyticsTab formId={formId} template={template} />}
     </div>
   );

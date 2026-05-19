@@ -28,6 +28,21 @@ interface ThemeSettings {
   logoUrl: string;
   headerTitle: string;
   headerSubtitle: string;
+  // Layout
+  layoutMode: "condensed" | "fullpage";
+  stickyHeader: boolean;
+  // Background
+  bgType: "color" | "gradient" | "image";
+  bgGradientFrom: string;
+  bgGradientTo: string;
+  bgGradientAngle: number;
+  bgImageUrl: string;
+  bgOpacity: number;
+  // Card
+  cardShadow: "none" | "sm" | "md" | "lg";
+  cardBgOpacity: number;
+  // Dropdown accent
+  dropdownAccentColor: string;
 }
 
 const DEFAULT_THEME: ThemeSettings = {
@@ -48,6 +63,17 @@ const DEFAULT_THEME: ThemeSettings = {
   logoUrl: "",
   headerTitle: "",
   headerSubtitle: "",
+  layoutMode: "condensed",
+  stickyHeader: false,
+  bgType: "color",
+  bgGradientFrom: "#e0f7fa",
+  bgGradientTo: "#ffffff",
+  bgGradientAngle: 135,
+  bgImageUrl: "",
+  bgOpacity: 100,
+  cardShadow: "md",
+  cardBgOpacity: 100,
+  dropdownAccentColor: "#1d6fa4",
 };
 
 function parseTheme(raw?: string | null): ThemeSettings {
@@ -117,10 +143,14 @@ function FormField({
         <input type="time" value={value ?? ""} onChange={e => onChange(e.target.value)} style={{ ...base, width: "auto" }} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} />
       )}
       {(item.itemType === "dropdown") && (
-        <select value={value ?? ""} onChange={e => onChange(e.target.value)} style={base} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}>
-          <option value="">— Select —</option>
-          {options.map((o: any) => <option key={o.id} value={o.value}>{o.label}</option>)}
-        </select>
+        <>
+          <select value={value ?? ""} onChange={e => onChange(e.target.value)} style={base} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}>
+            <option value="">— Select —</option>
+            {options.map((o: any) => <option key={o.id} value={o.value}>{o.label}</option>)}
+          </select>
+          {/* Inject accent color for native select option:checked highlight */}
+          <style>{`select option:checked { background: ${theme.dropdownAccentColor ?? theme.primaryColor} !important; color: #fff !important; }`}</style>
+        </>
       )}
       {(item.itemType === "radio") && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
@@ -297,8 +327,41 @@ export default function PublicFormRenderer({ isEmbed = false, isPreview = false 
     </div>
   );
 
+  // ── Derived style helpers ──
+  const bgStyle: React.CSSProperties = (() => {
+    if (theme.bgType === "gradient") {
+      return { background: `linear-gradient(${theme.bgGradientAngle}deg, ${theme.bgGradientFrom}, ${theme.bgGradientTo})` };
+    }
+    if (theme.bgType === "image" && theme.bgImageUrl) {
+      return {
+        backgroundImage: `url(${theme.bgImageUrl})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+      };
+    }
+    return { background: theme.backgroundColor };
+  })();
+
+  const cardShadowMap: Record<string, string> = {
+    none: "none",
+    sm: "0 1px 6px rgba(0,0,0,0.07)",
+    md: "0 4px 20px rgba(0,0,0,0.10)",
+    lg: "0 8px 40px rgba(0,0,0,0.16)",
+  };
+  const cardShadow = cardShadowMap[theme.cardShadow ?? "md"];
+
+  const cardBg = (() => {
+    const hex = theme.formBackground ?? "#f9fafb";
+    const opacity = Math.round(((theme.cardBgOpacity ?? 100) / 100) * 255).toString(16).padStart(2, "0");
+    return hex.startsWith("#") && hex.length === 7 ? hex + opacity : hex;
+  })();
+
+  const isFullPage = theme.layoutMode === "fullpage";
+
   // ── Main form ──
   return (
+<<<<<<< Updated upstream
     <div style={{ minHeight: isEmbed ? "auto" : "100vh", background: theme.backgroundColor, fontFamily: theme.fontFamily, fontSize: `${theme.fontSize}px`, color: theme.textColor }}>
       {/* Admin preview banner */}
       {isPreview && (
@@ -306,9 +369,22 @@ export default function PublicFormRenderer({ isEmbed = false, isPreview = false 
           <span style={{ fontSize: 16 }}>&#128065;</span>
           Admin Preview — this form may not be publicly visible yet. Submissions made here are real.
         </div>
+=======
+    <div style={{ minHeight: isEmbed ? "auto" : "100vh", fontFamily: theme.fontFamily, fontSize: `${theme.fontSize}px`, color: theme.textColor, position: "relative", ...bgStyle }}>
+      {/* Background image opacity overlay */}
+      {theme.bgType === "image" && theme.bgImageUrl && theme.bgOpacity < 100 && (
+        <div style={{ position: "absolute", inset: 0, background: "#fff", opacity: 1 - (theme.bgOpacity / 100), pointerEvents: "none", zIndex: 0 }} />
+>>>>>>> Stashed changes
       )}
       {/* Header */}
-      <div style={{ background: theme.headerBackground, color: theme.headerTextColor, padding: "24px 32px" }}>
+      <div style={{
+        background: theme.headerBackground,
+        color: theme.headerTextColor,
+        padding: "24px 32px",
+        position: theme.stickyHeader && isFullPage ? "sticky" : "relative",
+        top: 0,
+        zIndex: 10,
+      }}>
         {theme.showLogo && theme.logoUrl && <img src={theme.logoUrl} alt="Logo" style={{ height: 40, marginBottom: 12, objectFit: "contain" }} />}
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, color: theme.headerTextColor }}>{theme.headerTitle || template.name}</h1>
         {(theme.headerSubtitle || template.description) && (
@@ -319,8 +395,8 @@ export default function PublicFormRenderer({ isEmbed = false, isPreview = false 
       </div>
 
       {/* Body */}
-      <div style={{ maxWidth: 680, margin: "0 auto", padding: "32px 16px" }}>
-        <div style={{ background: theme.formBackground, borderRadius: `${parseInt(theme.borderRadius) + 4}px`, padding: 32, boxShadow: "0 2px 16px rgba(0,0,0,0.06)" }}>
+      <div style={{ position: "relative", zIndex: 1, maxWidth: isFullPage ? "100%" : 680, margin: "0 auto", padding: isFullPage ? "32px 48px" : "32px 16px" }}>
+        <div style={{ background: cardBg, borderRadius: isFullPage ? 0 : `${parseInt(theme.borderRadius) + 4}px`, padding: isFullPage ? "32px 0" : 32, boxShadow: isFullPage ? "none" : cardShadow }}>
           {sections.map((section: any) => {
             const items = (data.items ?? [])
               .filter((i: any) => i.sectionId === section.id && !hiddenIds.has(i.id))

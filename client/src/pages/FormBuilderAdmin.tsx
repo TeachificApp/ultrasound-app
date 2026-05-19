@@ -1099,7 +1099,7 @@ function OrgVisibilityBuilder({ templateId, items, sections, rules, onSaved }: {
 
 function FormEditor({ templateId }: { templateId: number }) {
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<"editor" | "branching" | "org-visibility" | "preview">("editor");
+  const [activeTab, setActiveTab] = useState<"editor" | "branching" | "org-visibility" | "preview" | "settings" | "results">("editor");
   const [editingItem, setEditingItem] = useState<FormItem | null>(null);
   const [editingItemOptions, setEditingItemOptions] = useState<FormOption[]>([]);
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
@@ -1258,6 +1258,8 @@ function FormEditor({ templateId }: { templateId: number }) {
           { id: "branching" as const, label: "Branching Logic", icon: GitBranch, badge: branchRulesCount > 0 ? branchRulesCount : null },
           { id: "org-visibility" as const, label: "Org Visibility", icon: Building2, badge: orgVisRulesCount > 0 ? orgVisRulesCount : null },
           { id: "preview" as const, label: "Preview", icon: Eye, badge: null },
+          { id: "settings" as const, label: "Settings", icon: Save, badge: null },
+          { id: "results" as const, label: "Results", icon: BarChart2, badge: null },
         ].map(tab => (
           <button
             key={tab.id}

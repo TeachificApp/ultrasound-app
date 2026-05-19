@@ -31,6 +31,10 @@ import {
   users,
 } from "../../drizzle/schema";
 import { eq, desc, asc, and, sql, like, count, inArray } from "drizzle-orm";
+<<<<<<< Updated upstream
+=======
+import { users } from "../../drizzle/schema";
+>>>>>>> Stashed changes
 import { invokeLLM } from "../_core/llm";
 
 // ─── Guard ────────────────────────────────────────────────────────────────────
@@ -153,6 +157,7 @@ export const generalFormRouter = router({
       maxSubmissions: z.number().optional(),
       openAt: z.string().optional(),
       closeAt: z.string().optional(),
+      hostDomain: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await requireAdmin(ctx);
@@ -695,13 +700,92 @@ export const generalFormRouter = router({
       return { id: (result as any).insertId, score, maxScore };
     }),
 
+<<<<<<< Updated upstream
   // ── Admin preview: get form by slug ignoring isPublic ─────────────────────
   getFormPreview: protectedProcedure
     .input(z.object({ slug: z.string() }))
+=======
+  // ── PUBLIC: Save draft (auto-save while filling form) ─────────────────────
+  saveFormDraft: publicProcedure
+    .input(z.object({
+      templateId: z.number(),
+      responses: z.string(), // JSON partial responses
+      userId: z.number().optional(),
+      draftId: z.number().optional(), // if updating existing draft
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const req = (ctx as any).req;
+      if (input.draftId) {
+        // Update existing draft
+        await db.update(generalFormSubmissions)
+          .set({ responses: input.responses, updatedAt: new Date() })
+          .where(and(eq(generalFormSubmissions.id, input.draftId), eq(generalFormSubmissions.status, "draft")));
+        return { draftId: input.draftId };
+      } else {
+        // Create new draft
+        const [result] = await db.insert(generalFormSubmissions).values({
+          templateId: input.templateId,
+          submittedByUserId: input.userId ?? null,
+          responses: input.responses,
+          score: 0,
+          maxScore: 0,
+          status: "draft",
+          ipAddress: req?.ip?.substring(0, 64) ?? null,
+          userAgent: req?.headers?.["user-agent"]?.substring(0, 500) ?? null,
+          referrer: req?.headers?.referer?.substring(0, 500) ?? null,
+        });
+        return { draftId: (result as any).insertId };
+      }
+    }),
+
+  // ── ADMIN: Get form results (all submissions incl. drafts) ─────────────────
+  getFormResults: protectedProcedure
+    .input(z.object({
+      templateId: z.number(),
+      page: z.number().int().min(1).default(1),
+      pageSize: z.number().int().min(1).max(100).default(50),
+      status: z.enum(["all", "submitted", "draft", "reviewed"]).default("all"),
+    }))
     .query(async ({ ctx, input }) => {
       await requireAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const offset = (input.page - 1) * input.pageSize;
+      const conditions: any[] = [eq(generalFormSubmissions.templateId, input.templateId)];
+      if (input.status !== "all") conditions.push(eq(generalFormSubmissions.status, input.status as any));
+      const [submissions, [{ total }]] = await Promise.all([
+        db.select().from(generalFormSubmissions).where(and(...conditions)).orderBy(desc(generalFormSubmissions.submittedAt)).limit(input.pageSize).offset(offset),
+        db.select({ total: count() }).from(generalFormSubmissions).where(and(...conditions)),
+      ]);
+      // Enrich with user info
+      const userIds = submissions.map((s: any) => s.submittedByUserId).filter(Boolean);
+      const userMap: Record<number, { name: string | null; email: string | null }> = {};
+      if (userIds.length > 0) {
+        const userRows = await db.select({ id: users.id, name: users.name, email: users.email }).from(users).where(inArray(users.id, userIds));
+        for (const u of userRows) userMap[u.id] = { name: u.name, email: u.email };
+      }
+      const enriched = submissions.map((s: any) => ({
+        ...s,
+        userName: s.submittedByUserId ? (userMap[s.submittedByUserId]?.name ?? null) : null,
+        userEmail: s.submittedByUserId ? (userMap[s.submittedByUserId]?.email ?? null) : null,
+      }));
+      return { submissions: enriched, total: total as number };
+    }),
+
+  // ── ADMIN: Export form results as CSV-ready data ───────────────────────────
+  exportFormResults: protectedProcedure
+    .input(z.object({
+      templateId: z.number(),
+      status: z.enum(["all", "submitted", "draft", "reviewed"]).default("all"),
+    }))
+>>>>>>> Stashed changes
+    .query(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+<<<<<<< Updated upstream
       const [template] = await db.select().from(generalFormTemplates)
         .where(eq(generalFormTemplates.publicSlug, input.slug))
         .limit(1);
@@ -713,5 +797,20 @@ export const generalFormRouter = router({
         : [];
       const branchRules = await db.select().from(generalFormBranchRules).where(eq(generalFormBranchRules.templateId, template.id));
       return { template, sections, items, options, branchRules };
+=======
+      const conditions: any[] = [eq(generalFormSubmissions.templateId, input.templateId)];
+      if (input.status !== "all") conditions.push(eq(generalFormSubmissions.status, input.status as any));
+      const [submissions, items] = await Promise.all([
+        db.select().from(generalFormSubmissions).where(and(...conditions)).orderBy(desc(generalFormSubmissions.submittedAt)),
+        db.select().from(generalFormItems).where(eq(generalFormItems.templateId, input.templateId)).orderBy(asc(generalFormItems.sortOrder)),
+      ]);
+      const userIds = submissions.map((s: any) => s.submittedByUserId).filter(Boolean);
+      const userMap: Record<number, { name: string | null; email: string | null }> = {};
+      if (userIds.length > 0) {
+        const userRows = await db.select({ id: users.id, name: users.name, email: users.email }).from(users).where(inArray(users.id, userIds));
+        for (const u of userRows) userMap[u.id] = { name: u.name, email: u.email };
+      }
+      return { submissions, items, userMap };
+>>>>>>> Stashed changes
     }),
 });

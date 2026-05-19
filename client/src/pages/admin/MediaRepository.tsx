@@ -1031,11 +1031,11 @@ export default function MediaRepository() {
     search: debouncedSearch || undefined,
     mediaType: typeFilter !== "all" ? (typeFilter as MediaType) : undefined,
     access: accessFilter !== "all" ? (accessFilter as "public" | "private") : undefined,
-    folder: selectedFolder !== null ? selectedFolder : undefined,
+    // selectedFolder: null = show all; string = filter to that folder slug
+    folder: selectedFolder as string | null | undefined,
     page,
     pageSize: 24,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  }) as any, [debouncedSearch, typeFilter, accessFilter, selectedFolder, page]);
+  }), [debouncedSearch, typeFilter, accessFilter, selectedFolder, page]);
 
   const { data, isLoading, refetch } = trpc.mediaRepo.listAssets.useQuery(queryInput);
   const { data: foldersData, refetch: refetchFolders } = trpc.mediaRepo.listFoldersFull.useQuery();

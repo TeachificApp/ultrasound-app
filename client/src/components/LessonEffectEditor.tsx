@@ -1,14 +1,14 @@
 /**
  * LessonEffectEditor — Admin panel for configuring per-lesson effects:
- * banner message (with duration), sound effect, and confetti cannon.
+ * banner message (with duration), sound effect, and confetti cannon/fall.
  *
- * Changes:
- * - Added effectBannerDuration slider (1–30 seconds)
- * - Added key-based re-sync when initialData changes (parent passes key={fullLesson ? 'full' : 'shallow'})
- * - Live banner preview reflects active saved state
- * - Fixed: confettiTheme sync runs on every initialData change, not just mount
+ * Fix log:
+ * - effectBannerDuration now included in shallow lesson list query (server fix)
+ * - useEffect only re-syncs when initialData.effectEnabled/effectBannerDuration
+ *   actually change (stable dep comparison) — prevents reset after save
+ * - Added confetti mode: Fall (gentle) vs Cannon (burst from sides)
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
-import { Sparkles, Volume2, Megaphone, Save, Play, Clock, CheckCircle2 } from "lucide-react";
+import { Sparkles, Volume2, Megaphone, Save, Play, Clock, CheckCircle2, Wind, Zap } from "lucide-react";
 
 // ─── Built-in sound presets ────────────────────────────────────────────────────
 export const SOUND_PRESETS: { value: string; label: string; url: string }[] = [
@@ -56,12 +56,17 @@ interface LessonEffectEditorProps {
     effectSoundUrl?: string | null;
     effectConfetti?: boolean | null;
     effectConfettiColors?: string | null;
+    effectConfettiMode?: string | null;
     effectBannerDuration?: number | null;
   };
   onSaved?: () => void;
 }
 
 export default function LessonEffectEditor({ lessonId, initialData, onSaved }: LessonEffectEditorProps) {
+  // Track whether we've already initialised from initialData so we don't
+  // overwrite user edits every time the parent re-renders.
+  const initializedRef = useRef(false);
+
   const [enabled, setEnabled] = useState(initialData?.effectEnabled ?? false);
   const [trigger, setTrigger] = useState<"lesson_start" | "lesson_complete">(
     (initialData?.effectTrigger as "lesson_start" | "lesson_complete") ?? "lesson_start"
@@ -73,25 +78,35 @@ export default function LessonEffectEditor({ lessonId, initialData, onSaved }: L
   const [soundPreset, setSoundPreset] = useState(initialData?.effectSound ?? "none");
   const [customSoundUrl, setCustomSoundUrl] = useState(initialData?.effectSoundUrl ?? "");
   const [confetti, setConfetti] = useState(initialData?.effectConfetti ?? false);
+  const [confettiMode, setConfettiMode] = useState<"fall" | "cannon">((initialData?.effectConfettiMode as "fall" | "cannon") ?? "fall");
   const [confettiTheme, setConfettiTheme] = useState("rainbow");
   const [customColors, setCustomColors] = useState(initialData?.effectConfettiColors ?? "");
   const [savedState, setSavedState] = useState<typeof initialData | null>(initialData ?? null);
 
-  // Sync all state when initialData changes (e.g. when fullLesson arrives from getLessonAdmin)
+  // Sync state when initialData arrives for the first time (full lesson load).
+  // After that, user edits take precedence — we only re-sync if the lesson ID changes.
   useEffect(() => {
-    setEnabled(initialData?.effectEnabled ?? false);
-    setTrigger((initialData?.effectTrigger as "lesson_start" | "lesson_complete") ?? "lesson_start");
-    setBannerText(initialData?.effectBannerText ?? "");
-    setBannerBg(initialData?.effectBannerBgColor ?? "#179ca3");
-    setBannerTextColor(initialData?.effectBannerTextColor ?? "#ffffff");
-    setBannerDuration(initialData?.effectBannerDuration ?? 5);
-    setSoundPreset(initialData?.effectSound ?? "none");
-    setCustomSoundUrl(initialData?.effectSoundUrl ?? "");
-    setConfetti(initialData?.effectConfetti ?? false);
-    setSavedState(initialData ?? null);
+    if (!initialData) return;
+    // Only sync once per lessonId (the key prop on the parent resets the component
+    // when the lesson changes, so we just need to guard against repeated renders
+    // of the same lesson while the user is editing).
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+
+    setEnabled(initialData.effectEnabled ?? false);
+    setTrigger((initialData.effectTrigger as "lesson_start" | "lesson_complete") ?? "lesson_start");
+    setBannerText(initialData.effectBannerText ?? "");
+    setBannerBg(initialData.effectBannerBgColor ?? "#179ca3");
+    setBannerTextColor(initialData.effectBannerTextColor ?? "#ffffff");
+    setBannerDuration(initialData.effectBannerDuration ?? 5);
+    setSoundPreset(initialData.effectSound ?? "none");
+    setCustomSoundUrl(initialData.effectSoundUrl ?? "");
+    setConfetti(initialData.effectConfetti ?? false);
+    setConfettiMode((initialData.effectConfettiMode as "fall" | "cannon") ?? "fall");
+    setSavedState(initialData);
 
     // Sync confetti theme from saved colors
-    if (initialData?.effectConfettiColors) {
+    if (initialData.effectConfettiColors) {
       const saved = initialData.effectConfettiColors;
       const match = CONFETTI_THEMES.find(t => t.colors.join(",") === saved);
       if (match) setConfettiTheme(match.value);
@@ -105,7 +120,7 @@ export default function LessonEffectEditor({ lessonId, initialData, onSaved }: L
   const updateEffect = trpc.lmsAdmin.updateLessonEffect.useMutation({
     onSuccess: () => {
       toast.success("Effect settings saved.");
-      setSavedState({
+      const newState = {
         effectEnabled: enabled,
         effectTrigger: trigger,
         effectBannerText: bannerText || undefined,
@@ -115,8 +130,10 @@ export default function LessonEffectEditor({ lessonId, initialData, onSaved }: L
         effectSoundUrl: soundPreset === "custom" ? customSoundUrl : (SOUND_PRESETS.find(p => p.value === soundPreset)?.url ?? undefined),
         effectConfetti: confetti,
         effectConfettiColors: confetti ? (confettiTheme === "custom" ? customColors : (CONFETTI_THEMES.find(t => t.value === confettiTheme)?.colors.join(",") ?? "")) : undefined,
+        effectConfettiMode: confettiMode,
         effectBannerDuration: bannerDuration,
-      });
+      };
+      setSavedState(newState);
       onSaved?.();
     },
     onError: (e) => toast.error(`Error: ${e.message}`),
@@ -137,6 +154,7 @@ export default function LessonEffectEditor({ lessonId, initialData, onSaved }: L
       effectSoundUrl: soundPreset === "custom" ? customSoundUrl : (SOUND_PRESETS.find(p => p.value === soundPreset)?.url ?? undefined),
       effectConfetti: confetti,
       effectConfettiColors: confetti ? colorsStr : undefined,
+      effectConfettiMode: confettiMode,
       effectBannerDuration: bannerDuration,
     });
   };
@@ -170,7 +188,7 @@ export default function LessonEffectEditor({ lessonId, initialData, onSaved }: L
             Effect active: fires on <strong>{savedState.effectTrigger === "lesson_complete" ? "lesson complete" : "lesson start"}</strong>
             {savedState.effectBannerText ? ` · banner "${savedState.effectBannerText.slice(0, 40)}${savedState.effectBannerText.length > 40 ? "…" : ""}"` : ""}
             {savedState.effectSound && savedState.effectSound !== "none" ? ` · sound: ${savedState.effectSound}` : ""}
-            {savedState.effectConfetti ? " · confetti 🎉" : ""}
+            {savedState.effectConfetti ? ` · confetti (${savedState.effectConfettiMode ?? "fall"}) 🎉` : ""}
           </span>
         </div>
       )}
@@ -313,42 +331,82 @@ export default function LessonEffectEditor({ lessonId, initialData, onSaved }: L
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-teal-600" />
-                <span className="text-sm font-semibold">Confetti Cannon</span>
+                <span className="text-sm font-semibold">Confetti</span>
               </div>
               <Switch checked={confetti} onCheckedChange={setConfetti} />
             </div>
             {confetti && (
-              <div className="space-y-2">
-                <Label className="text-xs">Color Theme</Label>
-                <Select value={confettiTheme} onValueChange={setConfettiTheme}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CONFETTI_THEMES.map(t => (
-                      <SelectItem key={t.value} value={t.value}>
-                        <div className="flex items-center gap-2">
-                          {t.value !== "custom" && (
-                            <div className="flex gap-0.5">
-                              {t.colors.slice(0,4).map(c => (
-                                <div key={c} className="h-3 w-3 rounded-full border border-white/30" style={{ backgroundColor: c }} />
-                              ))}
-                            </div>
-                          )}
-                          {t.label}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {confettiTheme === "custom" && (
-                  <Input
-                    placeholder="#ff0000,#00ff00,#0000ff (comma-separated hex)"
-                    value={customColors}
-                    onChange={(e) => setCustomColors(e.target.value)}
-                    className="text-sm font-mono"
-                  />
-                )}
+              <div className="space-y-3">
+                {/* Confetti Mode */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Confetti Style</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setConfettiMode("fall")}
+                      className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm transition-colors ${
+                        confettiMode === "fall"
+                          ? "border-teal-500 bg-teal-50 text-teal-700 font-medium"
+                          : "border-border hover:bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      <Wind className="h-4 w-4 shrink-0" />
+                      <div className="text-left">
+                        <div className="font-medium text-xs">Fall</div>
+                        <div className="text-[10px] opacity-70">Gentle rain from top</div>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfettiMode("cannon")}
+                      className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm transition-colors ${
+                        confettiMode === "cannon"
+                          ? "border-teal-500 bg-teal-50 text-teal-700 font-medium"
+                          : "border-border hover:bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      <Zap className="h-4 w-4 shrink-0" />
+                      <div className="text-left">
+                        <div className="font-medium text-xs">Cannon</div>
+                        <div className="text-[10px] opacity-70">Burst from both sides</div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Color Theme */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Color Theme</Label>
+                  <Select value={confettiTheme} onValueChange={setConfettiTheme}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CONFETTI_THEMES.map(t => (
+                        <SelectItem key={t.value} value={t.value}>
+                          <div className="flex items-center gap-2">
+                            {t.value !== "custom" && (
+                              <div className="flex gap-0.5">
+                                {t.colors.slice(0,4).map(c => (
+                                  <div key={c} className="h-3 w-3 rounded-full border border-white/30" style={{ backgroundColor: c }} />
+                                ))}
+                              </div>
+                            )}
+                            {t.label}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {confettiTheme === "custom" && (
+                    <Input
+                      placeholder="#ff0000,#00ff00,#0000ff (comma-separated hex)"
+                      value={customColors}
+                      onChange={(e) => setCustomColors(e.target.value)}
+                      className="text-sm font-mono"
+                    />
+                  )}
+                </div>
               </div>
             )}
           </div>

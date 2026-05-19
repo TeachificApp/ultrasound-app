@@ -141,6 +141,7 @@ export const formBuilderRouter = router({
       description: z.string().optional(),
       formType: z.string().min(1).max(100).optional(),
       isActive: z.boolean().optional(),
+      hostDomain: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await requirePlatformAdmin(ctx);

@@ -152,6 +152,7 @@ export const mediaRepoRouter = router({
       mediaType: z.enum(MEDIA_TYPES).optional(),
       access: z.enum(["public", "private"]).optional(),
       brand: z.enum(["aaus", "iheartecho"]).optional(),
+      folder: z.string().nullable().optional(), // null = uncategorized, string = specific folder, undefined = all
       page: z.number().int().min(1).default(1),
       pageSize: z.number().int().min(1).max(100).default(24),
     }))
@@ -174,12 +175,11 @@ export const mediaRepoRouter = router({
           )!
         );
       }
-      if ((input as any).folder !== undefined) {
-        const folderVal = (input as any).folder;
-        if (folderVal === null || folderVal === "") {
+      if (input.folder !== undefined) {
+        if (input.folder === null || input.folder === "") {
           conditions.push(isNull(mediaAssets.folder));
         } else {
-          conditions.push(eq(mediaAssets.folder, folderVal));
+          conditions.push(eq(mediaAssets.folder, input.folder));
         }
       }
 

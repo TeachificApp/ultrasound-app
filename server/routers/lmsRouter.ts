@@ -436,6 +436,8 @@ export const lmsLearnerRouter = router({
           effectSoundUrl: lmsLessons.effectSoundUrl,
           effectConfetti: lmsLessons.effectConfetti,
           effectConfettiColors: lmsLessons.effectConfettiColors,
+          effectConfettiMode: lmsLessons.effectConfettiMode,
+          effectBannerDuration: lmsLessons.effectBannerDuration,
           createdAt: lmsLessons.createdAt,
           updatedAt: lmsLessons.updatedAt,
         }).from(lmsLessons).where(eq(lmsLessons.courseId, course.id)).orderBy(asc(lmsLessons.position)),
@@ -1349,6 +1351,16 @@ export const lmsAdminRouter = router({
           isPrerequisite: lmsLessons.isPrerequisite,
           showInstructor: lmsLessons.showInstructor,
           effectEnabled: lmsLessons.effectEnabled,
+          effectTrigger: lmsLessons.effectTrigger,
+          effectBannerText: lmsLessons.effectBannerText,
+          effectBannerBgColor: lmsLessons.effectBannerBgColor,
+          effectBannerTextColor: lmsLessons.effectBannerTextColor,
+          effectBannerDuration: lmsLessons.effectBannerDuration,
+          effectSound: lmsLessons.effectSound,
+          effectSoundUrl: lmsLessons.effectSoundUrl,
+          effectConfetti: lmsLessons.effectConfetti,
+          effectConfettiColors: lmsLessons.effectConfettiColors,
+          effectConfettiMode: lmsLessons.effectConfettiMode,
           createdAt: lmsLessons.createdAt,
           updatedAt: lmsLessons.updatedAt,
         }).from(lmsLessons).where(eq(lmsLessons.courseId, course.id)).orderBy(asc(lmsLessons.position)),
@@ -1660,6 +1672,7 @@ export const lmsAdminRouter = router({
       effectSoundUrl: z.string().max(500).optional(),
       effectConfetti: z.boolean(),
       effectConfettiColors: z.string().max(500).optional(),
+      effectConfettiMode: z.enum(["fall", "cannon"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -1676,6 +1689,7 @@ export const lmsAdminRouter = router({
         effectSoundUrl: input.effectSoundUrl ?? null,
         effectConfetti: input.effectConfetti,
         effectConfettiColors: input.effectConfettiColors ?? null,
+        effectConfettiMode: input.effectConfettiMode ?? "fall",
       }).where(eq(lmsLessons.id, input.id));
       return { success: true };
     }),

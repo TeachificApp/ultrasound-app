@@ -1258,6 +1258,24 @@ export default function CoursePlayer() {
                   <StickyNote className="w-4 h-4" />
                 </button>
               )}
+              {/* ── Top Mark Complete button ── */}
+              {lessonData && lessonData.type !== "quiz" && !isCompleted && requireManualComplete && (
+                <Button
+                  size="sm"
+                  className="h-7 text-xs bg-teal-500 hover:bg-teal-400 text-white font-semibold px-3 rounded-full gap-1 shadow-sm"
+                  onClick={handleMarkComplete}
+                  disabled={markComplete.isPending || !canMarkComplete}
+                  title={!canMarkComplete ? "Watch the full video first" : undefined}
+                >
+                  <CheckCircle className="w-3 h-3" />
+                  {markComplete.isPending ? "Saving..." : "Mark Complete"}
+                </Button>
+              )}
+              {lessonData && lessonData.type !== "quiz" && isCompleted && (
+                <div className="flex items-center gap-1 text-teal-700 text-xs font-semibold bg-teal-100 px-3 py-1 rounded-full h-7">
+                  <CheckCircle className="w-3 h-3" /> Completed
+                </div>
+              )}
               {prevLesson && (
                 <Button size="sm" variant="outline" onClick={() => handleLessonSelect(prevLesson.id)} className="text-xs h-7 border-teal-400 text-teal-700 hover:bg-teal-50">
                   <ChevronLeft className="w-3 h-3 mr-1" /> Prev
