@@ -82,7 +82,16 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
         setAudioLevel(Math.min(100, Math.round((rms / 128) * 100)));
         levelRafRef.current = requestAnimationFrame(tick);
       };
-      levelRafRef.current = requestAnimationFrame(tick);
+      // AudioContext starts suspended in many browsers — must resume before reading data
+      if (ctx.state === "suspended") {
+        ctx.resume().then(() => {
+          levelRafRef.current = requestAnimationFrame(tick);
+        }).catch(() => {
+          levelRafRef.current = requestAnimationFrame(tick);
+        });
+      } else {
+        levelRafRef.current = requestAnimationFrame(tick);
+      }
     } catch { /* AudioContext not available */ }
   }, []);
 
@@ -139,9 +148,12 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
     }
   }, [audioUrl]);
 
-  // Cleanup blob URL on unmount
+  // Cleanup blob URL and permission stream on unmount
   useEffect(() => {
-    return () => { if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current); };
+    return () => {
+      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+      if (permStreamRef.current) { permStreamRef.current.getTracks().forEach(t => t.stop()); permStreamRef.current = null; }
+    };
   }, []);
 
   // ── Recording ─────────────────────────────────────────────────────────────
@@ -150,21 +162,28 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
   const setRef = useRef(set);
   setRef.current = set;
 
+  // Keep a reference to the permission stream so we can reuse it
+  const permStreamRef = useRef<MediaStream | null>(null);
+
   /** Open mic selection dialog — enumerate devices first */
   const openMicDialog = useCallback(async () => {
     try {
-      // Request permission first so device labels are populated
-      const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      tempStream.getTracks().forEach(t => t.stop());
+      // Request permission to get device labels — keep stream alive so deviceId stays valid
+      if (!permStreamRef.current || !permStreamRef.current.active) {
+        permStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
 
       const devices = await navigator.mediaDevices.enumerateDevices();
       const mics = devices.filter(d => d.kind === "audioinput");
       setAvailableMics(mics);
 
-      // Pre-select the current default or first device
-      if (mics.length > 0 && selectedMicId === "default") {
-        const def = mics.find(m => m.deviceId === "default") ?? mics[0];
-        setSelectedMicId(def.deviceId);
+      // Pre-select the device that the permission stream is already using
+      const activeTrack = permStreamRef.current.getAudioTracks()[0];
+      const activeDeviceId = activeTrack?.getSettings()?.deviceId;
+      if (activeDeviceId) {
+        setSelectedMicId(activeDeviceId);
+      } else if (mics.length > 0) {
+        setSelectedMicId(mics[0].deviceId);
       }
 
       setMicDialogOpen(true);
@@ -173,24 +192,46 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
         ? "Microphone access denied. Please allow microphone permissions in your browser."
         : "Could not access microphone. Please check your browser settings.");
     }
-  }, [selectedMicId]);
+  }, []);
 
   /** Actually start recording with the chosen device */
   const startRecording = useCallback(async (deviceId: string) => {
     setMicDialogOpen(false);
     try {
-      const constraints: MediaStreamConstraints = {
-        audio: {
-          deviceId: deviceId && deviceId !== "default" ? { exact: deviceId } : undefined,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: 48000,
-          channelCount: 1,
-        },
-      };
+      // Try to reuse the permission stream if the device matches — avoids re-requesting
+      // getUserMedia with exact deviceId which can fail on some browsers
+      let stream: MediaStream | null = null;
+      const permStream = permStreamRef.current;
+      if (permStream && permStream.active) {
+        const permTrack = permStream.getAudioTracks()[0];
+        const permDeviceId = permTrack?.getSettings()?.deviceId;
+        if (!deviceId || deviceId === "default" || deviceId === permDeviceId) {
+          // Reuse the existing stream
+          stream = permStream;
+          permStreamRef.current = null; // transfer ownership — onstop will stop it
+        }
+      }
 
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      if (!stream) {
+        // Need a new stream for a different device
+        // Stop the permission stream first to release the old device
+        if (permStreamRef.current) {
+          permStreamRef.current.getTracks().forEach(t => t.stop());
+          permStreamRef.current = null;
+        }
+        const constraints: MediaStreamConstraints = {
+          audio: {
+            deviceId: deviceId && deviceId !== "default" ? { exact: deviceId } : undefined,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: 48000,
+            channelCount: 1,
+          },
+        };
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      }
+
       const audioTracks = stream.getAudioTracks();
       if (audioTracks.length === 0 || !audioTracks[0].enabled) {
         toast.error("No active microphone track found. Please check your microphone.");
