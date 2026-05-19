@@ -49,7 +49,7 @@ export default function LessonFlashcardBlockEditor({ data, onChange, handleFileU
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingCard, setEditingCard] = useState<FlashcardItem | null>(null);
   const [aiCount, setAiCount] = useState(10);
-  const [aiStyle, setAiStyle] = useState<"understanding" | "thinking" | "compliance" | "thought_provoking" | "custom">("understanding");
+  const [aiStyle, setAiStyle] = useState<"understanding" | "thinking" | "compliance" | "thought_provoking" | "reflection" | "custom">("understanding");
   const [aiCustomPrompt, setAiCustomPrompt] = useState("");
   const [aiPreview, setAiPreview] = useState<FlashcardItem[] | null>(null);
   const frontImgRef = useRef<HTMLInputElement | null>(null);
@@ -179,6 +179,7 @@ export default function LessonFlashcardBlockEditor({ data, onChange, handleFileU
                   <SelectItem value="thinking" className="text-xs">Getting Thinking — apply &amp; reason</SelectItem>
                   <SelectItem value="compliance" className="text-xs">Compliance — protocol &amp; safety</SelectItem>
                   <SelectItem value="thought_provoking" className="text-xs">Thought Provoking — critical &amp; nuanced</SelectItem>
+                  <SelectItem value="reflection" className="text-xs">Reflection — self-assess &amp; connect to practice</SelectItem>
                   <SelectItem value="custom" className="text-xs">Custom Prompt…</SelectItem>
                 </SelectContent>
               </Select>
@@ -200,7 +201,7 @@ export default function LessonFlashcardBlockEditor({ data, onChange, handleFileU
               size="sm"
               className="h-8 bg-teal-600 hover:bg-teal-700 text-white text-xs w-full"
               disabled={!lessonId || generateMutation.isPending}
-              onClick={() => generateMutation.mutate({ lessonId: lessonId!, count: aiCount })}
+              onClick={() => generateMutation.mutate({ lessonId: lessonId!, count: aiCount, cardStyle: aiStyle, customPrompt: aiStyle === "custom" ? aiCustomPrompt : undefined })}
             >
               {generateMutation.isPending ? "Generating…" : "Generate from Lesson"}
             </Button>

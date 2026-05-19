@@ -2848,6 +2848,21 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<{ id: number; title: string; s3Url: string; mediaType: string } | null>(null);
 
+  // Reset all lesson state when navigating to a different lesson
+  useEffect(() => {
+    setTitle(lessonShallow.title ?? "");
+    setContent(lessonShallow.content ?? "");
+    setVideoContent(lessonShallow.videoContent ?? "");
+    setEmbedUrl(lessonShallow.embedUrl ?? "");
+    setIsPreview(!!lessonShallow.isPreview);
+    setDurationMinutes(String(lessonShallow.durationMinutes ?? ""));
+    setRequireVideoCompletion(lessonShallow.requireVideoCompletion === 1);
+    setRequireManualComplete(lessonShallow.requireManualComplete === 1);
+    setDripDays(String(lessonShallow.dripDays ?? ""));
+    setShowInstructor(lessonShallow.showInstructor ?? "inherit");
+    setIsPrerequisite(!!lessonShallow.isPrerequisite);
+  }, [lessonShallow.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Sync state when full lesson data arrives (content/videoContent/embedUrl may be empty until then)
   useEffect(() => {
     if (fullLesson) {

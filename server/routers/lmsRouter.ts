@@ -3292,6 +3292,8 @@ export const lmsGroupRouter = router({
     .input(z.object({
       lessonId: z.number().int().positive(),
       count: z.number().int().min(1).max(30).default(10),
+      cardStyle: z.enum(["understanding", "thinking", "compliance", "thought_provoking", "reflection", "custom"]).default("understanding"),
+      customPrompt: z.string().max(500).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
@@ -3322,9 +3324,18 @@ export const lmsGroupRouter = router({
         } catch { /* ignore parse errors */ }
       }
       if (lessonText.trim().length < 20) throw new TRPCError({ code: "BAD_REQUEST", message: "Lesson has insufficient text content to generate flashcards." });
+      const flashcardStylePrompts: Record<string, string> = {
+        understanding: "Create straightforward recall flashcards: front = term or definition question, back = clear concise answer. Focus on key concepts, anatomy, measurements, and definitions.",
+        thinking: "Create application-based flashcards that require the learner to reason or apply knowledge: front = scenario or 'why/how' question, back = reasoned explanation.",
+        compliance: "Create protocol- and safety-focused flashcards: front = procedure, checklist item, or safety question, back = correct protocol step or rationale.",
+        thought_provoking: "Create critical-thinking flashcards with nuanced or differential-based fronts: front = complex clinical scenario or 'what would you do' question, back = nuanced answer with key differentiators.",
+        reflection: "Create introspective flashcards that prompt the learner to connect lesson content to their own clinical practice or professional development: front = reflective prompt (e.g. 'How has your scanning approach changed after learning…?'), back = suggested reflection points or self-assessment criteria.",
+        custom: input.customPrompt ?? "Create helpful flashcards based on the lesson content.",
+      };
+      const styleInstruction = flashcardStylePrompts[input.cardStyle] ?? flashcardStylePrompts.understanding;
       const response = await invokeLLM({
         messages: [
-          { role: "system", content: "You are a medical ultrasound educator. Create flashcards (question/answer pairs) based on the provided lesson content. Each card should have a concise front (term or question) and a clear back (definition or answer). Optionally include a hint. Return only valid JSON." },
+          { role: "system", content: `You are a medical ultrasound educator. Create flashcards (question/answer pairs) based on the provided lesson content. ${styleInstruction} Each card should have a concise front and a clear back. Optionally include a hint. Return only valid JSON.` },
           { role: "user", content: `Generate ${input.count} flashcards based on this lesson content:\n\n${lessonText.slice(0, 6000)}` },
         ],
         response_format: {
