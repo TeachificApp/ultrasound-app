@@ -2274,3 +2274,12 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
   - [x] Courses/quizzes: enrolled → /learn/:slug/player, not enrolled → /learn/:slug
   - [x] Digital products: purchased → /downloads/:slug/files, not purchased → /downloads/:slug
   - [x] Owned cards show green checkmark + "Continue Learning / Access Download / Continue Quiz" CTA
+
+## Lesson Free Preview & Course Outline (May 2026)
+- [x] Add previewMode enum (none/preview/preview_hide_after_purchase) to lmsLessons schema
+- [x] Replace isPreview toggle with three-option previewMode selector in lesson editor (LMSAdmin)
+- [x] Update getLesson access control to use previewMode three-state logic
+- [x] Update getCourse and lesson select queries to return previewMode
+- [x] Add Free Preview eye icon + clickable "Free Preview" link in curriculum_auto block (CourseLanding)
+- [x] Hide preview_hide_after_purchase lessons from enrolled users in CourseOverview
+- [x] CoursePlayer: use previewMode for hasPreviewLessons check and lesson access gating

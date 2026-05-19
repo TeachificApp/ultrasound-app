@@ -237,6 +237,9 @@ export default function CourseOverview() {
   };
 
   const renderLessonRow = (lesson: any, section?: any) => {
+    // Hide "preview_hide_after_purchase" lessons for enrolled users
+    const pm = lesson.previewMode ?? (lesson.isPreview ? "preview" : "none");
+    if (pm === "preview_hide_after_purchase") return null;
     const done = completedIds.has(lesson.id);
     const dripLocked = isDripLocked(lesson, section);
     const prereqLocked = isPrereqLocked(lesson);

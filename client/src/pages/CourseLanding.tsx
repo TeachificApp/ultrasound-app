@@ -401,13 +401,25 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
                   </AccordionTrigger>
                   <AccordionContent>
                     <ul className="space-y-1 pt-1">
-                      {section.lessons.map((lesson: any) => (
-                        <li key={lesson.id} className="flex items-center gap-3 py-2 px-5 text-sm">
-                          {lesson.isPreview ? <PlayCircle className="w-4 h-4 text-teal-500 flex-shrink-0" /> : <Lock className="w-4 h-4 text-gray-300 flex-shrink-0" />}
-                          <span className={lesson.isPreview ? "text-teal-700 font-medium" : "text-gray-700"}>{lesson.title}</span>
-                          {lesson.isPreview && <Badge variant="outline" className="text-xs text-teal-600 border-teal-300 ml-auto">Preview</Badge>}
-                        </li>
-                      ))}
+                      {section.lessons.map((lesson: any) => {
+                        const pm = lesson.previewMode ?? (lesson.isPreview ? "preview" : "none");
+                        const isFreePreview = pm === "preview" || pm === "preview_hide_after_purchase";
+                        return (
+                          <li key={lesson.id} className="flex items-center gap-3 py-2 px-5 text-sm">
+                            {isFreePreview ? <PlayCircle className="w-4 h-4 text-teal-500 flex-shrink-0" /> : <Lock className="w-4 h-4 text-gray-300 flex-shrink-0" />}
+                            <span className={isFreePreview ? "text-teal-700 font-medium" : "text-gray-700"}>{lesson.title}</span>
+                            {isFreePreview && (
+                              <a
+                                href={`/learn/${course.slug}/player?lesson=${lesson.id}`}
+                                className="ml-auto text-xs text-teal-600 hover:text-teal-800 hover:underline font-semibold flex items-center gap-1 shrink-0"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <PlayCircle className="w-3 h-3" /> Free Preview
+                              </a>
+                            )}
+                          </li>
+                        );
+                      })}
                     </ul>
                   </AccordionContent>
                 </AccordionItem>
