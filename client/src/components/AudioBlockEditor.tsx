@@ -2,18 +2,32 @@
  * AudioBlockEditor.tsx
  * Block editor panel for the "audio" block type.
  *
- * Fixes applied:
- *  1. Recording: create an object URL immediately after stop so the preview
- *     works before the S3 upload completes.
- *  2. Duration detection: use the previewRef audio element directly (avoids
- *     creating a second Audio() that may be blocked by CORS). Falls back to
- *     multiple events (loadedmetadata, canplay, durationchange).
- *  3. Trim: trimEnd is initialised to full duration when a new file is loaded.
- *  4. Upload: passes the blob file directly; the server handles any mime type.
+ * Features:
+ *  - Mic selection dialog before recording starts (lists all available audio inputs)
+ *  - Explicit deviceId constraint so the correct mic is used
+ *  - echoCancellation / noiseSuppression / autoGainControl enabled for cleaner audio
+ *  - Object URL created immediately after stop for instant preview/trim before S3 upload
+ *  - Duration detection via the preview audio element
+ *  - Trim controls with dual-handle range sliders
  */
 import { useRef, useState, useEffect, useCallback } from "react";
-import { Mic, Square, Upload, Play, Pause, Scissors, X, RotateCcw } from "lucide-react";
+import { Mic, Square, Upload, Play, Pause, Scissors, X, RotateCcw, ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 
 interface AudioBlockEditorProps {
@@ -40,8 +54,12 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
   const [recSeconds, setRecSeconds] = useState(0);
   const recTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // blobPreviewUrl: temporary object URL created immediately after recording stops,
-  // so the user can preview/trim before the S3 upload finishes.
+  // Mic selection dialog
+  const [micDialogOpen, setMicDialogOpen] = useState(false);
+  const [availableMics, setAvailableMics] = useState<MediaDeviceInfo[]>([]);
+  const [selectedMicId, setSelectedMicId] = useState<string>("default");
+
+  // blobPreviewUrl: temporary object URL created immediately after recording stops
   const [blobPreviewUrl, setBlobPreviewUrl] = useState<string | null>(null);
   const blobUrlRef = useRef<string | null>(null);
 
@@ -52,38 +70,25 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
   const trimStart: number = d.trimStart ?? 0;
   const trimEnd: number = d.trimEnd ?? 0;
 
-  // The URL to use for the preview audio element — prefer the uploaded S3 URL,
-  // fall back to the local blob URL while uploading.
+  // The URL to use for the preview audio element
   const activePreviewUrl = audioUrl || blobPreviewUrl || "";
 
   // ── Duration detection via the preview audio element ──────────────────────
   useEffect(() => {
     if (!activePreviewUrl) { setDuration(0); return; }
-
     const el = previewRef.current;
     if (!el) return;
-
     const applyDuration = () => {
       const dur = el.duration;
       if (isFinite(dur) && dur > 0) {
         setDuration(dur);
-        // Auto-set trimEnd to full duration when a new file is loaded
-        // (only if trimEnd is 0 or not yet set)
-        if (!d.trimEnd || d.trimEnd === 0) {
-          set("trimEnd", dur);
-        }
+        if (!d.trimEnd || d.trimEnd === 0) set("trimEnd", dur);
       }
     };
-
     el.addEventListener("loadedmetadata", applyDuration);
     el.addEventListener("durationchange", applyDuration);
     el.addEventListener("canplay", applyDuration);
-
-    // If already loaded (e.g. cached)
-    if (el.readyState >= 1 && isFinite(el.duration) && el.duration > 0) {
-      applyDuration();
-    }
-
+    if (el.readyState >= 1 && isFinite(el.duration) && el.duration > 0) applyDuration();
     return () => {
       el.removeEventListener("loadedmetadata", applyDuration);
       el.removeEventListener("durationchange", applyDuration);
@@ -102,23 +107,56 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
 
   // Cleanup blob URL on unmount
   useEffect(() => {
-    return () => {
-      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
-    };
+    return () => { if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current); };
   }, []);
 
   // ── Recording ─────────────────────────────────────────────────────────────
-  // Store the latest handleFileUpload in a ref so the onstop closure always
-  // uses the current version (avoids stale closure issues).
   const handleFileUploadRef = useRef(handleFileUpload);
   handleFileUploadRef.current = handleFileUpload;
   const setRef = useRef(set);
   setRef.current = set;
 
-  const startRecording = useCallback(async () => {
+  /** Open mic selection dialog — enumerate devices first */
+  const openMicDialog = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Verify we actually have an active audio track
+      // Request permission first so device labels are populated
+      const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      tempStream.getTracks().forEach(t => t.stop());
+
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const mics = devices.filter(d => d.kind === "audioinput");
+      setAvailableMics(mics);
+
+      // Pre-select the current default or first device
+      if (mics.length > 0 && selectedMicId === "default") {
+        const def = mics.find(m => m.deviceId === "default") ?? mics[0];
+        setSelectedMicId(def.deviceId);
+      }
+
+      setMicDialogOpen(true);
+    } catch (err: any) {
+      toast.error(err?.message?.includes("Permission")
+        ? "Microphone access denied. Please allow microphone permissions in your browser."
+        : "Could not access microphone. Please check your browser settings.");
+    }
+  }, [selectedMicId]);
+
+  /** Actually start recording with the chosen device */
+  const startRecording = useCallback(async (deviceId: string) => {
+    setMicDialogOpen(false);
+    try {
+      const constraints: MediaStreamConstraints = {
+        audio: {
+          deviceId: deviceId && deviceId !== "default" ? { exact: deviceId } : undefined,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 48000,
+          channelCount: 1,
+        },
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       const audioTracks = stream.getAudioTracks();
       if (audioTracks.length === 0 || !audioTracks[0].enabled) {
         toast.error("No active microphone track found. Please check your microphone.");
@@ -126,26 +164,33 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
         return;
       }
 
+      // Log the actual device being used
+      const trackSettings = audioTracks[0].getSettings();
+      console.log("[AudioBlockEditor] Recording from:", audioTracks[0].label, "settings:", trackSettings);
+
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
         ? "audio/webm;codecs=opus"
         : MediaRecorder.isTypeSupported("audio/webm")
         ? "audio/webm"
+        : MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")
+        ? "audio/ogg;codecs=opus"
         : MediaRecorder.isTypeSupported("audio/ogg")
         ? "audio/ogg"
         : "";
+
       if (!mimeType) {
         toast.error("Your browser does not support audio recording. Please use Chrome or Firefox.");
         stream.getTracks().forEach(t => t.stop());
         return;
       }
 
-      const mr = new MediaRecorder(stream, { mimeType });
+      const mr = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 128000 });
       chunksRef.current = [];
+
       mr.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) {
-          chunksRef.current.push(e.data);
-        }
+        if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
       };
+
       mr.onstop = () => {
         stream.getTracks().forEach(t => t.stop());
 
@@ -158,7 +203,6 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
         }
 
         const blob = new Blob(chunksRef.current, { type: mimeType });
-
         if (blob.size < 100) {
           toast.error("Recording is too short or empty. Please try again.");
           setRecording(false);
@@ -167,17 +211,15 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
           return;
         }
 
-        // Create a local blob URL immediately so the user can preview/trim
+        // Create a local blob URL immediately for preview/trim
         if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
         const blobUrl = URL.createObjectURL(blob);
         blobUrlRef.current = blobUrl;
         setBlobPreviewUrl(blobUrl);
-        // Reset trim so it re-detects duration from the new blob
         setRef.current("trimStart", 0);
         setRef.current("trimEnd", 0);
 
-        // Upload to S3 in the background
-        // Use the correct file extension based on mime type
+        // Upload to S3
         const ext = mimeType.includes("webm") ? "webm" : mimeType.includes("ogg") ? "ogg" : "webm";
         const file = new File([blob], `recording-${Date.now()}.${ext}`, { type: mimeType });
         handleFileUploadRef.current(file, "audioUrl", "audio-recording");
@@ -187,20 +229,25 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
         setRecSeconds(0);
       };
 
-      // Do NOT pass a timeslice — let the browser collect all data in one chunk
-      // on stop. Using timeslice (e.g. 250ms) can produce fragmented WebM clusters
-      // that don't concatenate into a valid file in some browsers.
-      mr.start();
+      // Use a 1-second timeslice so we get data even if the tab loses focus,
+      // but the final onstop will still collect all chunks into one blob.
+      mr.start(1000);
       mediaRecorderRef.current = mr;
       setRecording(true);
       setRecSeconds(0);
       recTimerRef.current = setInterval(() => setRecSeconds(s => s + 1), 1000);
     } catch (err: any) {
-      toast.error(err?.message?.includes("Permission")
-        ? "Microphone access denied. Please allow microphone permissions."
-        : "Could not start recording. Please check your microphone.");
+      const msg = err?.message ?? "";
+      if (msg.includes("Permission") || msg.includes("NotAllowed")) {
+        toast.error("Microphone access denied. Please allow microphone permissions.");
+      } else if (msg.includes("NotFound") || msg.includes("DevicesNotFound")) {
+        toast.error("Selected microphone not found. Please choose a different device.");
+        openMicDialog();
+      } else {
+        toast.error("Could not start recording: " + msg);
+      }
     }
-  }, []);
+  }, [openMicDialog]);
 
   const stopRecording = useCallback(() => {
     mediaRecorderRef.current?.stop();
@@ -219,7 +266,6 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
     }
   };
 
-  // Stop preview at trimEnd
   useEffect(() => {
     const el = previewRef.current;
     if (!el) return;
@@ -246,6 +292,47 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
 
   return (
     <div className="space-y-3">
+      {/* ── Mic Selection Dialog ── */}
+      <Dialog open={micDialogOpen} onOpenChange={setMicDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Mic size={16} className="text-teal-600" /> Select Microphone
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-gray-500">Choose the microphone to record from:</p>
+            {availableMics.length === 0 ? (
+              <p className="text-sm text-red-500">No microphones found. Please connect a microphone and try again.</p>
+            ) : (
+              <Select value={selectedMicId} onValueChange={setSelectedMicId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select microphone…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableMics.map((mic, i) => (
+                    <SelectItem key={mic.deviceId} value={mic.deviceId}>
+                      {mic.label || `Microphone ${i + 1}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" size="sm" onClick={() => setMicDialogOpen(false)}>Cancel</Button>
+            <Button
+              size="sm"
+              className="bg-red-600 hover:bg-red-700 text-white"
+              disabled={availableMics.length === 0}
+              onClick={() => startRecording(selectedMicId)}
+            >
+              <Mic size={14} className="mr-1" /> Start Recording
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* ── Title ── */}
       <div>
         <label className="text-xs text-gray-500 block mb-1">Title (optional)</label>
@@ -270,7 +357,6 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
               const f = e.target.files?.[0];
               if (f) {
                 if (f.size > 100 * 1024 * 1024) { toast.error("Audio file must be under 100 MB"); return; }
-                // Reset trim so duration re-detects for the new file
                 set("trimStart", 0);
                 set("trimEnd", 0);
                 handleFileUpload(f, "audioUrl", "audio-block");
@@ -291,7 +377,7 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
           {!recording ? (
             <button
               type="button"
-              onClick={startRecording}
+              onClick={openMicDialog}
               disabled={uploading === "audioUrl"}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-red-50 text-red-600 rounded border border-red-200 hover:bg-red-100 disabled:opacity-50"
             >
@@ -309,7 +395,6 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
         </div>
         <p className="text-[10px] text-gray-400 mt-1">Supported: mp3, wav, ogg, m4a, webm, aac, flac · Max 100 MB</p>
 
-        {/* Upload status indicator */}
         {uploading === "audioUrl" && blobPreviewUrl && (
           <p className="text-[10px] text-teal-600 mt-1 animate-pulse">⬆ Uploading to cloud… you can trim while waiting.</p>
         )}
@@ -371,119 +456,50 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
               <button
                 type="button"
                 onClick={() => { set("trimStart", 0); set("trimEnd", duration); }}
-                className="flex items-center gap-1 px-2 py.5 text-xs text-gray-500 rounded border border-gray-200 hover:bg-gray-50"
+                className="flex items-center gap-1 px-2 py-0.5 text-xs text-gray-500 rounded border border-gray-200 hover:bg-gray-50"
               >
                 <RotateCcw size={10} /> Reset
               </button>
             </div>
           </div>
 
-          {/* ── Dual-handle trim bar ── */}
+          {/* Dual-handle trim bar */}
           <div className="space-y-2">
-            {/* Time readout */}
-            <div className="flex justify-between text-[10px] text-gray-500">
-              <span className="font-medium text-teal-700">▶ {fmt(trimStart)}</span>
-              <span className="text-gray-400">Clip length: {fmt(Math.max(0, effectiveTrimEnd - trimStart))}</span>
-              <span className="font-medium text-teal-700">{fmt(effectiveTrimEnd)} ■</span>
+            <div className="flex justify-between text-[10px] text-gray-400">
+              <span>Start: {fmt(trimStart)}</span>
+              <span>End: {fmt(effectiveTrimEnd)}</span>
+              <span>Duration: {fmt(effectiveTrimEnd - trimStart)}</span>
             </div>
 
-            {/* Track with two overlapping range inputs */}
-            <div className="relative" style={{ height: 36 }}>
-              {/* Background track */}
-              <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-2 bg-gray-200 rounded-full" />
-              {/* Selected region highlight */}
-              <div
-                className="absolute top-1/2 -translate-y-1/2 h-2 bg-teal-400 rounded-full"
-                style={{
-                  left: `${(trimStart / duration) * 100}%`,
-                  width: `${((effectiveTrimEnd - trimStart) / duration) * 100}%`,
-                }}
-              />
-              {/* Excluded region — left (before start) */}
-              <div
-                className="absolute top-1/2 -translate-y-1/2 h-2 bg-gray-300 rounded-l-full"
-                style={{ left: 0, width: `${(trimStart / duration) * 100}%` }}
-              />
-              {/* Excluded region — right (after end) */}
-              <div
-                className="absolute top-1/2 -translate-y-1/2 h-2 bg-gray-300 rounded-r-full"
-                style={{
-                  left: `${(effectiveTrimEnd / duration) * 100}%`,
-                  right: 0,
-                }}
-              />
-              {/* Start handle (rendered on top of end handle when at left) */}
-              <input
-                type="range"
-                min={0}
-                max={duration}
-                step={0.1}
-                value={trimStart}
-                onChange={e => {
-                  const v = parseFloat(e.target.value);
-                  if (v < effectiveTrimEnd - 0.5) set("trimStart", v);
-                }}
-                className="absolute inset-0 w-full opacity-0 cursor-pointer"
-                style={{ zIndex: trimStart > duration * 0.9 ? 5 : 3 }}
-                title={`Start: ${fmt(trimStart)}`}
-              />
-              {/* End handle */}
-              <input
-                type="range"
-                min={0}
-                max={duration}
-                step={0.1}
-                value={effectiveTrimEnd}
-                onChange={e => {
-                  const v = parseFloat(e.target.value);
-                  if (v > trimStart + 0.5) set("trimEnd", v);
-                }}
-                className="absolute inset-0 w-full opacity-0 cursor-pointer"
-                style={{ zIndex: 4 }}
-                title={`End: ${fmt(effectiveTrimEnd)}`}
-              />
-              {/* Visible start handle knob */}
-              <div
-                className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white border-2 border-teal-500 rounded-full shadow-md pointer-events-none"
-                style={{ left: `calc(${(trimStart / duration) * 100}% - 8px)`, zIndex: 6 }}
-              />
-              {/* Visible end handle knob */}
-              <div
-                className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white border-2 border-teal-500 rounded-full shadow-md pointer-events-none"
-                style={{ left: `calc(${(effectiveTrimEnd / duration) * 100}% - 8px)`, zIndex: 6 }}
-              />
-            </div>
-
-            {/* Fine-tune number inputs */}
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-[10px] text-gray-400 block mb-0.5">Start (seconds)</label>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-gray-400 w-8">Start</span>
                 <input
-                  type="number"
+                  type="range"
                   min={0}
-                  max={effectiveTrimEnd - 0.5}
-                  step={0.1}
-                  value={Math.round(trimStart * 10) / 10}
-                  onChange={e => {
-                    const v = parseFloat(e.target.value);
-                    if (!isNaN(v) && v >= 0 && v < effectiveTrimEnd - 0.5) set("trimStart", v);
-                  }}
-                  className="w-full h-7 text-xs border border-gray-200 rounded px-2 text-center"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] text-gray-400 block mb-0.5">End (seconds)</label>
-                <input
-                  type="number"
-                  min={trimStart + 0.5}
                   max={duration}
                   step={0.1}
-                  value={Math.round(effectiveTrimEnd * 10) / 10}
+                  value={trimStart}
                   onChange={e => {
                     const v = parseFloat(e.target.value);
-                    if (!isNaN(v) && v > trimStart + 0.5 && v <= duration) set("trimEnd", v);
+                    if (v < effectiveTrimEnd) set("trimStart", v);
                   }}
-                  className="w-full h-7 text-xs border border-gray-200 rounded px-2 text-center"
+                  className="flex-1 accent-teal-600"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-gray-400 w-8">End</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={duration}
+                  step={0.1}
+                  value={effectiveTrimEnd}
+                  onChange={e => {
+                    const v = parseFloat(e.target.value);
+                    if (v > trimStart) set("trimEnd", v);
+                  }}
+                  className="flex-1 accent-teal-600"
                 />
               </div>
             </div>
@@ -491,54 +507,15 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
         </div>
       )}
 
-      {/* ── Playback options ── */}
-      <div className="border border-gray-100 rounded p-2 space-y-2">
-        <p className="text-xs font-semibold text-gray-600 mb-1">Playback Options</p>
-        {[
-          { key: "autoplay", label: "Autoplay", note: "(muted required in most browsers)" },
-          { key: "muted", label: "Muted" },
-          { key: "loop", label: "Loop" },
-          { key: "controls", label: "Show controls", defaultVal: true },
-        ].map(({ key, label, note, defaultVal }) => (
-          <div key={key} className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={d[key] ?? (defaultVal ?? false)}
-              onChange={e => set(key, e.target.checked)}
-              className="rounded"
-            />
-            <label className="text-xs text-gray-600">
-              {label} {note && <span className="text-gray-400">{note}</span>}
-            </label>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Caption / Styling ── */}
+      {/* ── Transcript ── */}
       <div>
-        <label className="text-xs text-gray-500 block mb-1">Caption / Description</label>
-        <Input
-          value={d.caption ?? ""}
-          onChange={e => set("caption", e.target.value)}
-          className="h-8 text-sm"
-          placeholder="Optional caption shown below player"
+        <label className="text-xs text-gray-500 block mb-1">Transcript (optional)</label>
+        <textarea
+          value={d.transcript ?? ""}
+          onChange={e => set("transcript", e.target.value)}
+          className="w-full text-xs border border-gray-200 rounded p-2 min-h-[60px] resize-y focus:outline-none focus:ring-1 focus:ring-teal-400"
+          placeholder="Add a text transcript for accessibility…"
         />
-      </div>
-      <div>
-        <label className="text-xs text-gray-500 block mb-1">Background Color</label>
-        <div className="flex gap-2 items-center">
-          <input
-            type="color"
-            value={d.bgColor ?? "#f8fffe"}
-            onChange={e => set("bgColor", e.target.value)}
-            className="h-8 w-10 rounded border border-gray-200 cursor-pointer"
-          />
-          <Input
-            value={d.bgColor ?? "#f8fffe"}
-            onChange={e => set("bgColor", e.target.value)}
-            className="h-8 text-xs flex-1"
-          />
-        </div>
       </div>
     </div>
   );
