@@ -387,17 +387,22 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
       return <ProductOfferStackBlock data={d} onPrimaryCta={onEnroll} />;
     case "order_bump_checkout":
       return <InlineOrderBumpBlock data={d} onPrimaryCta={onEnroll} />;
-    case "curriculum_auto":
+    case "curriculum_auto": {
+      const cr = d.cornerRadius ?? 12;
+      const iconStyle = d.iconStyle ?? "lock";
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
-          <div className="border border-gray-200 rounded-xl overflow-hidden max-w-3xl">
+          {d.headline && <h2 className="text-2xl font-bold mb-6" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          <div className="overflow-hidden max-w-3xl" style={{ border: `1px solid ${d.sectionBorderColor ?? "#e5e7eb"}`, borderRadius: `${cr}px` }}>
             <Accordion type="multiple" defaultValue={["section-0"]}>
               {course.sections.map((section: any, si: number) => (
-                <AccordionItem key={section.id} value={`section-${si}`}>
-                  <AccordionTrigger className="text-sm font-medium text-gray-800 hover:no-underline px-5">
+                <AccordionItem key={section.id} value={`section-${si}`} style={{ borderBottom: `1px solid ${d.sectionBorderColor ?? "#e5e7eb"}` }}>
+                  <AccordionTrigger
+                    className="hover:no-underline px-5 font-semibold text-sm"
+                    style={{ backgroundColor: d.sectionBgColor ?? "#f9fafb", color: d.sectionTextColor ?? "#1f2937" }}
+                  >
                     <span>{section.title}</span>
-                    <span className="text-xs text-gray-400 ml-auto mr-2">{section.lessons.length} lesson{section.lessons.length !== 1 ? "s" : ""}</span>
+                    <span className="text-xs ml-auto mr-2" style={{ color: d.lessonCountColor ?? "#9ca3af" }}>{section.lessons.length} lesson{section.lessons.length !== 1 ? "s" : ""}</span>
                   </AccordionTrigger>
                   <AccordionContent>
                     <ul className="space-y-1 pt-1">
@@ -406,12 +411,19 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
                         const isFreePreview = pm === "preview" || pm === "preview_hide_after_purchase";
                         return (
                           <li key={lesson.id} className="flex items-center gap-3 py-2 px-5 text-sm">
-                            {isFreePreview ? <PlayCircle className="w-4 h-4 text-teal-500 flex-shrink-0" /> : <Lock className="w-4 h-4 text-gray-300 flex-shrink-0" />}
-                            <span className={isFreePreview ? "text-teal-700 font-medium" : "text-gray-700"}>{lesson.title}</span>
+                            {iconStyle !== "none" && (
+                              isFreePreview
+                                ? <PlayCircle className="w-4 h-4 flex-shrink-0" style={{ color: d.lessonPreviewIconColor ?? "#14b8a6" }} />
+                                : iconStyle === "circle"
+                                  ? <span className="w-4 h-4 rounded-full border-2 flex-shrink-0" style={{ borderColor: d.lessonLockedIconColor ?? "#d1d5db" }} />
+                                  : <Lock className="w-4 h-4 flex-shrink-0" style={{ color: d.lessonLockedIconColor ?? "#d1d5db" }} />
+                            )}
+                            <span style={{ color: isFreePreview ? (d.lessonPreviewIconColor ?? "#0d9488") : (d.lessonTextColor ?? "#374151"), fontWeight: isFreePreview ? 500 : 400 }}>{lesson.title}</span>
                             {isFreePreview && (
                               <a
                                 href={`/learn/${course.slug}/player?lesson=${lesson.id}`}
-                                className="ml-auto text-xs text-teal-600 hover:text-teal-800 hover:underline font-semibold flex items-center gap-1 shrink-0"
+                                className="ml-auto text-xs hover:underline font-semibold flex items-center gap-1 shrink-0"
+                                style={{ color: d.lessonPreviewIconColor ?? "#0d9488" }}
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <PlayCircle className="w-3 h-3" /> Free Preview
@@ -428,6 +440,7 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
           </div>
         </div>
       );
+    }
     case "pricing_options_auto": {
       const pricingOptions: any[] = course.pricingOptions ?? [];
       const allOptions = [

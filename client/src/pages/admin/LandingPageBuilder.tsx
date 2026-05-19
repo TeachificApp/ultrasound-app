@@ -255,7 +255,10 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
     } },
   // ── Smart Sections
   { type: "curriculum_auto", label: "Curriculum (Auto)", icon: <BookOpen size={14} />, category: "Smart",
-    defaultData: { headline: "Course Curriculum", bgColor: "#ffffff", showLocked: true } },
+    defaultData: { headline: "Course Curriculum", headlineColor: "#111827", bgColor: "#ffffff", showLocked: true,
+      sectionBgColor: "#f9fafb", sectionTextColor: "#1f2937", sectionBorderColor: "#e5e7eb",
+      lessonTextColor: "#374151", lessonLockedIconColor: "#d1d5db", lessonPreviewIconColor: "#14b8a6",
+      lessonCountColor: "#9ca3af", iconStyle: "lock", cornerRadius: 12 } },
   { type: "pricing_options_auto", label: "Pricing Options (Auto)", icon: <CreditCard size={14} />, category: "Smart",
     defaultData: { headline: "Choose Your Plan", bgColor: "#f9fafb" } },
   { type: "related_products", label: "Related Products", icon: <Package size={14} />, category: "Smart",
@@ -273,6 +276,30 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
       accentColor: "#179ca3",
       textColor: "#111827",
       excludeCurrentSlug: true,
+    } },
+  // ── File Downloads
+  { type: "file_download", label: "File Download", icon: <Upload size={14} />, category: "Content",
+    defaultData: {
+      // source: "upload" uses fileUrl/fileName directly; source: "media_repo" uses mediaAssetId
+      source: "upload",
+      fileUrl: "",
+      fileName: "",
+      mediaAssetId: null,
+      mediaAssetTitle: "",
+      mediaAssetUrl: "",
+      label: "Download File",
+      description: "",
+      // displayMode: "card" = styled download button/card; "inline" = native browser renderer (PDF, image, video)
+      displayMode: "card",
+      buttonText: "Download",
+      buttonColor: "#179ca3",
+      buttonTextColor: "#ffffff",
+      bgColor: "#f8fffe",
+      showIcon: true,
+      showFileSize: true,
+      fileSize: "",
+      // inline mode options
+      inlineHeight: 600,
     } },
 ];
 
@@ -692,11 +719,11 @@ function OptOutSettings({ d, set }: { d: Record<string, any>; set: (key: string,
 }
 
 export function BlockSettings({ block, onChange, lessonId }: { block: Block; onChange: (data: Record<string, any>) => void; lessonId?: number }) {
-  const d = block.data;
+  const d = block.data ?? {};
   // Use refs to avoid stale closures with debounced inputs
-  const dataRef = useRef(block.data);
+  const dataRef = useRef(block.data ?? {});
   const onChangeRef = useRef(onChange);
-  dataRef.current = block.data;
+  dataRef.current = block.data ?? {};
   onChangeRef.current = onChange;
   const set = useCallback((key: string, value: any) => {
     onChangeRef.current({ ...dataRef.current, [key]: value });
@@ -1334,7 +1361,50 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
       );
     }
     case "curriculum_auto":
-      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Section Headline" field="headline" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div className="flex items-center gap-2"><input type="checkbox" checked={d.showLocked ?? true} onChange={e => set("showLocked", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show locked lessons</label></div></div>);
+      return (
+        <div className="space-y-3">
+          <BSTextField data={d} onSet={set} label="Section Headline" field="headline" />
+          <BSColorField data={d} onSet={set} label="Headline Color" field="headlineColor" />
+          <BSColorField data={d} onSet={set} label="Block Background" field="bgColor" />
+          <div className="border-t pt-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Section Headers</p>
+            <div className="space-y-2">
+              <BSColorField data={d} onSet={set} label="Header Background" field="sectionBgColor" />
+              <BSColorField data={d} onSet={set} label="Header Text" field="sectionTextColor" />
+              <BSColorField data={d} onSet={set} label="Border / Divider" field="sectionBorderColor" />
+              <BSColorField data={d} onSet={set} label="Lesson Count Text" field="lessonCountColor" />
+            </div>
+          </div>
+          <div className="border-t pt-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Lessons</p>
+            <div className="space-y-2">
+              <BSColorField data={d} onSet={set} label="Lesson Text" field="lessonTextColor" />
+              <BSColorField data={d} onSet={set} label="Locked Icon" field="lessonLockedIconColor" />
+              <BSColorField data={d} onSet={set} label="Preview Icon" field="lessonPreviewIconColor" />
+            </div>
+          </div>
+          <div className="border-t pt-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Icon Style</p>
+            <div className="flex gap-2">
+              {["lock","circle","none"].map(s => (
+                <button key={s} onClick={() => set("iconStyle", s)}
+                  className={`flex-1 py-1 rounded text-xs font-medium border ${(d.iconStyle ?? "lock") === s ? "bg-teal-600 text-white border-teal-600" : "bg-white text-gray-600 border-gray-200"}`}>
+                  {s === "lock" ? "🔒 Lock" : s === "circle" ? "⭕ Circle" : "— None"}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="border-t pt-3">
+            <label className="text-xs text-gray-500 block mb-1">Corner Radius (px)</label>
+            <input type="range" min={0} max={24} step={2} value={d.cornerRadius ?? 12} onChange={e => set("cornerRadius", Number(e.target.value))} className="w-full" />
+            <span className="text-xs text-gray-400">{d.cornerRadius ?? 12}px</span>
+          </div>
+          <div className="flex items-center gap-2 border-t pt-3">
+            <input type="checkbox" checked={d.showLocked ?? true} onChange={e => set("showLocked", e.target.checked)} className="rounded" />
+            <label className="text-xs text-gray-600">Show locked lessons</label>
+          </div>
+        </div>
+      );
     case "pricing_options_auto":
       return (
         <div className="space-y-3">
@@ -1576,6 +1646,9 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
           }}
         />
       );
+    case "file_download": {
+      return <FileDownloadBlockSettings d={d} set={set} uploading={uploading} setUploading={setUploading} uploadMedia={uploadMedia} />;
+    }
      default:
       return <p className="text-xs text-gray-400">No settings for this block type.</p>;
   } })();
@@ -1620,7 +1693,7 @@ export function SortableBlock({ block, isSelected, onSelect, onDelete, onDuplica
       <div {...attributes} {...listeners} onClick={e => e.stopPropagation()}
         className={`absolute top-2 left-2 z-10 w-7 h-7 bg-white border border-gray-200 rounded shadow text-gray-400 hover:text-gray-600 flex items-center justify-center cursor-grab active:cursor-grabbing ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity`}
         title="Drag to reorder"><GripVertical size={14} /></div>
-      <div style={{ marginTop: block.data.marginTop ? `${block.data.marginTop}px` : undefined, marginBottom: block.data.marginBottom ? `${block.data.marginBottom}px` : undefined, paddingTop: block.data.paddingTop ? `${block.data.paddingTop}px` : undefined, paddingBottom: block.data.paddingBottom ? `${block.data.paddingBottom}px` : undefined, paddingLeft: block.data.paddingLeft ? `${block.data.paddingLeft}px` : undefined, paddingRight: block.data.paddingRight ? `${block.data.paddingRight}px` : undefined }}>
+      <div style={{ marginTop: block.data?.marginTop ? `${block.data.marginTop}px` : undefined, marginBottom: block.data?.marginBottom ? `${block.data.marginBottom}px` : undefined, paddingTop: block.data?.paddingTop ? `${block.data.paddingTop}px` : undefined, paddingBottom: block.data?.paddingBottom ? `${block.data.paddingBottom}px` : undefined, paddingLeft: block.data?.paddingLeft ? `${block.data.paddingLeft}px` : undefined, paddingRight: block.data?.paddingRight ? `${block.data.paddingRight}px` : undefined }}>
         <BlockPreview block={block} coursePrice={coursePrice} courseTitle={courseTitle} />
       </div>
     </div>
@@ -1945,5 +2018,208 @@ export default function LandingPageBuilder() {
       )}
     </div>
     </BlockTemplateLibraryProvider>
+  );
+}
+
+// ─── File Download Block Settings ─────────────────────────────────────────────
+function FileDownloadBlockSettings({ d, set, uploading, setUploading, uploadMedia }: {
+  d: Record<string, any>;
+  set: (key: string, val: any) => void;
+  uploading: string | null;
+  setUploading: (v: string | null) => void;
+  uploadMedia: any;
+}) {
+  const [showMediaPicker, setShowMediaPicker] = useState(false);
+  const [mediaSearch, setMediaSearch] = useState("");
+  const [mediaPage, setMediaPage] = useState(1);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const { data: mediaData } = trpc.mediaRepo.listAssets.useQuery(
+    { search: mediaSearch || undefined, page: mediaPage, pageSize: 12 },
+    { enabled: showMediaPicker }
+  );
+
+  const handleFileUpload = async (file: File) => {
+    if (file.size > 200 * 1024 * 1024) { toast.error("File must be under 200 MB"); return; }
+    setUploading("file_download_file");
+    try {
+      const reader = new FileReader();
+      const dataUri = await new Promise<string>((resolve) => { reader.onload = () => resolve(reader.result as string); reader.readAsDataURL(file); });
+      const result = await uploadMedia.mutateAsync({ dataUri, mimeType: file.type, fileName: file.name, context: "file-download-block" });
+      set("fileUrl", result.url);
+      set("fileName", file.name);
+      set("fileSize", file.size > 1024 * 1024 ? `${(file.size / (1024 * 1024)).toFixed(1)} MB` : `${Math.round(file.size / 1024)} KB`);
+      set("source", "upload");
+      toast.success("File uploaded");
+    } catch (err: any) { toast.error(err.message || "Upload failed"); }
+    setUploading(null);
+  };
+
+  const selectMediaAsset = (asset: any) => {
+    const url = asset.currentVersion?.s3Url ?? "";
+    const title = asset.title ?? asset.currentVersion?.fileName ?? "File";
+    const size = asset.currentVersion?.fileSize
+      ? asset.currentVersion.fileSize > 1024 * 1024
+        ? `${(asset.currentVersion.fileSize / (1024 * 1024)).toFixed(1)} MB`
+        : `${Math.round(asset.currentVersion.fileSize / 1024)} KB`
+      : "";
+    set("source", "media_repo");
+    set("mediaAssetId", asset.id);
+    set("mediaAssetTitle", title);
+    set("mediaAssetUrl", url);
+    set("fileName", asset.currentVersion?.fileName ?? title);
+    set("fileSize", size);
+    if (!d.label) set("label", title);
+    setShowMediaPicker(false);
+    toast.success("File selected from media repository");
+  };
+
+  const currentFileUrl = d.source === "media_repo" ? (d.mediaAssetUrl || "") : (d.fileUrl || "");
+  const currentFileName = d.source === "media_repo" ? (d.mediaAssetTitle || d.fileName || "") : (d.fileName || "");
+
+  return (
+    <div className="space-y-3">
+      {/* Display Mode */}
+      <div>
+        <label className="text-xs text-gray-500 block mb-1">Display Mode</label>
+        <Select value={d.displayMode ?? "card"} onValueChange={v => set("displayMode", v)}>
+          <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="card">Download Card (button + icon)</SelectItem>
+            <SelectItem value="inline">Inline Viewer (PDF/image/video + download)</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* File Source */}
+      <div>
+        <label className="text-xs text-gray-500 block mb-1">File Source</label>
+        <div className="flex gap-2">
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading === "file_download_file"}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs bg-teal-50 text-teal-700 rounded border border-teal-200 hover:bg-teal-100 disabled:opacity-50"
+          >
+            <Upload size={12} />
+            {uploading === "file_download_file" ? "Uploading..." : "Upload File"}
+          </button>
+          <button
+            onClick={() => setShowMediaPicker(true)}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs bg-blue-50 text-blue-700 rounded border border-blue-200 hover:bg-blue-100"
+          >
+            <FolderOpen size={12} />
+            Media Repo
+          </button>
+          <input ref={fileInputRef} type="file" className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); e.target.value = ""; }} />
+        </div>
+        {currentFileName && (
+          <div className="mt-1.5 flex items-center gap-1.5 p-2 bg-gray-50 rounded text-xs text-gray-600 border border-gray-200">
+            <Upload size={11} className="text-teal-600 flex-shrink-0" />
+            <span className="truncate flex-1">{currentFileName}</span>
+            {d.fileSize && <span className="text-gray-400 flex-shrink-0">{d.fileSize}</span>}
+            <button onClick={() => { set("fileUrl", ""); set("fileName", ""); set("mediaAssetId", null); set("mediaAssetUrl", ""); set("mediaAssetTitle", ""); }} className="text-red-400 hover:text-red-600 flex-shrink-0"><X size={11} /></button>
+          </div>
+        )}
+      </div>
+
+      {/* Label & Description */}
+      <BSTextField data={d} onSet={set} label="Label / Title" field="label" placeholder="Download File" />
+      <BSTextField data={d} onSet={set} label="Description (optional)" field="description" placeholder="Brief description of the file" />
+
+      {/* Button */}
+      <BSTextField data={d} onSet={set} label="Button Text" field="buttonText" placeholder="Download" />
+      <div className="grid grid-cols-2 gap-2">
+        <BSColorField data={d} onSet={set} label="Button Color" field="buttonColor" />
+        <BSColorField data={d} onSet={set} label="Button Text Color" field="buttonTextColor" />
+      </div>
+      <BSColorField data={d} onSet={set} label="Background Color" field="bgColor" />
+
+      {/* Inline height (only for inline mode) */}
+      {(d.displayMode ?? "card") === "inline" && (
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Viewer Height (px)</label>
+          <DebouncedInput value={d.inlineHeight ?? 600} onChange={v => set("inlineHeight", Number(v) || 600)} className="h-8 text-xs" placeholder="600" />
+        </div>
+      )}
+
+      {/* Toggles */}
+      <div className="flex items-center gap-2">
+        <input type="checkbox" id="fd-show-icon" checked={d.showIcon !== false} onChange={e => set("showIcon", e.target.checked)} className="rounded" />
+        <label htmlFor="fd-show-icon" className="text-xs text-gray-600">Show icon</label>
+      </div>
+      <div className="flex items-center gap-2">
+        <input type="checkbox" id="fd-show-size" checked={d.showFileSize !== false} onChange={e => set("showFileSize", e.target.checked)} className="rounded" />
+        <label htmlFor="fd-show-size" className="text-xs text-gray-600">Show file size</label>
+      </div>
+
+      {/* Media Repo Picker Modal */}
+      {showMediaPicker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl shadow-2xl w-[640px] max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="font-semibold text-gray-800">Select from Media Repository</h3>
+              <button onClick={() => setShowMediaPicker(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+            <div className="p-3 border-b">
+              <input
+                type="text"
+                placeholder="Search files..."
+                value={mediaSearch}
+                onChange={e => { setMediaSearch(e.target.value); setMediaPage(1); }}
+                className="w-full h-8 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
+            <div className="flex-1 overflow-y-auto p-3">
+              {!mediaData ? (
+                <div className="flex items-center justify-center h-32 text-gray-400 text-sm">Loading...</div>
+              ) : mediaData.assets.length === 0 ? (
+                <div className="flex items-center justify-center h-32 text-gray-400 text-sm">No files found</div>
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  {mediaData.assets.map((asset: any) => {
+                    const url = asset.currentVersion?.s3Url ?? "";
+                    const isImage = ["jpg", "jpeg", "png", "gif", "webp", "svg"].some(ext => url.toLowerCase().includes(`.${ext}`));
+                    return (
+                      <button
+                        key={asset.id}
+                        onClick={() => selectMediaAsset(asset)}
+                        className="flex flex-col items-center gap-1.5 p-2 rounded-lg border border-gray-200 hover:border-teal-400 hover:bg-teal-50 transition-all text-left"
+                      >
+                        {isImage ? (
+                          <img src={url} alt={asset.title} className="w-full h-20 object-cover rounded" />
+                        ) : (
+                          <div className="w-full h-20 bg-gray-100 rounded flex items-center justify-center">
+                            <Upload size={24} className="text-gray-400" />
+                          </div>
+                        )}
+                        <p className="text-xs text-gray-700 font-medium truncate w-full text-center">{asset.title}</p>
+                        {asset.currentVersion?.fileSize && (
+                          <p className="text-[10px] text-gray-400">
+                            {asset.currentVersion.fileSize > 1024 * 1024
+                              ? `${(asset.currentVersion.fileSize / (1024 * 1024)).toFixed(1)} MB`
+                              : `${Math.round(asset.currentVersion.fileSize / 1024)} KB`}
+                          </p>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            {mediaData && mediaData.total > mediaData.pageSize && (
+              <div className="p-3 border-t flex items-center justify-between text-xs text-gray-500">
+                <span>{mediaData.total} files total</span>
+                <div className="flex gap-2">
+                  <button disabled={mediaPage === 1} onClick={() => setMediaPage(p => p - 1)} className="px-2 py-1 rounded border disabled:opacity-40">Prev</button>
+                  <span>Page {mediaPage}</span>
+                  <button disabled={mediaPage * mediaData.pageSize >= mediaData.total} onClick={() => setMediaPage(p => p + 1)} className="px-2 py-1 rounded border disabled:opacity-40">Next</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

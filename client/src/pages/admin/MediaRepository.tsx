@@ -173,166 +173,209 @@ interface UploadDialogProps {
   onSuccess: () => void;
   existingAssetId?: number;
   existingTitle?: string;
+  /** Pre-select this folder slug when the dialog opens (e.g. currently browsed folder) */
+  initialFolder?: string | null;
 }
 
-function UploadDialog({ open, onClose, onSuccess, existingAssetId, existingTitle }: UploadDialogProps) {
+function UploadDialog({ open, onClose, onSuccess, existingAssetId, existingTitle, initialFolder }: UploadDialogProps) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const [file, setFile] = useState<File | null>(null);
-  const [title, setTitle] = useState(existingTitle ?? "");
-  const [description, setDescription] = useState("");
-  const [tags, setTags] = useState("");
+  // Bulk mode: list of queued files
+  const [files, setFiles] = useState<File[]>([]);
   const [access, setAccess] = useState<"public" | "private">("private");
-  const [folderSlug, setFolderSlug] = useState<string>("none");
+  const [folderSlug, setFolderSlug] = useState<string>(initialFolder ?? "none");
   const [notes, setNotes] = useState("");
   const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [uploadState, setUploadState] = useState<{ current: number; total: number; fileProgress: number }>({
+    current: 0, total: 0, fileProgress: 0,
+  });
+  const [errors, setErrors] = useState<string[]>([]);
 
   const { data: foldersData } = trpc.mediaRepo.listFoldersFull.useQuery();
-
   const isReupload = !!existingAssetId;
 
-  const handleFile = (f: File) => {
-    setFile(f);
-    if (!isReupload && !title) setTitle(f.name.replace(/\.[^.]+$/, ""));
+  // Sync folder when dialog opens with a new initialFolder
+  useEffect(() => {
+    if (!isReupload) setFolderSlug(initialFolder ?? "none");
+  }, [initialFolder, isReupload, open]);
+
+  // Reset state when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setFiles([]);
+      setErrors([]);
+      setNotes("");
+      setUploadState({ current: 0, total: 0, fileProgress: 0 });
+    }
+  }, [open]);
+
+  const addFiles = (incoming: FileList | File[]) => {
+    const arr = Array.from(incoming);
+    setFiles(prev => {
+      const existing = new Set(prev.map(f => f.name + f.size));
+      return [...prev, ...arr.filter(f => !existing.has(f.name + f.size))];
+    });
   };
+
+  const removeFile = (idx: number) => setFiles(prev => prev.filter((_, i) => i !== idx));
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    const f = e.dataTransfer.files[0];
-    if (f) handleFile(f);
-  }, [title, isReupload]);
+    if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
+  }, []);
 
   const CHUNK_SIZE = 10 * 1024 * 1024; // 10 MB per chunk
 
-  const handleUpload = async () => {
-    if (!file) { toast.error("Please select a file"); return; }
-    if (!isReupload && !title.trim()) { toast.error("Title is required"); return; }
-    setUploading(true);
-    setProgress(0);
-
-    try {
-      // Step 1: initialise the upload session
-      const initRes = await fetch("/api/upload-media-repo/init", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assetId: existingAssetId ?? undefined }),
+  const uploadOneFile = async (file: File, fileIndex: number, totalFiles: number): Promise<void> => {
+    const title = file.name.replace(/\.[^.]+$/, "");
+    const initRes = await fetch("/api/upload-media-repo/init", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ assetId: isReupload ? existingAssetId : undefined }),
+    });
+    if (!initRes.ok) {
+      const e = await initRes.json().catch(() => ({}));
+      throw new Error(e.error ?? "Failed to initialise upload");
+    }
+    const { uploadId } = await initRes.json();
+    const totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
+    for (let i = 0; i < totalChunks; i++) {
+      const start = i * CHUNK_SIZE;
+      const end = Math.min(start + CHUNK_SIZE, file.size);
+      const chunk = file.slice(start, end);
+      const fd = new FormData();
+      fd.append("chunk", chunk, file.name);
+      fd.append("uploadId", uploadId);
+      fd.append("chunkIndex", String(i));
+      fd.append("totalChunks", String(totalChunks));
+      fd.append("fileName", file.name);
+      fd.append("mimeType", file.type || "application/octet-stream");
+      fd.append("fileSize", String(file.size));
+      fd.append("notes", notes);
+      if (isReupload && existingAssetId) fd.append("assetId", String(existingAssetId));
+      if (!isReupload) {
+        fd.append("title", title);
+        fd.append("access", access);
+        if (folderSlug && folderSlug !== "none") fd.append("folder", folderSlug);
+      }
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.upload.onprogress = (ev) => {
+          if (ev.lengthComputable) {
+            const chunkPct = ev.loaded / ev.total;
+            const filePct = Math.round(((i + chunkPct) / totalChunks) * 100);
+            setUploadState({ current: fileIndex + 1, total: totalFiles, fileProgress: filePct });
+          }
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) resolve();
+          else {
+            try { reject(new Error(JSON.parse(xhr.responseText)?.error ?? "Chunk upload failed")); }
+            catch { reject(new Error("Chunk upload failed")); }
+          }
+        };
+        xhr.onerror = () => reject(new Error("Network error on chunk " + i));
+        xhr.open("POST", "/api/upload-media-repo/chunk");
+        xhr.withCredentials = true;
+        xhr.send(fd);
       });
-      if (!initRes.ok) {
-        const e = await initRes.json().catch(() => ({}));
-        throw new Error(e.error ?? "Failed to initialise upload");
+    }
+  };
+
+  const handleUpload = async () => {
+    if (isReupload) {
+      // Re-upload: single file mode
+      if (files.length === 0) { toast.error("Please select a file"); return; }
+    } else {
+      if (files.length === 0) { toast.error("Please add at least one file"); return; }
+    }
+    setUploading(true);
+    setErrors([]);
+    const errs: string[] = [];
+    const total = files.length;
+    for (let idx = 0; idx < total; idx++) {
+      try {
+        await uploadOneFile(files[idx], idx, total);
+      } catch (err: any) {
+        errs.push(`${files[idx].name}: ${err.message}`);
       }
-      const { uploadId } = await initRes.json();
-
-      // Step 2: send chunks sequentially
-      const totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
-
-      for (let i = 0; i < totalChunks; i++) {
-        const start = i * CHUNK_SIZE;
-        const end = Math.min(start + CHUNK_SIZE, file.size);
-        const chunk = file.slice(start, end);
-
-        const fd = new FormData();
-        fd.append("chunk", chunk, file.name);
-        fd.append("uploadId", uploadId);
-        fd.append("chunkIndex", String(i));
-        fd.append("totalChunks", String(totalChunks));
-        fd.append("fileName", file.name);
-        fd.append("mimeType", file.type || "application/octet-stream");
-        fd.append("fileSize", String(file.size));
-        fd.append("notes", notes);
-        if (existingAssetId) fd.append("assetId", String(existingAssetId));
-        if (!isReupload) {
-          fd.append("title", title.trim());
-          fd.append("description", description);
-          fd.append("tags", tags);
-          fd.append("access", access);
-          if (folderSlug && folderSlug !== "none") fd.append("folder", folderSlug);
-        }
-
-        await new Promise<void>((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.upload.onprogress = (e) => {
-            if (e.lengthComputable) {
-              const chunkProgress = e.loaded / e.total;
-              const overall = Math.round(((i + chunkProgress) / totalChunks) * 100);
-              setProgress(overall);
-            }
-          };
-          xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) resolve();
-            else {
-              try { reject(new Error(JSON.parse(xhr.responseText)?.error ?? "Chunk upload failed")); }
-              catch { reject(new Error("Chunk upload failed")); }
-            }
-          };
-          xhr.onerror = () => reject(new Error("Network error on chunk " + i));
-          xhr.open("POST", "/api/upload-media-repo/chunk");
-          xhr.withCredentials = true;
-          xhr.send(fd);
-        });
-      }
-
-      setProgress(100);
-      toast.success(isReupload ? "New version uploaded" : "File uploaded successfully");
+    }
+    setUploading(false);
+    if (errs.length === 0) {
+      toast.success(isReupload ? "New version uploaded" : `${total} file${total > 1 ? "s" : ""} uploaded successfully`);
       onSuccess();
       onClose();
-    } catch (err: any) {
-      toast.error(`Upload failed: ${err.message}`);
-    } finally {
-      setUploading(false);
-      setProgress(0);
+    } else {
+      setErrors(errs);
+      if (errs.length < total) {
+        toast.warning(`${total - errs.length} of ${total} files uploaded; ${errs.length} failed`);
+        onSuccess();
+      } else {
+        toast.error("All uploads failed — see details below");
+      }
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isReupload ? `Upload New Version — ${existingTitle}` : "Upload Media File"}</DialogTitle>
+          <DialogTitle>{isReupload ? `Upload New Version — ${existingTitle}` : "Upload Files"}</DialogTitle>
         </DialogHeader>
 
         {/* Drop zone */}
         <div
-          className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary/60 transition-colors"
+          className="border-2 border-dashed border-border rounded-lg p-5 text-center cursor-pointer hover:border-primary/60 transition-colors"
           onDragOver={(e) => e.preventDefault()}
           onDrop={handleDrop}
           onClick={() => fileRef.current?.click()}
         >
-          <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-          {file ? (
-            <p className="text-sm font-medium">{file.name} <span className="text-muted-foreground">({formatBytes(file.size)})</span></p>
-          ) : (
-            <p className="text-sm text-muted-foreground">Drag & drop any file, or click to browse<br /><span className="text-xs">Images, video, audio, PDF, HTML, SCORM, ZIP, LMS — no size limit</span></p>
-          )}
-          <input ref={fileRef} type="file" className="hidden" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
+          <Upload className="w-7 h-7 mx-auto mb-2 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">
+            Drag & drop files here, or click to browse
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">Images, video, audio, PDF, HTML, SCORM, ZIP — no size limit</p>
+          <input
+            ref={fileRef}
+            type="file"
+            multiple={!isReupload}
+            className="hidden"
+            onChange={(e) => e.target.files && addFiles(e.target.files)}
+          />
         </div>
 
+        {/* File queue */}
+        {files.length > 0 && (
+          <div className="space-y-1 max-h-40 overflow-y-auto rounded-lg border border-border p-2">
+            {files.map((f, idx) => (
+              <div key={idx} className="flex items-center gap-2 text-sm px-1 py-0.5 rounded hover:bg-muted/50 group">
+                <File className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                <span className="flex-1 truncate">{f.name}</span>
+                <span className="text-xs text-muted-foreground shrink-0">{formatBytes(f.size)}</span>
+                {!uploading && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); removeFile(idx); }}
+                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
         {!isReupload && (
-          <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label>Title *</Label>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Display title" />
-            </div>
-            <div>
-              <Label>Description</Label>
-              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional description" rows={2} />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Tags</Label>
-                <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="tag1, tag2" />
-              </div>
-              <div>
-                <Label>Access</Label>
-                <Select value={access} onValueChange={(v) => setAccess(v as any)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="private">Private (invite only)</SelectItem>
-                    <SelectItem value="public">Public (anyone with link)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <Label>Access</Label>
+              <Select value={access} onValueChange={(v) => setAccess(v as any)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="private">Private (invite only)</SelectItem>
+                  <SelectItem value="public">Public (anyone with link)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label>Folder</Label>
@@ -349,26 +392,53 @@ function UploadDialog({ open, onClose, onSuccess, existingAssetId, existingTitle
           </div>
         )}
 
-        <div>
-          <Label>Version Notes</Label>
-          <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes about this version" />
-        </div>
+        {isReupload && (
+          <div>
+            <Label>Version Notes</Label>
+            <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes about this version" />
+          </div>
+        )}
 
+        {/* Upload progress */}
         {uploading && (
           <div className="space-y-1">
             <div className="flex justify-between text-xs text-muted-foreground">
-              <span>Uploading…</span><span>{progress}%</span>
+              <span>Uploading file {uploadState.current} of {uploadState.total}…</span>
+              <span>{uploadState.fileProgress}%</span>
             </div>
             <div className="h-2 bg-muted rounded-full overflow-hidden">
-              <div className="h-full bg-primary transition-all" style={{ width: `${progress}%` }} />
+              <div className="h-full bg-primary transition-all" style={{ width: `${uploadState.fileProgress}%` }} />
             </div>
+            {uploadState.total > 1 && (
+              <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-1">
+                <div
+                  className="h-full bg-primary/40 transition-all"
+                  style={{ width: `${Math.round(((uploadState.current - 1) / uploadState.total) * 100)}%` }}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Errors */}
+        {errors.length > 0 && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-1">
+            {errors.map((e, i) => (
+              <p key={i} className="text-xs text-destructive">{e}</p>
+            ))}
           </div>
         )}
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={uploading}>Cancel</Button>
-          <Button onClick={handleUpload} disabled={uploading || !file}>
-            {uploading ? "Uploading…" : isReupload ? "Upload New Version" : "Upload"}
+          <Button onClick={handleUpload} disabled={uploading || files.length === 0}>
+            {uploading
+              ? `Uploading ${uploadState.current}/${uploadState.total}…`
+              : isReupload
+                ? "Upload New Version"
+                : files.length > 1
+                  ? `Upload ${files.length} Files`
+                  : "Upload"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1552,6 +1622,7 @@ export default function MediaRepository() {
           open={uploadOpen}
           onClose={() => setUploadOpen(false)}
           onSuccess={handleRefresh}
+          initialFolder={selectedFolder}
         />
       )}
 

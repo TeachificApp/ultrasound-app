@@ -22,7 +22,8 @@ export type BlockType =
   | "price_stack" | "urgency_offer" | "checkout_form"
   | "footer" | "logo_strip" | "three_column"
   | "related_products" | "embedded_checkout" | "inline_checkout"
-  | "lesson_quiz" | "lesson_flashcard";
+  | "lesson_quiz" | "lesson_flashcard"
+  | "file_download";
 
 export interface Block {
   id: string;
@@ -31,7 +32,7 @@ export interface Block {
 }
 
 export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block; coursePrice?: number; courseTitle?: string }) {
-  const d = block.data;
+  const d = block.data ?? {};
 
   switch (block.type) {
     case "hero": {
@@ -521,15 +522,18 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
         </div>
       );
     }
-    case "curriculum_auto":
+    case "curriculum_auto": {
+      const cr = d.cornerRadius ?? 12;
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
-          <div className="border border-gray-200 rounded-xl overflow-hidden max-w-3xl">
+          {d.headline && <h2 className="text-2xl font-bold mb-6" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          <div className="overflow-hidden max-w-3xl" style={{ border: `1px solid ${d.sectionBorderColor ?? "#e5e7eb"}`, borderRadius: `${cr}px` }}>
             {["Section 1", "Section 2", "Section 3"].map((s, i) => (
-              <div key={i} className="border-b border-gray-100 last:border-0">
-                <div className="flex items-center justify-between px-5 py-4 bg-gray-50 font-semibold text-gray-800">
-                  <span>{s}</span><ChevronDown size={16} className="text-gray-400" />
+              <div key={i} style={{ borderBottom: `1px solid ${d.sectionBorderColor ?? "#e5e7eb"}` }} className="last:border-0">
+                <div className="flex items-center justify-between px-5 py-4 font-semibold" style={{ backgroundColor: d.sectionBgColor ?? "#f9fafb", color: d.sectionTextColor ?? "#1f2937" }}>
+                  <span>{s}</span>
+                  <span className="text-xs mr-2" style={{ color: d.lessonCountColor ?? "#9ca3af" }}>5 lessons</span>
+                  <ChevronDown size={16} style={{ color: d.lessonCountColor ?? "#9ca3af" }} />
                 </div>
               </div>
             ))}
@@ -537,6 +541,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
           <p className="text-xs text-gray-400 mt-3">Auto-populated from course curriculum</p>
         </div>
       );
+    }
     case "pricing_options_auto":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
@@ -742,6 +747,60 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
             </div>
           ))}
           {cards.length > 2 && <p className="text-xs text-gray-400 mt-1">+{cards.length - 2} more cards</p>}
+        </div>
+      );
+    }
+    case "file_download": {
+      const fileUrl = d.source === "media_repo" ? (d.mediaAssetUrl || "") : (d.fileUrl || "");
+      const fileName = d.source === "media_repo" ? (d.mediaAssetTitle || d.fileName || "File") : (d.fileName || "File");
+      const displayMode = d.displayMode ?? "card";
+      if (displayMode === "inline" && fileUrl) {
+        const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
+        const isPdf = ext === "pdf";
+        const isImage = ["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(ext);
+        const isVideo = ["mp4", "webm", "mov", "ogg"].includes(ext);
+        const isAudio = ["mp3", "wav", "ogg", "m4a"].includes(ext);
+        return (
+          <div className="px-8 py-6" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+            {d.label && <h3 className="text-lg font-semibold text-gray-800 mb-2">{d.label}</h3>}
+            {d.description && <p className="text-sm text-gray-500 mb-3">{d.description}</p>}
+            {isPdf && <iframe src={fileUrl} className="w-full rounded-lg border border-gray-200" style={{ height: `${d.inlineHeight ?? 600}px` }} title={fileName} />}
+            {isImage && <img src={fileUrl} alt={fileName} className="max-w-full rounded-lg shadow" />}
+            {isVideo && <video src={fileUrl} controls className="w-full rounded-lg shadow" style={{ maxHeight: `${d.inlineHeight ?? 400}px` }} />}
+            {isAudio && <audio src={fileUrl} controls className="w-full" />}
+            {/* Always show download button in inline mode */}
+            <div className="mt-3 flex justify-end">
+              <a href={fileUrl} download={fileName}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
+                style={{ backgroundColor: d.buttonColor ?? "#179ca3", color: d.buttonTextColor ?? "#fff" }}>
+                <Upload size={14} />{d.buttonText ?? "Download"}
+                {d.showFileSize !== false && d.fileSize && <span className="opacity-70 text-xs">({d.fileSize})</span>}
+              </a>
+            </div>
+          </div>
+        );
+      }
+      // Card mode (default)
+      return (
+        <div className="px-8 py-6" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
+          <div className="max-w-xl mx-auto flex items-center gap-4 p-5 bg-white rounded-xl border border-gray-200 shadow-sm">
+            {d.showIcon !== false && (
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${d.buttonColor ?? "#179ca3"}20` }}>
+                <Upload size={22} style={{ color: d.buttonColor ?? "#179ca3" }} />
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-gray-800 truncate">{d.label || fileName || "Download File"}</p>
+              {d.description && <p className="text-sm text-gray-500 mt-0.5">{d.description}</p>}
+              {d.showFileSize !== false && d.fileSize && <p className="text-xs text-gray-400 mt-0.5">{d.fileSize}</p>}
+              {!fileUrl && <p className="text-xs text-amber-500 mt-0.5">No file selected</p>}
+            </div>
+            <a href={fileUrl || "#"} download={fileName} onClick={e => !fileUrl && e.preventDefault()}
+              className="px-5 py-2.5 rounded-lg text-sm font-semibold flex-shrink-0 transition-opacity"
+              style={{ backgroundColor: d.buttonColor ?? "#179ca3", color: d.buttonTextColor ?? "#ffffff", opacity: fileUrl ? 1 : 0.4 }}>
+              {d.buttonText ?? "Download"}
+            </a>
+          </div>
         </div>
       );
     }

@@ -4060,3 +4060,16 @@ export const lmsPendingEnrollments = mysqlTable("lms_pending_enrollments", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 export type LmsPendingEnrollment = typeof lmsPendingEnrollments.$inferSelect;
+
+// --- LMS Archive (30-day soft-delete) ---
+export const lmsArchive = mysqlTable("lms_archive", {
+  id: int("id").autoincrement().primaryKey(),
+  itemType: mysqlEnum("item_type", ["course", "quiz", "download", "product", "bundle"]).notNull(),
+  originalId: int("original_id").notNull(),
+  title: varchar("title", { length: 500 }).notNull(),
+  snapshot: longtext("snapshot").notNull(),
+  deletedByUserId: int("deleted_by_user_id").notNull(),
+  deletedAt: timestamp("deleted_at").defaultNow().notNull(),
+  purgeAt: timestamp("purge_at").notNull(),
+});
+export type LmsArchiveItem = typeof lmsArchive.$inferSelect;

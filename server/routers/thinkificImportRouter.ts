@@ -84,16 +84,19 @@ function stripHtml(html: string | null | undefined): string {
 /** Build a default Hero banner content block from a lesson title */
 function buildHeroBannerBlock(title: string): object {
   return {
+    id: `hero-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     type: "hero",
-    headline1: title,
-    headline2: "",
-    subtext: "",
-    showButtons: false,
-    buttons: [],
-    bgColor: "#149096",
-    textColor: "#ffffff",
-    alignment: "left",
-    padding: "md",
+    data: {
+      headline: title,
+      headline2: "",
+      subheadline: "",
+      bgType: "color",
+      bgColor: "#149096",
+      textColor: "#ffffff",
+      align: "left",
+      buttons: [],
+      showButtons: false,
+    },
   };
 }
 
