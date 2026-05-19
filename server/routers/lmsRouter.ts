@@ -51,6 +51,8 @@ import {
   platformSettings,
   digitalProducts,
   lmsThinkificImports,
+  lmsArchive,
+  sonoQuizzes,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 
@@ -202,6 +204,42 @@ export const lmsPublicRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
+      // If type is explicitly "quiz", merge lmsCourses quizzes + sonoQuizzes
+      if (input.type === "quiz") {
+        const lmsConditions = [eq(lmsCourses.status, "public"), eq(lmsCourses.showInLibrary, true), eq(lmsCourses.type, "quiz")];
+        if (input.brand) lmsConditions.push(eq(lmsCourses.brand, input.brand));
+        const offset = (input.page - 1) * input.pageSize;
+        const [lmsQuizRows, sqRows] = await Promise.all([
+          db.select().from(lmsCourses).where(and(...lmsConditions)).orderBy(desc(lmsCourses.createdAt)),
+          db.select().from(sonoQuizzes).where(eq(sonoQuizzes.status, "published")).orderBy(desc(sonoQuizzes.createdAt)),
+        ]);
+        const lmsMapped = lmsQuizRows.map(c => ({ ...c, instructor: null, _source: "lms_course" as const }));
+        const sqMapped = sqRows.map(q => ({
+          id: q.id,
+          slug: `quiz-${q.id}`,
+          title: q.title,
+          subtitle: q.description ?? null,
+          description: q.description ?? null,
+          coverImageUrl: q.coverImageUrl ?? null,
+          status: "public" as const,
+          type: "quiz" as const,
+          brand: "aaus" as const,
+          price: 0,
+          isFree: true,
+          isFeatured: false,
+          showInLibrary: true,
+          createdAt: q.createdAt,
+          updatedAt: q.updatedAt,
+          instructor: null,
+          _source: "sono_quiz" as const,
+        }));
+        const combined = [...lmsMapped, ...sqMapped].sort((a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        const paginated = combined.slice(offset, offset + input.pageSize);
+        return { courses: paginated, total: combined.length, page: input.page, pageSize: input.pageSize };
+      }
+
       // If type is explicitly "download", pull from digitalProducts table and return in same shape
       if (input.type === "download") {
         const dpConditions = [eq(digitalProducts.status, "published"), eq(digitalProducts.showInLibrary, true)];
@@ -263,6 +301,60 @@ export const lmsPublicRouter = router({
             return { ...c, instructor: ci ? (insMap.get(ci.instructorId) ?? null) : null };
           });
         }
+      }
+
+      // When no type filter (All Types), also include digitalProducts and sonoQuizzes
+      if (!input.type) {
+        const dpConditions = [eq(digitalProducts.status, "published"), eq(digitalProducts.showInLibrary, true)];
+        if (input.isFree !== undefined) dpConditions.push(eq(digitalProducts.isFree, input.isFree));
+        const dpRows = await db.select().from(digitalProducts).where(and(...dpConditions)).orderBy(desc(digitalProducts.createdAt));
+        const dpMapped = dpRows.map(p => ({
+          id: p.id,
+          slug: p.slug,
+          title: p.title,
+          subtitle: p.subtitle ?? null,
+          description: p.description ?? null,
+          coverImageUrl: p.thumbnailUrl ?? null,
+          status: "public" as const,
+          type: "download" as const,
+          brand: "aaus" as const,
+          price: p.price,
+          isFree: p.isFree,
+          isFeatured: false,
+          showInLibrary: p.showInLibrary,
+          createdAt: p.createdAt,
+          updatedAt: p.updatedAt,
+          instructor: null,
+          _source: "digital_product" as const,
+        }));
+        // Also include published sonoQuizzes
+        const sqRows = await db.select().from(sonoQuizzes).where(eq(sonoQuizzes.status, "published")).orderBy(desc(sonoQuizzes.createdAt));
+        const sqMapped = sqRows.map(q => ({
+          id: q.id,
+          slug: `quiz-${q.id}`,
+          title: q.title,
+          subtitle: q.description ?? null,
+          description: q.description ?? null,
+          coverImageUrl: q.coverImageUrl ?? null,
+          status: "public" as const,
+          type: "quiz" as const,
+          brand: "aaus" as const,
+          price: 0,
+          isFree: true,
+          isFeatured: false,
+          showInLibrary: true,
+          createdAt: q.createdAt,
+          updatedAt: q.updatedAt,
+          instructor: null,
+          _source: "sono_quiz" as const,
+        }));
+        // Merge all, sort by createdAt desc, then paginate
+        const combined = [...enriched, ...dpMapped, ...sqMapped].sort((a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        const totalCombined = Number(count) + dpRows.length + sqRows.length;
+        const paginated = combined.slice(offset, offset + input.pageSize);
+        return { courses: paginated, total: totalCombined, page: input.page, pageSize: input.pageSize };
       }
 
       return { courses: enriched, total: Number(count), page: input.page, pageSize: input.pageSize };
@@ -1252,6 +1344,17 @@ export const lmsAdminRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.id, input.id)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      const purgeAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      await db.insert(lmsArchive).values({
+        itemType: "course",
+        originalId: course.id,
+        title: course.title,
+        snapshot: JSON.stringify(course),
+        deletedByUserId: ctx.user.id,
+        purgeAt,
+      });
       await db.delete(lmsCourses).where(eq(lmsCourses.id, input.id));
       return { success: true };
     }),
