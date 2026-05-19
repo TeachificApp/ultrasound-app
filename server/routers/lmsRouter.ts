@@ -83,11 +83,25 @@ async function recalcProgress(db: Awaited<ReturnType<typeof getDb>>, enrollmentI
   const [enrollRow] = await db.select().from(lmsEnrollments).where(eq(lmsEnrollments.id, enrollmentId)).limit(1);
   if (!enrollRow) return;
   const courseId = enrollRow.courseId;
-  // Count ALL lessons in course — both section-based and top-level (courseId direct reference)
-  const totalRows = await db.select({ count: sql<number>`count(*)` }).from(lmsLessons).where(
-    eq(lmsLessons.courseId, courseId)
-  );
-  const total = Number(totalRows[0]?.count ?? 0);
+
+  // Get all section IDs for this course
+  const courseSections = await db.select({ id: lmsSections.id }).from(lmsSections).where(eq(lmsSections.courseId, courseId));
+  const sectionIds = courseSections.map(s => s.id);
+
+  // Count ALL lessons in course — direct courseId OR via sectionId
+  let totalCount = 0;
+  if (sectionIds.length > 0) {
+    const [totalRows] = await db.select({ count: sql<number>`count(*)` }).from(lmsLessons).where(
+      sql`(${lmsLessons.courseId} = ${courseId} OR ${lmsLessons.sectionId} IN (${sql.join(sectionIds.map(id => sql`${id}`), sql`, `)}))`
+    );
+    totalCount = Number(totalRows?.count ?? 0);
+  } else {
+    const [totalRows] = await db.select({ count: sql<number>`count(*)` }).from(lmsLessons).where(
+      eq(lmsLessons.courseId, courseId)
+    );
+    totalCount = Number(totalRows?.count ?? 0);
+  }
+  const total = totalCount;
   if (total === 0) return;
 
   // Count completed lessons

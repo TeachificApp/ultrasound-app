@@ -1060,6 +1060,7 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
               initialBlocks={course.courseOverviewBlocks ? (typeof course.courseOverviewBlocks === "string" ? JSON.parse(course.courseOverviewBlocks) : course.courseOverviewBlocks) : []}
               initialTopBlocks={course.courseOverviewTopBlocks ? (typeof course.courseOverviewTopBlocks === "string" ? JSON.parse(course.courseOverviewTopBlocks) : course.courseOverviewTopBlocks) : []}
               initialBottomBlocks={course.courseOverviewBottomBlocks ? (typeof course.courseOverviewBottomBlocks === "string" ? JSON.parse(course.courseOverviewBottomBlocks) : course.courseOverviewBottomBlocks) : []}
+              hideProgress={course.hideProgress ?? false}
               onSaved={() => refetch()}
             />
           ) : (
@@ -1743,6 +1744,7 @@ function CourseOverviewEditor({
   initialBlocks,
   initialTopBlocks,
   initialBottomBlocks,
+  hideProgress,
   onSaved,
 }: {
   courseId: number;
@@ -1754,6 +1756,7 @@ function CourseOverviewEditor({
   initialBlocks: Block[];
   initialTopBlocks: Block[];
   initialBottomBlocks: Block[];
+  hideProgress: boolean;
   onSaved: () => void;
 }) {
   // Three block zones: main (between progress bar and curriculum), top (above progress bar), bottom (below curriculum)
@@ -1975,7 +1978,12 @@ function CourseOverviewEditor({
               )}
             </div>
 
-            {/* ── Read-only: Progress bar ── */}
+            {/* ── Read-only: Progress bar — only shown when hideProgress is false AND at least one lesson has requireManualComplete ── */}
+            {(() => {
+              const allLessonsFlat = [...(topLevelLessons ?? []), ...(sections ?? []).flatMap((s: any) => s.lessons ?? [])];
+              const hasAnyManualComplete = allLessonsFlat.some((l: any) => l.requireManualComplete === 1 || l.requireManualComplete === true);
+              if (hideProgress || !hasAnyManualComplete) return null;
+              return (
             <div className="bg-white rounded-xl border border-gray-200 p-5 opacity-60 pointer-events-none select-none">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-gray-700">Your Progress</span>
@@ -1986,6 +1994,8 @@ function CourseOverviewEditor({
               </div>
               <p className="text-xs text-gray-500 mt-2">0 of {[...(topLevelLessons ?? []), ...(sections ?? []).flatMap((s: any) => s.lessons ?? [])].length} lessons completed</p>
             </div>
+              );
+            })()}
 
             {/* ── Main Zone (between progress bar and curriculum) ── */}
             <div className={cn("rounded-xl border-2 overflow-hidden bg-white", activeZone === "main" ? "border-teal-400" : "border-dashed border-teal-200")}>

@@ -46,6 +46,7 @@ import {
 import AudioBlockEditor from "@/components/AudioBlockEditor";
 import LessonQuizBlockEditor from "@/components/LessonQuizBlockEditor";
 import LessonFlashcardBlockEditor from "@/components/LessonFlashcardBlockEditor";
+import { BlockTemplateLibraryProvider, OpenTemplateLibraryButton, SaveAsTemplateButton } from "@/components/BlockTemplateLibrary";
 
 
 // ─── Block Types & BlockPreview (re-exported from shared component) ─────────
@@ -1584,7 +1585,7 @@ export function SortableBlock({ block, isSelected, onSelect, onDelete, onDuplica
       className={`relative group cursor-pointer border-2 transition-all ${isSelected ? "border-teal-500 shadow-lg shadow-teal-100" : "border-transparent hover:border-teal-200"}`}>
       <div className={`absolute top-2 right-2 z-10 flex gap-1 ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity`}>
         <button onClick={e => { e.stopPropagation(); onDuplicate(); }} className="w-7 h-7 bg-white border border-gray-200 rounded shadow text-gray-500 hover:text-teal-600 flex items-center justify-center" title="Duplicate"><Copy size={12} /></button>
-        {onSaveAsTemplate && <button onClick={e => { e.stopPropagation(); onSaveAsTemplate(block); }} className="w-7 h-7 bg-white border border-gray-200 rounded shadow text-gray-500 hover:text-amber-500 flex items-center justify-center" title="Save as Global Template"><Bookmark size={12} /></button>}
+        {onSaveAsTemplate && <SaveAsTemplateButton block={block} blockLabel={BLOCK_CATALOG.find(c => c.type === block.type)?.label ?? block.type} className="w-7 h-7 bg-white border border-gray-200 rounded shadow flex items-center justify-center" />}
         <button onClick={e => { e.stopPropagation(); onDelete(); }} className="w-7 h-7 bg-white border border-gray-200 rounded shadow text-gray-500 hover:text-red-500 flex items-center justify-center" title="Delete"><Trash2 size={12} /></button>
       </div>
       {/* Up/Down arrow buttons */}
@@ -1805,6 +1806,7 @@ export default function LandingPageBuilder() {
   const catalogByCat = BLOCK_CATALOG.filter(c => c.category === activeCat);
 
   return (
+    <BlockTemplateLibraryProvider onInsert={(block) => { setBlocks(prev => [...prev, block]); setSelectedId(block.id); }}>
     <div className="fixed inset-0 z-50 flex flex-col bg-gray-50" style={{ fontFamily: "Inter, sans-serif" }}>
       {/* Top Bar */}
       <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200 shadow-sm flex-shrink-0">
@@ -1818,8 +1820,9 @@ export default function LandingPageBuilder() {
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => { setTemplatesInitialTab("page"); setShowTemplates(true); }} className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-teal-700 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors">
-            <FolderOpen size={14} /> Templates
+            <FolderOpen size={14} /> Page Templates
           </button>
+          <OpenTemplateLibraryButton />
           <button onClick={() => { setTemplatesInitialTab("page"); setShowTemplates(true); }} className="flex items-center gap-1.5 text-sm text-amber-600 hover:text-amber-700 border border-amber-200 bg-amber-50 hover:bg-amber-100 rounded-lg px-3 py-1.5 transition-colors" title="Save current page as a reusable template">
             <Bookmark size={14} /> Save as Template
           </button>
@@ -1917,5 +1920,6 @@ export default function LandingPageBuilder() {
         <TemplateLibrary blocks={blocks} onInsert={insertTemplateBlocks} onClose={() => setShowTemplates(false)} initialTab={templatesInitialTab} />
       )}
     </div>
+    </BlockTemplateLibraryProvider>
   );
 }

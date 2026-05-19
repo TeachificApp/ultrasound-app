@@ -3998,3 +3998,18 @@ export const generalFormSubmissions = mysqlTable("generalFormSubmissions", {
 });
 export type GeneralFormSubmission = typeof generalFormSubmissions.$inferSelect;
 export type InsertGeneralFormSubmission = typeof generalFormSubmissions.$inferInsert;
+
+// ─── Block Templates (shared across all page editors) ─────────────────────────
+export const blockTemplates = mysqlTable("blockTemplates", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 200 }).notNull(),
+  description: text("description"),
+  blockType: varchar("blockType", { length: 80 }).notNull(), // e.g. "text", "image", "lesson_quiz"
+  blockData: longtext("blockData").notNull(), // JSON of the block's data object
+  tags: varchar("tags", { length: 500 }), // comma-separated tags for search
+  createdByUserId: int("createdByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type BlockTemplate = typeof blockTemplates.$inferSelect;
+export type InsertBlockTemplate = typeof blockTemplates.$inferInsert;

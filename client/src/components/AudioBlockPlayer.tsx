@@ -45,14 +45,31 @@ interface WaveformProps {
 function WaveformCanvas({ peaks, progress, onSeek, accentColor = "#0d9488" }: WaveformProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Resize canvas to match its CSS display size so bars always fill full width
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ro = new ResizeObserver(() => {
+      canvas.width = canvas.offsetWidth || 600;
+      canvas.height = canvas.offsetHeight || 56;
+      // Trigger redraw by dispatching a synthetic resize — the draw effect will re-run
+      // because we're updating the canvas dimensions which the draw effect reads
+    });
+    ro.observe(canvas);
+    return () => ro.disconnect();
+  }, []);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const W = canvas.width;
-    const H = canvas.height;
+    // Use the actual rendered pixel dimensions so bars always span full width
+    const W = canvas.offsetWidth || canvas.width || 600;
+    const H = canvas.offsetHeight || canvas.height || 56;
+    canvas.width = W;
+    canvas.height = H;
     ctx.clearRect(0, 0, W, H);
 
     if (!peaks || peaks.length === 0) {
@@ -65,20 +82,25 @@ function WaveformCanvas({ peaks, progress, onSeek, accentColor = "#0d9488" }: Wa
       return;
     }
 
-    const barW = Math.max(1, W / peaks.length);
+    const numBars = peaks.length;
+    // Use the full canvas width divided evenly across all bars
+    const barW = W / numBars;
     const midY = H / 2;
-    const playedX = progress * W;
+    const playedX = Math.max(0, Math.min(progress, 1)) * W;
 
-    for (let i = 0; i < peaks.length; i++) {
+    for (let i = 0; i < numBars; i++) {
+      // x position: evenly spaced across the full width
       const x = i * barW;
-      const amp = Math.max(0.02, peaks[i]);
+      const amp = Math.max(0.04, peaks[i]);
       const barH = amp * (H * 0.85);
-      const isPlayed = x <= playedX;
+      // Bars to the left of the scrub head are teal (played), rest are grey
+      const isPlayed = x + barW / 2 <= playedX;
       ctx.fillStyle = isPlayed ? accentColor : "#d1d5db";
+      // Leave a 1px gap between bars for visual separation
       ctx.fillRect(x, midY - barH / 2, Math.max(1, barW - 1), barH);
     }
 
-    // Scrub head
+    // Scrub head — draw on top of bars
     ctx.fillStyle = accentColor;
     ctx.fillRect(playedX - 1, 0, 2, H);
   }, [peaks, progress, accentColor]);

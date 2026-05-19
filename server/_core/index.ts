@@ -203,6 +203,19 @@ async function startServer() {
       createContext,
     })
   );
+  // Redirect /media/:slug → /api/media/:slug (backward-compat for stored URLs without /api/ prefix)
+  app.get("/media/:slug", (req, res) => {
+    const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+    res.redirect(301, `/api/media/${req.params.slug}${qs}`);
+  });
+  app.get("/media/:slug/download", (req, res) => {
+    const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+    res.redirect(301, `/api/media/${req.params.slug}/download${qs}`);
+  });
+  app.get("/media/:slug/embed", (req, res) => {
+    const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+    res.redirect(301, `/api/media/${req.params.slug}/embed${qs}`);
+  });
   // Media repository public serve/embed routes (cookieless, token-based access)
   // MUST be registered BEFORE serveStatic so they take priority over the SPA catch-all
   registerMediaServeRoutes(app);

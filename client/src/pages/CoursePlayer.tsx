@@ -120,7 +120,7 @@ function QuizRunner({ lesson, courseSlug, onComplete }: { lesson: any; courseSlu
 }
 
 // ─── Inline Lesson Quiz (for lesson_quiz content blocks) ────────────────────
-function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[]; showExplanations?: boolean; passingScore?: number; shuffleQuestions?: boolean } }) {
+function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[]; showExplanations?: boolean; passingScore?: number; shuffleQuestions?: boolean; requirePassToComplete?: boolean } }) {
   const questions = data.questions ?? [];
   const shuffled = data.shuffleQuestions
     ? [...questions].sort(() => Math.random() - 0.5)
@@ -141,14 +141,16 @@ function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[];
       <div className="px-5 py-3 bg-gradient-to-r from-teal-600 to-teal-500 flex items-center gap-2">
         <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
         <h3 className="text-white font-semibold text-sm">{data.title || "Knowledge Check"}</h3>
-        <span className="ml-auto text-teal-100 text-xs">{questions.length} question{questions.length !== 1 ? "s" : ""} · Pass: {data.passingScore ?? 70}%</span>
+        <span className="ml-auto text-teal-100 text-xs">{questions.length} question{questions.length !== 1 ? "s" : ""}{data.requirePassToComplete !== false ? ` · Pass: ${data.passingScore ?? 70}%` : ""}</span>
       </div>
       <div className="p-5 space-y-5">
         {submitted && (
           <div className={`rounded-lg p-3 border text-sm font-semibold ${
             passed ? "bg-green-50 border-green-300 text-green-700" : "bg-red-50 border-red-300 text-red-700"
           }`}>
-            {passed ? `✓ Passed! Score: ${score}%` : `✗ Score: ${score}% — ${data.passingScore ?? 70}% required to pass`}
+            {data.requirePassToComplete !== false
+              ? (passed ? `✓ Passed! Score: ${score}%` : `✗ Score: ${score}% — ${data.passingScore ?? 70}% required to pass`)
+              : `Score: ${score}%`}
             {!passed && (
               <button className="ml-3 text-xs underline" onClick={() => { setSelected({}); setSubmitted(false); setShowResults(false); }}>Retake</button>
             )}
@@ -202,7 +204,11 @@ function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[];
 }
 
 // ─── Inline Lesson Flashcard Deck (for lesson_flashcard content blocks) ───────
-function InlineLessonFlashcardDeck({ data }: { data: { title?: string; cards?: any[]; shuffleCards?: boolean; showHints?: boolean } }) {
+function InlineLessonFlashcardDeck({ data }: { data: { title?: string; cards?: any[]; shuffleCards?: boolean; showHints?: boolean; gotItColor?: string; gotItTextColor?: string; stillLearningColor?: string; stillLearningTextColor?: string } }) {
+  const gotItBg = data.gotItColor ?? "#0d9488";
+  const gotItText = data.gotItTextColor ?? "#ffffff";
+  const stillBg = data.stillLearningColor ?? "#f0fdfa";
+  const stillText = data.stillLearningTextColor ?? "#0f766e";
   const cards = data.cards ?? [];
   const deck = data.shuffleCards ? [...cards].sort(() => Math.random() - 0.5) : cards;
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -275,14 +281,16 @@ function InlineLessonFlashcardDeck({ data }: { data: { title?: string; cards?: a
         {/* Controls */}
         <div className="flex flex-col gap-2 mt-4">
           {/* Known/Unknown buttons — always visible */}
-          <div className="flex gap-2 justify-center">
+          <div className="flex gap-3 justify-center">
             <button
               onClick={markUnknown}
-              className="flex-1 px-3 py-2 text-xs rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors font-medium"
-            >✕ Still Learning</button>
+              className="flex-1 py-2.5 text-sm rounded-xl border-2 font-semibold shadow-sm transition-all"
+              style={{ background: stillBg, color: stillText, borderColor: stillText + "55" }}
+            >↺ Still Learning</button>
             <button
               onClick={markKnown}
-              className="flex-1 px-3 py-2 text-xs rounded-lg border border-green-300 text-green-700 hover:bg-green-50 transition-colors font-medium"
+              className="flex-1 py-2.5 text-sm rounded-xl font-semibold shadow-md transition-all"
+              style={{ background: gotItBg, color: gotItText }}
             >✓ Got It!</button>
           </div>
           {/* Prev / Next navigation */}

@@ -1095,6 +1095,105 @@ function OrgVisibilityBuilder({ templateId, items, sections, rules, onSaved }: {
   );
 }
 
+// ─── Form Results Tab ────────────────────────────────────────────────────────
+
+function FormResultsTab({ templateId }: { templateId: number }) {
+  const { data: submissions, isLoading } = trpc.formBuilder.getTemplateSubmissions.useQuery({ templateId });
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  if (isLoading) return <div className="flex items-center justify-center py-12 text-gray-400"><RefreshCw className="w-4 h-4 animate-spin mr-2" /> Loading results…</div>;
+  if (!submissions || submissions.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-gray-400 gap-3">
+        <ClipboardList className="w-10 h-10 opacity-40" />
+        <p className="text-sm">No submissions yet</p>
+      </div>
+    );
+  }
+
+  const handleExportCsv = () => {
+    const rows = submissions.map(s => {
+      const resp = (() => { try { return JSON.parse(s.responses); } catch { return {}; } })();
+      return {
+        id: s.id,
+        submittedAt: new Date(s.submittedAt).toLocaleString(),
+        status: s.status,
+        userId: s.submittedByUserId,
+        qualityScore: s.qualityScore,
+        maxScore: s.maxPossibleScore,
+        ...Object.fromEntries(Object.entries(resp).map(([k, v]) => [k, Array.isArray(v) ? v.join("; ") : String(v ?? "")])),
+      };
+    });
+    const headers = Object.keys(rows[0] ?? {});
+    const csv = [headers.join(","), ...rows.map(r => headers.map(h => JSON.stringify((r as any)[h] ?? "")).join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = `form-results-${templateId}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="space-y-3 py-4">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-sm text-gray-500">{submissions.length} submission{submissions.length !== 1 ? "s" : ""}</p>
+        <button onClick={handleExportCsv} className="flex items-center gap-1.5 text-xs text-teal-700 border border-teal-300 bg-teal-50 hover:bg-teal-100 rounded-lg px-3 py-1.5 font-medium transition-colors">
+          <FileCode className="w-3.5 h-3.5" /> Export CSV
+        </button>
+      </div>
+      <div className="border border-gray-200 rounded-xl overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-600">ID</th>
+              <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-600">Submitted</th>
+              <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-600">Status</th>
+              <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-600">Score</th>
+              <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-600">Responses</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {submissions.map(s => {
+              const resp = (() => { try { return JSON.parse(s.responses); } catch { return {}; } })();
+              const isExpanded = expandedId === s.id;
+              return (
+                <>
+                  <tr key={s.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : s.id)}>
+                    <td className="px-4 py-2.5 text-gray-500 text-xs">#{s.id}</td>
+                    <td className="px-4 py-2.5 text-gray-700 text-xs">{new Date(s.submittedAt).toLocaleDateString()}</td>
+                    <td className="px-4 py-2.5">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        s.status === "reviewed" ? "bg-green-100 text-green-700" :
+                        s.status === "submitted" ? "bg-blue-100 text-blue-700" :
+                        "bg-gray-100 text-gray-600"
+                      }`}>{s.status}</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-gray-700 text-xs">{s.qualityScore}/{s.maxPossibleScore}</td>
+                    <td className="px-4 py-2.5 text-xs text-teal-600">{isExpanded ? "Hide ▲" : `${Object.keys(resp).length} fields ▼`}</td>
+                  </tr>
+                  {isExpanded && (
+                    <tr key={`${s.id}-expanded`}>
+                      <td colSpan={5} className="px-4 py-3 bg-gray-50">
+                        <div className="grid grid-cols-2 gap-2">
+                          {Object.entries(resp).map(([k, v]) => (
+                            <div key={k} className="text-xs">
+                              <span className="font-medium text-gray-600">{k}: </span>
+                              <span className="text-gray-800">{Array.isArray(v) ? v.join(", ") : String(v ?? "")}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ─── Form Editor ──────────────────────────────────────────────────────────────
 
 function FormEditor({ templateId }: { templateId: number }) {
@@ -1433,6 +1532,78 @@ function FormEditor({ templateId }: { templateId: number }) {
           branchRules={branchRules}
           orgVisibilityRules={orgVisRules ?? []}
         />
+      )}
+
+      {/* Settings Tab */}
+      {activeTab === "settings" && (
+        <div className="space-y-6 py-4 max-w-xl">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Form Details</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-gray-600 block mb-1">Form Name</label>
+                <div className="flex gap-2">
+                  <Input
+                    defaultValue={template.name}
+                    onBlur={e => { if (e.target.value.trim() && e.target.value.trim() !== template.name) updateTemplateMutation.mutate({ id: templateId, name: e.target.value.trim() }); }}
+                    className="text-sm"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 block mb-1">Description</label>
+                <textarea
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  rows={3}
+                  defaultValue={template.description ?? ""}
+                  onBlur={e => { if (e.target.value !== (template.description ?? "")) updateTemplateMutation.mutate({ id: templateId, description: e.target.value }); }}
+                  placeholder="Optional description shown to form users…"
+                />
+              </div>
+            </div>
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Host Domain</h3>
+            <p className="text-xs text-gray-500 mb-2">Select which domain this form is associated with.</p>
+            <Select
+              defaultValue={template.hostDomain ?? "app.allaboutultrasound.com"}
+              onValueChange={val => updateTemplateMutation.mutate({ id: templateId, hostDomain: val })}
+            >
+              <SelectTrigger className="text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {["app.allaboutultrasound.com", "allaboutultrasound.com", "allaboutvascular.com", "allaboutobgyn.com", "allaboutecho.com"].map(d => (
+                  <SelectItem key={d} value={d}>{d}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Visibility</h3>
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <div>
+                <p className="text-sm font-medium text-gray-800">Form Active</p>
+                <p className="text-xs text-gray-500">When inactive, the form is hidden from users</p>
+              </div>
+              <button
+                onClick={() => updateTemplateMutation.mutate({ id: templateId, isActive: !template.isActive })}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  template.isActive ? "bg-teal-500" : "bg-gray-300"
+                }`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                  template.isActive ? "translate-x-6" : "translate-x-1"
+                }`} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Results Tab */}
+      {activeTab === "results" && (
+        <FormResultsTab templateId={templateId} />
       )}
 
       {/* Section Dialog */}

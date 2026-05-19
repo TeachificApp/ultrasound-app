@@ -168,6 +168,8 @@ export default function CourseOverview() {
   const totalLessons = allLessons.length;
   const completedCount = allLessons.filter((l: any) => completedIds.has(l.id)).length;
   const progressPct = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
+  // Progress bar only shown when at least one lesson requires manual completion (progress is trackable)
+  const hasAnyManualComplete = allLessons.some((l: any) => l.requireManualComplete === 1 || l.requireManualComplete === true);
 
   const toggleSection = (id: number) => {
     setExpandedSections(prev => {
@@ -325,7 +327,7 @@ export default function CourseOverview() {
         )}
 
         {/* Progress bar — hidden when course.hideProgress is enabled */}
-        {totalLessons > 0 && !course.hideProgress && (
+        {totalLessons > 0 && !course.hideProgress && hasAnyManualComplete && (
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-gray-700">Your Progress</span>

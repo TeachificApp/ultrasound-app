@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
@@ -22,6 +23,11 @@ export interface LessonFlashcardData {
   cards: FlashcardItem[];
   shuffleCards?: boolean;
   showHints?: boolean;
+  /** Theme colors for the player buttons */
+  gotItColor?: string;
+  stillLearningColor?: string;
+  gotItTextColor?: string;
+  stillLearningTextColor?: string;
 }
 
 interface Props {
@@ -33,11 +39,18 @@ interface Props {
 
 const EMPTY_CARD: FlashcardItem = { front: "", back: "", hint: "" };
 
+const DEFAULT_GOT_IT_COLOR = "#0d9488"; // teal-600
+const DEFAULT_STILL_LEARNING_COLOR = "#f0fdfa"; // teal-50
+const DEFAULT_GOT_IT_TEXT = "#ffffff";
+const DEFAULT_STILL_LEARNING_TEXT = "#0f766e"; // teal-700
+
 export default function LessonFlashcardBlockEditor({ data, onChange, handleFileUpload, lessonId }: Props) {
-  const [activeTab, setActiveTab] = useState<"ai" | "manual">("manual");
+  const [activeTab, setActiveTab] = useState<"ai" | "manual" | "style">("manual");
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingCard, setEditingCard] = useState<FlashcardItem | null>(null);
   const [aiCount, setAiCount] = useState(10);
+  const [aiStyle, setAiStyle] = useState<"understanding" | "thinking" | "compliance" | "thought_provoking" | "custom">("understanding");
+  const [aiCustomPrompt, setAiCustomPrompt] = useState("");
   const [aiPreview, setAiPreview] = useState<FlashcardItem[] | null>(null);
   const frontImgRef = useRef<HTMLInputElement | null>(null);
   const backImgRef = useRef<HTMLInputElement | null>(null);
@@ -51,6 +64,7 @@ export default function LessonFlashcardBlockEditor({ data, onChange, handleFileU
   });
 
   const set = (key: keyof LessonFlashcardData, value: any) => onChange({ ...data, [key]: value });
+  const setMulti = (updates: Partial<LessonFlashcardData>) => onChange({ ...data, ...updates });
 
   const saveCard = () => {
     if (!editingCard) return;
@@ -92,6 +106,11 @@ export default function LessonFlashcardBlockEditor({ data, onChange, handleFileU
     if (url) setEditingCard({ ...editingCard, backImageUrl: url });
   };
 
+  const gotItColor = data.gotItColor ?? DEFAULT_GOT_IT_COLOR;
+  const stillLearningColor = data.stillLearningColor ?? DEFAULT_STILL_LEARNING_COLOR;
+  const gotItText = data.gotItTextColor ?? DEFAULT_GOT_IT_TEXT;
+  const stillLearningText = data.stillLearningTextColor ?? DEFAULT_STILL_LEARNING_TEXT;
+
   return (
     <div className="space-y-4">
       {/* Settings row */}
@@ -125,10 +144,11 @@ export default function LessonFlashcardBlockEditor({ data, onChange, handleFileU
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "ai" | "manual")}>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
         <TabsList className="h-8">
           <TabsTrigger value="manual" className="text-xs h-7">Manual Entry</TabsTrigger>
           <TabsTrigger value="ai" className="text-xs h-7">AI Generate</TabsTrigger>
+          <TabsTrigger value="style" className="text-xs h-7">Button Style</TabsTrigger>
         </TabsList>
 
         {/* ── AI Generate ── */}
@@ -136,19 +156,49 @@ export default function LessonFlashcardBlockEditor({ data, onChange, handleFileU
           {!lessonId && (
             <p className="text-xs text-amber-600 bg-amber-50 rounded p-2">Save the lesson first to enable AI generation.</p>
           )}
-          <div className="flex items-center gap-2">
-            <Label className="text-xs text-gray-600 whitespace-nowrap">Cards to generate:</Label>
-            <Input
-              type="number"
-              min={1}
-              max={30}
-              value={aiCount}
-              onChange={(e) => setAiCount(Number(e.target.value))}
-              className="h-8 text-sm w-20"
-            />
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <Label className="text-xs text-gray-600 whitespace-nowrap shrink-0">Cards to generate:</Label>
+              <Input
+                type="number"
+                min={1}
+                max={30}
+                value={aiCount}
+                onChange={(e) => setAiCount(Number(e.target.value))}
+                className="h-8 text-sm w-20"
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-gray-600">Card Style</Label>
+              <Select value={aiStyle} onValueChange={(v) => setAiStyle(v as typeof aiStyle)}>
+                <SelectTrigger className="h-8 text-xs mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="understanding" className="text-xs">Ensuring Understanding — recall &amp; definitions</SelectItem>
+                  <SelectItem value="thinking" className="text-xs">Getting Thinking — apply &amp; reason</SelectItem>
+                  <SelectItem value="compliance" className="text-xs">Compliance — protocol &amp; safety</SelectItem>
+                  <SelectItem value="thought_provoking" className="text-xs">Thought Provoking — critical &amp; nuanced</SelectItem>
+                  <SelectItem value="custom" className="text-xs">Custom Prompt…</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {aiStyle === "custom" && (
+              <div>
+                <Label className="text-xs text-gray-600">Custom Style Instructions</Label>
+                <Textarea
+                  value={aiCustomPrompt}
+                  onChange={(e) => setAiCustomPrompt(e.target.value)}
+                  placeholder="e.g. Focus on image interpretation and scanning technique errors…"
+                  className="text-xs mt-1 min-h-[60px]"
+                  maxLength={500}
+                />
+                <p className="text-xs text-gray-400 mt-0.5 text-right">{aiCustomPrompt.length}/500</p>
+              </div>
+            )}
             <Button
               size="sm"
-              className="h-8 bg-purple-600 hover:bg-purple-700 text-white text-xs"
+              className="h-8 bg-teal-600 hover:bg-teal-700 text-white text-xs w-full"
               disabled={!lessonId || generateMutation.isPending}
               onClick={() => generateMutation.mutate({ lessonId: lessonId!, count: aiCount })}
             >
@@ -159,14 +209,14 @@ export default function LessonFlashcardBlockEditor({ data, onChange, handleFileU
             <div className="space-y-2">
               <p className="text-xs font-medium text-gray-700">Preview ({aiPreview.length} cards):</p>
               {aiPreview.map((c, i) => (
-                <div key={i} className="p-2 bg-purple-50 rounded text-xs">
+                <div key={i} className="p-2 bg-teal-50 rounded text-xs">
                   <p className="font-medium text-gray-700 mb-0.5">Front: {c.front}</p>
                   <p className="text-gray-600">Back: {c.back}</p>
                   {c.hint && <p className="text-gray-400 italic mt-0.5">Hint: {c.hint}</p>}
                 </div>
               ))}
               <div className="flex gap-2">
-                <Button size="sm" className="h-8 bg-purple-600 hover:bg-purple-700 text-white text-xs" onClick={applyAiPreview}>
+                <Button size="sm" className="h-8 bg-teal-600 hover:bg-teal-700 text-white text-xs" onClick={applyAiPreview}>
                   Add All to Deck
                 </Button>
                 <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setAiPreview(null)}>
@@ -194,7 +244,7 @@ export default function LessonFlashcardBlockEditor({ data, onChange, handleFileU
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="h-6 px-2 text-xs text-purple-600"
+                    className="h-6 px-2 text-xs text-teal-600"
                     onClick={() => { setEditingIndex(i); setEditingCard({ ...c }); }}
                   >Edit</Button>
                   <Button
@@ -210,7 +260,7 @@ export default function LessonFlashcardBlockEditor({ data, onChange, handleFileU
 
           {/* Add / Edit form */}
           {editingCard !== null ? (
-            <div className="p-3 bg-white border border-purple-200 rounded-lg space-y-2">
+            <div className="p-3 bg-white border border-teal-200 rounded-lg space-y-2">
               <p className="text-xs font-semibold text-gray-700">{editingIndex === null ? "New Card" : `Edit Card ${editingIndex + 1}`}</p>
               <div>
                 <Label className="text-xs text-gray-600">Front (Question / Term)</Label>
@@ -274,7 +324,7 @@ export default function LessonFlashcardBlockEditor({ data, onChange, handleFileU
                 </div>
               )}
               <div className="flex gap-2 pt-1">
-                <Button size="sm" className="h-8 bg-purple-600 hover:bg-purple-700 text-white text-xs" onClick={saveCard}>
+                <Button size="sm" className="h-8 bg-teal-600 hover:bg-teal-700 text-white text-xs" onClick={saveCard}>
                   {editingIndex === null ? "Add Card" : "Save Changes"}
                 </Button>
                 <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => { setEditingIndex(null); setEditingCard(null); }}>
@@ -286,12 +336,121 @@ export default function LessonFlashcardBlockEditor({ data, onChange, handleFileU
             <Button
               size="sm"
               variant="outline"
-              className="h-8 text-xs border-purple-300 text-purple-700 hover:bg-purple-50"
+              className="h-8 text-xs border-teal-300 text-teal-700 hover:bg-teal-50"
               onClick={() => { setEditingIndex(null); setEditingCard({ ...EMPTY_CARD }); }}
             >
               + Add Card
             </Button>
           )}
+        </TabsContent>
+
+        {/* ── Button Style ── */}
+        <TabsContent value="style" className="mt-3 space-y-4">
+          <p className="text-xs text-gray-500">Customize the "Got It" and "Still Learning" button colors shown to students.</p>
+
+          {/* Preview */}
+          <div className="flex gap-3">
+            <button
+              className="flex-1 py-2.5 text-sm rounded-xl font-semibold border-2 shadow-sm transition-all"
+              style={{ background: stillLearningColor, color: stillLearningText, borderColor: stillLearningText + "55" }}
+            >↺ Still Learning</button>
+            <button
+              className="flex-1 py-2.5 text-sm rounded-xl font-semibold shadow-md transition-all"
+              style={{ background: gotItColor, color: gotItText }}
+            >✓ Got It!</button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {/* Got It button */}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-gray-700">Got It! Button</p>
+              <div>
+                <Label className="text-xs text-gray-600">Background</Label>
+                <div className="flex items-center gap-2 mt-1">
+                  <input
+                    type="color"
+                    value={gotItColor}
+                    onChange={(e) => set("gotItColor", e.target.value)}
+                    className="h-8 w-10 rounded border border-gray-200 cursor-pointer p-0.5"
+                  />
+                  <Input
+                    value={gotItColor}
+                    onChange={(e) => set("gotItColor", e.target.value)}
+                    className="h-8 text-xs font-mono"
+                    placeholder="#0d9488"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs text-gray-600">Text Color</Label>
+                <div className="flex items-center gap-2 mt-1">
+                  <input
+                    type="color"
+                    value={gotItText}
+                    onChange={(e) => set("gotItTextColor", e.target.value)}
+                    className="h-8 w-10 rounded border border-gray-200 cursor-pointer p-0.5"
+                  />
+                  <Input
+                    value={gotItText}
+                    onChange={(e) => set("gotItTextColor", e.target.value)}
+                    className="h-8 text-xs font-mono"
+                    placeholder="#ffffff"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Still Learning button */}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-gray-700">Still Learning Button</p>
+              <div>
+                <Label className="text-xs text-gray-600">Background</Label>
+                <div className="flex items-center gap-2 mt-1">
+                  <input
+                    type="color"
+                    value={stillLearningColor}
+                    onChange={(e) => set("stillLearningColor", e.target.value)}
+                    className="h-8 w-10 rounded border border-gray-200 cursor-pointer p-0.5"
+                  />
+                  <Input
+                    value={stillLearningColor}
+                    onChange={(e) => set("stillLearningColor", e.target.value)}
+                    className="h-8 text-xs font-mono"
+                    placeholder="#f0fdfa"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs text-gray-600">Text Color</Label>
+                <div className="flex items-center gap-2 mt-1">
+                  <input
+                    type="color"
+                    value={stillLearningText}
+                    onChange={(e) => set("stillLearningTextColor", e.target.value)}
+                    className="h-8 w-10 rounded border border-gray-200 cursor-pointer p-0.5"
+                  />
+                  <Input
+                    value={stillLearningText}
+                    onChange={(e) => set("stillLearningTextColor", e.target.value)}
+                    className="h-8 text-xs font-mono"
+                    placeholder="#0f766e"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs"
+            onClick={() => setMulti({
+              gotItColor: DEFAULT_GOT_IT_COLOR,
+              gotItTextColor: DEFAULT_GOT_IT_TEXT,
+              stillLearningColor: DEFAULT_STILL_LEARNING_COLOR,
+              stillLearningTextColor: DEFAULT_STILL_LEARNING_TEXT,
+            })}
+          >Reset to Default Teal</Button>
         </TabsContent>
       </Tabs>
 
