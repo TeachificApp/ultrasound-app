@@ -372,6 +372,7 @@ export default function LessonQuizBlockEditor({ data, onChange, handleFileUpload
                     <SelectItem value="thinking" className="text-xs">Getting Thinking — apply &amp; reason</SelectItem>
                     <SelectItem value="compliance" className="text-xs">Compliance — protocol &amp; safety</SelectItem>
                     <SelectItem value="thought_provoking" className="text-xs">Thought Provoking — critical &amp; nuanced</SelectItem>
+                    <SelectItem value="reflection" className="text-xs">Reflection — self-assess &amp; connect to practice</SelectItem>
                     <SelectItem value="custom" className="text-xs">Custom Prompt…</SelectItem>
                   </SelectContent>
                 </Select>

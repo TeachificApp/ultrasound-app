@@ -3208,7 +3208,7 @@ export const lmsGroupRouter = router({
     .input(z.object({
       lessonId: z.number().int().positive(),
       count: z.number().int().min(1).max(20).default(5),
-      questionStyle: z.enum(["understanding", "thinking", "compliance", "thought_provoking", "custom"]).default("understanding"),
+      questionStyle: z.enum(["understanding", "thinking", "compliance", "thought_provoking", "reflection", "custom"]).default("understanding"),
       customPrompt: z.string().max(500).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -3248,6 +3248,7 @@ export const lmsGroupRouter = router({
   thinking: "Write questions that require the learner to apply knowledge, reason through scenarios, or connect concepts — not just recall facts.",
   compliance: "Focus on protocol adherence, safety requirements, regulatory standards, and correct procedural steps.",
   thought_provoking: "Write challenging, nuanced questions that push the learner to think critically, consider edge cases, or evaluate competing options.",
+  reflection: "Write introspective questions that prompt the learner to connect lesson content to their own clinical practice, prior experiences, or professional development. Questions should encourage self-assessment, personal insight, and real-world application rather than pure recall.",
   custom: input.customPrompt ? `Custom style instruction: ${input.customPrompt}` : "Generate well-balanced questions covering the key points of the lesson.",
 }[input.questionStyle]}` },
           { role: "user", content: `Generate ${input.count} multiple-choice quiz questions based on this lesson content:\n\n${lessonText.slice(0, 6000)}` },
