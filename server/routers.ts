@@ -251,7 +251,10 @@ export const appRouter = router({
       }))
       .mutation(async ({ ctx, input }) => {
         // Decode base64 → Buffer
-        const base64Data = input.dataUri.replace(/^data:[^;]+;base64,/, "");
+        // Strip data URI prefix by finding the ";base64," marker
+        const b64Marker = ";base64,";
+        const b64Idx = input.dataUri.indexOf(b64Marker);
+        const base64Data = b64Idx >= 0 ? input.dataUri.slice(b64Idx + b64Marker.length) : input.dataUri;
         const buffer = Buffer.from(base64Data, "base64");
         if (buffer.byteLength > 4 * 1024 * 1024) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Avatar image must be under 4 MB" });
@@ -273,7 +276,12 @@ export const appRouter = router({
       }))
       .mutation(async ({ ctx, input }) => {
         if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
-        const base64Data = input.dataUri.replace(/^data:[^;]+;base64,/, "");
+        // Strip data URI prefix by finding the ";base64," marker.
+        // Mime type may contain semicolons and commas
+        // (e.g. "data:audio/webm;codecs=opus;base64,...")
+        const b64Marker = ";base64,";
+        const b64Idx = input.dataUri.indexOf(b64Marker);
+        const base64Data = b64Idx >= 0 ? input.dataUri.slice(b64Idx + b64Marker.length) : input.dataUri;
         const buffer = Buffer.from(base64Data, "base64");
         if (buffer.byteLength > 40 * 1024 * 1024) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "File must be under 40 MB" });

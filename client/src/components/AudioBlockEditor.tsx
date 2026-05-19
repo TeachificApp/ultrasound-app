@@ -108,20 +108,64 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
   }, []);
 
   // ── Recording ─────────────────────────────────────────────────────────────
+  // Store the latest handleFileUpload in a ref so the onstop closure always
+  // uses the current version (avoids stale closure issues).
+  const handleFileUploadRef = useRef(handleFileUpload);
+  handleFileUploadRef.current = handleFileUpload;
+  const setRef = useRef(set);
+  setRef.current = set;
+
   const startRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Verify we actually have an active audio track
+      const audioTracks = stream.getAudioTracks();
+      if (audioTracks.length === 0 || !audioTracks[0].enabled) {
+        toast.error("No active microphone track found. Please check your microphone.");
+        stream.getTracks().forEach(t => t.stop());
+        return;
+      }
+
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
         ? "audio/webm;codecs=opus"
         : MediaRecorder.isTypeSupported("audio/webm")
         ? "audio/webm"
-        : "audio/ogg";
+        : MediaRecorder.isTypeSupported("audio/ogg")
+        ? "audio/ogg"
+        : "";
+      if (!mimeType) {
+        toast.error("Your browser does not support audio recording. Please use Chrome or Firefox.");
+        stream.getTracks().forEach(t => t.stop());
+        return;
+      }
+
       const mr = new MediaRecorder(stream, { mimeType });
       chunksRef.current = [];
-      mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      mr.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          chunksRef.current.push(e.data);
+        }
+      };
       mr.onstop = () => {
         stream.getTracks().forEach(t => t.stop());
-        const blob = new Blob(chunksRef.current, { type: mr.mimeType });
+
+        if (chunksRef.current.length === 0) {
+          toast.error("Recording produced no audio data. Please check your microphone.");
+          setRecording(false);
+          if (recTimerRef.current) clearInterval(recTimerRef.current);
+          setRecSeconds(0);
+          return;
+        }
+
+        const blob = new Blob(chunksRef.current, { type: mimeType });
+
+        if (blob.size < 100) {
+          toast.error("Recording is too short or empty. Please try again.");
+          setRecording(false);
+          if (recTimerRef.current) clearInterval(recTimerRef.current);
+          setRecSeconds(0);
+          return;
+        }
 
         // Create a local blob URL immediately so the user can preview/trim
         if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
@@ -129,26 +173,34 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
         blobUrlRef.current = blobUrl;
         setBlobPreviewUrl(blobUrl);
         // Reset trim so it re-detects duration from the new blob
-        set("trimStart", 0);
-        set("trimEnd", 0);
+        setRef.current("trimStart", 0);
+        setRef.current("trimEnd", 0);
 
         // Upload to S3 in the background
-        const file = new File([blob], `recording-${Date.now()}.webm`, { type: mr.mimeType });
-        handleFileUpload(file, "audioUrl", "audio-recording");
+        // Use the correct file extension based on mime type
+        const ext = mimeType.includes("webm") ? "webm" : mimeType.includes("ogg") ? "ogg" : "webm";
+        const file = new File([blob], `recording-${Date.now()}.${ext}`, { type: mimeType });
+        handleFileUploadRef.current(file, "audioUrl", "audio-recording");
 
         setRecording(false);
         if (recTimerRef.current) clearInterval(recTimerRef.current);
         setRecSeconds(0);
       };
-      mr.start(250); // collect data every 250ms
+
+      // Do NOT pass a timeslice — let the browser collect all data in one chunk
+      // on stop. Using timeslice (e.g. 250ms) can produce fragmented WebM clusters
+      // that don't concatenate into a valid file in some browsers.
+      mr.start();
       mediaRecorderRef.current = mr;
       setRecording(true);
       setRecSeconds(0);
       recTimerRef.current = setInterval(() => setRecSeconds(s => s + 1), 1000);
-    } catch {
-      toast.error("Microphone access denied. Please allow microphone permissions.");
+    } catch (err: any) {
+      toast.error(err?.message?.includes("Permission")
+        ? "Microphone access denied. Please allow microphone permissions."
+        : "Could not start recording. Please check your microphone.");
     }
-  }, [handleFileUpload, set]);
+  }, []);
 
   const stopRecording = useCallback(() => {
     mediaRecorderRef.current?.stop();

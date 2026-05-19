@@ -2177,3 +2177,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Separate DIY Accreditation Tool into its own admin division — DIYAccreditationAdmin hub page + AccreditationDivisionRouter + /admin/diy-accreditation route + PlatformAdmin card
 - [x] Separate results tables from DIY accreditation (generalFormSubmissions vs accreditationFormSubmissions)
 - [x] General Form Builder: no accreditation categories, optional score calculation in settings (scoreEnabled field)
+
+## Audio Recording Fix (May 2026)
+- [x] Fix data URI regex that failed to strip prefix for mime types with semicolons (audio/webm;codecs=opus)
+- [x] Replace regex /^data:[^;]+;base64,/ with indexOf(";base64,") approach in routers.ts and lmsRouter.ts
+- [x] Remove MediaRecorder timeslice (mr.start(250) → mr.start()) to produce valid single-chunk WebM files
+- [x] Add error handling for empty recordings and missing audio tracks in AudioBlockEditor
+- [x] Use refs for handleFileUpload and set to avoid stale closure issues in recording callbacks

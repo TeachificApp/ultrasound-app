@@ -1211,7 +1211,9 @@ export const lmsAdminRouter = router({
       const [course] = await db.select({ title: lmsCourses.title }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
 
-      const base64Data = input.dataUri.replace(/^data:[^;]+;base64,/, "");
+      const b64Marker = ";base64,";
+      const b64Idx = input.dataUri.indexOf(b64Marker);
+      const base64Data = b64Idx >= 0 ? input.dataUri.slice(b64Idx + b64Marker.length) : input.dataUri;
       const buffer = Buffer.from(base64Data, "base64");
       const ext = input.mimeType.split("/")[1];
       const suffix = randomBytes(4).toString("hex");
@@ -1269,7 +1271,9 @@ export const lmsAdminRouter = router({
       const [course] = await db.select({ title: lmsCourses.title }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
 
-      const base64Data = input.dataUri.replace(/^data:[^;]+;base64,/, "");
+      const b64Marker2 = ";base64,";
+      const b64Idx2 = input.dataUri.indexOf(b64Marker2);
+      const base64Data = b64Idx2 >= 0 ? input.dataUri.slice(b64Idx2 + b64Marker2.length) : input.dataUri;
       const buffer = Buffer.from(base64Data, "base64");
       const ext = input.mimeType.split("/")[1];
       const suffix = randomBytes(4).toString("hex");
