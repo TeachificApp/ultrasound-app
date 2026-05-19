@@ -39,10 +39,10 @@ interface Props {
 
 const EMPTY_CARD: FlashcardItem = { front: "", back: "", hint: "" };
 
-const DEFAULT_GOT_IT_COLOR = "#0d9488"; // teal-600
-const DEFAULT_STILL_LEARNING_COLOR = "#f0fdfa"; // teal-50
+const DEFAULT_GOT_IT_COLOR = "#1ab7b4";
+const DEFAULT_STILL_LEARNING_COLOR = "#f0fdfa";
 const DEFAULT_GOT_IT_TEXT = "#ffffff";
-const DEFAULT_STILL_LEARNING_TEXT = "#0f766e"; // teal-700
+const DEFAULT_STILL_LEARNING_TEXT = "#189593";
 
 export default function LessonFlashcardBlockEditor({ data, onChange, handleFileUpload, lessonId }: Props) {
   const [activeTab, setActiveTab] = useState<"ai" | "manual" | "style">("manual");
@@ -377,7 +377,7 @@ export default function LessonFlashcardBlockEditor({ data, onChange, handleFileU
                     value={gotItColor}
                     onChange={(e) => set("gotItColor", e.target.value)}
                     className="h-8 text-xs font-mono"
-                    placeholder="#0d9488"
+                    placeholder="#1ab7b4"
                   />
                 </div>
               </div>
@@ -433,7 +433,7 @@ export default function LessonFlashcardBlockEditor({ data, onChange, handleFileU
                     value={stillLearningText}
                     onChange={(e) => set("stillLearningTextColor", e.target.value)}
                     className="h-8 text-xs font-mono"
-                    placeholder="#0f766e"
+                    placeholder="#189593"
                   />
                 </div>
               </div>

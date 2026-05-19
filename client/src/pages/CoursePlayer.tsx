@@ -205,10 +205,10 @@ function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[];
 
 // ─── Inline Lesson Flashcard Deck (for lesson_flashcard content blocks) ───────
 function InlineLessonFlashcardDeck({ data }: { data: { title?: string; cards?: any[]; shuffleCards?: boolean; showHints?: boolean; gotItColor?: string; gotItTextColor?: string; stillLearningColor?: string; stillLearningTextColor?: string } }) {
-  const gotItBg = data.gotItColor ?? "#0d9488";
+  const gotItBg = data.gotItColor ?? "#1ab7b4";
   const gotItText = data.gotItTextColor ?? "#ffffff";
   const stillBg = data.stillLearningColor ?? "#f0fdfa";
-  const stillText = data.stillLearningTextColor ?? "#0f766e";
+  const stillText = data.stillLearningTextColor ?? "#189593";
   const cards = data.cards ?? [];
   const deck = data.shuffleCards ? [...cards].sort(() => Math.random() - 0.5) : cards;
   const [currentIndex, setCurrentIndex] = useState(0);
