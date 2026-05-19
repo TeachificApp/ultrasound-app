@@ -321,6 +321,8 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
       );
     case "lead_capture":
       return <LeadCaptureBlock data={d} funnelId={funnelId} pageId={pageId} />;
+    case "cta_optin":
+      return <CtaOptinBlock data={d} funnelId={funnelId} pageId={pageId} />;
     case "faq":
       return (
         <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
@@ -740,6 +742,89 @@ function LeadCaptureBlock({ data, funnelId, pageId }: { data: Record<string, any
           </Button>
         </form>
         <p className="text-xs opacity-60 mt-3">We respect your privacy. Unsubscribe anytime.</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── CTA with Opt-In Block ───────────────────────────────────────────────────
+
+function CtaOptinBlock({ data, funnelId, pageId }: { data: Record<string, any>; funnelId: number; pageId: number }) {
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+
+  const submitLead = trpc.funnelPublic.submitLead.useMutation({
+    onSuccess: () => {
+      setSubmitted(true);
+      // Navigate to ctaLink if set
+      if (data.ctaLink) {
+        window.location.href = data.ctaLink;
+      }
+    },
+    onError: (e: any) => toast.error(e.message || "Submission failed"),
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) { toast.error("Please enter your email"); return; }
+    submitLead.mutate({
+      funnelId,
+      funnelPageId: pageId,
+      email,
+      name: name || undefined,
+      tags: data.tags || undefined,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      referrer: document.referrer || undefined,
+      sourcePage: window.location.href,
+    });
+  };
+
+  if (submitted && !data.ctaLink) {
+    return (
+      <div className="px-8 py-16 text-center" style={{ backgroundColor: data.bgColor ?? "#f0fafa" }}>
+        <div className="max-w-md mx-auto">
+          <CheckCircle size={48} className="mx-auto mb-4 text-teal-600" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">You're In!</h2>
+          <p className="text-gray-600">Check your email for details.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-8 py-12" style={{ backgroundColor: data.bgColor ?? "#f0fafa", textAlign: (data.align ?? "center") as any }}>
+      <div className="max-w-sm mx-auto">
+        {data.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: data.headline }} />}
+        {data.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: data.subtext }} />}
+        <form onSubmit={handleSubmit} className="space-y-3 mb-4">
+          <Input
+            type="text"
+            placeholder={data.namePlaceholder ?? "Your name"}
+            value={name}
+            onChange={e => setName(e.target.value)}
+            className="h-12 text-base"
+          />
+          <Input
+            type="email"
+            placeholder={data.emailPlaceholder ?? "Your email address"}
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            required
+            className="h-12 text-base"
+          />
+          <Button
+            type="submit"
+            disabled={submitLead.isPending}
+            className="w-full h-12 text-base font-bold"
+            style={{ backgroundColor: data.ctaColor ?? "#179ca3", color: data.ctaTextColor ?? "#fff" }}
+          >
+            {submitLead.isPending ? <Loader2 className="animate-spin mr-2" size={18} /> : null}
+            {data.ctaText ?? "Get Access"}
+          </Button>
+        </form>
+        <ButtonSubtext d={data} />
+        <OptOutLink d={data} />
       </div>
     </div>
   );

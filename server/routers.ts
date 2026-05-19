@@ -25,6 +25,7 @@ import { emailCampaignRouter } from "./routers/emailCampaignRouter";
 import { menuLinksRouter } from "./routers/menuLinksRouter";
 import { navigatorAdminRouter } from "./routers/navigatorAdminRouter";
 import { lmsPublicRouter, lmsLearnerRouter, lmsAdminRouter, lmsGroupRouter } from "./routers/lmsRouter";
+import { thinkificImportRouter } from "./routers/thinkificImportRouter";
 import { downloadsPublicRouter, downloadsLearnerRouter, downloadsAdminRouter } from "./routers/downloadsRouter";
 import { orderBumpsAdminRouter, orderBumpsPublicRouter } from "./routers/orderBumpsRouter";
 import { socialContentRouter } from "./routers/socialContentRouter";
@@ -1866,6 +1867,7 @@ export const appRouter = router({
   lmsLearner: lmsLearnerRouter,
   lmsAdmin: lmsAdminRouter,
   lmsGroup: lmsGroupRouter,
+  thinkificImport: thinkificImportRouter,
   downloads: downloadsPublicRouter,
   downloadsLearner: downloadsLearnerRouter,
   downloadsAdmin: downloadsAdminRouter,

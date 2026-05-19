@@ -1203,6 +1203,8 @@ export const funnelPublicRouter = router({
         timezone: z.string().optional(),
         referrer: z.string().optional(),
         sourcePage: z.string().optional(),
+        // Tags to apply to the lead (comma-separated or array)
+        tags: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -1226,6 +1228,7 @@ export const funnelPublicRouter = router({
         referrer: input.referrer || null,
         timezone: input.timezone || null,
         sourcePage: input.sourcePage || null,
+        tags: input.tags || null,
       });
       // Track conversion
       await db.execute(sql`UPDATE funnel_pages SET conversions = conversions + 1 WHERE id = ${input.funnelPageId}`);

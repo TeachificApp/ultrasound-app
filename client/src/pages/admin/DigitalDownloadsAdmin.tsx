@@ -165,6 +165,7 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
       landingHeadline: product.landingHeadline ?? "",
       landingBody: product.landingBody ?? "",
       landingFeatures: product.landingFeatures ?? "",
+      showInLibrary: (product as any).showInLibrary ?? true,
     });
     setSlug(product.slug ?? "");
     setMetaTitle((product as any).metaTitle ?? "");
@@ -185,6 +186,7 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
       landingHeadline: form.landingHeadline || null,
       landingBody: form.landingBody || null,
       landingFeatures: form.landingFeatures || null,
+      showInLibrary: (form as any).showInLibrary ?? true,
     });
   };
 
@@ -289,6 +291,13 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
               <Switch checked={(form as any).bundleOnly ?? false} onCheckedChange={(v) => setForm({ ...form, bundleOnly: v } as any)} />
               <label className="text-sm font-medium">Bundle Only</label>
               <span className="text-xs text-muted-foreground">If enabled, this product cannot be purchased standalone</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch checked={(form as any).showInLibrary ?? true} onCheckedChange={(v) => setForm({ ...form, showInLibrary: v } as any)} />
+              <div>
+                <label className="text-sm font-medium">Show in Education Library</label>
+                <p className="text-xs text-muted-foreground">When enabled, this download will appear in the public Education Library.</p>
+              </div>
             </div>
           </div>
           <div>

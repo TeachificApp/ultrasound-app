@@ -25,8 +25,9 @@ const BRAND_LABELS: Record<string, string> = {
 
 function CourseCard({ course }: { course: any }) {
   const price = course.isFree ? "Free" : `$${(course.price / 100).toFixed(0)}`;
+  const href = course._source === "digital_product" ? `/downloads/${course.slug}` : `/learn/${course.slug}`;
   return (
-    <Link href={`/learn/${course.slug}`}>
+    <Link href={href}>
       <div className="group bg-white rounded-xl border border-gray-200 hover:border-teal-400 hover:shadow-lg transition-all duration-200 overflow-hidden cursor-pointer flex flex-col h-full">
         {/* Cover image */}
         <div className="relative h-44 bg-gradient-to-br from-teal-50 to-teal-100 overflow-hidden">

@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import LessonEffectEditor from "@/components/LessonEffectEditor";
+import ThinkificImporter from "@/pages/admin/ThinkificImporter";
 import { LMSSalesTab } from "@/components/LMSSalesTab";
 import DigitalDownloadsAdmin from "./DigitalDownloadsAdmin";
 import PhysicalProductsAdmin from "./PhysicalProductsAdmin";
@@ -1206,6 +1207,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
   const [isDrip, setIsDrip] = useState(course.isDrip ?? false);
   const [hideProgress, setHideProgress] = useState(course.hideProgress ?? false);
   const [showInstructor, setShowInstructor] = useState(course.showInstructor ?? false);
+  const [showInLibrary, setShowInLibrary] = useState(course.showInLibrary ?? true);
   const [sendEnrollmentEmail, setSendEnrollmentEmail] = useState(course.sendEnrollmentEmail ?? true);
   const [coverImageUrl, setCoverImageUrl] = useState(course.coverImageUrl ?? "");
   const [slug, setSlug] = useState(course.slug ?? "");
@@ -1240,6 +1242,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
             isDrip,
             hideProgress,
             showInstructor,
+            showInLibrary,
             price: pricingType === "free" ? 0 : Math.round(parseFloat(price || "0") * 100),
             subscriptionInterval: pricingType === "subscription" ? subscriptionInterval : null,
             downPayment: pricingType === "payment_plan" ? Math.round(parseFloat(downPayment || "0") * 100) : null,
@@ -1480,6 +1483,13 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
         <Label htmlFor="featured-switch" className="text-sm">Featured on LMS Home Page</Label>
       </div>
       <div className="flex items-start gap-2">
+        <Switch checked={showInLibrary} onCheckedChange={setShowInLibrary} id="show-in-library-switch" className="mt-0.5" />
+        <div>
+          <Label htmlFor="show-in-library-switch" className="text-sm">Show in Education Library</Label>
+          <p className="text-xs text-gray-400 mt-0.5">When enabled, this item will appear in the public Education Library. Disable to hide it from the library while keeping it accessible by direct URL.</p>
+        </div>
+      </div>
+      <div className="flex items-start gap-2">
         <Switch checked={isDrip} onCheckedChange={setIsDrip} id="drip-switch" className="mt-0.5" />
         <div>
           <Label htmlFor="drip-switch" className="text-sm">Enable drip content</Label>
@@ -1622,6 +1632,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
           isDrip,
           hideProgress,
           showInstructor,
+          showInLibrary,
           price: pricingType === "free" ? 0 : Math.round(parseFloat(price || "0") * 100),
           subscriptionInterval: pricingType === "subscription" ? subscriptionInterval : null,
           downPayment: pricingType === "payment_plan" ? Math.round(parseFloat(downPayment || "0") * 100) : null,
@@ -4375,6 +4386,7 @@ export default function LMSAdmin() {
             <TabsTrigger value="analytics" className="text-xs">Analytics</TabsTrigger>
             <TabsTrigger value="collections" className="text-xs">Collections</TabsTrigger>
             <TabsTrigger value="orderbumps" className="text-xs">Order Bumps</TabsTrigger>
+            <TabsTrigger value="thinkific" className="text-xs">Import from Thinkific</TabsTrigger>
           </TabsList>
           <TabsContent value="courses" className="mt-4"><CoursesTab onEdit={setEditingCourseId} typeFilter="course" /></TabsContent>
           <TabsContent value="quizzes" className="mt-4"><CoursesTab onEdit={setEditingCourseId} typeFilter="quiz" /></TabsContent>
@@ -4387,6 +4399,7 @@ export default function LMSAdmin() {
           <TabsContent value="analytics" className="mt-4"><AnalyticsTab /></TabsContent>
           <TabsContent value="collections" className="mt-4"><CollectionsTab /></TabsContent>
           <TabsContent value="orderbumps" className="mt-4"><OrderBumpsAdmin /></TabsContent>
+          <TabsContent value="thinkific" className="mt-4"><ThinkificImporter /></TabsContent>
         </Tabs>
       )}
     </div>

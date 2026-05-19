@@ -408,3 +408,88 @@ export async function enrollInFreeMembership(
 export async function getAllThinkificUsers(): Promise<ThinkificUser[]> {
   return fetchAllPages<ThinkificUser>("/users");
 }
+// ─── Course Structure (for import) ───────────────────────────────────────────
+export interface ThinkificCourse {
+  id: number;
+  name: string;
+  slug: string;
+  subtitle: string | null;
+  description: string | null;
+  card_image_url: string | null;
+  banner_image_url: string | null;
+  instructor_id: number | null;
+  course_card_text: string | null;
+  keywords: string | null;
+  duration_in_days: number | null;
+  reviews_enabled: boolean;
+  certificate_enabled: boolean;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ThinkificChapter {
+  id: number;
+  name: string;
+  position: number;
+  course_id: number;
+  chapter_type: string;
+  free_preview: boolean;
+}
+
+export interface ThinkificContent {
+  id: number;
+  name: string;
+  position: number;
+  chapter_id: number;
+  course_id: number;
+  contentable_type: string;
+  free_preview: boolean;
+  take_url: string | null;
+  description: string | null;
+  video_url: string | null;
+  html_description: string | null;
+  duration_in_seconds: number | null;
+  permanent_url: string | null;
+}
+
+export interface ThinkificInstructor {
+  id: number;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  slug: string;
+  bio: string | null;
+  title: string | null;
+  avatar_image_url: string | null;
+}
+
+export async function getThinkificCourse(courseId: number): Promise<ThinkificCourse> {
+  return thinkificFetch<ThinkificCourse>(`/courses/${courseId}`);
+}
+
+export async function getAllThinkificCourses(): Promise<ThinkificCourse[]> {
+  return fetchAllPages<ThinkificCourse>("/courses");
+}
+
+export async function getChaptersForCourse(courseId: number): Promise<ThinkificChapter[]> {
+  const all = await fetchAllPages<ThinkificChapter>(`/chapters?course_id=${courseId}`);
+  return all.sort((a, b) => a.position - b.position);
+}
+
+export async function getContentsForChapter(chapterId: number): Promise<ThinkificContent[]> {
+  const all = await fetchAllPages<ThinkificContent>(`/contents?chapter_id=${chapterId}`);
+  return all.sort((a, b) => a.position - b.position);
+}
+
+export async function getEnrollmentsForCourse(courseId: number): Promise<ThinkificEnrollment[]> {
+  return fetchAllPages<ThinkificEnrollment>(`/enrollments?course_id=${courseId}`);
+}
+
+export async function getThinkificInstructor(instructorId: number): Promise<ThinkificInstructor | null> {
+  try {
+    return await thinkificFetch<ThinkificInstructor>(`/instructors/${instructorId}`);
+  } catch {
+    return null;
+  }
+}

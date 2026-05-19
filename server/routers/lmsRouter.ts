@@ -49,6 +49,7 @@ import {
   mediaVersions,
   lmsPricingOptions,
   platformSettings,
+  digitalProducts,
 } from "../../drizzle/schema";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -198,7 +199,40 @@ export const lmsPublicRouter = router({
     .query(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const conditions = [eq(lmsCourses.status, "public")];
+
+      // If type is explicitly "download", pull from digitalProducts table and return in same shape
+      if (input.type === "download") {
+        const dpConditions = [eq(digitalProducts.status, "published"), eq(digitalProducts.showInLibrary, true)];
+        if (input.isFree !== undefined) dpConditions.push(eq(digitalProducts.isFree, input.isFree));
+        const offset = (input.page - 1) * input.pageSize;
+        const [dpRows, dpCount] = await Promise.all([
+          db.select().from(digitalProducts).where(and(...dpConditions)).orderBy(desc(digitalProducts.createdAt)).limit(input.pageSize).offset(offset),
+          db.select({ count: sql<number>`count(*)` }).from(digitalProducts).where(and(...dpConditions)),
+        ]);
+        // Map digitalProducts to same shape as lmsCourses for the frontend
+        const mapped = dpRows.map(p => ({
+          id: p.id,
+          slug: p.slug,
+          title: p.title,
+          subtitle: p.subtitle ?? null,
+          description: p.description ?? null,
+          coverImageUrl: p.thumbnailUrl ?? null,
+          status: "public" as const,
+          type: "download" as const,
+          brand: "aaus" as const,
+          price: p.price,
+          isFree: p.isFree,
+          isFeatured: false,
+          showInLibrary: p.showInLibrary,
+          createdAt: p.createdAt,
+          updatedAt: p.updatedAt,
+          instructor: null,
+          _source: "digital_product" as const,
+        }));
+        return { courses: mapped, total: Number(dpCount[0]?.count ?? 0), page: input.page, pageSize: input.pageSize };
+      }
+
+      const conditions = [eq(lmsCourses.status, "public"), eq(lmsCourses.showInLibrary, true)];
       if (input.brand) conditions.push(eq(lmsCourses.brand, input.brand));
       if (input.type) conditions.push(eq(lmsCourses.type, input.type));
       if (input.isFree !== undefined) conditions.push(eq(lmsCourses.isFree, input.isFree));
@@ -1181,6 +1215,7 @@ export const lmsAdminRouter = router({
       gradientTo: z.string().max(20).optional(),
       gradientDirection: z.string().max(30).optional(),
       thumbnailUrl: z.string().nullable().optional(),
+      showInLibrary: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -1418,9 +1453,18 @@ export const lmsAdminRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const { id, ...updates } = input;
-      // Convert null dripDays to 0 (no drip)
-      const safeUpdates = { ...updates, ...(updates.dripDays === null ? { dripDays: 0 } : {}) };
-      await db.update(lmsSections).set(safeUpdates).where(eq(lmsSections.id, id));
+      // Build a typed update object — dripDays is notNull() in the schema so null must be coerced to 0
+      const sectionUpdate: {
+        title?: string;
+        position?: number;
+        isPreview?: boolean;
+        dripDays?: number;
+      } = {};
+      if (updates.title !== undefined) sectionUpdate.title = updates.title;
+      if (updates.position !== undefined) sectionUpdate.position = updates.position;
+      if (updates.isPreview !== undefined) sectionUpdate.isPreview = updates.isPreview;
+      if (updates.dripDays !== undefined) sectionUpdate.dripDays = updates.dripDays ?? 0;
+      await db.update(lmsSections).set(sectionUpdate).where(eq(lmsSections.id, id));
       return { success: true };
     }),
 
@@ -1477,6 +1521,19 @@ export const lmsAdminRouter = router({
             : and(eq(lmsLessons.courseId, input.courseId), isNull(lmsLessons.sectionId))
         );
       const nextPosition = (posResult[0]?.maxPos ?? -1) + 1;
+      // Build default Hero banner block pre-filled with the lesson title
+      const defaultHeroBlock = JSON.stringify([{
+        type: "hero",
+        headline1: input.title,
+        headline2: "",
+        subtext: "",
+        showButtons: false,
+        buttons: [],
+        bgColor: "#149096",
+        textColor: "#ffffff",
+        alignment: "left",
+        padding: "md",
+      }]);
       const [result] = await db.insert(lmsLessons).values({
         courseId: input.courseId,
         sectionId: input.sectionId ?? null,
@@ -1492,6 +1549,7 @@ export const lmsAdminRouter = router({
         durationMinutes: input.durationMinutes ?? null,
         requireVideoCompletion: input.requireVideoCompletion ? 1 : 0,
         requireManualComplete: input.requireManualComplete ? 1 : 0,
+        contentBlocks: defaultHeroBlock,
       }).$returningId();
       // Auto-create quiz if type is quiz
       if (input.type === "quiz") {

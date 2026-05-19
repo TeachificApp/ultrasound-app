@@ -34,9 +34,9 @@ export const downloadsPublicRouter = router({
       const limit = input?.limit ?? 12;
       const offset = (page - 1) * limit;
 
-      const conditions = [eq(digitalProducts.status, "published")];
+      const conditions = [eq(digitalProducts.status, "published"), eq(digitalProducts.showInLibrary, true)];
       if (input?.search) {
-        conditions.push(sql`${digitalProducts.title} LIKE ${"%" + input.search + "%"}`);
+        conditions.push(sql`${digitalProducts.title} LIKE ${"%%" + input.search + "%%"}`);
       }
 
       const [products, countResult] = await Promise.all([
@@ -450,6 +450,7 @@ export const downloadsAdminRouter = router({
       landingBlocks: z.string().nullable().optional(),
       metaTitle: z.string().nullable().optional(),
       metaDescription: z.string().nullable().optional(),
+      showInLibrary: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });

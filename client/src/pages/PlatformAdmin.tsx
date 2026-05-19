@@ -1081,7 +1081,7 @@ export default function PlatformAdmin() {
     { id: "form-builder", href: "/admin/form-builder", icon: ClipboardList, label: "DIY Accreditation Forms", description: "Build accreditation review forms for DIY organizations", color: "#0891b2" },
     { id: "general-form-builder", href: "/admin/general-forms", icon: ClipboardList, label: "General Form Builder", description: "Build public forms, surveys, and quizzes with branding, analytics, and share links", color: "#0e7490" },
     { id: "media-repository", href: "/admin/media-repository", icon: HardDrive, label: "Media Repository", description: "Shared media library with AAUS/IHE brand tags", color: "#0f766e" },
-    { id: "downloads", href: "/admin/downloads", icon: FileDown, label: "Digital Downloads", description: "Manage downloadable products and files", color: "#b45309" },
+    { id: "downloads", href: "/admin/lms?tab=downloads", icon: FileDown, label: "Digital Downloads", description: "Manage downloadable products and files", color: "#b45309" },
     { id: "lms", href: "/admin/lms", icon: Library, label: "Education Library", description: "Manage courses, videos, and learning content", color: "#1d4ed8" },
     { id: "funnels", href: "/admin/funnels", icon: LayoutTemplate, label: "Funnel Builder", description: "Build and manage marketing funnels", color: "#be185d" },
     { id: "contacts", href: "/admin/contacts", icon: Users, label: "Contacts", description: "Manage contacts and audience segments", color: "#059669" },

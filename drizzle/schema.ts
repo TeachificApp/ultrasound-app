@@ -2743,6 +2743,8 @@ export const lmsCourses = mysqlTable("lms_courses", {
   showInstructor: boolean("show_instructor").default(false).notNull(),
   // Hide the progress bar/percentage from students in the course player and overview
   hideProgress: boolean("hide_progress").default(false).notNull(),
+  // Show in Education Library — admin toggle to include/exclude from the public library
+  showInLibrary: boolean("show_in_library").default(true).notNull(),
   // Block editor content for the Course Overview page (JSON array of Block objects)
   // courseOverviewTopBlocks: shown ABOVE the progress bar
   // courseOverviewBlocks: shown BETWEEN progress bar and curriculum (middle zone)
@@ -3080,6 +3082,8 @@ export const digitalProducts = mysqlTable("digital_products", {
   // SEO
   metaTitle: varchar("meta_title", { length: 255 }),
   metaDescription: text("meta_description"),
+  // Show in Education Library — admin toggle to include/exclude from the public library
+  showInLibrary: boolean("show_in_library").default(true).notNull(),
   // Stats
   downloadCount: int("download_count").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -4014,3 +4018,40 @@ export const blockTemplates = mysqlTable("blockTemplates", {
 });
 export type BlockTemplate = typeof blockTemplates.$inferSelect;
 export type InsertBlockTemplate = typeof blockTemplates.$inferInsert;
+
+// ─── Thinkific Course Importer ────────────────────────────────────────────────
+export const lmsThinkificImports = mysqlTable("lms_thinkific_imports", {
+  id: int("id").autoincrement().primaryKey(),
+  thinkificCourseId: int("thinkific_course_id").notNull(),
+  thinkificCourseName: varchar("thinkific_course_name", { length: 255 }).notNull(),
+  thinkificSlug: varchar("thinkific_slug", { length: 255 }),
+  lmsCourseId: int("lms_course_id"),
+  status: mysqlEnum("status", ["pending", "running", "complete", "failed"]).default("pending").notNull(),
+  importedByUserId: int("imported_by_user_id").notNull(),
+  sectionsImported: int("sections_imported").default(0).notNull(),
+  lessonsImported: int("lessons_imported").default(0).notNull(),
+  enrollmentsPending: int("enrollments_pending").default(0).notNull(),
+  enrollmentsActivated: int("enrollments_activated").default(0).notNull(),
+  errorMessage: text("error_message"),
+  importLog: longtext("import_log"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type LmsThinkificImport = typeof lmsThinkificImports.$inferSelect;
+
+export const lmsPendingEnrollments = mysqlTable("lms_pending_enrollments", {
+  id: int("id").autoincrement().primaryKey(),
+  importId: int("import_id").notNull(),
+  lmsCourseId: int("lms_course_id").notNull(),
+  thinkificUserId: int("thinkific_user_id"),
+  thinkificEmail: varchar("thinkific_email", { length: 255 }).notNull(),
+  thinkificName: varchar("thinkific_name", { length: 255 }),
+  lmsUserId: int("lms_user_id"),
+  thinkificEnrolledAt: timestamp("thinkific_enrolled_at"),
+  thinkificCompletedAt: timestamp("thinkific_completed_at"),
+  thinkificProgressPct: int("thinkific_progress_pct").default(0),
+  status: mysqlEnum("status", ["pending", "activated", "skipped"]).default("pending").notNull(),
+  activatedAt: timestamp("activated_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type LmsPendingEnrollment = typeof lmsPendingEnrollments.$inferSelect;

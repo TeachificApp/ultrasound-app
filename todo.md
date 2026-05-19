@@ -2254,3 +2254,18 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 
 ## Rich Text Editor Enhancements
 - [x] Add direct video file upload into rich text editor (TipTap) with S3 storage and inline playback (auto-saved to Media Repository)
+
+## Funnel Builder & Education Library (May 19, 2026)
+- [x] Fix thinkificImportRouter.ts TypeScript error (db import → getDb())
+- [x] Fix lmsRouter.ts dripDays TypeScript error (null vs undefined in .set())
+- [x] Add default Hero block on new lesson creation
+- [x] Add CTA with Opt-In block to Funnel Builder (Conversion category)
+  - [x] Block renderer in BlockPreview.tsx
+  - [x] Block editor settings in LandingPageBuilder.tsx (headline, subtext, placeholders, button, colors, tags)
+  - [x] Live form renderer in PublicFunnelPage.tsx (CtaOptinBlock) with submitLead mutation + tags
+- [x] Add showInLibrary field to lmsCourses schema (migration applied)
+- [x] Add showInLibrary field to digitalProducts schema (migration applied)
+- [x] Fix Downloads not showing in Education Library (bridge digitalProducts into lms.listCourses when type=download)
+- [x] Add showInLibrary toggle to LMS admin (courses/quizzes/downloads) — on by default
+- [x] Add showInLibrary toggle to Digital Downloads admin — on by default
+- [x] Add content type selector (Course/Quiz/Download) to Thinkific importer dialog

@@ -16,7 +16,7 @@ export type BlockType =
   | "pricing_cta" | "divider" | "two_column" | "divided_columns" | "spacer"
   | "faq" | "image_text" | "gallery" | "icon_grid" | "countdown"
   | "instructor" | "logos" | "reviews" | "embed" | "cta_standalone"
-  | "lead_capture" | "numbered_list" | "alert" | "flip_cards"
+  | "lead_capture" | "cta_optin" | "numbered_list" | "alert" | "flip_cards"
   | "curriculum_auto" | "pricing_options_auto"
   | "funnel_workflow" | "product_offer_stack" | "order_bump_checkout"
   | "price_stack" | "urgency_offer" | "checkout_form"
@@ -368,6 +368,19 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
             <input type="email" placeholder="Your email address" className="flex-1 px-4 py-3 rounded-lg text-gray-900 border-0 focus:ring-2 focus:ring-white/50" />
             <button className="px-6 py-3 bg-white font-semibold rounded-lg" style={{ color: d.bgColor ?? "#179ca3" }}>{d.ctaText ?? "Send Me Access"}</button>
           </div>
+        </div>
+      );
+    case "cta_optin":
+      return (
+        <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa", textAlign: d.align ?? "center" }}>
+          {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
+          <div className="max-w-sm mx-auto space-y-3 mb-4">
+            <input type="text" placeholder={d.namePlaceholder ?? "Your name"} className="w-full px-4 py-3 rounded-lg border border-gray-200 text-gray-900 text-sm" />
+            <input type="email" placeholder={d.emailPlaceholder ?? "Your email address"} className="w-full px-4 py-3 rounded-lg border border-gray-200 text-gray-900 text-sm" />
+          </div>
+          <a href="#" className={`inline-block px-8 py-3 rounded-lg font-semibold shadow ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`} style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>{d.ctaText ?? "Get Access"}</a>
+          <ButtonSubtext d={d} />
         </div>
       );
     case "funnel_workflow":
