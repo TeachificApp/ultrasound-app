@@ -335,7 +335,13 @@ async function handlePhysicalProductCheckoutCompleted(session: Record<string, un
     stripeCheckoutSessionId: session.id as string,
     amountPaid,
     currency: (session.currency as string) ?? "usd",
-    shippingAddress,
+    shippingName: shippingDetails?.name ?? null,
+    shippingLine1: addr?.line1 ?? null,
+    shippingLine2: addr?.line2 ?? null,
+    shippingCity: addr?.city ?? null,
+    shippingState: addr?.state ?? null,
+    shippingPostalCode: addr?.postal_code ?? null,
+    shippingCountry: addr?.country ?? null,
     fulfillmentStatus: "pending",
   });
 
