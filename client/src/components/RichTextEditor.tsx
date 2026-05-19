@@ -8,6 +8,7 @@
  *  - Text color picker (12 preset colors + reset)
  *  - Bullet and numbered lists, blockquote, horizontal rule
  *  - Image insertion: URL or local file upload (base64 preview)
+ *  - Video upload: direct file upload → auto-saved to Media Repository → inline <video>
  *  - YouTube / video URL embedding
  *  - Raw HTML code insert dialog
  *  - Hyperlink insert/remove dialog
@@ -20,7 +21,7 @@
  *   named    RichTextDisplay  — read-only HTML renderer
  */
 
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor, EditorContent, Node, mergeAttributes } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
@@ -33,6 +34,7 @@ import Youtube from "@tiptap/extension-youtube";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import {
   Dialog,
   DialogContent,
@@ -67,10 +69,36 @@ import {
   X,
   Upload,
   Smile,
+  Video,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
+import { toast } from "sonner";
+
+// ─── Custom Video TipTap Node ─────────────────────────────────────────────────
+
+const VideoNode = Node.create({
+  name: "video",
+  group: "block",
+  atom: true,
+
+  addAttributes() {
+    return {
+      src: { default: null },
+      controls: { default: true },
+      width: { default: "100%" },
+    };
+  },
+
+  parseHTML() {
+    return [{ tag: "video" }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return ["video", mergeAttributes({ controls: true, style: "max-width:100%;border-radius:8px;margin:0.5em 0;" }, HTMLAttributes)];
+  },
+});
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -126,6 +154,77 @@ const TEXT_COLORS = [
   "#EC4899", "#FFFFFF",
 ];
 
+const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB chunks
+
+// ─── Video Upload Helper ──────────────────────────────────────────────────────
+
+async function uploadVideoToMediaRepo(
+  file: File,
+  onProgress: (pct: number) => void,
+): Promise<string> {
+  // 1. Init upload session
+  const initRes = await fetch("/api/upload-media-repo/init", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  if (!initRes.ok) {
+    const e = await initRes.json().catch(() => ({}));
+    throw new Error(e.error ?? "Failed to initialize upload");
+  }
+  const { uploadId } = await initRes.json();
+
+  // 2. Send chunks
+  const totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
+  let lastResult: any = null;
+
+  for (let i = 0; i < totalChunks; i++) {
+    const start = i * CHUNK_SIZE;
+    const end = Math.min(start + CHUNK_SIZE, file.size);
+    const chunk = file.slice(start, end);
+
+    const fd = new FormData();
+    fd.append("chunk", chunk, file.name);
+    fd.append("uploadId", uploadId);
+    fd.append("chunkIndex", String(i));
+    fd.append("totalChunks", String(totalChunks));
+    fd.append("fileName", file.name);
+    fd.append("mimeType", file.type || "video/mp4");
+    fd.append("fileSize", String(file.size));
+    fd.append("title", file.name.replace(/\.[^.]+$/, ""));
+    fd.append("access", "public");
+    fd.append("mediaType", "video");
+    fd.append("notes", "Uploaded via rich text editor");
+
+    lastResult = await new Promise<any>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const overall = Math.round(((i + e.loaded / e.total) / totalChunks) * 100);
+          onProgress(overall);
+        }
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try { resolve(JSON.parse(xhr.responseText)); }
+          catch { resolve({}); }
+        } else {
+          try { reject(new Error(JSON.parse(xhr.responseText)?.error ?? "Chunk upload failed")); }
+          catch { reject(new Error("Chunk upload failed")); }
+        }
+      };
+      xhr.onerror = () => reject(new Error("Network error on chunk " + i));
+      xhr.open("POST", "/api/upload-media-repo/chunk");
+      xhr.withCredentials = true;
+      xhr.send(fd);
+    });
+  }
+
+  if (!lastResult?.s3Url) throw new Error("Upload completed but no URL returned");
+  return lastResult.s3Url as string;
+}
+
 // ─── Main Editor ──────────────────────────────────────────────────────────────
 
 export default function RichTextEditor({
@@ -142,6 +241,10 @@ export default function RichTextEditor({
   const [imageAlt, setImageAlt] = useState("");
   const [videoDialogOpen, setVideoDialogOpen] = useState(false);
   const [videoUrl, setVideoUrl] = useState("");
+  const [videoUploadDialogOpen, setVideoUploadDialogOpen] = useState(false);
+  const [videoUploadFile, setVideoUploadFile] = useState<File | null>(null);
+  const [videoUploadProgress, setVideoUploadProgress] = useState(0);
+  const [videoUploading, setVideoUploading] = useState(false);
   const [htmlDialogOpen, setHtmlDialogOpen] = useState(false);
   const [rawHtml, setRawHtml] = useState("");
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
@@ -150,6 +253,7 @@ export default function RichTextEditor({
   const [customColor, setCustomColor] = useState("#179ca3");
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoFileInputRef = useRef<HTMLInputElement>(null);
 
   const editor = useEditor({
     extensions: [
@@ -159,6 +263,7 @@ export default function RichTextEditor({
       Color,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       Image.configure({ inline: false, allowBase64: true }),
+      VideoNode,
       Link.configure({
         openOnClick: false,
         autolink: true,
@@ -215,6 +320,36 @@ export default function RichTextEditor({
     editor.chain().focus().setYoutubeVideo({ src: videoUrl.trim() }).run();
     setVideoUrl(""); setVideoDialogOpen(false);
   }, [editor, videoUrl]);
+
+  const handleVideoFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setVideoUploadFile(file);
+    setVideoUploadDialogOpen(true);
+    e.target.value = "";
+  }, []);
+
+  const handleVideoUpload = useCallback(async () => {
+    if (!videoUploadFile || !editor) return;
+    setVideoUploading(true);
+    setVideoUploadProgress(0);
+    try {
+      const s3Url = await uploadVideoToMediaRepo(videoUploadFile, setVideoUploadProgress);
+      // Insert native <video> node into editor
+      editor.chain().focus().insertContent({
+        type: "video",
+        attrs: { src: s3Url, controls: true, width: "100%" },
+      }).run();
+      toast.success("Video uploaded and saved to Media Repository");
+      setVideoUploadDialogOpen(false);
+      setVideoUploadFile(null);
+      setVideoUploadProgress(0);
+    } catch (err: any) {
+      toast.error(`Video upload failed: ${err.message}`);
+    } finally {
+      setVideoUploading(false);
+    }
+  }, [videoUploadFile, editor]);
 
   const insertHtml = useCallback(() => {
     if (!editor || !rawHtml.trim()) return;
@@ -391,8 +526,13 @@ export default function RichTextEditor({
             <ImageIcon className="w-3.5 h-3.5" />
           </ToolbarBtn>
 
-          {/* Video */}
-          <ToolbarBtn title="Embed YouTube / video" onClick={() => setVideoDialogOpen(true)}>
+          {/* Video Upload (direct file) */}
+          <ToolbarBtn title="Upload video file (saved to Media Repository)" onClick={() => videoFileInputRef.current?.click()}>
+            <Video className="w-3.5 h-3.5" />
+          </ToolbarBtn>
+
+          {/* YouTube / URL embed */}
+          <ToolbarBtn title="Embed YouTube / video URL" onClick={() => setVideoDialogOpen(true)}>
             <YoutubeIcon className="w-3.5 h-3.5" />
           </ToolbarBtn>
 
@@ -433,10 +573,9 @@ export default function RichTextEditor({
         style={{ minHeight, maxHeight, overflowY: "auto" }}
       />
 
-      {/* Bubble menu removed - BubbleMenu requires separate package install */}
-
-      {/* Hidden file input */}
+      {/* Hidden file inputs */}
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={insertImageFile} />
+      <input ref={videoFileInputRef} type="file" accept="video/*" className="hidden" onChange={handleVideoFileSelect} />
 
       {/* Scoped styles */}
       <style>{`
@@ -466,6 +605,7 @@ export default function RichTextEditor({
         .rte-content .tiptap img { max-width: 100%; border-radius: 8px; margin: 0.5em 0; }
         .rte-content .tiptap iframe { max-width: 100%; border-radius: 8px; margin: 0.5em 0; }
         .rte-content .tiptap .youtube-embed { max-width: 100%; }
+        .rte-content .tiptap video { max-width: 100%; border-radius: 8px; margin: 0.5em 0; }
       `}</style>
 
       {/* ── Dialogs ── */}
@@ -506,12 +646,63 @@ export default function RichTextEditor({
         </DialogContent>
       </Dialog>
 
-      {/* Video Dialog */}
+      {/* Video Upload Dialog */}
+      <Dialog open={videoUploadDialogOpen} onOpenChange={(v) => { if (!videoUploading) { setVideoUploadDialogOpen(v); if (!v) setVideoUploadFile(null); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Video className="w-5 h-5 text-[#0891b2]" /> Upload Video
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {videoUploadFile && (
+              <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <p className="text-sm font-medium text-gray-800 truncate">{videoUploadFile.name}</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {(videoUploadFile.size / (1024 * 1024)).toFixed(1)} MB · {videoUploadFile.type || "video"}
+                </p>
+              </div>
+            )}
+            <div className="p-3 bg-teal-50 rounded-lg border border-teal-100 text-xs text-teal-700 flex items-start gap-2">
+              <Video className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span>This video will be automatically saved to the <strong>Media Repository</strong> and inserted inline as a playable video.</span>
+            </div>
+            {videoUploading && (
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs text-gray-500">
+                  <span>Uploading…</span>
+                  <span>{videoUploadProgress}%</span>
+                </div>
+                <Progress value={videoUploadProgress} className="h-2" />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setVideoUploadDialogOpen(false); setVideoUploadFile(null); }} disabled={videoUploading}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleVideoUpload}
+              disabled={!videoUploadFile || videoUploading}
+              style={{ background: "#0891b2" }}
+              className="text-white gap-2"
+            >
+              {videoUploading ? (
+                <><span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full inline-block" /> Uploading…</>
+              ) : (
+                <><Upload className="w-4 h-4" /> Upload & Insert</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* YouTube / URL Video Dialog */}
       <Dialog open={videoDialogOpen} onOpenChange={setVideoDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <YoutubeIcon className="w-5 h-5 text-red-500" /> Embed Video
+              <YoutubeIcon className="w-5 h-5 text-red-500" /> Embed Video URL
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
@@ -641,6 +832,7 @@ export function RichTextDisplay({
         "[&_code]:bg-gray-100 [&_code]:rounded [&_code]:px-1 [&_code]:text-xs [&_code]:font-mono",
         "[&_img]:max-w-full [&_img]:rounded-lg [&_img]:my-2",
         "[&_iframe]:max-w-full [&_iframe]:rounded-lg [&_iframe]:my-2",
+        "[&_video]:max-w-full [&_video]:rounded-lg [&_video]:my-2",
         className,
       )}
       dangerouslySetInnerHTML={{ __html: html }}
