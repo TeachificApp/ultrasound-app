@@ -624,6 +624,57 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
         </div>
       )}
 
+      {/* ── Playback Options ── */}
+      <div className="border border-gray-100 rounded p-2 space-y-2">
+        <p className="text-xs font-semibold text-gray-600 mb-1">Playback Options</p>
+        {[
+          { key: "autoplay", label: "Autoplay", note: "(muted required in most browsers)" },
+          { key: "muted", label: "Muted" },
+          { key: "loop", label: "Loop" },
+          { key: "controls", label: "Show controls", defaultVal: true },
+        ].map(({ key, label, note, defaultVal }) => (
+          <div key={key} className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={d[key] ?? (defaultVal ?? false)}
+              onChange={e => set(key, e.target.checked)}
+              className="rounded"
+            />
+            <label className="text-xs text-gray-600">
+              {label} {note && <span className="text-gray-400">{note}</span>}
+            </label>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Caption / Styling ── */}
+      <div>
+        <label className="text-xs text-gray-500 block mb-1">Caption / Description</label>
+        <Input
+          value={d.caption ?? ""}
+          onChange={e => set("caption", e.target.value)}
+          className="h-8 text-sm"
+          placeholder="Optional caption shown below player"
+        />
+      </div>
+
+      <div>
+        <label className="text-xs text-gray-500 block mb-1">Background Color</label>
+        <div className="flex gap-2 items-center">
+          <input
+            type="color"
+            value={d.bgColor ?? "#f8fffe"}
+            onChange={e => set("bgColor", e.target.value)}
+            className="h-8 w-10 rounded border border-gray-200 cursor-pointer"
+          />
+          <Input
+            value={d.bgColor ?? "#f8fffe"}
+            onChange={e => set("bgColor", e.target.value)}
+            className="h-8 text-xs flex-1"
+          />
+        </div>
+      </div>
+
       {/* ── Transcript ── */}
       <div>
         <label className="text-xs text-gray-500 block mb-1">Transcript (optional)</label>
