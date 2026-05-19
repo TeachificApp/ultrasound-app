@@ -127,6 +127,25 @@ function setCorsHeaders(res: Response) {
   res.setHeader("Content-Security-Policy", "frame-ancestors *");
 }
 
+// ─── OPTIONS preflight handler for all /media routes ────────────────────────
+// Required for cross-origin <img> and fetch() preflight requests
+router.options("/api/media/:slug", (req: Request, res: Response) => {
+  setCorsHeaders(res);
+  res.status(204).end();
+});
+router.options("/api/media/:slug/embed", (req: Request, res: Response) => {
+  setCorsHeaders(res);
+  res.status(204).end();
+});
+router.options("/api/media/:slug/info", (req: Request, res: Response) => {
+  setCorsHeaders(res);
+  res.status(204).end();
+});
+router.options("/api/media/:slug/download", (req: Request, res: Response) => {
+  setCorsHeaders(res);
+  res.status(204).end();
+});
+
 // ─── GET /media/:slug — serve content inline (no forced download) ────────────
 
 /**
