@@ -584,6 +584,11 @@ export default function CoursePlayer() {
       utils.lmsLearner.getCoursePlayer.invalidate({ slug: slug! });
       setTimeout(() => utils.lmsLearner.getCourseCertificate.invalidate({ courseSlug: slug! }), 3000);
     },
+    onError: (e, vars) => {
+      // Roll back optimistic update on server error
+      setOptimisticCompleted(prev => { const next = new Set(prev); next.delete(vars.lessonId); return next; });
+      toast.error(`Could not save progress: ${e.message}`);
+    },
   });
   const saveNote = trpc.lmsLearner.saveNote.useMutation({
     onSuccess: () => { refetchNotes(); toast.success("Note saved"); },
@@ -646,7 +651,11 @@ export default function CoursePlayer() {
     if (!selectedLessonId) return;
     // Optimistically mark as complete immediately so checkmarks appear in both sidebars
     setOptimisticCompleted(prev => new Set([...prev, selectedLessonId]));
-    await markComplete.mutateAsync({ lessonId: selectedLessonId, courseSlug: slug! });
+    // In admin preview mode the enrollment is synthetic (id: -1) — skip the server call
+    // to avoid a FORBIDDEN error. Progress is not persisted in preview mode.
+    if (!data?.isAdminPreview) {
+      await markComplete.mutateAsync({ lessonId: selectedLessonId, courseSlug: slug! });
+    }
     // Fire the effect BEFORE navigating — the LessonEffectPlayer must still be mounted
     // when the custom event fires. Navigating immediately (setSelectedLessonId) causes React
     // to re-key the players for the next lesson, unmounting the current one before the
