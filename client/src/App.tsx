@@ -417,6 +417,7 @@ function Router() {
         {/* ── Public Form Renderer (no auth required) ──────────────────────── */}
         <Route path="/forms/:slug" component={PublicFormRenderer} />
         <Route path="/forms/:slug/embed" component={PublicFormRenderer} />
+        <Route path="/forms/:slug/preview">{() => <PublicFormRenderer isPreview />}</Route>
         <Route path="/admin/email">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><EmailAdmin /></RoleGuard>}</Route>
         <Route path="/admin/sharing-monitor">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><SharingMonitor /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/user-analytics">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><UserAnalytics /></RoleGuard>}</Route>
@@ -631,6 +632,7 @@ function IHeartEchoRouter() {
         {/* ── Public Form Renderer (no auth required) ──────────────────────── */}
         <Route path="/forms/:slug" component={PublicFormRenderer} />
         <Route path="/forms/:slug/embed" component={PublicFormRenderer} />
+        <Route path="/forms/:slug/preview">{() => <PublicFormRenderer isPreview />}</Route>
         <Route path="/admin/email">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><EmailAdmin /></RoleGuard>}</Route>
         <Route path="/admin/engagement">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><EngagementDashboard /></RoleGuard>}</Route>
         <Route path="/admin/challenge-cards">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ChallengeCardGenerator /></RoleGuard>}</Route>

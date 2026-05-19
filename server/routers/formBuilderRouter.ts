@@ -243,6 +243,13 @@ export const formBuilderRouter = router({
     .mutation(async ({ ctx, input }) => {
       await requirePlatformAdmin(ctx);
       const { options, ...itemData } = input;
+      // Auto-assign sortOrder as max existing + 1 so new items always go to the bottom
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [maxRow] = await db.select({ maxOrder: sql<number>`COALESCE(MAX(${accreditationFormItems.sortOrder}), -1)` })
+        .from(accreditationFormItems)
+        .where(eq(accreditationFormItems.sectionId, itemData.sectionId));
+      const autoSortOrder = (maxRow?.maxOrder ?? -1) + 1;
       const itemId = await createFormItem({
         sectionId: itemData.sectionId,
         templateId: itemData.templateId,
@@ -250,7 +257,7 @@ export const formBuilderRouter = router({
         helpText: itemData.helpText ?? null,
         itemType: itemData.itemType,
         isRequired: itemData.isRequired,
-        sortOrder: itemData.sortOrder,
+        sortOrder: autoSortOrder,
         scaleMin: itemData.scaleMin ?? null,
         scaleMax: itemData.scaleMax ?? null,
         scaleMinLabel: itemData.scaleMinLabel ?? null,

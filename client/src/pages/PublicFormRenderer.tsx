@@ -191,14 +191,19 @@ function FormField({
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export default function PublicFormRenderer({ isEmbed = false }: { isEmbed?: boolean }) {
+export default function PublicFormRenderer({ isEmbed = false, isPreview = false }: { isEmbed?: boolean; isPreview?: boolean }) {
   const params = useParams<{ slug: string }>();
   const slug = params.slug ?? "";
 
-  const { data, isLoading, error } = trpc.generalForm.getPublicForm.useQuery(
+  const publicQuery = trpc.generalForm.getPublicForm.useQuery(
     { slug },
-    { enabled: !!slug, retry: false }
+    { enabled: !!slug && !isPreview, retry: false }
   );
+  const previewQuery = trpc.generalForm.getFormPreview.useQuery(
+    { slug },
+    { enabled: !!slug && isPreview, retry: false }
+  );
+  const { data, isLoading, error } = isPreview ? previewQuery : publicQuery;
 
   const [responses, setResponses] = useState<Record<string, any>>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -295,6 +300,13 @@ export default function PublicFormRenderer({ isEmbed = false }: { isEmbed?: bool
   // ── Main form ──
   return (
     <div style={{ minHeight: isEmbed ? "auto" : "100vh", background: theme.backgroundColor, fontFamily: theme.fontFamily, fontSize: `${theme.fontSize}px`, color: theme.textColor }}>
+      {/* Admin preview banner */}
+      {isPreview && (
+        <div style={{ background: "#fef3c7", borderBottom: "2px solid #f59e0b", padding: "8px 24px", display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#92400e", fontWeight: 500 }}>
+          <span style={{ fontSize: 16 }}>&#128065;</span>
+          Admin Preview — this form may not be publicly visible yet. Submissions made here are real.
+        </div>
+      )}
       {/* Header */}
       <div style={{ background: theme.headerBackground, color: theme.headerTextColor, padding: "24px 32px" }}>
         {theme.showLogo && theme.logoUrl && <img src={theme.logoUrl} alt="Logo" style={{ height: 40, marginBottom: 12, objectFit: "contain" }} />}

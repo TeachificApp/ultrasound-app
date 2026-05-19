@@ -2201,3 +2201,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Set DIYAccreditationLanding as root route for accreditation.iheartecho.com (no auth required)
 - [x] Replace all ICAEL references with IAC across 5 files
 - [x] Fix Back to Dashboard button in PremiumPearlGate (window.location.href)
+
+## Form Builder Reorder Bug (May 2026)
+- [x] Fix item/block reorder (drag and arrow buttons) broken in General Form Builder — fixed broken filter/reduce swap logic, now uses correct array destructuring swap
+- [x] Fix item/block reorder (drag and arrow buttons) broken in DIY Form Builder — fixed auto-sortOrder on item creation
+- [x] Fix form preview button broken and public form link returns 404 — added getFormPreview admin procedure + /forms/:slug/preview route bypassing isPublic check
+- [x] General Form Builder and DIY Form Builder now open full-screen (no sidebar) with breadcrumb navigation back
+- [x] Fix: General Form public renderer not showing dropdown/multi-select options — root cause: Drizzle sql template IN() treated joined IDs as single parameter; fixed with inArray()

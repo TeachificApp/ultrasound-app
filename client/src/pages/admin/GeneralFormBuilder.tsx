@@ -485,10 +485,18 @@ function FormEditor({ formId }: { formId: number }) {
                     )}
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                    <Button variant="ghost" size="sm" onClick={() => reorderItems.mutate({ templateId: formId, sectionId: section.id, orderedIds: arr.map((a: any) => a.id).filter((_: any, i: number) => i !== idx).reduce((acc: number[], id: number, i: number) => { acc.splice(idx > 0 ? idx - 1 : 0, 0, arr[idx].id); return acc; }, []) })} disabled={idx === 0}>
+                    <Button variant="ghost" size="sm" onClick={() => {
+                      const ids = arr.map((a: any) => a.id);
+                      [ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]];
+                      reorderItems.mutate({ templateId: formId, sectionId: section.id, orderedIds: ids });
+                    }} disabled={idx === 0}>
                       <ChevronUp className="w-3.5 h-3.5" />
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => reorderItems.mutate({ templateId: formId, sectionId: section.id, orderedIds: arr.map((a: any) => a.id).reduce((acc: number[], id: number, i: number) => { if (i === idx) { acc.splice(idx + 1, 0, id); } else if (i === idx + 1) { acc.splice(idx, 0, id); } else { acc.push(id); } return acc; }, []) })} disabled={idx === arr.length - 1}>
+                    <Button variant="ghost" size="sm" onClick={() => {
+                      const ids = arr.map((a: any) => a.id);
+                      [ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]];
+                      reorderItems.mutate({ templateId: formId, sectionId: section.id, orderedIds: ids });
+                    }} disabled={idx === arr.length - 1}>
                       <ChevronDown className="w-3.5 h-3.5" />
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => setEditingItem({ ...item, options: getOptionsForItem(item.id) })}><Edit2 className="w-3.5 h-3.5" /></Button>
@@ -1002,9 +1010,17 @@ function ShareTab({ formId, template, onRefetch }: { formId: number; template: a
                   variant="outline"
                   size="sm"
                   className="gap-2"
-                  onClick={() => window.open(publicUrl, "_blank")}
+                  onClick={() => window.open(publicUrl!, "_blank")}
                 >
                   <ExternalLink className="w-3.5 h-3.5" /> Open Form
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => window.open(`${publicUrl}/preview`, "_blank")}
+                >
+                  <Eye className="w-3.5 h-3.5" /> Admin Preview
                 </Button>
               </div>
             </>
@@ -1329,8 +1345,9 @@ function FormEditorShell({ formId, onBack }: { formId: number; onBack: () => voi
           variant="outline"
           size="sm"
           className="gap-1"
-          onClick={() => template.publicSlug && window.open(getPublicUrl(template.publicSlug), "_blank")}
-          disabled={!template.publicSlug || !template.isPublic}
+          onClick={() => template.publicSlug && window.open(`${window.location.origin}/forms/${template.publicSlug}/preview`, "_blank")}
+          disabled={!template.publicSlug}
+          title={!template.isPublic ? "Admin preview (form is not yet public)" : "Preview form"}
         >
           <Eye className="w-3.5 h-3.5" /> Preview
         </Button>
@@ -1390,13 +1407,18 @@ export default function GeneralFormBuilder() {
     );
   }
 
+  // When editing a form, render full-screen (no sidebar) like other editors
+  if (selectedFormId) {
+    return (
+      <div className="fixed inset-0 z-50 bg-white overflow-auto">
+        <FormEditorShell formId={selectedFormId} onBack={() => setSelectedFormId(null)} />
+      </div>
+    );
+  }
+
   return (
     <Layout>
-      {selectedFormId ? (
-        <FormEditorShell formId={selectedFormId} onBack={() => setSelectedFormId(null)} />
-      ) : (
-        <FormList onSelect={setSelectedFormId} />
-      )}
+      <FormList onSelect={setSelectedFormId} />
     </Layout>
   );
 }

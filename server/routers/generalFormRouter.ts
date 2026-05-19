@@ -28,8 +28,9 @@ import {
   generalFormOptions,
   generalFormBranchRules,
   generalFormSubmissions,
+  users,
 } from "../../drizzle/schema";
-import { eq, desc, asc, and, sql, like, count } from "drizzle-orm";
+import { eq, desc, asc, and, sql, like, count, inArray } from "drizzle-orm";
 import { invokeLLM } from "../_core/llm";
 
 // ─── Guard ────────────────────────────────────────────────────────────────────
@@ -57,9 +58,10 @@ async function getFullForm(db: any, templateId: number) {
   if (!template) return null;
   const sections = await db.select().from(generalFormSections).where(eq(generalFormSections.templateId, templateId)).orderBy(asc(generalFormSections.sortOrder));
   const items = await db.select().from(generalFormItems).where(eq(generalFormItems.templateId, templateId)).orderBy(asc(generalFormItems.sortOrder));
-  const options = await db.select().from(generalFormOptions).where(
-    sql`${generalFormOptions.itemId} IN (${items.length > 0 ? items.map((i: any) => i.id).join(",") : "0"})`
-  ).orderBy(asc(generalFormOptions.sortOrder));
+  const _ids = items.map((i: any) => i.id);
+  const options = _ids.length > 0
+    ? await db.select().from(generalFormOptions).where(inArray(generalFormOptions.itemId, _ids)).orderBy(asc(generalFormOptions.sortOrder))
+    : [];
   const branchRules = await db.select().from(generalFormBranchRules).where(eq(generalFormBranchRules.templateId, templateId));
   return { template, sections, items, options, branchRules };
 }
@@ -206,7 +208,7 @@ export const generalFormRouter = router({
       // Cascade delete
       const items = await db.select({ id: generalFormItems.id }).from(generalFormItems).where(eq(generalFormItems.templateId, input.id));
       if (items.length > 0) {
-        await db.delete(generalFormOptions).where(sql`${generalFormOptions.itemId} IN (${items.map((i: any) => i.id).join(",")})`);
+        await db.delete(generalFormOptions).where(inArray(generalFormOptions.itemId, items.map((i: any) => i.id)));
       }
       await db.delete(generalFormItems).where(eq(generalFormItems.templateId, input.id));
       await db.delete(generalFormSections).where(eq(generalFormSections.templateId, input.id));
@@ -337,7 +339,7 @@ export const generalFormRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const items = await db.select({ id: generalFormItems.id }).from(generalFormItems).where(eq(generalFormItems.sectionId, input.id));
       if (items.length > 0) {
-        await db.delete(generalFormOptions).where(sql`${generalFormOptions.itemId} IN (${items.map((i: any) => i.id).join(",")})`);
+        await db.delete(generalFormOptions).where(inArray(generalFormOptions.itemId, items.map((i: any) => i.id)));
         await db.delete(generalFormItems).where(eq(generalFormItems.sectionId, input.id));
       }
       await db.delete(generalFormSections).where(eq(generalFormSections.id, input.id));
@@ -401,7 +403,7 @@ export const generalFormRouter = router({
     }),
 
   reorderItems: protectedProcedure
-    .input(z.object({ sectionId: z.number(), orderedIds: z.array(z.number()) }))
+    .input(z.object({ sectionId: z.number(), orderedIds: z.array(z.number()), templateId: z.number().optional() }))
     .mutation(async ({ ctx, input }) => {
       await requireAdmin(ctx);
       const db = await getDb();
@@ -551,10 +553,95 @@ export const generalFormRouter = router({
       const sections = await db.select().from(generalFormSections).where(eq(generalFormSections.templateId, template.id)).orderBy(asc(generalFormSections.sortOrder));
       const items = await db.select().from(generalFormItems).where(eq(generalFormItems.templateId, template.id)).orderBy(asc(generalFormItems.sortOrder));
       const options = items.length > 0
-        ? await db.select().from(generalFormOptions).where(sql`${generalFormOptions.itemId} IN (${items.map((i: any) => i.id).join(",")})`).orderBy(asc(generalFormOptions.sortOrder))
+        ? await db.select().from(generalFormOptions).where(inArray(generalFormOptions.itemId, items.map((i: any) => i.id))).orderBy(asc(generalFormOptions.sortOrder))
         : [];
       const branchRules = await db.select().from(generalFormBranchRules).where(eq(generalFormBranchRules.templateId, template.id));
       return { template, sections, items, options, branchRules };
+    }),
+
+  // ── Save draft (auto-save partial attempt) ──────────────────────────────
+  saveFormDraft: publicProcedure
+    .input(z.object({
+      templateId: z.number(),
+      responses: z.string(), // JSON: Record<itemId, value>
+      userId: z.number().optional(),
+      draftId: z.number().optional(), // if updating existing draft
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const req = (ctx as any).req;
+      const ip = req?.ip?.substring(0, 64) ?? null;
+      const ua = req?.headers?.["user-agent"]?.substring(0, 500) ?? null;
+      const ref = req?.headers?.referer?.substring(0, 500) ?? null;
+      if (input.draftId) {
+        // Update existing draft
+        await db.update(generalFormSubmissions)
+          .set({ responses: input.responses, updatedAt: new Date() })
+          .where(and(
+            eq(generalFormSubmissions.id, input.draftId),
+            eq(generalFormSubmissions.status, "draft"),
+          ));
+        return { id: input.draftId };
+      }
+      // Create new draft row
+      const [result] = await db.insert(generalFormSubmissions).values({
+        templateId: input.templateId,
+        submittedByUserId: input.userId ?? null,
+        responses: input.responses,
+        score: 0,
+        maxScore: 0,
+        status: "draft",
+        ipAddress: ip,
+        userAgent: ua,
+        referrer: ref,
+      });
+      return { id: (result as any).insertId as number };
+    }),
+
+  // ── Get all results (admin) — complete + incomplete ───────────────────────
+  getFormResults: protectedProcedure
+    .input(z.object({
+      templateId: z.number(),
+      page: z.number().int().min(1).default(1),
+      pageSize: z.number().int().min(1).max(100).default(25),
+      status: z.enum(["all", "submitted", "reviewed", "draft"]).default("all"),
+      search: z.string().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const offset = (input.page - 1) * input.pageSize;
+      const conditions: any[] = [eq(generalFormSubmissions.templateId, input.templateId)];
+      if (input.status !== "all") conditions.push(eq(generalFormSubmissions.status, input.status as any));
+      const [submissions, [{ total }]] = await Promise.all([
+        db.select({
+          id: generalFormSubmissions.id,
+          templateId: generalFormSubmissions.templateId,
+          submittedByUserId: generalFormSubmissions.submittedByUserId,
+          responses: generalFormSubmissions.responses,
+          score: generalFormSubmissions.score,
+          maxScore: generalFormSubmissions.maxScore,
+          status: generalFormSubmissions.status,
+          ipAddress: generalFormSubmissions.ipAddress,
+          userAgent: generalFormSubmissions.userAgent,
+          referrer: generalFormSubmissions.referrer,
+          submittedAt: generalFormSubmissions.submittedAt,
+          updatedAt: generalFormSubmissions.updatedAt,
+          userName: users.name,
+          userEmail: users.email,
+          userDisplayName: users.displayName,
+        })
+          .from(generalFormSubmissions)
+          .leftJoin(users, eq(generalFormSubmissions.submittedByUserId, users.id))
+          .where(and(...conditions))
+          .orderBy(desc(generalFormSubmissions.updatedAt))
+          .limit(input.pageSize)
+          .offset(offset),
+        db.select({ total: count() }).from(generalFormSubmissions).where(and(...conditions)),
+      ]);
+      return { submissions, total: total as number };
     }),
 
   // ── PUBLIC: Submit form ───────────────────────────────────────────────────
@@ -581,7 +668,7 @@ export const generalFormRouter = router({
       if (template.scoreEnabled) {
         const items = await db.select().from(generalFormItems).where(eq(generalFormItems.templateId, input.templateId));
         const options = items.length > 0
-          ? await db.select().from(generalFormOptions).where(sql`${generalFormOptions.itemId} IN (${items.map((i: any) => i.id).join(",")})`)
+          ? await db.select().from(generalFormOptions).where(inArray(generalFormOptions.itemId, items.map((i: any) => i.id)))
           : [];
         const responses: Record<string, any> = JSON.parse(input.responses);
         for (const item of items) {
@@ -606,5 +693,25 @@ export const generalFormRouter = router({
         referrer: req?.headers?.referer?.substring(0, 500) ?? null,
       });
       return { id: (result as any).insertId, score, maxScore };
+    }),
+
+  // ── Admin preview: get form by slug ignoring isPublic ─────────────────────
+  getFormPreview: protectedProcedure
+    .input(z.object({ slug: z.string() }))
+    .query(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [template] = await db.select().from(generalFormTemplates)
+        .where(eq(generalFormTemplates.publicSlug, input.slug))
+        .limit(1);
+      if (!template) throw new TRPCError({ code: "NOT_FOUND", message: "Form not found." });
+      const sections = await db.select().from(generalFormSections).where(eq(generalFormSections.templateId, template.id)).orderBy(asc(generalFormSections.sortOrder));
+      const items = await db.select().from(generalFormItems).where(eq(generalFormItems.templateId, template.id)).orderBy(asc(generalFormItems.sortOrder));
+      const options = items.length > 0
+        ? await db.select().from(generalFormOptions).where(inArray(generalFormOptions.itemId, items.map((i: any) => i.id))).orderBy(asc(generalFormOptions.sortOrder))
+        : [];
+      const branchRules = await db.select().from(generalFormBranchRules).where(eq(generalFormBranchRules.templateId, template.id));
+      return { template, sections, items, options, branchRules };
     }),
 });

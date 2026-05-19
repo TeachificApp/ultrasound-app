@@ -1488,14 +1488,21 @@ export default function FormBuilderAdmin() {
   const params = useParams<{ id?: string }>();
   const templateId = params.id ? parseInt(params.id) : null;
 
+  // When editing a template, render full-screen (no sidebar) like other editors
+  if (templateId && !isNaN(templateId)) {
+    return (
+      <div className="fixed inset-0 z-50 bg-white overflow-auto">
+        <div className="max-w-5xl mx-auto px-4 py-6">
+          <FormEditor templateId={templateId} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Layout>
       <div className="container py-8 max-w-5xl">
-        {templateId && !isNaN(templateId) ? (
-          <FormEditor templateId={templateId} />
-        ) : (
-          <TemplateList />
-        )}
+        <TemplateList />
       </div>
     </Layout>
   );
