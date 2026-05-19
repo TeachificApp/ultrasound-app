@@ -130,8 +130,13 @@ async function handleLmsCheckoutCompleted(session: Record<string, unknown>) {
   const db = await getDb();
   if (!db) return;
 
-  // Mark order as paid
-  await db.update(lmsOrders).set({ status: "paid", stripeSessionId: sessionId }).where(eq(lmsOrders.id, orderId));
+  // Mark order as paid (also store subscription ID if this was a subscription checkout)
+  const subscriptionIdForOrder = session.subscription as string | undefined;
+  await db.update(lmsOrders).set({
+    status: "paid",
+    stripeSessionId: sessionId,
+    ...(subscriptionIdForOrder ? { stripeSubscriptionId: subscriptionIdForOrder } : {}),
+  }).where(eq(lmsOrders.id, orderId));
 
   // Enroll user (and extra seats if group purchase)
   const [existingEnrollment] = await db.select().from(lmsEnrollments)

@@ -2972,6 +2972,7 @@ export const lmsOrders = mysqlTable("lms_orders", {
   currency: varchar("currency", { length: 8 }).default("usd").notNull(),
   stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
   stripeSessionId: varchar("stripe_session_id", { length: 255 }),
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
   status: mysqlEnum("status", ["pending", "paid", "failed", "refunded"]).default("pending").notNull(),
   affiliateId: int("affiliate_id"),
   groupId: int("group_id"),

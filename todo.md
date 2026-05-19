@@ -2240,3 +2240,17 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] CoursePlayer sidebar reads course.showInstructor and respects lesson-level override (inherit/show/hide)
 - [x] Fix flashcard button defaults: Got It #1ab7b4 / #ffffff, Still Learning #f0fdfa / #189593
 - [x] Add Reflection question style to quiz AI generator
+
+## Sales Tab (LMS Admin)
+- [ ] Server: getSalesData procedure — fetch orders/enrollments with Stripe payment info per course/product
+- [ ] Server: refundOrder mutation — call Stripe refund API
+- [ ] Server: cancelSubscription mutation — call Stripe cancel subscription API
+- [ ] Server: getCheckoutLinks procedure — return all pricing option checkout URLs + embed codes
+- [ ] Client: SalesTab component — checkout links section with copy + embed code
+- [ ] Client: SalesTab — sales table with running total, student name, date, amount, status
+- [ ] Client: SalesTab — student profile drawer (name, email, enrollment status, order history)
+- [ ] Client: SalesTab — refund/cancel actions with confirmation dialog
+- [ ] Wire SalesTab into LMSAdmin course-level tabs
+
+## Rich Text Editor Enhancements
+- [ ] Add direct video file upload into rich text editor (TipTap) with S3 storage and inline playback

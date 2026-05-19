@@ -17,6 +17,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Award, BookOpen, CheckCircle, ChevronDown, ChevronRight, Clock, Edit3,
   Lock, PlayCircle, User, FileText, HelpCircle, Download, Monitor,
@@ -84,6 +85,7 @@ export default function CourseOverview() {
 
   const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set());
   const [showEditor, setShowEditor] = useState(false);
+  const [selectedInstructor, setSelectedInstructor] = useState<any>(null);
 
   const { data, isLoading, refetch } = trpc.lmsLearner.getCourseOverview.useQuery(
     { slug: slug!, preview: isAdmin },
@@ -438,29 +440,79 @@ export default function CourseOverview() {
         {/* Instructor profiles */}
         {course.showInstructor && instructors?.length > 0 && (
           <div>
-            <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <User className="w-5 h-5 text-teal-600" /> Your Instructor{instructors.length > 1 ? "s" : ""}
+            <h2 className="text-lg font-bold text-gray-900 mb-4">
+              Your Instructor{instructors.length > 1 ? "s" : ""}
             </h2>
             <div className="grid gap-4 sm:grid-cols-2">
-              {instructors.map((inst: any) => (
-                <div key={inst.id} className="bg-white rounded-xl border border-gray-200 p-5 flex gap-4 shadow-sm">
-                  {inst.avatarUrl ? (
-                    <img src={inst.avatarUrl} alt={inst.name} className="w-16 h-16 rounded-full object-cover border-2 border-teal-200 shrink-0" />
-                  ) : (
-                    <div className="w-16 h-16 rounded-full bg-teal-100 border-2 border-teal-200 flex items-center justify-center shrink-0">
-                      <User className="w-8 h-8 text-teal-600" />
+              {instructors.map((inst: any) => {
+                const rawBio = inst.bio ?? "";
+                const plainBio = rawBio.replace(/<[^>]*>/g, " ").replace(/&[a-z#0-9]+;/gi, " ").replace(/\s+/g, " ").trim();
+                const BIO_LIMIT = 180;
+                const truncated = plainBio.length > BIO_LIMIT;
+                return (
+                  <div key={inst.id} className="bg-white rounded-xl border border-gray-200 p-5 flex gap-4 shadow-sm">
+                    {inst.avatarUrl ? (
+                      <img src={inst.avatarUrl} alt={inst.name} className="w-16 h-16 rounded-full object-cover border-2 border-teal-200 shrink-0" />
+                    ) : (
+                      <div className="w-16 h-16 rounded-full bg-teal-100 border-2 border-teal-200 flex items-center justify-center shrink-0">
+                        <User className="w-8 h-8 text-teal-600" />
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="font-bold text-gray-900">{inst.name}</p>
+                      {inst.title && <p className="text-sm text-teal-600">{inst.title}</p>}
+                      {plainBio && (
+                        <p className="text-sm text-gray-500 mt-2 leading-relaxed">
+                          {truncated ? plainBio.slice(0, BIO_LIMIT).trimEnd() + "…" : plainBio}
+                          {truncated && (
+                            <button
+                              className="ml-1 text-teal-600 font-medium hover:underline text-sm"
+                              onClick={() => setSelectedInstructor(inst)}
+                            >More</button>
+                          )}
+                        </p>
+                      )}
                     </div>
-                  )}
-                  <div className="min-w-0">
-                    <p className="font-bold text-gray-900">{inst.name}</p>
-                    {inst.title && <p className="text-sm text-teal-600">{inst.title}</p>}
-                    {inst.bio && <p className="text-sm text-gray-500 mt-2 leading-relaxed line-clamp-4">{inst.bio}</p>}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
+        {/* Instructor profile popup */}
+        <Dialog open={!!selectedInstructor} onOpenChange={() => setSelectedInstructor(null)}>
+          <DialogContent className="max-w-lg">
+            {selectedInstructor && (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-3">
+                    {selectedInstructor.avatarUrl ? (
+                      <img src={selectedInstructor.avatarUrl} alt={selectedInstructor.name} className="w-12 h-12 rounded-full object-cover border-2 border-teal-200 shrink-0" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-teal-100 border-2 border-teal-200 flex items-center justify-center shrink-0">
+                        <User className="w-6 h-6 text-teal-600" />
+                      </div>
+                    )}
+                    <div>
+                      <p className="font-bold text-gray-900 text-base">{selectedInstructor.name}</p>
+                      {selectedInstructor.title && <p className="text-sm text-teal-600 font-normal">{selectedInstructor.title}</p>}
+                    </div>
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="text-sm text-gray-600 leading-relaxed max-h-80 overflow-y-auto">
+                  {selectedInstructor.bio
+                    ? <div dangerouslySetInnerHTML={{ __html: selectedInstructor.bio }} />
+                    : <p className="text-gray-400 italic">No biography provided.</p>}
+                </div>
+                {selectedInstructor.website && (
+                  <a href={selectedInstructor.website} target="_blank" rel="noopener noreferrer" className="text-sm text-teal-600 hover:underline mt-1 inline-block">
+                    {selectedInstructor.website.replace(/^https?:\/\//, "")}
+                  </a>
+                )}
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* Certificate badge */}
         {course.hasCertificate && (

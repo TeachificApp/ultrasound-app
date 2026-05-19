@@ -2976,6 +2976,191 @@ Generate 3-6 sections with 2-5 lessons each. Lesson types can be: text, video (f
       await db.insert(platformSettings).values({ id: 1, customDomains: json } as any).onDuplicateKeyUpdate({ set: { customDomains: json } });
       return { success: true };
     }),
+
+  // ─── Sales: get all orders for a course with enriched user data ─────────────
+  getSalesData: protectedProcedure
+    .input(z.object({
+      courseId: z.number().int(),
+      page: z.number().int().min(1).default(1),
+      pageSize: z.number().int().min(1).max(100).default(50),
+    }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const offset = (input.page - 1) * input.pageSize;
+      const orders = await db.select().from(lmsOrders)
+        .where(eq(lmsOrders.courseId, input.courseId))
+        .orderBy(desc(lmsOrders.createdAt))
+        .limit(input.pageSize).offset(offset);
+      const enriched = await Promise.all(orders.map(async (o) => {
+        const [u] = await db!.select({
+          id: users.id,
+          displayName: users.displayName,
+          email: users.email,
+          createdAt: users.createdAt,
+        }).from(users).where(eq(users.id, o.userId)).limit(1);
+        const [enrollment] = await db!.select({
+          id: lmsEnrollments.id,
+          progressPct: lmsEnrollments.progressPct,
+          completedAt: lmsEnrollments.completedAt,
+          enrolledAt: lmsEnrollments.enrolledAt,
+        }).from(lmsEnrollments)
+          .where(and(eq(lmsEnrollments.userId, o.userId), eq(lmsEnrollments.courseId, input.courseId)))
+          .limit(1);
+        return { ...o, user: u ?? null, enrollment: enrollment ?? null };
+      }));
+      const [{ total }] = await db.select({ total: sql<number>`count(*)` }).from(lmsOrders)
+        .where(eq(lmsOrders.courseId, input.courseId));
+      const [{ revenue }] = await db.select({ revenue: sql<number>`coalesce(sum(amount), 0)` }).from(lmsOrders)
+        .where(and(eq(lmsOrders.courseId, input.courseId), eq(lmsOrders.status, "paid")));
+      return { orders: enriched, total: Number(total), totalRevenue: Number(revenue) };
+    }),
+
+  // ─── Sales: get checkout links for all pricing options ──────────────────────
+  getCheckoutLinks: protectedProcedure
+    .input(z.object({ courseId: z.number().int(), origin: z.string() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      const pricingOptions = await db.select().from(lmsPricingOptions)
+        .where(and(eq(lmsPricingOptions.courseId, input.courseId), eq(lmsPricingOptions.isActive, true)))
+        .orderBy(asc(lmsPricingOptions.sortOrder));
+      // Build checkout URL for each pricing option
+      const buildCheckoutUrl = (optionId?: number) => {
+        const base = `${input.origin}/learn/${course.slug}`;
+        return optionId ? `${base}?pricingOptionId=${optionId}&checkout=1` : `${base}?checkout=1`;
+      };
+      const buildEmbedCode = (url: string) =>
+        `<iframe src="${url}" width="100%" height="600" frameborder="0" style="border:none;border-radius:8px;"></iframe>`;
+      // Primary pricing option (from course itself)
+      const primaryUrl = buildCheckoutUrl();
+      const links = [
+        {
+          id: 0,
+          label: course.pricingType === "free" ? "Free Enrollment" : `Primary — ${course.pricingType ?? "one_time"}`,
+          pricingType: course.pricingType ?? "one_time",
+          price: course.price,
+          checkoutUrl: primaryUrl,
+          embedCode: buildEmbedCode(primaryUrl),
+          isActive: true,
+        },
+        ...pricingOptions.map(opt => {
+          const url = buildCheckoutUrl(opt.id);
+          return {
+            id: opt.id,
+            label: opt.label,
+            sublabel: opt.sublabel,
+            pricingType: opt.pricingType,
+            price: opt.price,
+            checkoutUrl: url,
+            embedCode: buildEmbedCode(url),
+            isActive: opt.isActive,
+          };
+        }),
+      ];
+      return { course: { id: course.id, title: course.title, slug: course.slug }, links };
+    }),
+
+  // ─── Sales: refund an order via Stripe ──────────────────────────────────────
+  refundOrder: protectedProcedure
+    .input(z.object({ orderId: z.number().int(), reason: z.string().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [order] = await db.select().from(lmsOrders).where(eq(lmsOrders.id, input.orderId)).limit(1);
+      if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Order not found" });
+      if (order.status === "refunded") throw new TRPCError({ code: "BAD_REQUEST", message: "Order already refunded" });
+      if (order.status !== "paid") throw new TRPCError({ code: "BAD_REQUEST", message: "Only paid orders can be refunded" });
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      // Retrieve the payment intent or session to get the charge
+      let chargeId: string | null = null;
+      if (order.stripePaymentIntentId) {
+        const pi = await stripe.paymentIntents.retrieve(order.stripePaymentIntentId);
+        chargeId = typeof pi.latest_charge === "string" ? pi.latest_charge : null;
+      } else if (order.stripeSessionId) {
+        const session = await stripe.checkout.sessions.retrieve(order.stripeSessionId);
+        if (session.payment_intent) {
+          const pi = await stripe.paymentIntents.retrieve(session.payment_intent as string);
+          chargeId = typeof pi.latest_charge === "string" ? pi.latest_charge : null;
+        }
+      }
+      if (!chargeId) throw new TRPCError({ code: "BAD_REQUEST", message: "No charge found for this order — refund manually in Stripe dashboard" });
+      await stripe.refunds.create({
+        charge: chargeId,
+        reason: (input.reason as any) ?? "requested_by_customer",
+      });
+      await db.update(lmsOrders).set({ status: "refunded" }).where(eq(lmsOrders.id, input.orderId));
+      return { success: true };
+    }),
+
+  // ─── Sales: cancel a subscription ───────────────────────────────────────────
+  cancelSubscription: protectedProcedure
+    .input(z.object({ orderId: z.number().int() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [order] = await db.select().from(lmsOrders).where(eq(lmsOrders.id, input.orderId)).limit(1);
+      if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Order not found" });
+      if (!order.stripeSubscriptionId) {
+        // Try to find subscription from session
+        if (order.stripeSessionId) {
+          const Stripe = (await import("stripe")).default;
+          const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+          const session = await stripe.checkout.sessions.retrieve(order.stripeSessionId);
+          if (session.subscription) {
+            const subId = session.subscription as string;
+            await stripe.subscriptions.cancel(subId);
+            await db.update(lmsOrders).set({ stripeSubscriptionId: subId, status: "refunded" }).where(eq(lmsOrders.id, input.orderId));
+            return { success: true, subscriptionId: subId };
+          }
+        }
+        throw new TRPCError({ code: "BAD_REQUEST", message: "No subscription found for this order" });
+      }
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      await stripe.subscriptions.cancel(order.stripeSubscriptionId);
+      await db.update(lmsOrders).set({ status: "refunded" }).where(eq(lmsOrders.id, input.orderId));
+      return { success: true, subscriptionId: order.stripeSubscriptionId };
+    }),
+
+  // ─── Sales: get student profile for a user ──────────────────────────────────
+  getStudentProfile: protectedProcedure
+    .input(z.object({ userId: z.number().int() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [user] = await db.select().from(users).where(eq(users.id, input.userId)).limit(1);
+      if (!user) throw new TRPCError({ code: "NOT_FOUND" });
+      const enrollments = await db.select({
+        id: lmsEnrollments.id,
+        courseId: lmsEnrollments.courseId,
+        enrolledAt: lmsEnrollments.enrolledAt,
+        progressPct: lmsEnrollments.progressPct,
+        completedAt: lmsEnrollments.completedAt,
+      }).from(lmsEnrollments).where(eq(lmsEnrollments.userId, input.userId)).orderBy(desc(lmsEnrollments.enrolledAt));
+      const enrichedEnrollments = await Promise.all(enrollments.map(async (e) => {
+        const [course] = await db!.select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug }).from(lmsCourses).where(eq(lmsCourses.id, e.courseId)).limit(1);
+        return { ...e, course: course ?? null };
+      }));
+      const orders = await db.select().from(lmsOrders).where(eq(lmsOrders.userId, input.userId)).orderBy(desc(lmsOrders.createdAt));
+      const enrichedOrders = await Promise.all(orders.map(async (o) => {
+        const [course] = await db!.select({ id: lmsCourses.id, title: lmsCourses.title }).from(lmsCourses).where(eq(lmsCourses.id, o.courseId)).limit(1);
+        return { ...o, course: course ?? null };
+      }));
+      return {
+        user: { id: user.id, displayName: user.displayName, email: user.email, createdAt: user.createdAt, role: user.role },
+        enrollments: enrichedEnrollments,
+        orders: enrichedOrders,
+      };
+    }),
 });
 
 // ─── Group Manager Router ─────────────────────────────────────────────────────

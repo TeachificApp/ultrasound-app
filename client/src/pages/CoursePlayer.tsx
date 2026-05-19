@@ -554,6 +554,7 @@ export default function CoursePlayer() {
   const [adminPreviewStudent, setAdminPreviewStudent] = useState(isPreviewMode);
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   const [upgradePromptReason, setUpgradePromptReason] = useState<"entry" | "exit" | "locked_lesson">("entry");
+  const [instructorPopup, setInstructorPopup] = useState<any>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const utils = trpc.useUtils();
 
@@ -990,6 +991,41 @@ export default function CoursePlayer() {
           courseTitle={course.title}
           certificateUrl={certData?.certificateUrl}
         />
+
+        {/* ── Instructor Profile Popup ── */}
+        <Dialog open={!!instructorPopup} onOpenChange={() => setInstructorPopup(null)}>
+          <DialogContent className="max-w-lg">
+            {instructorPopup && (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-3">
+                    {instructorPopup.avatarUrl ? (
+                      <img src={instructorPopup.avatarUrl} alt={instructorPopup.name} className="w-12 h-12 rounded-full object-cover border-2 border-teal-200 shrink-0" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-teal-100 border-2 border-teal-200 flex items-center justify-center shrink-0">
+                        <User className="w-6 h-6 text-teal-600" />
+                      </div>
+                    )}
+                    <div>
+                      <p className="font-bold text-gray-900 text-base">{instructorPopup.name}</p>
+                      {instructorPopup.title && <p className="text-sm text-teal-600 font-normal">{instructorPopup.title}</p>}
+                    </div>
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="text-sm text-gray-600 leading-relaxed max-h-80 overflow-y-auto">
+                  {instructorPopup.bio
+                    ? <div dangerouslySetInnerHTML={{ __html: instructorPopup.bio }} />
+                    : <p className="text-gray-400 italic">No biography provided.</p>}
+                </div>
+                {instructorPopup.website && (
+                  <a href={instructorPopup.website} target="_blank" rel="noopener noreferrer" className="text-sm text-teal-600 hover:underline mt-1 inline-block">
+                    {instructorPopup.website.replace(/^https?:\/\//, "")}
+                  </a>
+                )}
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* ── Left Sidebar — Course Modules ── */}
         {/* Mobile: overlay drawer; Desktop: collapsible inline sidebar */}
@@ -1574,29 +1610,43 @@ export default function CoursePlayer() {
                     if (!shouldShow || instructors.length === 0) return null;
                     return (
                       <div className="border-t border-gray-200 pt-4 space-y-3">
-                        <h3 className="text-xs font-bold text-teal-700 uppercase tracking-widest flex items-center gap-2">
-                          <User className="w-3.5 h-3.5" /> Your Instructor{instructors.length > 1 ? "s" : ""}
+                        <h3 className="text-xs font-bold text-teal-700 uppercase tracking-widest">
+                          Your Instructor{instructors.length > 1 ? "s" : ""}
                         </h3>
-                        {instructors.map((inst: any) => (
-                          <div key={inst.id} className="flex flex-col gap-2">
-                            <div className="flex items-center gap-2">
-                              {inst.avatarUrl ? (
-                                <img src={inst.avatarUrl} alt={inst.name} className="w-10 h-10 rounded-full object-cover border-2 border-teal-200 shrink-0" />
-                              ) : (
-                                <div className="w-10 h-10 rounded-full bg-teal-100 border-2 border-teal-200 flex items-center justify-center shrink-0">
-                                  <User className="w-5 h-5 text-teal-600" />
+                        {instructors.map((inst: any) => {
+                          const rawBio = inst.bio ?? "";
+                          const plainBio = rawBio.replace(/<[^>]*>/g, " ").replace(/&[a-z#0-9]+;/gi, " ").replace(/\s+/g, " ").trim();
+                          const BIO_LIMIT = 120;
+                          const truncated = plainBio.length > BIO_LIMIT;
+                          return (
+                            <div key={inst.id} className="flex flex-col gap-2">
+                              <div className="flex items-center gap-2">
+                                {inst.avatarUrl ? (
+                                  <img src={inst.avatarUrl} alt={inst.name} className="w-10 h-10 rounded-full object-cover border-2 border-teal-200 shrink-0" />
+                                ) : (
+                                  <div className="w-10 h-10 rounded-full bg-teal-100 border-2 border-teal-200 flex items-center justify-center shrink-0">
+                                    <User className="w-5 h-5 text-teal-600" />
+                                  </div>
+                                )}
+                                <div className="min-w-0">
+                                  <p className="text-xs font-semibold text-gray-900 truncate">{inst.name}</p>
+                                  {inst.title && <p className="text-[10px] text-teal-600 truncate">{inst.title}</p>}
                                 </div>
-                              )}
-                              <div className="min-w-0">
-                                <p className="text-xs font-semibold text-gray-900 truncate">{inst.name}</p>
-                                {inst.title && <p className="text-[10px] text-teal-600 truncate">{inst.title}</p>}
                               </div>
+                              {plainBio && (
+                                <p className="text-[10px] text-gray-500 leading-relaxed">
+                                  {truncated ? plainBio.slice(0, BIO_LIMIT).trimEnd() + "…" : plainBio}
+                                  {truncated && (
+                                    <button
+                                      className="ml-1 text-teal-600 font-medium hover:underline text-[10px]"
+                                      onClick={() => setInstructorPopup(inst)}
+                                    >More</button>
+                                  )}
+                                </p>
+                              )}
                             </div>
-                            {inst.bio && (
-                              <p className="text-[10px] text-gray-500 leading-relaxed line-clamp-4">{inst.bio}</p>
-                            )}
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     );
                   })()}

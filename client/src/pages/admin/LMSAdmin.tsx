@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import LessonEffectEditor from "@/components/LessonEffectEditor";
+import { LMSSalesTab } from "@/components/LMSSalesTab";
 import DigitalDownloadsAdmin from "./DigitalDownloadsAdmin";
 import PhysicalProductsAdmin from "./PhysicalProductsAdmin";
 import OrderBumpsAdmin from "./OrderBumpsAdmin";
@@ -922,6 +923,7 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
           <TabsTrigger value="instructors" className="text-xs">Instructors</TabsTrigger>
           <TabsTrigger value="users" className="text-xs">Students</TabsTrigger>
           <TabsTrigger value="analytics" className="text-xs">Analytics</TabsTrigger>
+          <TabsTrigger value="sales" className="text-xs">Sales</TabsTrigger>
         </TabsList>
 
         {/* Settings Tab */}
@@ -1081,6 +1083,9 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
         {/* Analytics Tab */}
         <TabsContent value="analytics" className="mt-4">
           <CourseAnalyticsTab courseId={courseId} />
+        </TabsContent>
+        <TabsContent value="sales" className="mt-4">
+          <LMSSalesTab courseId={courseId} />
         </TabsContent>
       </Tabs>
 

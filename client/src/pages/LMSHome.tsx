@@ -135,9 +135,6 @@ export default function LMSHome() {
                         <BookOpen className="w-10 h-10 text-teal-300" />
                       </div>
                     )}
-                    {course.isFree && (
-                      <Badge className="absolute top-2 left-2 bg-teal-500 text-white text-xs">Free</Badge>
-                    )}
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
                       <Play className="w-10 h-10 text-white opacity-0 group-hover:opacity-80 transition-opacity drop-shadow-lg" />
                     </div>
@@ -159,6 +156,11 @@ export default function LMSHome() {
                         </span>
                       )}
                     </div>
+                    {course.isFree && (
+                      <div className="mt-1.5">
+                        <Badge className="bg-green-500 text-white text-xs">Free</Badge>
+                      </div>
+                    )}
                   </div>
                 </div>
               </Link>
@@ -220,9 +222,6 @@ export default function LMSHome() {
                           <FileDown className="w-8 h-8 text-teal-300" />
                         </div>
                       )}
-                      {product.price === 0 && (
-                        <Badge className="absolute top-2 left-2 bg-teal-500 text-white text-xs">Free</Badge>
-                      )}
                     </div>
                     <div className="p-4 flex flex-col flex-1">
                       <h3 className="font-semibold text-gray-900 text-sm leading-snug line-clamp-2 mb-2 group-hover:text-[#189aa1] transition-colors">
@@ -234,6 +233,11 @@ export default function LMSHome() {
                         </span>
                         <FileDown className="w-4 h-4 text-gray-400 group-hover:text-[#4ad9e0] transition-colors" />
                       </div>
+                      {product.price === 0 && (
+                        <div className="mt-1.5">
+                          <Badge className="bg-green-500 text-white text-xs">Free</Badge>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </Link>

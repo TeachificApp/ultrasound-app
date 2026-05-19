@@ -37,19 +37,7 @@ function CourseCard({ course }: { course: any }) {
               <BookOpen className="w-12 h-12 text-teal-300" />
             </div>
           )}
-          <div className="absolute top-3 left-3 flex gap-1.5">
-            <Badge variant="secondary" className="bg-white/90 text-teal-700 text-xs font-medium flex items-center gap-1">
-              {TYPE_ICONS[course.type]} {course.type.charAt(0).toUpperCase() + course.type.slice(1)}
-            </Badge>
-            {course.isFree && (
-              <Badge className="bg-green-500 text-white text-xs">Free</Badge>
-            )}
-          </div>
-          <div className="absolute top-3 right-3">
-            <Badge variant="outline" className="bg-white/90 text-xs text-gray-600 border-gray-200">
-              {BRAND_LABELS[course.brand] ?? course.brand}
-            </Badge>
-          </div>
+
         </div>
 
         {/* Content */}
@@ -81,6 +69,20 @@ function CourseCard({ course }: { course: any }) {
             <Button size="sm" variant="outline" className="text-xs h-7 border-teal-300 text-teal-700 hover:bg-teal-50">
               {course.type === "quiz" ? "Take Quiz" : course.type === "download" ? "Get Download" : "View Course"}
             </Button>
+          </div>
+          {/* Tags below price */}
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            <Badge variant="secondary" className="bg-teal-50 text-teal-700 text-xs font-medium flex items-center gap-1">
+              {TYPE_ICONS[course.type]} {course.type.charAt(0).toUpperCase() + course.type.slice(1)}
+            </Badge>
+            {course.isFree && (
+              <Badge className="bg-green-500 text-white text-xs">Free</Badge>
+            )}
+            {course.brand && (
+              <Badge variant="outline" className="text-xs text-gray-500 border-gray-200">
+                {BRAND_LABELS[course.brand] ?? course.brand}
+              </Badge>
+            )}
           </div>
         </div>
       </div>
