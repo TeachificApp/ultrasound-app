@@ -149,62 +149,88 @@ function syntheticPeaks(seed: string, numBars = 150): Float32Array {
 
 // ── Decode waveform peaks — tries CORS then falls back to synthetic ───────────
 async function decodePeaks(url: string, numBars = 150): Promise<Float32Array> {
-  const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-  if (!AudioCtx) {
-    // No Web Audio API — return synthetic waveform immediately
-    return syntheticPeaks(url, numBars);
-  }
-
-  const audioCtx = new AudioCtx();
+  // Always resolve — never reject. Any failure returns synthetic peaks.
   try {
-    // Try with CORS first; if that fails, try a plain fetch
-    let arrayBuffer: ArrayBuffer;
-    try {
-      const res = await fetch(url, { mode: "cors", cache: "force-cache" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      arrayBuffer = await res.arrayBuffer();
-    } catch {
-      const res = await fetch(url, { cache: "force-cache" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      arrayBuffer = await res.arrayBuffer();
+    // WebM and OGG files (browser recordings) cannot be reliably decoded by the
+    // Web Audio API (Safari doesn't support Opus; AudioContext may be suspended
+    // before user interaction). Skip decode and use synthetic peaks immediately.
+    const lowerUrl = url.toLowerCase().split("?")[0];
+    const isBrowserRecorded = lowerUrl.endsWith(".webm") || lowerUrl.endsWith(".ogg") ||
+      lowerUrl.includes("/audio-recording/") || lowerUrl.includes("recording-");
+    if (isBrowserRecorded) return syntheticPeaks(url, numBars);
+
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return syntheticPeaks(url, numBars);
+
+    const audioCtx = new AudioCtx();
+    // Resume context — required in Chrome/Safari which start suspended
+    if (audioCtx.state === "suspended") {
+      await audioCtx.resume().catch(() => {});
     }
 
-    let audioBuffer: AudioBuffer;
     try {
-      audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-    } catch {
-      // decodeAudioData fails for browser-recorded WebM/Opus on some browsers
-      // (e.g. Safari doesn't support Opus, Firefox WebM may fail in certain contexts)
-      // Fall back to a synthetic waveform so the player still looks correct.
-      return syntheticPeaks(url, numBars);
-    }
+      // Fetch the audio file — try CORS first, then plain fetch
+      let arrayBuffer: ArrayBuffer | null = null;
+      try {
+        const res = await fetch(url, { mode: "cors", cache: "force-cache" });
+        if (res.ok) arrayBuffer = await res.arrayBuffer();
+      } catch { /* CORS failed — try plain */ }
 
-    const channelData = audioBuffer.getChannelData(0);
-    const blockSize = Math.floor(channelData.length / numBars);
-    const peaks = new Float32Array(numBars);
-
-    for (let i = 0; i < numBars; i++) {
-      let max = 0;
-      const start = i * blockSize;
-      for (let j = 0; j < blockSize; j++) {
-        const abs = Math.abs(channelData[start + j]);
-        if (abs > max) max = abs;
+      if (!arrayBuffer) {
+        try {
+          const res = await fetch(url, { cache: "force-cache" });
+          if (res.ok) arrayBuffer = await res.arrayBuffer();
+        } catch { /* network error */ }
       }
-      peaks[i] = max;
+
+      if (!arrayBuffer) return syntheticPeaks(url, numBars);
+
+      // Decode with an 8-second timeout — decodeAudioData can hang on WebM/Opus
+      let audioBuffer: AudioBuffer | null = null;
+      try {
+        audioBuffer = await Promise.race([
+          new Promise<AudioBuffer>((resolve, reject) =>
+            audioCtx.decodeAudioData(arrayBuffer!, resolve, reject)
+          ),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("decode timeout")), 8000)
+          ),
+        ]);
+      } catch {
+        // decodeAudioData fails for WebM/Opus on Safari, or times out
+        return syntheticPeaks(url, numBars);
+      }
+
+      if (!audioBuffer) return syntheticPeaks(url, numBars);
+
+      const channelData = audioBuffer.getChannelData(0);
+      const blockSize = Math.max(1, Math.floor(channelData.length / numBars));
+      const peaks = new Float32Array(numBars);
+
+      for (let i = 0; i < numBars; i++) {
+        let max = 0;
+        const start = i * blockSize;
+        for (let j = 0; j < blockSize; j++) {
+          const abs = Math.abs(channelData[start + j]);
+          if (abs > max) max = abs;
+        }
+        peaks[i] = max;
+      }
+
+      const globalMax = Math.max(...Array.from(peaks));
+      if (globalMax > 0) {
+        for (let i = 0; i < peaks.length; i++) peaks[i] /= globalMax;
+      }
+
+      // If all peaks are zero (silent or corrupt file), use synthetic
+      const hasSignal = Array.from(peaks).some(p => p > 0.01);
+      return hasSignal ? peaks : syntheticPeaks(url, numBars);
+    } finally {
+      audioCtx.close().catch(() => {});
     }
-
-    const globalMax = Math.max(...Array.from(peaks));
-    if (globalMax > 0) {
-      for (let i = 0; i < peaks.length; i++) peaks[i] /= globalMax;
-    }
-
-    // Sanity-check: if all peaks are zero (silent or corrupt), use synthetic
-    const hasSignal = Array.from(peaks).some(p => p > 0.01);
-    if (!hasSignal) return syntheticPeaks(url, numBars);
-
-    return peaks;
-  } finally {
-    audioCtx.close();
+  } catch {
+    // Absolute last-resort fallback
+    return syntheticPeaks(url, numBars);
   }
 }
 
