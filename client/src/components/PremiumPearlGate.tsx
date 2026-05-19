@@ -79,7 +79,7 @@ const PREMIUM_BULLETS = [
 
 const DIY_BULLETS = [
   "Lab Admin portal — seat management & member onboarding",
-  "Accreditation Navigator — ICAEL/IAC protocol workflows",
+  "Accreditation Navigator — IAC protocol workflows",
   "Quality review tools & peer review tracking",
   "Accreditation document library & compliance checklists",
 ];
@@ -308,11 +308,13 @@ function DiyCard({ featureName }: { featureName?: string }) {
             View DIY Plans
           </Button>
         </Link>
-        <Link href="/">
-          <Button variant="outline" className="w-full mt-2 text-sm">
-            Back to Dashboard
-          </Button>
-        </Link>
+        <Button
+          variant="outline"
+          className="w-full mt-2 text-sm"
+          onClick={() => { window.location.href = "/"; }}
+        >
+          Back to Dashboard
+        </Button>
       </div>
     </div>
   );

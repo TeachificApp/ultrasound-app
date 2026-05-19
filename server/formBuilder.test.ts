@@ -65,7 +65,7 @@ vi.mock("./db", () => ({
   deleteOrgVisibilityRule: vi.fn().mockResolvedValue(undefined),
   listOrganizationsForFormBuilder: vi.fn().mockResolvedValue([
     { id: 101, name: "IAC", accreditationTypes: "echo" },
-    { id: 102, name: "ICAEL", accreditationTypes: "echo" },
+    { id: 102, name: "IAC", accreditationTypes: "echo" },
   ]),
 }));
 
@@ -329,7 +329,7 @@ describe("Form Builder — Org Visibility Rules", () => {
       targetId: 1,
       action: "hide_for",
       orgIds: JSON.stringify([103]),
-      label: "Hide for non-ICAEL",
+      label: "Hide for non-IAC",
     });
     expect(id).toBe(1);
   });

@@ -2807,6 +2807,8 @@ export const lmsLessons = mysqlTable("lms_lessons", {
   effectSoundUrl: varchar("effect_sound_url", { length: 500 }),
   effectConfetti: boolean("effect_confetti").default(false),
   effectConfettiColors: varchar("effect_confetti_colors", { length: 500 }),
+  // Confetti animation mode: "fall" (from top) or "cannon" (burst from bottom corners)
+  effectConfettiMode: varchar("effect_confetti_mode", { length: 20 }).default("fall"),
   // Banner display duration in seconds (default 5)
   effectBannerDuration: int("effect_banner_duration").default(5),
   // Page builder blocks for rich lesson content (JSON array of Block objects)

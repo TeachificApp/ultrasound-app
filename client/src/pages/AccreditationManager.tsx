@@ -1039,7 +1039,6 @@ function ManagedAccountsPanel() {
                   <SelectTrigger className="mt-1"><SelectValue placeholder="Select..." /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="IAC">IAC</SelectItem>
-                    <SelectItem value="ICAEL">ICAEL</SelectItem>
                     <SelectItem value="ACR">ACR</SelectItem>
                     <SelectItem value="JCAHO">JCAHO</SelectItem>
                     <SelectItem value="Other">Other</SelectItem>

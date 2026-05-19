@@ -70,7 +70,7 @@ const STANDARDS: Standard[] = [
     id: "pers-04",
     section: "Section 1.4",
     title: "CME Requirements — Sonographers",
-    content: `Continuing Medical Education (CME) / Continuing Education (CE) requirements for sonographers:\n\n• ARDMS RDCS: 30 CE credits every 3 years (triennium)\n• CCI RCS: 30 CE credits every 3 years\n• At least 50% of CE credits must be in the registered specialty\n• CE activities must be from approved providers (ARDMS/CCI approved)\n\nDocumentation requirements:\n• CE certificates must be maintained in personnel files\n• Annual review of CE status recommended\n• Failure to maintain CE results in credential lapse\n\nApproved CE sources include: ASE annual meeting, ASE online education, ICAEL workshops, accredited echo conferences, online CME providers.`,
+    content: `Continuing Medical Education (CME) / Continuing Education (CE) requirements for sonographers:\n\n• ARDMS RDCS: 30 CE credits every 3 years (triennium)\n• CCI RCS: 30 CE credits every 3 years\n• At least 50% of CE credits must be in the registered specialty\n• CE activities must be from approved providers (ARDMS/CCI approved)\n\nDocumentation requirements:\n• CE certificates must be maintained in personnel files\n• Annual review of CE status recommended\n• Failure to maintain CE results in credential lapse\n\nApproved CE sources include: ASE annual meeting, ASE online education, IAC workshops, accredited echo conferences, online CME providers.`,
     modalities: ["TTE", "TEE", "Stress", "Pediatric", "Fetal", "HOCM"],
     category: "cme",
     tags: ["CME", "CE", "continuing education", "ARDMS", "CCI", "credits", "renewal", "30 credits", "triennium"],

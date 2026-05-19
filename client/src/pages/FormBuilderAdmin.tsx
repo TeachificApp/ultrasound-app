@@ -952,7 +952,7 @@ function OrgVisibilityBuilder({ templateId, items, sections, rules, onSaved }: {
                 <label className="text-xs font-medium text-gray-500 block mb-1">Rule Label (optional, for your reference)</label>
                 <Input
                   className="h-7 text-xs"
-                  placeholder="e.g. IAC-only question, Hide for non-ICAEL orgs…"
+                  placeholder="e.g. IAC-only question, Hide for non-IAC orgs…"
                   value={rule.label}
                   onChange={e => updateRule(idx, "label", e.target.value)}
                 />
