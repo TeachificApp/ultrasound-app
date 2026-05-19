@@ -647,9 +647,21 @@ export default function CoursePlayer() {
     // Optimistically mark as complete immediately so checkmarks appear in both sidebars
     setOptimisticCompleted(prev => new Set([...prev, selectedLessonId]));
     await markComplete.mutateAsync({ lessonId: selectedLessonId, courseSlug: slug! });
+    // Fire the effect BEFORE navigating — the LessonEffectPlayer must still be mounted
+    // when the custom event fires. Navigating immediately (setSelectedLessonId) causes React
+    // to re-key the players for the next lesson, unmounting the current one before the
+    // event listener can respond.
     fireLessonCompleteEffect();
     toast.success("Lesson marked complete!");
-    if (nextLesson) setSelectedLessonId(nextLesson.id);
+    if (nextLesson) {
+      // Delay navigation so the effect (banner + confetti) has time to display.
+      // If the lesson has an effect with a banner, wait for its duration; otherwise 1.5s.
+      const bannerDuration = lessonData?.effectEnabled && lessonData?.effectBannerText
+        ? (lessonData.effectBannerDuration ?? 5) * 1000
+        : 0;
+      const navDelay = bannerDuration > 0 ? bannerDuration + 500 : 1500;
+      setTimeout(() => setSelectedLessonId(nextLesson.id), navDelay);
+    }
   };
 
   // Wait for auth to finish loading before redirecting — avoids false redirect on initial render
