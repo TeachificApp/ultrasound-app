@@ -222,10 +222,10 @@ function InlineLessonFlashcardDeck({ data }: { data: { title?: string; cards?: a
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-lg overflow-hidden">
-      <div className="px-5 py-3 bg-gradient-to-r from-purple-600 to-purple-500 flex items-center gap-2">
+      <div className="px-5 py-3 bg-gradient-to-r from-teal-600 to-teal-500 flex items-center gap-2">
         <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
         <h3 className="text-white font-semibold text-sm">{data.title || "Flashcard Deck"}</h3>
-        <span className="ml-auto text-purple-100 text-xs">{deck.length} cards · {known.size} known</span>
+        <span className="ml-auto text-teal-100 text-xs">{deck.length} cards · {known.size} known</span>
       </div>
       <div className="p-5">
         {/* Progress bar */}
@@ -235,7 +235,7 @@ function InlineLessonFlashcardDeck({ data }: { data: { title?: string; cards?: a
             <span>{progress}% known</span>
           </div>
           <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-            <div className="h-full bg-purple-500 rounded-full transition-all" style={{ width: `${progress}%` }} />
+            <div className="h-full bg-teal-500 rounded-full transition-all" style={{ width: `${progress}%` }} />
           </div>
         </div>
         {/* Flashcard */}
@@ -250,20 +250,20 @@ function InlineLessonFlashcardDeck({ data }: { data: { title?: string; cards?: a
           >
             {/* Front */}
             <div
-              className="absolute inset-0 rounded-xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-teal-50 flex flex-col items-center justify-center p-5 text-center"
+              className="absolute inset-0 rounded-xl border-2 border-teal-200 bg-gradient-to-br from-teal-50 to-cyan-50 flex flex-col items-center justify-center p-5 text-center"
               style={{ backfaceVisibility: "hidden" }}
             >
               {card.imageUrl && <img src={card.imageUrl} alt="" className="max-h-24 mb-3 rounded-lg object-cover" />}
               <p className="font-semibold text-gray-800 text-base">{card.front}</p>
               {data.showHints && card.hint && !showHint && (
-                <button className="mt-2 text-xs text-purple-500 hover:text-purple-700 underline" onClick={e => { e.stopPropagation(); setShowHint(true); }}>Show hint</button>
+                <button className="mt-2 text-xs text-teal-500 hover:text-teal-700 underline" onClick={e => { e.stopPropagation(); setShowHint(true); }}>Show hint</button>
               )}
               {showHint && card.hint && <p className="mt-2 text-xs text-gray-500 italic">{card.hint}</p>}
               <p className="mt-3 text-xs text-gray-400">Click to reveal answer</p>
             </div>
             {/* Back */}
             <div
-              className="absolute inset-0 rounded-xl border-2 border-teal-300 bg-gradient-to-br from-teal-50 to-purple-50 flex flex-col items-center justify-center p-5 text-center"
+              className="absolute inset-0 rounded-xl border-2 border-teal-400 bg-gradient-to-br from-cyan-50 to-teal-100 flex flex-col items-center justify-center p-5 text-center"
               style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
             >
               {card.backImageUrl && <img src={card.backImageUrl} alt="" className="max-h-24 mb-3 rounded-lg object-cover" />}
@@ -273,23 +273,32 @@ function InlineLessonFlashcardDeck({ data }: { data: { title?: string; cards?: a
           </div>
         </div>
         {/* Controls */}
-        <div className="flex items-center justify-between mt-4 gap-2">
-          <button
-            onClick={goPrev}
-            disabled={currentIndex === 0}
-            className="px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-colors"
-          >← Prev</button>
-          {flipped && (
-            <div className="flex gap-2">
-              <button onClick={markUnknown} className="px-3 py-1.5 text-xs rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors">Still learning</button>
-              <button onClick={markKnown} className="px-3 py-1.5 text-xs rounded-lg border border-green-300 text-green-700 hover:bg-green-50 transition-colors">Got it ✓</button>
-            </div>
-          )}
-          <button
-            onClick={goNext}
-            disabled={currentIndex === deck.length - 1}
-            className="px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-colors"
-          >Next →</button>
+        <div className="flex flex-col gap-2 mt-4">
+          {/* Known/Unknown buttons — always visible */}
+          <div className="flex gap-2 justify-center">
+            <button
+              onClick={markUnknown}
+              className="flex-1 px-3 py-2 text-xs rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors font-medium"
+            >✕ Still Learning</button>
+            <button
+              onClick={markKnown}
+              className="flex-1 px-3 py-2 text-xs rounded-lg border border-green-300 text-green-700 hover:bg-green-50 transition-colors font-medium"
+            >✓ Got It!</button>
+          </div>
+          {/* Prev / Next navigation */}
+          <div className="flex items-center justify-between">
+            <button
+              onClick={goPrev}
+              disabled={currentIndex === 0}
+              className="px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-colors"
+            >← Prev</button>
+            <span className="text-xs text-gray-400">{known.size} of {deck.length} known</span>
+            <button
+              onClick={goNext}
+              disabled={currentIndex === deck.length - 1}
+              className="px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-colors"
+            >Next →</button>
+          </div>
         </div>
         {known.size === deck.length && (
           <div className="mt-3 text-center text-sm text-green-700 font-semibold bg-green-50 rounded-lg py-2 border border-green-200">

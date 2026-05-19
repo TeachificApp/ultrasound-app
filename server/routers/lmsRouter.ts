@@ -83,15 +83,9 @@ async function recalcProgress(db: Awaited<ReturnType<typeof getDb>>, enrollmentI
   const [enrollRow] = await db.select().from(lmsEnrollments).where(eq(lmsEnrollments.id, enrollmentId)).limit(1);
   if (!enrollRow) return;
   const courseId = enrollRow.courseId;
-
-  // Count total lessons in course
-  const sections = await db.select({ id: lmsSections.id }).from(lmsSections).where(eq(lmsSections.courseId, courseId));
-  if (!sections.length) return;
-  const sectionIds = sections.map(s => s.id);
+  // Count ALL lessons in course — both section-based and top-level (courseId direct reference)
   const totalRows = await db.select({ count: sql<number>`count(*)` }).from(lmsLessons).where(
-    sectionIds.length === 1
-      ? eq(lmsLessons.sectionId, sectionIds[0])
-      : sql`${lmsLessons.sectionId} IN (${sql.join(sectionIds.map(id => sql`${id}`), sql`, `)})`
+    eq(lmsLessons.courseId, courseId)
   );
   const total = Number(totalRows[0]?.count ?? 0);
   if (total === 0) return;
@@ -3200,6 +3194,8 @@ export const lmsGroupRouter = router({
     .input(z.object({
       lessonId: z.number().int().positive(),
       count: z.number().int().min(1).max(20).default(5),
+      questionStyle: z.enum(["understanding", "thinking", "compliance", "thought_provoking", "custom"]).default("understanding"),
+      customPrompt: z.string().max(500).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
@@ -3233,7 +3229,13 @@ export const lmsGroupRouter = router({
       if (lessonText.trim().length < 20) throw new TRPCError({ code: "BAD_REQUEST", message: "Lesson has insufficient text content to generate questions." });
       const response = await invokeLLM({
         messages: [
-          { role: "system", content: "You are a medical ultrasound educator. Generate multiple-choice quiz questions based on the provided lesson content. Each question must have exactly 4 options (A, B, C, D) with one correct answer. Return only valid JSON." },
+          { role: "system", content: `You are a medical ultrasound educator. Generate multiple-choice quiz questions based on the provided lesson content. Each question must have exactly 4 options (A, B, C, D) with one correct answer. Return only valid JSON.\n\nQuestion style guidance:\n${{
+  understanding: "Focus on ensuring the learner understands core concepts, definitions, and factual recall from the lesson.",
+  thinking: "Write questions that require the learner to apply knowledge, reason through scenarios, or connect concepts — not just recall facts.",
+  compliance: "Focus on protocol adherence, safety requirements, regulatory standards, and correct procedural steps.",
+  thought_provoking: "Write challenging, nuanced questions that push the learner to think critically, consider edge cases, or evaluate competing options.",
+  custom: input.customPrompt ? `Custom style instruction: ${input.customPrompt}` : "Generate well-balanced questions covering the key points of the lesson.",
+}[input.questionStyle]}` },
           { role: "user", content: `Generate ${input.count} multiple-choice quiz questions based on this lesson content:\n\n${lessonText.slice(0, 6000)}` },
         ],
         response_format: {
