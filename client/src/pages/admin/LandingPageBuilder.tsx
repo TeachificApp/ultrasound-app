@@ -272,12 +272,12 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
     } },
 ];
 
-export const CATALOG_CATEGORIES = ["Layout", "Content", "Marketing", "Conversion", "Funnel", "Smart", "Interactive"];
+export const CATALOG_CATEGORIES = ["Layout", "Content", "Marketing", "Conversion", "Funnel", "Smart"];
 
-// Lesson interactive blocks (quiz + flashcard) — added to catalog
+// Lesson interactive blocks (quiz + flashcard) — added to Content category
 BLOCK_CATALOG.push(
-  { type: "lesson_quiz", label: "Lesson Quiz", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>, category: "Interactive", defaultData: { title: "Knowledge Check", questions: [], showExplanations: true, passingScore: 70, shuffleQuestions: false } },
-  { type: "lesson_flashcard", label: "Flashcard Deck", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>, category: "Interactive", defaultData: { title: "Review Flashcards", cards: [], shuffleCards: true, showHints: true } },
+  { type: "lesson_quiz", label: "Lesson Quiz", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>, category: "Content", defaultData: { title: "Knowledge Check", questions: [], showExplanations: true, passingScore: 70, shuffleQuestions: false } },
+  { type: "lesson_flashcard", label: "Flashcard Deck", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>, category: "Content", defaultData: { title: "Review Flashcards", cards: [], shuffleCards: true, showHints: true } },
 );
 
 // ─── Block Preview ─────────────────────────────────────────────────────────────
