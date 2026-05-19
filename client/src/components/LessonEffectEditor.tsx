@@ -35,6 +35,25 @@ export const SOUND_PRESETS: { value: string; label: string; url: string }[] = [
   { value: "custom", label: "Custom MP3 URL…", url: "" },
 ];
 
+// ─── Banner message presets ──────────────────────────────────────────────────────
+const BANNER_PRESETS: string[] = [
+  "You've just completed your first module! 🎉🥳",
+  "Well done! ✨",
+  "One more down! You're on fire 🔥",
+  "You're on a roll! 🤩",
+  "You've got this! 💥",
+  "Nice work! ✨",
+  "Great job! 🌟",
+  "You're on it! Keep it up ⚡️",
+  "You're on fire 🔥",
+  "Keep Crushing It. ✨",
+  "Learning Looks Good On You 😍",
+  "One Step Closer to Mastery 🎓",
+  "Knowledge Builds Confidence. Keep Going.",
+  "✔ Module Complete",
+  "Lesson Complete ✔",
+];
+
 // ─── Confetti color themes ─────────────────────────────────────────────────────
 const CONFETTI_THEMES: { value: string; label: string; colors: string[] }[] = [
   { value: "rainbow", label: "Rainbow", colors: ["#ff0000","#ff7700","#ffff00","#00cc00","#0000ff","#8b00ff"] },
@@ -218,6 +237,22 @@ export default function LessonEffectEditor({ lessonId, initialData, onSaved }: L
               <span className="text-sm font-semibold">Banner Message</span>
               <Badge variant="outline" className="text-xs">optional</Badge>
             </div>
+            {/* Preset picker */}
+            <Select
+              value=""
+              onValueChange={(v) => { if (v) setBannerText(v); }}
+            >
+              <SelectTrigger className="h-8 text-xs text-muted-foreground">
+                <SelectValue placeholder="Choose a preset message…" />
+              </SelectTrigger>
+              <SelectContent>
+                {BANNER_PRESETS.map((preset) => (
+                  <SelectItem key={preset} value={preset} className="text-xs">
+                    {preset}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Textarea
               placeholder="e.g. Well done! You've started this lesson 🎉"
               value={bannerText}
