@@ -1292,17 +1292,20 @@ export default function StudentDashboardPage() {
   const initialTab: Tab = urlTab && VALID_TABS.includes(urlTab) ? urlTab : "profile";
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
 
-  // Keep URL in sync when tab changes
+  // Keep URL in sync when tab changes.
+  // Use window.history.replaceState directly so the URL updates reliably
+  // across all subdomains — wouter's navigate() can miss re-renders when
+  // only the query string changes inside a nested Switch.
   const handleTabChange = (tab: Tab) => {
     setActiveTab(tab);
-    const params = new URLSearchParams(search);
-    params.set("tab", tab);
-    navigate(`/my-dashboard?${params.toString()}`, { replace: true });
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", tab);
+    window.history.replaceState(null, "", url.toString());
   };
 
   // Sync if URL changes externally (e.g. back/forward)
   useEffect(() => {
-    const t = new URLSearchParams(search).get("tab") as Tab | null;
+    const t = new URLSearchParams(window.location.search).get("tab") as Tab | null;
     if (t && VALID_TABS.includes(t) && t !== activeTab) setActiveTab(t);
   }, [search]);
 
