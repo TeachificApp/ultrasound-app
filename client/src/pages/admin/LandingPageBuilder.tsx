@@ -1652,7 +1652,7 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
       return <FileDownloadBlockSettings d={d} set={set} uploading={uploading} setUploading={setUploading} uploadMedia={uploadMedia} />;
     }
     case "scorm_embed": {
-      return <ScormEmbedBlockSettings d={d} set={set} onChange={onChange} />;
+      return <ScormEmbedBlockSettings d={d} set={set} dataRef={dataRef} onChangeRef={onChangeRef} />;
     }
      default:
       return <p className="text-xs text-gray-400">No settings for this block type.</p>;
@@ -2230,10 +2230,11 @@ function FileDownloadBlockSettings({ d, set, uploading, setUploading, uploadMedi
 }
 
 // ─── SCORM / HTML Package Block Settings ─────────────────────────────────────
-function ScormEmbedBlockSettings({ d, set, onChange }: {
+function ScormEmbedBlockSettings({ d, set, dataRef, onChangeRef }: {
   d: Record<string, any>;
   set: (key: string, value: any) => void;
-  onChange: (data: Record<string, any>) => void;
+  dataRef: React.MutableRefObject<Record<string, any>>;
+  onChangeRef: React.MutableRefObject<(data: Record<string, any>) => void>;
 }) {
   const [mediaPage, setMediaPage] = useState(1);
   const [mediaSearch, setMediaSearch] = useState("");
@@ -2262,7 +2263,7 @@ function ScormEmbedBlockSettings({ d, set, onChange }: {
             <Package size={16} className="text-teal-600 flex-shrink-0" />
             <span className="text-sm text-teal-800 font-medium flex-1 truncate">{d.mediaAssetTitle || d.mediaAssetSlug}</span>
             <button
-              onClick={() => { set("mediaAssetId", null); set("mediaAssetSlug", ""); set("mediaAssetTitle", ""); }}
+              onClick={() => { onChangeRef.current({ ...dataRef.current, mediaAssetId: null, mediaAssetSlug: "", mediaAssetTitle: "" }); }}
               className="text-teal-400 hover:text-red-500 flex-shrink-0"
             >
               <X size={14} />
@@ -2307,9 +2308,10 @@ function ScormEmbedBlockSettings({ d, set, onChange }: {
                     key={asset.id}
                     title={`${asset.title ?? asset.currentVersion?.fileName ?? asset.slug}\n${asset.mediaType ?? ""} · ${asset.slug}`}
                     className="w-full flex items-center gap-2 px-3 py-2 hover:bg-teal-50 text-left transition-colors"
-                    onClick={() => {
-                      // Use atomic batch update to avoid re-render race between multiple set() calls
-                      onChange({ ...d, mediaAssetId: asset.id, mediaAssetSlug: asset.slug, mediaAssetTitle: asset.title ?? asset.currentVersion?.fileName ?? asset.slug ?? "" });
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onChangeRef.current({ ...dataRef.current, mediaAssetId: asset.id, mediaAssetSlug: asset.slug, mediaAssetTitle: asset.title ?? asset.currentVersion?.fileName ?? asset.slug ?? "" });
                       setShowPicker(false);
                     }}
                   >
