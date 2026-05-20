@@ -285,8 +285,9 @@ export const thinkificImportRouter = router({
 
       const totalLessons = chapterContents.reduce((sum, c) => sum + c.contents.length, 0);
 
-      // Count enrollments (just the total, not all emails)
-      const enrollments = await getEnrollmentsForCourse(input.thinkificCourseId);
+      // Count active (non-expired) enrollments only — expired = access has lapsed
+      const allEnrollments = await getEnrollmentsForCourse(input.thinkificCourseId);
+      const enrollments = allEnrollments.filter((e) => !e.expired);
 
       return {
         course: {
@@ -463,8 +464,10 @@ export const thinkificImportRouter = router({
         // 7. Import enrollments directly into lms_enrollments (no welcome emails)
         let enrolledCount = 0;
         if (input.importEnrollments) {
-          const enrollments = await getEnrollmentsForCourse(input.thinkificCourseId);
-          log.push(`Found ${enrollments.length} enrollments to import`);
+          const allEnrollments = await getEnrollmentsForCourse(input.thinkificCourseId);
+          // Only import active (non-expired) enrollments — expired = access has lapsed
+          const enrollments = allEnrollments.filter((e) => !e.expired);
+          log.push(`Found ${enrollments.length} active enrollments to import (${allEnrollments.length - enrollments.length} expired skipped)`);
           const BATCH = 50;
           for (let i = 0; i < enrollments.length; i += BATCH) {
             const batch = enrollments.slice(i, i + BATCH);

@@ -2296,3 +2296,8 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Always append a curriculum_auto block at the end of scraped landing page blocks
 - [x] Add sendEnrollmentEmail to updateCourse input schema (was silently dropped on save)
 - [x] coverImageUrl (from course.card_image_url) saved to lmsCourses on import and displayed in CourseSettingsForm
+
+## Thinkific Import: Enrollment Count Fix (May 2026)
+- [x] Fix enrollment import to only include active (non-expired) enrollments — filter out e.expired === true
+- [x] Fix preview dialog enrollment count to show active-only count (not all-time total)
+- [x] Log skipped expired count in import log for transparency
