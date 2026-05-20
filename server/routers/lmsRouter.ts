@@ -1638,17 +1638,22 @@ export const lmsAdminRouter = router({
         );
       const nextPosition = (posResult[0]?.maxPos ?? -1) + 1;
       // Build default Hero banner block pre-filled with the lesson title
+      // hideButtons: true ensures the CTA button is always hidden on auto-generated lesson banners
+      // Must use { id, type, data } wrapper format as expected by BlockPreview
       const defaultHeroBlock = JSON.stringify([{
+        id: `hero-auto-${Date.now()}`,
         type: "hero",
-        headline1: input.title,
-        headline2: "",
-        subtext: "",
-        showButtons: false,
-        buttons: [],
-        bgColor: "#149096",
-        textColor: "#ffffff",
-        alignment: "left",
-        padding: "md",
+        data: {
+          headline: input.title,
+          headline2: "",
+          subheadline: "",
+          hideButtons: true,
+          buttons: [],
+          bgType: "color",
+          bgColor: "#149096",
+          textColor: "#ffffff",
+          align: "left",
+        },
       }]);
       const [result] = await db.insert(lmsLessons).values({
         courseId: input.courseId,
