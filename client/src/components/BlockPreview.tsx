@@ -23,7 +23,7 @@ export type BlockType =
   | "footer" | "logo_strip" | "three_column"
   | "related_products" | "embedded_checkout" | "inline_checkout"
   | "lesson_quiz" | "lesson_flashcard"
-  | "file_download";
+  | "file_download" | "scorm_embed";
 
 export interface Block {
   id: string;
@@ -801,6 +801,36 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
               {d.buttonText ?? "Download"}
             </a>
           </div>
+        </div>
+      );
+    }
+    case "scorm_embed": {
+      const slug = d.mediaAssetSlug ?? "";
+      const title = d.mediaAssetTitle ?? "Interactive Content";
+      const height = d.height ?? 600;
+      const embedUrl = slug ? `/api/media/${slug}/embed` : "";
+      return (
+        <div className="px-8 py-6" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          {d.title && <h3 className="text-lg font-semibold text-gray-800 mb-3">{d.title}</h3>}
+          {embedUrl ? (
+            <iframe
+              src={embedUrl}
+              style={{ width: "100%", height: `${height}px`, border: "none", borderRadius: "8px" }}
+              title={title}
+              allow="autoplay; fullscreen"
+              allowFullScreen
+            />
+          ) : (
+            <div
+              className="w-full bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-3 text-gray-400"
+              style={{ height: `${height}px` }}
+            >
+              <Package size={36} className="text-gray-300" />
+              <p className="text-sm font-medium">No file selected</p>
+              <p className="text-xs text-gray-400">Pick an HTML, SCORM, or ZIP file from the media repository</p>
+            </div>
+          )}
+          {d.caption && <p className="text-sm text-gray-500 mt-2 text-center">{d.caption}</p>}
         </div>
       );
     }

@@ -309,6 +309,8 @@ export const CATALOG_CATEGORIES = ["Layout", "Content", "Marketing", "Conversion
 BLOCK_CATALOG.push(
   { type: "lesson_quiz", label: "Lesson Quiz", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>, category: "Content", defaultData: { title: "Knowledge Check", questions: [], showExplanations: true, passingScore: 70, shuffleQuestions: false } },
   { type: "lesson_flashcard", label: "Flashcard Deck", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>, category: "Content", defaultData: { title: "Review Flashcards", cards: [], shuffleCards: true, showHints: true } },
+  { type: "scorm_embed", label: "SCORM / HTML Package", icon: <Package size={14} />, category: "Content",
+    defaultData: { mediaAssetId: null, mediaAssetSlug: "", mediaAssetTitle: "", title: "", caption: "", height: 600, bgColor: "#ffffff" } },
 );
 
 // ─── Block Preview ─────────────────────────────────────────────────────────────
@@ -1649,6 +1651,9 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
     case "file_download": {
       return <FileDownloadBlockSettings d={d} set={set} uploading={uploading} setUploading={setUploading} uploadMedia={uploadMedia} />;
     }
+    case "scorm_embed": {
+      return <ScormEmbedBlockSettings d={d} set={set} />;
+    }
      default:
       return <p className="text-xs text-gray-400">No settings for this block type.</p>;
   } })();
@@ -2218,6 +2223,167 @@ function FileDownloadBlockSettings({ d, set, uploading, setUploading, uploadMedi
               </div>
             )}
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── SCORM / HTML Package Block Settings ─────────────────────────────────────
+function ScormEmbedBlockSettings({ d, set }: {
+  d: Record<string, any>;
+  set: (key: string, value: any) => void;
+}) {
+  const [mediaPage, setMediaPage] = useState(1);
+  const [mediaSearch, setMediaSearch] = useState("");
+  const [showPicker, setShowPicker] = useState(false);
+
+  const { data: mediaData } = trpc.mediaRepo.listAssets.useQuery(
+    { page: mediaPage, pageSize: 12, search: mediaSearch || undefined },
+    { enabled: showPicker }
+  );
+
+  // Filter to only HTML/SCORM/ZIP-compatible assets
+  const scormTypes = ["html", "zip", "scorm", "lms"];
+  const filteredAssets = (mediaData?.assets ?? []).filter((a: any) => {
+    const mt = (a.mediaType ?? "").toLowerCase();
+    const ext = (a.currentVersion?.fileName ?? a.title ?? "").split(".").pop()?.toLowerCase() ?? "";
+    return scormTypes.some(t => mt.includes(t) || ext.includes(t));
+  });
+
+  return (
+    <div className="space-y-3">
+      {/* Selected asset display */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Selected File</label>
+        {d.mediaAssetSlug ? (
+          <div className="flex items-center gap-2 p-2 bg-teal-50 border border-teal-200 rounded-lg">
+            <Package size={16} className="text-teal-600 flex-shrink-0" />
+            <span className="text-sm text-teal-800 font-medium flex-1 truncate">{d.mediaAssetTitle || d.mediaAssetSlug}</span>
+            <button
+              onClick={() => { set("mediaAssetId", null); set("mediaAssetSlug", ""); set("mediaAssetTitle", ""); }}
+              className="text-teal-400 hover:text-red-500 flex-shrink-0"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        ) : (
+          <p className="text-xs text-gray-400 italic">No file selected</p>
+        )}
+      </div>
+
+      {/* Pick from media repo button */}
+      <Button
+        variant="outline"
+        size="sm"
+        className="w-full text-xs gap-2"
+        onClick={() => setShowPicker(v => !v)}
+      >
+        <FolderOpen size={13} />
+        {showPicker ? "Close Media Library" : "Pick from Media Repository"}
+      </Button>
+
+      {/* Media picker panel */}
+      {showPicker && (
+        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm">
+          <div className="p-2 border-b">
+            <Input
+              placeholder="Search files..."
+              value={mediaSearch}
+              onChange={e => { setMediaSearch(e.target.value); setMediaPage(1); }}
+              className="h-7 text-xs"
+            />
+          </div>
+          <div className="max-h-64 overflow-y-auto">
+            {!mediaData ? (
+              <div className="p-4 text-center text-xs text-gray-400">Loading...</div>
+            ) : (mediaData.assets?.length ?? 0) === 0 ? (
+              <div className="p-4 text-center text-xs text-gray-400">No files found</div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {(filteredAssets.length > 0 ? filteredAssets : (mediaData?.assets ?? [])).map((asset: any) => (
+                  <button
+                    key={asset.id}
+                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-teal-50 text-left transition-colors"
+                    onClick={() => {
+                      set("mediaAssetId", asset.id);
+                      set("mediaAssetSlug", asset.slug);
+                      set("mediaAssetTitle", asset.title ?? asset.fileName ?? "");
+                      setShowPicker(false);
+                    }}
+                  >
+                    <Package size={14} className="text-teal-500 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-gray-800 truncate">{asset.title ?? asset.currentVersion?.fileName ?? asset.slug}</p>
+                      <p className="text-[10px] text-gray-400 truncate">{asset.mediaType ?? ""} · {asset.slug}</p>
+                    </div>
+                    {d.mediaAssetSlug === asset.slug && (
+                      <span className="text-[10px] text-teal-600 font-semibold flex-shrink-0">Selected</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {mediaData && mediaData.total > mediaData.pageSize && (
+            <div className="p-2 border-t flex items-center justify-between text-xs text-gray-500">
+              <span>{mediaData.total} files</span>
+              <div className="flex gap-1">
+                <button disabled={mediaPage === 1} onClick={() => setMediaPage(p => p - 1)} className="px-2 py-1 rounded border disabled:opacity-40">Prev</button>
+                <span className="px-1">Page {mediaPage}</span>
+                <button disabled={mediaPage * mediaData.pageSize >= mediaData.total} onClick={() => setMediaPage(p => p + 1)} className="px-2 py-1 rounded border disabled:opacity-40">Next</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Title (optional label above iframe) */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Title (optional)</label>
+        <DebouncedInput
+          value={d.title ?? ""}
+          onChange={v => set("title", v)}
+          className="h-7 text-xs"
+          placeholder="e.g. Interactive Module"
+        />
+      </div>
+
+      {/* Caption */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Caption (optional)</label>
+        <DebouncedInput
+          value={d.caption ?? ""}
+          onChange={v => set("caption", v)}
+          className="h-7 text-xs"
+          placeholder="Shown below the embed"
+        />
+      </div>
+
+      {/* Height */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Height (px)</label>
+        <DebouncedInput
+          value={String(d.height ?? 600)}
+          onChange={v => set("height", parseInt(v) || 600)}
+          className="h-7 text-xs"
+          placeholder="600"
+        />
+      </div>
+
+      {/* Background color */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Background Color</label>
+        <div className="flex gap-2 items-center">
+          <input type="color" value={d.bgColor ?? "#ffffff"} onChange={e => set("bgColor", e.target.value)} className="w-8 h-7 rounded cursor-pointer border border-gray-200" />
+          <DebouncedInput value={d.bgColor ?? "#ffffff"} onChange={v => set("bgColor", v)} className="h-7 text-xs flex-1" placeholder="#ffffff" />
+        </div>
+      </div>
+
+      {/* Embed URL preview */}
+      {d.mediaAssetSlug && (
+        <div className="text-[10px] text-gray-400 bg-gray-50 rounded p-2 font-mono break-all">
+          /api/media/{d.mediaAssetSlug}/embed
         </div>
       )}
     </div>
