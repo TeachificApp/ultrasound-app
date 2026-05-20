@@ -206,6 +206,7 @@ function InlineCheckoutInner({ data, onSuccess }: InnerFormProps) {
         productName:  selectedProduct.name,
         productPrice: selectedProduct.price,
         productType:  (selectedProduct.type as any) ?? "other",
+        productId:    (selectedProduct as any).productId ?? undefined,
         selectedBumps: Array.from(addedBumps).map(i => ({
           title: orderBumps[i].title,
           price: orderBumps[i].price,

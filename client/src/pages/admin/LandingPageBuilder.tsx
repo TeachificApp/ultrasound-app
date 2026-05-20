@@ -1012,7 +1012,7 @@ function CheckoutFormBlockSettings({
 }: {
   d: Record<string, any>;
   set: (key: string, value: any) => void;
-  cfProds: Array<{ name: string; description: string; price: number; imageUrl: string; type: string }>;
+  cfProds: Array<{ name: string; description: string; price: number; imageUrl: string; type: string; productId?: number }>;
   cfBumps: Array<{ label: string; price: string; description: string }>;
 }) {
   const { data: catalog } = trpc.funnel.listAllProducts.useQuery(undefined, { staleTime: 60_000 });
@@ -1020,7 +1020,7 @@ function CheckoutFormBlockSettings({
   const [bumpMode, setBumpMode] = useState<"catalog" | "manual">("catalog");
 
   const addFromCatalog = (item: { id: number; type: string; name: string; price: number; imageUrl: string }) => {
-    const next = [...cfProds, { name: item.name, description: "", price: item.price, imageUrl: item.imageUrl, type: item.type }];
+    const next = [...cfProds, { name: item.name, description: "", price: item.price, imageUrl: item.imageUrl, type: item.type, productId: item.id }];
     set("products", next);
   };
 
@@ -1085,6 +1085,10 @@ function CheckoutFormBlockSettings({
               <select value={p.type} onChange={e => { const next = [...cfProds]; next[i] = { ...next[i], type: e.target.value }; set("products", next); }} className="h-7 text-xs rounded border border-gray-200 px-2"><option value="course">Course</option><option value="download">Download</option><option value="bundle">Bundle</option><option value="quiz">Quiz</option><option value="product">Product</option><option value="external">External (URL)</option></select>
             </div>
             <DebouncedInput value={p.imageUrl} onChange={v => { const next = [...cfProds]; next[i] = { ...next[i], imageUrl: v }; set("products", next); }} className="h-7 text-xs" placeholder="Image URL (optional)" />
+            <div className="flex items-center gap-1">
+              <label className="text-xs text-gray-400 w-24 flex-shrink-0">Product ID</label>
+              <Input type="number" value={(p as any).productId ?? ""} onChange={e => { const next = [...cfProds]; next[i] = { ...next[i], productId: e.target.value ? Number(e.target.value) : undefined }; set("products", next); }} className="h-7 text-xs" placeholder="DB product ID (for access grant)" />
+            </div>
           </div>
         ))}
       </div>
@@ -1669,6 +1673,10 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
                   <div><label className="text-xs text-gray-400">Type</label><select value={p.type} onChange={e => { const next = [...icProds]; next[i] = { ...next[i], type: e.target.value }; set("products", next); }} className="h-7 w-full text-xs rounded border border-gray-200 px-2"><option value="other">Other / Service</option><option value="course">Course</option><option value="download">Download</option><option value="physical">Physical Product</option><option value="membership">Membership</option></select></div>
                 </div>
                 <DebouncedInput value={p.imageUrl} onChange={v => { const next = [...icProds]; next[i] = { ...next[i], imageUrl: v }; set("products", next); }} className="h-7 text-xs" placeholder="Image URL (optional)" />
+                <div className="flex items-center gap-1">
+                  <label className="text-xs text-gray-400 w-24 flex-shrink-0">Product ID</label>
+                  <Input type="number" value={(p as any).productId ?? ""} onChange={e => { const next = [...icProds]; next[i] = { ...next[i], productId: e.target.value ? Number(e.target.value) : undefined }; set("products", next); }} className="h-7 text-xs" placeholder="DB product ID (for access grant)" />
+                </div>
               </div>
             ))}
           </div>
@@ -1765,8 +1773,18 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
                   <div><label className="text-xs text-gray-400">Type</label><select value={p.type} onChange={e => { const next = [...ecProds]; next[i] = { ...next[i], type: e.target.value }; set("products", next); }} className="h-7 w-full text-xs rounded border border-gray-200 px-2"><option value="other">Other / Service</option><option value="course">Course</option><option value="download">Download</option><option value="physical">Physical Product</option><option value="subscription">Subscription</option></select></div>
                 </div>
                 <DebouncedInput value={p.imageUrl} onChange={v => { const next = [...ecProds]; next[i] = { ...next[i], imageUrl: v }; set("products", next); }} className="h-7 text-xs" placeholder="Image URL (optional)" />
+                <div className="flex items-center gap-1">
+                  <label className="text-xs text-gray-400 w-24 flex-shrink-0">Product ID</label>
+                  <Input type="number" value={(p as any).productId ?? ""} onChange={e => { const next = [...ecProds]; next[i] = { ...next[i], productId: e.target.value ? Number(e.target.value) : undefined }; set("products", next); }} className="h-7 text-xs" placeholder="DB product ID (for access grant)" />
+                </div>
               </div>
             ))}
+          </div>
+          {/* Fulfillment */}
+          <div className="border border-teal-100 rounded p-3 space-y-2 bg-teal-50/30">
+            <p className="text-xs font-semibold text-teal-700">Fulfillment (Auto-Access Grant)</p>
+            <div><label className="text-xs text-gray-500">LMS Course ID</label><Input type="number" value={d.lmsCourseId ?? ""} onChange={e => set("lmsCourseId", e.target.value ? Number(e.target.value) : undefined)} className="h-7 text-xs" placeholder="Enroll buyer in this course" /></div>
+            <div><label className="text-xs text-gray-500">Brand Membership</label><select value={d.fulfillmentBrand ?? ""} onChange={e => set("fulfillmentBrand", e.target.value || undefined)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="">None</option><option value="aaus">All About Ultrasound</option><option value="iheartecho">iHeartEcho</option><option value="both">Both</option></select></div>
           </div>
           {/* Order Bumps */}
           <div className="border border-gray-200 rounded p-3 space-y-2">

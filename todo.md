@@ -2396,3 +2396,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] StudentDashboardPage ProfileTab: add Content Interests section (ACS, Adult Echo, Pediatric Echo, Fetal Echo, POCUS checkboxes)
 - [x] Layout.tsx (AAUS/IHE main app): "Edit Profile" link updated to members.allaboutultrasound.com/my-dashboard?tab=profile
 - [x] Layout.tsx profile icon: change from gradient to solid teal (#179ca3)
+
+## Funnel Checkout Enhancements (May 2026)
+- [ ] Funnel price overrides: store override price per product/bump in block data (all 3 checkout block types)
+- [ ] Use funnel override price in payment intent creation (ignore published product price when override is set)
+- [ ] Immediate access grant at checkout completion (enroll user in courses, grant download access, unlock quizzes)
+- [ ] Send buyer purchase confirmation email with access details
+- [ ] Send owner notification email on funnel purchase

@@ -879,3 +879,72 @@ export function buildUltrasoundAssistPremiumWelcomeEmail(opts: {
   `);
   return { subject, htmlBody, previewText };
 }
+
+/**
+ * Build a purchase confirmation email for funnel checkout purchases.
+ * Sent to the buyer immediately after successful payment.
+ */
+export function buildFunnelPurchaseConfirmationEmail(opts: {
+  firstName: string;
+  productName: string;
+  amountPaid: number; // cents
+  orderBumps?: Array<{ title: string; price: number }>;
+  loginUrl: string;
+  brandMode?: BrandMode;
+}): { subject: string; htmlBody: string; previewText: string } {
+  const bc = getBrandDisplayConfig(opts.brandMode || "aaus");
+  const subject = `Your purchase is confirmed — ${opts.productName}`;
+  const previewText = `Thank you for your purchase! Your access to ${opts.productName} is now active.`;
+  const totalCents = opts.amountPaid;
+  const totalDisplay = `$${(totalCents / 100).toFixed(2)}`;
+
+  const bumpRows = (opts.orderBumps ?? []).length > 0
+    ? `<table width="100%" cellpadding="0" cellspacing="0" style="margin:12px 0 0;">
+        ${(opts.orderBumps ?? []).map(b => `
+          <tr>
+            <td style="font-size:13px;color:#475569;padding:4px 0;">${b.title}</td>
+            <td style="font-size:13px;color:#475569;text-align:right;padding:4px 0;">$${(b.price / 100).toFixed(2)}</td>
+          </tr>`).join("")}
+      </table>`
+    : "";
+
+  const htmlBody = emailWrapper(`
+    <h2 style="margin:0 0 8px;font-size:20px;color:${brandDark};font-family:Georgia,serif;">
+      Thank you, ${opts.firstName}!
+    </h2>
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
+      Your payment was successful and your access has been granted immediately.
+    </p>
+    <div style="background:#f0fbfc;border:1px solid #d1f5f7;border-radius:8px;padding:16px 20px;margin:0 0 24px;">
+      <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:${brandColor};text-transform:uppercase;letter-spacing:0.05em;">Order Summary</p>
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="font-size:14px;color:#0e1e2e;font-weight:600;padding:4px 0;">${opts.productName}</td>
+          <td style="font-size:14px;color:#0e1e2e;font-weight:600;text-align:right;padding:4px 0;">${totalDisplay}</td>
+        </tr>
+      </table>
+      ${bumpRows}
+      <hr style="border:none;border-top:1px solid #d1f5f7;margin:12px 0;" />
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="font-size:14px;color:#0e1e2e;font-weight:700;padding:4px 0;">Total Paid</td>
+          <td style="font-size:14px;color:${brandColor};font-weight:700;text-align:right;padding:4px 0;">${totalDisplay}</td>
+        </tr>
+      </table>
+    </div>
+    <p style="margin:0 0 20px;font-size:14px;color:#475569;line-height:1.6;">
+      Your access is now active. Log in to start learning right away.
+    </p>
+    <div style="text-align:center;margin:28px 0;">
+      <a href="${opts.loginUrl}"
+        style="display:inline-block;background:linear-gradient(135deg,${brandColor},#4ad9e0);color:#ffffff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;" target="_blank" rel="noopener noreferrer">
+        Access Your Purchase
+      </a>
+    </div>
+    <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.5;">
+      Questions? Contact us at
+      <a href="mailto:support@allaboutultrasound.com" style="color:${brandColor};" target="_blank" rel="noopener noreferrer">support@allaboutultrasound.com</a>.
+    </p>
+  `, opts.brandMode);
+  return { subject, htmlBody, previewText };
+}

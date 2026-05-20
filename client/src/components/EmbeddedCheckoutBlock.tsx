@@ -662,6 +662,7 @@ function EmbeddedCheckoutInner({
         productName: selectedProduct.name,
         productPrice: selectedProduct.price,
         productType: selectedProduct.type,
+        productId: (selectedProduct as any).productId ?? undefined,
         selectedBumps,
         shippingAddress: formData.shippingAddress || undefined,
         collectShipping: !!formData.shippingAddress,
@@ -670,6 +671,8 @@ function EmbeddedCheckoutInner({
         sourceFunnelPageId: d.sourceFunnelPageId,
         sourceLandingPageId: d.sourceLandingPageId,
         sourceLmsLessonId: d.sourceLmsLessonId,
+        lmsCourseId: d.lmsCourseId ?? undefined,
+        fulfillmentBrand: d.fulfillmentBrand ?? undefined,
         successRedirect: d.successRedirect,
         origin: window.location.origin,
       });

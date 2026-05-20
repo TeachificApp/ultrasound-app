@@ -70,6 +70,8 @@ export const embeddedCheckoutRouter = router({
         // Fulfillment: auto-enroll in LMS course or grant brand membership on payment success
         lmsCourseId: z.number().optional(),       // If set, enroll user in this course after payment
         fulfillmentBrand: z.enum(["aaus", "iheartecho", "both"]).optional(), // If set, grant brand membership after payment
+        // Direct product ID for download/bundle/quiz fulfillment (overrides productType-based lookup)
+        productId: z.number().optional(),
         // Redirect after success
         successRedirect: z.string().optional(),
         origin: z.string(),
@@ -124,6 +126,7 @@ export const embeddedCheckoutRouter = router({
       // Fulfillment metadata — used by webhook to auto-enroll/grant access
       if (input.lmsCourseId) metadata.fulfillment_course_id = input.lmsCourseId.toString();
       if (input.fulfillmentBrand) metadata.fulfillment_brand = input.fulfillmentBrand;
+      if (input.productId) metadata.product_id = input.productId.toString();
 
       // Add shipping address to metadata if physical product
       if (input.shippingAddress && input.collectShipping) {
