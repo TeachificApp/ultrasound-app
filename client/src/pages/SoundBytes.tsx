@@ -23,7 +23,7 @@ import { trpc } from "@/lib/trpc";
 const isIHE = isIHeartEchoDomain();
 
 const BANNER_IMG = isIHE
-  ? "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/ihe-hero-MNscA4NaWNyxrdkewtLGLG.webp"
+  ? "/manus-storage/soundbytes-ihe-banner_94f6a87a.webp"
   : "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/soundbytes-banner-AAUS_8880afff.png";
 
 /** Convert any YouTube watch/share URL to an embed URL */
@@ -284,11 +284,12 @@ export default function SoundBytes() {
         style={{ background: "linear-gradient(135deg, #0e1e2e 0%, #0e4a50 60%, #189aa1 100%)" }}
       >
         <div
-          className="absolute inset-0 opacity-20"
+          className="absolute inset-0"
           style={{
             backgroundImage: `url("${BANNER_IMG}")`,
             backgroundSize: "cover",
-            backgroundPosition: "center right",
+            backgroundPosition: "center",
+            opacity: isIHE ? 0.55 : 0.20,
           }}
         />
         <div className="relative container py-10 md:py-14">
