@@ -62,6 +62,8 @@ export interface ThinkificEnrollment {
   started_at: string | null;
   expiry_date: string | null;
   expired: boolean;
+  is_free_trial: boolean;
+  activated_at: string | null;
   created_at: string;
   updated_at: string;
 }

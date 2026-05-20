@@ -285,9 +285,9 @@ export const thinkificImportRouter = router({
 
       const totalLessons = chapterContents.reduce((sum, c) => sum + c.contents.length, 0);
 
-      // Count active (non-expired) enrollments only — expired = access has lapsed
+      // Count only paid, active enrollments — exclude expired and free trials
       const allEnrollments = await getEnrollmentsForCourse(input.thinkificCourseId);
-      const enrollments = allEnrollments.filter((e) => !e.expired);
+      const enrollments = allEnrollments.filter((e) => !e.expired && !e.is_free_trial);
 
       return {
         course: {
@@ -465,9 +465,11 @@ export const thinkificImportRouter = router({
         let enrolledCount = 0;
         if (input.importEnrollments) {
           const allEnrollments = await getEnrollmentsForCourse(input.thinkificCourseId);
-          // Only import active (non-expired) enrollments — expired = access has lapsed
-          const enrollments = allEnrollments.filter((e) => !e.expired);
-          log.push(`Found ${enrollments.length} active enrollments to import (${allEnrollments.length - enrollments.length} expired skipped)`);
+          // Only import paid, active enrollments — exclude expired and free trials
+          const enrollments = allEnrollments.filter((e) => !e.expired && !e.is_free_trial);
+          const skippedExpired = allEnrollments.filter((e) => e.expired).length;
+          const skippedTrial = allEnrollments.filter((e) => !e.expired && e.is_free_trial).length;
+          log.push(`Found ${enrollments.length} paid active enrollments to import (${skippedExpired} expired + ${skippedTrial} free trials skipped)`);
           const BATCH = 50;
           for (let i = 0; i < enrollments.length; i += BATCH) {
             const batch = enrollments.slice(i, i + BATCH);
