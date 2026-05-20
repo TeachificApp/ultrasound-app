@@ -93,26 +93,50 @@ async function recalcProgress(db: Awaited<ReturnType<typeof getDb>>, enrollmentI
   const courseSections = await db.select({ id: lmsSections.id }).from(lmsSections).where(eq(lmsSections.courseId, courseId));
   const sectionIds = courseSections.map(s => s.id);
 
-  // Count ALL lessons in course — direct courseId OR via sectionId
+  // Count lessons that count toward progress — exclude free-preview lessons hidden after purchase
+  // (previewMode = 'preview_hide_after_purchase' are not visible to enrolled students so must not count)
   let totalCount = 0;
+  const excludeHiddenPreview = sql`${lmsLessons.previewMode} != 'preview_hide_after_purchase' OR ${lmsLessons.previewMode} IS NULL`;
   if (sectionIds.length > 0) {
     const [totalRows] = await db.select({ count: sql<number>`count(*)` }).from(lmsLessons).where(
-      sql`(${lmsLessons.courseId} = ${courseId} OR ${lmsLessons.sectionId} IN (${sql.join(sectionIds.map(id => sql`${id}`), sql`, `)}))`
+      and(
+        sql`(${lmsLessons.courseId} = ${courseId} OR ${lmsLessons.sectionId} IN (${sql.join(sectionIds.map(id => sql`${id}`), sql`, `)}))`,
+        excludeHiddenPreview
+      )
     );
     totalCount = Number(totalRows?.count ?? 0);
   } else {
     const [totalRows] = await db.select({ count: sql<number>`count(*)` }).from(lmsLessons).where(
-      eq(lmsLessons.courseId, courseId)
+      and(eq(lmsLessons.courseId, courseId), excludeHiddenPreview)
     );
     totalCount = Number(totalRows?.count ?? 0);
   }
   const total = totalCount;
   if (total === 0) return;
 
-  // Count completed lessons
-  const completedRows = await db.select({ count: sql<number>`count(*)` }).from(lmsLessonProgress).where(
-    and(eq(lmsLessonProgress.enrollmentId, enrollmentId), isNotNull(lmsLessonProgress.completedAt))
-  );
+  // Count completed lessons — also exclude hidden preview lessons from the completed count
+  // so that any stale progress records for those lessons don't inflate the percentage
+  const countableIds = await db
+    .select({ id: lmsLessons.id })
+    .from(lmsLessons)
+    .where(
+      sectionIds.length > 0
+        ? and(
+            sql`(${lmsLessons.courseId} = ${courseId} OR ${lmsLessons.sectionId} IN (${sql.join(sectionIds.map(id => sql`${id}`), sql`, `)}))`,
+            excludeHiddenPreview
+          )
+        : and(eq(lmsLessons.courseId, courseId), excludeHiddenPreview)
+    );
+  const countableIdSet = countableIds.map(r => r.id);
+  const completedRows = countableIdSet.length > 0
+    ? await db.select({ count: sql<number>`count(*)` }).from(lmsLessonProgress).where(
+        and(
+          eq(lmsLessonProgress.enrollmentId, enrollmentId),
+          isNotNull(lmsLessonProgress.completedAt),
+          inArray(lmsLessonProgress.lessonId, countableIdSet)
+        )
+      )
+    : [{ count: 0 }];
   const completed = Number(completedRows[0]?.count ?? 0);
   const pct = Math.round((completed / total) * 100);
   const wasCompleted = !!enrollRow.completedAt;
