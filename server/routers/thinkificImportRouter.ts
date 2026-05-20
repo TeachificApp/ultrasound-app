@@ -285,9 +285,11 @@ export const thinkificImportRouter = router({
 
       const totalLessons = chapterContents.reduce((sum, c) => sum + c.contents.length, 0);
 
-      // Count only paid, active enrollments — exclude expired and free trials
+      // Count only activated, non-expired enrollments
+      // activated_at !== null means the enrollment was explicitly activated (paid or admin-granted)
+      // This matches what Thinkific admin shows under "Enrolled in Course"
       const allEnrollments = await getEnrollmentsForCourse(input.thinkificCourseId);
-      const enrollments = allEnrollments.filter((e) => !e.expired && !e.is_free_trial);
+      const enrollments = allEnrollments.filter((e) => !e.expired && e.activated_at !== null);
 
       return {
         course: {
@@ -465,11 +467,12 @@ export const thinkificImportRouter = router({
         let enrolledCount = 0;
         if (input.importEnrollments) {
           const allEnrollments = await getEnrollmentsForCourse(input.thinkificCourseId);
-          // Only import paid, active enrollments — exclude expired and free trials
-          const enrollments = allEnrollments.filter((e) => !e.expired && !e.is_free_trial);
+          // Only import activated, non-expired enrollments
+          // activated_at !== null matches what Thinkific admin shows as "Enrolled in Course"
+          const enrollments = allEnrollments.filter((e) => !e.expired && e.activated_at !== null);
           const skippedExpired = allEnrollments.filter((e) => e.expired).length;
-          const skippedTrial = allEnrollments.filter((e) => !e.expired && e.is_free_trial).length;
-          log.push(`Found ${enrollments.length} paid active enrollments to import (${skippedExpired} expired + ${skippedTrial} free trials skipped)`);
+          const skippedTrial = allEnrollments.filter((e) => !e.expired && e.activated_at === null).length;
+          log.push(`Found ${enrollments.length} active enrollments to import (${skippedExpired} expired + ${skippedTrial} unactivated/trial skipped)`);
           const BATCH = 50;
           for (let i = 0; i < enrollments.length; i += BATCH) {
             const batch = enrollments.slice(i, i + BATCH);
