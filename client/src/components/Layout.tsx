@@ -10,7 +10,7 @@ import {
   Scan, BookOpen, FileText, Menu, X, ChevronRight,
   Stethoscope, Zap, ExternalLink, ShoppingBag, FlaskConical, MessageCircle, Award, Shield, GraduationCap,
   BookMarked, Library, Plus, Crown, Droplets, Building2, Users, UserPlus,
-  LogIn, LogOut, Settings, ChevronDown, Webhook, Layers, Lock, ClipboardCheck, Brain
+  LogIn, LogOut, ChevronDown, Webhook, Layers, Lock, ClipboardCheck, Brain
 } from "lucide-react";
 
 import { trpc } from "@/lib/trpc";
@@ -512,11 +512,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                           className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs md:text-sm text-gray-700 hover:bg-[#f0fbfc] hover:text-[#189aa1] transition-all text-left">
                           <GraduationCap className="w-3.5 h-3.5 text-[#189aa1]" />
                           My Dashboard
-                        </a>
-                        <a href="https://members.allaboutultrasound.com/my-dashboard?tab=profile" onClick={() => setAccountOpen(false)}
-                          className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs md:text-sm text-gray-700 hover:bg-[#f0fbfc] hover:text-[#189aa1] transition-all text-left">
-                          <Settings className="w-3.5 h-3.5 text-[#189aa1]" />
-                          Edit Profile
                         </a>
                         <WouterLink href="/case-library/submit">
                           <button onClick={() => setAccountOpen(false)}
