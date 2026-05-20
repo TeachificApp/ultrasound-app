@@ -1346,6 +1346,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
               </SelectContent>
             </Select>
           </div>
+          {pricingType !== "subscription" && pricingType !== "trial_then_subscription" && (
           <div>
             <Label className="text-sm">Content Access Duration</Label>
             <Select
@@ -1373,6 +1374,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
               />
             )}
           </div>
+          )}
         </div>
         {pricingType === "one_time" && (
           <div className="w-40">
