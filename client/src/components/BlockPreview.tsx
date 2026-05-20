@@ -23,7 +23,7 @@ export type BlockType =
   | "footer" | "logo_strip" | "three_column"
   | "related_products" | "embedded_checkout" | "inline_checkout"
   | "lesson_quiz" | "lesson_flashcard"
-  | "file_download" | "scorm_embed";
+  | "file_download" | "scorm_embed" | "url_embed";
 
 export interface Block {
   id: string;
@@ -828,6 +828,36 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
               <Package size={36} className="text-gray-300" />
               <p className="text-sm font-medium">No file selected</p>
               <p className="text-xs text-gray-400">Pick an HTML, SCORM, or ZIP file from the media repository</p>
+            </div>
+          )}
+          {d.caption && <p className="text-sm text-gray-500 mt-2 text-center">{d.caption}</p>}
+        </div>
+      );
+    }
+    case "url_embed": {
+      const url = d.url ?? "";
+      const height = d.height ?? 600;
+      const embedTitle = d.title ?? "Embedded Content";
+      return (
+        <div className="px-8 py-6" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          {d.title && <h3 className="text-lg font-semibold text-gray-800 mb-3">{d.title}</h3>}
+          {url ? (
+            <iframe
+              src={url}
+              style={{ width: "100%", height: `${height}px`, border: "none", borderRadius: "8px" }}
+              title={embedTitle}
+              allow="autoplay; fullscreen; clipboard-write; encrypted-media; picture-in-picture"
+              allowFullScreen
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation allow-top-navigation-by-user-activation"
+            />
+          ) : (
+            <div
+              className="w-full bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-3 text-gray-400"
+              style={{ height: `${height}px` }}
+            >
+              <Globe size={36} className="text-gray-300" />
+              <p className="text-sm font-medium">No URL entered</p>
+              <p className="text-xs text-gray-400">Enter a URL to embed any webpage or interactive content</p>
             </div>
           )}
           {d.caption && <p className="text-sm text-gray-500 mt-2 text-center">{d.caption}</p>}

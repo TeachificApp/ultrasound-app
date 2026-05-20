@@ -311,6 +311,8 @@ BLOCK_CATALOG.push(
   { type: "lesson_flashcard", label: "Flashcard Deck", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>, category: "Content", defaultData: { title: "Review Flashcards", cards: [], shuffleCards: true, showHints: true } },
   { type: "scorm_embed", label: "SCORM / HTML Package", icon: <Package size={14} />, category: "Content",
     defaultData: { mediaAssetId: null, mediaAssetSlug: "", mediaAssetTitle: "", title: "", caption: "", height: 600, bgColor: "#ffffff" } },
+  { type: "url_embed", label: "URL / iFrame Embed", icon: <Globe size={14} />, category: "Content",
+    defaultData: { url: "", title: "", caption: "", height: 600, bgColor: "#ffffff" } },
 );
 
 // ─── Block Preview ─────────────────────────────────────────────────────────────
@@ -1653,6 +1655,36 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
     }
     case "scorm_embed": {
       return <ScormEmbedBlockSettings d={d} set={set} dataRef={dataRef} onChangeRef={onChangeRef} />;
+    }
+    case "url_embed": {
+      return (
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">URL to Embed</label>
+            <DebouncedInput value={d.url ?? ""} onChange={v => set("url", v)} className="h-8 text-xs" placeholder="https://example.com" />
+            <p className="text-[10px] text-gray-400 mt-1">Enter any URL to display it in an iframe. Note: some sites block embedding.</p>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">Title (optional)</label>
+            <DebouncedInput value={d.title ?? ""} onChange={v => set("title", v)} className="h-8 text-xs" placeholder="e.g. Interactive Reference" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">Caption (optional)</label>
+            <DebouncedInput value={d.caption ?? ""} onChange={v => set("caption", v)} className="h-8 text-xs" placeholder="Shown below the embed" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">Height (px)</label>
+            <DebouncedInput value={String(d.height ?? 600)} onChange={v => set("height", Number(v) || 600)} className="h-8 text-xs" placeholder="600" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">Background Color</label>
+            <div className="flex items-center gap-2">
+              <input type="color" value={d.bgColor ?? "#ffffff"} onChange={e => set("bgColor", e.target.value)} className="w-8 h-8 rounded cursor-pointer border border-gray-200" />
+              <DebouncedInput value={d.bgColor ?? "#ffffff"} onChange={v => set("bgColor", v)} className="h-8 text-xs flex-1" placeholder="#ffffff" />
+            </div>
+          </div>
+        </div>
+      );
     }
      default:
       return <p className="text-xs text-gray-400">No settings for this block type.</p>;
