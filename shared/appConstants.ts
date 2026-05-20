@@ -28,6 +28,12 @@ export const CATEGORY_LABELS: Record<string, string> = {
   scrotum: "Scrotum",
   breast: "Breast",
   msk: "MSK",
+  // IHE echo categories
+  adult_echo: "Adult Echo",
+  pediatric_echo: "Pediatric Echo",
+  acs: "ACS",
+  ecg: "ECG",
+  general: "General",
 };
 
 export const CATEGORY_COLORS: Record<string, string> = {
@@ -47,6 +53,12 @@ export const CATEGORY_COLORS: Record<string, string> = {
   pocus: "bg-sky-100 text-sky-800",
   physics: "bg-gray-100 text-gray-800",
   fetal_echo: "bg-fuchsia-100 text-fuchsia-800",
+  // IHE echo categories
+  adult_echo: "bg-teal-100 text-teal-800",
+  pediatric_echo: "bg-purple-100 text-purple-800",
+  acs: "bg-red-100 text-red-800",
+  ecg: "bg-blue-100 text-blue-800",
+  general: "bg-gray-100 text-gray-700",
 };
 
 export const FREE_FLASHCARDS_PER_DAY = 10;

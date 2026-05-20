@@ -140,21 +140,70 @@ const CAT_KEY: Record<ChallengeCategory, string> = {
   "Physics": "physics",
 };
 
+// IHE-specific challenge categories (echocardiography)
+export const IHE_CHALLENGE_CATEGORIES = [
+  "Adult Echo",
+  "Pediatric Echo",
+  "ACS",
+  "Fetal Echo",
+  "ECG",
+  "POCUS",
+  "Physics",
+] as const;
+export type IHEChallengeCategory = typeof IHE_CHALLENGE_CATEGORIES[number];
+// Map IHE category label -> JSON key used in questionIds object
+const IHE_CAT_KEY: Record<IHEChallengeCategory, string> = {
+  "Adult Echo": "adultEcho",
+  "Pediatric Echo": "pediatricEcho",
+  "ACS": "acs",
+  "Fetal Echo": "fetalEcho",
+  "ECG": "ecg",
+  "POCUS": "pocus",
+  "Physics": "physics",
+};
+
+/** Get the category list and key map for a given brand */
+function getBrandCategoryConfig(brand: string): {
+  categories: readonly string[];
+  catKey: Record<string, string>;
+  defaultMap: Record<string, number | null>;
+  defaultOrder: string[];
+  defaultEnabledSet: Set<string>;
+} {
+  if (brand === "iheartecho") {
+    const defaultMap: Record<string, number | null> = { adultEcho: null, pediatricEcho: null, acs: null, fetalEcho: null, ecg: null, pocus: null, physics: null };
+    return {
+      categories: IHE_CHALLENGE_CATEGORIES,
+      catKey: IHE_CAT_KEY,
+      defaultMap,
+      defaultOrder: ["adultEcho", "pediatricEcho", "acs", "fetalEcho", "ecg", "pocus", "physics"],
+      defaultEnabledSet: new Set(["adultEcho", "pediatricEcho", "acs", "fetalEcho", "ecg", "pocus", "physics"]),
+    };
+  }
+  const defaultMap: Record<string, number | null> = { abdominal: null, smallParts: null, pelvicGyn: null, ob1st: null, ob2nd3rd: null, fetalEcho: null, breast: null, vascular: null, msk: null, pocus: null, physics: null };
+  return {
+    categories: CHALLENGE_CATEGORIES,
+    catKey: CAT_KEY,
+    defaultMap,
+    defaultOrder: ["abdominal", "smallParts", "pelvicGyn", "ob1st", "ob2nd3rd", "fetalEcho", "breast", "vascular", "msk", "pocus", "physics"],
+    defaultEnabledSet: new Set(["abdominal", "smallParts", "pelvicGyn", "ob1st", "ob2nd3rd", "fetalEcho", "breast", "vascular", "msk", "pocus", "physics"]),
+  };
+}
+
 /**
  * Parse questionIds from a daily set row.
  * Handles both the legacy array format [id] and the new object format
  * { acs: id|null, adultEcho: id|null, pediatricEcho: id|null, fetalEcho: id|null }.
  */
-function parseDailySetIds(raw: string): Record<string, number | null> {
-  const defaults: Record<string, number | null> = {
-    abdominal: null, smallParts: null, pelvicGyn: null, ob1st: null,
-    ob2nd3rd: null, fetalEcho: null, breast: null, vascular: null, msk: null, pocus: null, physics: null,
-  };
+function parseDailySetIds(raw: string, brand = "aaus"): Record<string, number | null> {
+  const { defaultMap } = getBrandCategoryConfig(brand);
+  const defaults: Record<string, number | null> = { ...defaultMap };
   try {
     const parsed = JSON.parse(raw || "{}");
     if (Array.isArray(parsed)) {
-      // Legacy: single-question array — treat as Abdominal
-      return { ...defaults, abdominal: parsed[0] ?? null };
+      // Legacy: single-question array — treat as first category
+      const firstKey = Object.keys(defaults)[0];
+      return { ...defaults, [firstKey]: parsed[0] ?? null };
     }
     return { ...defaults, ...parsed };
   } catch {
@@ -179,10 +228,8 @@ async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>
     .limit(1);
   if (existing.length > 0) return existing[0];
 
-  const questionMap: Record<string, number | null> = {
-    abdominal: null, smallParts: null, pelvicGyn: null, ob1st: null,
-    ob2nd3rd: null, fetalEcho: null, breast: null, vascular: null, msk: null, pocus: null, physics: null,
-  };
+  const { categories, catKey, defaultMap } = getBrandCategoryConfig(brand);
+  const questionMap: Record<string, number | null> = { ...defaultMap };
 
   // 0. First, map any already-live challenges for today into the category map
   const liveChallenges = await db
@@ -192,7 +239,7 @@ async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>
 
   for (const liveC of liveChallenges) {
     if (!liveC.category) continue;
-    const key = CAT_KEY[liveC.category as ChallengeCategory];
+    const key = catKey[liveC.category];
     if (!key) continue;
     const ids: number[] = JSON.parse(liveC.questionIds || "[]");
     if (ids.length > 0 && questionMap[key] === null) {
@@ -209,15 +256,16 @@ async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>
     .limit(50);
 
   const usedChallengeIds: number[] = [];
+  const firstCat = categories[0];
 
-  for (const cat of CHALLENGE_CATEGORIES) {
-    const key = CAT_KEY[cat];
+  for (const cat of categories) {
+    const key = catKey[cat];
     // Skip if already covered by a live challenge
     if (questionMap[key] !== null) continue;
     const match = queuedChallenges.find(
       (c) =>
         !usedChallengeIds.includes(c.id) &&
-        (c.category === cat || (!c.category && cat === "Abdominal")) &&
+        (c.category === cat || (!c.category && cat === firstCat)) &&
         (!c.publishDate || c.publishDate <= date)
     );
     if (match) {
@@ -271,20 +319,20 @@ async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>
 
   const usedIdsByCategory: Record<string, Set<number>> = {};
   for (const row of recentArchived) {
-    const catKey = row.category ?? "";
-    if (!usedIdsByCategory[catKey]) usedIdsByCategory[catKey] = new Set();
+    const catKey2 = row.category ?? "";
+    if (!usedIdsByCategory[catKey2]) usedIdsByCategory[catKey2] = new Set();
     try {
       const ids: number[] = JSON.parse(row.questionIds || "[]");
-      for (const id of ids) usedIdsByCategory[catKey].add(id);
+      for (const id of ids) usedIdsByCategory[catKey2].add(id);
     } catch { /* ignore */ }
   }
 
   const VASCULAR_CATS = ["Vascular"];
   // Track which categories need a fallback live challenge row created
-  const fallbackLiveNeeded: { cat: ChallengeCategory; questionId: number }[] = [];
+  const fallbackLiveNeeded: { cat: string; questionId: number }[] = [];
 
-  for (const cat of CHALLENGE_CATEGORIES) {
-    const key = CAT_KEY[cat];
+  for (const cat of categories) {
+    const key = catKey[cat];
     if (questionMap[key] !== null) continue;
     const usedIds = Array.from(usedIdsByCategory[cat] ?? new Set<number>());
     const catFilter = cat === "Vascular"
@@ -345,15 +393,15 @@ async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>
   }
 
   // Alert admin if any category has no questions at all
-  const emptyCats = CHALLENGE_CATEGORIES.filter(cat => questionMap[CAT_KEY[cat]] === null);
+  const emptyCats = categories.filter(cat => questionMap[catKey[cat]] === null);
   if (emptyCats.length > 0) {
     notifyOwner({
-      title: `⚠️ Daily Challenge: ${emptyCats.length} categor${emptyCats.length === 1 ? 'y has' : 'ies have'} no available questions`,
+      title: `⚠️ Daily Challenge [${brand}]: ${emptyCats.length} categor${emptyCats.length === 1 ? 'y has' : 'ies have'} no available questions`,
       content: `The following categories had no active questions available for today's (${date}) daily challenge and will show no question card:\n\n${emptyCats.map(c => `• ${c}`).join('\n')}\n\nPlease add active questions for these categories in the admin panel.`,
     }).catch(() => { /* non-blocking */ });
   }
 
-  // Create live quickfireChallenges rows for fallback categories (so admin queue shows all 11)
+  // Create live quickfireChallenges rows for fallback categories (so admin queue shows all categories)
   for (const { cat, questionId } of fallbackLiveNeeded) {
     // Archive any existing live challenge for this category first
     await db
@@ -361,7 +409,8 @@ async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>
       .set({ status: "archived", archivedAt: new Date() })
       .where(and(
         eq(quickfireChallenges.status, "live" as any),
-        eq(quickfireChallenges.category, cat as any)
+        eq(quickfireChallenges.category, cat as any),
+        eq(quickfireChallenges.brand, brand)
       ));
     // Create a new live challenge row for this category
     await db.insert(quickfireChallenges).values({
@@ -398,7 +447,8 @@ export const quickfireRouter = router({
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const date = todayDateStr();
     const set = await ensureTodaySet(db, date, ctx.brand);
-    const questionMap = parseDailySetIds(set.questionIds);
+    const brandCfg = getBrandCategoryConfig(ctx.brand);
+    const questionMap = parseDailySetIds(set.questionIds, ctx.brand);
     // Always sync questionMap from current live challenges — overrides stale stored IDs.
     // This ensures mid-day challenge swaps (trash/promote) are immediately reflected.
     const liveChallengesNow = await db
@@ -410,7 +460,7 @@ export const quickfireRouter = router({
     const liveKeys = new Set<string>();
     for (const lc of liveChallengesNow) {
       if (!lc.category) continue;
-      const key = CAT_KEY[lc.category as ChallengeCategory];
+      const key = brandCfg.catKey[lc.category];
       if (!key) continue;
       liveKeys.add(key);
       const ids: number[] = JSON.parse(lc.questionIds || "[]");
@@ -434,8 +484,8 @@ export const quickfireRouter = router({
         .where(and(eq(quickfireDailySets.setDate, date), eq(quickfireDailySets.brand, ctx.brand)))
         .catch(() => { /* non-blocking — stale row is fine */ });
     }
-    // Determine which categories the user has opted into (default: all)
-    let enabledCats: Set<string> = new Set(["abdominal", "smallParts", "pelvicGyn", "ob1st", "ob2nd3rd", "fetalEcho", "breast", "vascular", "msk", "pocus", "physics"]);
+    // Determine which categories the user has opted into (default: all for this brand)
+    let enabledCats: Set<string> = new Set(brandCfg.defaultEnabledSet);
     if (ctx.user) {
       const [userRow] = await db
         .select({ challengeCategoryPrefs: users.challengeCategoryPrefs })
@@ -445,15 +495,18 @@ export const quickfireRouter = router({
       if (userRow?.challengeCategoryPrefs) {
         try {
           const prefs = JSON.parse(userRow.challengeCategoryPrefs);
-          // prefs: { abdominal: bool, vascular: bool, ob2nd3rd: bool, pocus: bool }
+          // prefs: { abdominal: bool, vascular: bool, ... } or { adultEcho: bool, ... }
           // false = opted out
-          enabledCats = new Set(
+          const parsed = new Set(
             Object.entries(prefs)
               .filter(([, v]) => v !== false)
               .map(([k]) => k)
           );
+          // Only keep keys that belong to this brand's categories
+          const brandKeys = brandCfg.defaultEnabledSet;
+          const filtered = new Set([...parsed].filter(k => brandKeys.has(k)));
           // If user opted out of everything, show all anyway
-          if (enabledCats.size === 0) enabledCats = new Set(["abdominal", "smallParts", "pelvicGyn", "ob1st", "ob2nd3rd", "fetalEcho", "breast", "vascular", "msk", "pocus", "physics"]);
+          enabledCats = filtered.size === 0 ? new Set(brandCfg.defaultEnabledSet) : filtered;
         } catch { /* ignore parse errors */ }
       }
     }
@@ -473,7 +526,7 @@ export const quickfireRouter = router({
       .from(quickfireQuestions)
       .where(inArray(quickfireQuestions.id, allIds));
 
-    const catOrder = ["abdominal", "smallParts", "pelvicGyn", "ob1st", "ob2nd3rd", "fetalEcho", "breast", "vascular", "msk", "pocus", "physics"];
+    const catOrder = brandCfg.defaultOrder;
     const orderedQuestions = catOrder
       .filter((key) => enabledCats.has(key) && questionMap[key] !== null)
       .map((key) => questions.find((q) => q.id === questionMap[key]))

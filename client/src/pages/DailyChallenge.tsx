@@ -80,6 +80,24 @@ import { Textarea } from "@/components/ui/textarea";
 import { Pencil, Loader2, BookOpen, SendHorizonal, CheckCircle, Clock, XCircle as XCircleIcon, Plus, Minus } from "lucide-react";
 import DailyChallengeBanner from "@/components/DailyChallengeBanner";
 import { getLoginUrl } from "@/const";
+import { isIHeartEchoDomain } from "@/hooks/useSubdomain";
+
+// ─── Brand detection ─────────────────────────────────────────────────────────
+const isIHE = isIHeartEchoDomain();
+
+// IHE-specific category definitions (echo-focused)
+const IHE_CATS = [
+  { key: "Adult Echo", label: "Adult Echo", Icon: Heart, desc: "Adult Echocardiography", prefKey: "adultEcho" as const, mapKey: "adultEcho" },
+  { key: "Pediatric Echo", label: "Pediatric Echo", Icon: Baby, desc: "Pediatric Echocardiography", prefKey: "pediatricEcho" as const, mapKey: "pediatricEcho" },
+  { key: "ACS", label: "ACS", Icon: Activity, desc: "Acute Coronary Syndrome", prefKey: "acs" as const, mapKey: "acs" },
+  { key: "Fetal Echo", label: "Fetal Echo", Icon: Heart, desc: "Fetal Echocardiography", prefKey: "fetalEcho" as const, mapKey: "fetalEcho" },
+  { key: "ECG", label: "ECG", Icon: Zap, desc: "Electrocardiography", prefKey: "ecg" as const, mapKey: "ecg" },
+  { key: "POCUS", label: "POCUS", Icon: Wind, desc: "Point-of-Care Ultrasound", prefKey: "pocus" as const, mapKey: "pocus" },
+  { key: "Physics", label: "Physics", Icon: FlaskConical, desc: "Echo Physics & Instrumentation", prefKey: "physics" as const, mapKey: "physics" },
+] as const;
+
+const IHE_DEFAULT_PREFS = { adultEcho: true, pediatricEcho: true, acs: true, fetalEcho: true, ecg: true, pocus: true, physics: true };
+const AAUS_DEFAULT_PREFS = { abdominal: true, smallParts: true, pelvicGyn: true, ob1st: true, ob2nd3rd: true, fetalEcho: true, breast: true, vascular: true, msk: true, pocus: true, physics: true };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -982,8 +1000,11 @@ export default function QuickFire() {
   const todaySetForBanner = todaySetQuery.data;
   const catMapForBanner: Record<string, number> = (todaySetForBanner as any)?.categoryMap ?? {};
   const attemptsForBanner: Record<number, any> = (todaySetForBanner as any)?.userAttempts ?? {};
-  const catPrefsForBanner = categoryPrefsQuery.data ?? { abdominal: true, venous: true, arterial: true, ob2nd3rd: true, pocus: true };
-  const enabledCatKeysForBanner = ["abdominal", "venous", "arterial", "ob2nd3rd", "pocus"].filter(
+  const catPrefsForBanner = categoryPrefsQuery.data ?? (isIHE ? IHE_DEFAULT_PREFS : AAUS_DEFAULT_PREFS);
+  const enabledCatKeysForBanner = (isIHE
+    ? ["adultEcho", "pediatricEcho", "acs", "fetalEcho", "ecg", "pocus", "physics"]
+    : ["abdominal", "smallParts", "pelvicGyn", "ob1st", "ob2nd3rd", "fetalEcho", "breast", "vascular", "msk", "pocus", "physics"]
+  ).filter(
     (k) => (catPrefsForBanner as any)[k] !== false
   );
   const completedTodayForBanner =
@@ -1195,7 +1216,9 @@ export default function QuickFire() {
                   </button>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {([
+                  {(isIHE
+                    ? (IHE_CATS as unknown as { key: string; prefKey: string; Icon: any; label: string }[])
+                    : [
                     { cat: "Abdominal" as const, prefKey: "abdominal" as const, Icon: Stethoscope, label: "Abdominal" },
                     { cat: "Small Parts" as const, prefKey: "smallParts" as const, Icon: Scan, label: "Small Parts" },
                     { cat: "Pelvic/Gyn" as const, prefKey: "pelvicGyn" as const, Icon: Circle, label: "Pelvic/Gyn" },
@@ -1207,14 +1230,15 @@ export default function QuickFire() {
                     { cat: "MSK" as const, prefKey: "msk" as const, Icon: Bone, label: "MSK" },
                     { cat: "POCUS" as const, prefKey: "pocus" as const, Icon: Wind, label: "POCUS" },
                     { cat: "Physics" as const, prefKey: "physics" as const, Icon: FlaskConical, label: "Physics" },
-                  ] as { cat: string; prefKey: "abdominal" | "smallParts" | "pelvicGyn" | "ob1st" | "ob2nd3rd" | "fetalEcho" | "breast" | "vascular" | "msk" | "pocus" | "physics"; Icon: (props: { className?: string }) => import('react').ReactElement; label?: string }[]).map(({ cat, prefKey, Icon, label }) => {
-                    const prefs = categoryPrefsQuery.data ?? { abdominal: true, smallParts: true, pelvicGyn: true, ob1st: true, ob2nd3rd: true, fetalEcho: true, breast: true, vascular: true, msk: true, pocus: true, physics: true };
+                  ] as { cat?: string; key?: string; prefKey: string; Icon: any; label: string }[]).map(({ key, cat, prefKey, Icon, label }) => {
+                    const catLabel = label ?? cat ?? key ?? prefKey;
+                    const prefs = categoryPrefsQuery.data ?? (isIHE ? IHE_DEFAULT_PREFS : AAUS_DEFAULT_PREFS);
                     const isEnabled = (prefs as any)[prefKey] !== false;
                     return (
                       <button
-                        key={cat}
+                        key={key ?? cat ?? prefKey}
                         onClick={() => {
-                          const current = categoryPrefsQuery.data ?? { abdominal: true, smallParts: true, pelvicGyn: true, ob1st: true, ob2nd3rd: true, fetalEcho: true, breast: true, vascular: true, msk: true, pocus: true, physics: true };
+                          const current = categoryPrefsQuery.data ?? (isIHE ? IHE_DEFAULT_PREFS : AAUS_DEFAULT_PREFS);
                           updateCategoryPrefsMutation.mutate({ ...current, [prefKey]: !isEnabled });
                         }}
                         className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${
@@ -1226,7 +1250,7 @@ export default function QuickFire() {
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isEnabled ? "bg-[#189aa1]" : "bg-gray-200"}`}>
                             <Icon className="w-5 h-5 text-white" />
                           </div>
-                        <span className="text-xs font-semibold text-gray-700 text-center leading-tight">{label ?? cat}</span>
+                        <span className="text-xs font-semibold text-gray-700 text-center leading-tight">{catLabel}</span>
                         <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
                           isEnabled ? "bg-[#189aa1] text-white" : "bg-gray-200 text-gray-500"
                         }`}>{isEnabled ? "On" : "Off"}</span>
@@ -1270,8 +1294,8 @@ export default function QuickFire() {
                   const categoryMap: Record<string, number> = (todaySet as any)?.categoryMap ?? {};
                   const todayQuestions: any[] = (todaySet as any)?.questions ?? [];
                   const todayAttempts: Record<number, any> = (todaySet as any)?.userAttempts ?? {};
-                  const catPrefs = categoryPrefsQuery.data ?? { abdominal: true, smallParts: true, pelvicGyn: true, ob1st: true, ob2nd3rd: true, fetalEcho: true, breast: true, vascular: true, msk: true, pocus: true, physics: true };
-                  const CATS = [
+                  const catPrefs = categoryPrefsQuery.data ?? (isIHE ? IHE_DEFAULT_PREFS : AAUS_DEFAULT_PREFS);
+                  const CATS = isIHE ? (IHE_CATS as unknown as { key: string; label: string; Icon: any; desc: string; prefKey: string; mapKey: string }[]) : [
                     { key: "Abdominal", label: "Abdominal", Icon: Stethoscope, desc: "Abdominal Ultrasound", prefKey: "abdominal" as const, mapKey: "abdominal" },
                     { key: "Small Parts", label: "Small Parts", Icon: Scan, desc: "Small Parts Ultrasound", prefKey: "smallParts" as const, mapKey: "smallParts" },
                     { key: "Pelvic/Gyn", label: "Pelvic/Gyn", Icon: Circle, desc: "Pelvic/Gynecologic Ultrasound", prefKey: "pelvicGyn" as const, mapKey: "pelvicGyn" },
