@@ -456,6 +456,8 @@ function Router() {
         <Route path="/media/:slug/:action" component={MediaRedirect} />
         <Route path="/media/:slug" component={MediaRedirect} />
         <Route path="/404" component={NotFound} />
+        <Route path="/terms" component={() => { window.location.replace("https://www.allaboutultrasound.com/terms-of-service.html"); return null; }} />
+        <Route path="/privacy" component={() => { window.location.replace("https://www.allaboutultrasound.com/terms-of-service.html"); return null; }} />
         <Route component={NotFound} />
       </Switch>
     </Suspense>

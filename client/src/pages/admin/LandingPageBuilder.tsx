@@ -200,7 +200,7 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
       successRedirect: "",
       termsText: "I attest that I meet the pre-requisites for this course and I agree to the",
       termsLinkText: "TERMS OF SERVICE",
-      termsLinkUrl: "/terms",
+      termsLinkUrl: "https://www.allaboutultrasound.com/terms-of-service.html",
       sourceType: "landing_page",
     } },
   { type: "embedded_checkout", label: "Embedded Checkout (Legacy)", icon: <CreditCard size={14} />, category: "Funnel",
@@ -222,7 +222,7 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
       successMessage: "Thank you for your purchase! You'll receive a confirmation email shortly.",
       termsText: "",
       termsLinkText: "Terms of Service",
-      termsLinkUrl: "/terms",
+      termsLinkUrl: "https://www.allaboutultrasound.com/terms-of-service.html",
     } },
   { type: "checkout_form", label: "Checkout Form (Legacy)", icon: <CreditCard size={14} />, category: "Funnel",
     defaultData: {
@@ -243,7 +243,7 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
       ],
       termsText: "I attest that I meet the pre-requisites for this course and I agree to the",
       termsLinkText: "TERMS OF SERVICE",
-      termsLinkUrl: "/terms",
+      termsLinkUrl: "https://www.allaboutultrasound.com/terms-of-service.html",
       submitText: "Submit",
       successRedirect: "",
     } },
@@ -254,7 +254,7 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
     defaultData: {
       bgColor: "#0e1e2e", textColor: "#ffffff", align: "center",
       copyrightText: "© 2026 All About Ultrasound. All rights reserved.",
-      links: [{ text: "Privacy Policy", url: "/privacy" }, { text: "Terms of Service", url: "/terms" }, { text: "Contact", url: "/contact" }],
+      links: [{ text: "Privacy Policy", url: "/privacy" }, { text: "Terms of Service", url: "https://www.allaboutultrasound.com/terms-of-service.html" }, { text: "Contact", url: "/contact" }],
       showSocial: true, socialLinks: { facebook: "", instagram: "", youtube: "", linkedin: "" },
       logoUrl: "", logoMaxWidth: "120px",
     } },
@@ -1134,7 +1134,7 @@ function CheckoutFormBlockSettings({
       <BSTextField data={d} onSet={set} label="Terms Text" field="termsText" multiline />
       <div className="grid grid-cols-2 gap-2">
         <BSTextField data={d} onSet={set} label="Terms Link Text" field="termsLinkText" placeholder="TERMS OF SERVICE" />
-        <BSTextField data={d} onSet={set} label="Terms Link URL" field="termsLinkUrl" placeholder="/terms" />
+        <BSTextField data={d} onSet={set} label="Terms Link URL" field="termsLinkUrl" placeholder="https://www.allaboutultrasound.com/terms-of-service.html" />
       </div>
       <BSTextField data={d} onSet={set} label="Submit Button Text" field="submitText" placeholder="Submit" />
       <BSTextField data={d} onSet={set} label="Success Redirect URL" field="successRedirect" placeholder="/thank-you or https://..." />
@@ -1709,7 +1709,7 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
             <BSTextField data={d} onSet={set} label="Terms Text" field="termsText" placeholder="I agree to the" />
             <BSTextField data={d} onSet={set} label="Terms Link Text" field="termsLinkText" placeholder="Terms of Service" />
           </div>
-          <BSTextField data={d} onSet={set} label="Terms Link URL" field="termsLinkUrl" placeholder="/terms" />
+          <BSTextField data={d} onSet={set} label="Terms Link URL" field="termsLinkUrl" placeholder="https://www.allaboutultrasound.com/terms-of-service.html" />
           {/* Colors */}
           <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />
           <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
@@ -1816,7 +1816,7 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
             <BSTextField data={d} onSet={set} label="Terms Text" field="termsText" placeholder="I agree to the" />
             <BSTextField data={d} onSet={set} label="Terms Link Text" field="termsLinkText" placeholder="Terms of Service" />
           </div>
-          <BSTextField data={d} onSet={set} label="Terms Link URL" field="termsLinkUrl" placeholder="/terms" />
+          <BSTextField data={d} onSet={set} label="Terms Link URL" field="termsLinkUrl" placeholder="https://www.allaboutultrasound.com/terms-of-service.html" />
           {/* Colors */}
           <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />
           <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
