@@ -1830,7 +1830,7 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
           {/* Submit & Redirect */}
           <BSTextField data={d} onSet={set} label="Submit Button Text" field="submitText" placeholder="Submit" />
           <SuccessRedirectPicker value={d.successRedirect ?? ""} onChange={v => set("successRedirect", v)} />
-          {/* Terms */
+          {/* Terms */}
           <div className="grid grid-cols-2 gap-2">
             <BSTextField data={d} onSet={set} label="Terms Text" field="termsText" placeholder="I agree to the" />
             <BSTextField data={d} onSet={set} label="Terms Link Text" field="termsLinkText" placeholder="Terms of Service" />
