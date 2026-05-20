@@ -19,6 +19,7 @@ import { registerMediaServeRoutes } from "../routes/mediaServe";
 import { registerUploadMediaRepoRoute } from "../routes/uploadMediaRepo";
 import { registerUploadCourseImageRoute } from "../routes/uploadCourseImage";
 import { registerUploadSocialImageRoute } from "../routes/uploadSocialImage";
+import { registerSsoAutoRoute } from "../routes/ssoAuto";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -195,6 +196,8 @@ async function startServer() {
   registerUploadCourseImageRoute(app);
   // Social content image upload (multipart, admin only)
   registerUploadSocialImageRoute(app);
+  // Cross-domain silent SSO endpoint — must be before tRPC so it's not caught by the SPA catch-all
+  registerSsoAutoRoute(app);
   // tRPC API
   app.use(
     "/api/trpc",

@@ -20,6 +20,7 @@ import { SsoRedirect } from "./components/SsoRedirect";
 import { useAuth } from "./_core/hooks/useAuth";
 import { usePageViewTracker } from "./hooks/useAnalytics";
 import { useSsoConsumer } from "./hooks/useSsoConsumer";
+import { useCrossDomainSso } from "./hooks/useCrossDomainSso";
 
 // ── Core pages (eagerly loaded — tiny, always needed) ────────────────────────
 import Home from "./pages/Home";
@@ -249,6 +250,7 @@ const AdminUserDetailPage = lazy(() => import("./pages/admin/AdminUserDetailPage
 
 function Router() {
   usePageViewTracker();
+  useCrossDomainSso(); // Silently sign user into all other domains as free member
   const pageFallback = (
     <div className="flex items-center justify-center h-screen">
       <div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" />
@@ -467,6 +469,7 @@ function Router() {
 function LMSRouter() {
   usePageViewTracker();
   useSsoConsumer(); // Exchange ?sso=TOKEN for a session cookie on arrival from app.
+  useCrossDomainSso(); // Silently sign user into all other domains as free member
   const pageFallback = (
     <div className="flex items-center justify-center h-screen">
       <div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" />
@@ -506,8 +509,12 @@ function LMSRouter() {
         {/* ── Physical Products ───────────────────────────────────────────────── */}
         <Route path="/products/:slug" component={ProductLanding} />
         <Route path="/admin/products/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ProductLandingPageBuilder /></RoleGuard>}</Route>
-        <Route path="/admin/media-repository">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MediaRepository /></RoleGuard>}</Route>
-
+                <Route path="/admin/media-repository">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MediaRepository /></RoleGuard>}</Route>
+        <Route path="/admin/contacts">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><ContactsAdmin /></Suspense></RoleGuard>}</Route>
+        <Route path="/admin/sharing-monitor">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><SharingMonitor /></Suspense></RoleGuard>}</Route>
+        <Route path="/admin/user-analytics">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><UserAnalytics /></RoleGuard>}</Route>
+        <Route path="/admin/users/:userId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminUserDetailPage /></RoleGuard>}</Route>
+        <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
         {/* Auth pages (needed for login flow) */}
         <Route path="/login" component={Login} />
         <Route path="/magic-link" component={MagicLinkRequest} />
@@ -534,6 +541,7 @@ function LMSRouter() {
  */
 function IHeartEchoRouter() {
   usePageViewTracker();
+  useCrossDomainSso(); // Silently sign user into all other domains as free member
   const pageFallback = (
     <div className="flex items-center justify-center h-screen">
       <div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" />
@@ -698,6 +706,7 @@ function UpgradePromptWrapper() {
  */
 function AccreditationDivisionRouter() {
   usePageViewTracker();
+  useCrossDomainSso(); // Silently sign user into all other domains as free member
   const pageFallback = (
     <div className="flex items-center justify-center h-screen">
       <div className="animate-spin h-8 w-8 border-4 border-cyan-500 border-t-transparent rounded-full" />

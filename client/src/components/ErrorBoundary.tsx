@@ -9,20 +9,61 @@ interface Props {
 interface State {
   hasError: boolean;
   error: Error | null;
+  autoReloading: boolean;
 }
+
+/**
+ * Returns true if the error is a Vite/webpack chunk load failure caused by a
+ * stale deployment cache (e.g. "Failed to fetch dynamically imported module").
+ * In that case we automatically reload the page once to pick up the new chunks.
+ */
+function isChunkLoadError(error: Error): boolean {
+  const msg = error?.message ?? "";
+  return (
+    msg.includes("Failed to fetch dynamically imported module") ||
+    msg.includes("Importing a module script failed") ||
+    msg.includes("Loading chunk") ||
+    msg.includes("Loading CSS chunk") ||
+    /ChunkLoadError/.test(msg)
+  );
+}
+
+const CHUNK_RELOAD_KEY = "chunk_reload_attempted";
 
 class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, autoReloading: false };
   }
 
   static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+    // If it's a chunk load error and we haven't already tried reloading, auto-reload
+    if (isChunkLoadError(error)) {
+      const alreadyTried = sessionStorage.getItem(CHUNK_RELOAD_KEY);
+      if (!alreadyTried) {
+        sessionStorage.setItem(CHUNK_RELOAD_KEY, "1");
+        // Trigger reload after a short tick so React finishes this render cycle
+        setTimeout(() => window.location.reload(), 100);
+        return { hasError: true, error, autoReloading: true };
+      }
+    }
+    return { hasError: true, error, autoReloading: false };
   }
 
   render() {
     if (this.state.hasError) {
+      // Show a spinner while auto-reloading for chunk errors
+      if (this.state.autoReloading) {
+        return (
+          <div className="flex items-center justify-center min-h-screen p-8 bg-background">
+            <div className="flex flex-col items-center gap-4">
+              <div className="animate-spin h-10 w-10 border-4 border-teal-500 border-t-transparent rounded-full" />
+              <p className="text-sm text-muted-foreground">Updating resources, reloading…</p>
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div className="flex items-center justify-center min-h-screen p-8 bg-background">
           <div className="flex flex-col items-center w-full max-w-2xl p-8">
@@ -35,12 +76,15 @@ class ErrorBoundary extends Component<Props, State> {
 
             <div className="p-4 w-full rounded bg-muted overflow-auto mb-6">
               <pre className="text-sm text-muted-foreground whitespace-break-spaces">
-                {this.state.error?.stack}
+                {this.state.error?.message}
               </pre>
             </div>
 
             <button
-              onClick={() => window.location.reload()}
+              onClick={() => {
+                sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+                window.location.reload();
+              }}
               className={cn(
                 "flex items-center gap-2 px-4 py-2 rounded-lg",
                 "bg-primary text-primary-foreground",

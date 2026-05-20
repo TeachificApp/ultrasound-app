@@ -2326,3 +2326,18 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Remove LMS sidebar entirely — learn domain now uses header-only navigation
 - [x] Move LMS Admin and Media Repository links into the profile dropdown (admin-only, shown only to platform_admin/admin)
 - [x] Remove Analytics tab from StudentDashboardPage (My Dashboard) — tabs now: Profile, My Content, Subscriptions, Certificates
+
+## Session: May 20, 2026 — Cross-domain SSO + Nav fixes
+
+- [x] Remove LMS sidebar entirely from learn domain
+- [x] Move admin items (LMS Admin, Media Repository) into profile dropdown
+- [x] Remove Analytics tab from My Dashboard
+- [x] Add full top navigation bar to LMSLayout (Home, Education Library, Downloads, My Dashboard)
+- [x] Add mobile hamburger menu to LMSLayout
+- [x] Update LMSLayout branding to "All About Ultrasound™ | iHeartEcho™"
+- [x] Add /platform-admin and all other admin routes to LMSRouter (fix 404)
+- [x] Implement cross-domain SSO token infrastructure (ssoAuto REST endpoint)
+- [x] Build useCrossDomainSso hook with per-domain token issuance
+- [x] Wire useCrossDomainSso into all four routers (LMS, IHE, AAUS, Accreditation)
+- [x] Add accreditation subscription gate: only active accreditation subscribers broadcast from accreditation domain
+- [x] Fix HemodynamicsLab chunk load error with auto-reload ErrorBoundary
