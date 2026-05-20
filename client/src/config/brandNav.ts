@@ -6,7 +6,7 @@ import type { Brand } from "@/hooks/useBrand";
 import {
   Heart, Calculator, ClipboardList, Activity,
   BookOpen, Stethoscope, Zap, ExternalLink, MessageCircle, Award, Shield, GraduationCap,
-  BookMarked, Library, Crown, Layers, ClipboardCheck, Brain, Download, Trophy, Volume2, FileText, BookCheck
+  BookMarked, Library, Crown, Layers, ClipboardCheck, Brain, Trophy, Volume2, FileText, BookCheck
 } from "lucide-react";
 
 export interface NavItem {
@@ -60,7 +60,6 @@ const AAUS_NAV_GROUPS: NavGroup[] = [
       { path: "/soundbytes", label: "SoundBytes\u2122", icon: BookMarked },
       { path: "/cme", label: "CME Hub", icon: GraduationCap },
       { path: "/registry-review", label: "Registry Review Hub", icon: ClipboardCheck },
-      { path: "/my-downloads", label: "My Downloads", icon: Download },
       { path: "__LEARN_FETAL_ECHO_URL__", label: "Learn Fetal Echo", icon: BookOpen, external: true },
       { path: "__LEARN_ECHO_URL__", label: "Learn Echo", icon: BookOpen, external: true },
       { path: "__LEARN_VASCULAR_URL__", label: "Learn Vascular", icon: BookOpen, external: true },
