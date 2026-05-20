@@ -93,7 +93,7 @@ export default function MembersLayout({ children }: { children: React.ReactNode 
                   onClick={() => setAccountOpen(!accountOpen)}
                   className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
                 >
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ background: "#179ca3" }}>
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ background: "linear-gradient(135deg, #189aa1 0%, #4ad9e0 100%)" }}>
                     {(user as any)?.name?.charAt(0)?.toUpperCase() || "U"}
                   </div>
                   <span className="hidden sm:block text-sm text-gray-700 max-w-[120px] truncate">

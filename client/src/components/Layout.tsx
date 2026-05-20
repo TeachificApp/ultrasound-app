@@ -402,7 +402,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     />
                   ) : (
                     <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
-                      style={{ background: "#179ca3" }}>
+                      style={{ background: "linear-gradient(135deg, #189aa1 0%, #4ad9e0 100%)" }}>
                       <span className="text-xs font-bold text-white">
                         {(user?.displayName || user?.name || "?").charAt(0).toUpperCase()}
                       </span>
@@ -447,7 +447,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                           />
                         ) : (
                           <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-                            style={{ background: "#179ca3" }}>
+                            style={{ background: "linear-gradient(135deg, #189aa1 0%, #4ad9e0 100%)" }}>
                             <span className="text-base font-bold text-white">
                               {(user?.displayName || user?.name || "?").charAt(0).toUpperCase()}
                             </span>
