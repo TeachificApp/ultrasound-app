@@ -67,6 +67,8 @@ export interface EmbeddedCheckoutBlockData {
   collectBilling?: boolean;  // if true, show billing address form
   // Contact info
   showContactInfo?: boolean;
+  showPhone?: boolean;    // default true — show phone field
+  requirePhone?: boolean; // default false — require phone field
   // Appearance
   accentColor?: string;
   bgColor?: string;
@@ -382,13 +384,16 @@ function DetailsStep({
             onChange={(e) => setEmail(e.target.value)}
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2"
           />
-          <input
-            type="tel"
-            placeholder="Phone Number (optional)"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2"
-          />
+          {data.showPhone !== false && (
+            <input
+              type="tel"
+              placeholder={data.requirePhone ? "Phone Number *" : "Phone Number (optional)"}
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              required={data.requirePhone === true}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2"
+            />
+          )}
         </fieldset>
       )}
 

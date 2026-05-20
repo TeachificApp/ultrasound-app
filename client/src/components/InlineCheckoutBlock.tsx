@@ -59,6 +59,8 @@ export interface InlineCheckoutBlockData {
   textColor?: string;
   // Sections
   showContactInfo?: boolean;
+  showPhone?: boolean;              // default true — show phone field
+  requirePhone?: boolean;           // default false — require phone field
   showBillingInfo?: boolean;        // address section
   collectShipping?: boolean;        // shipping address (physical products)
   showProductSelect?: boolean;
@@ -322,14 +324,17 @@ function InlineCheckoutInner({ data, onSuccess }: InnerFormProps) {
                 className={fieldCls}
                 style={focusRingStyle}
               />
-              <input
-                type="tel"
-                placeholder="Phone Number"
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
-                className={fieldCls}
-                style={focusRingStyle}
-              />
+              {data.showPhone !== false && (
+                <input
+                  type="tel"
+                  placeholder="Phone Number"
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)}
+                  required={data.requirePhone === true}
+                  className={fieldCls}
+                  style={focusRingStyle}
+                />
+              )}
             </fieldset>
           )}
 

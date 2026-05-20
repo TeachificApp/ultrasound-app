@@ -49,6 +49,8 @@ interface CheckoutFormData {
   bgColor: string;
   textColor: string;
   showContactInfo: boolean;
+  showPhone?: boolean;       // default true — show phone field
+  requirePhone?: boolean;    // default false — require phone field
   showBillingInfo: boolean;
   showProductSelect: boolean;
   products: CheckoutProduct[];
@@ -298,13 +300,13 @@ function CheckoutFormInner({ data, funnelId, pageId, funnelSlug }: CheckoutFormB
             required
             className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-teal-400"
           />
-          {(d as any).showPhone !== false && (
+          {d.showPhone !== false && (
             <input
               type="tel"
               placeholder="Phone Number"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              required={(d as any).requirePhone === true}
+              required={d.requirePhone === true}
               className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
             />
           )}

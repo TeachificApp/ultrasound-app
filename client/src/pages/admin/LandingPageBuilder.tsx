@@ -1025,7 +1025,7 @@ function CheckoutFormBlockSettings({
   };
 
   const addBumpFromCatalog = (item: { id: number; type: string; name: string; price: number; imageUrl: string }) => {
-    const next = [...cfBumps, { label: item.name, price: `$${(item.price / 100).toFixed(2)}`, description: "" }];
+    const next = [...cfBumps, { title: item.name, headline: "❖ Special Add-On!", description: "", price: item.price, imageUrl: item.imageUrl, ctaText: "+ Add", ctaEmoji: "", externalUrl: "" }];
     set("orderBumps", next);
   };
 
@@ -1094,7 +1094,7 @@ function CheckoutFormBlockSettings({
           <label className="text-xs text-gray-500 font-medium">Order Bumps</label>
           <div className="flex gap-1">
             <button onClick={() => setBumpMode(m => m === "catalog" ? "manual" : "catalog")} className="text-xs text-gray-400 hover:text-gray-600 border border-gray-200 rounded px-2 py-0.5">{bumpMode === "catalog" ? "Manual" : "Catalog"}</button>
-            <button onClick={() => set("orderBumps", [...cfBumps, { label: "Add-on offer", price: "", description: "" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button>
+            <button onClick={() => set("orderBumps", [...cfBumps, { title: "Add-on Offer", headline: "❖ Special Add-On!", description: "", price: 2700, imageUrl: "", ctaText: "+ Add", ctaEmoji: "", externalUrl: "" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button>
           </div>
         </div>
         {bumpMode === "catalog" && catalog && catalog.length > 0 && (
@@ -1115,9 +1115,14 @@ function CheckoutFormBlockSettings({
         {cfBumps.map((bump: any, i: number) => (
           <div key={i} className="border border-gray-200 rounded p-2 space-y-1">
             <div className="flex justify-between items-center"><span className="text-xs text-gray-500">Bump {i + 1}</span><button onClick={() => set("orderBumps", cfBumps.filter((_: any, j: number) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div>
-            <DebouncedInput value={bump.label ?? ""} onChange={v => set("orderBumps", cfBumps.map((b: any, j: number) => j === i ? { ...b, label: v } : b))} className="h-7 text-xs" placeholder="Offer label" />
-            <DebouncedInput value={bump.price ?? ""} onChange={v => set("orderBumps", cfBumps.map((b: any, j: number) => j === i ? { ...b, price: v } : b))} className="h-7 text-xs" placeholder="Price (e.g. $27)" />
+            <DebouncedInput value={bump.headline ?? ""} onChange={v => set("orderBumps", cfBumps.map((b: any, j: number) => j === i ? { ...b, headline: v } : b))} className="h-7 text-xs" placeholder="Eyebrow (e.g. ❖ Special Add-On!)" />
+            <DebouncedInput value={bump.title ?? ""} onChange={v => set("orderBumps", cfBumps.map((b: any, j: number) => j === i ? { ...b, title: v } : b))} className="h-7 text-xs" placeholder="Bump title" />
             <DebouncedTextarea value={bump.description ?? ""} onChange={v => set("orderBumps", cfBumps.map((b: any, j: number) => j === i ? { ...b, description: v } : b))} className="text-xs min-h-[50px]" placeholder="Short description" />
+            <div className="grid grid-cols-2 gap-2">
+              <div><label className="text-xs text-gray-400">Price (cents)</label><Input type="number" value={bump.price ?? 0} onChange={e => set("orderBumps", cfBumps.map((b: any, j: number) => j === i ? { ...b, price: Number(e.target.value) } : b))} className="h-7 text-xs" placeholder="2700 = $27" /></div>
+              <div><label className="text-xs text-gray-400">CTA Text</label><DebouncedInput value={bump.ctaText ?? ""} onChange={v => set("orderBumps", cfBumps.map((b: any, j: number) => j === i ? { ...b, ctaText: v } : b))} className="h-7 text-xs" placeholder="+ Add" /></div>
+            </div>
+            <DebouncedInput value={bump.imageUrl ?? ""} onChange={v => set("orderBumps", cfBumps.map((b: any, j: number) => j === i ? { ...b, imageUrl: v } : b))} className="h-7 text-xs" placeholder="Image URL (optional)" />
           </div>
         ))}
       </div>
@@ -1611,6 +1616,8 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
     case "inline_checkout": {
       const icProds: Array<{ name: string; description: string; price: number; imageUrl: string; type: string }> = d.products ?? [];
       const icBumps: Array<{ title: string; headline: string; description: string; price: number; imageUrl: string; ctaText: string; ctaEmoji: string; animation: string }> = d.orderBumps ?? [];
+      // eslint-disable-next-line react-hooks/rules-of-hooks
+      const { data: icCatalog } = trpc.funnel.listAllProducts.useQuery(undefined, { staleTime: 60_000 });
       return (
         <div className="space-y-4">
           <div className="text-xs text-teal-700 bg-teal-50 border border-teal-200 rounded p-2">
@@ -1621,13 +1628,37 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
           <BSTextField data={d} onSet={set} label="Header Price" field="headerPrice" placeholder="$997" />
           {/* Options */}
           <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2"><input type="checkbox" checked={d.showContactInfo ?? true} onChange={e => set("showContactInfo", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Collect contact info (name, email, phone)</label></div>
+            <div className="flex items-center gap-2"><input type="checkbox" checked={d.showContactInfo ?? true} onChange={e => set("showContactInfo", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Collect contact info (name, email)</label></div>
+            {(d.showContactInfo ?? true) && (
+              <div className="ml-5 flex flex-col gap-1.5 border-l border-gray-100 pl-3">
+                <div className="flex items-center gap-2"><input type="checkbox" checked={d.showPhone !== false} onChange={e => set("showPhone", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show Phone Field</label></div>
+                {(d.showPhone !== false) && (
+                  <div className="flex items-center gap-2"><input type="checkbox" checked={d.requirePhone === true} onChange={e => set("requirePhone", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Require Phone</label></div>
+                )}
+              </div>
+            )}
             <div className="flex items-center gap-2"><input type="checkbox" checked={d.showBillingInfo ?? false} onChange={e => set("showBillingInfo", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Collect billing address <span className="text-teal-600">(auto-on for physical products)</span></label></div>
             <div className="flex items-center gap-2"><input type="checkbox" checked={d.showProductSelect ?? true} onChange={e => set("showProductSelect", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show product selector</label></div>
           </div>
           {/* Products */}
           <div className="border border-gray-200 rounded p-3 space-y-2">
             <div className="flex items-center justify-between"><span className="text-xs font-semibold text-gray-700">Products ({icProds.length})</span><button onClick={() => set("products", [...icProds, { name: "New Product", description: "", price: 9700, imageUrl: "", type: "other" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div>
+            {icCatalog && icCatalog.length > 0 && (
+              <div className="bg-gray-50 rounded p-2 space-y-1">
+                <p className="text-xs text-gray-400 mb-1">Click to add from catalog:</p>
+                <div className="max-h-36 overflow-y-auto space-y-1">
+                  {icCatalog.map(item => (
+                    <button key={`ic-${item.type}-${item.id}`} onClick={() => set("products", [...icProds, { name: item.name, description: "", price: item.price, imageUrl: item.imageUrl ?? "", type: item.type }])}
+                      className="w-full text-left flex items-center gap-2 px-2 py-1 rounded hover:bg-teal-50 hover:text-teal-700 text-xs border border-transparent hover:border-teal-200 transition-colors">
+                      {item.imageUrl && <img src={item.imageUrl} className="w-6 h-6 rounded object-cover flex-shrink-0" />}
+                      <span className="flex-1 truncate">{item.name}</span>
+                      <span className="text-gray-400 flex-shrink-0">${(item.price / 100).toFixed(2)}</span>
+                      <span className="text-gray-300 flex-shrink-0 capitalize">{item.type}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {icProds.map((p, i) => (
               <div key={i} className="border border-gray-100 rounded p-2 space-y-1">
                 <div className="flex items-center justify-between"><span className="text-xs text-gray-500">Product {i + 1}</span><button onClick={() => set("products", icProds.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div>
@@ -1681,6 +1712,8 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
     case "embedded_checkout": {
       const ecProds: Array<{ name: string; description: string; price: number; imageUrl: string; type: string }> = d.products ?? [];
       const ecBumps: Array<{ title: string; headline: string; description: string; price: number; imageUrl: string; ctaText: string; highlightColor: string; animation: string }> = d.orderBumps ?? [];
+      // eslint-disable-next-line react-hooks/rules-of-hooks
+      const { data: ecCatalog } = trpc.funnel.listAllProducts.useQuery(undefined, { staleTime: 60_000 });
       return (
         <div className="space-y-4">
           <div className="text-xs text-teal-700 bg-teal-50 border border-teal-200 rounded p-2">
@@ -1692,12 +1725,36 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
           {/* Options */}
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2"><input type="checkbox" checked={d.showContactInfo ?? true} onChange={e => set("showContactInfo", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Collect contact info (name, email)</label></div>
+            {(d.showContactInfo ?? true) && (
+              <div className="ml-5 flex flex-col gap-1.5 border-l border-gray-100 pl-3">
+                <div className="flex items-center gap-2"><input type="checkbox" checked={d.showPhone !== false} onChange={e => set("showPhone", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show Phone Field</label></div>
+                {(d.showPhone !== false) && (
+                  <div className="flex items-center gap-2"><input type="checkbox" checked={d.requirePhone === true} onChange={e => set("requirePhone", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Require Phone</label></div>
+                )}
+              </div>
+            )}
             <div className="flex items-center gap-2"><input type="checkbox" checked={d.collectShipping ?? false} onChange={e => set("collectShipping", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Collect shipping address <span className="text-teal-600">(auto-on for physical products)</span></label></div>
             <div className="flex items-center gap-2"><input type="checkbox" checked={d.collectBilling ?? false} onChange={e => set("collectBilling", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Collect billing address</label></div>
           </div>
           {/* Products */}
           <div className="border border-gray-200 rounded p-3 space-y-2">
             <div className="flex items-center justify-between"><span className="text-xs font-semibold text-gray-700">Products ({ecProds.length})</span><button onClick={() => set("products", [...ecProds, { name: "New Product", description: "", price: 9700, imageUrl: "", type: "other" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div>
+            {ecCatalog && ecCatalog.length > 0 && (
+              <div className="bg-gray-50 rounded p-2 space-y-1">
+                <p className="text-xs text-gray-400 mb-1">Click to add from catalog:</p>
+                <div className="max-h-36 overflow-y-auto space-y-1">
+                  {ecCatalog.map(item => (
+                    <button key={`ec-${item.type}-${item.id}`} onClick={() => set("products", [...ecProds, { name: item.name, description: "", price: item.price, imageUrl: item.imageUrl ?? "", type: item.type }])}
+                      className="w-full text-left flex items-center gap-2 px-2 py-1 rounded hover:bg-teal-50 hover:text-teal-700 text-xs border border-transparent hover:border-teal-200 transition-colors">
+                      {item.imageUrl && <img src={item.imageUrl} className="w-6 h-6 rounded object-cover flex-shrink-0" />}
+                      <span className="flex-1 truncate">{item.name}</span>
+                      <span className="text-gray-400 flex-shrink-0">${(item.price / 100).toFixed(2)}</span>
+                      <span className="text-gray-300 flex-shrink-0 capitalize">{item.type}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {ecProds.map((p, i) => (
               <div key={i} className="border border-gray-100 rounded p-2 space-y-1">
                 <div className="flex items-center justify-between"><span className="text-xs text-gray-500">Product {i + 1}</span><button onClick={() => set("products", ecProds.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div>
@@ -1751,7 +1808,7 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
     }
     case "checkout_form": {
       const cfProds: Array<{ name: string; description: string; price: number; imageUrl: string; type: string }> = d.products ?? [];
-      const cfBumps: Array<{ label: string; price: string; description: string }> = d.orderBumps ?? [];
+      const cfBumps: Array<{ title: string; headline: string; description: string; price: number; imageUrl: string; ctaText: string; ctaEmoji: string; externalUrl: string }> = d.orderBumps ?? [];
       return <CheckoutFormBlockSettings d={d} set={set} cfProds={cfProds} cfBumps={cfBumps} />;
     }
     case "curriculum_auto":
