@@ -709,10 +709,89 @@ function PricingCtaSettings({ d, set }: { d: Record<string, any>; set: (key: str
   );
 }
 
+// ─── Hero Button: Send Email Settings (lead capture + campaign selector) ────────
+function HeroSendEmailSettings({
+  btn, idx, setBtn, setBtnMulti,
+}: {
+  btn: Record<string, any>;
+  idx: number;
+  setBtn: (idx: number, key: string, val: any) => void;
+  setBtnMulti: (idx: number, patch: Record<string, any>) => void;
+}) {
+  const { data: campaignsData } = trpc.funnelPublic.listCampaignsPublic.useQuery();
+  const campaigns = (campaignsData ?? []) as Array<{ id: number; subject: string }>;
+  return (
+    <div className="space-y-2 border border-teal-200 bg-teal-50/40 rounded-lg p-2">
+      <p className="text-[10px] font-semibold text-teal-700 flex items-center gap-1">📧 Send Email Campaign to Lead</p>
+      <p className="text-[10px] text-gray-500">When clicked, a name/email form will appear first to capture the lead, then the selected campaign will be sent to that address.</p>
+      {/* Auto-enable lead capture */}
+      <div className="flex items-center gap-2">
+        <input type="checkbox" checked={true} readOnly className="rounded accent-teal-600" />
+        <label className="text-xs text-teal-700 font-medium">Collect lead before sending (required)</label>
+      </div>
+      {/* Lead modal title */}
+      <div>
+        <label className="text-xs text-gray-500 block mb-0.5">Lead Form Title</label>
+        <DebouncedInput
+          value={btn.leadModalTitle ?? ""}
+          onChange={v => setBtn(idx, "leadModalTitle", v)}
+          className="h-7 text-xs"
+          placeholder="e.g. Get Instant Access"
+        />
+      </div>
+      {/* Lead modal subtext */}
+      <div>
+        <label className="text-xs text-gray-500 block mb-0.5">Lead Form Subtext</label>
+        <DebouncedInput
+          value={btn.leadModalSubtext ?? ""}
+          onChange={v => setBtn(idx, "leadModalSubtext", v)}
+          className="h-7 text-xs"
+          placeholder="Optional — e.g. We'll send it right away!"
+        />
+      </div>
+      {/* Lead tags */}
+      <div>
+        <label className="text-xs text-gray-500 block mb-0.5">Tags (comma-separated)</label>
+        <DebouncedInput
+          value={btn.leadTags ?? ""}
+          onChange={v => setBtn(idx, "leadTags", v)}
+          className="h-7 text-xs"
+          placeholder="e.g. webinar, free-guide"
+        />
+      </div>
+      {/* Campaign selector */}
+      <div>
+        <label className="text-xs text-gray-500 block mb-0.5">Email Campaign to Send</label>
+        <Select
+          value={btn.campaignId ? String(btn.campaignId) : "none"}
+          onValueChange={v => setBtn(idx, "campaignId", v === "none" ? null : Number(v))}
+        >
+          <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Select campaign…" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">— No campaign (capture only) —</SelectItem>
+            {campaigns.map(c => (
+              <SelectItem key={c.id} value={String(c.id)}>{c.subject}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      {/* Link to campaign editor */}
+      <a
+        href="/admin/email"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-[10px] text-teal-600 underline flex items-center gap-1 hover:text-teal-800"
+      >
+        ✉ Open Email Campaign Editor
+      </a>
+    </div>
+  );
+}
+
 // ─── Lead Capture Button Behavior Settings ───────────────────────────────────
 function LeadCaptureSettings({ d, set }: { d: Record<string, any>; set: (key: string, val: any) => void }) {
   const { data: campaignsData } = trpc.funnelPublic.listCampaignsPublic.useQuery();
-  const campaigns = (campaignsData ?? []) as Array<{ id: number; name: string; subject: string }>;
+  const campaigns = (campaignsData ?? []) as Array<{ id: number; subject: string }>;
   const btnBehavior = d.btnBehavior ?? "none";
   return (
     <div className="space-y-3">
@@ -788,7 +867,7 @@ function LeadCaptureSettings({ d, set }: { d: Record<string, any>; set: (key: st
                 <SelectContent>
                   <SelectItem value="none">— No campaign —</SelectItem>
                   {campaigns.map((c: any) => (
-                    <SelectItem key={c.id} value={String(c.id)}>{c.name || c.subject}</SelectItem>
+                    <SelectItem key={c.id} value={String(c.id)}>{c.subject}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -815,7 +894,7 @@ function LeadCaptureSettings({ d, set }: { d: Record<string, any>; set: (key: st
 // ─── CTA with Opt-In Settings ───────────────────────────────────
 function CtaOptinSettings({ d, set }: { d: Record<string, any>; set: (key: string, val: any) => void }) {
   const { data: campaignsData } = trpc.funnelPublic.listCampaignsPublic.useQuery();
-  const campaigns = (campaignsData ?? []) as Array<{ id: number; name: string; subject: string }>;
+  const campaigns = (campaignsData ?? []) as Array<{ id: number; subject: string }>;
   const btnBehavior = d.btnBehavior ?? "none";
   return (
     <div className="space-y-3">
@@ -884,7 +963,7 @@ function CtaOptinSettings({ d, set }: { d: Record<string, any>; set: (key: strin
                 <SelectContent>
                   <SelectItem value="none">— No campaign —</SelectItem>
                   {campaigns.map((c: any) => (
-                    <SelectItem key={c.id} value={String(c.id)}>{c.name || c.subject}</SelectItem>
+                    <SelectItem key={c.id} value={String(c.id)}>{c.subject}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -959,9 +1038,10 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
   const blockSpecific = (() => { switch (block.type) {
     case "hero": {
       const bgType = d.bgType ?? "color";
-      const buttons: Array<{ text: string; color: string; textColor: string; link: string; style: string; animation?: string }> =
+      const buttons: Array<{ text: string; color: string; textColor: string; link: string; style: string; animation?: string; behavior?: string; leadCapture?: boolean; leadModalTitle?: string; leadModalSubtext?: string; leadTags?: string; campaignId?: number | null }> =
         d.buttons?.length ? d.buttons : [{ text: d.ctaText ?? "Enroll Now", color: d.ctaColor ?? "#fff", textColor: d.ctaTextColor ?? "#179ca3", link: "", style: "filled" }];
-      const setBtn = (idx: number, key: string, val: string) => { const next = buttons.map((b, i) => i === idx ? { ...b, [key]: val } : b); onChangeRef.current({ ...dataRef.current, buttons: next }); };
+      const setBtn = (idx: number, key: string, val: any) => { const next = buttons.map((b, i) => i === idx ? { ...b, [key]: val } : b); onChangeRef.current({ ...dataRef.current, buttons: next }); };
+      const setBtnMulti = (idx: number, patch: Record<string, any>) => { const next = buttons.map((b, i) => i === idx ? { ...b, ...patch } : b); onChangeRef.current({ ...dataRef.current, buttons: next }); };
       const addBtn = () => onChange({ ...d, buttons: [...buttons, { text: "Learn More", color: "transparent", textColor: "#fff", link: "", style: "outline" }] });
       const removeBtn = (idx: number) => onChange({ ...d, buttons: buttons.filter((_, i) => i !== idx) });
 
@@ -1050,7 +1130,9 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
                   <div><label className="text-xs text-gray-400 block mb-0.5">Label</label><DebouncedInput value={btn.text} onChange={v => setBtn(idx, "text", v)} className="h-7 text-xs" /></div>
                   <div><label className="text-xs text-gray-400 block mb-0.5">Button Action</label><Select value={btn.behavior ?? "url"} onValueChange={v => setBtn(idx, "behavior", v)}><SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="url">Link to URL</SelectItem><SelectItem value="send_email">Send Email</SelectItem><SelectItem value="next_funnel_step">Next Funnel Step</SelectItem></SelectContent></Select></div>
                   {(btn.behavior ?? "url") === "url" && <BSLinkField label="Link" value={btn.link ?? ""} onChange={v => setBtn(idx, "link", v)} />}
-                  {(btn.behavior ?? "url") === "send_email" && <div><label className="text-xs text-gray-400 block mb-0.5">Email Address</label><DebouncedInput value={btn.emailAddress ?? ""} onChange={v => setBtn(idx, "emailAddress", v)} className="h-7 text-xs" placeholder="e.g. hello@example.com" /></div>}
+                  {(btn.behavior ?? "url") === "send_email" && (
+                    <HeroSendEmailSettings btn={btn} idx={idx} setBtn={setBtn} setBtnMulti={setBtnMulti} />
+                  )}
                   {(btn.behavior ?? "url") === "next_funnel_step" && <p className="text-[10px] text-teal-600 bg-teal-50 rounded px-2 py-1">Button will navigate to the next page in the funnel sequence.</p>}
                   <div><label className="text-xs text-gray-400 block mb-0.5">Style</label><div className="flex gap-1">{(["filled", "outline"] as const).map(s => <button key={s} onClick={() => setBtn(idx, "style", s)} className={`flex-1 py-1 text-xs rounded border capitalize ${btn.style === s ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>{s}</button>)}</div></div>
                   <div className="flex items-center gap-2"><label className="text-xs text-gray-400 w-16 flex-shrink-0">Color</label><input type="color" value={btn.color} onChange={e => setBtn(idx, "color", e.target.value)} className="w-7 h-7 rounded cursor-pointer border border-gray-200" /><DebouncedInput value={btn.color} onChange={v => setBtn(idx, "color", v)} className="h-7 text-xs flex-1" /></div>

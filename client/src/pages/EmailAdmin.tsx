@@ -155,7 +155,10 @@ export default function EmailAdmin() {
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [subscriptionType, setSubscriptionType] = useState<SubscriptionType>("all");
   const [userStatus, setUserStatus] = useState<"all" | "active" | "pending">("active");
-  const [specificEmailsInput, setSpecificEmailsInput] = useState("");
+  const [specificEmailsInput, setSpecificEmailsInput] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("to") ?? "";
+  });
   const [audienceExpanded, setAudienceExpanded] = useState(true);
 
   // ── Template state ──────────────────────────────────────────────────────────
