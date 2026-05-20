@@ -104,10 +104,10 @@ function CountdownTimer({ targetDate, textColor }: { targetDate: string; textCol
 
 // ─── Block Renderer ────────────────────────────────────────────────────────────
 
-function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selectedPricingOptionId, onSelectPricingOption, slug }: {
+function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selectedPricingOptionId, onSelectPricingOption, slug, enrollment }: {
   block: Block; course: any; onEnroll: () => void; enrolling: boolean; ctaText: string; price: string;
   selectedPricingOptionId?: number; onSelectPricingOption?: (id: number | undefined) => void;
-  slug?: string;
+  slug?: string; enrollment?: any;
 }) {
   const d = block.data;
   switch (block.type) {
@@ -406,7 +406,11 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
                   </AccordionTrigger>
                   <AccordionContent>
                     <ul className="space-y-1 pt-1">
-                      {section.lessons.map((lesson: any) => {
+                      {section.lessons.filter((lesson: any) => {
+                        if (!enrollment) return true; // not enrolled — show all
+                        const pm = lesson.previewMode ?? (lesson.isPreview ? "preview" : "none");
+                        return pm !== "preview_hide_after_purchase";
+                      }).map((lesson: any) => {
                         const pm = lesson.previewMode ?? (lesson.isPreview ? "preview" : "none");
                         const isFreePreview = pm === "preview" || pm === "preview_hide_after_purchase";
                         return (
@@ -660,7 +664,7 @@ export default function CourseLanding() {
       <div className="min-h-screen bg-white">
         {blocks.map(block => (
           <div key={block.id} style={{ marginTop: block.data?.marginTop ? `${block.data.marginTop}px` : undefined, marginBottom: block.data?.marginBottom ? `${block.data.marginBottom}px` : undefined, paddingTop: block.data?.paddingTop ? `${block.data.paddingTop}px` : undefined, paddingBottom: block.data?.paddingBottom ? `${block.data.paddingBottom}px` : undefined, paddingLeft: block.data?.paddingLeft ? `${block.data.paddingLeft}px` : undefined, paddingRight: block.data?.paddingRight ? `${block.data.paddingRight}px` : undefined }}>
-            <RenderBlock block={block} course={course} onEnroll={handleEnroll} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} />
+            <RenderBlock block={block} course={course} onEnroll={handleEnroll} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} />
           </div>
         ))}
         {/* Before-checkout order bump */}
@@ -824,7 +828,11 @@ export default function CourseLanding() {
                     </AccordionTrigger>
                     <AccordionContent>
                       <ul className="space-y-1 pt-1">
-                        {section.lessons.map((lesson: any) => (
+                        {section.lessons.filter((lesson: any) => {
+                          if (!enrollment) return true;
+                          const pm = lesson.previewMode ?? (lesson.isPreview ? "preview" : "none");
+                          return pm !== "preview_hide_after_purchase";
+                        }).map((lesson: any) => (
                           <li key={lesson.id} className="flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-gray-50 text-sm">
                             {lesson.isPreview ? <PlayCircle className="w-4 h-4 text-teal-500 flex-shrink-0" /> : <Lock className="w-4 h-4 text-gray-300 flex-shrink-0" />}
                             <span className={lesson.isPreview ? "text-teal-700 font-medium" : "text-gray-700"}>{lesson.title}</span>

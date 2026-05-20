@@ -409,8 +409,19 @@ function MobileSidebarContent({
   completedIds: Set<number>; notesData: any; bookmarksData: any;
   slug: string; course: any; prereqLockedIds: Set<number>;
 }) {
-  const topLevelLessons = data?.topLevelLessons ?? [];
-  const sections = data?.sections ?? [];
+  const topLevelLessons = (data?.topLevelLessons ?? []).filter((l: any) => {
+    if (!data?.enrollment) return true;
+    const pm = l.previewMode ?? (l.isPreview ? "preview" : "none");
+    return pm !== "preview_hide_after_purchase";
+  });
+  const sections = (data?.sections ?? []).map((s: any) => ({
+    ...s,
+    lessons: s.lessons.filter((l: any) => {
+      if (!data?.enrollment) return true;
+      const pm = l.previewMode ?? (l.isPreview ? "preview" : "none");
+      return pm !== "preview_hide_after_purchase";
+    }),
+  }));
   const enrollment = data?.enrollment;
   const enrolledAt = enrollment?.enrolledAt ? new Date(enrollment.enrolledAt) : new Date();
   const daysSinceEnroll = Math.floor((Date.now() - enrolledAt.getTime()) / 86400000);
@@ -759,7 +770,16 @@ export default function CoursePlayer() {
   }
 
   if (!data) return null;
-  const { course, sections } = data;
+  const { course } = data;
+  // Filter out preview_hide_after_purchase lessons for enrolled students
+  const sections: any[] = (data.sections ?? []).map((s: any) => ({
+    ...s,
+    lessons: s.lessons.filter((l: any) => {
+      if (!data.enrollment) return true;
+      const pm = l.previewMode ?? (l.isPreview ? "preview" : "none");
+      return pm !== "preview_hide_after_purchase";
+    }),
+  }));
   // ── Course Color Scheme ──────────────────────────────────────────────────────
   const primaryColor = course.primaryColor ?? "#0d9488";
   const accentColor = course.accentColor ?? "#0f766e";
@@ -775,7 +795,11 @@ export default function CoursePlayer() {
   const primaryLightBg = { backgroundColor: `${primaryColor}18` };
   const primaryLightText = { color: primaryColor };
   const progress = data.progress ?? [];
-  const topLevelLessons: any[] = (data as any).topLevelLessons ?? [];
+  const topLevelLessons: any[] = ((data as any).topLevelLessons ?? []).filter((l: any) => {
+    if (!data.enrollment) return true;
+    const pm = l.previewMode ?? (l.isPreview ? "preview" : "none");
+    return pm !== "preview_hide_after_purchase";
+  });
   const completedIds = new Set([...progress.filter((p: any) => p.completedAt).map((p: any) => p.lessonId), ...optimisticCompleted]);
   const bookmarkedIds = new Set((bookmarksData ?? []).map((b: any) => b.lessonId));
   const notesByLesson = new Map((notesData ?? []).map((n: any) => [n.lessonId, n]));
