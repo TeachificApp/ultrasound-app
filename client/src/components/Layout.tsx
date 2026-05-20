@@ -490,20 +490,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       {/* Profile section */}
                       <div className="px-2 py-1.5">
                         <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider px-2 mb-1">Profile</div>
-                        <WouterLink href="/my-dashboard">
-                          <button onClick={() => setAccountOpen(false)}
-                            className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs md:text-sm text-gray-700 hover:bg-[#f0fbfc] hover:text-[#189aa1] transition-all text-left">
-                            <GraduationCap className="w-3.5 h-3.5 text-[#189aa1]" />
-                            My Dashboard
-                          </button>
-                        </WouterLink>
-                        <WouterLink href="/profile">
-                          <button onClick={() => setAccountOpen(false)}
-                            className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs md:text-sm text-gray-700 hover:bg-[#f0fbfc] hover:text-[#189aa1] transition-all text-left">
-                            <Settings className="w-3.5 h-3.5 text-[#189aa1]" />
-                            Edit Profile
-                          </button>
-                        </WouterLink>
+                        <a href="https://members.allaboutultrasound.com/my-dashboard" onClick={() => setAccountOpen(false)}
+                          className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs md:text-sm text-gray-700 hover:bg-[#f0fbfc] hover:text-[#189aa1] transition-all text-left">
+                          <GraduationCap className="w-3.5 h-3.5 text-[#189aa1]" />
+                          My Dashboard
+                        </a>
+                        <a href="https://members.allaboutultrasound.com/profile" onClick={() => setAccountOpen(false)}
+                          className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs md:text-sm text-gray-700 hover:bg-[#f0fbfc] hover:text-[#189aa1] transition-all text-left">
+                          <Settings className="w-3.5 h-3.5 text-[#189aa1]" />
+                          Edit Profile
+                        </a>
                         <WouterLink href="/case-library/submit">
                           <button onClick={() => setAccountOpen(false)}
                             className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs md:text-sm text-gray-700 hover:bg-[#f0fbfc] hover:text-[#189aa1] transition-all text-left">

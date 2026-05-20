@@ -1,27 +1,31 @@
 /**
  * LMSLayout — Dedicated layout for the learn.allaboutultrasound.com subdomain.
  * No sidebar — navigation is handled via the top header only.
- * Admin items (LMS Admin, Media Repository, Platform Admin) are accessible from the profile dropdown.
+ *
+ * My Dashboard and My Profile redirect to members.allaboutultrasound.com
+ * (the single hub for profile/subscriptions across all apps).
  */
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LogIn, LogOut, Settings, ChevronDown,
   GraduationCap, FolderOpen, ExternalLink, LayoutDashboard,
-  BookOpen, Download, Menu, X, Home, ShieldCheck
+  BookOpen, Download, Menu, X, Home, ShieldCheck, User
 } from "lucide-react";
-import { trpc } from "@/lib/trpc";
 import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 
 const AAUS_LOGO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp";
+const MEMBERS_URL = "https://members.allaboutultrasound.com";
+const AAUS_APP_URL = "https://app.allaboutultrasound.com";
 
 interface NavItem {
   label: string;
   href: string;
   icon: React.ReactNode;
   exact?: boolean;
+  external?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -77,19 +81,15 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
                 </div>
               </Link>
             ))}
+            {/* My Dashboard → members hub */}
             {isAuthenticated && (
-              <Link href="/my-dashboard">
-                <div
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
-                    isActive("/my-dashboard")
-                      ? "bg-[#189aa1]/10 text-[#189aa1]"
-                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                  }`}
-                >
-                  <LayoutDashboard className="w-4 h-4" />
-                  My Dashboard
-                </div>
-              </Link>
+              <a
+                href={`${MEMBERS_URL}/my-dashboard`}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                My Dashboard
+              </a>
             )}
           </nav>
 
@@ -100,7 +100,7 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2">
             {/* Back to main app — desktop only */}
             <a
-              href={import.meta.env.VITE_APP_URL || "https://app.allaboutultrasound.com"}
+              href={AAUS_APP_URL}
               className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#189aa1]/30 text-[#189aa1] text-xs font-medium hover:bg-[#189aa1]/5 transition-colors"
             >
               <ExternalLink className="w-3.5 h-3.5" />
@@ -128,7 +128,7 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
                 {accountOpen && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setAccountOpen(false)} />
-                    <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-xl shadow-lg border border-gray-200 py-1.5 z-50">
+                    <div className="absolute right-0 top-full mt-1 w-60 bg-white rounded-xl shadow-lg border border-gray-200 py-1.5 z-50">
                       {/* User info */}
                       <div className="px-3 py-2 border-b border-gray-100 mb-1">
                         <p className="text-sm font-semibold text-gray-800 truncate">
@@ -139,16 +139,22 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
                         </p>
                       </div>
 
-                      <Link href="/my-dashboard" onClick={() => setAccountOpen(false)}>
-                        <div className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer flex items-center gap-2">
-                          <LayoutDashboard className="w-3.5 h-3.5 text-teal-600" /> My Dashboard
-                        </div>
-                      </Link>
-                      <Link href="/profile" onClick={() => setAccountOpen(false)}>
-                        <div className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer flex items-center gap-2">
-                          <GraduationCap className="w-3.5 h-3.5 text-teal-600" /> My Profile
-                        </div>
-                      </Link>
+                      {/* My Dashboard → members hub */}
+                      <a
+                        href={`${MEMBERS_URL}/my-dashboard`}
+                        className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                        onClick={() => setAccountOpen(false)}
+                      >
+                        <LayoutDashboard className="w-3.5 h-3.5 text-teal-600" /> My Dashboard
+                      </a>
+                      {/* My Profile → members hub */}
+                      <a
+                        href={`${MEMBERS_URL}/profile`}
+                        className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                        onClick={() => setAccountOpen(false)}
+                      >
+                        <User className="w-3.5 h-3.5 text-teal-600" /> My Profile
+                      </a>
                       <Link href="/my-downloads" onClick={() => setAccountOpen(false)}>
                         <div className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer flex items-center gap-2">
                           <Download className="w-3.5 h-3.5 text-teal-600" /> My Downloads
@@ -158,7 +164,7 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
                       {/* Main App link — mobile */}
                       <div className="lg:hidden border-t border-gray-100 mt-1 pt-1">
                         <a
-                          href={import.meta.env.VITE_APP_URL || "https://app.allaboutultrasound.com"}
+                          href={AAUS_APP_URL}
                           className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                           onClick={() => setAccountOpen(false)}
                         >
@@ -237,22 +243,18 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
               </Link>
             ))}
             {isAuthenticated && (
-              <Link href="/my-dashboard" onClick={() => setMobileMenuOpen(false)}>
-                <div
-                  className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
-                    isActive("/my-dashboard")
-                      ? "bg-[#189aa1]/10 text-[#189aa1]"
-                      : "text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  <LayoutDashboard className="w-4 h-4" />
-                  My Dashboard
-                </div>
-              </Link>
+              <a
+                href={`${MEMBERS_URL}/my-dashboard`}
+                className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                My Dashboard
+              </a>
             )}
             <div className="border-t border-gray-100 mt-1 pt-1">
               <a
-                href={import.meta.env.VITE_APP_URL || "https://app.allaboutultrasound.com"}
+                href={AAUS_APP_URL}
                 className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-gray-100"
                 onClick={() => setMobileMenuOpen(false)}
               >

@@ -109,7 +109,7 @@ export const ssoRouter = router({
    */
   issueTokens: protectedProcedure
     .input(z.object({
-      count: z.number().int().min(1).max(10),
+      count: z.number().int().min(1).max(15),
       sourceIsAccreditation: z.boolean().default(false),
     }))
     .mutation(async ({ ctx, input }) => {

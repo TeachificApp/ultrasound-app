@@ -14,6 +14,7 @@ import GetAppBanner from "./components/GetAppBanner";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { RoleGuard } from "@/components/RoleGuard";
 import LMSLayout from "./components/LMSLayout";
+import MembersLayout from "./components/MembersLayout";
 import { isLearnDomain, isIHeartEchoDomain, isMembersDomain, isAccreditationDomain } from "./hooks/useSubdomain";
 import UpgradePrompt from "./components/UpgradePrompt";
 import { SsoRedirect } from "./components/SsoRedirect";
@@ -461,6 +462,47 @@ function Router() {
   );
 }
 
+/** MembersRouter — Routes for members.allaboutultrasound.com (profile/dashboard/subscriptions hub) */
+function MembersRouter() {
+  usePageViewTracker();
+  useSsoConsumer();
+  useCrossDomainSso();
+  const pageFallback = (
+    <div className="flex items-center justify-center h-screen">
+      <div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" />
+    </div>
+  );
+  return (
+    <MembersLayout>
+      <Suspense fallback={pageFallback}>
+        <Switch>
+          <Route path="/my-dashboard" component={StudentDashboardPage} />
+          <Route path="/profile" component={Profile} />
+          <Route path="/my-downloads" component={MyDownloads} />
+          <Route path="/downloads/:slug/files" component={DownloadFiles} />
+          <Route path="/downloads/:slug" component={DownloadLanding} />
+          <Route path="/downloads" component={DownloadsBrowse} />
+          {/* Admin routes */}
+          <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
+          <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
+          <Route path="/admin/media-repository">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MediaRepository /></RoleGuard>}</Route>
+          <Route path="/admin/contacts">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><ContactsAdmin /></Suspense></RoleGuard>}</Route>
+          <Route path="/admin/sharing-monitor">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><SharingMonitor /></Suspense></RoleGuard>}</Route>
+          <Route path="/admin/user-analytics">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><UserAnalytics /></RoleGuard>}</Route>
+          <Route path="/admin/users/:userId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminUserDetailPage /></RoleGuard>}</Route>
+          {/* Auth */}
+          <Route path="/login" component={Login} />
+          <Route path="/magic-link" component={MagicLinkRequest} />
+          <Route path="/auth/magic" component={MagicLinkCallback} />
+          <Route path="/register" component={Register} />
+          {/* Default: redirect to dashboard */}
+          <Route>{() => { window.location.replace("/my-dashboard"); return null; }}</Route>
+        </Switch>
+      </Suspense>
+    </MembersLayout>
+  );
+}
+
 /**
  * LMSRouter — Routes shown only on the learn subdomain.
  * CoursePlayer is rendered outside LMSLayout (full-screen, no sidebar).
@@ -755,7 +797,9 @@ function App() {
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster />
-          {(onLearnSubdomain || onMembersSubdomain) ? (
+          {onMembersSubdomain ? (
+            <MembersRouter />
+          ) : onLearnSubdomain ? (
             <LMSRouter />
           ) : onAccreditationSubdomain ? (
             <AccreditationDivisionRouter />
