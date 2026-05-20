@@ -99,10 +99,15 @@ export const embeddedCheckoutRouter = router({
       const bumpTitles = input.selectedBumps.map(b => b.title).join("|");
       const bumpPrices = input.selectedBumps.map(b => b.price).join("|");
 
-      // Success URL
-      const successUrl = input.successRedirect
-        ? (input.successRedirect.startsWith("http") ? input.successRedirect : `${input.origin}${input.successRedirect}`)
-        : `${input.origin}/?checkout_success=1`;
+      // Success URL — resolve special values
+      const resolveEcSuccessUrl = (redirect: string | undefined) => {
+        if (!redirect) return `${input.origin}/?checkout_success=1`;
+        if (redirect === "__dashboard__") return `${input.origin}/my-dashboard?purchase=success`;
+        if (redirect.startsWith("__funnel__:")) return `${input.origin}/f/${redirect.slice(11)}?success=1`;
+        if (redirect.startsWith("http")) return redirect;
+        return `${input.origin}${redirect}`;
+      };
+      const successUrl = resolveEcSuccessUrl(input.successRedirect);
 
       // Build metadata — all values must be strings ≤ 500 chars
       const metadata: Record<string, string> = {

@@ -998,11 +998,14 @@ export const funnelPublicRouter = router({
         .orderBy(asc(funnelPages.sortOrder));
       const thankYouPage = allPages.find(p => p.pageType === "thank_you");
       const successRedirect = checkoutBlock.data?.successRedirect;
-      const successUrl = successRedirect
-        ? (successRedirect.startsWith("http") ? successRedirect : `${input.origin}${successRedirect}`)
-        : thankYouPage
-          ? `${input.origin}/f/${funnel.slug}/${thankYouPage.slug}?success=1`
-          : `${input.origin}/f/${funnel.slug}/${page.slug}?success=1`;
+      const resolveSuccessUrl = (redirect: string | undefined) => {
+        if (!redirect) return thankYouPage ? `${input.origin}/f/${funnel.slug}/${thankYouPage.slug}?success=1` : `${input.origin}/f/${funnel.slug}/${page.slug}?success=1`;
+        if (redirect === "__dashboard__") return `${input.origin}/my-dashboard?purchase=success`;
+        if (redirect.startsWith("__funnel__:")) return `${input.origin}/f/${redirect.slice(11)}?success=1`;
+        if (redirect.startsWith("http")) return redirect;
+        return `${input.origin}${redirect}`;
+      };
+      const successUrl = resolveSuccessUrl(successRedirect);
       const cancelUrl = `${input.origin}/f/${funnel.slug}/${page.slug}`;
 
       const session = await stripe.checkout.sessions.create({
@@ -1135,11 +1138,14 @@ export const funnelPublicRouter = router({
         .orderBy(asc(funnelPages.sortOrder));
       const thankYouPage = allPages.find(p => p.pageType === "thank_you");
       const successRedirect = checkoutBlock.data?.successRedirect;
-      const successUrl = successRedirect
-        ? (successRedirect.startsWith("http") ? successRedirect : `${input.origin}${successRedirect}`)
-        : thankYouPage
-          ? `${input.origin}/f/${funnel.slug}/${thankYouPage.slug}?success=1`
-          : `${input.origin}/f/${funnel.slug}/${page.slug}?success=1`;
+      const resolveSuccessUrl2 = (redirect: string | undefined) => {
+        if (!redirect) return thankYouPage ? `${input.origin}/f/${funnel.slug}/${thankYouPage.slug}?success=1` : `${input.origin}/f/${funnel.slug}/${page.slug}?success=1`;
+        if (redirect === "__dashboard__") return `${input.origin}/my-dashboard?purchase=success`;
+        if (redirect.startsWith("__funnel__:")) return `${input.origin}/f/${redirect.slice(11)}?success=1`;
+        if (redirect.startsWith("http")) return redirect;
+        return `${input.origin}${redirect}`;
+      };
+      const successUrl = resolveSuccessUrl2(successRedirect);
 
       // Create PaymentIntent
       const paymentIntent = await stripe.paymentIntents.create({

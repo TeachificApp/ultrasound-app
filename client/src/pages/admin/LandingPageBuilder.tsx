@@ -1006,6 +1006,108 @@ function OptOutSettings({ d, set }: { d: Record<string, any>; set: (key: string,
   );
 }
 
+// ─── Success Redirect Picker ────────────────────────────────────────────────
+type RedirectMode = "url" | "dashboard" | "funnel_step";
+
+function SuccessRedirectPicker({
+  value, onChange
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const { data: funnelList } = trpc.funnel.list.useQuery(undefined, { staleTime: 60_000 });
+
+  // Detect current mode from stored value
+  const detectMode = (v: string): RedirectMode => {
+    if (v === "__dashboard__") return "dashboard";
+    if (v.startsWith("__funnel__:")) return "funnel_step";
+    return "url";
+  };
+
+  const [mode, setMode] = useState<RedirectMode>(() => detectMode(value));
+
+  const handleModeChange = (m: RedirectMode) => {
+    setMode(m);
+    if (m === "dashboard") onChange("__dashboard__");
+    else if (m === "funnel_step") onChange("__funnel__:");
+    else onChange("");
+  };
+
+  // Parse funnel step value: "__funnel__:funnelSlug/pageSlug"
+  const funnelStepVal = value.startsWith("__funnel__:") ? value.slice(11) : "";
+  const [selFunnelId, setSelFunnelId] = useState<number | null>(null);
+
+  // Build flat list of all funnel pages
+  const allFunnelPages = funnelList?.flatMap(f =>
+    (f.pages ?? []).map((p: any) => ({
+      funnelId: f.id,
+      funnelName: f.name,
+      funnelSlug: f.slug,
+      pageId: p.id,
+      pageName: p.name,
+      pageSlug: p.slug,
+      label: `${f.name} → ${p.name}`,
+      value: `${f.slug}/${p.slug}`,
+    }))
+  ) ?? [];
+
+  const filteredPages = selFunnelId
+    ? allFunnelPages.filter(p => p.funnelId === selFunnelId)
+    : allFunnelPages;
+
+  return (
+    <div className="space-y-2">
+      <label className="text-xs text-gray-500 font-medium">After Purchase</label>
+      <div className="grid grid-cols-3 gap-1">
+        {(["url", "dashboard", "funnel_step"] as RedirectMode[]).map(m => (
+          <button key={m} onClick={() => handleModeChange(m)}
+            className={`text-xs rounded px-2 py-1.5 border transition-colors ${
+              mode === m
+                ? "bg-teal-600 text-white border-teal-600"
+                : "bg-white text-gray-600 border-gray-200 hover:border-teal-300"
+            }`}>
+            {m === "url" ? "Custom URL" : m === "dashboard" ? "Student Dashboard" : "Funnel Step"}
+          </button>
+        ))}
+      </div>
+      {mode === "url" && (
+        <div>
+          <p className="text-xs text-gray-400 mb-1">Redirect to any URL after purchase</p>
+          <Input value={value === "__dashboard__" || value.startsWith("__funnel__:") ? "" : value}
+            onChange={e => onChange(e.target.value)}
+            className="h-7 text-xs" placeholder="/thank-you or https://..." />
+        </div>
+      )}
+      {mode === "dashboard" && (
+        <div className="bg-teal-50 rounded p-2">
+          <p className="text-xs text-teal-700 font-medium">Student Dashboard</p>
+          <p className="text-xs text-teal-600 mt-0.5">Buyer is redirected to their dashboard after purchase. If not logged in, they will be prompted to log in or create an account.</p>
+        </div>
+      )}
+      {mode === "funnel_step" && (
+        <div className="space-y-1.5">
+          <p className="text-xs text-gray-400">Choose a funnel step to redirect to</p>
+          {funnelList && funnelList.length > 1 && (
+            <select value={selFunnelId ?? ""} onChange={e => setSelFunnelId(e.target.value ? Number(e.target.value) : null)}
+              className="h-7 w-full text-xs rounded border border-gray-200 px-2">
+              <option value="">All funnels</option>
+              {funnelList.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+            </select>
+          )}
+          <select value={funnelStepVal} onChange={e => onChange(`__funnel__:${e.target.value}`)}
+            className="h-7 w-full text-xs rounded border border-gray-200 px-2">
+            <option value="">-- Select a funnel step --</option>
+            {filteredPages.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+          </select>
+          {funnelStepVal && (
+            <p className="text-xs text-gray-400">URL: /f/{funnelStepVal}</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Checkout Form Block Settings ───────────────────────────────────────────
 function CheckoutFormBlockSettings({
   d, set, cfProds, cfBumps
@@ -1149,7 +1251,7 @@ function CheckoutFormBlockSettings({
         <BSTextField data={d} onSet={set} label="Terms Link URL" field="termsLinkUrl" placeholder="https://www.allaboutultrasound.com/terms-of-service.html" />
       </div>
       <BSTextField data={d} onSet={set} label="Submit Button Text" field="submitText" placeholder="Submit" />
-      <BSTextField data={d} onSet={set} label="Success Redirect URL" field="successRedirect" placeholder="/thank-you or https://..." />
+      <SuccessRedirectPicker value={d.successRedirect ?? ""} onChange={v => set("successRedirect", v)} />
       {/* Colors */}
       <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />
       <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
@@ -1727,8 +1829,8 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
           </div>
           {/* Submit & Redirect */}
           <BSTextField data={d} onSet={set} label="Submit Button Text" field="submitText" placeholder="Submit" />
-          <BSTextField data={d} onSet={set} label="Success Redirect URL" field="successRedirect" placeholder="/thank-you" />
-          {/* Terms */}
+          <SuccessRedirectPicker value={d.successRedirect ?? ""} onChange={v => set("successRedirect", v)} />
+          {/* Terms */
           <div className="grid grid-cols-2 gap-2">
             <BSTextField data={d} onSet={set} label="Terms Text" field="termsText" placeholder="I agree to the" />
             <BSTextField data={d} onSet={set} label="Terms Link Text" field="termsLinkText" placeholder="Terms of Service" />
@@ -1845,7 +1947,7 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
           </div>
           {/* Submit & Redirect */}
           <BSTextField data={d} onSet={set} label="Submit Button Text" field="submitText" placeholder="Complete Purchase" />
-          <BSTextField data={d} onSet={set} label="Success Redirect URL" field="successRedirect" placeholder="/thank-you" />
+          <SuccessRedirectPicker value={d.successRedirect ?? ""} onChange={v => set("successRedirect", v)} />
           <BSTextField data={d} onSet={set} label="Success Message (if no redirect)" field="successMessage" multiline />
           {/* Terms */}
           <div className="grid grid-cols-2 gap-2">
