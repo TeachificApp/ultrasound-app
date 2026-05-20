@@ -255,7 +255,6 @@ function CheckoutFormInner({ data, funnelId, pageId, funnelSlug }: CheckoutFormB
         className="rounded-lg px-6 py-4 mb-6 text-center text-white font-bold text-lg flex items-center justify-center gap-2"
         style={{ backgroundColor: accent }}
       >
-        <Lock size={18} />
         <span>{d.headerText ?? "Lock in your seat now!"} {d.headerPrice ?? ""}</span>
       </div>
 
