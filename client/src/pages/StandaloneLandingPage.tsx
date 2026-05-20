@@ -135,7 +135,12 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
               {d.buttons?.length > 0 && (
                 <div className={`flex flex-wrap gap-3 ${align === "center" ? "justify-center" : align === "right" ? "justify-end" : ""}`}>
                   {d.buttons.map((btn: any, i: number) => (
-                    <a key={i} href={btn.link || "#"} className="inline-block px-6 py-3 rounded-lg font-semibold text-lg transition-transform hover:scale-105" style={{ backgroundColor: btn.color || "#ffffff", color: btn.textColor || "#179ca3" }}>{btn.text}</a>
+                    <div key={i} className="flex flex-col items-center gap-1">
+                      <a href={btn.link || "#"} className="inline-block px-6 py-3 rounded-lg font-semibold text-lg transition-transform hover:scale-105" style={{ backgroundColor: btn.color || "#ffffff", color: btn.textColor || "#179ca3" }}>{btn.text}</a>
+                      {btn.showOptOut && btn.optOutText && (
+                        <a href={btn.optOutUrl || "#"} className="text-xs text-white/60 underline hover:text-white/80 cursor-pointer">{btn.optOutText}</a>
+                      )}
+                    </div>
                   ))}
                 </div>
               )}

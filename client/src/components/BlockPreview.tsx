@@ -61,10 +61,15 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
               {d.subheadline && <p className="text-xl opacity-90 mb-8" dangerouslySetInnerHTML={{ __html: d.subheadline }} />}
               {!d.hideButtons && <div className="flex flex-wrap gap-3" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
                 {heroButtons.map((btn, i) => (
-                  <button key={i} className={`px-8 py-3 rounded-lg font-semibold text-lg shadow-lg ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
-                    style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
-                    {btn.text}
-                  </button>
+                  <div key={i} className="flex flex-col items-center gap-1">
+                    <button className={`px-8 py-3 rounded-lg font-semibold text-lg shadow-lg ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
+                      style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
+                      {btn.text}
+                    </button>
+                    {btn.showOptOut && btn.optOutText && (
+                      <span className="text-xs text-white/60 underline cursor-pointer hover:text-white/80">{btn.optOutText}</span>
+                    )}
+                  </div>
                 ))}
               </div>}
             </div>

@@ -134,11 +134,16 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
               {d.subheadline && <p className="text-xl opacity-90 mb-8 animate-fade-slide-up-delay-1" dangerouslySetInnerHTML={{ __html: d.subheadline }} />}
               {!d.hideButtons && <div className="flex flex-wrap gap-3 animate-fade-slide-up-delay-2" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
                 {buttons.map((btn, i) => (
-                  <button key={i} onClick={btn.link ? () => window.location.href = btn.link : onEnroll}
-                    className="px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-opacity hover:opacity-90"
-                    style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
-                    {btn.text}
-                  </button>
+                  <div key={i} className="flex flex-col items-center gap-1">
+                    <button onClick={btn.link ? () => window.location.href = btn.link : onEnroll}
+                      className="px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-opacity hover:opacity-90"
+                      style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
+                      {btn.text}
+                    </button>
+                    {btn.showOptOut && btn.optOutText && (
+                      <a href={btn.optOutUrl || "#"} className="text-xs text-white/60 underline hover:text-white/80 cursor-pointer">{btn.optOutText}</a>
+                    )}
+                  </div>
                 ))}
               </div>}
             </div>

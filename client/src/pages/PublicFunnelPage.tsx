@@ -149,7 +149,7 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
       else if (bgType === "gradient") heroBg = { background: `linear-gradient(${d.gradientDir ?? "to bottom right"}, ${d.gradientFrom ?? "#179ca3"}, ${d.gradientTo ?? "#0e4a50"})` };
       else if (bgType === "image") heroBg = { backgroundImage: `url(${d.imageUrl})`, backgroundSize: "cover", backgroundPosition: "center" };
       else if (bgType === "video") heroBg = { backgroundColor: "#000" };
-      const heroButtons: Array<{ text: string; color: string; textColor: string; link: string; style: string; animation?: string; leadCapture?: boolean; leadModalTitle?: string; leadModalSubtext?: string; leadTags?: string }> =
+      const heroButtons: Array<{ text: string; color: string; textColor: string; link: string; style: string; animation?: string; leadCapture?: boolean; leadModalTitle?: string; leadModalSubtext?: string; leadTags?: string; showOptOut?: boolean; optOutText?: string; optOutUrl?: string }> =
         d.buttons?.length ? d.buttons : [{ text: d.ctaText ?? "Get Started", color: "#fff", textColor: "#179ca3", link: "", style: "filled" }];
       const hasInlineMedia = !!d.inlineMediaUrl;
       const placement = d.inlineMediaPlacement ?? "right";
@@ -639,7 +639,7 @@ function UrgencyOfferBlock({ data: d, funnelSlug, nextPage }: { data: Record<str
 
 function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMedia, placement, isHorizontal, funnelId, pageId, funnelSlug, nextPage }: {
   d: Record<string, any>;
-  heroButtons: Array<{ text: string; color: string; textColor: string; link: string; style: string; animation?: string; leadCapture?: boolean; leadModalTitle?: string; leadModalSubtext?: string; leadTags?: string; behavior?: string; emailAddress?: string }>;
+  heroButtons: Array<{ text: string; color: string; textColor: string; link: string; style: string; animation?: string; leadCapture?: boolean; leadModalTitle?: string; leadModalSubtext?: string; leadTags?: string; behavior?: string; emailAddress?: string; showOptOut?: boolean; optOutText?: string; optOutUrl?: string }>;
   heroBg: React.CSSProperties;
   bgType: string;
   hasInlineMedia: boolean;
@@ -685,13 +685,18 @@ function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMed
           {d.subheadline && <p className="text-xl opacity-90 mb-8 max-w-2xl" dangerouslySetInnerHTML={{ __html: d.subheadline }} />}
           {!d.hideButtons && <div className="flex flex-wrap gap-3" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
             {heroButtons.map((btn, i) => (
-              <a key={i}
-                href={getBtnHref(btn)}
-                onClick={e => handleBtnClick(e, btn)}
-                className={`px-8 py-3 rounded-lg font-semibold text-lg shadow-lg inline-block transition-transform hover:scale-105 cursor-pointer ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
-                style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
-                {btn.text}
-              </a>
+              <div key={i} className="flex flex-col items-center gap-1">
+                <a
+                  href={getBtnHref(btn)}
+                  onClick={e => handleBtnClick(e, btn)}
+                  className={`px-8 py-3 rounded-lg font-semibold text-lg shadow-lg inline-block transition-transform hover:scale-105 cursor-pointer ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
+                  style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
+                  {btn.text}
+                </a>
+                {btn.showOptOut && btn.optOutText && (
+                  <a href={btn.optOutUrl || "#"} className="text-xs text-white/60 underline hover:text-white/80 cursor-pointer">{btn.optOutText}</a>
+                )}
+              </div>
             ))}
           </div>}
         </div>

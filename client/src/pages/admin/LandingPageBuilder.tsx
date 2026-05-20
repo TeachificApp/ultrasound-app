@@ -1152,6 +1152,19 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
                       </div>
                     )}
                   </div>
+                  <div className="space-y-2 border-t border-gray-100 pt-2 mt-1">
+                    <label className="text-xs text-gray-500 font-medium block">Opt-Out / Skip Link</label>
+                    <div className="flex items-center gap-2">
+                      <input type="checkbox" id={`oo-${idx}`} checked={btn.showOptOut ?? false} onChange={e => setBtn(idx, "showOptOut", e.target.checked as any)} className="rounded" />
+                      <label htmlFor={`oo-${idx}`} className="text-xs text-gray-600">Show opt-out link</label>
+                    </div>
+                    {btn.showOptOut && (
+                      <>
+                        <DebouncedInput value={btn.optOutText ?? "No thanks"} onChange={v => setBtn(idx, "optOutText", v)} className="h-8 text-xs" placeholder="No thanks, I don't want this" />
+                        <DebouncedInput value={btn.optOutUrl ?? ""} onChange={v => setBtn(idx, "optOutUrl", v)} className="h-8 text-xs" placeholder="https://... (skip destination)" />
+                      </>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
