@@ -837,6 +837,8 @@ function LeadCaptureBlock({ data, funnelId, pageId, nextPageUrl }: { data: Recor
   const submitLead = trpc.funnelPublic.submitLead.useMutation({
     onSuccess: () => {
       setSubmitted(true);
+      // Persist lead data so the next funnel step (checkout form) can auto-populate
+      try { sessionStorage.setItem("funnel_lead", JSON.stringify({ name, email })); } catch {}
       const behavior = data.btnBehavior ?? "none";
       if (behavior === "external_url" && data.btnUrl) {
         window.location.href = data.btnUrl;
@@ -945,6 +947,8 @@ function CtaOptinBlock({ data, funnelId, pageId, nextPageUrl }: { data: Record<s
   const submitLead = trpc.funnelPublic.submitLead.useMutation({
     onSuccess: () => {
       setSubmitted(true);
+      // Persist lead data so the next funnel step (checkout form) can auto-populate
+      try { sessionStorage.setItem("funnel_lead", JSON.stringify({ name, email })); } catch {}
       const behavior = data.btnBehavior ?? "none";
       if (behavior === "external_url" && data.btnUrl) {
         window.location.href = data.btnUrl;

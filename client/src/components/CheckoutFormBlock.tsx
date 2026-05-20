@@ -72,9 +72,21 @@ interface CheckoutFormBlockProps {
 function CheckoutFormInner({ data, funnelId, pageId, funnelSlug }: CheckoutFormBlockProps) {
   const d = data as unknown as CheckoutFormData;
 
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
+  // Auto-populate from funnel lead capture (stored in sessionStorage on previous step)
+  const savedLead = (() => {
+    try { return JSON.parse(sessionStorage.getItem("funnel_lead") ?? "null") ?? {}; } catch { return {}; }
+  })();
+  const [firstName, setFirstName] = useState(() => {
+    const saved = savedLead.name ?? "";
+    const parts = saved.trim().split(" ");
+    return parts[0] ?? "";
+  });
+  const [lastName, setLastName] = useState(() => {
+    const saved = savedLead.name ?? "";
+    const parts = saved.trim().split(" ");
+    return parts.slice(1).join(" ") ?? "";
+  });
+  const [email, setEmail] = useState(() => savedLead.email ?? "");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [address2, setAddress2] = useState("");
@@ -286,13 +298,16 @@ function CheckoutFormInner({ data, funnelId, pageId, funnelSlug }: CheckoutFormB
             required
             className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-teal-400"
           />
-          <input
-            type="tel"
-            placeholder="Phone Number"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
-          />
+          {(d as any).showPhone !== false && (
+            <input
+              type="tel"
+              placeholder="Phone Number"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              required={(d as any).requirePhone === true}
+              className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+            />
+          )}
         </fieldset>
       )}
 
