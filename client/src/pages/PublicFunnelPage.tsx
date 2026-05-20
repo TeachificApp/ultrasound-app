@@ -639,7 +639,7 @@ function UrgencyOfferBlock({ data: d, funnelSlug, nextPage }: { data: Record<str
 
 function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMedia, placement, isHorizontal, funnelId, pageId, funnelSlug, nextPage }: {
   d: Record<string, any>;
-  heroButtons: Array<{ text: string; color: string; textColor: string; link: string; style: string; animation?: string; leadCapture?: boolean; leadModalTitle?: string; leadModalSubtext?: string; leadTags?: string }>;
+  heroButtons: Array<{ text: string; color: string; textColor: string; link: string; style: string; animation?: string; leadCapture?: boolean; leadModalTitle?: string; leadModalSubtext?: string; leadTags?: string; behavior?: string; emailAddress?: string }>;
   heroBg: React.CSSProperties;
   bgType: string;
   hasInlineMedia: boolean;
@@ -659,9 +659,16 @@ function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMed
     }
   };
 
+  const getBtnHref = (btn: typeof heroButtons[0]) => {
+    const behavior = btn.behavior ?? "url";
+    const nextPageUrl = nextPage ? `/f/${funnelSlug}/${nextPage.slug}` : null;
+    if (behavior === "send_email" && btn.emailAddress) return `mailto:${btn.emailAddress}`;
+    if (behavior === "next_funnel_step" && nextPageUrl) return nextPageUrl;
+    return btn.link || nextPageUrl || "#";
+  };
+
   const handleLeadSuccess = (btn: typeof heroButtons[0]) => {
-    const href = btn.link || (nextPage ? `/f/${funnelSlug}/${nextPage.slug}` : "#");
-    window.location.href = href;
+    window.location.href = getBtnHref(btn);
   };
 
   return (
@@ -679,7 +686,7 @@ function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMed
           {!d.hideButtons && <div className="flex flex-wrap gap-3" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
             {heroButtons.map((btn, i) => (
               <a key={i}
-                href={btn.link || (nextPage ? `/f/${funnelSlug}/${nextPage.slug}` : "#")}
+                href={getBtnHref(btn)}
                 onClick={e => handleBtnClick(e, btn)}
                 className={`px-8 py-3 rounded-lg font-semibold text-lg shadow-lg inline-block transition-transform hover:scale-105 cursor-pointer ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
                 style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
@@ -719,7 +726,13 @@ function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMed
 function CtaStandaloneBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: Record<string, any>; funnelId: number; pageId: number; funnelSlug: string; nextPage?: { slug: string } | null }) {
   const [lcOpen, setLcOpen] = useState(false);
 
-  const href = d.ctaLink || (nextPage ? `/f/${funnelSlug}/${nextPage.slug}` : "#");
+  const behavior = d.ctaBehavior ?? "url";
+  const nextPageUrl = nextPage ? `/f/${funnelSlug}/${nextPage.slug}` : null;
+  const href = behavior === "send_email" && d.ctaEmailAddress
+    ? `mailto:${d.ctaEmailAddress}`
+    : behavior === "next_funnel_step" && nextPageUrl
+    ? nextPageUrl
+    : (d.ctaLink || nextPageUrl || "#");
   const btnStyle: React.CSSProperties = (d.btnStyle ?? "filled") === "outline"
     ? { backgroundColor: "transparent", color: d.ctaColor ?? "#179ca3", border: `2px solid ${d.btnBorderColor ?? d.ctaColor ?? "#179ca3"}` }
     : { backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#ffffff", border: `2px solid ${d.btnBorderColor ?? d.ctaColor ?? "#179ca3"}` };
@@ -765,7 +778,13 @@ function CtaStandaloneBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: 
 function PricingCtaBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: Record<string, any>; funnelId: number; pageId: number; funnelSlug: string; nextPage?: { slug: string } | null }) {
   const [lcOpen, setLcOpen] = useState(false);
 
-  const href = d.ctaLink || (nextPage ? `/f/${funnelSlug}/${nextPage.slug}` : "#");
+  const behavior = d.ctaBehavior ?? "url";
+  const nextPageUrl = nextPage ? `/f/${funnelSlug}/${nextPage.slug}` : null;
+  const href = behavior === "send_email" && d.ctaEmailAddress
+    ? `mailto:${d.ctaEmailAddress}`
+    : behavior === "next_funnel_step" && nextPageUrl
+    ? nextPageUrl
+    : (d.ctaLink || nextPageUrl || "#");
 
   const handleClick = (e: React.MouseEvent) => {
     if (d.leadCapture) {
