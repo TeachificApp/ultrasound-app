@@ -19,6 +19,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl, getThinkificFreeUrl } from "@/const";
 import { useBrand } from "@/hooks/useBrand";
 import { getBrandNavConfig } from "@/config/brandNav";
+import { isLearnDomain, isMembersDomain, isAccreditationDomain } from "@/hooks/useSubdomain";
 
 /** Badge showing the count of echo cases pending admin review */
 function CasePendingBadge() {
@@ -177,6 +178,13 @@ const hiddenNavItems = [
 // staticNavItems is now resolved inside the Layout function body (brand-aware)
 
 export default function Layout({ children }: { children: React.ReactNode }) {
+  // On learn, members, and accreditation domains, the domain-specific layout
+  // (LMSLayout / MembersLayout / AccreditationLayout) already provides the
+  // header and navigation chrome. Rendering Layout's sidebar here would
+  // create a double-header. Return children directly as a passthrough.
+  if (isLearnDomain() || isMembersDomain() || isAccreditationDomain()) {
+    return <>{children}</>;
+  }
   const [rawLocation] = useLocation();
   const location = rawLocation.split("?")[0];
   const fullLocation = rawLocation; // includes query string, used for tab-specific active state
@@ -229,9 +237,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       if (item.path === "__LEARN_VASCULAR_URL__")
         return { ...item, path: learnLinks?.learnVascularUrl || "" };
       if (item.path === "__LEARN_ACS_URL__")
-        return { ...item, path: learnLinks?.learnAcsUrl || "https://www.allaboutultrasound.net/acs-preview-pass-access" };
+        return { ...item, path: "https://www.allaboutultrasound.net/acs-preview-pass-access" };
       if (item.path === "__LEARN_PEDS_ECHO_URL__")
-        return { ...item, path: learnLinks?.learnPedsEchoUrl || "https://www.allaboutultrasound.net/pediatric-echo-cross-training-2cfdb" };
+        return { ...item, path: "https://www.allaboutultrasound.net/pediatric-echo-cross-training-2cfdb" };
       return item;
     // Hide Learn links if no URL is configured yet
     }).filter((item: { path: string; label: string; icon?: any; external?: boolean }) =>
