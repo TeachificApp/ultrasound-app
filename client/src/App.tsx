@@ -461,7 +461,8 @@ function Router() {
 
 /**
  * LMSRouter — Routes shown only on the learn subdomain.
- * Wraps all pages in LMSLayout with its own sidebar.
+ * CoursePlayer is rendered outside LMSLayout (full-screen, no sidebar).
+ * All other pages are wrapped in LMSLayout with its own sidebar.
  */
 function LMSRouter() {
   usePageViewTracker();
@@ -472,16 +473,24 @@ function LMSRouter() {
     </div>
   );
   return (
-    <LMSLayout>
-      <Suspense fallback={pageFallback}>
-      <Switch>
-        {/* LMS Home */}
-        <Route path="/" component={LMSHome} />
-        <Route path="/education-library" component={EducationLibrary} />
-        <Route path="/collections/:id" component={CollectionDetail} />
-        <Route path="/learn/:slug/player" component={CoursePlayer} />
-        <Route path="/learn/:slug/overview" component={CourseOverview} />
-        <Route path="/learn/:slug" component={CourseLanding} />
+    <Switch>
+      {/* CoursePlayer — full-screen, no LMSLayout sidebar */}
+      <Route path="/learn/:slug/player">
+        <Suspense fallback={pageFallback}>
+          <CoursePlayer />
+        </Suspense>
+      </Route>
+      {/* All other LMS routes — wrapped in LMSLayout */}
+      <Route>
+        <LMSLayout>
+          <Suspense fallback={pageFallback}>
+          <Switch>
+            {/* LMS Home */}
+            <Route path="/" component={LMSHome} />
+            <Route path="/education-library" component={EducationLibrary} />
+            <Route path="/collections/:id" component={CollectionDetail} />
+            <Route path="/learn/:slug/overview" component={CourseOverview} />
+            <Route path="/learn/:slug" component={CourseLanding} />
 
         {/* Digital Downloads */}
         <Route path="/my-downloads" component={MyDownloads} />
@@ -509,11 +518,13 @@ function LMSRouter() {
 
         <Route path="/media/:slug/:action" component={MediaRedirect} />
         <Route path="/media/:slug" component={MediaRedirect} />
-        {/* Fallback */}
-        <Route component={NotFound} />
-      </Switch>
-      </Suspense>
-    </LMSLayout>
+            {/* Fallback */}
+            <Route component={NotFound} />
+          </Switch>
+          </Suspense>
+        </LMSLayout>
+      </Route>
+    </Switch>
   );
 }
 

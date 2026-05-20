@@ -13,11 +13,11 @@ interface SsoRedirectProps {
 }
 
 export function SsoRedirect({ path }: SsoRedirectProps) {
-  const { user, isLoading } = useAuth();
+  const { user, loading } = useAuth();
   const issueToken = trpc.sso.issueToken.useMutation();
 
   useEffect(() => {
-    if (isLoading) return; // wait for auth state
+    if (loading) return; // wait for auth state
 
     const destination = LEARN_DOMAIN + (path.startsWith("/") ? path : `/${path}`);
 
@@ -39,7 +39,7 @@ export function SsoRedirect({ path }: SsoRedirectProps) {
       },
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, user]);
+  }, [loading, user]);
 
   return (
     <div className="flex items-center justify-center h-screen">

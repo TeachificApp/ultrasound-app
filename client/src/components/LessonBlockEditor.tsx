@@ -295,6 +295,12 @@ export default function LessonBlockEditor({
   };
 
   return (
+    <BlockTemplateLibraryProvider onInsert={(block) => {
+      const newBlock = { ...block, id: uid() };
+      setBlocks(prev => [...prev, newBlock]);
+      setSelectedBlockId(newBlock.id);
+      scrollToBlock(newBlock.id);
+    }}>
     <>
     <div className="fixed inset-0 z-50 flex bg-black/40">
       {/* Main editor panel */}
@@ -400,7 +406,7 @@ export default function LessonBlockEditor({
                         onDuplicate={() => duplicateBlock(block.id)}
                         onMoveUp={idx > 0 ? () => moveBlock(block.id, -1) : undefined}
                         onMoveDown={idx < blocks.length - 1 ? () => moveBlock(block.id, 1) : undefined}
-                        onSaveAsTemplate={() => {}}
+                        onSaveAsTemplate={(block) => block}
                       />
                     </div>
                   ))}
@@ -665,6 +671,7 @@ export default function LessonBlockEditor({
       </DialogContent>
     </Dialog>
     </>
+    </BlockTemplateLibraryProvider>
   );
 }
 
@@ -705,8 +712,11 @@ function BlockTemplatesTabContent({ onInsert }: { onInsert: (block: Block) => vo
       ) : (
         <div className="flex-1 overflow-y-auto space-y-2">
           {templates.map((tpl: any) => {
-            const block = tpl.blocks?.[0];
-            const catalogEntry = block ? BLOCK_CATALOG.find(c => c.type === block.type) : null;
+            // blockTemplates schema uses blockType + blockData (JSON string), not tpl.blocks
+            let blockData: Record<string, any> = {};
+            try { blockData = typeof tpl.blockData === "string" ? JSON.parse(tpl.blockData) : (tpl.blockData ?? {}); } catch { /* ignore */ }
+            const catalogEntry = BLOCK_CATALOG.find(c => c.type === tpl.blockType);
+            const block: Block = { id: uid(), type: tpl.blockType as any, data: blockData };
             return (
               <div key={tpl.id} className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg border border-gray-100 hover:border-teal-200 hover:bg-teal-50 group transition-colors">
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -714,12 +724,12 @@ function BlockTemplatesTabContent({ onInsert }: { onInsert: (block: Block) => vo
                   <div className="min-w-0">
                     <p className="text-xs font-semibold text-gray-700 truncate">{tpl.name}</p>
                     {tpl.description && <p className="text-xs text-gray-400 truncate">{tpl.description}</p>}
-                    {block && <p className="text-xs text-gray-300">{catalogEntry?.label ?? block.type}</p>}
+                    <p className="text-xs text-gray-300">{catalogEntry?.label ?? tpl.blockType}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <Button size="sm" variant="outline" className="h-6 text-xs border-teal-300 text-teal-700 hover:bg-teal-50 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => block && onInsert({ ...block, id: Math.random().toString(36).slice(2, 10) })}>
+                    onClick={() => onInsert({ ...block, id: uid() })}>
                     <Plus className="w-3 h-3 mr-1" /> Insert
                   </Button>
                   <button className="w-6 h-6 rounded text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"

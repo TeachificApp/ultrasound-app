@@ -2314,3 +2314,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix video URL import - use video_url only, not take_url (which requires Thinkific auth)
 - [x] Always create landing page on import - use API data (description, banner image) as fallback when scraping fails
 - [x] Fix landing page description block type (use "text" not "html")
+
+## UI Bug Fixes (May 20, 2026)
+- [x] Remove dual logos (iHeartEcho + AAUS) from LMSLayout sidebar header — keep only AAUS logo
+- [x] Move CoursePlayer route outside LMSLayout so it renders full-screen without the sidebar nav
+- [x] Fix LessonBlockEditor "Save block as template" — wrap component with BlockTemplateLibraryProvider
+- [x] Fix LessonBlockEditor BlockTemplatesTabContent — use blockType/blockData from schema (not tpl.blocks)
+- [x] Fix SsoRedirect.tsx — use 'loading' instead of non-existent 'isLoading' from useAuth
