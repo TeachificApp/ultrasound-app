@@ -2351,3 +2351,35 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] IHE SoundBytes empty state — root cause fixed by brand detection fix
 - [x] IHE member count offset (+3,997) — root cause fixed by brand detection fix
 - [x] IHE Daily Challenge echo categories — root cause fixed by brand detection fix
+## Lead Capture & Universal CTA Opt-In (May 20, 2026)
+- [ ] Lead Capture Form block: add name field (with show/hide toggle), input field appearance controls (border color, bg, text color, placeholder color, border radius)
+- [ ] Lead Capture Form block: button style controls (filled/outline toggle, outline border color, button bg, button text color)
+- [ ] Lead Capture Form block: button behavior options (send email + optional campaign link, external URL, go to landing page, go to next funnel step)
+- [ ] Lead Capture Form block: auto-store contact data to funnelLeads on every submission
+- [ ] CTA with Opt-In block: same input appearance + button style + behavior controls
+- [ ] Add listCampaignsPublic procedure to funnelPublicRouter (for campaign dropdown in block settings)
+- [ ] BlockSettings: extend lead_capture and cta_optin settings panels with all new controls
+- [ ] Universal lead capture modal: every CTA/button block (cta_standalone, hero buttons, pricing_cta, etc.) gets optional "Collect Lead Before Action" toggle
+- [ ] Universal lead capture modal: when enabled, clicking the button shows a name/email modal first, then executes the button's original action
+- [ ] Universal lead capture modal: modal appearance uses the same field/button style settings as lead_capture block
+- [ ] Wire lead capture modal into PublicFunnelPage, CourseLanding, DownloadLanding, BlockPreview
+
+## Session: May 20, 2026 — Lead Capture & Universal CTA Modal
+
+- [x] Lead Capture Form block: name field toggle + name placeholder setting
+- [x] Lead Capture Form block: input appearance (border color, bg, text color, placeholder color, border radius)
+- [x] Lead Capture Form block: button style (filled/outline, outline border color, bg, text color)
+- [x] Lead Capture Form block: button behavior (send_email + campaign link, external_url, go_to_landing_page, next_funnel_step)
+- [x] CTA with Opt-In block: same input appearance + button behavior controls
+- [x] Pricing CTA block: lead capture toggle in settings
+- [x] Hero block buttons: lead capture toggle per button
+- [x] CTA Standalone block: lead capture toggle in settings
+- [x] LeadCaptureModal component: reusable modal for any button lead capture
+- [x] HeroBlockWithLeadCapture: hero block rendering with per-button lead capture modal
+- [x] CtaStandaloneBlock: standalone CTA with lead capture modal support
+- [x] PricingCtaBlock: pricing CTA with lead capture modal support
+- [x] funnelLeads schema: added campaign_id column (migration applied)
+- [x] submitLead procedure: added campaignId input field
+- [x] listCampaignsPublic procedure: public endpoint to list campaigns for dropdown
+- [x] Contact data auto-stored on every form submission (funnelLeads table)
+- [x] Email campaign routing: campaignId linked to lead on submission

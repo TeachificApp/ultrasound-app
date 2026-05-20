@@ -7,7 +7,7 @@ import { z } from "zod";
 import { router, protectedProcedure, publicProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
-import { funnels, funnelPages, funnelLeads, funnelTemplates, lmsCourses, lmsLandingPages, digitalProducts, digitalBundles, funnelBranchRules, funnelBranchConditions } from "../../drizzle/schema";
+import { funnels, funnelPages, funnelLeads, funnelTemplates, lmsCourses, lmsLandingPages, digitalProducts, digitalBundles, funnelBranchRules, funnelBranchConditions, emailCampaigns } from "../../drizzle/schema";
 import { eq, and, asc, desc, sql } from "drizzle-orm";
 import { evaluateBranchRules, type VisitorContext } from "../lib/funnelBranchEngine";
 
@@ -1205,6 +1205,8 @@ export const funnelPublicRouter = router({
         sourcePage: z.string().optional(),
         // Tags to apply to the lead (comma-separated or array)
         tags: z.string().optional(),
+        // Optional email campaign to link this lead to
+        campaignId: z.number().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -1229,10 +1231,23 @@ export const funnelPublicRouter = router({
         timezone: input.timezone || null,
         sourcePage: input.sourcePage || null,
         tags: input.tags || null,
+        campaignId: input.campaignId || null,
       });
       // Track conversion
       await db.execute(sql`UPDATE funnel_pages SET conversions = conversions + 1 WHERE id = ${input.funnelPageId}`);
       return { success: true };
+    }),
+
+  /** List email campaigns for lead capture campaign linking (public — returns id + subject only) */
+  listCampaignsPublic: publicProcedure
+    .query(async () => {
+      const db = await getDb();
+      const campaigns = await db
+        .select({ id: emailCampaigns.id, subject: emailCampaigns.subject, status: emailCampaigns.status })
+        .from(emailCampaigns)
+        .orderBy(desc(emailCampaigns.createdAt))
+        .limit(100);
+      return campaigns;
     }),
 
   /** Evaluate branch rules for a funnel page given visitor context (public) */

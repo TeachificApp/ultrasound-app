@@ -18,6 +18,7 @@ import EmbeddedCheckoutBlock from "@/components/EmbeddedCheckoutBlock";
 import InlineCheckoutBlock from "@/components/InlineCheckoutBlock";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import AudioBlockPlayer from "@/components/AudioBlockPlayer";
+import LeadCaptureModal from "@/components/LeadCaptureModal";
 
 // ─── Opt-Out Link Component ─────────────────────────────────────────────────
 
@@ -148,43 +149,25 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
       else if (bgType === "gradient") heroBg = { background: `linear-gradient(${d.gradientDir ?? "to bottom right"}, ${d.gradientFrom ?? "#179ca3"}, ${d.gradientTo ?? "#0e4a50"})` };
       else if (bgType === "image") heroBg = { backgroundImage: `url(${d.imageUrl})`, backgroundSize: "cover", backgroundPosition: "center" };
       else if (bgType === "video") heroBg = { backgroundColor: "#000" };
-      const heroButtons: Array<{ text: string; color: string; textColor: string; link: string; style: string }> =
+      const heroButtons: Array<{ text: string; color: string; textColor: string; link: string; style: string; animation?: string; leadCapture?: boolean; leadModalTitle?: string; leadModalSubtext?: string; leadTags?: string }> =
         d.buttons?.length ? d.buttons : [{ text: d.ctaText ?? "Get Started", color: "#fff", textColor: "#179ca3", link: "", style: "filled" }];
       const hasInlineMedia = !!d.inlineMediaUrl;
       const placement = d.inlineMediaPlacement ?? "right";
       const isHorizontal = placement === "left" || placement === "right";
       return (
-        <div className="relative px-8 py-20 overflow-hidden" style={{ ...heroBg, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left") }}>
-          {bgType === "video" && d.videoUrl && (
-            <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
-          )}
-          <div className={`relative max-w-5xl mx-auto ${hasInlineMedia && isHorizontal ? "flex items-center gap-10" : ""} ${hasInlineMedia && placement === "left" ? "flex-row-reverse" : ""}`}>
-            <div className={hasInlineMedia && isHorizontal ? "flex-1" : "max-w-4xl mx-auto"}>
-              <h1 className="text-4xl md:text-5xl font-bold mb-4 leading-tight">
-                <span style={d.headlineColor ? { color: d.headlineColor } : undefined} dangerouslySetInnerHTML={{ __html: d.headline ?? '' }} />
-                {d.headline2 && <><br /><span style={d.headline2Color ? { color: d.headline2Color } : undefined} dangerouslySetInnerHTML={{ __html: d.headline2 }} /></>}
-              </h1>
-              {d.subheadline && <p className="text-xl opacity-90 mb-8 max-w-2xl" dangerouslySetInnerHTML={{ __html: d.subheadline }} />}
-              {!d.hideButtons && <div className="flex flex-wrap gap-3" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
-                {heroButtons.map((btn, i) => (
-                  <a key={i} href={btn.link || (nextPage ? `/f/${funnelSlug}/${nextPage.slug}` : "#")} className={`px-8 py-3 rounded-lg font-semibold text-lg shadow-lg inline-block transition-transform hover:scale-105 ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
-                    style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
-                    {btn.text}
-                  </a>
-                ))}
-              </div>}
-            </div>
-            {hasInlineMedia && (
-              <div className={isHorizontal ? "flex-1 max-w-md" : "mt-8 max-w-lg mx-auto"}>
-                {d.inlineMediaType === "video" ? (
-                  <video autoPlay muted loop playsInline className="w-full rounded-lg shadow-2xl"><source src={d.inlineMediaUrl} /></video>
-                ) : (
-                  <img src={d.inlineMediaUrl} alt="" className="w-full rounded-lg shadow-2xl" />
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+        <HeroBlockWithLeadCapture
+          d={d}
+          heroButtons={heroButtons}
+          heroBg={heroBg}
+          bgType={bgType}
+          hasInlineMedia={hasInlineMedia}
+          placement={placement}
+          isHorizontal={isHorizontal}
+          funnelId={funnelId}
+          pageId={pageId}
+          funnelSlug={funnelSlug}
+          nextPage={nextPage}
+        />
       );
     }
     case "text":
@@ -290,35 +273,9 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
         </div>
       );
     case "pricing_cta":
-      return (
-        <div className="px-8 py-16" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
-          <div className="max-w-2xl mx-auto text-center">
-            <h2 className="text-3xl font-bold mb-4 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />
-            {d.subtext && <p className="text-lg text-gray-600 mb-8" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
-            <button className={`px-10 py-4 rounded-xl font-bold text-xl shadow-lg transition-transform hover:scale-105 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
-              style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#ffffff" }}>
-              {d.ctaText ?? "Get Started"}
-            </button>
-            <ButtonSubtext d={d} />
-            <OptOutLink d={d} />
-          </div>
-        </div>
-      );
+      return <PricingCtaBlock d={d} funnelId={funnelId} pageId={pageId} funnelSlug={funnelSlug} nextPage={nextPage} />;
     case "cta_standalone":
-      return (
-        <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa", textAlign: d.align ?? "center" }}>
-          <div className="max-w-3xl mx-auto">
-            <h2 className="text-2xl font-bold mb-3 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />
-            {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
-            <a href={d.ctaLink || (nextPage ? `/f/${funnelSlug}/${nextPage.slug}` : "#")} className={`inline-block px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-transform hover:scale-105 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
-              style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#ffffff" }}>
-              {d.ctaText ?? "Get Started"}
-            </a>
-            <ButtonSubtext d={d} />
-            <OptOutLink d={d} />
-          </div>
-        </div>
-      );
+      return <CtaStandaloneBlock d={d} funnelId={funnelId} pageId={pageId} funnelSlug={funnelSlug} nextPage={nextPage} />;
     case "lead_capture":
       return <LeadCaptureBlock data={d} funnelId={funnelId} pageId={pageId} />;
     case "cta_optin":
@@ -678,9 +635,177 @@ function UrgencyOfferBlock({ data: d, funnelSlug, nextPage }: { data: Record<str
   );
 }
 
+// ─── Hero Block with Lead Capture ──────────────────────────────────────────
+
+function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMedia, placement, isHorizontal, funnelId, pageId, funnelSlug, nextPage }: {
+  d: Record<string, any>;
+  heroButtons: Array<{ text: string; color: string; textColor: string; link: string; style: string; animation?: string; leadCapture?: boolean; leadModalTitle?: string; leadModalSubtext?: string; leadTags?: string }>;
+  heroBg: React.CSSProperties;
+  bgType: string;
+  hasInlineMedia: boolean;
+  placement: string;
+  isHorizontal: boolean;
+  funnelId: number;
+  pageId: number;
+  funnelSlug: string;
+  nextPage?: { slug: string; title: string; pageType: string } | null;
+}) {
+  const [lcModal, setLcModal] = useState<{ btn: typeof heroButtons[0] } | null>(null);
+
+  const handleBtnClick = (e: React.MouseEvent, btn: typeof heroButtons[0]) => {
+    if (btn.leadCapture) {
+      e.preventDefault();
+      setLcModal({ btn });
+    }
+  };
+
+  const handleLeadSuccess = (btn: typeof heroButtons[0]) => {
+    const href = btn.link || (nextPage ? `/f/${funnelSlug}/${nextPage.slug}` : "#");
+    window.location.href = href;
+  };
+
+  return (
+    <div className="relative px-8 py-20 overflow-hidden" style={{ ...heroBg, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left") }}>
+      {bgType === "video" && d.videoUrl && (
+        <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
+      )}
+      <div className={`relative max-w-5xl mx-auto ${hasInlineMedia && isHorizontal ? "flex items-center gap-10" : ""} ${hasInlineMedia && placement === "left" ? "flex-row-reverse" : ""}`}>
+        <div className={hasInlineMedia && isHorizontal ? "flex-1" : "max-w-4xl mx-auto"}>
+          <h1 className="text-4xl md:text-5xl font-bold mb-4 leading-tight">
+            <span style={d.headlineColor ? { color: d.headlineColor } : undefined} dangerouslySetInnerHTML={{ __html: d.headline ?? "" }} />
+            {d.headline2 && <><br /><span style={d.headline2Color ? { color: d.headline2Color } : undefined} dangerouslySetInnerHTML={{ __html: d.headline2 }} /></>}
+          </h1>
+          {d.subheadline && <p className="text-xl opacity-90 mb-8 max-w-2xl" dangerouslySetInnerHTML={{ __html: d.subheadline }} />}
+          {!d.hideButtons && <div className="flex flex-wrap gap-3" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
+            {heroButtons.map((btn, i) => (
+              <a key={i}
+                href={btn.link || (nextPage ? `/f/${funnelSlug}/${nextPage.slug}` : "#")}
+                onClick={e => handleBtnClick(e, btn)}
+                className={`px-8 py-3 rounded-lg font-semibold text-lg shadow-lg inline-block transition-transform hover:scale-105 cursor-pointer ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
+                style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
+                {btn.text}
+              </a>
+            ))}
+          </div>}
+        </div>
+        {hasInlineMedia && (
+          <div className={isHorizontal ? "flex-1 max-w-md" : "mt-8 max-w-lg mx-auto"}>
+            {d.inlineMediaType === "video" ? (
+              <video autoPlay muted loop playsInline className="w-full rounded-lg shadow-2xl"><source src={d.inlineMediaUrl} /></video>
+            ) : (
+              <img src={d.inlineMediaUrl} alt="" className="w-full rounded-lg shadow-2xl" />
+            )}
+          </div>
+        )}
+      </div>
+      {lcModal && (
+        <LeadCaptureModal
+          open={true}
+          onClose={() => setLcModal(null)}
+          onSuccess={() => handleLeadSuccess(lcModal.btn)}
+          title={lcModal.btn.leadModalTitle || "Get Instant Access"}
+          subtext={lcModal.btn.leadModalSubtext}
+          tags={lcModal.btn.leadTags}
+          funnelId={funnelId}
+          pageId={pageId}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── CTA Standalone Block with Lead Capture ───────────────────────────────────
+
+function CtaStandaloneBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: Record<string, any>; funnelId: number; pageId: number; funnelSlug: string; nextPage?: { slug: string } | null }) {
+  const [lcOpen, setLcOpen] = useState(false);
+
+  const href = d.ctaLink || (nextPage ? `/f/${funnelSlug}/${nextPage.slug}` : "#");
+  const btnStyle: React.CSSProperties = (d.btnStyle ?? "filled") === "outline"
+    ? { backgroundColor: "transparent", color: d.ctaColor ?? "#179ca3", border: `2px solid ${d.btnBorderColor ?? d.ctaColor ?? "#179ca3"}` }
+    : { backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#ffffff", border: `2px solid ${d.btnBorderColor ?? d.ctaColor ?? "#179ca3"}` };
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (d.leadCapture) {
+      e.preventDefault();
+      setLcOpen(true);
+    }
+  };
+
+  return (
+    <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa", textAlign: d.align ?? "center" }}>
+      <div className="max-w-3xl mx-auto">
+        <h2 className="text-2xl font-bold mb-3 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />
+        {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
+        <a href={href} onClick={handleClick}
+          className={`inline-block px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-transform hover:scale-105 cursor-pointer ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
+          style={btnStyle}>
+          {d.ctaText ?? "Get Started"}
+        </a>
+        <ButtonSubtext d={d} />
+        <OptOutLink d={d} />
+      </div>
+      {lcOpen && (
+        <LeadCaptureModal
+          open={true}
+          onClose={() => setLcOpen(false)}
+          onSuccess={() => { window.location.href = href; }}
+          title={d.leadModalTitle || "Get Instant Access"}
+          subtext={d.leadModalSubtext}
+          tags={d.leadTags}
+          funnelId={funnelId}
+          pageId={pageId}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Pricing CTA Block with Lead Capture ─────────────────────────────────────
+
+function PricingCtaBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: Record<string, any>; funnelId: number; pageId: number; funnelSlug: string; nextPage?: { slug: string } | null }) {
+  const [lcOpen, setLcOpen] = useState(false);
+
+  const href = d.ctaLink || (nextPage ? `/f/${funnelSlug}/${nextPage.slug}` : "#");
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (d.leadCapture) {
+      e.preventDefault();
+      setLcOpen(true);
+    }
+  };
+
+  return (
+    <div className="px-8 py-16" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
+      <div className="max-w-2xl mx-auto text-center">
+        <h2 className="text-3xl font-bold mb-4 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />
+        {d.subtext && <p className="text-lg text-gray-600 mb-8" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
+        <a href={href} onClick={handleClick}
+          className={`inline-block px-10 py-4 rounded-xl font-bold text-xl shadow-lg transition-transform hover:scale-105 cursor-pointer ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
+          style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#ffffff" }}>
+          {d.ctaText ?? "Get Started"}
+        </a>
+        <ButtonSubtext d={d} />
+        <OptOutLink d={d} />
+      </div>
+      {lcOpen && (
+        <LeadCaptureModal
+          open={true}
+          onClose={() => setLcOpen(false)}
+          onSuccess={() => { window.location.href = href; }}
+          title={d.leadModalTitle || "Get Instant Access"}
+          subtext={d.leadModalSubtext}
+          tags={d.leadTags}
+          funnelId={funnelId}
+          pageId={pageId}
+        />
+      )}
+    </div>
+  );
+}
+
 // ─── Lead Capture Block ──────────────────────────────────────────────────────
 
-function LeadCaptureBlock({ data, funnelId, pageId }: { data: Record<string, any>; funnelId: number; pageId: number }) {
+function LeadCaptureBlock({ data, funnelId, pageId, nextPageUrl }: { data: Record<string, any>; funnelId: number; pageId: number; nextPageUrl?: string }) {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -688,7 +813,14 @@ function LeadCaptureBlock({ data, funnelId, pageId }: { data: Record<string, any
   const submitLead = trpc.funnelPublic.submitLead.useMutation({
     onSuccess: () => {
       setSubmitted(true);
-      toast.success("Thank you! Check your email for access.");
+      const behavior = data.btnBehavior ?? "none";
+      if (behavior === "external_url" && data.btnUrl) {
+        window.location.href = data.btnUrl;
+      } else if (behavior === "next_funnel_step" && nextPageUrl) {
+        window.location.href = nextPageUrl;
+      } else {
+        toast.success("Thank you! Check your email for access.");
+      }
     },
     onError: (e: any) => toast.error(e.message || "Submission failed"),
   });
@@ -696,10 +828,37 @@ function LeadCaptureBlock({ data, funnelId, pageId }: { data: Record<string, any
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) { toast.error("Please enter your email"); return; }
-    submitLead.mutate({ funnelId, funnelPageId: pageId, email, name: name || undefined });
+    submitLead.mutate({
+      funnelId,
+      funnelPageId: pageId,
+      email,
+      name: name || undefined,
+      tags: data.tags || undefined,
+      campaignId: data.campaignId ? Number(data.campaignId) : undefined,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      referrer: document.referrer || undefined,
+      sourcePage: window.location.href,
+    });
   };
 
-  if (submitted) {
+  // Derived input styles
+  const inputStyle: React.CSSProperties = {
+    backgroundColor: data.inputBg ?? "rgba(255,255,255,0.15)",
+    borderColor: data.inputBorderColor ?? "rgba(255,255,255,0.4)",
+    color: data.inputTextColor ?? "#ffffff",
+    borderRadius: data.inputBorderRadius != null ? `${data.inputBorderRadius}px` : "8px",
+  };
+
+  // Derived button styles
+  const btnStyleType = data.btnStyle ?? "filled";
+  const btnBgColor = data.btnBg ?? "#ffffff";
+  const btnTxtColor = data.btnTextColor ?? "#179ca3";
+  const btnBorderColor = data.btnBorderColor ?? btnBgColor;
+  const buttonStyle: React.CSSProperties = btnStyleType === "outline"
+    ? { backgroundColor: "transparent", color: btnTxtColor, border: `2px solid ${btnBorderColor}` }
+    : { backgroundColor: btnBgColor, color: btnTxtColor, border: `2px solid ${btnBorderColor}` };
+
+  if (submitted && (data.btnBehavior ?? "none") === "none") {
     return (
       <div className="px-8 py-16 text-center" style={{ backgroundColor: data.bgColor ?? "#179ca3", color: data.textColor ?? "#ffffff" }}>
         <div className="max-w-md mx-auto">
@@ -713,29 +872,34 @@ function LeadCaptureBlock({ data, funnelId, pageId }: { data: Record<string, any
 
   return (
     <div className="px-8 py-16" style={{ backgroundColor: data.bgColor ?? "#179ca3", color: data.textColor ?? "#ffffff" }}>
-      <div className="max-w-md mx-auto text-center">
+      <div className="max-w-2xl mx-auto text-center">
         <h2 className="text-2xl font-bold mb-2">{data.headline ?? "Get Access"}</h2>
         {data.subtext && <p className="opacity-80 mb-6">{data.subtext}</p>}
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <Input
-            type="text"
-            placeholder="Your name (optional)"
-            value={name}
-            onChange={e => setName(e.target.value)}
-            className="h-12 text-base bg-white/10 border-white/30 text-white placeholder:text-white/60"
-          />
+        <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2 items-stretch">
+          {(data.showNameField ?? true) && (
+            <Input
+              type="text"
+              placeholder={data.namePlaceholder ?? "Your name (optional)"}
+              value={name}
+              onChange={e => setName(e.target.value)}
+              style={inputStyle}
+              className="h-12 text-base border flex-1 placeholder:opacity-70"
+            />
+          )}
           <Input
             type="email"
-            placeholder="Your email address"
+            placeholder={data.emailPlaceholder ?? "Your email address"}
             value={email}
             onChange={e => setEmail(e.target.value)}
             required
-            className="h-12 text-base bg-white/10 border-white/30 text-white placeholder:text-white/60"
+            style={inputStyle}
+            className="h-12 text-base border flex-1 placeholder:opacity-70"
           />
           <Button
             type="submit"
             disabled={submitLead.isPending}
-            className="w-full h-12 text-base font-bold bg-white text-gray-900 hover:bg-gray-100"
+            className="h-12 text-base font-bold whitespace-nowrap px-6"
+            style={buttonStyle}
           >
             {submitLead.isPending ? <Loader2 className="animate-spin mr-2" size={18} /> : null}
             {data.ctaText ?? "Get Access"}
@@ -749,7 +913,7 @@ function LeadCaptureBlock({ data, funnelId, pageId }: { data: Record<string, any
 
 // ─── CTA with Opt-In Block ───────────────────────────────────────────────────
 
-function CtaOptinBlock({ data, funnelId, pageId }: { data: Record<string, any>; funnelId: number; pageId: number }) {
+function CtaOptinBlock({ data, funnelId, pageId, nextPageUrl }: { data: Record<string, any>; funnelId: number; pageId: number; nextPageUrl?: string }) {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -757,8 +921,12 @@ function CtaOptinBlock({ data, funnelId, pageId }: { data: Record<string, any>; 
   const submitLead = trpc.funnelPublic.submitLead.useMutation({
     onSuccess: () => {
       setSubmitted(true);
-      // Navigate to ctaLink if set
-      if (data.ctaLink) {
+      const behavior = data.btnBehavior ?? "none";
+      if (behavior === "external_url" && data.btnUrl) {
+        window.location.href = data.btnUrl;
+      } else if (behavior === "next_funnel_step" && nextPageUrl) {
+        window.location.href = nextPageUrl;
+      } else if (data.ctaLink) {
         window.location.href = data.ctaLink;
       }
     },
@@ -774,13 +942,32 @@ function CtaOptinBlock({ data, funnelId, pageId }: { data: Record<string, any>; 
       email,
       name: name || undefined,
       tags: data.tags || undefined,
+      campaignId: data.campaignId ? Number(data.campaignId) : undefined,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       referrer: document.referrer || undefined,
       sourcePage: window.location.href,
     });
   };
 
-  if (submitted && !data.ctaLink) {
+  // Input appearance
+  const inputStyle: React.CSSProperties = {
+    backgroundColor: data.inputBg,
+    borderColor: data.inputBorderColor,
+    color: data.inputTextColor,
+    borderRadius: data.inputBorderRadius != null ? `${data.inputBorderRadius}px` : undefined,
+  };
+
+  // Button appearance
+  const btnStyleType = data.btnStyle ?? "filled";
+  const btnBgColor = data.ctaColor ?? "#179ca3";
+  const btnTxtColor = data.ctaTextColor ?? "#fff";
+  const btnBorderColor = data.btnBorderColor ?? btnBgColor;
+  const buttonStyle: React.CSSProperties = btnStyleType === "outline"
+    ? { backgroundColor: "transparent", color: btnTxtColor, border: `2px solid ${btnBorderColor}` }
+    : { backgroundColor: btnBgColor, color: btnTxtColor, border: `2px solid ${btnBorderColor}` };
+
+  const showSuccess = submitted && (data.btnBehavior ?? "none") === "none" && !data.ctaLink;
+  if (showSuccess) {
     return (
       <div className="px-8 py-16 text-center" style={{ backgroundColor: data.bgColor ?? "#f0fafa" }}>
         <div className="max-w-md mx-auto">
@@ -803,7 +990,8 @@ function CtaOptinBlock({ data, funnelId, pageId }: { data: Record<string, any>; 
             placeholder={data.namePlaceholder ?? "Your name"}
             value={name}
             onChange={e => setName(e.target.value)}
-            className="h-12 text-base"
+            style={inputStyle}
+            className="h-12 text-base placeholder:opacity-70"
           />
           <Input
             type="email"
@@ -811,13 +999,14 @@ function CtaOptinBlock({ data, funnelId, pageId }: { data: Record<string, any>; 
             value={email}
             onChange={e => setEmail(e.target.value)}
             required
-            className="h-12 text-base"
+            style={inputStyle}
+            className="h-12 text-base placeholder:opacity-70"
           />
           <Button
             type="submit"
             disabled={submitLead.isPending}
             className="w-full h-12 text-base font-bold"
-            style={{ backgroundColor: data.ctaColor ?? "#179ca3", color: data.ctaTextColor ?? "#fff" }}
+            style={buttonStyle}
           >
             {submitLead.isPending ? <Loader2 className="animate-spin mr-2" size={18} /> : null}
             {data.ctaText ?? "Get Access"}

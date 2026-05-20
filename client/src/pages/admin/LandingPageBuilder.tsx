@@ -36,7 +36,7 @@ import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } fro
 import { FUNNEL_TEMPLATES, getFunnelTemplateBlocks } from "@/lib/funnelTemplates";
 import { BlockPreview } from "@/components/BlockPreview";
 import {
-  ArrowLeft, Save, Eye, Plus, Trash2, GripVertical, Type, Image, Video,
+  ArrowLeft, ArrowRight, Save, Eye, Plus, Trash2, GripVertical, Type, Image, Video,
   List, Quote, CreditCard, Minus, Columns, X, Palette, AlignLeft,
   AlignCenter, AlignRight, HelpCircle, Users, Star, Globe, Timer,
   AlertTriangle, CheckSquare, LayoutGrid, Layers, BookOpen, Tag,
@@ -125,7 +125,11 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
     defaultData: { headline: "Start Learning Today", subtext: "", ctaText: "Get Started", ctaLink: "", ctaColor: "#179ca3", ctaTextColor: "#ffffff", bgColor: "#f0fafa", align: "center",
       optOutEnabled: false, optOutText: "No thanks, take me to my course", optOutLinkType: "custom", optOutCourseId: null, optOutDownloadId: null, optOutCustomUrl: "" } },
   { type: "lead_capture", label: "Lead Capture Form", icon: <BookMarked size={14} />, category: "Conversion",
-    defaultData: { headline: "Get a Free Preview", subtext: "Enter your email to get instant access.", ctaText: "Send Me Access", bgColor: "#179ca3", textColor: "#ffffff" } },
+    defaultData: { headline: "Get a Free Preview", subtext: "Enter your email to get instant access.", ctaText: "Send Me Access", bgColor: "#179ca3", textColor: "#ffffff",
+      showNameField: true, namePlaceholder: "Your name (optional)", emailPlaceholder: "Your email address",
+      inputBg: "rgba(255,255,255,0.15)", inputBorderColor: "rgba(255,255,255,0.4)", inputTextColor: "#ffffff", inputPlaceholderColor: "rgba(255,255,255,0.7)", inputBorderRadius: 8,
+      btnStyle: "filled", btnBg: "#ffffff", btnTextColor: "#179ca3", btnBorderColor: "#ffffff",
+      btnBehavior: "none", btnUrl: "", btnCampaignId: null, btnNextStep: false } },
   { type: "cta_optin", label: "CTA with Opt-In", icon: <UserPlus size={14} />, category: "Conversion",
     defaultData: { headline: "Start Learning Today", subtext: "Enter your details to get instant access.", ctaText: "Get Access", ctaLink: "", ctaColor: "#179ca3", ctaTextColor: "#ffffff", bgColor: "#f0fafa", align: "center", namePlaceholder: "Your name", emailPlaceholder: "Your email address", tags: "",
       optOutEnabled: false, optOutText: "No thanks", optOutLinkType: "custom", optOutCourseId: null, optOutDownloadId: null, optOutCustomUrl: "" } },
@@ -704,6 +708,206 @@ function PricingCtaSettings({ d, set }: { d: Record<string, any>; set: (key: str
   );
 }
 
+// ─── Lead Capture Button Behavior Settings ───────────────────────────────────
+function LeadCaptureSettings({ d, set }: { d: Record<string, any>; set: (key: string, val: any) => void }) {
+  const { data: campaignsData } = trpc.funnelPublic.listCampaignsPublic.useQuery();
+  const campaigns = (campaignsData ?? []) as Array<{ id: number; name: string; subject: string }>;
+  const btnBehavior = d.btnBehavior ?? "none";
+  return (
+    <div className="space-y-3">
+      {/* Content */}
+      <BSTextField data={d} onSet={set} label="Headline" field="headline" />
+      <BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline />
+      <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
+      <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
+      {/* Fields */}
+      <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+        <p className="text-xs font-semibold text-gray-600">Form Fields</p>
+        <div className="flex items-center gap-2">
+          <input type="checkbox" id="lcShowName" checked={d.showNameField ?? true} onChange={e => set("showNameField", e.target.checked)} className="rounded" />
+          <label htmlFor="lcShowName" className="text-xs text-gray-600">Show name field</label>
+        </div>
+        {(d.showNameField ?? true) && (
+          <BSTextField data={d} onSet={set} label="Name placeholder" field="namePlaceholder" placeholder="Your name (optional)" />
+        )}
+        <BSTextField data={d} onSet={set} label="Email placeholder" field="emailPlaceholder" placeholder="Your email address" />
+      </div>
+      {/* Input Field Appearance */}
+      <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+        <p className="text-xs font-semibold text-gray-600">Input Field Appearance</p>
+        <BSColorField data={d} onSet={set} label="Input Background" field="inputBg" />
+        <BSColorField data={d} onSet={set} label="Input Border Color" field="inputBorderColor" />
+        <BSColorField data={d} onSet={set} label="Input Text Color" field="inputTextColor" />
+        <BSColorField data={d} onSet={set} label="Placeholder Color" field="inputPlaceholderColor" />
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Border Radius (px)</label>
+          <input type="number" min={0} max={50} value={d.inputBorderRadius ?? 8} onChange={e => set("inputBorderRadius", Number(e.target.value))} className="w-full h-8 text-xs rounded border border-gray-200 px-2" />
+        </div>
+      </div>
+      {/* Button Appearance */}
+      <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+        <p className="text-xs font-semibold text-gray-600">Button Appearance</p>
+        <BSTextField data={d} onSet={set} label="Button Text" field="ctaText" />
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Button Style</label>
+          <div className="flex gap-1">
+            {(["filled", "outline"] as const).map(s => (
+              <button key={s} type="button" onClick={() => set("btnStyle", s)}
+                className={`flex-1 py-1.5 text-xs rounded border capitalize ${
+                  (d.btnStyle ?? "filled") === s ? "bg-teal-50 border-teal-400 text-teal-700 font-semibold" : "border-gray-200 text-gray-500"
+                }`}>{s}</button>
+            ))}
+          </div>
+        </div>
+        <BSColorField data={d} onSet={set} label="Button Background" field="btnBg" />
+        <BSColorField data={d} onSet={set} label="Button Text Color" field="btnTextColor" />
+        <BSColorField data={d} onSet={set} label="Button Border / Outline Color" field="btnBorderColor" />
+      </div>
+      {/* Button Behavior */}
+      <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+        <p className="text-xs font-semibold text-gray-600 flex items-center gap-1"><ArrowRight size={12} /> Button Behavior After Submit</p>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Action</label>
+          <Select value={btnBehavior} onValueChange={v => set("btnBehavior", v)}>
+            <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">None (show success message)</SelectItem>
+              <SelectItem value="send_email">Send Email (link to campaign)</SelectItem>
+              <SelectItem value="external_url">Go to External URL</SelectItem>
+              <SelectItem value="next_funnel_step">Go to Next Funnel Step</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {btnBehavior === "send_email" && (
+          <div className="space-y-2">
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Link to Email Campaign (optional)</label>
+              <Select value={d.btnCampaignId ? String(d.btnCampaignId) : "none"} onValueChange={v => set("btnCampaignId", v === "none" ? null : Number(v))}>
+                <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Select campaign…" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— No campaign —</SelectItem>
+                  {campaigns.map((c: any) => (
+                    <SelectItem key={c.id} value={String(c.id)}>{c.name || c.subject}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-[10px] text-gray-400">Contact is always stored. Campaign link is optional for triggering an email sequence.</p>
+          </div>
+        )}
+        {btnBehavior === "external_url" && (
+          <BSLinkField label="Redirect URL" value={d.btnUrl ?? ""} onChange={v => set("btnUrl", v)} />
+        )}
+        {btnBehavior === "next_funnel_step" && (
+          <p className="text-[10px] text-gray-400">Will redirect to the next page in the funnel sequence after submit.</p>
+        )}
+      </div>
+      {/* Tags */}
+      <div className="border-t pt-2 mt-1 space-y-1">
+        <p className="text-xs font-semibold text-gray-600 flex items-center gap-1"><Tag size={12} /> Lead Tags</p>
+        <BSTextField data={d} onSet={set} label="Tags (comma-separated)" field="tags" placeholder="e.g. webinar, free-guide" />
+      </div>
+    </div>
+  );
+}
+
+// ─── CTA with Opt-In Settings ───────────────────────────────────
+function CtaOptinSettings({ d, set }: { d: Record<string, any>; set: (key: string, val: any) => void }) {
+  const { data: campaignsData } = trpc.funnelPublic.listCampaignsPublic.useQuery();
+  const campaigns = (campaignsData ?? []) as Array<{ id: number; name: string; subject: string }>;
+  const btnBehavior = d.btnBehavior ?? "none";
+  return (
+    <div className="space-y-3">
+      <BSTextField data={d} onSet={set} label="Headline" field="headline" />
+      <BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline />
+      <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
+      <BSAlignField data={d} onSet={set} label="Text Alignment" field="align" />
+      {/* Form Fields */}
+      <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+        <p className="text-xs font-semibold text-gray-600">Form Fields</p>
+        <BSTextField data={d} onSet={set} label="Name placeholder" field="namePlaceholder" placeholder="Your name" />
+        <BSTextField data={d} onSet={set} label="Email placeholder" field="emailPlaceholder" placeholder="Your email address" />
+      </div>
+      {/* Input Field Appearance */}
+      <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+        <p className="text-xs font-semibold text-gray-600">Input Field Appearance</p>
+        <BSColorField data={d} onSet={set} label="Input Background" field="inputBg" />
+        <BSColorField data={d} onSet={set} label="Input Border Color" field="inputBorderColor" />
+        <BSColorField data={d} onSet={set} label="Input Text Color" field="inputTextColor" />
+        <BSColorField data={d} onSet={set} label="Placeholder Color" field="inputPlaceholderColor" />
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Border Radius (px)</label>
+          <input type="number" min={0} max={50} value={d.inputBorderRadius ?? 8} onChange={e => set("inputBorderRadius", Number(e.target.value))} className="w-full h-8 text-xs rounded border border-gray-200 px-2" />
+        </div>
+      </div>
+      {/* Button Appearance */}
+      <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+        <p className="text-xs font-semibold text-gray-600">Button Appearance</p>
+        <BSTextField data={d} onSet={set} label="Button Text" field="ctaText" />
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Button Style</label>
+          <div className="flex gap-1">
+            {(["filled", "outline"] as const).map(s => (
+              <button key={s} type="button" onClick={() => set("btnStyle", s)}
+                className={`flex-1 py-1.5 text-xs rounded border capitalize ${
+                  (d.btnStyle ?? "filled") === s ? "bg-teal-50 border-teal-400 text-teal-700 font-semibold" : "border-gray-200 text-gray-500"
+                }`}>{s}</button>
+            ))}
+          </div>
+        </div>
+        <BSColorField data={d} onSet={set} label="Button Background" field="ctaColor" />
+        <BSColorField data={d} onSet={set} label="Button Text Color" field="ctaTextColor" />
+        <BSColorField data={d} onSet={set} label="Button Border / Outline Color" field="btnBorderColor" />
+      </div>
+      {/* Button Behavior */}
+      <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+        <p className="text-xs font-semibold text-gray-600 flex items-center gap-1"><ArrowRight size={12} /> Button Behavior After Submit</p>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Action</label>
+          <Select value={btnBehavior} onValueChange={v => set("btnBehavior", v)}>
+            <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">None (show success message)</SelectItem>
+              <SelectItem value="send_email">Send Email (link to campaign)</SelectItem>
+              <SelectItem value="external_url">Go to External URL</SelectItem>
+              <SelectItem value="next_funnel_step">Go to Next Funnel Step</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {btnBehavior === "send_email" && (
+          <div className="space-y-2">
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Link to Email Campaign (optional)</label>
+              <Select value={d.btnCampaignId ? String(d.btnCampaignId) : "none"} onValueChange={v => set("btnCampaignId", v === "none" ? null : Number(v))}>
+                <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Select campaign…" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— No campaign —</SelectItem>
+                  {campaigns.map((c: any) => (
+                    <SelectItem key={c.id} value={String(c.id)}>{c.name || c.subject}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-[10px] text-gray-400">Contact is always stored. Campaign link is optional for triggering an email sequence.</p>
+          </div>
+        )}
+        {btnBehavior === "external_url" && (
+          <BSLinkField label="Redirect URL" value={d.btnUrl ?? ""} onChange={v => set("btnUrl", v)} />
+        )}
+        {btnBehavior === "next_funnel_step" && (
+          <p className="text-[10px] text-gray-400">Will redirect to the next page in the funnel sequence after submit.</p>
+        )}
+      </div>
+      {/* Tags */}
+      <div className="border-t pt-2 mt-1 space-y-1">
+        <p className="text-xs font-semibold text-gray-600 flex items-center gap-1"><Tag size={12} /> Lead Tags</p>
+        <BSTextField data={d} onSet={set} label="Tags (comma-separated)" field="tags" placeholder="e.g. webinar, free-guide" />
+      </div>
+      <OptOutSettings d={d} set={set} />
+    </div>
+  );
+}
+
 function OptOutSettings({ d, set }: { d: Record<string, any>; set: (key: string, val: any) => void }) {
   return (
     <div className="space-y-2 border-t border-gray-100 pt-2 mt-2">
@@ -848,6 +1052,20 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
                   <div className="flex items-center gap-2"><label className="text-xs text-gray-400 w-16 flex-shrink-0">Color</label><input type="color" value={btn.color} onChange={e => setBtn(idx, "color", e.target.value)} className="w-7 h-7 rounded cursor-pointer border border-gray-200" /><DebouncedInput value={btn.color} onChange={v => setBtn(idx, "color", v)} className="h-7 text-xs flex-1" /></div>
                   {btn.style !== "outline" && <div className="flex items-center gap-2"><label className="text-xs text-gray-400 w-16 flex-shrink-0">Text</label><input type="color" value={btn.textColor} onChange={e => setBtn(idx, "textColor", e.target.value)} className="w-7 h-7 rounded cursor-pointer border border-gray-200" /><DebouncedInput value={btn.textColor} onChange={v => setBtn(idx, "textColor", v)} className="h-7 text-xs flex-1" /></div>}
                   <div><label className="text-xs text-gray-400 block mb-0.5">Animation</label><Select value={btn.animation ?? "none"} onValueChange={v => setBtn(idx, "animation", v)}><SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem><SelectItem value="pulse">Pulse</SelectItem><SelectItem value="bounce">Bounce</SelectItem><SelectItem value="shake">Shake</SelectItem><SelectItem value="glow">Glow</SelectItem></SelectContent></Select></div>
+                  <div className="border-t border-gray-100 pt-2 mt-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <input type="checkbox" id={`lc-${idx}`} checked={btn.leadCapture ?? false} onChange={e => setBtn(idx, "leadCapture", e.target.checked as any)} className="rounded" />
+                      <label htmlFor={`lc-${idx}`} className="text-xs text-teal-700 font-medium">Collect lead before action</label>
+                    </div>
+                    {btn.leadCapture && (
+                      <div className="space-y-1 pl-1">
+                        <p className="text-[10px] text-gray-400">A name/email form will appear before the button action executes.</p>
+                        <DebouncedInput value={btn.leadModalTitle ?? ""} onChange={v => setBtn(idx, "leadModalTitle", v)} className="h-7 text-xs" placeholder="Modal title (e.g. Get Instant Access)" />
+                        <DebouncedInput value={btn.leadModalSubtext ?? ""} onChange={v => setBtn(idx, "leadModalSubtext", v)} className="h-7 text-xs" placeholder="Modal subtext (optional)" />
+                        <DebouncedInput value={btn.leadTags ?? ""} onChange={v => setBtn(idx, "leadTags", v)} className="h-7 text-xs" placeholder="Tags (comma-separated)" />
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -935,6 +1153,20 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
             </Select>
           </div>
           <PricingCtaSettings d={d} set={set} />
+          <div className="border border-teal-100 bg-teal-50/50 rounded-lg p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="pcta-lc" checked={d.leadCapture??false} onChange={e=>set("leadCapture",e.target.checked)} className="rounded" />
+              <label htmlFor="pcta-lc" className="text-xs text-teal-700 font-medium">Collect lead before action</label>
+            </div>
+            {(d.leadCapture??false)&&(
+              <div className="space-y-1 pl-1">
+                <p className="text-[10px] text-gray-400">A name/email modal will appear before the button action executes.</p>
+                <BSTextField data={d} onSet={set} label="Modal Title" field="leadModalTitle" placeholder="e.g. Get Instant Access" />
+                <BSTextField data={d} onSet={set} label="Modal Subtext" field="leadModalSubtext" placeholder="Optional" />
+                <BSTextField data={d} onSet={set} label="Tags (comma-separated)" field="leadTags" placeholder="e.g. webinar, free-guide" />
+              </div>
+            )}
+          </div>
           <div className="border-t pt-3 mt-1 space-y-2">
             <p className="text-xs font-medium text-gray-500">Button Subtext (below button)</p>
             <BSTextField data={d} onSet={set} label="Subtext text" field="buttonSubtext" placeholder="e.g. No credit card required" />
@@ -961,30 +1193,11 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
         </div>
       );
     case "cta_standalone":
-      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Headline" field="headline" /><BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline /><BSTextField data={d} onSet={set} label="Button Text" field="ctaText" /><BSLinkField label="Button Link" value={d.ctaLink ?? ""} onChange={v => set("ctaLink", v)} /><BSColorField data={d} onSet={set} label="Button Color" field="ctaColor" /><BSColorField data={d} onSet={set} label="Button Text Color" field="ctaTextColor" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div><label className="text-xs text-gray-500 block mb-1">Button Animation</label><Select value={d.ctaAnimation ?? "none"} onValueChange={v => set("ctaAnimation", v)}><SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem><SelectItem value="pulse">Pulse</SelectItem><SelectItem value="bounce">Bounce</SelectItem><SelectItem value="shake">Shake</SelectItem><SelectItem value="glow">Glow</SelectItem></SelectContent></Select></div><BSAlignField data={d} onSet={set} label="Text Alignment" field="align" /><div className="border-t pt-3 mt-1 space-y-2"><p className="text-xs font-medium text-gray-500">Button Subtext (below button)</p><BSTextField data={d} onSet={set} label="Subtext text" field="buttonSubtext" placeholder="e.g. No credit card required" /><BSLinkField label="Subtext URL (optional)" value={d.buttonSubtextUrl ?? ""} onChange={v => set("buttonSubtextUrl", v)} /><BSColorField data={d} onSet={set} label="Subtext Color" field="buttonSubtextColor" /><div><label className="text-xs text-gray-500 block mb-1">Subtext Size</label><select value={d.buttonSubtextSize ?? "xs"} onChange={e => set("buttonSubtextSize", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="xs">Extra Small (xs)</option><option value="sm">Small (sm)</option><option value="base">Base</option><option value="lg">Large (lg)</option></select></div><div><label className="text-xs text-gray-500 block mb-1">Subtext Style</label><div className="flex gap-2"><button type="button" onClick={() => set("buttonSubtextItalic", !(d.buttonSubtextItalic ?? false))} className={`px-2 py-1 text-xs rounded border ${(d.buttonSubtextItalic ?? false) ? "bg-teal-50 border-teal-400 text-teal-700" : "border-gray-200 text-gray-500"}`}><em>Italic</em></button><button type="button" onClick={() => set("buttonSubtextBold", !(d.buttonSubtextBold ?? false))} className={`px-2 py-1 text-xs rounded border ${(d.buttonSubtextBold ?? false) ? "bg-teal-50 border-teal-400 text-teal-700" : "border-gray-200 text-gray-500"}`}><strong>Bold</strong></button></div></div></div><OptOutSettings d={d} set={set} /></div>);
+      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Headline" field="headline" /><BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline /><BSTextField data={d} onSet={set} label="Button Text" field="ctaText" /><BSLinkField label="Button Link" value={d.ctaLink ?? ""} onChange={v => set("ctaLink", v)} /><BSColorField data={d} onSet={set} label="Button Color" field="ctaColor" /><BSColorField data={d} onSet={set} label="Button Text Color" field="ctaTextColor" /><BSColorField data={d} onSet={set} label="Button Border / Outline Color" field="btnBorderColor" /><div><label className="text-xs text-gray-500 block mb-1">Button Style</label><div className="flex gap-1">{(["filled","outline"] as const).map(s=><button key={s} onClick={()=>set("btnStyle",s)} className={`flex-1 py-1 text-xs rounded border capitalize ${(d.btnStyle??"filled")===s?"bg-teal-600 text-white border-teal-600":"border-gray-200 text-gray-600"}`}>{s}</button>)}</div></div><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div className="border border-teal-100 bg-teal-50/50 rounded-lg p-3 space-y-2"><div className="flex items-center gap-2"><input type="checkbox" id="cta-lc" checked={d.leadCapture??false} onChange={e=>set("leadCapture",e.target.checked)} className="rounded" /><label htmlFor="cta-lc" className="text-xs text-teal-700 font-medium">Collect lead before action</label></div>{(d.leadCapture??false)&&(<div className="space-y-1 pl-1"><p className="text-[10px] text-gray-400">A name/email modal will appear before the button action executes.</p><BSTextField data={d} onSet={set} label="Modal Title" field="leadModalTitle" placeholder="e.g. Get Instant Access" /><BSTextField data={d} onSet={set} label="Modal Subtext" field="leadModalSubtext" placeholder="Optional" /><BSTextField data={d} onSet={set} label="Tags (comma-separated)" field="leadTags" placeholder="e.g. webinar, free-guide" /></div>)}</div><div><label className="text-xs text-gray-500 block mb-1">Button Animation</label><Select value={d.ctaAnimation ?? "none"} onValueChange={v => set("ctaAnimation", v)}><SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem><SelectItem value="pulse">Pulse</SelectItem><SelectItem value="bounce">Bounce</SelectItem><SelectItem value="shake">Shake</SelectItem><SelectItem value="glow">Glow</SelectItem></SelectContent></Select></div><BSAlignField data={d} onSet={set} label="Text Alignment" field="align" /><div className="border-t pt-3 mt-1 space-y-2"><p className="text-xs font-medium text-gray-500">Button Subtext (below button)</p><BSTextField data={d} onSet={set} label="Subtext text" field="buttonSubtext" placeholder="e.g. No credit card required" /><BSLinkField label="Subtext URL (optional)" value={d.buttonSubtextUrl ?? ""} onChange={v => set("buttonSubtextUrl", v)} /><BSColorField data={d} onSet={set} label="Subtext Color" field="buttonSubtextColor" /><div><label className="text-xs text-gray-500 block mb-1">Subtext Size</label><select value={d.buttonSubtextSize ?? "xs"} onChange={e => set("buttonSubtextSize", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="xs">Extra Small (xs)</option><option value="sm">Small (sm)</option><option value="base">Base</option><option value="lg">Large (lg)</option></select></div><div><label className="text-xs text-gray-500 block mb-1">Subtext Style</label><div className="flex gap-2"><button type="button" onClick={() => set("buttonSubtextItalic", !(d.buttonSubtextItalic ?? false))} className={`px-2 py-1 text-xs rounded border ${(d.buttonSubtextItalic ?? false) ? "bg-teal-50 border-teal-400 text-teal-700" : "border-gray-200 text-gray-500"}`}><em>Italic</em></button><button type="button" onClick={() => set("buttonSubtextBold", !(d.buttonSubtextBold ?? false))} className={`px-2 py-1 text-xs rounded border ${(d.buttonSubtextBold ?? false) ? "bg-teal-50 border-teal-400 text-teal-700" : "border-gray-200 text-gray-500"}`}><strong>Bold</strong></button></div></div></div><OptOutSettings d={d} set={set} /></div>);
     case "lead_capture":
-      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Headline" field="headline" /><BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline /><BSTextField data={d} onSet={set} label="Button Text" field="ctaText" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><BSColorField data={d} onSet={set} label="Text Color" field="textColor" /></div>);
+      return <LeadCaptureSettings d={d} set={set} />;
     case "cta_optin":
-      return (
-        <div className="space-y-3">
-          <BSTextField data={d} onSet={set} label="Headline" field="headline" />
-          <BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline />
-          <BSTextField data={d} onSet={set} label="Name Field Placeholder" field="namePlaceholder" placeholder="Your name" />
-          <BSTextField data={d} onSet={set} label="Email Field Placeholder" field="emailPlaceholder" placeholder="Your email address" />
-          <BSTextField data={d} onSet={set} label="Button Text" field="ctaText" />
-          <BSLinkField label="Button Link (after submit)" value={d.ctaLink ?? ""} onChange={v => set("ctaLink", v)} />
-          <BSColorField data={d} onSet={set} label="Button Color" field="ctaColor" />
-          <BSColorField data={d} onSet={set} label="Button Text Color" field="ctaTextColor" />
-          <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
-          <BSAlignField data={d} onSet={set} label="Text Alignment" field="align" />
-          <div className="border-t pt-3 mt-1 space-y-2">
-            <p className="text-xs font-semibold text-gray-600 flex items-center gap-1"><Tag size={12} /> Lead Tags</p>
-            <BSTextField data={d} onSet={set} label="Tags (comma-separated)" field="tags" placeholder="e.g. webinar, free-guide, newsletter" />
-            <p className="text-xs text-gray-400">These tags will be stored with every lead captured by this block.</p>
-          </div>
-          <OptOutSettings d={d} set={set} />
-        </div>
-      );
+      return <CtaOptinSettings d={d} set={set} />;
     case "funnel_workflow": {
       const steps: Array<{ name: string; role: string; url: string; cta: string }> = d.steps ?? [];
       return (

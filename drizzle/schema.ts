@@ -3298,6 +3298,7 @@ export const funnelLeads = mysqlTable("funnel_leads", {
   timezone: varchar("timezone", { length: 100 }),
   sourcePage: varchar("source_page", { length: 2048 }),
   tags: varchar("tags", { length: 500 }),
+  campaignId: int("campaign_id"), // linked email campaign (optional)
   lastActiveAt: timestamp("last_active_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
