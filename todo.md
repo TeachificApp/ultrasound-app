@@ -2301,3 +2301,7 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix enrollment import to only include active (non-expired) enrollments — filter out e.expired === true
 - [x] Fix preview dialog enrollment count to show active-only count (not all-time total)
 - [x] Log skipped expired count in import log for transparency
+
+## Course Player Enhancements (May 2026)
+- [x] Course-level custom text/labels — admin can override "Lesson", "Module", "Course Modules", "Mark Complete", "Completed", "Next Lesson", "Prev", "Submit Quiz" per course
+- [x] Full-screen content mode in course/quiz player — Maximize button in header hides sidebar/right panel, Escape key exits

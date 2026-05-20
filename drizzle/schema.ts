@@ -2766,6 +2766,9 @@ export const lmsCourses = mysqlTable("lms_courses", {
   gradientTo: varchar("gradient_to", { length: 20 }).default("#0d9488"),
   gradientDirection: varchar("gradient_direction", { length: 30 }).default("135deg"),
   thumbnailUrl: text("thumbnail_url"),
+  // Custom text labels — JSON object overriding default terminology per-course
+  // e.g. { lesson: "Lecture", section: "Unit", markComplete: "Mark Complete", nextLesson: "Next Lesson", ... }
+  customLabels: longtext("custom_labels"),
   createdByUserId: int("created_by_user_id").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),

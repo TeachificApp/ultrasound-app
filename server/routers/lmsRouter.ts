@@ -1344,6 +1344,8 @@ export const lmsAdminRouter = router({
       thumbnailUrl: z.string().nullable().optional(),
       showInLibrary: z.boolean().optional(),
       sendEnrollmentEmail: z.boolean().optional(),
+      // Custom text labels — JSON string of { lesson, section, markComplete, nextLesson, prevLesson, submitQuiz, courseModules, completed }
+      customLabels: z.string().nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);

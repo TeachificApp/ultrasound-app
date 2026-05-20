@@ -18,7 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { toast } from "sonner";
 import {
   Award, BookOpen, Bookmark, BookmarkCheck, CheckCircle, ChevronLeft, ChevronRight,
-  Download, Eye, FileText, HelpCircle, Lock, Menu, Monitor, PlayCircle, StickyNote, X,
+  Download, Eye, FileText, HelpCircle, Lock, Menu, Maximize2, Minimize2, Monitor, PlayCircle, StickyNote, X,
   User, ListChecks, ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -31,7 +31,7 @@ const LessonBlockEditor = lazy(() => import("@/components/LessonBlockEditor"));
 const LOGO = import.meta.env.VITE_APP_LOGO as string;
 
 // ─── Quiz Runner ──────────────────────────────────────────────────────────────
-function QuizRunner({ lesson, courseSlug, onComplete }: { lesson: any; courseSlug: string; onComplete: () => void }) {
+function QuizRunner({ lesson, courseSlug, onComplete, submitQuizLabel = "Submit Quiz" }: { lesson: any; courseSlug: string; onComplete: () => void; submitQuizLabel?: string }) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -112,7 +112,7 @@ function QuizRunner({ lesson, courseSlug, onComplete }: { lesson: any; courseSlu
           onClick={handleSubmit}
           disabled={Object.keys(answers).length < questions.length || submitQuiz.isPending}
         >
-          {submitQuiz.isPending ? "Submitting..." : "Submit Quiz"}
+          {submitQuiz.isPending ? "Submitting..." : submitQuizLabel}
         </Button>
       )}
     </div>
@@ -402,12 +402,12 @@ function CertificateDialog({ open, onClose, courseTitle, certificateUrl }: {
 // ─── Mobile Sidebar Content ──────────────────────────────────────────────────
 function MobileSidebarContent({
   data, sidebarTab, setSidebarTab, selectedLessonId, setSelectedLessonId,
-  completedIds, notesData, bookmarksData, slug, course, prereqLockedIds,
+  completedIds, notesData, bookmarksData, slug, course, prereqLockedIds, lbl,
 }: {
   data: any; sidebarTab: string; setSidebarTab: (t: any) => void;
   selectedLessonId: number | null; setSelectedLessonId: (id: number) => void;
   completedIds: Set<number>; notesData: any; bookmarksData: any;
-  slug: string; course: any; prereqLockedIds: Set<number>;
+  slug: string; course: any; prereqLockedIds: Set<number>; lbl: Record<string, string>;
 }) {
   const topLevelLessons = (data?.topLevelLessons ?? []).filter((l: any) => {
     if (!data?.enrollment) return true;
@@ -534,7 +534,7 @@ function MobileSidebarContent({
         )}
       </div>
       <div className="flex border-t border-gray-200 shrink-0">
-        {([{ key: "lessons", icon: BookOpen, label: "Modules" }, { key: "notes", icon: StickyNote, label: "Notes" }, { key: "bookmarks", icon: Bookmark, label: "Saved" }] as const).map(({ key, icon: Icon, label }) => (
+        {([{ key: "lessons", icon: BookOpen, label: lbl.courseModules }, { key: "notes", icon: StickyNote, label: "Notes" }, { key: "bookmarks", icon: Bookmark, label: "Saved" }]).map(({ key, icon: Icon, label }) => (
           <button key={key} onClick={() => setSidebarTab(key)}
             className={cn("flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[10px] transition-colors",
               sidebarTab === key ? "text-teal-600 border-t-2 border-teal-500 bg-teal-50" : "text-gray-500 hover:text-gray-700")}>
@@ -566,6 +566,7 @@ export default function CoursePlayer() {
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   const [upgradePromptReason, setUpgradePromptReason] = useState<"entry" | "exit" | "locked_lesson">("entry");
   const [instructorPopup, setInstructorPopup] = useState<any>(null);
+  const [contentFullscreen, setContentFullscreen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const utils = trpc.useUtils();
 
@@ -615,6 +616,12 @@ export default function CoursePlayer() {
   });
 
   useEffect(() => { setVideoWatched(false); setRightPanelTab("info"); }, [selectedLessonId]);
+  // Exit fullscreen on Escape key
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape" && contentFullscreen) setContentFullscreen(false); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [contentFullscreen]);
 
   useEffect(() => {
     if (data && !selectedLessonId) {
@@ -794,6 +801,19 @@ export default function CoursePlayer() {
   const primaryBorder = { borderColor: primaryColor };
   const primaryLightBg = { backgroundColor: `${primaryColor}18` };
   const primaryLightText = { color: primaryColor };
+  // ── Custom Labels ─────────────────────────────────────────────────────────────
+  // Parse per-course label overrides; fall back to defaults if not set.
+  const _cl = (() => { try { return course.customLabels ? JSON.parse(course.customLabels) : {}; } catch { return {}; } })();
+  const lbl = {
+    lesson: (_cl.lesson as string) || "Lesson",
+    section: (_cl.section as string) || "Module",
+    courseModules: (_cl.courseModules as string) || "Course Modules",
+    markComplete: (_cl.markComplete as string) || "Mark Complete",
+    completed: (_cl.completed as string) || "Completed",
+    nextLesson: (_cl.nextLesson as string) || "Next Lesson",
+    prevLesson: (_cl.prevLesson as string) || "Prev",
+    submitQuiz: (_cl.submitQuiz as string) || "Submit Quiz",
+  };
   const progress = data.progress ?? [];
   const topLevelLessons: any[] = ((data as any).topLevelLessons ?? []).filter((l: any) => {
     if (!data.enrollment) return true;
@@ -1071,7 +1091,7 @@ export default function CoursePlayer() {
         )}>
           {/* Mobile sidebar close button */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 shrink-0">
-            <h3 className="text-[11px] font-extrabold uppercase tracking-widest" style={primaryText}>Course Modules</h3>
+            <h3 className="text-[11px] font-extrabold uppercase tracking-widest" style={primaryText}>{lbl.courseModules}</h3>
             <button onClick={() => setMobileSidebarOpen(false)} className="text-gray-400 hover:text-gray-700">
               <X className="w-4 h-4" />
             </button>
@@ -1104,6 +1124,7 @@ export default function CoursePlayer() {
             slug={slug!}
             course={course}
             prereqLockedIds={prereqLockedIds}
+            lbl={lbl}
           />
         </aside>
 
@@ -1129,7 +1150,7 @@ export default function CoursePlayer() {
                 >
                   <BookOpen className="w-3 h-3" /> Course Overview
                 </button>
-                <h3 className="text-teal-700 text-[11px] font-extrabold uppercase tracking-widest">Course Modules</h3>
+                <h3 className="text-teal-700 text-[11px] font-extrabold uppercase tracking-widest">{lbl.courseModules}</h3>
               </>
             )}
             {sidebarTab === "notes" && <h3 className="text-[11px] font-extrabold uppercase tracking-widest flex items-center gap-1.5 mt-1" style={primaryText}><StickyNote className="w-3.5 h-3.5" /> My Notes</h3>}
@@ -1312,10 +1333,10 @@ export default function CoursePlayer() {
           {/* Sidebar Footer Tabs */}
           <div className="flex border-t border-gray-200 shrink-0">
             {([
-              { key: "lessons", icon: BookOpen, label: "Modules" },
-              { key: "notes", icon: StickyNote, label: "Notes" },
-              { key: "bookmarks", icon: Bookmark, label: "Saved" },
-            ] as const).map(({ key, icon: Icon, label }) => (
+              { key: "lessons" as const, icon: BookOpen, label: lbl.courseModules },
+              { key: "notes" as const, icon: StickyNote, label: "Notes" },
+              { key: "bookmarks" as const, icon: Bookmark, label: "Saved" },
+            ]).map(({ key, icon: Icon, label }) => (
               <button
                 key={key}
                 onClick={() => setSidebarTab(key)}
@@ -1333,15 +1354,17 @@ export default function CoursePlayer() {
         </aside>
 
         {/* ── Main Content Area ── */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className={cn("flex-1 flex flex-col overflow-hidden", contentFullscreen && "fixed inset-0 z-50 bg-white")}>
           {/* Content Header */}
           <div className="bg-white border-b border-gray-200 px-5 py-2.5 flex items-center gap-3 shrink-0">
-            <button onClick={() => setSidebarOpen(o => !o)} className="text-gray-400 hover:text-gray-700 transition-colors shrink-0">
-              {sidebarOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
-            </button>
+            {!contentFullscreen && (
+              <button onClick={() => setSidebarOpen(o => !o)} className="text-gray-400 hover:text-gray-700 transition-colors shrink-0">
+                {sidebarOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+              </button>
+            )}
             {moduleNum > 0 && (
               <span className="text-xs font-bold uppercase tracking-widest shrink-0" style={primaryText}>
-                Module {String(moduleNum).padStart(2, "0")}
+                {lbl.section} {String(moduleNum).padStart(2, "0")}
               </span>
             )}
             {lessonData && (
@@ -1367,6 +1390,14 @@ export default function CoursePlayer() {
                   <StickyNote className="w-4 h-4" />
                 </button>
               )}
+              {/* ── Fullscreen toggle ── */}
+              <button
+                onClick={() => setContentFullscreen(f => !f)}
+                title={contentFullscreen ? "Exit fullscreen" : "Fullscreen content"}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-teal-600 hover:bg-teal-50 transition-colors"
+              >
+                {contentFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+              </button>
               {/* ── Top Mark Complete button ── */}
               {lessonData && lessonData.type !== "quiz" && !isCompleted && requireManualComplete && (
                 <Button
@@ -1377,22 +1408,22 @@ export default function CoursePlayer() {
                   title={!canMarkComplete ? "Watch the full video first" : undefined}
                 >
                   <CheckCircle className="w-3 h-3" />
-                  {markComplete.isPending ? "Saving..." : "Mark Complete"}
+                  {markComplete.isPending ? "Saving..." : lbl.markComplete}
                 </Button>
               )}
               {lessonData && lessonData.type !== "quiz" && isCompleted && (
                 <div className="flex items-center gap-1 text-teal-700 text-xs font-semibold bg-teal-100 px-3 py-1 rounded-full h-7">
-                  <CheckCircle className="w-3 h-3" /> Completed
+                  <CheckCircle className="w-3 h-3" /> {lbl.completed}
                 </div>
               )}
               {prevLesson && (
                 <Button size="sm" variant="outline" onClick={() => handleLessonSelect(prevLesson.id)} className="text-xs h-7 border-teal-400 text-teal-700 hover:bg-teal-50">
-                  <ChevronLeft className="w-3 h-3 mr-1" /> Prev
+                  <ChevronLeft className="w-3 h-3 mr-1" /> {lbl.prevLesson}
                 </Button>
               )}
               {nextLesson && (
                 <Button size="sm" variant="outline" onClick={() => handleLessonSelect(nextLesson.id)} className="text-xs h-7 border-teal-400 text-teal-700 hover:bg-teal-50">
-                  Next <ChevronRight className="w-3 h-3 ml-1" />
+                  {lbl.lesson} <ChevronRight className="w-3 h-3 ml-1" />
                 </Button>
               )}
             </div>
@@ -1477,6 +1508,7 @@ export default function CoursePlayer() {
                     <QuizRunner
                       lesson={lessonData}
                       courseSlug={slug!}
+                      submitQuizLabel={lbl.submitQuiz}
                       onComplete={() => {
                         fireLessonCompleteEffect();
                         utils.lmsLearner.getCoursePlayer.invalidate({ slug: slug! });
@@ -1510,12 +1542,12 @@ export default function CoursePlayer() {
                     <div className="mt-auto pt-5 pb-4 flex items-center justify-end gap-3 flex-wrap">
                       {nextLesson && (
                         <Button variant="outline" onClick={() => handleLessonSelect(nextLesson.id)} className="border-teal-400 text-teal-700 hover:bg-teal-50 text-sm">
-                          Next Lesson <ChevronRight className="w-4 h-4 ml-1" />
+                          {lbl.nextLesson} <ChevronRight className="w-4 h-4 ml-1" />
                         </Button>
                       )}
                       {isCompleted ? (
                         <div className="flex items-center gap-2 text-teal-700 text-sm font-semibold bg-teal-100 px-4 py-2 rounded-full">
-                          <CheckCircle className="w-4 h-4" /> Completed
+                          <CheckCircle className="w-4 h-4" /> {lbl.completed}
                         </div>
                       ) : requireManualComplete ? (
                         <Button
@@ -1524,7 +1556,7 @@ export default function CoursePlayer() {
                           disabled={markComplete.isPending || !canMarkComplete}
                           title={!canMarkComplete ? "Watch the full video first" : undefined}
                         >
-                          {markComplete.isPending ? "Saving..." : "Mark Complete"}
+                          {markComplete.isPending ? "Saving..." : lbl.markComplete}
                           <CheckCircle className="w-4 h-4 ml-2" />
                         </Button>
                       ) : null}
@@ -1533,7 +1565,7 @@ export default function CoursePlayer() {
                 </div>
 
                 {/* ── Right Panel — "In This Lesson" / Notes ── */}
-                <div className="w-64 shrink-0 border-l border-gray-200 bg-gray-50 hidden lg:flex flex-col">
+                {!contentFullscreen && <div className="w-64 shrink-0 border-l border-gray-200 bg-gray-50 hidden lg:flex flex-col">
                   {/* Right panel tab switcher */}
                   <div className="flex border-b border-gray-200 shrink-0">
                     <button
@@ -1543,7 +1575,7 @@ export default function CoursePlayer() {
                         rightPanelTab === "info" ? "text-teal-600 border-b-2 border-teal-500 bg-white" : "text-gray-500 hover:text-gray-700"
                       )}
                     >
-                      <ListChecks className="w-3.5 h-3.5" /> Lesson Info
+                      <ListChecks className="w-3.5 h-3.5" /> {lbl.lesson} Info
                     </button>
                     <button
                       onClick={() => setRightPanelTab("notes")}
@@ -1573,7 +1605,7 @@ export default function CoursePlayer() {
                   {rightPanelTab === "info" && learningObjectives.length > 0 && (
                     <div>
                       <h3 className="text-xs font-bold text-teal-700 uppercase tracking-widest mb-3 flex items-center gap-2">
-                        <ListChecks className="w-3.5 h-3.5" /> In This Lesson:
+                        <ListChecks className="w-3.5 h-3.5" /> In This {lbl.lesson}:
                       </h3>
                       <div className="space-y-2">
                         {learningObjectives.map((obj: string, i: number) => (
@@ -1589,7 +1621,7 @@ export default function CoursePlayer() {
                   {/* Section lessons checklist */}
                   {rightPanelTab === "info" && currentSection && currentSection.lessons.length > 1 && (
                     <div className="border-t border-gray-200 pt-4">
-                      <h3 className="text-xs font-bold text-teal-700 uppercase tracking-widest mb-3">In This Module:</h3>
+                      <h3 className="text-xs font-bold text-teal-700 uppercase tracking-widest mb-3">In This {lbl.section}:</h3>
                       <div className="space-y-1.5">
                         {currentSection.lessons.map((lesson: any) => {
                           const done = completedIds.has(lesson.id);
@@ -1686,7 +1718,7 @@ export default function CoursePlayer() {
                     );
                   })()}
                   </div>
-                </div>
+                </div>}
               </div>
             ) : (
               <div className="text-center text-gray-500 py-20">

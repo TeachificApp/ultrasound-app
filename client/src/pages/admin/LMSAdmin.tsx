@@ -1209,6 +1209,28 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
   const [showInstructor, setShowInstructor] = useState(course.showInstructor ?? false);
   const [showInLibrary, setShowInLibrary] = useState(course.showInLibrary ?? true);
   const [sendEnrollmentEmail, setSendEnrollmentEmail] = useState(course.sendEnrollmentEmail ?? true);
+  // Custom labels — parse from JSON string stored in DB
+  const initLabels = (() => { try { return course.customLabels ? JSON.parse(course.customLabels) : {}; } catch { return {}; } })();
+  const [labelLesson, setLabelLesson] = useState<string>(initLabels.lesson ?? "");
+  const [labelSection, setLabelSection] = useState<string>(initLabels.section ?? "");
+  const [labelMarkComplete, setLabelMarkComplete] = useState<string>(initLabels.markComplete ?? "");
+  const [labelNextLesson, setLabelNextLesson] = useState<string>(initLabels.nextLesson ?? "");
+  const [labelPrevLesson, setLabelPrevLesson] = useState<string>(initLabels.prevLesson ?? "");
+  const [labelSubmitQuiz, setLabelSubmitQuiz] = useState<string>(initLabels.submitQuiz ?? "");
+  const [labelCourseModules, setLabelCourseModules] = useState<string>(initLabels.courseModules ?? "");
+  const [labelCompleted, setLabelCompleted] = useState<string>(initLabels.completed ?? "");
+  const buildCustomLabels = () => {
+    const obj: Record<string, string> = {};
+    if (labelLesson.trim()) obj.lesson = labelLesson.trim();
+    if (labelSection.trim()) obj.section = labelSection.trim();
+    if (labelMarkComplete.trim()) obj.markComplete = labelMarkComplete.trim();
+    if (labelNextLesson.trim()) obj.nextLesson = labelNextLesson.trim();
+    if (labelPrevLesson.trim()) obj.prevLesson = labelPrevLesson.trim();
+    if (labelSubmitQuiz.trim()) obj.submitQuiz = labelSubmitQuiz.trim();
+    if (labelCourseModules.trim()) obj.courseModules = labelCourseModules.trim();
+    if (labelCompleted.trim()) obj.completed = labelCompleted.trim();
+    return Object.keys(obj).length > 0 ? JSON.stringify(obj) : null;
+  };
   const [coverImageUrl, setCoverImageUrl] = useState(course.coverImageUrl ?? "");
   const [slug, setSlug] = useState(course.slug ?? "");
   const [metaTitle, setMetaTitle] = useState(course.metaTitle ?? "");
@@ -1258,6 +1280,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
             gradientTo: useGradient ? (gradientEnd || null) : null,
             gradientDirection: gradientDirection || null,
             sendEnrollmentEmail,
+            customLabels: buildCustomLabels(),
           })}
         >
           {saving ? "Saving..." : "Save Settings"}
@@ -1620,7 +1643,49 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
           <Switch checked={sendEnrollmentEmail} onCheckedChange={setSendEnrollmentEmail} />
         </div>
       </div>
-
+      {/* Custom Labels */}
+      <div className="border border-gray-200 rounded-lg p-4 space-y-4 bg-gray-50">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+            <span className="text-base">🏷️</span> Custom Text Labels
+          </h3>
+          <p className="text-xs text-gray-400 mt-1">Override default terminology shown to students in the course player and curriculum. Leave blank to use the default.</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <Label className="text-xs text-gray-600">"Lesson" label</Label>
+            <Input value={labelLesson} onChange={e => setLabelLesson(e.target.value)} placeholder="Lesson" className="mt-1 text-sm h-8" />
+          </div>
+          <div>
+            <Label className="text-xs text-gray-600">"Module" / Section label</Label>
+            <Input value={labelSection} onChange={e => setLabelSection(e.target.value)} placeholder="Module" className="mt-1 text-sm h-8" />
+          </div>
+          <div>
+            <Label className="text-xs text-gray-600">"Course Modules" sidebar header</Label>
+            <Input value={labelCourseModules} onChange={e => setLabelCourseModules(e.target.value)} placeholder="Course Modules" className="mt-1 text-sm h-8" />
+          </div>
+          <div>
+            <Label className="text-xs text-gray-600">"Mark Complete" button</Label>
+            <Input value={labelMarkComplete} onChange={e => setLabelMarkComplete(e.target.value)} placeholder="Mark Complete" className="mt-1 text-sm h-8" />
+          </div>
+          <div>
+            <Label className="text-xs text-gray-600">"Completed" badge</Label>
+            <Input value={labelCompleted} onChange={e => setLabelCompleted(e.target.value)} placeholder="Completed" className="mt-1 text-sm h-8" />
+          </div>
+          <div>
+            <Label className="text-xs text-gray-600">"Next Lesson" button</Label>
+            <Input value={labelNextLesson} onChange={e => setLabelNextLesson(e.target.value)} placeholder="Next Lesson" className="mt-1 text-sm h-8" />
+          </div>
+          <div>
+            <Label className="text-xs text-gray-600">"Prev" button</Label>
+            <Input value={labelPrevLesson} onChange={e => setLabelPrevLesson(e.target.value)} placeholder="Prev" className="mt-1 text-sm h-8" />
+          </div>
+          <div>
+            <Label className="text-xs text-gray-600">"Submit Quiz" button</Label>
+            <Input value={labelSubmitQuiz} onChange={e => setLabelSubmitQuiz(e.target.value)} placeholder="Submit Quiz" className="mt-1 text-sm h-8" />
+          </div>
+        </div>
+      </div>
       <Button
         className="bg-teal-600 hover:bg-teal-700 text-white"
         disabled={saving}
@@ -1646,10 +1711,11 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
           coverImageUrl: coverImageUrl.trim() || undefined,
           primaryColor: primaryColor || null,
           accentColor: accentColor || null,
-          gradientFrom: useGradient ? (gradientStart || null) : null,
+                    gradientFrom: useGradient ? (gradientStart || null) : null,
           gradientTo: useGradient ? (gradientEnd || null) : null,
           gradientDirection: gradientDirection || null,
           sendEnrollmentEmail,
+          customLabels: buildCustomLabels(),
         })}
       >
         {saving ? "Saving..." : "Save Settings"}
@@ -1657,7 +1723,6 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
     </div>
   );
 }
-
 // ─── Landing Page Editor ──────────────────────────────────────────────────────
 
 function LandingPageEditor({ courseId, landingPage, courseType, onSave, saving }: { courseId: number; landingPage: any; courseType?: string; onSave: (data: any) => void; saving: boolean }) {
