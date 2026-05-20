@@ -1020,7 +1020,7 @@ function CheckoutFormBlockSettings({
   const [bumpMode, setBumpMode] = useState<"catalog" | "manual">("catalog");
 
   const addFromCatalog = (item: { id: number; type: string; name: string; price: number; imageUrl: string }) => {
-    const next = [...cfProds, { name: item.name, description: "", price: item.price, imageUrl: item.imageUrl, type: item.type, productId: item.id }];
+    const next = [...cfProds, { name: item.name, description: "", price: item.price, catalogPrice: item.price, imageUrl: item.imageUrl, type: item.type, productId: item.id }];
     set("products", next);
   };
 
@@ -1080,9 +1080,21 @@ function CheckoutFormBlockSettings({
             <div className="flex items-center justify-between"><span className="text-xs text-gray-500">Product {i + 1}</span><button onClick={() => set("products", cfProds.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div>
             <DebouncedInput value={p.name} onChange={v => { const next = [...cfProds]; next[i] = { ...next[i], name: v }; set("products", next); }} className="h-7 text-xs" placeholder="Product name" />
             <DebouncedInput value={p.description} onChange={v => { const next = [...cfProds]; next[i] = { ...next[i], description: v }; set("products", next); }} className="h-7 text-xs" placeholder="Description" />
-            <div className="grid grid-cols-2 gap-2">
-              <Input type="number" value={p.price} onChange={e => { const next = [...cfProds]; next[i] = { ...next[i], price: Number(e.target.value) }; set("products", next); }} className="h-7 text-xs" placeholder="Price (cents)" />
-              <select value={p.type} onChange={e => { const next = [...cfProds]; next[i] = { ...next[i], type: e.target.value }; set("products", next); }} className="h-7 text-xs rounded border border-gray-200 px-2"><option value="course">Course</option><option value="download">Download</option><option value="bundle">Bundle</option><option value="quiz">Quiz</option><option value="product">Product</option><option value="external">External (URL)</option></select>
+            <div className="space-y-1">
+              <div className="flex items-center gap-1">
+                <label className="text-xs text-gray-400 w-24 flex-shrink-0">Override Price</label>
+                <div className="relative flex-1">
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">$</span>
+                  <Input type="number" step="0.01" min="0" value={(p.price / 100).toFixed(2)} onChange={e => { const next = [...cfProds]; next[i] = { ...next[i], price: Math.round(parseFloat(e.target.value || "0") * 100) }; set("products", next); }} className="h-7 text-xs pl-5" placeholder="0.00" />
+                </div>
+                {(p as any).catalogPrice && (p as any).catalogPrice !== p.price && (
+                  <span className="text-xs text-gray-400 flex-shrink-0">orig ${((p as any).catalogPrice / 100).toFixed(2)}</span>
+                )}
+              </div>
+              <div className="flex items-center gap-1">
+                <label className="text-xs text-gray-400 w-24 flex-shrink-0">Type</label>
+                <select value={p.type} onChange={e => { const next = [...cfProds]; next[i] = { ...next[i], type: e.target.value }; set("products", next); }} className="h-7 flex-1 text-xs rounded border border-gray-200 px-2"><option value="course">Course</option><option value="download">Download</option><option value="bundle">Bundle</option><option value="quiz">Quiz</option><option value="product">Product</option><option value="external">External (URL)</option></select>
+              </div>
             </div>
             <DebouncedInput value={p.imageUrl} onChange={v => { const next = [...cfProds]; next[i] = { ...next[i], imageUrl: v }; set("products", next); }} className="h-7 text-xs" placeholder="Image URL (optional)" />
             <div className="flex items-center gap-1">
@@ -1668,9 +1680,21 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
                 <div className="flex items-center justify-between"><span className="text-xs text-gray-500">Product {i + 1}</span><button onClick={() => set("products", icProds.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div>
                 <DebouncedInput value={p.name} onChange={v => { const next = [...icProds]; next[i] = { ...next[i], name: v }; set("products", next); }} className="h-7 text-xs" placeholder="Product name" />
                 <DebouncedInput value={p.description} onChange={v => { const next = [...icProds]; next[i] = { ...next[i], description: v }; set("products", next); }} className="h-7 text-xs" placeholder="Description" />
-                <div className="grid grid-cols-2 gap-2">
-                  <div><label className="text-xs text-gray-400">Price (cents)</label><Input type="number" value={p.price} onChange={e => { const next = [...icProds]; next[i] = { ...next[i], price: Number(e.target.value) }; set("products", next); }} className="h-7 text-xs" placeholder="9700 = $97.00" /></div>
-                  <div><label className="text-xs text-gray-400">Type</label><select value={p.type} onChange={e => { const next = [...icProds]; next[i] = { ...next[i], type: e.target.value }; set("products", next); }} className="h-7 w-full text-xs rounded border border-gray-200 px-2"><option value="other">Other / Service</option><option value="course">Course</option><option value="download">Download</option><option value="physical">Physical Product</option><option value="membership">Membership</option></select></div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1">
+                    <label className="text-xs text-gray-400 w-24 flex-shrink-0">Override Price</label>
+                    <div className="relative flex-1">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">$</span>
+                      <Input type="number" step="0.01" min="0" value={(p.price / 100).toFixed(2)} onChange={e => { const next = [...icProds]; next[i] = { ...next[i], price: Math.round(parseFloat(e.target.value || "0") * 100) }; set("products", next); }} className="h-7 text-xs pl-5" placeholder="0.00" />
+                    </div>
+                    {(p as any).catalogPrice && (p as any).catalogPrice !== p.price && (
+                      <span className="text-xs text-gray-400 flex-shrink-0">orig ${((p as any).catalogPrice / 100).toFixed(2)}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <label className="text-xs text-gray-400 w-24 flex-shrink-0">Type</label>
+                    <select value={p.type} onChange={e => { const next = [...icProds]; next[i] = { ...next[i], type: e.target.value }; set("products", next); }} className="h-7 flex-1 text-xs rounded border border-gray-200 px-2"><option value="other">Other / Service</option><option value="course">Course</option><option value="download">Download</option><option value="physical">Physical Product</option><option value="membership">Membership</option></select>
+                  </div>
                 </div>
                 <DebouncedInput value={p.imageUrl} onChange={v => { const next = [...icProds]; next[i] = { ...next[i], imageUrl: v }; set("products", next); }} className="h-7 text-xs" placeholder="Image URL (optional)" />
                 <div className="flex items-center gap-1">
@@ -1752,7 +1776,7 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
                 <p className="text-xs text-gray-400 mb-1">Click to add from catalog:</p>
                 <div className="max-h-36 overflow-y-auto space-y-1">
                   {ecCatalog.map(item => (
-                    <button key={`ec-${item.type}-${item.id}`} onClick={() => set("products", [...ecProds, { name: item.name, description: "", price: item.price, imageUrl: item.imageUrl ?? "", type: item.type }])}
+                    <button key={`ec-${item.type}-${item.id}`} onClick={() => set("products", [...ecProds, { name: item.name, description: "", price: item.price, catalogPrice: item.price, imageUrl: item.imageUrl ?? "", type: item.type, productId: item.id }])}
                       className="w-full text-left flex items-center gap-2 px-2 py-1 rounded hover:bg-teal-50 hover:text-teal-700 text-xs border border-transparent hover:border-teal-200 transition-colors">
                       {item.imageUrl && <img src={item.imageUrl} className="w-6 h-6 rounded object-cover flex-shrink-0" />}
                       <span className="flex-1 truncate">{item.name}</span>
@@ -1768,9 +1792,21 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
                 <div className="flex items-center justify-between"><span className="text-xs text-gray-500">Product {i + 1}</span><button onClick={() => set("products", ecProds.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div>
                 <DebouncedInput value={p.name} onChange={v => { const next = [...ecProds]; next[i] = { ...next[i], name: v }; set("products", next); }} className="h-7 text-xs" placeholder="Product name" />
                 <DebouncedInput value={p.description} onChange={v => { const next = [...ecProds]; next[i] = { ...next[i], description: v }; set("products", next); }} className="h-7 text-xs" placeholder="Description" />
-                <div className="grid grid-cols-2 gap-2">
-                  <div><label className="text-xs text-gray-400">Price (cents)</label><Input type="number" value={p.price} onChange={e => { const next = [...ecProds]; next[i] = { ...next[i], price: Number(e.target.value) }; set("products", next); }} className="h-7 text-xs" placeholder="9700 = $97.00" /></div>
-                  <div><label className="text-xs text-gray-400">Type</label><select value={p.type} onChange={e => { const next = [...ecProds]; next[i] = { ...next[i], type: e.target.value }; set("products", next); }} className="h-7 w-full text-xs rounded border border-gray-200 px-2"><option value="other">Other / Service</option><option value="course">Course</option><option value="download">Download</option><option value="physical">Physical Product</option><option value="subscription">Subscription</option></select></div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1">
+                    <label className="text-xs text-gray-400 w-24 flex-shrink-0">Override Price</label>
+                    <div className="relative flex-1">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">$</span>
+                      <Input type="number" step="0.01" min="0" value={(p.price / 100).toFixed(2)} onChange={e => { const next = [...ecProds]; next[i] = { ...next[i], price: Math.round(parseFloat(e.target.value || "0") * 100) }; set("products", next); }} className="h-7 text-xs pl-5" placeholder="0.00" />
+                    </div>
+                    {(p as any).catalogPrice && (p as any).catalogPrice !== p.price && (
+                      <span className="text-xs text-gray-400 flex-shrink-0">orig ${((p as any).catalogPrice / 100).toFixed(2)}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <label className="text-xs text-gray-400 w-24 flex-shrink-0">Type</label>
+                    <select value={p.type} onChange={e => { const next = [...ecProds]; next[i] = { ...next[i], type: e.target.value }; set("products", next); }} className="h-7 flex-1 text-xs rounded border border-gray-200 px-2"><option value="other">Other / Service</option><option value="course">Course</option><option value="download">Download</option><option value="physical">Physical Product</option><option value="subscription">Subscription</option></select>
+                  </div>
                 </div>
                 <DebouncedInput value={p.imageUrl} onChange={v => { const next = [...ecProds]; next[i] = { ...next[i], imageUrl: v }; set("products", next); }} className="h-7 text-xs" placeholder="Image URL (optional)" />
                 <div className="flex items-center gap-1">
