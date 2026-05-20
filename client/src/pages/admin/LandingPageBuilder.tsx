@@ -1652,7 +1652,7 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
       return <FileDownloadBlockSettings d={d} set={set} uploading={uploading} setUploading={setUploading} uploadMedia={uploadMedia} />;
     }
     case "scorm_embed": {
-      return <ScormEmbedBlockSettings d={d} set={set} />;
+      return <ScormEmbedBlockSettings d={d} set={set} onChange={onChange} />;
     }
      default:
       return <p className="text-xs text-gray-400">No settings for this block type.</p>;
@@ -2230,9 +2230,10 @@ function FileDownloadBlockSettings({ d, set, uploading, setUploading, uploadMedi
 }
 
 // ─── SCORM / HTML Package Block Settings ─────────────────────────────────────
-function ScormEmbedBlockSettings({ d, set }: {
+function ScormEmbedBlockSettings({ d, set, onChange }: {
   d: Record<string, any>;
   set: (key: string, value: any) => void;
+  onChange: (data: Record<string, any>) => void;
 }) {
   const [mediaPage, setMediaPage] = useState(1);
   const [mediaSearch, setMediaSearch] = useState("");
@@ -2307,9 +2308,8 @@ function ScormEmbedBlockSettings({ d, set }: {
                     title={`${asset.title ?? asset.currentVersion?.fileName ?? asset.slug}\n${asset.mediaType ?? ""} · ${asset.slug}`}
                     className="w-full flex items-center gap-2 px-3 py-2 hover:bg-teal-50 text-left transition-colors"
                     onClick={() => {
-                      set("mediaAssetId", asset.id);
-                      set("mediaAssetSlug", asset.slug);
-                      set("mediaAssetTitle", asset.title ?? asset.fileName ?? "");
+                      // Use atomic batch update to avoid re-render race between multiple set() calls
+                      onChange({ ...d, mediaAssetId: asset.id, mediaAssetSlug: asset.slug, mediaAssetTitle: asset.title ?? asset.currentVersion?.fileName ?? asset.slug ?? "" });
                       setShowPicker(false);
                     }}
                   >
