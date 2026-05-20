@@ -12,7 +12,8 @@
  *   - member.allaboutultrasound.com  (future — after Thinkific migration)
  *
  * iHeartEcho subdomain hostnames:
- *   - app.iheartecho.com (production)
+ *   - app.iheartecho.net (production — primary)
+ *   - app.iheartecho.com (legacy — keep detecting so old links still work)
  *   - iheartecho-etvpnuid.manus.space (staging)
  *   - Any hostname containing "iheartecho" (EXCEPT accreditation.iheartecho.com)
  *
@@ -37,13 +38,17 @@ const MEMBERS_HOSTNAMES = [
 ];
 
 const IHEARTECHO_HOSTNAMES = [
-  "app.iheartecho.com",
+  "app.iheartecho.net",   // primary production domain
+  "app.iheartecho.com",   // legacy — keep detecting so old links still work
   "iheartecho-etvpnuid.manus.space",
 ];
 
 const ACCREDITATION_HOSTNAMES = [
   "accreditation.iheartecho.com",
 ];
+
+/** The canonical iHeartEcho app URL — used for all outbound links */
+export const IHEARTECHO_APP_URL = "https://app.iheartecho.net";
 
 export function useSubdomain() {
   const isLearnSubdomain = useMemo(() => isLearnDomain(), []);

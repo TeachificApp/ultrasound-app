@@ -4,7 +4,7 @@
  */
 import { useEffect } from "react";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 const LEARN_DOMAIN = "https://learn.allaboutultrasound.com";
 

@@ -9,7 +9,7 @@
  * If the user is not logged in, navigates without a token (they'll see the login page).
  */
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 const LEARN_DOMAIN = "https://learn.allaboutultrasound.com";
 
