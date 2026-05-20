@@ -2304,6 +2304,7 @@ function ScormEmbedBlockSettings({ d, set }: {
                 {(filteredAssets.length > 0 ? filteredAssets : (mediaData?.assets ?? [])).map((asset: any) => (
                   <button
                     key={asset.id}
+                    title={`${asset.title ?? asset.currentVersion?.fileName ?? asset.slug}\n${asset.mediaType ?? ""} · ${asset.slug}`}
                     className="w-full flex items-center gap-2 px-3 py-2 hover:bg-teal-50 text-left transition-colors"
                     onClick={() => {
                       set("mediaAssetId", asset.id);
