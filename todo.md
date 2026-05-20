@@ -2305,3 +2305,12 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 ## Course Player Enhancements (May 2026)
 - [x] Course-level custom text/labels — admin can override "Lesson", "Module", "Course Modules", "Mark Complete", "Completed", "Next Lesson", "Prev", "Submit Quiz" per course
 - [x] Full-screen content mode in course/quiz player — Maximize button in header hides sidebar/right panel, Escape key exits
+
+## Thinkific Import Improvements (May 2026)
+
+- [x] Fix SCORM/ZIP asset mediaType detection - update ACS Flashcards Sample to scorm type
+- [x] Add Change Type UI in Media Repository asset detail panel
+- [x] Preserve lesson HTML body as text content block (instead of stripping tags)
+- [x] Fix video URL import - use video_url only, not take_url (which requires Thinkific auth)
+- [x] Always create landing page on import - use API data (description, banner image) as fallback when scraping fails
+- [x] Fix landing page description block type (use "text" not "html")

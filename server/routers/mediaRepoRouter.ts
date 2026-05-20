@@ -268,6 +268,7 @@ export const mediaRepoRouter = router({
       description: z.string().max(2000).nullable().optional(),
       tags: z.string().max(500).nullable().optional(),
       access: z.enum(["public", "private"]).optional(),
+      mediaType: z.enum(MEDIA_TYPES).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertPlatformAdmin(ctx);
@@ -288,6 +289,7 @@ export const mediaRepoRouter = router({
       if (input.description !== undefined) updates.description = input.description;
       if (input.tags !== undefined) updates.tags = input.tags;
       if (input.access !== undefined) updates.access = input.access;
+      if (input.mediaType !== undefined) updates.mediaType = input.mediaType;
 
       if (Object.keys(updates).length === 0) return { updated: false };
 

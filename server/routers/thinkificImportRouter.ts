@@ -404,19 +404,78 @@ export const thinkificImportRouter = router({
         });
         const lmsCourseId = (courseResult as unknown as { insertId: number }).insertId;
         log.push(`Created LMS course ID: ${lmsCourseId} (draft)`);
-        // 5b. Create landing page record with scraped blocks (so the page builder is pre-populated)
-        if (salesPageBlocks.length > 0) {
-          await db.insert(lmsLandingPages).values({
-            courseId: lmsCourseId,
-            heroTitle: course.name,
-            heroSubtitle: course.subtitle || undefined,
-            heroImageUrl: course.card_image_url || undefined,
-            ctaText: "Enroll Now",
-            isCustom: true,
-            blocks: JSON.stringify(salesPageBlocks),
+        // 5b. Create landing page record — always create one, using scraped blocks if available
+        // or building a minimal landing page from API data (description, images) as fallback
+        let finalLandingBlocks = salesPageBlocks;
+        if (finalLandingBlocks.length === 0) {
+          // Build a minimal landing page from Thinkific API data
+          const fallbackBlocks: LandingBlock[] = [];
+          // Hero block
+          fallbackBlocks.push({
+            id: uid(),
+            type: "hero",
+            data: {
+              headline: course.name,
+              headline2: "",
+              subheadline: course.subtitle || "",
+              bgType: course.banner_image_url ? "image" : "color",
+              bgColor: "#149096",
+              bgImage: course.banner_image_url || "",
+              textColor: "#ffffff",
+              align: "center",
+              buttons: [{ text: "Enroll Now", color: "#ffffff", textColor: "#149096", link: "", style: "filled" }],
+              showButtons: true,
+            },
           });
-          log.push(`Created landing page with ${salesPageBlocks.length} pre-built blocks`);
+          // Description block from API (preserve HTML if available)
+          if (course.description && course.description.trim().length > 0) {
+            const descHtml = course.description.trim().startsWith("<")
+              ? course.description
+              : `<p>${course.description}</p>`;
+            fallbackBlocks.push({
+              id: uid(),
+              type: "text",
+              data: {
+                html: descHtml,
+                align: "left",
+                bgColor: "#ffffff",
+                textColor: "#1a1a1a",
+              },
+            });
+          }
+          // Curriculum block
+          fallbackBlocks.push({
+            id: uid(),
+            type: "curriculum_auto",
+            data: {
+              headline: "Course Curriculum",
+              headlineColor: "#111827",
+              bgColor: "#ffffff",
+              showLocked: true,
+              sectionBgColor: "#f9fafb",
+              sectionTextColor: "#1f2937",
+              sectionBorderColor: "#e5e7eb",
+              lessonTextColor: "#374151",
+              lessonLockedIconColor: "#d1d5db",
+              lessonPreviewIconColor: "#14b8a6",
+              lessonCountColor: "#9ca3af",
+              iconStyle: "lock",
+              cornerRadius: 12,
+            },
+          });
+          finalLandingBlocks = fallbackBlocks;
+          log.push(`Built fallback landing page from API data: ${finalLandingBlocks.length} blocks`);
         }
+        await db.insert(lmsLandingPages).values({
+          courseId: lmsCourseId,
+          heroTitle: course.name,
+          heroSubtitle: course.subtitle || undefined,
+          heroImageUrl: course.card_image_url || undefined,
+          ctaText: "Enroll Now",
+          isCustom: true,
+          blocks: JSON.stringify(finalLandingBlocks),
+        });
+        log.push(`Created landing page with ${finalLandingBlocks.length} blocks`);
 
         // 6. Fetch chapters and contents
         const chapters = await getChaptersForCourse(input.thinkificCourseId);
@@ -442,16 +501,32 @@ export const thinkificImportRouter = router({
               ? Math.ceil(content.duration_in_seconds / 60)
               : undefined;
 
-            // Build default hero banner block for the lesson
+            // Build content blocks: hero banner + HTML body (if available)
             const heroBannerBlock = buildHeroBannerBlock(content.name);
-            const contentBlocks = JSON.stringify([heroBannerBlock]);
+            const blocks: object[] = [heroBannerBlock];
+            if (content.html_description && content.html_description.trim().length > 0) {
+              blocks.push({
+                id: `text-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                type: "text",
+                data: {
+                  html: content.html_description,
+                  align: "left",
+                  bgColor: "#ffffff",
+                  textColor: "#1a1a1a",
+                },
+              });
+            }
+            const contentBlocks = JSON.stringify(blocks);
+
+            // For video lessons use video_url only (take_url requires Thinkific auth)
+            const embedUrl = content.video_url || undefined;
 
             await db.insert(lmsLessons).values({
               courseId: lmsCourseId,
               sectionId,
               title: content.name,
               type: lessonType,
-              embedUrl: content.video_url || content.take_url || undefined,
+              embedUrl,
               content: content.html_description ? stripHtml(content.html_description) : undefined,
               position: content.position,
               isPreview: content.free_preview,
