@@ -378,12 +378,13 @@ function Router() {
         <Route path="/case-library/:id" component={CaseDetail} />
         <Route path="/soundbytes" component={SoundBytes} />
 
-        {/* ── LMS — Education Library ──────────────────────────────────────────────────── */}
-        <Route path="/education-library" component={EducationLibrary} />
-        <Route path="/collections/:id" component={CollectionDetail} />
-        <Route path="/learn/:slug/player" component={CoursePlayer} />
-        <Route path="/learn/:slug/overview" component={CourseOverview} />
-        <Route path="/learn/:slug" component={CourseLanding} />
+        {/* ── LMS — Education Library ─────────────────────────────────────────────── */}
+        {/* Student-facing LMS routes redirect to learn.allaboutultrasound.com */}
+        <Route path="/education-library">{() => { window.location.replace("https://learn.allaboutultrasound.com/education-library"); return null; }}</Route>
+        <Route path="/collections/:id">{(params: { id: string }) => { window.location.replace(`https://learn.allaboutultrasound.com/collections/${params.id}`); return null; }}</Route>
+        <Route path="/learn/:slug/player">{(params: { slug: string }) => { window.location.replace(`https://learn.allaboutultrasound.com/learn/${params.slug}/player`); return null; }}</Route>
+        <Route path="/learn/:slug/overview">{(params: { slug: string }) => { window.location.replace(`https://learn.allaboutultrasound.com/learn/${params.slug}/overview`); return null; }}</Route>
+        <Route path="/learn/:slug">{(params: { slug: string }) => { window.location.replace(`https://learn.allaboutultrasound.com/learn/${params.slug}`); return null; }}</Route>
           {/* ── Digital Downloads ───────────────────────────────────────────────────────── */}
         <Route path="/my-downloads" component={MyDownloads} />
         <Route path="/downloads/:slug/files" component={DownloadFiles} />
@@ -497,6 +498,8 @@ function LMSRouter() {
 
         {/* Auth pages (needed for login flow) */}
         <Route path="/login" component={Login} />
+        <Route path="/magic-link" component={MagicLinkRequest} />
+        <Route path="/auth/magic" component={MagicLinkCallback} />
         <Route path="/register" component={Register} />
         <Route path="/profile" component={Profile} />
         <Route path="/my-dashboard" component={StudentDashboardPage} />
