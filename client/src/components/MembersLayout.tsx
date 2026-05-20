@@ -19,7 +19,6 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 
 const AAUS_LOGO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp";
-const IHE_LOGO = "/manus-storage/iheartecho-logo_f9d91cd4.webp";
 
 const AAUS_APP_URL = "https://app.allaboutultrasound.com";
 const IHE_APP_URL = "https://app.iheartecho.net";
@@ -46,10 +45,7 @@ export default function MembersLayout({ children }: { children: React.ReactNode 
           {/* Logo + branding */}
           <Link href="/">
             <div className="flex items-center gap-2.5 cursor-pointer select-none shrink-0">
-              <div className="flex items-center -space-x-1.5">
-                <img src={AAUS_LOGO} alt="All About Ultrasound" className="w-8 h-8 rounded-full ring-2 ring-white z-10" />
-                <img src={IHE_LOGO} alt="iHeartEcho" className="w-8 h-8 rounded-full ring-2 ring-white object-contain bg-[#0d1b2a]" />
-              </div>
+              <img src={AAUS_LOGO} alt="All About Ultrasound" className="w-8 h-8 rounded-full" />
               <div className="flex flex-col leading-none">
                 <span className="text-[10px] font-medium text-gray-500">All About Ultrasound™ | iHeartEcho™</span>
                 <span className="text-sm font-bold text-[#189aa1]">Member Hub</span>
@@ -97,7 +93,7 @@ export default function MembersLayout({ children }: { children: React.ReactNode 
                   onClick={() => setAccountOpen(!accountOpen)}
                   className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
                 >
-                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ background: "#179ca3" }}>
                     {(user as any)?.name?.charAt(0)?.toUpperCase() || "U"}
                   </div>
                   <span className="hidden sm:block text-sm text-gray-700 max-w-[120px] truncate">
@@ -122,11 +118,6 @@ export default function MembersLayout({ children }: { children: React.ReactNode 
                       <Link href="/my-dashboard" onClick={() => setAccountOpen(false)}>
                         <div className={`px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer flex items-center gap-2 ${isActive("/my-dashboard") ? "text-teal-700 font-medium" : "text-gray-700"}`}>
                           <LayoutDashboard className="w-3.5 h-3.5 text-teal-600" /> My Dashboard
-                        </div>
-                      </Link>
-                      <Link href="/profile" onClick={() => setAccountOpen(false)}>
-                        <div className={`px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer flex items-center gap-2 ${isActive("/profile") ? "text-teal-700 font-medium" : "text-gray-700"}`}>
-                          <GraduationCap className="w-3.5 h-3.5 text-teal-600" /> My Profile
                         </div>
                       </Link>
                       <Link href="/my-downloads" onClick={() => setAccountOpen(false)}>

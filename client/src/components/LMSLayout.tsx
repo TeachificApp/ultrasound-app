@@ -10,7 +10,7 @@ import { Link, useLocation } from "wouter";
 import {
   LogIn, LogOut, Settings, ChevronDown,
   GraduationCap, FolderOpen, ExternalLink, LayoutDashboard,
-  BookOpen, Download, Menu, X, Home, ShieldCheck, User
+  BookOpen, Download, Menu, X, ShieldCheck
 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -28,10 +28,11 @@ interface NavItem {
   external?: boolean;
 }
 
+const AAUS_SITE_URL = "https://www.allaboutultrasound.com";
+const IHE_SITE_URL = "https://www.iheartecho.com";
+
 const NAV_ITEMS: NavItem[] = [
-  { label: "Home", href: "/", icon: <Home className="w-4 h-4" />, exact: true },
   { label: "Education Library", href: "/education-library", icon: <BookOpen className="w-4 h-4" /> },
-  { label: "Downloads", href: "/downloads", icon: <Download className="w-4 h-4" /> },
 ];
 
 export default function LMSLayout({ children }: { children: React.ReactNode }) {
@@ -81,16 +82,23 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
                 </div>
               </Link>
             ))}
-            {/* My Dashboard → members hub */}
-            {isAuthenticated && (
-              <a
-                href={`${MEMBERS_URL}/my-dashboard`}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-              >
-                <LayoutDashboard className="w-4 h-4" />
-                My Dashboard
-              </a>
-            )}
+            {/* External brand links */}
+            <a
+              href={AAUS_SITE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            >
+              All About Ultrasound™
+            </a>
+            <a
+              href={IHE_SITE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            >
+              iHeartEcho™
+            </a>
           </nav>
 
           {/* Spacer */}
@@ -117,7 +125,7 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
                   onClick={() => { setAccountOpen(!accountOpen); setMobileMenuOpen(false); }}
                   className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
                 >
-                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ background: "#179ca3" }}>
                     {(user as any)?.name?.charAt(0)?.toUpperCase() || "U"}
                   </div>
                   <span className="hidden sm:block text-sm text-gray-700 max-w-[120px] truncate">
@@ -146,14 +154,6 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
                         onClick={() => setAccountOpen(false)}
                       >
                         <LayoutDashboard className="w-3.5 h-3.5 text-teal-600" /> My Dashboard
-                      </a>
-                      {/* My Profile → members hub */}
-                      <a
-                        href={`${MEMBERS_URL}/profile`}
-                        className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                        onClick={() => setAccountOpen(false)}
-                      >
-                        <User className="w-3.5 h-3.5 text-teal-600" /> My Profile
                       </a>
                       <Link href="/my-downloads" onClick={() => setAccountOpen(false)}>
                         <div className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer flex items-center gap-2">
@@ -242,23 +242,24 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
                 </div>
               </Link>
             ))}
-            {isAuthenticated && (
+            <div className="border-t border-gray-100 mt-1 pt-1 flex flex-col gap-1">
               <a
-                href={`${MEMBERS_URL}/my-dashboard`}
-                className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                <LayoutDashboard className="w-4 h-4" />
-                My Dashboard
-              </a>
-            )}
-            <div className="border-t border-gray-100 mt-1 pt-1">
-              <a
-                href={AAUS_APP_URL}
+                href={AAUS_SITE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-gray-100"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                <ExternalLink className="w-4 h-4" /> Main App
+                <ExternalLink className="w-4 h-4" /> All About Ultrasound™
+              </a>
+              <a
+                href={IHE_SITE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-gray-100"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <ExternalLink className="w-4 h-4" /> iHeartEcho™
               </a>
             </div>
           </div>

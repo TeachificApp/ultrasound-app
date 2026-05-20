@@ -2383,3 +2383,16 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] listCampaignsPublic procedure: public endpoint to list campaigns for dropdown
 - [x] Contact data auto-stored on every form submission (funnelLeads table)
 - [x] Email campaign routing: campaignId linked to lead on submission
+
+## Session: May 20, 2026 — Navigation & Profile Cleanup
+- [x] LMSLayout top nav: keep only "Education Library" link; add "All About Ultrasound™" and "iHeartEcho™" external links; remove Downloads and My Dashboard
+- [x] LMSLayout profile dropdown: remove "My Profile" link (→ /profile)
+- [x] LMSLayout profile icon: change from gradient to solid teal (#179ca3)
+- [x] MembersLayout: remove IHE logo (keep AAUS logo only)
+- [x] MembersLayout: remove "My Profile" link (→ /profile) from account dropdown
+- [x] MembersLayout profile icon: change from gradient to solid teal (#179ca3)
+- [x] MembersRouter (App.tsx): /profile route now redirects to /my-dashboard?tab=profile
+- [x] StudentDashboardPage ProfileTab: add Notifications section (daily challenge reminder toggle + timezone selector)
+- [x] StudentDashboardPage ProfileTab: add Content Interests section (ACS, Adult Echo, Pediatric Echo, Fetal Echo, POCUS checkboxes)
+- [x] Layout.tsx (AAUS/IHE main app): "Edit Profile" link updated to members.allaboutultrasound.com/my-dashboard?tab=profile
+- [x] Layout.tsx profile icon: change from gradient to solid teal (#179ca3)

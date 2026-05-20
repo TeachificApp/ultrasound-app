@@ -477,7 +477,8 @@ function MembersRouter() {
       <Suspense fallback={pageFallback}>
         <Switch>
           <Route path="/my-dashboard" component={StudentDashboardPage} />
-          <Route path="/profile" component={Profile} />
+          {/* /profile removed — profile settings are now in /my-dashboard?tab=profile */}
+          <Route path="/profile">{() => { window.location.replace("/my-dashboard?tab=profile"); return null; }}</Route>
           <Route path="/my-downloads" component={MyDownloads} />
           <Route path="/downloads/:slug/files" component={DownloadFiles} />
           <Route path="/downloads/:slug" component={DownloadLanding} />
@@ -562,7 +563,8 @@ function LMSRouter() {
         <Route path="/magic-link" component={MagicLinkRequest} />
         <Route path="/auth/magic" component={MagicLinkCallback} />
         <Route path="/register" component={Register} />
-        <Route path="/profile" component={Profile} />
+        {/* /profile redirects to dashboard profile tab */}
+        <Route path="/profile">{() => { window.location.replace("/my-dashboard?tab=profile"); return null; }}</Route>
         <Route path="/my-dashboard" component={StudentDashboardPage} />
 
         <Route path="/media/:slug/:action" component={MediaRedirect} />

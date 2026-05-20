@@ -402,7 +402,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     />
                   ) : (
                     <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
-                      style={{ background: "linear-gradient(135deg, #189aa1, #4ad9e0)" }}>
+                      style={{ background: "#179ca3" }}>
                       <span className="text-xs font-bold text-white">
                         {(user?.displayName || user?.name || "?").charAt(0).toUpperCase()}
                       </span>
@@ -447,7 +447,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                           />
                         ) : (
                           <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-                            style={{ background: "linear-gradient(135deg, #189aa1, #4ad9e0)" }}>
+                            style={{ background: "#179ca3" }}>
                             <span className="text-base font-bold text-white">
                               {(user?.displayName || user?.name || "?").charAt(0).toUpperCase()}
                             </span>
@@ -505,7 +505,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                           <GraduationCap className="w-3.5 h-3.5 text-[#189aa1]" />
                           My Dashboard
                         </a>
-                        <a href="https://members.allaboutultrasound.com/profile" onClick={() => setAccountOpen(false)}
+                        <a href="https://members.allaboutultrasound.com/my-dashboard?tab=profile" onClick={() => setAccountOpen(false)}
                           className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs md:text-sm text-gray-700 hover:bg-[#f0fbfc] hover:text-[#189aa1] transition-all text-left">
                           <Settings className="w-3.5 h-3.5 text-[#189aa1]" />
                           Edit Profile

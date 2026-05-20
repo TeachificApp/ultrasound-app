@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import {
   User, BookOpen, CreditCard, Award, Camera, Save, Lock, Eye, EyeOff,
   ExternalLink, Download, Play, FileText, Package, AlertCircle, CheckCircle2,
-  Clock, XCircle, RefreshCw, Loader2, ChevronRight, ClipboardCheck, ShoppingCart, BarChart2,
+  Clock, XCircle, RefreshCw, Loader2, ChevronRight, ClipboardCheck, ShoppingCart, BarChart2, Bell,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +31,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import Layout from "@/components/Layout";
+import { isMembersDomain, isLearnDomain } from "@/hooks/useSubdomain";
 
 // ─── Brand config ─────────────────────────────────────────────────────────────
 
@@ -104,7 +105,42 @@ const VALID_TABS: Tab[] = ["profile", "content", "subscriptions", "certificates"
 
 function ProfileTab() {
   const utils = trpc.useUtils();
+  const { user } = useAuth();
   const { data: profile, isLoading } = trpc.dashboard.getProfile.useQuery();
+
+  // ── Notification preferences ──────────────────────────────────────────────
+  const { data: notifPrefs, isLoading: notifLoading } = trpc.quickfire.getNotificationPrefs.useQuery(
+    undefined,
+    { enabled: !!user }
+  );
+  const [notifEnabled, setNotifEnabled] = useState(true);
+  const [notifTimezone, setNotifTimezone] = useState("America/New_York");
+  useEffect(() => {
+    if (notifPrefs) {
+      setNotifEnabled(notifPrefs.quickfireReminder);
+      setNotifTimezone(notifPrefs.timezone ?? "America/New_York");
+    }
+  }, [notifPrefs]);
+  const updateNotifPrefsMutation = trpc.quickfire.updateNotificationPrefs.useMutation({
+    onSuccess: () => toast.success("Notification preferences saved"),
+    onError: () => toast.error("Failed to save preferences"),
+  });
+
+  // ── Interest preferences ──────────────────────────────────────────────────
+  const { data: interestPrefs, isLoading: interestLoading } = trpc.emailCampaign.getInterestPrefs.useQuery(
+    undefined,
+    { enabled: !!user }
+  );
+  const [interests, setInterests] = useState<{ acs: boolean; adultEcho: boolean; pediatricEcho: boolean; fetalEcho: boolean; pocus: boolean }>(
+    { acs: false, adultEcho: false, pediatricEcho: false, fetalEcho: false, pocus: false }
+  );
+  useEffect(() => {
+    if (interestPrefs) setInterests((prev) => ({ ...prev, ...interestPrefs }));
+  }, [interestPrefs]);
+  const updateInterestsMutation = trpc.emailCampaign.updateInterestPrefs.useMutation({
+    onSuccess: () => toast.success("Interests saved"),
+    onError: () => toast.error("Failed to save interests"),
+  });
   const updateProfile = trpc.auth.updateProfile.useMutation({
     onSuccess: () => {
       toast.success("Profile updated successfully.");
@@ -359,6 +395,217 @@ function ProfileTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Notification Preferences */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
+        <div className="px-6 py-4 border-b border-gray-100">
+          <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Notification Preferences</h3>
+          <p className="text-xs text-gray-500 mt-0.5">Control when All About Ultrasound™ sends you email reminders.</p>
+        </div>
+        <div className="p-6 space-y-6">
+          {notifLoading ? (
+            <div className="flex items-center gap-2 text-sm text-gray-400">
+              <RefreshCw className="w-4 h-4 animate-spin" />
+              Loading preferences...
+            </div>
+          ) : (
+            <>
+              {/* Daily Challenge Reminder Toggle */}
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Bell className="w-4 h-4" style={{ color: "#189aa1" }} />
+                    <span className="text-sm font-semibold text-gray-800">Daily Challenge Reminder</span>
+                  </div>
+                  <p className="text-xs text-gray-500 leading-relaxed">
+                    Receive a daily email reminder if you haven't completed your Daily Challenge session.
+                    Includes your current streak so you never lose momentum.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setNotifEnabled((v) => !v)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 mt-0.5 ${
+                    notifEnabled ? "bg-[#189aa1]" : "bg-gray-200"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                      notifEnabled ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+              {/* Timezone Selector */}
+              {notifEnabled && (
+                <div className="flex items-start gap-4 pl-6">
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <Clock className="w-4 h-4 text-gray-400" />
+                    <span className="text-xs font-medium text-gray-700">Your timezone</span>
+                  </div>
+                  <div className="flex-1">
+                    <select
+                      value={notifTimezone}
+                      onChange={(e) => setNotifTimezone(e.target.value)}
+                      className="w-full text-xs border border-gray-200 rounded-md px-2 py-1.5 text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#189aa1] bg-white"
+                    >
+                      <optgroup label="North America">
+                        <option value="America/New_York">Eastern Time (ET) — New York</option>
+                        <option value="America/Chicago">Central Time (CT) — Chicago</option>
+                        <option value="America/Denver">Mountain Time (MT) — Denver</option>
+                        <option value="America/Phoenix">Mountain Time, no DST — Phoenix</option>
+                        <option value="America/Los_Angeles">Pacific Time (PT) — Los Angeles</option>
+                        <option value="America/Anchorage">Alaska Time — Anchorage</option>
+                        <option value="Pacific/Honolulu">Hawaii Time — Honolulu</option>
+                        <option value="America/Toronto">Eastern Time — Toronto</option>
+                        <option value="America/Vancouver">Pacific Time — Vancouver</option>
+                      </optgroup>
+                      <optgroup label="Europe">
+                        <option value="Europe/London">GMT/BST — London</option>
+                        <option value="Europe/Paris">CET/CEST — Paris</option>
+                        <option value="Europe/Berlin">CET/CEST — Berlin</option>
+                        <option value="Europe/Amsterdam">CET/CEST — Amsterdam</option>
+                        <option value="Europe/Stockholm">CET/CEST — Stockholm</option>
+                        <option value="Europe/Helsinki">EET/EEST — Helsinki</option>
+                        <option value="Europe/Athens">EET/EEST — Athens</option>
+                        <option value="Europe/Istanbul">TRT — Istanbul</option>
+                        <option value="Europe/Moscow">MSK — Moscow</option>
+                      </optgroup>
+                      <optgroup label="Asia / Pacific">
+                        <option value="Asia/Dubai">GST — Dubai</option>
+                        <option value="Asia/Karachi">PKT — Karachi</option>
+                        <option value="Asia/Kolkata">IST — India</option>
+                        <option value="Asia/Dhaka">BST — Dhaka</option>
+                        <option value="Asia/Bangkok">ICT — Bangkok</option>
+                        <option value="Asia/Singapore">SGT — Singapore</option>
+                        <option value="Asia/Tokyo">JST — Tokyo</option>
+                        <option value="Asia/Seoul">KST — Seoul</option>
+                        <option value="Asia/Shanghai">CST — Shanghai</option>
+                        <option value="Australia/Sydney">AEST/AEDT — Sydney</option>
+                        <option value="Australia/Melbourne">AEST/AEDT — Melbourne</option>
+                        <option value="Pacific/Auckland">NZST/NZDT — Auckland</option>
+                      </optgroup>
+                      <optgroup label="Middle East / Africa">
+                        <option value="Africa/Cairo">EET — Cairo</option>
+                        <option value="Africa/Johannesburg">SAST — Johannesburg</option>
+                        <option value="Asia/Riyadh">AST — Riyadh</option>
+                        <option value="Asia/Jerusalem">IST/IDT — Jerusalem</option>
+                      </optgroup>
+                      <optgroup label="Latin America">
+                        <option value="America/Sao_Paulo">BRT/BRST — São Paulo</option>
+                        <option value="America/Argentina/Buenos_Aires">ART — Buenos Aires</option>
+                        <option value="America/Mexico_City">CST/CDT — Mexico City</option>
+                        <option value="America/Bogota">COT — Bogotá</option>
+                      </optgroup>
+                    </select>
+                    <p className="text-xs text-gray-400 mt-1">Notifications will be sent at 9:00 AM in your selected timezone.</p>
+                  </div>
+                </div>
+              )}
+              {/* Save Button */}
+              <div className="pt-2 border-t border-gray-100 flex justify-end">
+                <button
+                  onClick={() =>
+                    updateNotifPrefsMutation.mutate({
+                      quickfireReminder: notifEnabled,
+                      reminderTime: "09:00",
+                      timezone: notifTimezone,
+                    })
+                  }
+                  disabled={updateNotifPrefsMutation.isPending}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50"
+                  style={{ background: "#189aa1" }}
+                >
+                  {updateNotifPrefsMutation.isPending ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Save className="w-3.5 h-3.5" />
+                  )}
+                  Save Preferences
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Content Interests */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
+        <div className="px-6 py-4 border-b border-gray-100">
+          <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Content Interests</h3>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Select the clinical areas you are most interested in. This helps us send you relevant updates, resources, and announcements.
+          </p>
+        </div>
+        <div className="p-6 space-y-4">
+          {interestLoading ? (
+            <div className="flex items-center gap-2 text-sm text-gray-400">
+              <RefreshCw className="w-4 h-4 animate-spin" />
+              Loading interests...
+            </div>
+          ) : (
+            <>
+              {([
+                { key: "acs" as const, label: "ACS", description: "Acute care echo, ICU echo, hemodynamic assessment, and critical care applications.", icon: "🫀" },
+                { key: "adultEcho" as const, label: "Adult Echocardiography", description: "TTE, TEE, stress echo, valvular disease, cardiomyopathy, and adult structural heart.", icon: "❤️" },
+                { key: "pediatricEcho" as const, label: "Pediatric Echocardiography", description: "Congenital heart disease, CHD protocols, pediatric measurements, and neonatal echo.", icon: "🧒" },
+                { key: "fetalEcho" as const, label: "Fetal Echocardiography", description: "Fetal cardiac screening, CHD detection, biometry, and fetal hemodynamics.", icon: "🤰" },
+                { key: "pocus" as const, label: "POCUS", description: "Point-of-care ultrasound, eFAST, RUSH, lung POCUS, and bedside cardiac assessment.", icon: "🔍" },
+              ] as const).map(({ key, label, description, icon }) => (
+                <label
+                  key={key}
+                  className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                    interests[key]
+                      ? "border-[#189aa1] bg-[#189aa1]/5"
+                      : "border-gray-100 hover:border-gray-200 bg-gray-50"
+                  }`}
+                >
+                  <div className="mt-0.5">
+                    <div
+                      className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${
+                        interests[key] ? "bg-[#189aa1] border-[#189aa1]" : "border-gray-300 bg-white"
+                      }`}
+                    >
+                      {interests[key] && (
+                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </div>
+                    <input
+                      type="checkbox"
+                      className="sr-only"
+                      checked={interests[key]}
+                      onChange={(e) => setInterests((prev) => ({ ...prev, [key]: e.target.checked }))}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">{icon}</span>
+                      <span className="text-sm font-semibold text-gray-800">{label}</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{description}</p>
+                  </div>
+                </label>
+              ))}
+              <div className="pt-2 border-t border-gray-100 flex justify-end">
+                <button
+                  onClick={() => updateInterestsMutation.mutate(interests)}
+                  disabled={updateInterestsMutation.isPending}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50"
+                  style={{ background: "#189aa1" }}
+                >
+                  {updateInterestsMutation.isPending ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Save className="w-3.5 h-3.5" />
+                  )}
+                  Save Interests
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1059,23 +1306,28 @@ export default function StudentDashboardPage() {
     if (t && VALID_TABS.includes(t) && t !== activeTab) setActiveTab(t);
   }, [search]);
 
+    // On members/learn subdomains the outer router already provides a layout wrapper.
+  // Rendering Layout again would create a double sidebar.
+  const skipLayout = isMembersDomain() || isLearnDomain();
+  const Wrapper = skipLayout
+    ? ({ children }: { children: React.ReactNode }) => <>{children}</>
+    : Layout;
+
   if (loading) {
     return (
-      <Layout>
+      <Wrapper>
         <div className="flex items-center justify-center h-screen">
           <Loader2 className="w-8 h-8 animate-spin text-[#189aa1]" />
         </div>
-      </Layout>
+      </Wrapper>
     );
   }
-
   if (!isAuthenticated) {
     navigate("/login");
     return null;
   }
-
   return (
-    <Layout>
+    <Wrapper>
       <div className="min-h-screen bg-[#f0fbfc]">
         {/* Header */}
         <div className="bg-white border-b border-[#189aa1]/15 px-4 sm:px-8 py-6">
@@ -1115,6 +1367,6 @@ export default function StudentDashboardPage() {
           {activeTab === "certificates"  && <CertificatesTab />}
         </div>
       </div>
-    </Layout>
+    </Wrapper>
   );
 }
