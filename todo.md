@@ -2321,3 +2321,8 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix LessonBlockEditor "Save block as template" — wrap component with BlockTemplateLibraryProvider
 - [x] Fix LessonBlockEditor BlockTemplatesTabContent — use blockType/blockData from schema (not tpl.blocks)
 - [x] Fix SsoRedirect.tsx — use 'loading' instead of non-existent 'isLoading' from useAuth
+
+## LMS Layout & Dashboard Fixes (May 20, 2026)
+- [x] Remove LMS sidebar entirely — learn domain now uses header-only navigation
+- [x] Move LMS Admin and Media Repository links into the profile dropdown (admin-only, shown only to platform_admin/admin)
+- [x] Remove Analytics tab from StudentDashboardPage (My Dashboard) — tabs now: Profile, My Content, Subscriptions, Certificates

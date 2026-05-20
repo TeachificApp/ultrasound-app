@@ -97,8 +97,8 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 // ─── Tab types ────────────────────────────────────────────────────────────────
-type Tab = "profile" | "content" | "subscriptions" | "certificates" | "analytics";
-const VALID_TABS: Tab[] = ["profile", "content", "subscriptions", "certificates", "analytics"];
+type Tab = "profile" | "content" | "subscriptions" | "certificates";
+const VALID_TABS: Tab[] = ["profile", "content", "subscriptions", "certificates"];
 
 // ─── Profile Tab ─────────────────────────────────────────────────────────────
 
@@ -1033,7 +1033,6 @@ const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: "content",       label: "My Content",    icon: BookOpen },
   { key: "subscriptions", label: "Subscriptions", icon: CreditCard },
   { key: "certificates",  label: "Certificates",  icon: Award },
-  { key: "analytics",     label: "Analytics",     icon: BarChart2 },
 ];
 
 export default function StudentDashboardPage() {
@@ -1114,7 +1113,6 @@ export default function StudentDashboardPage() {
           {activeTab === "content"       && <MyContentTab />}
           {activeTab === "subscriptions" && <SubscriptionsTab />}
           {activeTab === "certificates"  && <CertificatesTab />}
-          {activeTab === "analytics"     && <AnalyticsTab />}
         </div>
       </div>
     </Layout>
