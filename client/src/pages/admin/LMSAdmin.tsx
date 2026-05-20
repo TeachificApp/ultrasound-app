@@ -2738,8 +2738,9 @@ function CopyLessonDialog({
   onClose: () => void;
   onCopy: (targetCourseId: number, targetSectionId: number | null) => void;
 }) {
-  const { data: coursesResp1 } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", page: 1, pageSize: 200 });
-  const courses1 = coursesResp1?.courses ?? [];
+  const { data: coursesResp1 } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", type: "all", page: 1, pageSize: 500 });
+  // Filter to only courses and quizzes (exclude downloads), sorted: current course first
+  const courses1 = (coursesResp1?.courses ?? []).filter((c: any) => c.type === "course" || c.type === "quiz").sort((a: any, b: any) => (a.id === currentCourseId ? -1 : b.id === currentCourseId ? 1 : 0));
   const [selectedCourseId, setSelectedCourseId] = useState<number>(currentCourseId);
   const [selectedSectionId, setSelectedSectionId] = useState<number | null>(null);
   const { data: targetCourse } = trpc.lmsAdmin.getCourse.useQuery({ id: selectedCourseId }, { enabled: !!selectedCourseId });
@@ -2760,7 +2761,13 @@ function CopyLessonDialog({
               </SelectTrigger>
               <SelectContent>
                 {(courses1).map((c: any) => (
-                  <SelectItem key={c.id} value={String(c.id)}>{c.title}</SelectItem>
+                  <SelectItem key={c.id} value={String(c.id)}>
+                    <span className="flex items-center gap-2">
+                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${c.type === "quiz" ? "bg-purple-100 text-purple-700" : "bg-teal-100 text-teal-700"}`}>{c.type === "quiz" ? "Quiz" : "Course"}</span>
+                      <span>{c.title}</span>
+                      {c.status !== "public" && <span className="text-xs text-gray-400">({c.status})</span>}
+                    </span>
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -2799,8 +2806,9 @@ function CopyModuleDialog({
   onClose: () => void;
   onCopy: (targetCourseId: number) => void;
 }) {
-  const { data: coursesResp2 } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", page: 1, pageSize: 200 });
-  const courses2 = coursesResp2?.courses ?? [];
+  const { data: coursesResp2 } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", type: "all", page: 1, pageSize: 500 });
+  // Filter to only courses and quizzes (exclude downloads), sorted: current course first
+  const courses2 = (coursesResp2?.courses ?? []).filter((c: any) => c.type === "course" || c.type === "quiz").sort((a: any, b: any) => (a.id === currentCourseId ? -1 : b.id === currentCourseId ? 1 : 0));
   const [selectedCourseId, setSelectedCourseId] = useState<number>(currentCourseId);
 
   return (
@@ -2821,7 +2829,13 @@ function CopyModuleDialog({
               </SelectTrigger>
               <SelectContent>
                 {(courses2).map((c: any) => (
-                  <SelectItem key={c.id} value={String(c.id)}>{c.title}</SelectItem>
+                  <SelectItem key={c.id} value={String(c.id)}>
+                    <span className="flex items-center gap-2">
+                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${c.type === "quiz" ? "bg-purple-100 text-purple-700" : "bg-teal-100 text-teal-700"}`}>{c.type === "quiz" ? "Quiz" : "Course"}</span>
+                      <span>{c.title}</span>
+                      {c.status !== "public" && <span className="text-xs text-gray-400">({c.status})</span>}
+                    </span>
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
