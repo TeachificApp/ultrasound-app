@@ -23,7 +23,7 @@ import LeadCaptureModal from "@/components/LeadCaptureModal";
 // ─── Opt-Out Link Component ─────────────────────────────────────────────────
 
 function OptOutLink({ d }: { d: Record<string, any> }) {
-  const enabled = !!d.optOutEnabled;
+  const enabled = !!d.optOutEnabled || !!d.showOptOut;
   const text = d.optOutText || "No thanks, I don't want this offer";
   const linkType: string = d.optOutLinkType ?? "custom";
 
@@ -42,7 +42,7 @@ function OptOutLink({ d }: { d: Record<string, any> }) {
   let href = "#";
   if (linkType === "course" && courseSlug) href = `/courses/${courseSlug}`;
   else if (linkType === "download" && downloadSlug) href = `/downloads/${downloadSlug}`;
-  else if (linkType === "custom" && d.optOutCustomUrl) href = d.optOutCustomUrl;
+  else if (linkType === "custom" && (d.optOutCustomUrl || d.optOutUrl)) href = d.optOutCustomUrl || d.optOutUrl;
 
   return (
     <div className="mt-4 text-center">
