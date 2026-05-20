@@ -2341,3 +2341,13 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Wire useCrossDomainSso into all four routers (LMS, IHE, AAUS, Accreditation)
 - [x] Add accreditation subscription gate: only active accreditation subscribers broadcast from accreditation domain
 - [x] Fix HemodynamicsLab chunk load error with auto-reload ErrorBoundary
+## Session: May 20, 2026 — Members Hub + Brand Detection + IHE Fixes
+- [x] Create members.allaboutultrasound.com hub (MembersLayout + MembersRouter)
+- [x] Extend cross-domain SSO to 5 domains (add members domain)
+- [x] Redirect My Dashboard/Edit Profile from AAUS/IHE apps to members hub
+- [x] Fix brand detection: send X-App-Hostname header in every tRPC request (main.tsx)
+- [x] Fix brand detection: check X-App-Hostname first in server context (context.ts)
+- [x] Fix IHE footer: show www.iheartecho.com and © iHeartEcho™ on iHeartEcho domain
+- [x] IHE SoundBytes empty state — root cause fixed by brand detection fix
+- [x] IHE member count offset (+3,997) — root cause fixed by brand detection fix
+- [x] IHE Daily Challenge echo categories — root cause fixed by brand detection fix

@@ -348,12 +348,22 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
         {/* Footer */}
         <div className="px-4 py-3 border-t border-white/10">
-          <a href="https://www.allaboutultrasound.com" target="_blank" rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-xs text-[#4ad9e0] hover:text-white transition-colors mb-1">
-            <ExternalLink className="w-3 h-3" />
-            www.allaboutultrasound.com
-          </a>
-          <div className="text-xs text-white/30">© All About Ultrasound™</div>
+          {brandConfig.brand === "iheartecho" ? (
+            <a href="https://www.iheartecho.com" target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-xs text-[#4ad9e0] hover:text-white transition-colors mb-1">
+              <ExternalLink className="w-3 h-3" />
+              www.iheartecho.com
+            </a>
+          ) : (
+            <a href="https://www.allaboutultrasound.com" target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-xs text-[#4ad9e0] hover:text-white transition-colors mb-1">
+              <ExternalLink className="w-3 h-3" />
+              www.allaboutultrasound.com
+            </a>
+          )}
+          <div className="text-xs text-white/30">
+            {brandConfig.brand === "iheartecho" ? "© iHeartEcho™" : "© All About Ultrasound™"}
+          </div>
         </div>
       </aside>
 

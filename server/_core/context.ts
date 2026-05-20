@@ -70,10 +70,12 @@ export async function createContext(
   }
 
   // Behind a reverse proxy (trust proxy=1), req.hostname may return the internal host.
-  // Use X-Forwarded-Host first so brand detection works correctly on production domains
-  // (e.g. app.iheartecho.com vs app.allaboutultrasound.com).
+  // Priority: X-App-Hostname (sent by tRPC client with window.location.hostname — most reliable)
+  //         → X-Forwarded-Host → Host header → req.hostname
+  const appHostname = opts.req.headers["x-app-hostname"];
   const forwardedHost = opts.req.headers["x-forwarded-host"];
-  const hostname = (Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost)
+  const hostname = (Array.isArray(appHostname) ? appHostname[0] : appHostname)
+    || (Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost)
     || opts.req.headers.host
     || opts.req.hostname
     || "";
