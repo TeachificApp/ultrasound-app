@@ -10,7 +10,7 @@ import { Link, useLocation } from "wouter";
 import {
   LogIn, LogOut, Settings, ChevronDown,
   GraduationCap, FolderOpen, ExternalLink, LayoutDashboard,
-  BookOpen, Download, Menu, X, ShieldCheck
+  BookOpen, Menu, X, ShieldCheck
 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -106,15 +106,6 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
 
           {/* Right side */}
           <div className="flex items-center gap-2">
-            {/* Back to main app — desktop only */}
-            <a
-              href={AAUS_APP_URL}
-              className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#189aa1]/30 text-[#189aa1] text-xs font-medium hover:bg-[#189aa1]/5 transition-colors"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              Main App
-            </a>
-
             {isAuthenticated && <NotificationBell />}
 
             {authLoading ? (
@@ -155,23 +146,6 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
                       >
                         <LayoutDashboard className="w-3.5 h-3.5 text-teal-600" /> My Dashboard
                       </a>
-                      <Link href="/my-downloads" onClick={() => setAccountOpen(false)}>
-                        <div className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer flex items-center gap-2">
-                          <Download className="w-3.5 h-3.5 text-teal-600" /> My Downloads
-                        </div>
-                      </Link>
-
-                      {/* Main App link — mobile */}
-                      <div className="lg:hidden border-t border-gray-100 mt-1 pt-1">
-                        <a
-                          href={AAUS_APP_URL}
-                          className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                          onClick={() => setAccountOpen(false)}
-                        >
-                          <ExternalLink className="w-3.5 h-3.5 text-gray-500" /> Main App
-                        </a>
-                      </div>
-
                       {isPlatformAdmin && (
                         <>
                           <div className="border-t border-gray-100 my-1" />

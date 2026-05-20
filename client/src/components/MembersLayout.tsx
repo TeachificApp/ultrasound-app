@@ -12,7 +12,7 @@ import { Link, useLocation } from "wouter";
 import {
   LogIn, LogOut, Settings, ChevronDown,
   FolderOpen, ExternalLink, LayoutDashboard,
-  GraduationCap, Download, ShieldCheck, ArrowLeft
+  GraduationCap, ShieldCheck, ArrowLeft
 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -120,12 +120,6 @@ export default function MembersLayout({ children }: { children: React.ReactNode 
                           <LayoutDashboard className="w-3.5 h-3.5 text-teal-600" /> My Dashboard
                         </div>
                       </Link>
-                      <Link href="/my-downloads" onClick={() => setAccountOpen(false)}>
-                        <div className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer flex items-center gap-2">
-                          <Download className="w-3.5 h-3.5 text-teal-600" /> My Downloads
-                        </div>
-                      </Link>
-
                       {/* App return links — mobile */}
                       <div className="md:hidden border-t border-gray-100 mt-1 pt-1">
                         <a href={AAUS_APP_URL} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2" onClick={() => setAccountOpen(false)}>
