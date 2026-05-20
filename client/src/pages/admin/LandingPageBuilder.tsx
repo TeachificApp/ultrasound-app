@@ -1187,7 +1187,7 @@ function CheckoutFormBlockSettings({
                 <label className="text-xs text-gray-400 w-24 flex-shrink-0">Override Price</label>
                 <div className="relative flex-1">
                   <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">$</span>
-                  <Input type="number" step="0.01" min="0" value={(p.price / 100).toFixed(2)} onChange={e => { const next = [...cfProds]; next[i] = { ...next[i], price: Math.round(parseFloat(e.target.value || "0") * 100) }; set("products", next); }} className="h-7 text-xs pl-5" placeholder="0.00" />
+                  <DebouncedInput type="number" value={(p.price / 100).toFixed(2)} onChange={v => { const next = [...cfProds]; next[i] = { ...next[i], price: Math.round(parseFloat(v || "0") * 100) }; set("products", next); }} className="h-7 text-xs pl-5" placeholder="0.00" />
                 </div>
                 {(p as any).catalogPrice && (p as any).catalogPrice !== p.price && (
                   <span className="text-xs text-gray-400 flex-shrink-0">orig ${((p as any).catalogPrice / 100).toFixed(2)}</span>
@@ -1787,7 +1787,7 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
                     <label className="text-xs text-gray-400 w-24 flex-shrink-0">Override Price</label>
                     <div className="relative flex-1">
                       <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">$</span>
-                      <Input type="number" step="0.01" min="0" value={(p.price / 100).toFixed(2)} onChange={e => { const next = [...icProds]; next[i] = { ...next[i], price: Math.round(parseFloat(e.target.value || "0") * 100) }; set("products", next); }} className="h-7 text-xs pl-5" placeholder="0.00" />
+                      <DebouncedInput type="number" value={(p.price / 100).toFixed(2)} onChange={v => { const next = [...icProds]; next[i] = { ...next[i], price: Math.round(parseFloat(v || "0") * 100) }; set("products", next); }} className="h-7 text-xs pl-5" placeholder="0.00" />
                     </div>
                     {(p as any).catalogPrice && (p as any).catalogPrice !== p.price && (
                       <span className="text-xs text-gray-400 flex-shrink-0">orig ${((p as any).catalogPrice / 100).toFixed(2)}</span>
@@ -1899,7 +1899,7 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
                     <label className="text-xs text-gray-400 w-24 flex-shrink-0">Override Price</label>
                     <div className="relative flex-1">
                       <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">$</span>
-                      <Input type="number" step="0.01" min="0" value={(p.price / 100).toFixed(2)} onChange={e => { const next = [...ecProds]; next[i] = { ...next[i], price: Math.round(parseFloat(e.target.value || "0") * 100) }; set("products", next); }} className="h-7 text-xs pl-5" placeholder="0.00" />
+                      <DebouncedInput type="number" value={(p.price / 100).toFixed(2)} onChange={v => { const next = [...ecProds]; next[i] = { ...next[i], price: Math.round(parseFloat(v || "0") * 100) }; set("products", next); }} className="h-7 text-xs pl-5" placeholder="0.00" />
                     </div>
                     {(p as any).catalogPrice && (p as any).catalogPrice !== p.price && (
                       <span className="text-xs text-gray-400 flex-shrink-0">orig ${((p as any).catalogPrice / 100).toFixed(2)}</span>
