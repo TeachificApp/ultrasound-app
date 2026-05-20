@@ -4076,3 +4076,14 @@ export const lmsArchive = mysqlTable("lms_archive", {
   purgeAt: timestamp("purge_at").notNull(),
 });
 export type LmsArchiveItem = typeof lmsArchive.$inferSelect;
+
+// --- Cross-Domain SSO Tokens ---
+export const ssoTokens = mysqlTable("sso_tokens", {
+  id: int("id").autoincrement().primaryKey(),
+  token: varchar("token", { length: 128 }).notNull().unique(),
+  userId: int("user_id").notNull(),
+  usedAt: timestamp("used_at"),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type SsoToken = typeof ssoTokens.$inferSelect;

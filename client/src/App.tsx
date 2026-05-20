@@ -16,8 +16,10 @@ import { RoleGuard } from "@/components/RoleGuard";
 import LMSLayout from "./components/LMSLayout";
 import { isLearnDomain, isIHeartEchoDomain, isMembersDomain, isAccreditationDomain } from "./hooks/useSubdomain";
 import UpgradePrompt from "./components/UpgradePrompt";
+import { SsoRedirect } from "./components/SsoRedirect";
 import { useAuth } from "./_core/hooks/useAuth";
 import { usePageViewTracker } from "./hooks/useAnalytics";
+import { useSsoConsumer } from "./hooks/useSsoConsumer";
 
 // ── Core pages (eagerly loaded — tiny, always needed) ────────────────────────
 import Home from "./pages/Home";
@@ -380,11 +382,11 @@ function Router() {
 
         {/* ── LMS — Education Library ─────────────────────────────────────────────── */}
         {/* Student-facing LMS routes redirect to learn.allaboutultrasound.com */}
-        <Route path="/education-library">{() => { window.location.replace("https://learn.allaboutultrasound.com/education-library"); return null; }}</Route>
-        <Route path="/collections/:id">{(params: { id: string }) => { window.location.replace(`https://learn.allaboutultrasound.com/collections/${params.id}`); return null; }}</Route>
-        <Route path="/learn/:slug/player">{(params: { slug: string }) => { window.location.replace(`https://learn.allaboutultrasound.com/learn/${params.slug}/player`); return null; }}</Route>
-        <Route path="/learn/:slug/overview">{(params: { slug: string }) => { window.location.replace(`https://learn.allaboutultrasound.com/learn/${params.slug}/overview`); return null; }}</Route>
-        <Route path="/learn/:slug">{(params: { slug: string }) => { window.location.replace(`https://learn.allaboutultrasound.com/learn/${params.slug}`); return null; }}</Route>
+        <Route path="/education-library">{() => <SsoRedirect path="/education-library" />}</Route>
+        <Route path="/collections/:id">{(params: { id: string }) => <SsoRedirect path={`/collections/${params.id}`} />}</Route>
+        <Route path="/learn/:slug/player">{(params: { slug: string }) => <SsoRedirect path={`/learn/${params.slug}/player`} />}</Route>
+        <Route path="/learn/:slug/overview">{(params: { slug: string }) => <SsoRedirect path={`/learn/${params.slug}/overview`} />}</Route>
+        <Route path="/learn/:slug">{(params: { slug: string }) => <SsoRedirect path={`/learn/${params.slug}`} />}</Route>
           {/* ── Digital Downloads ───────────────────────────────────────────────────────── */}
         <Route path="/my-downloads" component={MyDownloads} />
         <Route path="/downloads/:slug/files" component={DownloadFiles} />
@@ -463,6 +465,7 @@ function Router() {
  */
 function LMSRouter() {
   usePageViewTracker();
+  useSsoConsumer(); // Exchange ?sso=TOKEN for a session cookie on arrival from app.
   const pageFallback = (
     <div className="flex items-center justify-center h-screen">
       <div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" />

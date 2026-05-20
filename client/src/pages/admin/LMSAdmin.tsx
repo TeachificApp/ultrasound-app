@@ -49,6 +49,7 @@ import OrderBumpsAdmin from "./OrderBumpsAdmin";
 import LessonBlockEditor from "@/components/LessonBlockEditor";
 import { Block, BlockType, BlockPreview } from "@/components/BlockPreview";
 import { BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, SortableBlock, uid } from "@/pages/admin/LandingPageBuilder";
+import { useLearnLink } from "@/hooks/useLearnLink";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -78,6 +79,20 @@ const LESSON_TYPE_LABELS: Record<string, string> = {
   quiz: "Quiz",
   download: "Download / File",
 };
+
+// ─── SSO-aware link button for course list ───────────────────────────────────
+/** @param slug - either a bare slug ("my-course") or a full path ("my-course/overview") */
+function SsoLearnLinkButton({ slug, label }: { slug: string; label?: string }) {
+  const { openLearnLink } = useLearnLink();
+  const path = slug.startsWith("/") ? slug : `/learn/${slug}`;
+  return (
+    <Button size="sm" variant="ghost" className="h-7 text-xs text-gray-500 hover:bg-gray-50"
+      onClick={() => openLearnLink(path)}
+    >
+      <LinkIcon className="w-3 h-3" />{label && <span className="ml-1">{label}</span>}
+    </Button>
+  );
+}
 
 // ─── Course / Quiz / Download List Tab ──────────────────────────────────────
 
@@ -140,11 +155,7 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
               <Button size="sm" variant="ghost" className="h-7 text-xs text-teal-600 hover:bg-teal-50" onClick={() => onEdit(c.id)}>
                 <Edit2 className="w-3 h-3 mr-1" /> Edit
               </Button>
-              <Link href={`/learn/${c.slug}`} target="_blank">
-                <Button size="sm" variant="ghost" className="h-7 text-xs text-gray-500 hover:bg-gray-50">
-                  <LinkIcon className="w-3 h-3" />
-                </Button>
-              </Link>
+              <SsoLearnLinkButton slug={c.slug} />
               <Button size="sm" variant="ghost" className="h-7 text-xs text-blue-500 hover:bg-blue-50" title="Duplicate" onClick={() => duplicateCourse.mutate({ id: c.id })} disabled={duplicateCourse.isPending}>
                 <Copy className="w-3 h-3" />
               </Button>
@@ -698,6 +709,7 @@ function SortableSectionRow({ section, children, onAddLesson, onDrip, onDelete, 
 
 function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => void }) {
   const [, navigate] = useLocation();
+  const { openLearnLink } = useLearnLink();
   
   const utils = trpc.useUtils();
   const { data: course, isLoading, refetch } = trpc.lmsAdmin.getCourse.useQuery({ id: courseId });
@@ -902,15 +914,15 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
         <Button
           size="sm" variant="outline"
           className="h-8 text-xs text-teal-600 border-teal-300"
-          onClick={() => window.open(`/learn/${course.slug}/player`, '_blank')}
+          onClick={() => openLearnLink(`/learn/${course.slug}/player`)}
         >
           <Eye className="w-3 h-3 mr-1" /> Preview Course
         </Button>
-        <a href={`/learn/${course.slug}/player?preview=student`} target="_blank" rel="noopener noreferrer">
-          <Button size="sm" variant="outline" className="h-8 text-xs text-purple-600 border-purple-300 hover:bg-purple-50">
-            <Users className="w-3 h-3 mr-1" /> Preview as Student
-          </Button>
-        </a>
+        <Button size="sm" variant="outline" className="h-8 text-xs text-purple-600 border-purple-300 hover:bg-purple-50"
+          onClick={() => openLearnLink(`/learn/${course.slug}/player?preview=student`)}
+        >
+          <Users className="w-3 h-3 mr-1" /> Preview as Student
+        </Button>
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
@@ -1037,11 +1049,11 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
             >
               <LinkIcon className="w-3 h-3 mr-1" /> Edit Landing Page (Full Builder)
             </Button>
-            <a href={`/learn/${course.slug}?preview=admin`} target="_blank" rel="noopener noreferrer">
-              <Button size="sm" variant="ghost" className="h-8 text-xs text-gray-500 hover:text-teal-600">
-                <Eye className="w-3 h-3 mr-1" /> Preview Landing Page
-              </Button>
-            </a>
+            <Button size="sm" variant="ghost" className="h-8 text-xs text-gray-500 hover:text-teal-600"
+              onClick={() => openLearnLink(`/learn/${course.slug}?preview=admin`)}
+            >
+              <Eye className="w-3 h-3 mr-1" /> Preview Landing Page
+            </Button>
           </div>
           {visitedTabs.has("landing") ? (
             <LandingPageEditor courseId={courseId} landingPage={course.landingPage} courseType={course.type} onSave={data => updateLandingPage.mutate({ courseId, ...data })} saving={updateLandingPage.isPending} />
@@ -1839,6 +1851,7 @@ function CourseOverviewEditor({
   initialBottomBlocks,
   hideProgress,
   onSaved,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
 }: {
   courseId: number;
   courseSlug: string;
@@ -1957,14 +1970,7 @@ function CourseOverviewEditor({
           <span className="text-gray-400 text-xs">Shown to enrolled students at /learn/{courseSlug}/overview</span>
         </div>
         <div className="flex items-center gap-2">
-          <a
-            href={`/learn/${courseSlug}/overview`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-teal-300 text-teal-700 hover:bg-teal-50 text-xs font-medium transition-colors"
-          >
-            <Eye className="w-3.5 h-3.5" /> Preview Overview
-          </a>
+          <SsoLearnLinkButton slug={`${courseSlug}/overview`} />
           <Button
             size="sm"
             variant="outline"

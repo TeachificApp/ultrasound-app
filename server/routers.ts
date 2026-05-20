@@ -42,6 +42,7 @@ import { dashboardRouter } from "./routers/dashboardRouter";
 import { embeddedCheckoutRouter } from "./routers/embeddedCheckoutRouter";
 import { adminUserRouter } from "./routers/adminUserRouter";
 import { blockTemplatesRouter } from "./routers/blockTemplatesRouter";
+import { ssoRouter } from "./routers/ssoRouter";
 import {
   getUserById,
   getUsersByIds,
@@ -1835,6 +1836,8 @@ export const appRouter = router({
 
   // ─── Email/Password Auth (white-label, no OAuth portal) ──────────────────────
   emailAuth: emailAuthRouter,
+  // ─── Cross-Domain SSO ────────────────────────────────────────────────────────
+  sso: ssoRouter,
 
   // ─── Daily Challenge Engine ───────────────────────────────────────────────────
   quickfire: quickfireRouter,
