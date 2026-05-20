@@ -483,15 +483,41 @@ function MembersRouter() {
           <Route path="/downloads/:slug/files" component={DownloadFiles} />
           <Route path="/downloads/:slug" component={DownloadLanding} />
           <Route path="/downloads" component={DownloadsBrowse} />
-          {/* Admin routes */}
+          {/* Admin routes — comprehensive list so no admin URL falls through to /my-dashboard */}
           <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
+          {/* LMS */}
           <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
+          <Route path="/admin/lms/:courseId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LandingPageBuilder /></RoleGuard>}</Route>
+          {/* Funnels */}
           <Route path="/admin/funnels/:funnelId/pages/:pageId/edit">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><FunnelPageEditor /></Suspense></RoleGuard>}</Route>
           <Route path="/admin/funnels/:funnelId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><FunnelBuilder /></Suspense></RoleGuard>}</Route>
           <Route path="/admin/funnels">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><FunnelBuilder /></Suspense></RoleGuard>}</Route>
-          <Route path="/admin/lms/:courseId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LandingPageBuilder /></RoleGuard>}</Route>
+          {/* Landing builders */}
           <Route path="/admin/downloads/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><DownloadLandingPageBuilder /></RoleGuard>}</Route>
           <Route path="/admin/products/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ProductLandingPageBuilder /></RoleGuard>}</Route>
+          {/* Forms */}
+          <Route path="/admin/general-forms/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><GeneralFormBuilder /></RoleGuard>}</Route>
+          <Route path="/admin/general-forms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><GeneralFormBuilder /></RoleGuard>}</Route>
+          <Route path="/admin/form-builder/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
+          <Route path="/admin/form-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
+          {/* Email */}
+          <Route path="/admin/email">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><EmailAdmin /></RoleGuard>}</Route>
+          {/* DIY Accreditation */}
+          <Route path="/admin/diy-accreditation">{() => <RoleGuard roles={["diy_admin", "platform_admin", "accreditation_manager"]} allowAdmin={true}><DIYAccreditationAdmin /></RoleGuard>}</Route>
+          <Route path="/accreditation-manager">{() => <RoleGuard roles={["platform_admin", "accreditation_manager"]} allowAdmin={true}><AccreditationManager /></RoleGuard>}</Route>
+          {/* Content & tools */}
+          <Route path="/admin/cases">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminCaseManagement /></RoleGuard>}</Route>
+          <Route path="/admin/quickfire">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuickFireAdmin /></RoleGuard>}</Route>
+          <Route path="/admin/scancoach">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ScanCoachEditor /></RoleGuard>}</Route>
+          <Route path="/admin/navigator">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><NavigatorEditor /></RoleGuard>}</Route>
+          <Route path="/admin/soundbytes">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SoundBytesAdmin /></RoleGuard>}</Route>
+          <Route path="/admin/thinkific-webhook">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ThinkificWebhookAdmin /></RoleGuard>}</Route>
+          <Route path="/admin/challenge-cards">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ChallengeCardGenerator /></RoleGuard>}</Route>
+          <Route path="/admin/social-content">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SocialContentGenerator /></RoleGuard>}</Route>
+          <Route path="/admin/engagement">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><EngagementDashboard /></RoleGuard>}</Route>
+          <Route path="/admin/sonoquiz/host/:sessionId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SonoQuizHost /></RoleGuard>}</Route>
+          <Route path="/admin/sonoquiz">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SonoQuizCreator /></RoleGuard>}</Route>
+          {/* Media & users */}
           <Route path="/admin/media-repository">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MediaRepository /></RoleGuard>}</Route>
           <Route path="/admin/contacts">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><ContactsAdmin /></Suspense></RoleGuard>}</Route>
           <Route path="/admin/sharing-monitor">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><SharingMonitor /></Suspense></RoleGuard>}</Route>
