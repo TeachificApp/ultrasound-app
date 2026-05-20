@@ -34,7 +34,7 @@ const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
     tagline: "Echocardiography Clinical Intelligence",
     primaryColor: "#189aa1", // teal brand
     accentColor: "#4ad9e0", // aqua accent
-    domain: "app.iheartecho.com",
+    domain: "app.iheartecho.net",
     logoText: "EchoAssist™",
   },
 };
