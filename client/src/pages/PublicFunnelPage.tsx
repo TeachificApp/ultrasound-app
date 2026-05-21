@@ -276,10 +276,14 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
       return <PricingCtaBlock d={d} funnelId={funnelId} pageId={pageId} funnelSlug={funnelSlug} nextPage={nextPage} />;
     case "cta_standalone":
       return <CtaStandaloneBlock d={d} funnelId={funnelId} pageId={pageId} funnelSlug={funnelSlug} nextPage={nextPage} />;
-    case "lead_capture":
-      return <LeadCaptureBlock data={d} funnelId={funnelId} pageId={pageId} />;
-    case "cta_optin":
-      return <CtaOptinBlock data={d} funnelId={funnelId} pageId={pageId} />;
+    case "lead_capture": {
+      const lcNextUrl = nextPage ? (nextPage.slug.startsWith("/") ? nextPage.slug : `/f/${funnelSlug}/${nextPage.slug}`) : undefined;
+      return <LeadCaptureBlock data={d} funnelId={funnelId} pageId={pageId} nextPageUrl={lcNextUrl} />;
+    }
+    case "cta_optin": {
+      const optinNextUrl = nextPage ? (nextPage.slug.startsWith("/") ? nextPage.slug : `/f/${funnelSlug}/${nextPage.slug}`) : undefined;
+      return <CtaOptinBlock data={d} funnelId={funnelId} pageId={pageId} nextPageUrl={optinNextUrl} />;
+    }
     case "faq":
       return (
         <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
@@ -651,6 +655,9 @@ function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMed
   nextPage?: { slug: string; title: string; pageType: string } | null;
 }) {
   const [lcModal, setLcModal] = useState<{ btn: typeof heroButtons[0] } | null>(null);
+  // Use ref so callbacks always read the latest resolved nextPage, not a stale closure
+  const nextPageRef = useRef(nextPage);
+  nextPageRef.current = nextPage;
 
   const handleBtnClick = (e: React.MouseEvent, btn: typeof heroButtons[0]) => {
     if (btn.leadCapture) {
@@ -661,7 +668,8 @@ function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMed
 
   const getBtnHref = (btn: typeof heroButtons[0]) => {
     const behavior = btn.behavior ?? "url";
-    const nextPageUrl = nextPage ? `/f/${funnelSlug}/${nextPage.slug}` : null;
+    const np = nextPageRef.current;
+    const nextPageUrl = np ? (np.slug.startsWith("/") ? np.slug : `/f/${funnelSlug}/${np.slug}`) : null;
     if (behavior === "send_email" && btn.emailAddress) return `mailto:${btn.emailAddress}`;
     if (behavior === "next_funnel_step" && nextPageUrl) return nextPageUrl;
     return btn.link || nextPageUrl || "#";
@@ -730,14 +738,19 @@ function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMed
 
 function CtaStandaloneBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: Record<string, any>; funnelId: number; pageId: number; funnelSlug: string; nextPage?: { slug: string } | null }) {
   const [lcOpen, setLcOpen] = useState(false);
+  // Use ref so onSuccess always reads the latest resolved nextPage, not a stale closure
+  const nextPageRef = useRef(nextPage);
+  nextPageRef.current = nextPage;
 
-  const behavior = d.ctaBehavior ?? "url";
-  const nextPageUrl = nextPage ? `/f/${funnelSlug}/${nextPage.slug}` : null;
-  const href = behavior === "send_email" && d.ctaEmailAddress
-    ? `mailto:${d.ctaEmailAddress}`
-    : behavior === "next_funnel_step" && nextPageUrl
-    ? nextPageUrl
-    : (d.ctaLink || nextPageUrl || "#");
+  const getHref = () => {
+    const behavior = d.ctaBehavior ?? "url";
+    const np = nextPageRef.current;
+    const nextPageUrl = np ? (np.slug.startsWith("/") ? np.slug : `/f/${funnelSlug}/${np.slug}`) : null;
+    if (behavior === "send_email" && d.ctaEmailAddress) return `mailto:${d.ctaEmailAddress}`;
+    if (behavior === "next_funnel_step" && nextPageUrl) return nextPageUrl;
+    return d.ctaLink || nextPageUrl || "#";
+  };
+
   const btnStyle: React.CSSProperties = (d.btnStyle ?? "filled") === "outline"
     ? { backgroundColor: "transparent", color: d.ctaColor ?? "#179ca3", border: `2px solid ${d.btnBorderColor ?? d.ctaColor ?? "#179ca3"}` }
     : { backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#ffffff", border: `2px solid ${d.btnBorderColor ?? d.ctaColor ?? "#179ca3"}` };
@@ -754,7 +767,7 @@ function CtaStandaloneBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: 
       <div className="max-w-3xl mx-auto">
         <h2 className="text-2xl font-bold mb-3 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />
         {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
-        <a href={href} onClick={handleClick}
+        <a href={getHref()} onClick={handleClick}
           className={`inline-block px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-transform hover:scale-105 cursor-pointer ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
           style={btnStyle}>
           {d.ctaText ?? "Get Started"}
@@ -766,7 +779,7 @@ function CtaStandaloneBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: 
         <LeadCaptureModal
           open={true}
           onClose={() => setLcOpen(false)}
-          onSuccess={() => { window.location.href = href; }}
+          onSuccess={() => { window.location.href = getHref(); }}
           title={d.leadModalTitle || "Get Instant Access"}
           subtext={d.leadModalSubtext}
           tags={d.leadTags}
@@ -782,14 +795,18 @@ function CtaStandaloneBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: 
 
 function PricingCtaBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: Record<string, any>; funnelId: number; pageId: number; funnelSlug: string; nextPage?: { slug: string } | null }) {
   const [lcOpen, setLcOpen] = useState(false);
+  // Use ref so onSuccess always reads the latest resolved nextPage, not a stale closure
+  const nextPageRef = useRef(nextPage);
+  nextPageRef.current = nextPage;
 
-  const behavior = d.ctaBehavior ?? "url";
-  const nextPageUrl = nextPage ? `/f/${funnelSlug}/${nextPage.slug}` : null;
-  const href = behavior === "send_email" && d.ctaEmailAddress
-    ? `mailto:${d.ctaEmailAddress}`
-    : behavior === "next_funnel_step" && nextPageUrl
-    ? nextPageUrl
-    : (d.ctaLink || nextPageUrl || "#");
+  const getHref = () => {
+    const behavior = d.ctaBehavior ?? "url";
+    const np = nextPageRef.current;
+    const nextPageUrl = np ? (np.slug.startsWith("/") ? np.slug : `/f/${funnelSlug}/${np.slug}`) : null;
+    if (behavior === "send_email" && d.ctaEmailAddress) return `mailto:${d.ctaEmailAddress}`;
+    if (behavior === "next_funnel_step" && nextPageUrl) return nextPageUrl;
+    return d.ctaLink || nextPageUrl || "#";
+  };
 
   const handleClick = (e: React.MouseEvent) => {
     if (d.leadCapture) {
@@ -803,7 +820,7 @@ function PricingCtaBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: Rec
       <div className="max-w-2xl mx-auto text-center">
         <h2 className="text-3xl font-bold mb-4 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />
         {d.subtext && <p className="text-lg text-gray-600 mb-8" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
-        <a href={href} onClick={handleClick}
+        <a href={getHref()} onClick={handleClick}
           className={`inline-block px-10 py-4 rounded-xl font-bold text-xl shadow-lg transition-transform hover:scale-105 cursor-pointer ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
           style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#ffffff" }}>
           {d.ctaText ?? "Get Started"}
@@ -815,7 +832,7 @@ function PricingCtaBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: Rec
         <LeadCaptureModal
           open={true}
           onClose={() => setLcOpen(false)}
-          onSuccess={() => { window.location.href = href; }}
+          onSuccess={() => { window.location.href = getHref(); }}
           title={d.leadModalTitle || "Get Instant Access"}
           subtext={d.leadModalSubtext}
           tags={d.leadTags}
