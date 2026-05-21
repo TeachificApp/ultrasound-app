@@ -197,6 +197,7 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
       ],
       orderBumps: [],
       submitText: "Submit",
+      submitIcon: "none",
       successRedirect: "",
       termsText: "I attest that I meet the pre-requisites for this course and I agree to the",
       termsLinkText: "TERMS OF SERVICE",
@@ -218,6 +219,7 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
       ],
       orderBumps: [],
       submitText: "Complete Purchase",
+      submitIcon: "none",
       successRedirect: "",
       successMessage: "Thank you for your purchase! You'll receive a confirmation email shortly.",
       termsText: "",
@@ -245,6 +247,7 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
       termsLinkText: "TERMS OF SERVICE",
       termsLinkUrl: "https://www.allaboutultrasound.com/terms-of-service.html",
       submitText: "Submit",
+      submitIcon: "none",
       successRedirect: "",
     } },
   // ── Layout extras
@@ -554,6 +557,46 @@ function BSColorField({ data, onSet, label, field }: {
     </div>
   );
 }
+
+function BSSelectField({ data, onSet, label, field, options }: {
+  data: Record<string, any>; onSet: (key: string, val: any) => void;
+  label: string; field: string;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <div>
+      <label className="text-xs text-gray-500 block mb-1">{label}</label>
+      <Select value={data[field] ?? "none"} onValueChange={v => onSet(field, v)}>
+        <SelectTrigger className="h-8 text-xs">
+          <SelectValue placeholder="Select..." />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map(o => (
+            <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+const SUBMIT_ICON_OPTIONS = [
+  { value: "none", label: "None" },
+  { value: "lock", label: "🔒 Lock" },
+  { value: "shield", label: "🛡 Shield" },
+  { value: "shopping-cart", label: "🛒 Shopping Cart" },
+  { value: "shopping-bag", label: "🛍 Shopping Bag" },
+  { value: "credit-card", label: "💳 Credit Card" },
+  { value: "zap", label: "⚡ Zap" },
+  { value: "star", label: "⭐ Star" },
+  { value: "heart", label: "❤ Heart" },
+  { value: "gift", label: "🎁 Gift" },
+  { value: "award", label: "🏆 Award" },
+  { value: "arrow-right", label: "→ Arrow Right" },
+  { value: "sparkles", label: "✨ Sparkles" },
+  { value: "rocket", label: "🚀 Rocket" },
+  { value: "badge-check", label: "✅ Badge Check" },
+];
 
 function BSAlignField({ data, onSet, label, field }: {
   data: Record<string, any>; onSet: (key: string, val: any) => void;
@@ -1359,8 +1402,9 @@ function CheckoutFormBlockSettings({
         <BSTextField data={d} onSet={set} label="Terms Link URL" field="termsLinkUrl" placeholder="https://www.allaboutultrasound.com/terms-of-service.html" />
       </div>
       <BSTextField data={d} onSet={set} label="Submit Button Text" field="submitText" placeholder="Submit" />
+      <BSSelectField data={d} onSet={set} label="Submit Button Icon" field="submitIcon" options={SUBMIT_ICON_OPTIONS} />
       <SuccessRedirectPicker value={d.successRedirect ?? ""} onChange={v => set("successRedirect", v)} />
-      {/* Colors */}
+      {/* Colors */
       <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />
       <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
       <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
@@ -1958,8 +2002,9 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
           <AdditionalAccessEditor data={d} onSet={set} catalog={icCatalog} />
           {/* Submit & Redirect */}
           <BSTextField data={d} onSet={set} label="Submit Button Text" field="submitText" placeholder="Submit" />
+          <BSSelectField data={d} onSet={set} label="Submit Button Icon" field="submitIcon" options={SUBMIT_ICON_OPTIONS} />
           <SuccessRedirectPicker value={d.successRedirect ?? ""} onChange={v => set("successRedirect", v)} />
-          {/* Terms */}
+          {/* Terms */
           <div className="grid grid-cols-2 gap-2">
             <BSTextField data={d} onSet={set} label="Terms Text" field="termsText" placeholder="I agree to the" />
             <BSTextField data={d} onSet={set} label="Terms Link Text" field="termsLinkText" placeholder="Terms of Service" />
@@ -2076,6 +2121,7 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
           </div>
           {/* Submit & Redirect */}
           <BSTextField data={d} onSet={set} label="Submit Button Text" field="submitText" placeholder="Complete Purchase" />
+          <BSSelectField data={d} onSet={set} label="Submit Button Icon" field="submitIcon" options={SUBMIT_ICON_OPTIONS} />
           <SuccessRedirectPicker value={d.successRedirect ?? ""} onChange={v => set("successRedirect", v)} />
           <BSTextField data={d} onSet={set} label="Success Message (if no redirect)" field="successMessage" multiline />
           {/* Terms */}

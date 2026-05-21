@@ -10,8 +10,10 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { funnelPurchases } from "../../drizzle/schema";
-import { eq } from "drizzle-orm";
+import { funnelPurchases, lmsEnrollments, brandMemberships, digitalPurchases } from "../../drizzle/schema";
+import { eq, and } from "drizzle-orm";
+import { notifyOwner } from "../_core/notification";
+import { sendEmail, buildFunnelPurchaseConfirmationEmail } from "../_core/email";
 
 const billingAddressSchema = z.object({
   address: z.string(),
@@ -221,5 +223,184 @@ export const embeddedCheckoutRouter = router({
         .where(eq(funnelPurchases.stripePaymentIntentId, input.paymentIntentId));
 
       return { success: true };
+    }),
+
+  /**
+   * Process a free order (total = $0) without Stripe.
+   * Performs the same fulfillment as the Stripe webhook: course enrollment,
+   * download access, brand membership, and additional access items.
+   */
+  processFreeOrder: publicProcedure
+    .input(z.object({
+      email: z.string().email(),
+      firstName: z.string().optional(),
+      lastName: z.string().optional(),
+      phone: z.string().optional(),
+      productName: z.string(),
+      productType: z.enum(["course", "download", "physical", "membership", "bundle", "other"]).default("other"),
+      sourceType: z.enum(["funnel", "landing_page", "product_page", "lms_lesson", "other"]).default("other"),
+      sourceFunnelId: z.number().optional(),
+      sourceFunnelPageId: z.number().optional(),
+      sourceLandingPageId: z.number().optional(),
+      sourceLmsLessonId: z.number().optional(),
+      lmsCourseId: z.number().optional(),
+      fulfillmentBrand: z.enum(["aaus", "iheartecho", "both"]).optional(),
+      productId: z.number().optional(),
+      successRedirect: z.string().optional(),
+      origin: z.string(),
+      additionalAccess: z.array(z.object({
+        type: z.string(),
+        productId: z.number().optional(),
+        brand: z.string().optional(),
+        label: z.string(),
+      })).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      const customerName = [input.firstName, input.lastName].filter(Boolean).join(" ") || undefined;
+      const userId = ctx.user?.id ?? null;
+
+      // Resolve success URL
+      const resolveSuccessUrl = (redirect: string | undefined) => {
+        if (!redirect) return `${input.origin}/?checkout_success=1`;
+        if (redirect === "__dashboard__") return `${input.origin}/my-dashboard?purchase=success`;
+        if (redirect.startsWith("__funnel__:")) return `${input.origin}/f/${redirect.slice(11)}?success=1`;
+        if (redirect.startsWith("http")) return redirect;
+        return `${input.origin}${redirect}`;
+      };
+      const successUrl = resolveSuccessUrl(input.successRedirect);
+
+      // Record the free purchase
+      await db.insert(funnelPurchases).values({
+        userId,
+        email: input.email,
+        name: customerName ?? null,
+        phone: input.phone ?? null,
+        productName: input.productName,
+        productType: input.productType,
+        orderBumps: null,
+        amountPaid: 0,
+        currency: "usd",
+        stripePaymentIntentId: null,
+        sourceType: input.sourceType,
+        sourceFunnelId: input.sourceFunnelId ?? null,
+        sourceFunnelPageId: input.sourceFunnelPageId ?? null,
+        sourceLandingPageId: input.sourceLandingPageId ?? null,
+        sourceLmsLessonId: input.sourceLmsLessonId ?? null,
+        status: "paid",
+      });
+
+      const fulfillmentNotes: string[] = [];
+
+      // ── LMS Course Enrollment ──
+      if (input.lmsCourseId && userId) {
+        const [existing] = await db.select({ id: lmsEnrollments.id }).from(lmsEnrollments)
+          .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, input.lmsCourseId))).limit(1);
+        if (!existing) {
+          await db.insert(lmsEnrollments).values({ userId, courseId: input.lmsCourseId, orderId: null, affiliateCode: null });
+        }
+        fulfillmentNotes.push(`Course enrollment: #${input.lmsCourseId}`);
+      }
+
+      // ── Download Access ──
+      if (input.productId && input.productType === "download" && userId) {
+        const [existing] = await db.select({ id: digitalPurchases.id }).from(digitalPurchases)
+          .where(and(eq(digitalPurchases.userId, userId), eq(digitalPurchases.productId, input.productId))).limit(1);
+        if (!existing) {
+          await db.insert(digitalPurchases).values({ userId, productId: input.productId, stripeCheckoutSessionId: null });
+        }
+        fulfillmentNotes.push(`Download access: #${input.productId}`);
+      }
+
+      // ── Brand Membership ──
+      if (input.fulfillmentBrand && userId) {
+        const brandsToGrant: ("aaus" | "iheartecho")[] =
+          input.fulfillmentBrand === "both" ? ["aaus", "iheartecho"] : [input.fulfillmentBrand];
+        for (const brand of brandsToGrant) {
+          const [existing] = await db.select({ id: brandMemberships.id }).from(brandMemberships)
+            .where(and(eq(brandMemberships.userId, userId), eq(brandMemberships.brand, brand))).limit(1);
+          if (existing) {
+            await db.update(brandMemberships)
+              .set({ tier: "premium", status: "active", source: "free", grantedAt: new Date() })
+              .where(eq(brandMemberships.id, existing.id));
+          } else {
+            await db.insert(brandMemberships).values({
+              userId, brand, tier: "premium", status: "active", source: "free",
+              stripeSubscriptionId: null, stripeCustomerId: null,
+            });
+          }
+        }
+        fulfillmentNotes.push(`Brand access: ${input.fulfillmentBrand}`);
+      }
+
+      // ── Additional Access Items ──
+      if (input.additionalAccess?.length && userId) {
+        for (const item of input.additionalAccess) {
+          try {
+            if (item.type === "course" && item.productId) {
+              const [existing] = await db.select({ id: lmsEnrollments.id }).from(lmsEnrollments)
+                .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, item.productId))).limit(1);
+              if (!existing) {
+                await db.insert(lmsEnrollments).values({ userId, courseId: item.productId, orderId: null, affiliateCode: null });
+              }
+              fulfillmentNotes.push(`Bonus course: ${item.label}`);
+            } else if (item.type === "download" && item.productId) {
+              const [existing] = await db.select({ id: digitalPurchases.id }).from(digitalPurchases)
+                .where(and(eq(digitalPurchases.userId, userId), eq(digitalPurchases.productId, item.productId))).limit(1);
+              if (!existing) {
+                await db.insert(digitalPurchases).values({ userId, productId: item.productId, stripeCheckoutSessionId: null });
+              }
+              fulfillmentNotes.push(`Bonus download: ${item.label}`);
+            } else if (item.type === "membership" && item.brand) {
+              const brandsToGrant: ("aaus" | "iheartecho")[] =
+                item.brand === "both" ? ["aaus", "iheartecho"] : [item.brand as "aaus" | "iheartecho"];
+              for (const brand of brandsToGrant) {
+                const [existing] = await db.select({ id: brandMemberships.id }).from(brandMemberships)
+                  .where(and(eq(brandMemberships.userId, userId), eq(brandMemberships.brand, brand))).limit(1);
+                if (existing) {
+                  await db.update(brandMemberships)
+                    .set({ tier: "premium", status: "active", source: "free", grantedAt: new Date() })
+                    .where(eq(brandMemberships.id, existing.id));
+                } else {
+                  await db.insert(brandMemberships).values({
+                    userId, brand, tier: "premium", status: "active", source: "free",
+                    stripeSubscriptionId: null, stripeCustomerId: null,
+                  });
+                }
+              }
+              fulfillmentNotes.push(`Bonus membership: ${item.label}`);
+            }
+          } catch (itemErr) {
+            console.error(`[FreeOrder] Failed to grant additional access item "${item.label}":`, itemErr);
+          }
+        }
+      }
+
+      // ── Notify owner ──
+      await notifyOwner({
+        title: `🎁 New Free Order — ${input.productName}`,
+        content: `Free order processed.\nProduct: ${input.productName}\nEmail: ${input.email}\nName: ${customerName ?? ""}${fulfillmentNotes.length ? `\nFulfillment: ${fulfillmentNotes.join(", ")}` : ""}`,
+      }).catch(() => {});
+
+      // ── Send confirmation email ──
+      if (input.email) {
+        try {
+          const firstName = customerName ? customerName.split(" ")[0] : "there";
+          const { subject, htmlBody, previewText } = buildFunnelPurchaseConfirmationEmail({
+            firstName,
+            productName: input.productName,
+            amountPaid: 0,
+            loginUrl: successUrl,
+            brandMode: "aaus",
+          });
+          await sendEmail({ to: { name: customerName || firstName, email: input.email }, subject, htmlBody, previewText });
+        } catch (err) {
+          console.error(`[FreeOrder] Failed to send confirmation email:`, err);
+        }
+      }
+
+      return { success: true, successUrl };
     }),
 });

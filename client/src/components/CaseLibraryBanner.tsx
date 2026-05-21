@@ -6,16 +6,18 @@ import { Link } from "wouter";
 import { Plus, BookOpen, LogIn } from "lucide-react";
 import { isIHeartEchoDomain } from "@/hooks/useSubdomain";
 
-const isIHE = isIHeartEchoDomain();
-const BANNER_IMG = isIHE
-  ? "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/ihe-hero-MNscA4NaWNyxrdkewtLGLG.webp"
-  : "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/caselibrary-banner-final_AAUS_4bee1eff.webp";
+const AAUS_BANNER_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/caselibrary-banner-final_AAUS_4bee1eff.webp";
+const IHE_BANNER_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/ihe-hero-MNscA4NaWNyxrdkewtLGLG.webp";
 
 interface CaseLibraryBannerProps {
   isAuthenticated: boolean;
 }
 
 export default function CaseLibraryBanner({ isAuthenticated }: CaseLibraryBannerProps) {
+  // Evaluate at render time so it reflects the actual hostname (not module-load hostname)
+  const isIHE = isIHeartEchoDomain();
+  const BANNER_IMG = isIHE ? IHE_BANNER_IMG : AAUS_BANNER_IMG;
+
   return (
     <div
       className="relative overflow-hidden"

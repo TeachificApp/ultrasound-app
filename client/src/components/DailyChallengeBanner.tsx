@@ -7,8 +7,6 @@ import { isIHeartEchoDomain } from "@/hooks/useSubdomain";
 
 const AAUS_BANNER_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/daily-challenge-banner-v3_AAUS_ccb55bf0.webp";
 const IHE_BANNER_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/ihe-hero-MNscA4NaWNyxrdkewtLGLG.webp";
-const isIHE = isIHeartEchoDomain();
-const BANNER_IMG = isIHE ? IHE_BANNER_IMG : AAUS_BANNER_IMG;
 
 interface DailyChallengeBannerProps {
   streak?: number;
@@ -23,6 +21,10 @@ export default function DailyChallengeBanner({
   onStartChallenge,
   onViewArchive,
 }: DailyChallengeBannerProps) {
+  // Evaluate at render time (not module load) so it reflects the actual hostname
+  const isIHE = isIHeartEchoDomain();
+  const BANNER_IMG = isIHE ? IHE_BANNER_IMG : AAUS_BANNER_IMG;
+
   return (
     <div
       className="relative overflow-hidden"

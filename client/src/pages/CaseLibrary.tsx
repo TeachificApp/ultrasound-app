@@ -51,7 +51,6 @@ import { formatDistanceToNow } from "date-fns";
 import { formatViewCount, getDisplayViewCount } from "@/lib/caseViewCount";
 import CaseLibraryBanner from "@/components/CaseLibraryBanner";
 import { isIHeartEchoDomain } from "@/hooks/useSubdomain";
-const isIHE = isIHeartEchoDomain();
 
 const MODALITY_COLORS: Record<string, string> = {
   // AAUS modalities
@@ -96,12 +95,14 @@ const STATUS_ICONS: Record<string, React.ElementType> = {
 const AAUS_MODALITIES = ["All", "Abdominal", "Vascular", "OB/Gyn", "MSK", "POCUS", "Thyroid", "Breast", "Renal", "Fetal Echo", "Other"];
 // iHeartEcho modality values must match actual DB values in echoLibraryCases.modality
 const IHE_MODALITIES = ["All", "TTE", "TEE", "Stress", "Pediatric", "HOCM", "ICE", "Fetal", "Other"];
-const MODALITIES = isIHE ? IHE_MODALITIES : AAUS_MODALITIES;
 const DIFFICULTIES = ["All", "beginner", "intermediate", "advanced"];
 
 type TabType = "browse" | "mySubmissions";
 
 export default function CaseLibrary() {
+  // Evaluate at render time so it reflects the actual hostname (not module-load hostname)
+  const isIHE = isIHeartEchoDomain();
+  const MODALITIES = isIHE ? IHE_MODALITIES : AAUS_MODALITIES;
   const { isAuthenticated, loading: authLoading } = useAuth();
   const [, navigate] = useLocation();
   const [showRegisterModal, setShowRegisterModal] = useState(false);

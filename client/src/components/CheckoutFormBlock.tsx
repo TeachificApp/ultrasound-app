@@ -15,7 +15,32 @@ import {
 } from "@stripe/react-stripe-js";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Loader2, Lock, ShoppingCart, CheckCircle2 } from "lucide-react";
+import {
+  Loader2, Lock, ShoppingCart, CheckCircle2,
+  Shield, Zap, Star, Heart, Gift, Award, ArrowRight,
+  Sparkles, Rocket, BadgeCheck, ShoppingBag, CreditCard,
+} from "lucide-react";
+
+// ─── Submit icon renderer ────────────────────────────────────────────────────
+function renderSubmitIcon(icon: string | undefined, size: number) {
+  const s = icon ?? "none";
+  if (s === "none") return null;
+  if (s === "lock") return <Lock size={size} />;
+  if (s === "shield") return <Shield size={size} />;
+  if (s === "shopping-cart") return <ShoppingCart size={size} />;
+  if (s === "shopping-bag") return <ShoppingBag size={size} />;
+  if (s === "zap") return <Zap size={size} />;
+  if (s === "star") return <Star size={size} />;
+  if (s === "heart") return <Heart size={size} />;
+  if (s === "gift") return <Gift size={size} />;
+  if (s === "award") return <Award size={size} />;
+  if (s === "arrow-right") return <ArrowRight size={size} />;
+  if (s === "sparkles") return <Sparkles size={size} />;
+  if (s === "rocket") return <Rocket size={size} />;
+  if (s === "badge-check") return <BadgeCheck size={size} />;
+  if (s === "credit-card") return <CreditCard size={size} />;
+  return null;
+}
 
 // Load Stripe outside of component to avoid re-creating on every render
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "");
@@ -60,6 +85,7 @@ interface CheckoutFormData {
   termsLinkText: string;
   termsLinkUrl: string;
   submitText: string;
+  submitIcon?: "none" | "lock" | "shield" | "shopping-cart" | "shopping-bag" | "zap" | "star" | "heart" | "gift" | "award" | "arrow-right" | "sparkles" | "rocket" | "badge-check" | "credit-card";
   successRedirect: string;
 }
 
@@ -130,6 +156,10 @@ function CheckoutFormInner({ data, funnelId, pageId, funnelSlug }: CheckoutFormB
     onError: (e: any) => toast.error(e.message || "Checkout failed"),
   });
 
+  const processFreeOrder = trpc.embeddedCheckout.processFreeOrder.useMutation({
+    onError: (e: any) => toast.error(e.message || "Failed to process order"),
+  });
+
   const handleProceedToPayment = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -139,6 +169,38 @@ function CheckoutFormInner({ data, funnelId, pageId, funnelSlug }: CheckoutFormB
     }
     if (!email) {
       toast.error("Please enter your email address");
+      return;
+    }
+
+    // ── Free order: skip Stripe entirely ──
+    if (totalPrice === 0) {
+      setIsCreatingIntent(true);
+      try {
+        const selectedProduct = products[selectedProductIdx];
+        const result = await processFreeOrder.mutateAsync({
+          email,
+          firstName: firstName || undefined,
+          lastName:  lastName  || undefined,
+          phone:     phone     || undefined,
+          productName:  selectedProduct?.name ?? "Free Product",
+          productType:  (selectedProduct?.type as any) ?? "other",
+          productId:    (selectedProduct as any)?.productId ?? undefined,
+          sourceType: "funnel",
+          sourceFunnelId: funnelId,
+          sourceFunnelPageId: pageId,
+          successRedirect: d.successRedirect,
+          origin: window.location.origin,
+          lmsCourseId: (d as any).lmsCourseId,
+          fulfillmentBrand: (d as any).fulfillmentBrand,
+          additionalAccess: (d as any).additionalAccess ?? undefined,
+        });
+        setSuccessUrl(result.successUrl);
+        setPaymentSuccess(true);
+      } catch {
+        // Error handled by mutation onError
+      } finally {
+        setIsCreatingIntent(false);
+      }
       return;
     }
 
@@ -202,7 +264,6 @@ function CheckoutFormInner({ data, funnelId, pageId, funnelSlug }: CheckoutFormB
           className="rounded-lg px-6 py-4 mb-6 text-center text-white font-bold text-lg flex items-center justify-center gap-2"
           style={{ backgroundColor: accent }}
         >
-          <Lock size={18} />
           <span>Complete Your Payment — ${(totalPrice / 100).toFixed(2)}</span>
         </div>
 
@@ -246,6 +307,7 @@ function CheckoutFormInner({ data, funnelId, pageId, funnelSlug }: CheckoutFormB
           <PaymentStep
             accent={accent}
             submitText={d.submitText ?? "Pay Now"}
+            submitIcon={d.submitIcon}
             successUrl={successUrl}
             onSuccess={() => setPaymentSuccess(true)}
           />
@@ -533,7 +595,12 @@ function CheckoutFormInner({ data, funnelId, pageId, funnelSlug }: CheckoutFormB
         style={{ backgroundColor: accent }}
       >
         {isCreatingIntent && <Loader2 size={20} className="animate-spin" />}
-        {isCreatingIntent ? "Preparing Payment..." : `Proceed to Payment — $${(totalPrice / 100).toFixed(2)}`}
+        {isCreatingIntent
+          ? (totalPrice === 0 ? "Processing..." : "Preparing Payment...")
+          : totalPrice === 0
+            ? (d.submitText || "Complete Order")
+            : `Proceed to Payment — $${(totalPrice / 100).toFixed(2)}`
+        }
       </button>
     </form>
   );
@@ -544,11 +611,13 @@ function CheckoutFormInner({ data, funnelId, pageId, funnelSlug }: CheckoutFormB
 function PaymentStep({
   accent,
   submitText,
+  submitIcon,
   successUrl,
   onSuccess,
 }: {
   accent: string;
   submitText: string;
+  submitIcon?: string;
   successUrl: string | null;
   onSuccess: () => void;
 }) {
@@ -612,6 +681,7 @@ function PaymentStep({
         style={{ backgroundColor: accent }}
       >
         {isProcessing && <Loader2 size={20} className="animate-spin" />}
+        {!isProcessing && renderSubmitIcon(submitIcon, 20)}
         {isProcessing ? "Processing..." : submitText}
       </button>
 

@@ -18,34 +18,34 @@ import { isCombinedBrandingDomain, isIHeartEchoDomain } from "@/hooks/useSubdoma
 
 const LOGO = import.meta.env.VITE_APP_LOGO as string;
 const IHE_LOGO = "/manus-storage/iheartecho-logo_f9d91cd4.webp";
-const isCombined = isCombinedBrandingDomain();
-const isIHE = isIHeartEchoDomain();
-const BRAND_NAME = isIHE
-  ? "iHeartEcho™"
-  : isCombined
-  ? "All About Ultrasound™ | iHeartEcho™"
-  : "All About Ultrasound™";
-const BRAND_SUBTITLE = isIHE
-  ? "EchoAssist™ Clinical Intelligence"
-  : isCombined
-  ? "General, Vascular & Cardiac Ultrasound Clinical Intelligence"
-  : "UltrasoundAssist™ Clinical Intelligence";
-
-const FEATURES = isIHE
-  ? [
-    { icon: Stethoscope, title: "EchoNavigators™", desc: "Adult TTE, TEE, Pediatric, Fetal Echo, Structural Heart & more" },
-    { icon: Activity, title: "EchoAssist™ Calculators", desc: "Guideline-based echo interpretation across all modalities" },
-    { icon: BookOpen, title: "Echo Case Library", desc: "Image, video, and scenario-based echocardiography cases" },
-    { icon: Shield, title: "ScanCoach™ & Reference Values", desc: "Protocol guidance, guideline-based normal echo values" },
-  ]
-  : [
-    { icon: Stethoscope, title: "Clinical Navigators", desc: "Abdomen, Pelvic/Gyn, OB, Vascular, POCUS & more" },
-    { icon: Activity, title: "Ultrasound-Assist™ Calculators", desc: "Guideline-based interpretation across all modalities" },
-    { icon: BookOpen, title: "CME & Registry Review", desc: "Accredited courses, registry prep, 500+ ultrasound cases" },
-    { icon: Shield, title: "ScanCoach™ & Reference Values", desc: "Protocol guidance, guideline-based normal values and reference ranges" },
-  ];
 
 export default function Login() {
+  // Evaluate at render time so these reflect the actual hostname (not module-load hostname)
+  const isCombined = isCombinedBrandingDomain();
+  const isIHE = isIHeartEchoDomain();
+  const BRAND_NAME = isIHE
+    ? "iHeartEcho™"
+    : isCombined
+    ? "All About Ultrasound™ | iHeartEcho™"
+    : "All About Ultrasound™";
+  const BRAND_SUBTITLE = isIHE
+    ? "EchoAssist™ Clinical Intelligence"
+    : isCombined
+    ? "General, Vascular & Cardiac Ultrasound Clinical Intelligence"
+    : "UltrasoundAssist™ Clinical Intelligence";
+  const FEATURES = isIHE
+    ? [
+      { icon: Stethoscope, title: "EchoNavigators™", desc: "Adult TTE, TEE, Pediatric, Fetal Echo, Structural Heart & more" },
+      { icon: Activity, title: "EchoAssist™ Calculators", desc: "Guideline-based echo interpretation across all modalities" },
+      { icon: BookOpen, title: "Echo Case Library", desc: "Image, video, and scenario-based echocardiography cases" },
+      { icon: Shield, title: "ScanCoach™ & Reference Values", desc: "Protocol guidance, guideline-based normal echo values" },
+    ]
+    : [
+      { icon: Stethoscope, title: "Clinical Navigators", desc: "Abdomen, Pelvic/Gyn, OB, Vascular, POCUS & more" },
+      { icon: Activity, title: "Ultrasound-Assist™ Calculators", desc: "Guideline-based interpretation across all modalities" },
+      { icon: BookOpen, title: "CME & Registry Review", desc: "Accredited courses, registry prep, 500+ ultrasound cases" },
+      { icon: Shield, title: "ScanCoach™ & Reference Values", desc: "Protocol guidance, guideline-based normal values and reference ranges" },
+    ];
   const { isAuthenticated, loading } = useAuth();
   const [, navigate] = useLocation();
 

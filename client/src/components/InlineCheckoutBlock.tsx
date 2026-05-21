@@ -24,7 +24,8 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import {
   Lock, CheckCircle2, Plus, Minus, ChevronDown, ChevronUp,
-  ShoppingCart, Loader2, CreditCard
+  ShoppingCart, Loader2, CreditCard, Shield, Zap, Star, Heart,
+  Gift, Award, ArrowRight, Sparkles, Rocket, BadgeCheck, ShoppingBag
 } from "lucide-react";
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "");
@@ -84,6 +85,7 @@ export interface InlineCheckoutBlockData {
   termsLinkUrl?: string;
   // Submit
   submitText?: string;
+  submitIcon?: "none" | "lock" | "shield" | "shopping-cart" | "shopping-bag" | "zap" | "star" | "heart" | "gift" | "award" | "arrow-right" | "sparkles" | "rocket" | "badge-check" | "credit-card";
   successRedirect?: string;
   // Source context
   sourceType?: "funnel" | "landing_page" | "product_page" | "lms_lesson" | "other";
@@ -94,6 +96,27 @@ export interface InlineCheckoutBlockData {
   // Legacy single-item fulfillment fields (deprecated — use additionalAccess)
   lmsCourseId?: number;
   fulfillmentBrand?: "aaus" | "iheartecho" | "both";
+}
+
+// ─── Submit icon renderer ────────────────────────────────────────────────────
+function renderSubmitIcon(icon: string | undefined, size: number) {
+  const s = icon ?? "none";
+  if (s === "none") return null;
+  if (s === "lock") return <Lock size={size} />;
+  if (s === "shield") return <Shield size={size} />;
+  if (s === "shopping-cart") return <ShoppingCart size={size} />;
+  if (s === "shopping-bag") return <ShoppingBag size={size} />;
+  if (s === "zap") return <Zap size={size} />;
+  if (s === "star") return <Star size={size} />;
+  if (s === "heart") return <Heart size={size} />;
+  if (s === "gift") return <Gift size={size} />;
+  if (s === "award") return <Award size={size} />;
+  if (s === "arrow-right") return <ArrowRight size={size} />;
+  if (s === "sparkles") return <Sparkles size={size} />;
+  if (s === "rocket") return <Rocket size={size} />;
+  if (s === "badge-check") return <BadgeCheck size={size} />;
+  if (s === "credit-card") return <CreditCard size={size} />;
+  return null;
 }
 
 // ─── CSS animation classes (defined in index.css) ─────────────────────────────
@@ -174,6 +197,9 @@ function InlineCheckoutInner({ data, onSuccess }: InnerFormProps) {
     onError: (e) => toast.error(e.message || "Failed to initialize payment"),
   });
   const confirmPayment = trpc.embeddedCheckout.confirmPayment.useMutation();
+  const processFreeOrder = trpc.embeddedCheckout.processFreeOrder.useMutation({
+    onError: (e) => toast.error(e.message || "Failed to process order"),
+  });
 
   const selectedProduct = products[selectedIdx];
 
@@ -212,6 +238,35 @@ function InlineCheckoutInner({ data, onSuccess }: InnerFormProps) {
 
     setSubmitting(true);
     setCardError(null);
+
+    // ── Free order: skip Stripe entirely ──
+    if (totalCents === 0) {
+      try {
+        const result = await processFreeOrder.mutateAsync({
+          email,
+          firstName: firstName || undefined,
+          lastName:  lastName  || undefined,
+          phone:     phone     || undefined,
+          productName:  selectedProduct.name,
+          productType:  (selectedProduct.type as any) ?? "other",
+          productId:    (selectedProduct as any).productId ?? undefined,
+          sourceType: data.sourceType ?? "other",
+          sourceFunnelId:      data.sourceFunnelId,
+          sourceLandingPageId: data.sourceLandingPageId,
+          successRedirect: data.successRedirect,
+          origin: window.location.origin,
+          lmsCourseId: data.lmsCourseId,
+          fulfillmentBrand: data.fulfillmentBrand,
+          additionalAccess: (data as any).additionalAccess ?? undefined,
+        });
+        onSuccess(result.successUrl);
+      } catch (_) {
+        // error handled by onError above
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
 
     try {
       // 1. Create PaymentIntent on server
@@ -306,7 +361,6 @@ function InlineCheckoutInner({ data, onSuccess }: InnerFormProps) {
           style={{ backgroundColor: accent }}
         >
           <div className="flex items-center gap-2">
-            <Lock size={18} />
             <span>{data.headerText}</span>
           </div>
           {data.headerPrice && (
@@ -477,7 +531,7 @@ function InlineCheckoutInner({ data, onSuccess }: InnerFormProps) {
           )}
 
           {/* ── Payment Information ─────────────────────────────────────── */}
-          <fieldset className="border border-gray-200 rounded-lg p-4 space-y-3">
+          {totalCents > 0 && <fieldset className="border border-gray-200 rounded-lg p-4 space-y-3">
             <legend className="text-[10px] font-bold tracking-widest text-gray-500 uppercase px-1">
               Payment Information
             </legend>
@@ -502,7 +556,7 @@ function InlineCheckoutInner({ data, onSuccess }: InnerFormProps) {
             {cardError && (
               <p className="text-xs text-red-500 mt-1">{cardError}</p>
             )}
-          </fieldset>
+          </fieldset>}
 
           {/* ── Order Bumps ─────────────────────────────────────────────── */}
           {orderBumps.length > 0 && (
@@ -660,7 +714,7 @@ function InlineCheckoutInner({ data, onSuccess }: InnerFormProps) {
             {submitting ? (
               <><Loader2 size={18} className="animate-spin" /> Processing…</>
             ) : (
-              <><Lock size={16} /> {data.submitText || "Submit"}</>
+              <>{renderSubmitIcon(data.submitIcon, 16)}{renderSubmitIcon(data.submitIcon, 16) ? " " : ""}{data.submitText || "Submit"}</>
             )}
           </button>
 

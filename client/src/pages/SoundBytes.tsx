@@ -20,12 +20,6 @@ import { CATEGORY_LABELS, CATEGORY_COLORS, THINKIFIC_LINKS } from "@shared/appCo
 import Layout from "@/components/Layout";
 import { trpc } from "@/lib/trpc";
 
-const isIHE = isIHeartEchoDomain();
-
-const BANNER_IMG = isIHE
-  ? "/manus-storage/soundbytes-ihe-banner_94f6a87a.webp"
-  : "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/soundbytes-banner-AAUS_8880afff.png";
-
 /** Convert any YouTube watch/share URL to an embed URL */
 function toEmbedUrl(url: string): string {
   if (!url) return "";
@@ -252,6 +246,11 @@ function SoundByteCard({
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function SoundBytes() {
+  // Evaluate at render time so it reflects the actual hostname (not module-load hostname)
+  const isIHE = isIHeartEchoDomain();
+  const BANNER_IMG = isIHE
+    ? "/manus-storage/soundbytes-ihe-banner_94f6a87a.webp"
+    : "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/soundbytes-banner-AAUS_8880afff.png";
   const { user, isAuthenticated } = useAuth();
   const isPremium = !!(user as any)?.isPremium || user?.role === "admin";
   const [selectedCategory, setSelectedCategory] = useState("all");

@@ -29,7 +29,31 @@ import {
   MapPin,
   ChevronDown,
   ChevronUp,
+  Shield, Zap, Star, Heart,
+  Gift, Award, ArrowRight, Sparkles, Rocket, BadgeCheck,
+  ShoppingCart, CreditCard,
 } from "lucide-react";
+
+// ─── Submit icon renderer ────────────────────────────────────────────────────
+function renderSubmitIcon(icon: string | undefined, size: number) {
+  const s = icon ?? "none";
+  if (s === "none") return null;
+  if (s === "lock") return <Lock size={size} />;
+  if (s === "shield") return <Shield size={size} />;
+  if (s === "shopping-cart") return <ShoppingCart size={size} />;
+  if (s === "shopping-bag") return <ShoppingBag size={size} />;
+  if (s === "zap") return <Zap size={size} />;
+  if (s === "star") return <Star size={size} />;
+  if (s === "heart") return <Heart size={size} />;
+  if (s === "gift") return <Gift size={size} />;
+  if (s === "award") return <Award size={size} />;
+  if (s === "arrow-right") return <ArrowRight size={size} />;
+  if (s === "sparkles") return <Sparkles size={size} />;
+  if (s === "rocket") return <Rocket size={size} />;
+  if (s === "badge-check") return <BadgeCheck size={size} />;
+  if (s === "credit-card") return <CreditCard size={size} />;
+  return null;
+}
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "");
 
@@ -76,6 +100,7 @@ export interface EmbeddedCheckoutBlockData {
   textColor?: string;
   // Submit
   submitText?: string;
+  submitIcon?: "none" | "lock" | "shield" | "shopping-cart" | "shopping-bag" | "zap" | "star" | "heart" | "gift" | "award" | "arrow-right" | "sparkles" | "rocket" | "badge-check" | "credit-card";
   successRedirect?: string;
   successMessage?: string;
   // Terms
@@ -525,12 +550,14 @@ function DetailsStep({
 function PaymentStep({
   accent,
   submitText,
+  submitIcon,
   successUrl,
   paymentIntentId,
   onSuccess,
 }: {
   accent: string;
   submitText: string;
+  submitIcon?: string;
   successUrl: string;
   paymentIntentId: string;
   onSuccess: () => void;
@@ -586,6 +613,7 @@ function PaymentStep({
         style={{ backgroundColor: accent }}
       >
         {isProcessing && <Loader2 size={20} className="animate-spin" />}
+        {!isProcessing && renderSubmitIcon(submitIcon, 20)}
         {isProcessing ? "Processing..." : submitText}
       </button>
       <div className="flex items-center justify-center gap-2 mt-3 text-xs text-gray-400">
@@ -638,6 +666,13 @@ function EmbeddedCheckoutInner({
     },
   });
 
+  const processFreeOrder = trpc.embeddedCheckout.processFreeOrder.useMutation({
+    onError: (e: any) => {
+      toast.error(e.message || "Failed to process order");
+      setIsCreatingIntent(false);
+    },
+  });
+
   const handleProceed = async (formData: {
     firstName: string;
     lastName: string;
@@ -664,6 +699,38 @@ function EmbeddedCheckoutInner({
       .map((b) => ({ title: b.title, price: b.price, productType: b.title }));
 
     setIsCreatingIntent(true);
+    // ── Free order: skip Stripe entirely ──
+    if (formData.totalAmount === 0) {
+      try {
+        const result = await processFreeOrder.mutateAsync({
+          email: formData.email,
+          firstName: formData.firstName || undefined,
+          lastName: formData.lastName || undefined,
+          phone: formData.phone || undefined,
+          productName: selectedProduct.name,
+          productType: selectedProduct.type,
+          productId: (selectedProduct as any).productId ?? undefined,
+          sourceType: d.sourceType ?? "other",
+          sourceFunnelId: d.sourceFunnelId,
+          sourceFunnelPageId: d.sourceFunnelPageId,
+          sourceLandingPageId: d.sourceLandingPageId,
+          sourceLmsLessonId: d.sourceLmsLessonId,
+          lmsCourseId: (d as any).lmsCourseId ?? undefined,
+          fulfillmentBrand: (d as any).fulfillmentBrand ?? undefined,
+          successRedirect: d.successRedirect,
+          origin: window.location.origin,
+          additionalAccess: (d as any).additionalAccess ?? undefined,
+        });
+        setSuccessUrl(result.successUrl);
+        setStep("success");
+        if (result.successUrl && result.successUrl !== window.location.href) {
+          setTimeout(() => { window.location.href = result.successUrl; }, 2500);
+        }
+      } finally {
+        setIsCreatingIntent(false);
+      }
+      return;
+    }
     try {
       const result = await createPaymentIntent.mutateAsync({
         email: formData.email,
@@ -682,8 +749,8 @@ function EmbeddedCheckoutInner({
         sourceFunnelPageId: d.sourceFunnelPageId,
         sourceLandingPageId: d.sourceLandingPageId,
         sourceLmsLessonId: d.sourceLmsLessonId,
-        lmsCourseId: d.lmsCourseId ?? undefined,
-        fulfillmentBrand: d.fulfillmentBrand ?? undefined,
+        lmsCourseId: (d as any).lmsCourseId ?? undefined,
+        fulfillmentBrand: (d as any).fulfillmentBrand ?? undefined,
         successRedirect: d.successRedirect,
         origin: window.location.origin,
       });
@@ -725,8 +792,8 @@ function EmbeddedCheckoutInner({
       )}
 
       <div className="px-6 py-6">
-        {/* Step indicator */}
-        {step !== "success" && (
+        {/* Step indicator — only show for paid products */}
+        {step !== "success" && (d.products ?? []).some(p => p.price > 0) && (
           <div className="flex items-center gap-2 mb-6">
             <div
               className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full"
@@ -740,7 +807,7 @@ function EmbeddedCheckoutInner({
               className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full"
               style={step === "payment" ? { backgroundColor: accent, color: "white" } : { backgroundColor: "#f3f4f6", color: "#9ca3af" }}
             >
-              <Lock size={12} />
+              <CreditCard size={12} />
               2. Payment
             </div>
           </div>
@@ -753,7 +820,7 @@ function EmbeddedCheckoutInner({
         {step === "details" && isCreatingIntent && (
           <div className="flex flex-col items-center justify-center py-16 gap-4">
             <Loader2 size={32} className="animate-spin" style={{ color: accent }} />
-            <p className="text-sm text-gray-500">Preparing your secure checkout...</p>
+            <p className="text-sm text-gray-500">Processing your order...</p>
           </div>
         )}
 
@@ -774,6 +841,7 @@ function EmbeddedCheckoutInner({
             <PaymentStep
               accent={accent}
               submitText={d.submitText ?? "Complete Purchase"}
+              submitIcon={d.submitIcon}
               successUrl={successUrl}
               paymentIntentId={paymentIntentId}
               onSuccess={handleSuccess}

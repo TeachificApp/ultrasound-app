@@ -83,7 +83,8 @@ import { getLoginUrl } from "@/const";
 import { isIHeartEchoDomain } from "@/hooks/useSubdomain";
 
 // ─── Brand detection ─────────────────────────────────────────────────────────
-const isIHE = isIHeartEchoDomain();
+// NOTE: isIHE is computed inside the component (see useMemo below) to ensure
+// it reads window.location.hostname at runtime, not at module-load time.
 
 // IHE-specific category definitions (echo-focused)
 const IHE_CATS = [
@@ -427,6 +428,8 @@ function SubmitQuestionTab({ isAuthenticated }: { isAuthenticated: boolean }) {
 
 export default function QuickFire() {
   const { isAuthenticated, user } = useAuth();
+  // Evaluate brand at render time so it reflects the actual hostname (not module-load hostname)
+  const isIHE = useMemo(() => isIHeartEchoDomain(), []);
   const appRoles: string[] = (user as any)?.appRoles ?? [];
   const PREMIUM_ROLES_SET = new Set(["premium_user", "diy_user", "diy_admin", "platform_admin"]);
   const isPremium = (user as any)?.isPremium === true || appRoles.some(r => PREMIUM_ROLES_SET.has(r)) || (user as any)?.role === "admin";

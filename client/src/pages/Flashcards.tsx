@@ -36,8 +36,6 @@ import FlashcardsBanner from "@/components/FlashcardsBanner";
 
 import { isIHeartEchoDomain } from "@/hooks/useSubdomain";
 
-const isIHE = isIHeartEchoDomain();
-
 type StudyMode = "sequential" | "spaced";
 type EchoCategory = "all" | "abdominal" | "pelvic_gyn" | "obstetric_1st" | "obstetric_2nd_3rd" | "fetal_echo" | "venous" | "arterial" | "abdominal_vascular" | "extracranial_carotid" | "intracranial_tcd" | "pocus" | "physics" | "thyroid" | "scrotum" | "breast" | "msk" | "acs" | "adult" | "pediatric_congenital" | "fetal" | "general";
 
@@ -70,9 +68,10 @@ const IHE_CATEGORIES: { value: EchoCategory; label: string }[] = [
   { value: "fetal", label: "Fetal Echo" },
 ];
 
-const CATEGORIES = isIHE ? IHE_CATEGORIES : AAUS_CATEGORIES;
-
 export default function Flashcards() {
+  // Evaluate at render time so it reflects the actual hostname (not module-load hostname)
+  const isIHE = isIHeartEchoDomain();
+  const CATEGORIES = isIHE ? IHE_CATEGORIES : AAUS_CATEGORIES;
   const { isAuthenticated } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState<EchoCategory>("all");
   const [currentIndex, setCurrentIndex] = useState(0);
