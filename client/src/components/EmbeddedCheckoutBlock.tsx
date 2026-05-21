@@ -40,7 +40,8 @@ export interface EmbeddedCheckoutProduct {
   description?: string;
   price: number; // cents
   imageUrl?: string;
-  type: "course" | "download" | "physical" | "membership" | "bundle" | "other";
+  type: "course" | "download" | "physical" | "membership" | "bundle" | "other" | "subscription";
+  strikethroughPrice?: string; // display-only, e.g. "$197"
 }
 
 export interface EmbeddedCheckoutOrderBump {
@@ -333,7 +334,12 @@ function DetailsStep({
                   <p className="font-semibold text-sm text-gray-900">{p.name}</p>
                   {p.description && <p className="text-xs text-gray-500">{p.description}</p>}
                 </div>
-                <span className="font-bold text-sm" style={{ color: accent }}>${(p.price / 100).toFixed(2)}</span>
+                <div className="text-right flex-shrink-0">
+                  {p.strikethroughPrice && (
+                    <div className="text-xs text-red-500 line-through font-medium">{p.strikethroughPrice}</div>
+                  )}
+                  <span className="font-bold text-sm" style={{ color: accent }}>${(p.price / 100).toFixed(2)}</span>
+                </div>
                 <input type="radio" className="sr-only" checked={selectedProductIdx === i} onChange={() => setSelectedProductIdx(i)} />
               </label>
             ))}
@@ -351,7 +357,12 @@ function DetailsStep({
             <p className="font-bold text-gray-900">{selectedProduct.name}</p>
             {selectedProduct.description && <p className="text-sm text-gray-500">{selectedProduct.description}</p>}
           </div>
-          <span className="font-bold text-lg" style={{ color: accent }}>${(selectedProduct.price / 100).toFixed(2)}</span>
+          <div className="text-right flex-shrink-0">
+            {selectedProduct.strikethroughPrice && (
+              <div className="text-sm text-red-500 line-through font-medium">{selectedProduct.strikethroughPrice}</div>
+            )}
+            <span className="font-bold text-lg" style={{ color: accent }}>${(selectedProduct.price / 100).toFixed(2)}</span>
+          </div>
         </div>
       )}
 

@@ -2035,6 +2035,10 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
                     )}
                   </div>
                   <div className="flex items-center gap-1">
+                    <label className="text-xs text-gray-400 w-24 flex-shrink-0">Strikethrough</label>
+                    <DebouncedInput value={(p as any).strikethroughPrice ?? ""} onChange={v => { const next = [...ecProds]; next[i] = { ...next[i], strikethroughPrice: v }; set("products", next); }} className="h-7 text-xs flex-1" placeholder="e.g. $197 (display only)" />
+                  </div>
+                  <div className="flex items-center gap-1">
                     <label className="text-xs text-gray-400 w-24 flex-shrink-0">Type</label>
                     <select value={p.type} onChange={e => { const next = [...ecProds]; next[i] = { ...next[i], type: e.target.value }; set("products", next); }} className="h-7 flex-1 text-xs rounded border border-gray-200 px-2"><option value="other">Other / Service</option><option value="course">Course</option><option value="download">Download</option><option value="physical">Physical Product</option><option value="subscription">Subscription</option></select>
                   </div>
