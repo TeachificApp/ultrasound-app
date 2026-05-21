@@ -739,6 +739,61 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
       }
     }
   }
+  // 3. Additional access items (bonus — no extra charge)
+  // These are extra products/courses/downloads granted alongside the primary product.
+  const additionalAccessNotes: string[] = [];
+  if (meta.additional_access && userId) {
+    try {
+      const accessItems = JSON.parse(meta.additional_access) as Array<{
+        type: string; productId?: number; brand?: string; label: string;
+      }>;
+      for (const item of accessItems) {
+        try {
+          if (item.type === "course" && item.productId) {
+            const [existing] = await db.select({ id: lmsEnrollments.id }).from(lmsEnrollments)
+              .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, item.productId))).limit(1);
+            if (!existing) {
+              await db.insert(lmsEnrollments).values({ userId, courseId: item.productId, orderId: null, affiliateCode: null });
+              console.log(`[Stripe] Additional access: enrolled user ${userId} in course ${item.productId} (${item.label})`);
+            }
+            additionalAccessNotes.push(`Course: ${item.label}`);
+          } else if (item.type === "download" && item.productId) {
+            const { digitalPurchases: dp } = await import("../../drizzle/schema");
+            const [existing] = await db.select({ id: dp.id }).from(dp)
+              .where(and(eq(dp.userId, userId), eq(dp.productId, item.productId))).limit(1);
+            if (!existing) {
+              await db.insert(dp).values({ userId, productId: item.productId, stripeCheckoutSessionId: piId });
+              console.log(`[Stripe] Additional access: granted download ${item.productId} (${item.label}) to user ${userId}`);
+            }
+            additionalAccessNotes.push(`Download: ${item.label}`);
+          } else if (item.type === "membership" && item.brand) {
+            const brandsToGrant: ("aaus" | "iheartecho")[] =
+              item.brand === "both" ? ["aaus", "iheartecho"] : [item.brand as "aaus" | "iheartecho"];
+            for (const brand of brandsToGrant) {
+              const [existing] = await db.select({ id: brandMemberships.id }).from(brandMemberships)
+                .where(and(eq(brandMemberships.userId, userId), eq(brandMemberships.brand, brand))).limit(1);
+              if (existing) {
+                await db.update(brandMemberships)
+                  .set({ tier: "premium", status: "active", source: "stripe", grantedAt: new Date() })
+                  .where(eq(brandMemberships.id, existing.id));
+              } else {
+                await db.insert(brandMemberships).values({
+                  userId, brand, tier: "premium", status: "active", source: "stripe",
+                  stripeSubscriptionId: null, stripeCustomerId: null,
+                });
+              }
+              console.log(`[Stripe] Additional access: granted ${brand} membership to user ${userId}`);
+            }
+            additionalAccessNotes.push(`Membership: ${item.label}`);
+          }
+        } catch (itemErr) {
+          console.error(`[Stripe] Failed to grant additional access item "${item.label}" to user ${userId}:`, itemErr);
+        }
+      }
+    } catch (parseErr) {
+      console.error(`[Stripe] Failed to parse additional_access metadata:`, parseErr);
+    }
+  }
   // ── END AUTO-FULFILLMENT ────────────────────────────────────────────────
 
   // Notify owner
@@ -747,6 +802,7 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
     fulfillmentDownloadId ? `Download access: #${fulfillmentDownloadId}` : null,
     fulfillmentBundleId ? `Bundle access: #${fulfillmentBundleId}` : null,
     fulfillmentBrand ? `Brand access: ${fulfillmentBrand}` : null,
+    ...additionalAccessNotes.map(n => `Bonus: ${n}`),
   ].filter(Boolean).join(", ");
   await notifyOwner({
     title: `💰 New Funnel Purchase — ${productName}`,

@@ -36,8 +36,8 @@ import Layout from "@/components/Layout";
 
 // ─── Brand config ─────────────────────────────────────────────────────────────
 const BRAND_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  aaus:       { label: "All About Ultrasound", color: "#189aa1", bg: "bg-teal-50",  border: "border-teal-200" },
-  iheartecho: { label: "iHeartEcho",           color: "#e05c8a", bg: "bg-pink-50",  border: "border-pink-200" },
+  aaus:       { label: "All About Ultrasound - UltrasoundAssist", color: "#189aa1", bg: "bg-teal-50",  border: "border-teal-200" },
+  iheartecho: { label: "iHeartEcho - EchoAssist",                  color: "#e05c8a", bg: "bg-pink-50",  border: "border-pink-200" },
 };
 
 function BrandBadge({ brand }: { brand?: string | null }) {
@@ -206,8 +206,8 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
               <Select value={grantBrand} onValueChange={(v) => setGrantBrand(v as any)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="aaus">All About Ultrasound</SelectItem>
-                  <SelectItem value="iheartecho">iHeartEcho</SelectItem>
+                  <SelectItem value="aaus">All About Ultrasound - UltrasoundAssist</SelectItem>
+                  <SelectItem value="iheartecho">iHeartEcho - EchoAssist</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -692,8 +692,8 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
               <Select value={grantBrand} onValueChange={(v) => setGrantBrand(v as any)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="aaus">All About Ultrasound</SelectItem>
-                  <SelectItem value="iheartecho">iHeartEcho</SelectItem>
+                  <SelectItem value="aaus">All About Ultrasound - UltrasoundAssist</SelectItem>
+                  <SelectItem value="iheartecho">iHeartEcho - EchoAssist</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -179,8 +179,8 @@ export default function Premium() {
     : "Everything a sonographer or ultrasound professional needs — protocols, calculators, cases, and AI tools — in one guideline-based platform.";
 
   const badgeLabel = isIHE
-    ? "iHeartEcho™ — Founding Member Access"
-    : "All About Ultrasound™ — Founding Member Access";
+    ? "iHeartEcho - EchoAssist™ — Founding Member Access"
+    : "All About Ultrasound - UltrasoundAssist™ — Founding Member Access";
 
   const appName = isIHE ? "EchoAssist™" : "UltrasoundAssist™";
 

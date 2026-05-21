@@ -149,7 +149,7 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
               <span className="text-gray-400">{TYPE_ICONS[c.type]}</span>
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-gray-900 text-sm truncate">{c.title}</p>
-                <p className="text-xs text-gray-400">{c.brand === "aaus" ? "All About Ultrasound" : "iHeartEcho™"} · {c.type} · {c.isFree ? "Free" : `$${(c.price / 100).toFixed(0)}`}</p>
+                <p className="text-xs text-gray-400">{c.brand === "aaus" ? "All About Ultrasound - UltrasoundAssist" : "iHeartEcho - EchoAssist"} · {c.type} · {c.isFree ? "Free" : `$${(c.price / 100).toFixed(0)}`}</p>
               </div>
               <Badge className={`text-xs ${STATUS_COLORS[c.status]}`}>{c.status}</Badge>
               <Button size="sm" variant="ghost" className="h-7 text-xs text-teal-600 hover:bg-teal-50" onClick={() => onEdit(c.id)}>
@@ -294,8 +294,8 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
                   <Select value={brand} onValueChange={v => setBrand(v as any)}>
                     <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="aaus">All About Ultrasound</SelectItem>
-                      <SelectItem value="iheartecho">iHeartEcho™</SelectItem>
+                      <SelectItem value="aaus">All About Ultrasound - UltrasoundAssist</SelectItem>
+                      <SelectItem value="iheartecho">iHeartEcho - EchoAssist</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -408,8 +408,8 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
                       <Select value={brand} onValueChange={v => setBrand(v as any)}>
                         <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="aaus">All About Ultrasound™</SelectItem>
-                          <SelectItem value="iheartecho">iHeartEcho™</SelectItem>
+                          <SelectItem value="aaus">All About Ultrasound - UltrasoundAssist</SelectItem>
+                          <SelectItem value="iheartecho">iHeartEcho - EchoAssist</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1325,8 +1325,8 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
           <Select value={brand} onValueChange={setBrand}>
             <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="aaus">All About Ultrasound™</SelectItem>
-              <SelectItem value="iheartecho">iHeartEcho™</SelectItem>
+              <SelectItem value="aaus">All About Ultrasound - UltrasoundAssist</SelectItem>
+              <SelectItem value="iheartecho">iHeartEcho - EchoAssist</SelectItem>
             </SelectContent>
           </Select>
         </div>

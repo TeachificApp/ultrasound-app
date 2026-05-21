@@ -50,6 +50,18 @@ export interface InlineCheckoutOrderBump {
   animation?: "none" | "pulse" | "glow" | "shake" | "bounce";
 }
 
+/** A bonus access item granted at no extra charge after payment */
+export interface AdditionalAccessItem {
+  /** Human-readable label shown in the editor */
+  label: string;
+  /** "course" | "download" | "physical" | "membership" */
+  type: "course" | "download" | "physical" | "membership";
+  /** DB product/course ID (for course/download/physical) */
+  productId?: number;
+  /** Brand slug for membership grants: "aaus" | "iheartecho" | "both" */
+  brand?: "aaus" | "iheartecho" | "both";
+}
+
 export interface InlineCheckoutBlockData {
   // Header
   headerText?: string;
@@ -77,6 +89,11 @@ export interface InlineCheckoutBlockData {
   sourceType?: "funnel" | "landing_page" | "product_page" | "lms_lesson" | "other";
   sourceFunnelId?: number;
   sourceLandingPageId?: number;
+  // Additional access items granted at no extra charge after payment
+  additionalAccess?: AdditionalAccessItem[];
+  // Legacy single-item fulfillment fields (deprecated — use additionalAccess)
+  lmsCourseId?: number;
+  fulfillmentBrand?: "aaus" | "iheartecho" | "both";
 }
 
 // ─── CSS animation classes (defined in index.css) ─────────────────────────────
@@ -219,6 +236,10 @@ function InlineCheckoutInner({ data, onSuccess }: InnerFormProps) {
         sourceLandingPageId: data.sourceLandingPageId,
         successRedirect: data.successRedirect,
         origin: window.location.origin,
+        // Legacy single-item fulfillment (backward compat) — these are still passed as metadata
+        // for the webhook to process. additionalAccess array is resolved server-side from block data.
+        lmsCourseId: data.lmsCourseId,
+        fulfillmentBrand: data.fulfillmentBrand,
       });
 
       // 2. Confirm card payment with Stripe

@@ -1118,6 +1118,95 @@ function SuccessRedirectPicker({
   );
 }
 
+// ─── Additional Access Editor ───────────────────────────────────────────────
+// Grants bonus access to extra products/courses/downloads after payment.
+// No extra charge — purely fulfillment. Supports multiple items.
+function AdditionalAccessEditor({
+  data, onSet, catalog
+}: {
+  data: Record<string, any>;
+  onSet: (key: string, value: any) => void;
+  catalog?: Array<{ id: number; type: string; name: string; price: number; imageUrl: string }>;
+}) {
+  const items: Array<{ type: string; productId?: number; brand?: string; label: string }> = data.additionalAccess ?? [];
+  const [search, setSearch] = useState("");
+
+  const filtered = (catalog ?? []).filter(c =>
+    !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.type.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const addItem = (item: { id: number; type: string; name: string }) => {
+    onSet("additionalAccess", [...items, { type: item.type, productId: item.id, label: item.name }]);
+    setSearch("");
+  };
+
+  const addMembership = (brand: string) => {
+    const label = brand === "aaus" ? "All About Ultrasound - UltrasoundAssist Membership" : brand === "iheartecho" ? "iHeartEcho - EchoAssist Membership" : "All Memberships";
+    onSet("additionalAccess", [...items, { type: "membership", brand, label }]);
+  };
+
+  const removeItem = (i: number) => onSet("additionalAccess", items.filter((_, j) => j !== i));
+
+  return (
+    <div className="border border-teal-200 rounded-lg p-3 space-y-2 bg-teal-50/30">
+      <div className="flex items-center gap-2">
+        <UserPlus size={13} className="text-teal-600 flex-shrink-0" />
+        <p className="text-xs font-semibold text-teal-700">Additional Access (Bonus — no charge)</p>
+      </div>
+      <p className="text-xs text-gray-500">Automatically grants access to these extra items after purchase. The primary product from the checkout is always granted automatically.</p>
+      {/* Current items */}
+      {items.length > 0 && (
+        <div className="space-y-1">
+          {items.map((item, i) => (
+            <div key={i} className="flex items-center gap-2 bg-white border border-teal-100 rounded px-2 py-1">
+              <span className="text-xs text-gray-500 capitalize flex-shrink-0">{item.type}</span>
+              <span className="text-xs flex-1 truncate text-gray-700">{item.label}</span>
+              <button onClick={() => removeItem(i)} className="text-red-400 hover:text-red-600 flex-shrink-0"><X size={10} /></button>
+            </div>
+          ))}
+        </div>
+      )}
+      {/* Search catalog */}
+      {catalog && catalog.length > 0 && (
+        <div className="space-y-1">
+          <div className="relative">
+            <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full h-7 text-xs pl-6 pr-2 rounded border border-gray-200 focus:outline-none focus:border-teal-400"
+              placeholder="Search courses, downloads, products..."
+            />
+          </div>
+          {search && (
+            <div className="max-h-32 overflow-y-auto space-y-0.5 bg-white border border-gray-100 rounded">
+              {filtered.length === 0 && <p className="text-xs text-gray-400 px-2 py-1">No results</p>}
+              {filtered.map(item => (
+                <button key={`aa-${item.type}-${item.id}`} onClick={() => addItem(item)}
+                  className="w-full text-left flex items-center gap-2 px-2 py-1 hover:bg-teal-50 hover:text-teal-700 text-xs transition-colors">
+                  {item.imageUrl && <img src={item.imageUrl} className="w-5 h-5 rounded object-cover flex-shrink-0" />}
+                  <span className="flex-1 truncate">{item.name}</span>
+                  <span className="text-gray-300 flex-shrink-0 capitalize">{item.type}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {/* Membership quick-add */}
+      <div className="flex flex-wrap gap-1">
+        <span className="text-xs text-gray-400">+ Membership:</span>
+        {(["aaus", "iheartecho", "both"] as const).map(b => (
+          <button key={b} onClick={() => addMembership(b)}
+            className="text-xs px-2 py-0.5 rounded-full border border-teal-200 text-teal-600 hover:bg-teal-50 transition-colors">
+            {b === "aaus" ? "AAUS - UltrasoundAssist" : b === "iheartecho" ? "iHeartEcho - EchoAssist" : "Both"}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Checkout Form Block Settings ───────────────────────────────────────────
 function CheckoutFormBlockSettings({
   d, set, cfProds, cfBumps
@@ -1261,6 +1350,8 @@ function CheckoutFormBlockSettings({
           </div>
         ))}
       </div>
+      {/* Additional Access (Bonus — no extra charge) */}
+      <AdditionalAccessEditor data={d} onSet={set} catalog={catalog} />
       {/* Terms & Submit */}
       <BSTextField data={d} onSet={set} label="Terms Text" field="termsText" multiline />
       <div className="grid grid-cols-2 gap-2">
@@ -1859,6 +1950,8 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
               </div>
             ))}
           </div>
+          {/* Additional Access (Bonus — no extra charge) */}
+          <AdditionalAccessEditor data={d} onSet={set} catalog={icCatalog} />
           {/* Submit & Redirect */}
           <BSTextField data={d} onSet={set} label="Submit Button Text" field="submitText" placeholder="Submit" />
           <SuccessRedirectPicker value={d.successRedirect ?? ""} onChange={v => set("successRedirect", v)} />
@@ -1950,12 +2043,8 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
               </div>
             ))}
           </div>
-          {/* Fulfillment */}
-          <div className="border border-teal-100 rounded p-3 space-y-2 bg-teal-50/30">
-            <p className="text-xs font-semibold text-teal-700">Fulfillment (Auto-Access Grant)</p>
-            <div><label className="text-xs text-gray-500">LMS Course ID</label><Input type="number" value={d.lmsCourseId ?? ""} onChange={e => set("lmsCourseId", e.target.value ? Number(e.target.value) : undefined)} className="h-7 text-xs" placeholder="Enroll buyer in this course" /></div>
-            <div><label className="text-xs text-gray-500">Brand Membership</label><select value={d.fulfillmentBrand ?? ""} onChange={e => set("fulfillmentBrand", e.target.value || undefined)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="">None</option><option value="aaus">All About Ultrasound</option><option value="iheartecho">iHeartEcho</option><option value="both">Both</option></select></div>
-          </div>
+          {/* Additional Access (Bonus — no extra charge) */}
+          <AdditionalAccessEditor data={d} onSet={set} catalog={ecCatalog} />
           {/* Order Bumps */}
           <div className="border border-gray-200 rounded p-3 space-y-2">
             <div className="flex items-center justify-between"><span className="text-xs font-semibold text-gray-700">Order Bumps ({ecBumps.length})</span><button onClick={() => set("orderBumps", [...ecBumps, { title: "Add-on Offer", headline: "Special one-time offer!", description: "Enhance your purchase with this exclusive add-on.", price: 2700, imageUrl: "", ctaText: "+ Add to my order", highlightColor: "#f59e0b", animation: "pulse" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add Bump</button></div>

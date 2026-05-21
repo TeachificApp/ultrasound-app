@@ -2445,3 +2445,22 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] InlineCheckoutBlock: headerStrikethroughPrice + per-product strikethroughPrice in renderer
 - [x] FunnelBlocks.tsx: ProductOfferStackBlock per-product strikethroughPrice rendering
 - [x] 11 vitest tests passing (strikethroughPrice.test.ts)
+
+## Checkout Fulfillment Auto-Access (May 2026)
+- [ ] Auto-grant access to primary checkout product without requiring Fulfillment box entry
+- [ ] Rename Fulfillment box to "Additional Access" (for bonus products/courses beyond primary)
+- [ ] Convert LMS Course ID field to searchable product/course/download picker
+- [ ] Stripe webhook: read products from checkout form block data and auto-fulfill on payment
+
+## Brand Membership Label Update (May 2026)
+- [x] Update brand membership labels to "All About Ultrasound - UltrasoundAssist" and "iHeartEcho - EchoAssist" everywhere
+  - [x] LandingPageBuilder.tsx (inline_checkout and embedded_checkout settings panels)
+  - [x] AdminUserDetailPage.tsx (grant membership dialogs)
+  - [x] LMSAdmin.tsx (course brand select items)
+  - [x] EducationLibrary.tsx (brand filter)
+  - [x] PlatformAdmin.tsx (dual brand toggle and viewing-as badge)
+  - [x] StudentDashboardPage.tsx (brand badge config)
+  - [x] Premium.tsx (founding member badge label)
+  - [x] useBrand.ts (brand config name fields)
+  - [x] quickfireRouter.ts (leaderboard owner brand name)
+  - [x] caseLibraryRouter.ts (owner display name masking)

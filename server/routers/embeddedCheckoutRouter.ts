@@ -75,6 +75,13 @@ export const embeddedCheckoutRouter = router({
         // Redirect after success
         successRedirect: z.string().optional(),
         origin: z.string(),
+        // Additional access items (no extra charge — bonus fulfillment)
+        additionalAccess: z.array(z.object({
+          type: z.string(),
+          productId: z.number().optional(),
+          brand: z.string().optional(),
+          label: z.string(),
+        })).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -132,6 +139,8 @@ export const embeddedCheckoutRouter = router({
       if (input.lmsCourseId) metadata.fulfillment_course_id = input.lmsCourseId.toString();
       if (input.fulfillmentBrand) metadata.fulfillment_brand = input.fulfillmentBrand;
       if (input.productId) metadata.product_id = input.productId.toString();
+      // Note: additionalAccess items are stored in block data and resolved server-side
+      // from the page blocks after payment — not passed through Stripe metadata.
 
       // Add shipping address to metadata if physical product
       if (input.shippingAddress && input.collectShipping) {

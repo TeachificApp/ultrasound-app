@@ -37,13 +37,13 @@ import { isMembersDomain, isLearnDomain } from "@/hooks/useSubdomain";
 
 const BRAND_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
   aaus: {
-    label: "All About Ultrasound",
+    label: "All About Ultrasound - UltrasoundAssist",
     color: "#189aa1",
     bg: "bg-teal-50",
     border: "border-teal-200",
   },
   iheartecho: {
-    label: "iHeartEcho",
+    label: "iHeartEcho - EchoAssist",
     color: "#e05c8a",
     bg: "bg-pink-50",
     border: "border-pink-200",

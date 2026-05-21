@@ -1350,7 +1350,7 @@ export default function PlatformAdmin() {
                     : "text-gray-500 hover:text-gray-700"
                 }`}
               >
-                All About Ultrasound
+                All About Ultrasound - UltrasoundAssist
               </button>
               <button
                 onClick={() => setDualBrand("iheartecho")}
@@ -1360,7 +1360,7 @@ export default function PlatformAdmin() {
                     : "text-gray-500 hover:text-gray-700"
                 }`}
               >
-                iHeartEcho
+                iHeartEcho - EchoAssist
               </button>
             </div>
           </div>
@@ -1369,7 +1369,7 @@ export default function PlatformAdmin() {
               dualBrand === "aaus" ? "bg-teal-50 text-teal-700" : "bg-pink-50 text-pink-700"
             }`}>
               <Globe className="w-3 h-3" />
-              Viewing as: {dualBrand === "aaus" ? "All About Ultrasound" : "iHeartEcho"}
+              Viewing as: {dualBrand === "aaus" ? "All About Ultrasound - UltrasoundAssist" : "iHeartEcho - EchoAssist"}
             </span>
           </div>
           <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleDualDragEnd}>
