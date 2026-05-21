@@ -81,7 +81,12 @@ export function ProductOfferStackBlock({ data, onPrimaryCta }: { data: Record<st
                     {product.type === "physical" ? <Truck size={12} /> : <Package size={12} />}
                     {product.type === "physical" ? "Physical" : "Digital"}
                   </span>
-                  <span className="text-2xl font-bold" style={{ color: accentColor }}>{product.price}</span>
+                  <div className="text-right">
+                    {(product as any).strikethroughPrice && (
+                      <div className="text-sm text-gray-400 line-through">{(product as any).strikethroughPrice}</div>
+                    )}
+                    <span className="text-2xl font-bold" style={{ color: accentColor }}>{product.price}</span>
+                  </div>
                 </div>
                 <h3 className="text-xl font-bold text-gray-900">{product.title}</h3>
                 <p className="text-sm text-gray-600 mt-2">{product.description}</p>

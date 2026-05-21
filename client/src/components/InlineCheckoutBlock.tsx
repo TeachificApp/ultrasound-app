@@ -281,11 +281,21 @@ function InlineCheckoutInner({ data, onSuccess }: InnerFormProps) {
       {/* ── Header Banner ─────────────────────────────────────────────────── */}
       {data.headerText && (
         <div
-          className="rounded-t-xl px-6 py-4 mb-0 text-center text-white font-bold text-lg flex items-center justify-center gap-2"
+          className="rounded-t-xl px-6 py-4 mb-0 text-center text-white font-bold text-lg flex flex-col items-center justify-center gap-1"
           style={{ backgroundColor: accent }}
         >
-          <Lock size={18} />
-          <span>{data.headerText}{data.headerPrice ? ` ${data.headerPrice}` : ""}</span>
+          <div className="flex items-center gap-2">
+            <Lock size={18} />
+            <span>{data.headerText}</span>
+          </div>
+          {data.headerPrice && (
+            <div className="flex items-center gap-2 text-base">
+              {(data as any).showHeaderStrikethrough && (data as any).headerStrikethroughPrice && (
+                <span className="font-normal line-through opacity-70">{(data as any).headerStrikethroughPrice}</span>
+              )}
+              <span>{data.headerPrice}</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -373,7 +383,12 @@ function InlineCheckoutInner({ data, onSuccess }: InnerFormProps) {
                         <div className="text-xs text-gray-500 truncate">{product.description}</div>
                       )}
                     </div>
-                    <span className="font-semibold text-sm flex-shrink-0">{fmt(product.price)}</span>
+                    <div className="text-right flex-shrink-0">
+                      {(product as any).strikethroughPrice && (
+                        <div className="text-xs text-gray-400 line-through">{(product as any).strikethroughPrice}</div>
+                      )}
+                      <span className="font-semibold text-sm">{fmt(product.price)}</span>
+                    </div>
                   </label>
                 ))}
               </div>

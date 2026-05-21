@@ -3,7 +3,7 @@
  * Shared read-only block renderer used by CoursePlayer, CourseOverview, and LandingPageBuilder.
  * Extracted into its own file to break the circular dependency between CoursePlayer and LandingPageBuilder.
  */
-import { ChevronDown, Globe, Image, Package, Video } from "lucide-react";
+import { ChevronDown, Globe, Image, Package, Upload, Video } from "lucide-react";
 import InlineCheckoutBlock from "@/components/InlineCheckoutBlock";
 import AudioBlockPlayer from "@/components/AudioBlockPlayer";
 import { Users } from "lucide-react";
@@ -42,7 +42,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       else if (bgType === "gradient") heroBg = { background: `linear-gradient(${d.gradientDir ?? "to bottom right"}, ${d.gradientFrom ?? "#179ca3"}, ${d.gradientTo ?? "#0e4a50"})` };
       else if (bgType === "image") heroBg = { backgroundImage: `url(${d.imageUrl})`, backgroundSize: "cover", backgroundPosition: "center" };
       else if (bgType === "video") heroBg = { backgroundColor: "#000" };
-      const heroButtons: Array<{ text: string; color: string; textColor: string; link: string; style: string }> =
+      const heroButtons: Array<{ text: string; color: string; textColor: string; link: string; style: string; animation?: string; showStrikethrough?: boolean; strikethroughPrice?: string; showOptOut?: boolean; optOutText?: string; optOutUrl?: string }> =
         d.buttons?.length ? d.buttons : [{ text: d.ctaText ?? "Enroll Now", color: d.ctaColor ?? "#fff", textColor: d.ctaTextColor ?? "#179ca3", link: "", style: "filled" }];
       const hasInlineMedia = !!d.inlineMediaUrl;
       const placement = d.inlineMediaPlacement ?? "right";
@@ -66,7 +66,10 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
                       style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
                       {btn.text}
                     </button>
-                    {btn.showOptOut && btn.optOutText && (
+                    {btn.showStrikethrough && btn.strikethroughPrice && (
+                      <span className="text-xs text-white/60 line-through">{btn.strikethroughPrice}</span>
+                    )}
+                  {btn.showOptOut && btn.optOutText && (
                       <span className="text-xs text-white/60 underline cursor-pointer hover:text-white/80">{btn.optOutText}</span>
                     )}
                   </div>
@@ -361,6 +364,10 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
         <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa", textAlign: d.align ?? "center" }}>
           {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
+          {(d.showStrikethrough && d.strikethroughPrice) && (
+            <p className="text-lg text-gray-400 line-through mb-1">{d.strikethroughPrice}</p>
+          )}
+          {d.displayPrice && <p className="text-3xl font-bold mb-4" style={{ color: d.ctaColor ?? "#179ca3" }}>{d.displayPrice}</p>}
           <a href={d.ctaLink ?? "#"} className={`inline-block px-8 py-3 rounded-lg font-semibold shadow ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`} style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>{d.ctaText ?? "Get Started"}</a>
           <ButtonSubtext d={d} />
           {(d.showOptOut || d.optOutEnabled) && d.optOutText && (
@@ -384,6 +391,10 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
         <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa", textAlign: d.align ?? "center" }}>
           {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
+          {(d.showStrikethrough && d.strikethroughPrice) && (
+            <p className="text-lg text-gray-400 line-through mb-1">{d.strikethroughPrice}</p>
+          )}
+          {d.displayPrice && <p className="text-3xl font-bold mb-4" style={{ color: d.ctaColor ?? "#179ca3" }}>{d.displayPrice}</p>}
           <div className="max-w-sm mx-auto space-y-3 mb-4">
             <input type="text" placeholder={d.namePlaceholder ?? "Your name"} className="w-full px-4 py-3 rounded-lg border border-gray-200 text-gray-900 text-sm" />
             <input type="email" placeholder={d.emailPlaceholder ?? "Your email address"} className="w-full px-4 py-3 rounded-lg border border-gray-200 text-gray-900 text-sm" />
@@ -452,8 +463,12 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
           {d.headline && <h2 className="text-2xl md:text-3xl font-black text-center mb-4 whitespace-pre-line" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.description && <p className="italic mb-4" style={{ color: d.accentColor ?? "#179ca3" }}>{d.description}</p>}
           {d.bodyHtml && <div className="prose max-w-none mb-6" dangerouslySetInnerHTML={{ __html: d.bodyHtml }} />}
+          {(d.showStrikethrough && d.strikethroughPrice) && (
+            <p className="text-xl text-gray-400 line-through text-center mt-4">{d.strikethroughPrice}</p>
+          )}
+          {d.displayPrice && <p className="text-3xl font-bold text-center mt-1" style={{ color: d.accentColor ?? "#179ca3" }}>{d.displayPrice}</p>}
           {d.ctaText && (
-            <p className="font-bold" style={{ color: d.accentColor ?? "#179ca3" }}>
+            <p className="font-bold mt-4" style={{ color: d.accentColor ?? "#179ca3" }}>
               {d.ctaEmoji && <span className="mr-1">{d.ctaEmoji}</span>}
               {d.ctaText}
             </p>
@@ -467,8 +482,18 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       return (
         <div className="py-6 px-4" style={{ backgroundColor: d.bgColor ?? "#ffffff", color: d.textColor ?? "#0e1e2e" }}>
           {/* Header */}
-          <div className="rounded-lg px-6 py-4 mb-6 text-center text-white font-bold text-lg flex items-center justify-center gap-2" style={{ backgroundColor: d.accentColor ?? "#179ca3" }}>
-            <span>\uD83D\uDD12</span> {d.headerText ?? "Lock in your seat now!"} {d.headerPrice ?? ""}
+          <div className="rounded-lg px-6 py-4 mb-6 text-center text-white font-bold text-lg flex flex-col items-center justify-center gap-1" style={{ backgroundColor: d.accentColor ?? "#179ca3" }}>
+            <div className="flex items-center gap-2">
+              <span>\uD83D\uDD12</span> {d.headerText ?? "Lock in your seat now!"}
+            </div>
+            {d.headerPrice && (
+              <div className="flex items-center gap-2">
+                {d.showHeaderStrikethrough && d.headerStrikethroughPrice && (
+                  <span className="text-base font-normal line-through opacity-70">{d.headerStrikethroughPrice}</span>
+                )}
+                <span>{d.headerPrice}</span>
+              </div>
+            )}
           </div>
           {/* Contact Info */}
           {d.showContactInfo && (
@@ -488,7 +513,10 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
                   <span className="w-4 h-4 rounded-full border-2 border-teal-500 flex-shrink-0" style={{ backgroundColor: i === 0 ? d.accentColor ?? "#179ca3" : "transparent" }} />
                   {p.imageUrl && <img src={p.imageUrl} alt="" className="w-8 h-8 rounded object-cover" />}
                   <div className="flex-1"><div className="font-semibold text-sm">{p.name}</div><div className="text-xs text-gray-500">{p.description}</div></div>
-                  <span className="text-sm font-medium">${(p.price / 100).toFixed(2)}</span>
+                  <div className="text-right">
+                    {(p as any).strikethroughPrice && <div className="text-xs text-gray-400 line-through">{(p as any).strikethroughPrice}</div>}
+                    <span className="text-sm font-medium">${(p.price / 100).toFixed(2)}</span>
+                  </div>
                 </div>
               ))}
             </fieldset>
@@ -519,6 +547,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
                 <div className="text-xs text-gray-600 mt-1">{bump.description}</div>
               </div>
               <div className="text-right flex-shrink-0">
+                {(bump as any).strikethroughPrice && <div className="text-xs text-gray-400 line-through">{(bump as any).strikethroughPrice}</div>}
                 <div className="text-sm font-bold" style={{ color: d.accentColor ?? "#179ca3" }}>${(bump.price / 100).toFixed(2)}</div>
                 <button className="mt-2 px-4 py-1 border-2 rounded font-semibold text-sm" style={{ borderColor: d.accentColor ?? "#179ca3", color: d.accentColor ?? "#179ca3" }}>{bump.ctaText || "+ Add"}</button>
               </div>

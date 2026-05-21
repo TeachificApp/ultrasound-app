@@ -2415,3 +2415,33 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] All editors: left panel replaced with "Add Block" button that opens the modal
 - [x] All editors: Block Templates tab uses blockTemplates.list and blockTemplates.delete procedures
 - [x] Vitest tests for block picker utilities (7 tests passing)
+
+## Strikethrough Price + Price Override (May 2026)
+- [ ] pricing_cta: already has strikethrough price — add price override field (manual price that overrides auto-pulled price)
+- [ ] cta_standalone: add strikethrough price + price override fields to editor panel and renderer
+- [ ] cta_optin: add strikethrough price + price override fields to editor panel and renderer
+- [ ] hero block buttons: add per-button price display, strikethrough price, and price override
+- [ ] urgency_offer: add price display, strikethrough price, and price override fields
+- [ ] checkout_form (legacy): add per-product price override + strikethrough price in product list
+- [ ] checkout_form (legacy): add per-bump price override + strikethrough price in order bumps list
+- [ ] order_bump_checkout: already has compareAtPrice — ensure it renders as strikethrough; add price override
+- [ ] price_stack: already has originalPrice as strikethrough — add price override for finalPrice
+- [ ] CheckoutFormBlock (live checkout): add per-product price override + strikethrough price
+- [ ] FunnelBlocks (InlineOrderBumpBlock, ProductOfferStackBlock): add strikethrough price rendering
+- [ ] All renderers in BlockPreview updated to show strikethrough price and use override price
+
+## Strikethrough Price + Price Override (May 2026)
+- [x] Add optional display-only strikethrough price to all checkout forms and CTA/pricing blocks
+- [x] Add price override field to all checkout forms that pull products/courses/quizzes/downloads
+- [x] pricing_cta: already had showStrikethroughPrice + strikethroughPrice (confirmed working)
+- [x] hero buttons: per-button showStrikethrough + strikethroughPrice fields in editor + renderer
+- [x] cta_standalone: displayPrice + showStrikethrough + strikethroughPrice in editor + renderer
+- [x] cta_optin (CtaOptinSettings): displayPrice + showStrikethrough + strikethroughPrice in editor + renderer
+- [x] urgency_offer: displayPrice + showStrikethrough + strikethroughPrice in editor + renderer
+- [x] checkout_form: headerStrikethroughPrice + per-product strikethroughPrice in editor + renderer
+- [x] inline_checkout: headerStrikethroughPrice + per-product strikethroughPrice in editor + renderer
+- [x] order_bump_checkout: per-bump strikethroughPrice in editor + renderer
+- [x] product_offer_stack: per-product strikethroughPrice in editor (FunnelBlocks.tsx renderer)
+- [x] InlineCheckoutBlock: headerStrikethroughPrice + per-product strikethroughPrice in renderer
+- [x] FunnelBlocks.tsx: ProductOfferStackBlock per-product strikethroughPrice rendering
+- [x] 11 vitest tests passing (strikethroughPrice.test.ts)

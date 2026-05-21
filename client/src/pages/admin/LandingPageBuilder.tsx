@@ -983,6 +983,16 @@ function CtaOptinSettings({ d, set }: { d: Record<string, any>; set: (key: strin
         <p className="text-xs font-semibold text-gray-600 flex items-center gap-1"><Tag size={12} /> Lead Tags</p>
         <BSTextField data={d} onSet={set} label="Tags (comma-separated)" field="tags" placeholder="e.g. webinar, free-guide" />
       </div>
+      {/* Price Display */}
+      <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+        <p className="text-xs font-semibold text-gray-600">Price Display (optional)</p>
+        <BSTextField data={d} onSet={set} label="Display Price" field="displayPrice" placeholder="e.g. $197" />
+        <div className="flex items-center gap-2">
+          <input type="checkbox" checked={d.showStrikethrough ?? false} onChange={e => set("showStrikethrough", e.target.checked)} className="rounded" />
+          <label className="text-xs text-gray-600">Show strikethrough price</label>
+        </div>
+        {(d.showStrikethrough ?? false) && <DebouncedInput value={d.strikethroughPrice ?? ""} onChange={v => set("strikethroughPrice", v)} className="h-7 text-xs" placeholder="e.g. $497" />}
+      </div>
       <OptOutSettings d={d} set={set} />
     </div>
   );
@@ -1114,8 +1124,8 @@ function CheckoutFormBlockSettings({
 }: {
   d: Record<string, any>;
   set: (key: string, value: any) => void;
-  cfProds: Array<{ name: string; description: string; price: number; imageUrl: string; type: string; productId?: number }>;
-  cfBumps: Array<{ label: string; price: string; description: string }>;
+  cfProds: Array<{ name: string; description: string; price: number; imageUrl: string; type: string; productId?: number; strikethroughPrice?: string }>;
+  cfBumps: Array<{ title?: string; headline?: string; label?: string; description: string; price: number | string; imageUrl?: string; ctaText?: string; ctaEmoji?: string; externalUrl?: string; strikethroughPrice?: string }>;
 }) {
   const { data: catalog } = trpc.funnel.listAllProducts.useQuery(undefined, { staleTime: 60_000 });
   const [prodMode, setProdMode] = useState<"catalog" | "manual">("catalog");
@@ -1138,6 +1148,8 @@ function CheckoutFormBlockSettings({
       {/* Header */}
       <BSTextField data={d} onSet={set} label="Header Text" field="headerText" placeholder="Lock in your seat now!" />
       <BSTextField data={d} onSet={set} label="Header Price" field="headerPrice" placeholder="$1997" />
+      <div className="flex items-center gap-2"><input type="checkbox" checked={d.showHeaderStrikethrough ?? false} onChange={e => set("showHeaderStrikethrough", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show header strikethrough price</label></div>
+      {(d.showHeaderStrikethrough ?? false) && <DebouncedInput value={d.headerStrikethroughPrice ?? ""} onChange={v => set("headerStrikethroughPrice", v)} className="h-7 text-xs" placeholder="e.g. $2997" />}
       {/* Sections Toggle */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2"><input type="checkbox" checked={d.showContactInfo ?? true} onChange={e => set("showContactInfo", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show Contact Info</label></div>
@@ -1194,6 +1206,10 @@ function CheckoutFormBlockSettings({
                 )}
               </div>
               <div className="flex items-center gap-1">
+                <label className="text-xs text-gray-400 w-24 flex-shrink-0">Strikethrough</label>
+                <DebouncedInput value={(p as any).strikethroughPrice ?? ""} onChange={v => { const next = [...cfProds]; next[i] = { ...next[i], strikethroughPrice: v }; set("products", next); }} className="h-7 text-xs flex-1" placeholder="e.g. $497 (display only)" />
+              </div>
+              <div className="flex items-center gap-1">
                 <label className="text-xs text-gray-400 w-24 flex-shrink-0">Type</label>
                 <select value={p.type} onChange={e => { const next = [...cfProds]; next[i] = { ...next[i], type: e.target.value }; set("products", next); }} className="h-7 flex-1 text-xs rounded border border-gray-200 px-2"><option value="course">Course</option><option value="download">Download</option><option value="bundle">Bundle</option><option value="quiz">Quiz</option><option value="product">Product</option><option value="external">External (URL)</option></select>
               </div>
@@ -1240,6 +1256,7 @@ function CheckoutFormBlockSettings({
               <div><label className="text-xs text-gray-400">Price (cents)</label><Input type="number" value={bump.price ?? 0} onChange={e => set("orderBumps", cfBumps.map((b: any, j: number) => j === i ? { ...b, price: Number(e.target.value) } : b))} className="h-7 text-xs" placeholder="2700 = $27" /></div>
               <div><label className="text-xs text-gray-400">CTA Text</label><DebouncedInput value={bump.ctaText ?? ""} onChange={v => set("orderBumps", cfBumps.map((b: any, j: number) => j === i ? { ...b, ctaText: v } : b))} className="h-7 text-xs" placeholder="+ Add" /></div>
             </div>
+            <div className="flex items-center gap-1"><label className="text-xs text-gray-400 w-24 flex-shrink-0">Strikethrough</label><DebouncedInput value={bump.strikethroughPrice ?? ""} onChange={v => set("orderBumps", cfBumps.map((b: any, j: number) => j === i ? { ...b, strikethroughPrice: v } : b))} className="h-7 text-xs flex-1" placeholder="e.g. $47 (display only)" /></div>
             <DebouncedInput value={bump.imageUrl ?? ""} onChange={v => set("orderBumps", cfBumps.map((b: any, j: number) => j === i ? { ...b, imageUrl: v } : b))} className="h-7 text-xs" placeholder="Image URL (optional)" />
           </div>
         ))}
@@ -1292,7 +1309,7 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
   const blockSpecific = (() => { switch (block.type) {
     case "hero": {
       const bgType = d.bgType ?? "color";
-      const buttons: Array<{ text: string; color: string; textColor: string; link: string; style: string; animation?: string; behavior?: string; leadCapture?: boolean; leadModalTitle?: string; leadModalSubtext?: string; leadTags?: string; campaignId?: number | null }> =
+      const buttons: Array<{ text: string; color: string; textColor: string; link: string; style: string; animation?: string; behavior?: string; leadCapture?: boolean; leadModalTitle?: string; leadModalSubtext?: string; leadTags?: string; campaignId?: number | null; showStrikethrough?: boolean; strikethroughPrice?: string; showOptOut?: boolean; optOutText?: string; optOutUrl?: string }> =
         d.buttons?.length ? d.buttons : [{ text: d.ctaText ?? "Enroll Now", color: d.ctaColor ?? "#fff", textColor: d.ctaTextColor ?? "#179ca3", link: "", style: "filled" }];
       const setBtn = (idx: number, key: string, val: any) => { const next = buttons.map((b, i) => i === idx ? { ...b, [key]: val } : b); onChangeRef.current({ ...dataRef.current, buttons: next }); };
       const setBtnMulti = (idx: number, patch: Record<string, any>) => { const next = buttons.map((b, i) => i === idx ? { ...b, ...patch } : b); onChangeRef.current({ ...dataRef.current, buttons: next }); };
@@ -1404,6 +1421,16 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
                         <DebouncedInput value={btn.leadModalSubtext ?? ""} onChange={v => setBtn(idx, "leadModalSubtext", v)} className="h-7 text-xs" placeholder="Modal subtext (optional)" />
                         <DebouncedInput value={btn.leadTags ?? ""} onChange={v => setBtn(idx, "leadTags", v)} className="h-7 text-xs" placeholder="Tags (comma-separated)" />
                       </div>
+                    )}
+                  </div>
+                  <div className="border-t border-gray-100 pt-2 mt-1 space-y-1">
+                    <label className="text-xs text-gray-500 font-medium block">Price Display (below button)</label>
+                    <div className="flex items-center gap-2">
+                      <input type="checkbox" id={`sp-${idx}`} checked={btn.showStrikethrough ?? false} onChange={e => setBtn(idx, "showStrikethrough", e.target.checked as any)} className="rounded" />
+                      <label htmlFor={`sp-${idx}`} className="text-xs text-gray-600">Show strikethrough price</label>
+                    </div>
+                    {btn.showStrikethrough && (
+                      <DebouncedInput value={btn.strikethroughPrice ?? ""} onChange={v => setBtn(idx, "strikethroughPrice", v)} className="h-7 text-xs" placeholder="e.g. $497" />
                     )}
                   </div>
                   <div className="space-y-2 border-t border-gray-100 pt-2 mt-1">
@@ -1550,7 +1577,7 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
         </div>
       );
     case "cta_standalone":
-      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Headline" field="headline" /><BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline /><BSTextField data={d} onSet={set} label="Button Text" field="ctaText" /><div><label className="text-xs text-gray-500 block mb-1">Button Action</label><Select value={d.ctaBehavior ?? "url"} onValueChange={v => set("ctaBehavior", v)}><SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="url">Link to URL</SelectItem><SelectItem value="send_email">Send Email</SelectItem><SelectItem value="next_funnel_step">Next Funnel Step</SelectItem></SelectContent></Select></div>{(d.ctaBehavior ?? "url") === "url" && <BSLinkField label="Button Link" value={d.ctaLink ?? ""} onChange={v => set("ctaLink", v)} />}{(d.ctaBehavior ?? "url") === "send_email" && <div><label className="text-xs text-gray-500 block mb-1">Email Address</label><DebouncedInput value={d.ctaEmailAddress ?? ""} onChange={v => set("ctaEmailAddress", v)} className="h-7 text-xs" placeholder="e.g. hello@example.com" /></div>}{(d.ctaBehavior ?? "url") === "next_funnel_step" && <p className="text-[10px] text-teal-600 bg-teal-50 rounded px-2 py-1">Button will navigate to the next page in the funnel sequence.</p>}<BSColorField data={d} onSet={set} label="Button Color" field="ctaColor" /><BSColorField data={d} onSet={set} label="Button Text Color" field="ctaTextColor" /><BSColorField data={d} onSet={set} label="Button Border / Outline Color" field="btnBorderColor" /><div><label className="text-xs text-gray-500 block mb-1">Button Style</label><div className="flex gap-1">{(["filled","outline"] as const).map(s=><button key={s} onClick={()=>set("btnStyle",s)} className={`flex-1 py-1 text-xs rounded border capitalize ${(d.btnStyle??"filled")===s?"bg-teal-600 text-white border-teal-600":"border-gray-200 text-gray-600"}`}>{s}</button>)}</div></div><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div className="border border-teal-100 bg-teal-50/50 rounded-lg p-3 space-y-2"><div className="flex items-center gap-2"><input type="checkbox" id="cta-lc" checked={d.leadCapture??false} onChange={e=>set("leadCapture",e.target.checked)} className="rounded" /><label htmlFor="cta-lc" className="text-xs text-teal-700 font-medium">Collect lead before action</label></div>{(d.leadCapture??false)&&(<div className="space-y-1 pl-1"><p className="text-[10px] text-gray-400">A name/email modal will appear before the button action executes.</p><BSTextField data={d} onSet={set} label="Modal Title" field="leadModalTitle" placeholder="e.g. Get Instant Access" /><BSTextField data={d} onSet={set} label="Modal Subtext" field="leadModalSubtext" placeholder="Optional" /><BSTextField data={d} onSet={set} label="Tags (comma-separated)" field="leadTags" placeholder="e.g. webinar, free-guide" /></div>)}</div><div><label className="text-xs text-gray-500 block mb-1">Button Animation</label><Select value={d.ctaAnimation ?? "none"} onValueChange={v => set("ctaAnimation", v)}><SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem><SelectItem value="pulse">Pulse</SelectItem><SelectItem value="bounce">Bounce</SelectItem><SelectItem value="shake">Shake</SelectItem><SelectItem value="glow">Glow</SelectItem></SelectContent></Select></div><BSAlignField data={d} onSet={set} label="Text Alignment" field="align" /><div className="border-t pt-3 mt-1 space-y-2"><p className="text-xs font-medium text-gray-500">Button Subtext (below button)</p><BSTextField data={d} onSet={set} label="Subtext text" field="buttonSubtext" placeholder="e.g. No credit card required" /><BSLinkField label="Subtext URL (optional)" value={d.buttonSubtextUrl ?? ""} onChange={v => set("buttonSubtextUrl", v)} /><BSColorField data={d} onSet={set} label="Subtext Color" field="buttonSubtextColor" /><div><label className="text-xs text-gray-500 block mb-1">Subtext Size</label><select value={d.buttonSubtextSize ?? "xs"} onChange={e => set("buttonSubtextSize", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="xs">Extra Small (xs)</option><option value="sm">Small (sm)</option><option value="base">Base</option><option value="lg">Large (lg)</option></select></div><div><label className="text-xs text-gray-500 block mb-1">Subtext Style</label><div className="flex gap-2"><button type="button" onClick={() => set("buttonSubtextItalic", !(d.buttonSubtextItalic ?? false))} className={`px-2 py-1 text-xs rounded border ${(d.buttonSubtextItalic ?? false) ? "bg-teal-50 border-teal-400 text-teal-700" : "border-gray-200 text-gray-500"}`}><em>Italic</em></button><button type="button" onClick={() => set("buttonSubtextBold", !(d.buttonSubtextBold ?? false))} className={`px-2 py-1 text-xs rounded border ${(d.buttonSubtextBold ?? false) ? "bg-teal-50 border-teal-400 text-teal-700" : "border-gray-200 text-gray-500"}`}><strong>Bold</strong></button></div></div></div><OptOutSettings d={d} set={set} /></div>);
+      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Headline" field="headline" /><div className="border border-gray-200 rounded-lg p-3 space-y-2"><p className="text-xs font-semibold text-gray-600">Price Display</p><div className="flex items-center gap-2"><input type="checkbox" checked={d.showStrikethrough ?? false} onChange={e => set("showStrikethrough", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show strikethrough price</label></div>{(d.showStrikethrough ?? false) && <DebouncedInput value={d.strikethroughPrice ?? ""} onChange={v => set("strikethroughPrice", v)} className="h-7 text-xs" placeholder="e.g. $497" />}<BSTextField data={d} onSet={set} label="Current Price (display only)" field="displayPrice" placeholder="e.g. $197" /></div><BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline /><BSTextField data={d} onSet={set} label="Button Text" field="ctaText" /><div><label className="text-xs text-gray-500 block mb-1">Button Action</label><Select value={d.ctaBehavior ?? "url"} onValueChange={v => set("ctaBehavior", v)}><SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="url">Link to URL</SelectItem><SelectItem value="send_email">Send Email</SelectItem><SelectItem value="next_funnel_step">Next Funnel Step</SelectItem></SelectContent></Select></div>{(d.ctaBehavior ?? "url") === "url" && <BSLinkField label="Button Link" value={d.ctaLink ?? ""} onChange={v => set("ctaLink", v)} />}{(d.ctaBehavior ?? "url") === "send_email" && <div><label className="text-xs text-gray-500 block mb-1">Email Address</label><DebouncedInput value={d.ctaEmailAddress ?? ""} onChange={v => set("ctaEmailAddress", v)} className="h-7 text-xs" placeholder="e.g. hello@example.com" /></div>}{(d.ctaBehavior ?? "url") === "next_funnel_step" && <p className="text-[10px] text-teal-600 bg-teal-50 rounded px-2 py-1">Button will navigate to the next page in the funnel sequence.</p>}<BSColorField data={d} onSet={set} label="Button Color" field="ctaColor" /><BSColorField data={d} onSet={set} label="Button Text Color" field="ctaTextColor" /><BSColorField data={d} onSet={set} label="Button Border / Outline Color" field="btnBorderColor" /><div><label className="text-xs text-gray-500 block mb-1">Button Style</label><div className="flex gap-1">{(["filled","outline"] as const).map(s=><button key={s} onClick={()=>set("btnStyle",s)} className={`flex-1 py-1 text-xs rounded border capitalize ${(d.btnStyle??"filled")===s?"bg-teal-600 text-white border-teal-600":"border-gray-200 text-gray-600"}`}>{s}</button>)}</div></div><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div className="border border-teal-100 bg-teal-50/50 rounded-lg p-3 space-y-2"><div className="flex items-center gap-2"><input type="checkbox" id="cta-lc" checked={d.leadCapture??false} onChange={e=>set("leadCapture",e.target.checked)} className="rounded" /><label htmlFor="cta-lc" className="text-xs text-teal-700 font-medium">Collect lead before action</label></div>{(d.leadCapture??false)&&(<div className="space-y-1 pl-1"><p className="text-[10px] text-gray-400">A name/email modal will appear before the button action executes.</p><BSTextField data={d} onSet={set} label="Modal Title" field="leadModalTitle" placeholder="e.g. Get Instant Access" /><BSTextField data={d} onSet={set} label="Modal Subtext" field="leadModalSubtext" placeholder="Optional" /><BSTextField data={d} onSet={set} label="Tags (comma-separated)" field="leadTags" placeholder="e.g. webinar, free-guide" /></div>)}</div><div><label className="text-xs text-gray-500 block mb-1">Button Animation</label><Select value={d.ctaAnimation ?? "none"} onValueChange={v => set("ctaAnimation", v)}><SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem><SelectItem value="pulse">Pulse</SelectItem><SelectItem value="bounce">Bounce</SelectItem><SelectItem value="shake">Shake</SelectItem><SelectItem value="glow">Glow</SelectItem></SelectContent></Select></div><BSAlignField data={d} onSet={set} label="Text Alignment" field="align" /><div className="border-t pt-3 mt-1 space-y-2"><p className="text-xs font-medium text-gray-500">Button Subtext (below button)</p><BSTextField data={d} onSet={set} label="Subtext text" field="buttonSubtext" placeholder="e.g. No credit card required" /><BSLinkField label="Subtext URL (optional)" value={d.buttonSubtextUrl ?? ""} onChange={v => set("buttonSubtextUrl", v)} /><BSColorField data={d} onSet={set} label="Subtext Color" field="buttonSubtextColor" /><div><label className="text-xs text-gray-500 block mb-1">Subtext Size</label><select value={d.buttonSubtextSize ?? "xs"} onChange={e => set("buttonSubtextSize", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="xs">Extra Small (xs)</option><option value="sm">Small (sm)</option><option value="base">Base</option><option value="lg">Large (lg)</option></select></div><div><label className="text-xs text-gray-500 block mb-1">Subtext Style</label><div className="flex gap-2"><button type="button" onClick={() => set("buttonSubtextItalic", !(d.buttonSubtextItalic ?? false))} className={`px-2 py-1 text-xs rounded border ${(d.buttonSubtextItalic ?? false) ? "bg-teal-50 border-teal-400 text-teal-700" : "border-gray-200 text-gray-500"}`}><em>Italic</em></button><button type="button" onClick={() => set("buttonSubtextBold", !(d.buttonSubtextBold ?? false))} className={`px-2 py-1 text-xs rounded border ${(d.buttonSubtextBold ?? false) ? "bg-teal-50 border-teal-400 text-teal-700" : "border-gray-200 text-gray-500"}`}><strong>Bold</strong></button></div></div></div><OptOutSettings d={d} set={set} /></div>);
     case "lead_capture":
       return <LeadCaptureSettings d={d} set={set} />;
     case "cta_optin":
@@ -1617,6 +1644,7 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
                     <DebouncedInput value={product.price} onChange={v => set("products", products.map((p, j) => j === i ? { ...p, price: v } : p))} className="h-7 text-xs" placeholder="$49" />
                     <DebouncedInput value={product.ctaText} onChange={v => set("products", products.map((p, j) => j === i ? { ...p, ctaText: v } : p))} className="h-7 text-xs" placeholder="CTA" />
                   </div>
+                  <DebouncedInput value={(product as any).strikethroughPrice ?? ""} onChange={v => set("products", products.map((p, j) => j === i ? { ...p, strikethroughPrice: v } : p))} className="h-7 text-xs" placeholder="Strikethrough price (e.g. $99, display only)" />
                   <BSLinkField label="CTA Link" value={product.ctaLink ?? ""} onChange={v => set("products", products.map((p, j) => j === i ? { ...p, ctaLink: v } : p))} />
                   <DebouncedInput value={product.fulfillment ?? ""} onChange={v => set("products", products.map((p, j) => j === i ? { ...p, fulfillment: v } : p))} className="h-7 text-xs" placeholder="Fulfillment note" />
                   <DebouncedInput value={product.imageUrl ?? ""} onChange={v => set("products", products.map((p, j) => j === i ? { ...p, imageUrl: v } : p))} className="h-7 text-xs" placeholder="Image URL" />
@@ -1643,9 +1671,10 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
               <option value="physical">Physical item</option>
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <BSTextField data={d} onSet={set} label="Price" field="price" />
             <BSTextField data={d} onSet={set} label="Compare At" field="compareAtPrice" />
+            <BSTextField data={d} onSet={set} label="Strikethrough" field="strikethroughPrice" />
           </div>
           <BSTextField data={d} onSet={set} label="Checkbox Label" field="checkboxLabel" />
           <BSTextField data={d} onSet={set} label="CTA Text" field="ctaText" />
@@ -1713,6 +1742,7 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
     case "urgency_offer":
       return (
         <div className="space-y-3">
+          <div className="border border-gray-200 rounded-lg p-3 space-y-2"><p className="text-xs font-semibold text-gray-600">Price Display</p><BSTextField data={d} onSet={set} label="Current Price (display only)" field="displayPrice" placeholder="e.g. $197" /><div className="flex items-center gap-2"><input type="checkbox" checked={d.showStrikethrough ?? false} onChange={e => set("showStrikethrough", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show strikethrough price</label></div>{(d.showStrikethrough ?? false) && <DebouncedInput value={d.strikethroughPrice ?? ""} onChange={v => set("strikethroughPrice", v)} className="h-7 text-xs" placeholder="e.g. $497" />}</div>
           <BSTextField data={d} onSet={set} label="Countdown Headline" field="countdownHeadline" placeholder="LIMITED TIME OFFER!" />
           <div><label className="text-xs text-gray-500 block mb-1">Countdown Mode</label><select value={d.countdownMode ?? "on_load"} onChange={e => set("countdownMode", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="on_load">Countdown on page load (minutes)</option><option value="event">Countdown to specific date/time</option></select></div>
           {(d.countdownMode ?? "on_load") === "on_load" ? (<div><label className="text-xs text-gray-500 block mb-1">Duration (minutes)</label><Input type="number" value={d.countdownMinutes ?? 90} onChange={e => set("countdownMinutes", Number(e.target.value))} className="h-8 text-sm" min={1} max={10080} /></div>) : (<div><label className="text-xs text-gray-500 block mb-1">Target Date & Time</label><Input type="datetime-local" value={d.countdownTargetDate ?? ""} onChange={e => set("countdownTargetDate", e.target.value)} className="h-8 text-sm" /></div>)}
@@ -1732,7 +1762,7 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
         </div>
       );
     case "inline_checkout": {
-      const icProds: Array<{ name: string; description: string; price: number; imageUrl: string; type: string }> = d.products ?? [];
+      const icProds: Array<{ name: string; description: string; price: number; imageUrl: string; type: string; strikethroughPrice?: string; productId?: number }> = d.products ?? [];
       const icBumps: Array<{ title: string; headline: string; description: string; price: number; imageUrl: string; ctaText: string; ctaEmoji: string; animation: string }> = d.orderBumps ?? [];
       // eslint-disable-next-line react-hooks/rules-of-hooks
       const { data: icCatalog } = trpc.funnel.listAllProducts.useQuery(undefined, { staleTime: 60_000 });
@@ -1744,6 +1774,8 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
           {/* Header */}
           <BSTextField data={d} onSet={set} label="Header Text" field="headerText" placeholder="🔒 Lock in your seat now!" />
           <BSTextField data={d} onSet={set} label="Header Price" field="headerPrice" placeholder="$997" />
+          <div className="flex items-center gap-2"><input type="checkbox" checked={d.showHeaderStrikethrough ?? false} onChange={e => set("showHeaderStrikethrough", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show header strikethrough price</label></div>
+          {(d.showHeaderStrikethrough ?? false) && <DebouncedInput value={d.headerStrikethroughPrice ?? ""} onChange={v => set("headerStrikethroughPrice", v)} className="h-7 text-xs" placeholder="e.g. $2997" />}
           {/* Options */}
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2"><input type="checkbox" checked={d.showContactInfo ?? true} onChange={e => set("showContactInfo", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Collect contact info (name, email)</label></div>
@@ -1844,7 +1876,7 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
       );
     }
     case "embedded_checkout": {
-      const ecProds: Array<{ name: string; description: string; price: number; imageUrl: string; type: string }> = d.products ?? [];
+      const ecProds: Array<{ name: string; description: string; price: number; imageUrl: string; type: string; strikethroughPrice?: string; productId?: number }> = d.products ?? [];
       const ecBumps: Array<{ title: string; headline: string; description: string; price: number; imageUrl: string; ctaText: string; highlightColor: string; animation: string }> = d.orderBumps ?? [];
       // eslint-disable-next-line react-hooks/rules-of-hooks
       const { data: ecCatalog } = trpc.funnel.listAllProducts.useQuery(undefined, { staleTime: 60_000 });
@@ -1963,7 +1995,7 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
       );
     }
     case "checkout_form": {
-      const cfProds: Array<{ name: string; description: string; price: number; imageUrl: string; type: string }> = d.products ?? [];
+      const cfProds: Array<{ name: string; description: string; price: number; imageUrl: string; type: string; strikethroughPrice?: string }> = d.products ?? [];
       const cfBumps: Array<{ title: string; headline: string; description: string; price: number; imageUrl: string; ctaText: string; ctaEmoji: string; externalUrl: string }> = d.orderBumps ?? [];
       return <CheckoutFormBlockSettings d={d} set={set} cfProds={cfProds} cfBumps={cfBumps} />;
     }
