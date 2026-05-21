@@ -320,14 +320,14 @@ export default function FunnelPageEditor() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          {pageData?.funnel?.slug && currentPage?.slug && (
+          {pageData?.funnel?.slug && (currentPage?.slug || numericPageId) && (
             <a
-              href={`/f/${pageData.funnel.slug}/${currentPage.slug}`}
+              href={currentPage?.slug ? `/f/${pageData.funnel.slug}/${currentPage.slug}` : `/f/${pageData.funnel.slug}?preview=${numericPageId}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-teal-700 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors"
+              className="flex items-center gap-1.5 text-sm text-teal-600 hover:text-teal-700 border border-teal-200 bg-teal-50 hover:bg-teal-100 rounded-lg px-3 py-1.5 transition-colors font-medium"
             >
-              <Eye size={14} /> Preview
+              <Eye size={14} /> Preview Page
             </a>
           )}
           <button
@@ -391,33 +391,51 @@ export default function FunnelPageEditor() {
       {/* Main Editor Area */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left Panel: Block Catalog + Page Nav */}
-        <div className="w-52 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col overflow-hidden">
+        <div className="w-52 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col overflow-y-auto">
           {/* Page navigation */}
           {allPages.length > 1 && (
             <div className="p-2 border-b border-gray-100">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-1 mb-2 flex items-center gap-1">
                 <Layers size={12} /> Funnel Pages
               </p>
-              <div className="flex flex-col gap-0.5 max-h-32 overflow-y-auto">
+              <div className="flex flex-col gap-0.5 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 380px)', minHeight: '5rem' }}>
                 {allPages.map((p: any) => (
-                  <button
+                  <div
                     key={p.id}
-                    onClick={() => {
-                      if (p.id !== numericPageId) {
-                        navigate(`/admin/funnels/${numericFunnelId}/pages/${p.id}/edit`);
-                      }
-                    }}
-                    className={`w-full text-left px-2 py-1.5 text-xs rounded-lg transition-colors truncate ${
-                      p.id === numericPageId
-                        ? "bg-teal-50 text-teal-700 font-semibold"
-                        : "text-gray-600 hover:bg-gray-50"
+                    className={`flex items-center gap-0.5 rounded-lg transition-colors ${
+                      p.id === numericPageId ? "bg-teal-50" : "hover:bg-gray-50"
                     }`}
                   >
-                    {p.title}
-                    <span className="text-[10px] text-gray-400 ml-1 capitalize">
-                      ({p.pageType.replace("_", " ")})
-                    </span>
-                  </button>
+                    <button
+                      onClick={() => {
+                        if (p.id !== numericPageId) {
+                          navigate(`/admin/funnels/${numericFunnelId}/pages/${p.id}/edit`);
+                        }
+                      }}
+                      className={`flex-1 text-left px-2 py-1.5 text-xs transition-colors truncate min-w-0 ${
+                        p.id === numericPageId
+                          ? "text-teal-700 font-semibold"
+                          : "text-gray-600"
+                      }`}
+                    >
+                      {p.title}
+                      <span className="text-[10px] text-gray-400 ml-1 capitalize">
+                        ({p.pageType.replace("_", " ")})
+                      </span>
+                    </button>
+                    {pageData?.funnel?.slug && p.slug && (
+                      <a
+                        href={`/f/${pageData.funnel.slug}/${p.slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={`Preview: ${p.title}`}
+                        className="flex-shrink-0 p-1 mr-1 text-gray-300 hover:text-teal-600 transition-colors"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        <Eye size={11} />
+                      </a>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>
