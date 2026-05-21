@@ -1669,4 +1669,29 @@ export const funnelAdminRouter = router({
 
       return { csvContent, total: leads.length };
     }),
+
+  /** Get all funnels with their pages (including blocks) for the block picker "Copy from Other Pages" tab */
+  getFunnelsWithPages: protectedProcedure
+    .query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const allFunnelsList = await db
+        .select({ id: funnels.id, name: funnels.name, status: funnels.status })
+        .from(funnels)
+        .orderBy(asc(funnels.name));
+      const result = [];
+      for (const funnel of allFunnelsList) {
+        const pages = await db
+          .select({ id: funnelPages.id, title: funnelPages.title, slug: funnelPages.slug, pageType: funnelPages.pageType, blocks: funnelPages.blocks })
+          .from(funnelPages)
+          .where(eq(funnelPages.funnelId, funnel.id))
+          .orderBy(asc(funnelPages.sortOrder));
+        const pagesWithBlocks = pages.filter(p => p.blocks && p.blocks.length > 2);
+        if (pagesWithBlocks.length > 0) {
+          result.push({ ...funnel, pages: pagesWithBlocks });
+        }
+      }
+      return result;
+    }),
 });

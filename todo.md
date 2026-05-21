@@ -2403,3 +2403,15 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Immediate access grant at checkout completion (enroll user in courses, grant download access, unlock quizzes)
 - [ ] Send buyer purchase confirmation email with access details
 - [ ] Send owner notification email on funnel purchase
+
+## Block Picker Unification (May 2026)
+- [x] Add 3-tab block picker modal (New Block, Copy from Other Pages, Block Templates) to FunnelPageEditor
+- [x] Add 3-tab block picker modal to LandingPageBuilder (courses as source for Copy tab)
+- [x] Add 3-tab block picker modal to DownloadLandingPageBuilder (downloads as source for Copy tab)
+- [x] Add 3-tab block picker modal to ProductLandingPageBuilder (physical products as source for Copy tab)
+- [x] LessonBlockEditor already had the 3-tab picker (lessons as source for Copy tab) — verified consistent
+- [x] Add getCoursesWithLandingBlocks, getDownloadsWithLandingBlocks, getProductsWithLandingBlocks to lmsAdminRouter
+- [x] Add getFunnelsWithPages to funnelRouter for FunnelPageEditor Copy tab
+- [x] All editors: left panel replaced with "Add Block" button that opens the modal
+- [x] All editors: Block Templates tab uses blockTemplates.list and blockTemplates.delete procedures
+- [x] Vitest tests for block picker utilities (7 tests passing)

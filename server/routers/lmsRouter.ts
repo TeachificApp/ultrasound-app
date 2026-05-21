@@ -53,6 +53,7 @@ import {
   lmsThinkificImports,
   lmsArchive,
   sonoQuizzes,
+  physicalProducts,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 
@@ -3519,6 +3520,56 @@ Generate 3-6 sections with 2-5 lessons each. Lesson types can be: text, video (f
         enrollments: enrichedEnrollments,
         orders: enrichedOrders,
       };
+    }),
+
+  /** Get all courses with their landing page blocks for the block picker "Copy from Other Pages" tab */
+  getCoursesWithLandingBlocks: protectedProcedure
+    .query(async ({ ctx }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const courses = await db
+        .select({ id: lmsCourses.id, title: lmsCourses.title, type: lmsCourses.type })
+        .from(lmsCourses)
+        .orderBy(asc(lmsCourses.title));
+      const result = [];
+      for (const course of courses) {
+        const [lp] = await db
+          .select({ id: lmsLandingPages.id, blocks: lmsLandingPages.blocks })
+          .from(lmsLandingPages)
+          .where(eq(lmsLandingPages.courseId, course.id))
+          .limit(1);
+        if (lp?.blocks && lp.blocks.length > 2) {
+          result.push({ ...course, blocks: lp.blocks });
+        }
+      }
+      return result;
+    }),
+
+  /** Get all digital download products with their landing page blocks for the block picker */
+  getDownloadsWithLandingBlocks: protectedProcedure
+    .query(async ({ ctx }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const products = await db
+        .select({ id: digitalProducts.id, title: digitalProducts.title, landingBlocks: digitalProducts.landingBlocks })
+        .from(digitalProducts)
+        .orderBy(asc(digitalProducts.title));
+      return products.filter(p => p.landingBlocks && p.landingBlocks.length > 2);
+    }),
+
+  /** Get all physical products with their landing page blocks for the block picker */
+  getProductsWithLandingBlocks: protectedProcedure
+    .query(async ({ ctx }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const products = await db
+        .select({ id: physicalProducts.id, title: physicalProducts.title, landingBlocks: physicalProducts.landingBlocks })
+        .from(physicalProducts)
+        .orderBy(asc(physicalProducts.title));
+      return products.filter(p => p.landingBlocks && p.landingBlocks.length > 2);
     }),
 });
 
