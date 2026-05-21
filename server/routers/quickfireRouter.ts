@@ -449,6 +449,7 @@ export const quickfireRouter = router({
     const set = await ensureTodaySet(db, date, ctx.brand);
     const brandCfg = getBrandCategoryConfig(ctx.brand);
     const questionMap = parseDailySetIds(set.questionIds, ctx.brand);
+
     // Always sync questionMap from current live challenges — overrides stale stored IDs.
     // This ensures mid-day challenge swaps (trash/promote) are immediately reflected.
     const liveChallengesNow = await db
