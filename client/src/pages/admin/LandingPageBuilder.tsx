@@ -1404,7 +1404,7 @@ function CheckoutFormBlockSettings({
       <BSTextField data={d} onSet={set} label="Submit Button Text" field="submitText" placeholder="Submit" />
       <BSSelectField data={d} onSet={set} label="Submit Button Icon" field="submitIcon" options={SUBMIT_ICON_OPTIONS} />
       <SuccessRedirectPicker value={d.successRedirect ?? ""} onChange={v => set("successRedirect", v)} />
-      {/* Colors */
+      {/* Colors */}
       <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />
       <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
       <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
@@ -2004,7 +2004,7 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
           <BSTextField data={d} onSet={set} label="Submit Button Text" field="submitText" placeholder="Submit" />
           <BSSelectField data={d} onSet={set} label="Submit Button Icon" field="submitIcon" options={SUBMIT_ICON_OPTIONS} />
           <SuccessRedirectPicker value={d.successRedirect ?? ""} onChange={v => set("successRedirect", v)} />
-          {/* Terms */
+          {/* Terms */}
           <div className="grid grid-cols-2 gap-2">
             <BSTextField data={d} onSet={set} label="Terms Text" field="termsText" placeholder="I agree to the" />
             <BSTextField data={d} onSet={set} label="Terms Link Text" field="termsLinkText" placeholder="Terms of Service" />
