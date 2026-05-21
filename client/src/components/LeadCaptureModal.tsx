@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 interface LeadCaptureModalProps {
   open: boolean;
@@ -30,9 +31,31 @@ export default function LeadCaptureModal({
   funnelId,
   pageId,
 }: LeadCaptureModalProps) {
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
+  const { user } = useAuth();
+
+  // Derive initial first/last name from user.name or user.displayName
+  const getInitialName = () => {
+    const fullName = (user?.displayName || user?.name || "").trim();
+    const parts = fullName.split(" ");
+    return {
+      first: parts[0] ?? "",
+      last: parts.slice(1).join(" ") ?? "",
+    };
+  };
+
+  const [firstName, setFirstName] = useState(() => getInitialName().first);
+  const [lastName, setLastName] = useState(() => getInitialName().last);
+  const [email, setEmail] = useState(() => user?.email ?? "");
+
+  // Re-populate if user loads after modal opens
+  useEffect(() => {
+    if (!user) return;
+    const { first, last } = getInitialName();
+    if (first) setFirstName(first);
+    if (last) setLastName(last);
+    if (user.email) setEmail(user.email);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const submitLead = trpc.funnelPublic.submitLead.useMutation({
     onSuccess: () => {
