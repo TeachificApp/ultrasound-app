@@ -30,7 +30,8 @@ export default function LeadCaptureModal({
   funnelId,
   pageId,
 }: LeadCaptureModalProps) {
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
 
   const submitLead = trpc.funnelPublic.submitLead.useMutation({
@@ -43,12 +44,15 @@ export default function LeadCaptureModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!firstName.trim()) { toast.error("Please enter your first name"); return; }
+    if (!lastName.trim()) { toast.error("Please enter your last name"); return; }
     if (!email) { toast.error("Please enter your email"); return; }
+    const fullName = `${firstName.trim()} ${lastName.trim()}`;
     submitLead.mutate({
       funnelId,
       funnelPageId: pageId,
       email,
-      name: name || undefined,
+      name: fullName,
       tags: tags || undefined,
       campaignId: campaignId || undefined,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -65,13 +69,24 @@ export default function LeadCaptureModal({
           {subtext && <DialogDescription>{subtext}</DialogDescription>}
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-3 mt-2">
-          <Input
-            type="text"
-            placeholder="Your name (optional)"
-            value={name}
-            onChange={e => setName(e.target.value)}
-            className="h-11"
-          />
+          <div className="flex gap-2">
+            <Input
+              type="text"
+              placeholder="First name"
+              value={firstName}
+              onChange={e => setFirstName(e.target.value)}
+              required
+              className="h-11"
+            />
+            <Input
+              type="text"
+              placeholder="Last name"
+              value={lastName}
+              onChange={e => setLastName(e.target.value)}
+              required
+              className="h-11"
+            />
+          </div>
           <Input
             type="email"
             placeholder="Your email address"
