@@ -83,7 +83,7 @@ export function ProductOfferStackBlock({ data, onPrimaryCta }: { data: Record<st
                   </span>
                   <div className="text-right">
                     {(product as any).strikethroughPrice && (
-                      <div className="text-sm text-gray-400 line-through">{(product as any).strikethroughPrice}</div>
+                      <div className="text-sm text-red-500 line-through font-medium">{(product as any).strikethroughPrice}</div>
                     )}
                     <span className="text-2xl font-bold" style={{ color: accentColor }}>{product.price}</span>
                   </div>

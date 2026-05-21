@@ -406,7 +406,7 @@ function InlineCheckoutInner({ data, onSuccess }: InnerFormProps) {
                     </div>
                     <div className="text-right flex-shrink-0">
                       {(product as any).strikethroughPrice && (
-                        <div className="text-xs text-gray-400 line-through">{(product as any).strikethroughPrice}</div>
+                        <div className="text-xs text-red-500 line-through font-medium">{(product as any).strikethroughPrice}</div>
                       )}
                       <span className="font-semibold text-sm">{fmt(product.price)}</span>
                     </div>

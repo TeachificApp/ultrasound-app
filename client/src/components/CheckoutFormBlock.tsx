@@ -28,6 +28,7 @@ interface CheckoutProduct {
   price: number; // cents
   imageUrl: string;
   type: string; // "course" | "quiz" | "product" | "external"
+  strikethroughPrice?: string; // display-only original price, e.g. "$97"
 }
 
 interface OrderBump {
@@ -339,7 +340,12 @@ function CheckoutFormInner({ data, funnelId, pageId, funnelSlug }: CheckoutFormB
                   <div className="font-semibold text-sm">{product.name}</div>
                   <div className="text-xs text-gray-500">{product.description}</div>
                 </div>
-                <span className="font-medium text-sm">${(product.price / 100).toFixed(2)}</span>
+                <div className="flex flex-col items-end gap-0.5">
+                  {(product as any).strikethroughPrice && (
+                    <span className="text-xs font-medium text-red-500 line-through leading-none">{(product as any).strikethroughPrice}</span>
+                  )}
+                  <span className="font-medium text-sm">${(product.price / 100).toFixed(2)}</span>
+                </div>
               </label>
             ))}
           </div>
