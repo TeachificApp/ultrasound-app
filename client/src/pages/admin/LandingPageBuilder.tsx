@@ -18,9 +18,16 @@ import {
   useSensors,
   DragEndEvent,
   DragStartEvent,
+<<<<<<< Updated upstream
   DragOverlay,
   useDroppable,
   type UniqueIdentifier,
+=======
+  DragOverEvent,
+  DragOverlay,
+  useDroppable,
+  UniqueIdentifier,
+>>>>>>> Stashed changes
 } from "@dnd-kit/core";
 import {
   SortableContext,
