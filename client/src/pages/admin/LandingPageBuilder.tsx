@@ -74,6 +74,8 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
   },
   { type: "two_column", label: "Two Columns", icon: <Columns size={14} />, category: "Layout",
     defaultData: { leftType: "rich_text", rightType: "rich_text", leftHtml: "<p>Left column content</p>", rightHtml: "<p>Right column content</p>", leftRatio: 50, bgColor: "#ffffff" } },
+  { type: "column_layout", label: "Column Layout (Blocks)", icon: <Columns size={14} />, category: "Layout",
+    defaultData: { leftBlocks: [], rightBlocks: [], leftRatio: 50, gap: 32, bgColor: "transparent", paddingX: 32, paddingY: 16 } },
   { type: "divided_columns", label: "Divided Columns", icon: <Columns size={14} />, category: "Layout",
     defaultData: { columns: [{ html: "<p>Column 1</p>" }, { html: "<p>Column 2</p>" }], gap: 32, bgColor: "#ffffff" } },
   { type: "three_column", label: "Three Columns", icon: <Columns size={14} />, category: "Layout",
@@ -2460,6 +2462,76 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
               <input type="color" value={d.bgColor ?? "#ffffff"} onChange={e => set("bgColor", e.target.value)} className="w-8 h-8 rounded cursor-pointer border border-gray-200" />
               <DebouncedInput value={d.bgColor ?? "#ffffff"} onChange={v => set("bgColor", v)} className="h-8 text-xs flex-1" placeholder="#ffffff" />
             </div>
+          </div>
+        </div>
+      );
+    }
+    case "column_layout": {
+      const leftBlocks: Block[] = d.leftBlocks ?? [];
+      const rightBlocks: Block[] = d.rightBlocks ?? [];
+      const ColumnBlockList = ({ side, blocks }: { side: "left" | "right"; blocks: Block[] }) => {
+        const [addOpen, setAddOpen] = useState(false);
+        const [addCat, setAddCat] = useState(CATALOG_CATEGORIES[0]);
+        const updateBlocks = (newBlocks: Block[]) => set(side === "left" ? "leftBlocks" : "rightBlocks", newBlocks);
+        return (
+          <div className="space-y-1">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-medium text-gray-600 capitalize">{side} Column</span>
+              <button onClick={() => setAddOpen(v => !v)} className="text-xs text-teal-600 flex items-center gap-1 hover:text-teal-700"><Plus size={11} /> Add Block</button>
+            </div>
+            {addOpen && (
+              <div className="bg-gray-50 border border-gray-200 rounded p-2 space-y-1 mb-2">
+                <div className="flex gap-1 flex-wrap">
+                  {CATALOG_CATEGORIES.map(cat => (
+                    <button key={cat} onClick={() => setAddCat(cat)} className={`text-[10px] px-2 py-0.5 rounded-full border ${addCat === cat ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-500"}`}>{cat}</button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-1 max-h-40 overflow-y-auto">
+                  {BLOCK_CATALOG.filter(c => c.category === addCat && c.type !== "column_layout").map(c => (
+                    <button key={c.type} onClick={() => {
+                      const newBlock: Block = { id: uid(), type: c.type, data: { ...c.defaultData } };
+                      updateBlocks([...blocks, newBlock]);
+                      setAddOpen(false);
+                    }} className="text-[10px] text-left px-2 py-1 rounded border border-gray-200 hover:bg-teal-50 hover:border-teal-300 text-gray-600 truncate">{c.label}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {blocks.length === 0 ? (
+              <div className="border-2 border-dashed border-gray-200 rounded p-3 text-center text-gray-400 text-xs">No blocks yet — click Add Block</div>
+            ) : (
+              <div className="space-y-1">
+                {blocks.map((b, i) => (
+                  <div key={b.id} className="border border-gray-200 rounded p-2 bg-white">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] font-medium text-gray-600 truncate flex-1">{BLOCK_CATALOG.find(c => c.type === b.type)?.label ?? b.type}</span>
+                      <div className="flex gap-0.5">
+                        <button disabled={i === 0} onClick={() => { const nb = [...blocks]; [nb[i-1], nb[i]] = [nb[i], nb[i-1]]; updateBlocks(nb); }} className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-teal-600 disabled:opacity-30"><ChevronUp size={10} /></button>
+                        <button disabled={i === blocks.length - 1} onClick={() => { const nb = [...blocks]; [nb[i], nb[i+1]] = [nb[i+1], nb[i]]; updateBlocks(nb); }} className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-teal-600 disabled:opacity-30"><ChevronDown size={10} /></button>
+                        <button onClick={() => updateBlocks(blocks.filter((_, j) => j !== i))} className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-red-500"><X size={10} /></button>
+                      </div>
+                    </div>
+                    <BlockSettings block={b} onChange={newData => {
+                      const nb = blocks.map((bl, j) => j === i ? { ...bl, data: newData } : bl);
+                      updateBlocks(nb);
+                    }} lessonId={lessonId} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      };
+      return (
+        <div className="space-y-3">
+          <ColumnBlockList side="left" blocks={leftBlocks} />
+          <div className="border-t border-gray-100 pt-3">
+            <ColumnBlockList side="right" blocks={rightBlocks} />
+          </div>
+          <div className="border-t border-gray-100 pt-3 space-y-2">
+            <div><label className="text-xs text-gray-500 block mb-1">Left Column Width (%)</label><Input type="number" value={d.leftRatio ?? 50} onChange={e => set("leftRatio", Number(e.target.value))} className="h-8 text-sm" min={20} max={80} /></div>
+            <div><label className="text-xs text-gray-500 block mb-1">Gap (px)</label><Input type="number" value={d.gap ?? 32} onChange={e => set("gap", Number(e.target.value))} className="h-8 text-sm" min={0} max={80} /></div>
+            <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
           </div>
         </div>
       );

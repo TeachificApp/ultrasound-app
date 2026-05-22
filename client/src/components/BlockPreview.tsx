@@ -23,7 +23,8 @@ export type BlockType =
   | "footer" | "logo_strip" | "three_column"
   | "related_products" | "embedded_checkout" | "inline_checkout"
   | "lesson_quiz" | "lesson_flashcard"
-  | "file_download" | "scorm_embed" | "url_embed";
+  | "file_download" | "scorm_embed" | "url_embed"
+  | "column_layout";
 
 export interface Block {
   id: string;
@@ -898,6 +899,36 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
             </div>
           )}
           {d.caption && <p className="text-sm text-gray-500 mt-2 text-center">{d.caption}</p>}
+        </div>
+      );
+    }
+    case "column_layout": {
+      const leftBlocks: Block[] = d.leftBlocks ?? [];
+      const rightBlocks: Block[] = d.rightBlocks ?? [];
+      const leftRatio = d.leftRatio ?? 50;
+      const gap = d.gap ?? 32;
+      return (
+        <div className="py-4" style={{ backgroundColor: d.bgColor ?? "transparent", padding: `${d.paddingY ?? 16}px ${d.paddingX ?? 32}px` }}>
+          <div className="flex items-start" style={{ gap: `${gap}px` }}>
+            <div style={{ flex: leftRatio, minWidth: 0 }}>
+              {leftBlocks.length === 0 ? (
+                <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center text-gray-400 text-xs">Left column (empty)</div>
+              ) : (
+                <div className="space-y-2">
+                  {leftBlocks.map((b: Block) => <BlockPreview key={b.id} block={b} />)}
+                </div>
+              )}
+            </div>
+            <div style={{ flex: 100 - leftRatio, minWidth: 0 }}>
+              {rightBlocks.length === 0 ? (
+                <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center text-gray-400 text-xs">Right column (empty)</div>
+              ) : (
+                <div className="space-y-2">
+                  {rightBlocks.map((b: Block) => <BlockPreview key={b.id} block={b} />)}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       );
     }

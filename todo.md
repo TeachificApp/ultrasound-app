@@ -2464,3 +2464,12 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
   - [x] useBrand.ts (brand config name fields)
   - [x] quickfireRouter.ts (leaderboard owner brand name)
   - [x] caseLibraryRouter.ts (owner display name masking)
+
+## Two-Column Layout Block (May 2026)
+- [x] Implement column_layout block data model (leftBlocks/rightBlocks arrays with nested blocks, leftRatio, gap, bgColor, paddingX, paddingY)
+- [x] Add column_layout block type to funnel page builder block catalog (BLOCK_CATALOG in LandingPageBuilder.tsx)
+- [x] Add column_layout BlockSettings case with inline ColumnBlockList editor (add/remove/reorder blocks per column, recursive BlockSettings)
+- [x] Add column_layout block type to LMS lesson builder (LessonBlockEditor imports from LandingPageBuilder — auto-inherited)
+- [x] column_layout public render component in BlockPreview.tsx (recursive BlockPreview rendering for left/right columns)
+- [x] column_layout renders in LMS lesson viewer (CoursePlayer uses BlockPreview — auto-inherited)
+- [x] 8 vitest tests for column_layout block data structure (server/columnLayout.test.ts)
