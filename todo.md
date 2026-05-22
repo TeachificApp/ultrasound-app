@@ -2529,3 +2529,8 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix DailyChallenge.tsx: filter CATS.map grid to only render cards for categories with questions
 - [x] Fix DailyChallenge.tsx: filter Preferences panel to only show toggles for categories with questions today
 - [x] Fix DailyChallenge.tsx: filter banner enabledCatKeysForBanner to exclude null-question categories
+
+## LandingPageBuilder Bugs (May 22, 2026)
+- [ ] Fix drag-and-drop block reordering: blocks snap back to original position after drop
+- [ ] Fix add-block-from-saved-template within content block: block not inserted after selecting template
+- [ ] Fix save-block-as-template: floppy disk icon does nothing; add name prompt dialog before saving

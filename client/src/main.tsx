@@ -31,9 +31,8 @@ document.addEventListener("cut", (e) => {
   if (!isFormElement(e.target)) e.preventDefault();
 });
 
-document.addEventListener("dragstart", (e) => {
-  if (!isFormElement(e.target)) e.preventDefault();
-});
+// NOTE: dragstart prevention removed — it broke drag-and-drop in the page builder.
+// Copy protection is handled by copy/cut listeners above.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
@@ -63,10 +62,18 @@ queryClient.getMutationCache().subscribe(event => {
   }
 });
 
+// Embed brand in the tRPC URL as a query param — this cannot be stripped by any proxy.
+// The X-App-Hostname header is also sent as a belt-and-suspenders fallback.
+function getBrandParam(): string {
+  const h = window.location.hostname.toLowerCase();
+  if (h.includes("iheartecho")) return "iheartecho";
+  return "aaus";
+}
+
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
-      url: "/api/trpc",
+      url: `/api/trpc?_brand=${getBrandParam()}`,
       transformer: superjson,
       headers() {
         return { "X-App-Hostname": window.location.hostname };
