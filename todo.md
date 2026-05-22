@@ -236,6 +236,9 @@
 - [x] Generate and insert 300 flashcards spread across all 16 AAUS categories
 - [x] Verify and fix AI case generator for AAUS category types (updated prompts, AIUM/SVU/ACR/ARDMS guidelines)
 
+## Features
+- [x] Add Course Curriculum block to funnel pages — added getCurriculumById server procedure, CurriculumCourseSelector in BlockSettings, and FunnelCurriculumBlock renderer in PublicFunnelPage
+
 ## Bugs
 - [x] Fix drag-and-drop in all page builders (LandingPageBuilder, DownloadLandingPageBuilder, ProductLandingPageBuilder, FunnelPageEditor, FunnelBuilder, LessonBlockEditor) — applied restrictToFirstScrollableAncestor modifier to fix overflow-y-auto parent issue
 - [x] Fix save-as-template in all page builders — added proper dialog + mutation + onSaveAsTemplate prop to all builders (was missing or no-op in Download, Product, Lesson, Funnel builders)

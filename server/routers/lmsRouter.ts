@@ -526,6 +526,28 @@ export const lmsPublicRouter = router({
       return { ...col, courses: courses.filter(Boolean) };
     }),
 
+  /** Fetch course title + sections + lessons by course ID — used by curriculum_auto block on funnel pages */
+  getCurriculumById: publicProcedure
+    .input(z.object({ courseId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return null;
+      const [course] = await db.select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug, status: lmsCourses.status })
+        .from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+      if (!course) return null;
+      const sections = await db.select().from(lmsSections)
+        .where(eq(lmsSections.courseId, course.id)).orderBy(asc(lmsSections.position));
+      const sectionsWithLessons = await Promise.all(sections.map(async (s) => {
+        const lessons = await db.select({
+          id: lmsLessons.id, title: lmsLessons.title, type: lmsLessons.type,
+          position: lmsLessons.position, isPreview: lmsLessons.isPreview,
+          previewMode: lmsLessons.previewMode, durationMinutes: lmsLessons.durationMinutes,
+        }).from(lmsLessons).where(eq(lmsLessons.sectionId, s.id)).orderBy(asc(lmsLessons.position));
+        return { ...s, lessons };
+      }));
+      return { id: course.id, title: course.title, slug: course.slug, sections: sectionsWithLessons };
+    }),
+
   /** Resolve a course/download ID to its slug (used for opt-out link redirect) */
   getSlugById: publicProcedure
     .input(z.object({ id: z.number().int().positive() }))

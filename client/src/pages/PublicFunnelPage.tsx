@@ -10,7 +10,8 @@ import { ButtonSubtext } from "@/lib/ctaSubtext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Loader2, ArrowRight, CheckCircle, Globe, Users } from "lucide-react";
+import { Loader2, ArrowRight, CheckCircle, Globe, Users, Lock, PlayCircle, ChevronDown } from "lucide-react";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import type { Block } from "@/components/BlockPreview";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import CheckoutFormBlock from "@/components/CheckoutFormBlock";
@@ -544,9 +545,98 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
         </footer>
       );
     }
+    case "curriculum_auto":
+      return <FunnelCurriculumBlock block={block} />;
     default:
       return null;
   }
+}
+
+// ─── Curriculum Block (for funnel pages) ────────────────────────────────────
+
+function FunnelCurriculumBlock({ block }: { block: Block }) {
+  const d = block.data;
+  const courseId = d.courseId ? Number(d.courseId) : 0;
+  const { data: curriculum, isLoading } = trpc.lms.getCurriculumById.useQuery(
+    { courseId },
+    { enabled: courseId > 0 }
+  );
+  const cr = d.cornerRadius ?? 12;
+  const iconStyle = d.iconStyle ?? "lock";
+
+  if (!courseId) {
+    return (
+      <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <p className="text-sm text-gray-400 text-center">No course selected. Edit this block to choose a course.</p>
+      </div>
+    );
+  }
+
+  if (isLoading || !curriculum) {
+    return (
+      <div className="px-8 py-10 flex justify-center" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <Loader2 className="animate-spin text-gray-400" size={24} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+      {d.headline && (
+        <h2 className="text-2xl font-bold mb-6" style={{ color: d.headlineColor ?? "#111827" }}
+          dangerouslySetInnerHTML={{ __html: d.headline }} />
+      )}
+      <div className="overflow-hidden max-w-3xl" style={{ border: `1px solid ${d.sectionBorderColor ?? "#e5e7eb"}`, borderRadius: `${cr}px` }}>
+        <Accordion type="multiple" defaultValue={["section-0"]}>
+          {curriculum.sections.map((section: any, si: number) => (
+            <AccordionItem key={section.id} value={`section-${si}`} style={{ borderBottom: `1px solid ${d.sectionBorderColor ?? "#e5e7eb"}` }}>
+              <AccordionTrigger
+                className="hover:no-underline px-5 font-semibold text-sm"
+                style={{ backgroundColor: d.sectionBgColor ?? "#f9fafb", color: d.sectionTextColor ?? "#1f2937" }}
+              >
+                <span>{section.title}</span>
+                <span className="text-xs ml-auto mr-2" style={{ color: d.lessonCountColor ?? "#9ca3af" }}>
+                  {section.lessons.length} lesson{section.lessons.length !== 1 ? "s" : ""}
+                </span>
+              </AccordionTrigger>
+              <AccordionContent>
+                <ul className="space-y-1 pt-1">
+                  {section.lessons.map((lesson: any) => {
+                    const pm = lesson.previewMode ?? (lesson.isPreview ? "preview" : "none");
+                    const isFreePreview = pm === "preview" || pm === "preview_hide_after_purchase";
+                    return (
+                      <li key={lesson.id} className="flex items-center gap-3 py-2 px-5 text-sm">
+                        {iconStyle !== "none" && (
+                          isFreePreview
+                            ? <PlayCircle className="w-4 h-4 flex-shrink-0" style={{ color: d.lessonPreviewIconColor ?? "#14b8a6" }} />
+                            : iconStyle === "circle"
+                              ? <span className="w-4 h-4 rounded-full border-2 flex-shrink-0" style={{ borderColor: d.lessonLockedIconColor ?? "#d1d5db" }} />
+                              : <Lock className="w-4 h-4 flex-shrink-0" style={{ color: d.lessonLockedIconColor ?? "#d1d5db" }} />
+                        )}
+                        <span style={{ color: isFreePreview ? (d.lessonPreviewIconColor ?? "#0d9488") : (d.lessonTextColor ?? "#374151"), fontWeight: isFreePreview ? 500 : 400 }}>
+                          {lesson.title}
+                        </span>
+                        {isFreePreview && (
+                          <a
+                            href={`/learn/${curriculum.slug}/player?lesson=${lesson.id}`}
+                            className="ml-auto text-xs hover:underline font-semibold flex items-center gap-1 shrink-0"
+                            style={{ color: d.lessonPreviewIconColor ?? "#0d9488" }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <PlayCircle className="w-3 h-3" /> Free Preview
+                          </a>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
+      </div>
+    </div>
+  );
 }
 
 // ─── Price Stack CTA Block ──────────────────────────────────────────────────

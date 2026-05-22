@@ -652,6 +652,28 @@ function BSLinkField({ data, onSet, label, field, value, onChange }: {
   );
 }
 
+/** Course selector for curriculum_auto block when used on funnel pages */
+function CurriculumCourseSelector({ d, set }: { d: Record<string, any>; set: (key: string, val: any) => void }) {
+  const { data: coursesData } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", type: "course", pageSize: 200 });
+  const courses = (coursesData?.courses ?? []) as Array<{ id: number; title: string; type: string }>;
+  const selectedId = d.courseId ? String(d.courseId) : "";
+  return (
+    <div className="border-b pb-3 mb-1">
+      <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Course to Display</label>
+      <Select value={selectedId} onValueChange={v => set("courseId", v ? Number(v) : null)}>
+        <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Auto (from page context)" /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="">Auto (from page context)</SelectItem>
+          {courses.map((c) => (
+            <SelectItem key={c.id} value={String(c.id)}>{c.title}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <p className="text-xs text-gray-400 mt-1">On funnel pages, select the course whose curriculum to display. On course landing pages, leave as “Auto”.</p>
+    </div>
+  );
+}
+
 function PricingCtaSettings({ d, set }: { d: Record<string, any>; set: (key: string, val: any) => void }) {
   const { data: coursesData } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", type: "all", pageSize: 100 });
   const allItems = (coursesData?.courses ?? []).map((c: any) => ({
@@ -2156,6 +2178,7 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
     case "curriculum_auto":
       return (
         <div className="space-y-3">
+          <CurriculumCourseSelector d={d} set={set} />
           <BSTextField data={d} onSet={set} label="Section Headline" field="headline" />
           <BSColorField data={d} onSet={set} label="Headline Color" field="headlineColor" />
           <BSColorField data={d} onSet={set} label="Block Background" field="bgColor" />
