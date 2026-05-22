@@ -331,6 +331,9 @@ async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>
   // Track which categories need a fallback live challenge row created
   const fallbackLiveNeeded: { cat: string; questionId: number }[] = [];
 
+  // Brand filter: only pick questions belonging to this brand
+  const brandFilter = eq(quickfireQuestions.brand, brand as any);
+
   for (const cat of categories) {
     const key = catKey[cat];
     if (questionMap[key] !== null) continue;
@@ -345,6 +348,7 @@ async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>
       .from(quickfireQuestions)
       .where(and(
         eq(quickfireQuestions.isActive, true),
+        brandFilter,
         sql`${quickfireQuestions.type} != 'quickReview'` as any,
         catFilter,
         ...(usedIds.length > 0 ? [sql`${quickfireQuestions.id} NOT IN (${sql.join(usedIds.map(id => sql`${id}`), sql`, `)})` as any] : [])
@@ -356,6 +360,7 @@ async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>
       .from(quickfireQuestions)
       .where(and(
         eq(quickfireQuestions.isActive, true),
+        brandFilter,
         sql`${quickfireQuestions.type} != 'quickReview'` as any,
         catFilter
       ));
@@ -373,6 +378,7 @@ async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>
       .from(quickfireQuestions)
       .where(and(
         eq(quickfireQuestions.isActive, true),
+        brandFilter,
         catFilter,
         ...(usedIds.length > 0 ? [sql`${quickfireQuestions.id} NOT IN (${sql.join(usedIds.map(id => sql`${id}`), sql`, `)})` as any] : [])
       ));
@@ -382,6 +388,7 @@ async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>
       .from(quickfireQuestions)
       .where(and(
         eq(quickfireQuestions.isActive, true),
+        brandFilter,
         catFilter
       ));
 
@@ -470,13 +477,9 @@ export const quickfireRouter = router({
         mapChanged = true;
       }
     }
-    // Clear categories that no longer have a live challenge
-    for (const key of Object.keys(questionMap)) {
-      if (!liveKeys.has(key) && questionMap[key] !== null) {
-        questionMap[key] = null;
-        mapChanged = true;
-      }
-    }
+    // NOTE: Do NOT clear categories that have no live challenge — those were populated
+    // by ensureTodaySet's fallback logic and should be preserved.
+    // Only update categories that DO have a live challenge (already done above in the loop).
     // Persist the updated map back to the daily set row if it changed
     if (mapChanged) {
       await db

@@ -1008,7 +1008,7 @@ export default function QuickFire() {
     ? ["adultEcho", "pediatricEcho", "acs", "fetalEcho", "ecg", "pocus", "physics"]
     : ["abdominal", "smallParts", "pelvicGyn", "ob1st", "ob2nd3rd", "fetalEcho", "breast", "vascular", "msk", "pocus", "physics"]
   ).filter(
-    (k) => (catPrefsForBanner as any)[k] !== false
+    (k) => (catPrefsForBanner as any)[k] !== false && catMapForBanner[k] != null
   );
   const completedTodayForBanner =
     isAuthenticated &&
@@ -1220,20 +1220,25 @@ export default function QuickFire() {
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {(isIHE
-                    ? (IHE_CATS as unknown as { key: string; prefKey: string; Icon: any; label: string }[])
+                    ? (IHE_CATS as unknown as { key: string; prefKey: string; Icon: any; label: string; mapKey: string }[])
                     : [
-                    { cat: "Abdominal" as const, prefKey: "abdominal" as const, Icon: Stethoscope, label: "Abdominal" },
-                    { cat: "Small Parts" as const, prefKey: "smallParts" as const, Icon: Scan, label: "Small Parts" },
-                    { cat: "Pelvic/Gyn" as const, prefKey: "pelvicGyn" as const, Icon: Circle, label: "Pelvic/Gyn" },
-                    { cat: "OB 1st Trimester" as const, prefKey: "ob1st" as const, Icon: Baby, label: "OB 1st Tri" },
-                    { cat: "OB 2nd/3rd Trimester" as const, prefKey: "ob2nd3rd" as const, Icon: Baby, label: "OB 2nd/3rd" },
-                    { cat: "Fetal Echo" as const, prefKey: "fetalEcho" as const, Icon: Heart, label: "Fetal Echo" },
-                    { cat: "Breast" as const, prefKey: "breast" as const, Icon: Microscope, label: "Breast" },
-                    { cat: "Vascular" as const, prefKey: "vascular" as const, Icon: Activity, label: "Vascular" },
-                    { cat: "MSK" as const, prefKey: "msk" as const, Icon: Bone, label: "MSK" },
-                    { cat: "POCUS" as const, prefKey: "pocus" as const, Icon: Wind, label: "POCUS" },
-                    { cat: "Physics" as const, prefKey: "physics" as const, Icon: FlaskConical, label: "Physics" },
-                  ] as { cat?: string; key?: string; prefKey: string; Icon: any; label: string }[]).map(({ key, cat, prefKey, Icon, label }) => {
+                    { cat: "Abdominal" as const, prefKey: "abdominal" as const, Icon: Stethoscope, label: "Abdominal", mapKey: "abdominal" },
+                    { cat: "Small Parts" as const, prefKey: "smallParts" as const, Icon: Scan, label: "Small Parts", mapKey: "smallParts" },
+                    { cat: "Pelvic/Gyn" as const, prefKey: "pelvicGyn" as const, Icon: Circle, label: "Pelvic/Gyn", mapKey: "pelvicGyn" },
+                    { cat: "OB 1st Trimester" as const, prefKey: "ob1st" as const, Icon: Baby, label: "OB 1st Tri", mapKey: "ob1st" },
+                    { cat: "OB 2nd/3rd Trimester" as const, prefKey: "ob2nd3rd" as const, Icon: Baby, label: "OB 2nd/3rd", mapKey: "ob2nd3rd" },
+                    { cat: "Fetal Echo" as const, prefKey: "fetalEcho" as const, Icon: Heart, label: "Fetal Echo", mapKey: "fetalEcho" },
+                    { cat: "Breast" as const, prefKey: "breast" as const, Icon: Microscope, label: "Breast", mapKey: "breast" },
+                    { cat: "Vascular" as const, prefKey: "vascular" as const, Icon: Activity, label: "Vascular", mapKey: "vascular" },
+                    { cat: "MSK" as const, prefKey: "msk" as const, Icon: Bone, label: "MSK", mapKey: "msk" },
+                    { cat: "POCUS" as const, prefKey: "pocus" as const, Icon: Wind, label: "POCUS", mapKey: "pocus" },
+                    { cat: "Physics" as const, prefKey: "physics" as const, Icon: FlaskConical, label: "Physics", mapKey: "physics" },
+                  ] as { cat?: string; key?: string; prefKey: string; Icon: any; label: string; mapKey: string }[]
+                  ).filter(({ mapKey }) => {
+                    // Only show preference toggles for categories that have questions available today
+                    const cm: Record<string, number | null> = (todaySetQuery.data as any)?.categoryMap ?? {};
+                    return cm[mapKey] != null;
+                  }).map(({ key, cat, prefKey, Icon, label }) => {
                     const catLabel = label ?? cat ?? key ?? prefKey;
                     const prefs = categoryPrefsQuery.data ?? (isIHE ? IHE_DEFAULT_PREFS : AAUS_DEFAULT_PREFS);
                     const isEnabled = (prefs as any)[prefKey] !== false;
@@ -1311,7 +1316,8 @@ export default function QuickFire() {
                     { key: "POCUS", label: "POCUS", Icon: Wind, desc: "Point-of-Care Ultrasound", prefKey: "pocus" as const, mapKey: "pocus" },
                     { key: "Physics", label: "Physics", Icon: FlaskConical, desc: "Ultrasound Physics & Instrumentation", prefKey: "physics" as const, mapKey: "physics" },
                   ];
-                  const enabledCats = CATS.filter((c) => catPrefs[c.prefKey] !== false);
+                  // Only show categories that have a question available today (non-null in categoryMap)
+                  const enabledCats = CATS.filter((c) => catPrefs[c.prefKey] !== false && categoryMap[c.mapKey] != null);
                   const allDone = enabledCats.length > 0 && enabledCats.every((c) => {
                     const qId = categoryMap[c.mapKey];
                     return qId && todayAttempts[qId] !== undefined;
@@ -1386,7 +1392,7 @@ export default function QuickFire() {
                       </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {CATS.map((cat) => {
+                      {CATS.filter((cat) => categoryMap[cat.mapKey] != null).map((cat) => {
                         const isDisabled = catPrefs[cat.prefKey] === false;
                         const qId = categoryMap[cat.mapKey];
                         const q = todayQuestions.find((q: any) => q.id === qId);

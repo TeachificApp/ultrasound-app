@@ -2520,3 +2520,12 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Update handleDragEnd to handle column-to-column moves (remove from source column, add to target column)
 - [ ] Admin reply moderation: Show Replies toggle per comment row in AdminLessonComments
 - [ ] Admin reply moderation: delete individual replies from the expanded reply list
+
+## Daily Challenge IHE Fix (May 22, 2026)
+- [x] Fix ensureTodaySet: add brand filter to all fallback question queries so IHE only picks IHE-brand questions
+- [x] Fix getTodaySet: removed "clear categories without live challenge" loop that zeroed out fallback question IDs
+- [x] Delete stale IHE daily set rows and stale live challenge rows with AAUS question IDs
+- [x] Fix DailyChallenge.tsx: filter enabledCats to only include categories with non-null questions (no more "No question available today" cards for ECG/Physics on IHE)
+- [x] Fix DailyChallenge.tsx: filter CATS.map grid to only render cards for categories with questions
+- [x] Fix DailyChallenge.tsx: filter Preferences panel to only show toggles for categories with questions today
+- [x] Fix DailyChallenge.tsx: filter banner enabledCatKeysForBanner to exclude null-question categories
