@@ -2546,3 +2546,4 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix save-block-as-template: move saveDialogOpen state before useCallback in BlockTemplateLibrary.tsx to fix closure bug
 - [x] Fix add-block-from-template: make Insert button always visible (was opacity-0 until hover)
 - [x] Fix drag-and-drop: remove global dragstart prevention from main.tsx
+# Last updated: Fri May 22 19:37:18 UTC 2026
