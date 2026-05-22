@@ -2534,3 +2534,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Fix drag-and-drop block reordering: blocks snap back to original position after drop
 - [ ] Fix add-block-from-saved-template within content block: block not inserted after selecting template
 - [ ] Fix save-block-as-template: floppy disk icon does nothing; add name prompt dialog before saving
+
+## IHE Daily Challenge Fix - Round 2 (May 22, 2026)
+- [x] Fix brand detection: embed _brand query param in tRPC URL (Cloud Run strips custom headers)
+- [x] Fix DailyChallenge.tsx: derive CATS from server-returned categoryMap keys, not just isIHE flag
+- [x] Fix DailyChallenge.tsx: hoist useIHECats to be available in Preferences panel scope
+- [x] Fix ensureTodaySet: add brand filter to all fallback question queries
+- [x] Fix dragstart global prevention that was blocking drag-and-drop in page builder

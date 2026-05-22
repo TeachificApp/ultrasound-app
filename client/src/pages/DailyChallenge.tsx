@@ -1003,8 +1003,12 @@ export default function QuickFire() {
   const todaySetForBanner = todaySetQuery.data;
   const catMapForBanner: Record<string, number> = (todaySetForBanner as any)?.categoryMap ?? {};
   const attemptsForBanner: Record<number, any> = (todaySetForBanner as any)?.userAttempts ?? {};
-  const catPrefsForBanner = categoryPrefsQuery.data ?? (isIHE ? IHE_DEFAULT_PREFS : AAUS_DEFAULT_PREFS);
-  const enabledCatKeysForBanner = (isIHE
+  const bannerServerReturnedIHEKeys = Object.keys(catMapForBanner).some(k => ["adultEcho","pediatricEcho","acs"].includes(k));
+  const useBannerIHECats = isIHE || bannerServerReturnedIHEKeys;
+  // Hoist useIHECats here so it's available in the Preferences panel (which renders before the IIFE below)
+  const useIHECats = useBannerIHECats;
+  const catPrefsForBanner = categoryPrefsQuery.data ?? (useBannerIHECats ? IHE_DEFAULT_PREFS : AAUS_DEFAULT_PREFS);
+  const enabledCatKeysForBanner = (useBannerIHECats
     ? ["adultEcho", "pediatricEcho", "acs", "fetalEcho", "ecg", "pocus", "physics"]
     : ["abdominal", "smallParts", "pelvicGyn", "ob1st", "ob2nd3rd", "fetalEcho", "breast", "vascular", "msk", "pocus", "physics"]
   ).filter(
@@ -1219,7 +1223,7 @@ export default function QuickFire() {
                   </button>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {(isIHE
+                  {(useIHECats
                     ? (IHE_CATS as unknown as { key: string; prefKey: string; Icon: any; label: string; mapKey: string }[])
                     : [
                     { cat: "Abdominal" as const, prefKey: "abdominal" as const, Icon: Stethoscope, label: "Abdominal", mapKey: "abdominal" },
@@ -1240,13 +1244,13 @@ export default function QuickFire() {
                     return cm[mapKey] != null;
                   }).map(({ key, cat, prefKey, Icon, label }) => {
                     const catLabel = label ?? cat ?? key ?? prefKey;
-                    const prefs = categoryPrefsQuery.data ?? (isIHE ? IHE_DEFAULT_PREFS : AAUS_DEFAULT_PREFS);
+                    const prefs = categoryPrefsQuery.data ?? (localUseIHECats ? IHE_DEFAULT_PREFS : AAUS_DEFAULT_PREFS);
                     const isEnabled = (prefs as any)[prefKey] !== false;
                     return (
                       <button
                         key={key ?? cat ?? prefKey}
                         onClick={() => {
-                          const current = categoryPrefsQuery.data ?? (isIHE ? IHE_DEFAULT_PREFS : AAUS_DEFAULT_PREFS);
+                          const current = categoryPrefsQuery.data ?? (localUseIHECats ? IHE_DEFAULT_PREFS : AAUS_DEFAULT_PREFS);
                           updateCategoryPrefsMutation.mutate({ ...current, [prefKey]: !isEnabled });
                         }}
                         className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${
@@ -1302,8 +1306,14 @@ export default function QuickFire() {
                   const categoryMap: Record<string, number> = (todaySet as any)?.categoryMap ?? {};
                   const todayQuestions: any[] = (todaySet as any)?.questions ?? [];
                   const todayAttempts: Record<number, any> = (todaySet as any)?.userAttempts ?? {};
-                  const catPrefs = categoryPrefsQuery.data ?? (isIHE ? IHE_DEFAULT_PREFS : AAUS_DEFAULT_PREFS);
-                  const CATS = isIHE ? (IHE_CATS as unknown as { key: string; label: string; Icon: any; desc: string; prefKey: string; mapKey: string }[]) : [
+                  // Derive CATS from actual categoryMap keys returned by server.
+                  // If the server returned IHE keys (adultEcho, etc.) use IHE_CATS regardless of isIHE flag.
+                  // This is more robust than relying solely on domain detection.
+                  const serverReturnedIHEKeys = Object.keys(categoryMap).some(k => ["adultEcho","pediatricEcho","acs"].includes(k));
+                  // useIHECats is also hoisted above for the Preferences panel; keep in sync
+                  const localUseIHECats = isIHE || serverReturnedIHEKeys;
+                  const catPrefs = categoryPrefsQuery.data ?? (localUseIHECats ? IHE_DEFAULT_PREFS : AAUS_DEFAULT_PREFS);
+                  const CATS = localUseIHECats ? (IHE_CATS as unknown as { key: string; label: string; Icon: any; desc: string; prefKey: string; mapKey: string }[]) : [
                     { key: "Abdominal", label: "Abdominal", Icon: Stethoscope, desc: "Abdominal Ultrasound", prefKey: "abdominal" as const, mapKey: "abdominal" },
                     { key: "Small Parts", label: "Small Parts", Icon: Scan, desc: "Small Parts Ultrasound", prefKey: "smallParts" as const, mapKey: "smallParts" },
                     { key: "Pelvic/Gyn", label: "Pelvic/Gyn", Icon: Circle, desc: "Pelvic/Gynecologic Ultrasound", prefKey: "pelvicGyn" as const, mapKey: "pelvicGyn" },
