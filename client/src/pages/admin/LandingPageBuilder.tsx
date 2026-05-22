@@ -49,7 +49,7 @@ import {
   AlignCenter, AlignRight, HelpCircle, Users, Star, Globe, Timer,
   AlertTriangle, CheckSquare, LayoutGrid, Layers, BookOpen, Tag,
   ChevronDown, ChevronUp, Copy, FolderOpen, BookMarked, Upload, Code,
-  ShoppingCart, Package, Link, Mail, Phone, MapPin, Bookmark, Music, UserPlus, Search,
+  ShoppingCart, Package, Link, Mail, Phone, MapPin, Bookmark, BookmarkPlus, Music, UserPlus, Search,
 } from "lucide-react";
 import AudioBlockEditor from "@/components/AudioBlockEditor";
 import LessonQuizBlockEditor from "@/components/LessonQuizBlockEditor";
@@ -2746,11 +2746,11 @@ export function SortableBlock({ block, isSelected, onSelect, onDelete, onDuplica
   const gap = block.data?.gap ?? 32;
 
   return (
-    <div ref={setNodeRef} style={style} onClick={onSelect} data-block-id={block.id}
+    <div ref={setNodeRef} style={style} onClick={(e) => { if ((e.target as HTMLElement).closest('[data-drag-handle]')) return; onSelect(); }} data-block-id={block.id}
       className={`relative group cursor-pointer border-2 transition-all ${isSelected ? "border-teal-500 shadow-lg shadow-teal-100" : "border-transparent hover:border-teal-200"}`}>
       <div className={`absolute top-2 right-2 z-10 flex gap-1 ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity`}>
         <button onClick={e => { e.stopPropagation(); onDuplicate(); }} className="w-7 h-7 bg-white border border-gray-200 rounded shadow text-gray-500 hover:text-teal-600 flex items-center justify-center" title="Duplicate"><Copy size={12} /></button>
-        {onSaveAsTemplate && <SaveAsTemplateButton block={block} blockLabel={BLOCK_CATALOG.find(c => c.type === block.type)?.label ?? block.type} className="w-7 h-7 bg-white border border-gray-200 rounded shadow flex items-center justify-center" />}
+        {onSaveAsTemplate && <button onClick={e => { e.stopPropagation(); onSaveAsTemplate(block); }} className="w-7 h-7 bg-white border border-gray-200 rounded shadow text-gray-500 hover:text-teal-600 flex items-center justify-center" title="Save as template"><BookmarkPlus size={12} /></button>}
         <button onClick={e => { e.stopPropagation(); onDelete(); }} className="w-7 h-7 bg-white border border-gray-200 rounded shadow text-gray-500 hover:text-red-500 flex items-center justify-center" title="Delete"><Trash2 size={12} /></button>
       </div>
       {/* Up/Down arrow buttons */}
@@ -2758,9 +2758,14 @@ export function SortableBlock({ block, isSelected, onSelect, onDelete, onDuplica
         <button disabled={!onMoveUp} onClick={e => { e.stopPropagation(); onMoveUp?.(); }} className="w-6 h-6 bg-white border border-gray-200 rounded shadow text-gray-400 hover:text-teal-600 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed" title="Move up"><ChevronUp size={12} /></button>
         <button disabled={!onMoveDown} onClick={e => { e.stopPropagation(); onMoveDown?.(); }} className="w-6 h-6 bg-white border border-gray-200 rounded shadow text-gray-400 hover:text-teal-600 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed" title="Move down"><ChevronDown size={12} /></button>
       </div>
-      <div {...attributes} {...listeners} onClick={e => e.stopPropagation()}
-        className={`absolute top-2 left-2 z-10 w-7 h-7 bg-white border border-gray-200 rounded shadow text-gray-400 hover:text-gray-600 flex items-center justify-center cursor-grab active:cursor-grabbing ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity`}
-        title="Drag to reorder"><GripVertical size={14} /></div>
+      <div
+        {...attributes}
+        {...listeners}
+        onClick={e => e.stopPropagation()}
+        className={`absolute top-2 left-2 z-10 w-7 h-7 bg-white border border-gray-200 rounded shadow text-gray-400 hover:text-gray-600 flex items-center justify-center cursor-grab active:cursor-grabbing opacity-100 transition-opacity`}
+        title="Drag to reorder"
+        data-drag-handle="true"
+      ><GripVertical size={14} /></div>
       <div style={{ marginTop: block.data?.marginTop ? `${block.data.marginTop}px` : undefined, marginBottom: block.data?.marginBottom ? `${block.data.marginBottom}px` : undefined, paddingTop: block.data?.paddingTop ? `${block.data.paddingTop}px` : undefined, paddingBottom: block.data?.paddingBottom ? `${block.data.paddingBottom}px` : undefined, paddingLeft: block.data?.paddingLeft ? `${block.data.paddingLeft}px` : undefined, paddingRight: block.data?.paddingRight ? `${block.data.paddingRight}px` : undefined }}>
         {isColumnLayout ? (
           <div style={{ backgroundColor: block.data?.bgColor ?? "transparent", padding: `${block.data?.paddingY ?? 16}px ${block.data?.paddingX ?? 32}px` }}>
@@ -2918,6 +2923,10 @@ export default function LandingPageBuilder() {
   // Use a ref so handleDragEnd always reads the latest column target (avoids stale closure)
   const activeColumnTargetRef = useRef<{ blockId: string; side: "left" | "right" } | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  // Save-as-template dialog state
+  const [saveTemplateDialogBlock, setSaveTemplateDialogBlock] = useState<Block | null>(null);
+  const [saveTemplateName, setSaveTemplateName] = useState("");
+  const [saveTemplateDesc, setSaveTemplateDesc] = useState("");
 
   // Auto-scroll preview canvas to the selected block
   useEffect(() => {
@@ -3140,16 +3149,18 @@ export default function LandingPageBuilder() {
     setBlocks(prev => [...prev, ...tplBlocks]);
   }, []);
 
-  const saveBlockTemplateMutation = trpc.lmsAdmin.savePageTemplate.useMutation({
-    onSuccess: () => toast.success("Block saved as global template!"),
+  const utils = trpc.useUtils();
+  const saveBlockTemplateMutation = trpc.blockTemplates.save.useMutation({
+    onSuccess: () => { toast.success("Block saved as template!"); utils.blockTemplates.list.invalidate(); },
     onError: (e: any) => toast.error(`Save failed: ${e.message}`),
   });
 
   const handleSaveBlockAsTemplate = useCallback((block: Block) => {
     const label = BLOCK_CATALOG.find(c => c.type === block.type)?.label ?? block.type;
-    const name = `${label} — ${new Date().toLocaleDateString()}`;
-    saveBlockTemplateMutation.mutate({ name, description: `Saved from page builder`, templateType: "block", blocks: [block] });
-  }, [saveBlockTemplateMutation]);
+    setSaveTemplateName(`${label} — ${new Date().toLocaleDateString()}`);
+    setSaveTemplateDesc("Saved from page builder");
+    setSaveTemplateDialogBlock(block);
+  }, []);
 
   const selectedBlock = blocks.find(b => b.id === selectedId);
   const catalogByCat = BLOCK_CATALOG.filter(c => c.category === activeCat);
@@ -3462,6 +3473,59 @@ export default function LandingPageBuilder() {
         {pickerTab === "templates" && (
           <LandingBlockTemplatesTab onInsert={(block) => { setBlocks(prev => [...prev, block]); setSelectedId(block.id); toast.success("Block template inserted!"); setAddMenuOpen(false); }} />
         )}
+      </DialogContent>
+    </Dialog>
+
+    {/* ── Save Block as Template Dialog ── */}
+    <Dialog open={!!saveTemplateDialogBlock} onOpenChange={(open) => { if (!open) setSaveTemplateDialogBlock(null); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-teal-700 flex items-center gap-2">
+            <Bookmark className="w-4 h-4" /> Save Block as Template
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div>
+            <Label className="text-xs font-semibold text-gray-600 mb-1 block">Template Name <span className="text-red-500">*</span></Label>
+            <Input
+              value={saveTemplateName}
+              onChange={e => setSaveTemplateName(e.target.value)}
+              placeholder="e.g. Hero Banner — Teal"
+              className="text-sm"
+              autoFocus
+            />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-gray-600 mb-1 block">Description <span className="text-gray-400">(optional)</span></Label>
+            <Input
+              value={saveTemplateDesc}
+              onChange={e => setSaveTemplateDesc(e.target.value)}
+              placeholder="Brief description of this block template"
+              className="text-sm"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setSaveTemplateDialogBlock(null)} className="text-sm">Cancel</Button>
+          <Button
+            disabled={!saveTemplateName.trim() || saveBlockTemplateMutation.isPending}
+            onClick={() => {
+              if (!saveTemplateDialogBlock || !saveTemplateName.trim()) return;
+              saveBlockTemplateMutation.mutate(
+                {
+                  name: saveTemplateName.trim(),
+                  description: saveTemplateDesc.trim() || undefined,
+                  blockType: saveTemplateDialogBlock.type,
+                  blockData: saveTemplateDialogBlock.data ?? {},
+                },
+                { onSuccess: () => { setSaveTemplateDialogBlock(null); } }
+              );
+            }}
+            className="bg-teal-600 hover:bg-teal-700 text-white text-sm"
+          >
+            {saveBlockTemplateMutation.isPending ? "Saving…" : "Save Template"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
     </>
