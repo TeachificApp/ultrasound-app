@@ -36,6 +36,7 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { restrictToFirstScrollableAncestor } from "@dnd-kit/modifiers";
 import { FunnelFlowDiagram } from "@/components/FunnelFlowDiagram";
 
 type FunnelStatus = "draft" | "active" | "archived";
@@ -157,7 +158,7 @@ function FunnelListView({ onSelect, onCreate }: { onSelect: (id: number) => void
       ) : (
         <>
           <p className="text-xs text-gray-400 mb-3">Drag cards to reorder your funnels</p>
-          <DndContext sensors={listSensors} collisionDetection={closestCenter} onDragEnd={handleFunnelDragEnd}>
+          <DndContext sensors={listSensors} modifiers={[restrictToFirstScrollableAncestor]} collisionDetection={closestCenter} onDragEnd={handleFunnelDragEnd}>
             <SortableContext items={localFunnels.map(f => f.id)} strategy={verticalListSortingStrategy}>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {localFunnels.map((funnel: Funnel, fi: number) => (
@@ -741,7 +742,7 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
 
       {/* Pages as sortable connected flow */}
       {pageView === "list" && (
-      <DndContext sensors={pageSensors} collisionDetection={closestCenter} onDragEnd={handlePageDragEnd}>
+      <DndContext sensors={pageSensors} modifiers={[restrictToFirstScrollableAncestor]} collisionDetection={closestCenter} onDragEnd={handlePageDragEnd}>
         <SortableContext items={localPages.map(p => p.id)} strategy={verticalListSortingStrategy}>
           <div className="space-y-3">
             {localPages.map((page, idx) => {

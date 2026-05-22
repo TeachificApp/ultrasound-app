@@ -19,6 +19,7 @@ import {
   verticalListSortingStrategy,
   arrayMove,
 } from "@dnd-kit/sortable";
+import { restrictToFirstScrollableAncestor } from "@dnd-kit/modifiers";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -183,16 +184,25 @@ export default function FunnelPageEditor() {
     setAddMenuOpen(false);
   };
 
-  const saveBlockTemplateMutation = trpc.lmsAdmin.savePageTemplate.useMutation({
-    onSuccess: () => toast.success("Block saved as global template!"),
+  const [saveTemplateDialogBlock, setSaveTemplateDialogBlock] = useState<Block | null>(null);
+  const [saveTemplateBlockName, setSaveTemplateBlockName] = useState("");
+  const [saveTemplateBlockDesc, setSaveTemplateBlockDesc] = useState("");
+  const saveBlockTemplateMutation = trpc.blockTemplates.save.useMutation({
+    onSuccess: () => {
+      toast.success("Block saved as template!");
+      utils.blockTemplates.list.invalidate();
+      setSaveTemplateDialogBlock(null);
+      setSaveTemplateBlockName("");
+      setSaveTemplateBlockDesc("");
+    },
     onError: (e: any) => toast.error(`Save failed: ${e.message}`),
   });
 
   const handleSaveBlockAsTemplate = useCallback((block: Block) => {
-    const label = BLOCK_CATALOG.find(c => c.type === block.type)?.label ?? block.type;
-    const name = `${label} — ${new Date().toLocaleDateString()}`;
-    saveBlockTemplateMutation.mutate({ name, description: `Saved from funnel page builder`, templateType: "block", blocks: [block] });
-  }, [saveBlockTemplateMutation]);
+    setSaveTemplateBlockName("");
+    setSaveTemplateBlockDesc("");
+    setSaveTemplateDialogBlock(block);
+  }, []);
 
   // Page navigation sidebar
   const allPages = pageData?.allPages ?? [];
@@ -296,7 +306,7 @@ export default function FunnelPageEditor() {
 
   return (
     <>
-    <div className="fixed inset-0 z-50 flex flex-col bg-gray-50" style={{ fontFamily: "Inter, sans-serif" }}>
+    <div className="fixed inset-0 z-40 flex flex-col bg-gray-50" style={{ fontFamily: "Inter, sans-serif" }}>
       {/* Top Bar */}
       <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200 shadow-sm flex-shrink-0">
         <div className="flex items-center gap-3">
@@ -686,7 +696,7 @@ export default function FunnelPageEditor() {
             </div>
           ) : (
             <div className="bg-white min-h-full shadow-sm mx-auto" style={{ maxWidth: "900px" }}>
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <DndContext sensors={sensors} modifiers={[restrictToFirstScrollableAncestor]} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
                   {blocks.map((block, idx) => (
                     <SortableBlock
@@ -961,11 +971,42 @@ export default function FunnelPageEditor() {
         )}
       </DialogContent>
     </Dialog>
+    {/* Save Block as Template Dialog */}
+    <Dialog open={!!saveTemplateDialogBlock} onOpenChange={(open) => { if (!open) setSaveTemplateDialogBlock(null); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-teal-700 flex items-center gap-2">Save Block as Template</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div>
+            <label className="text-xs font-semibold text-gray-600 mb-1 block">Template Name <span className="text-red-500">*</span></label>
+            <input type="text" value={saveTemplateBlockName} onChange={e => setSaveTemplateBlockName(e.target.value)} placeholder="e.g. Hero Banner" className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-400" autoFocus />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-600 mb-1 block">Description <span className="text-gray-400">(optional)</span></label>
+            <input type="text" value={saveTemplateBlockDesc} onChange={e => setSaveTemplateBlockDesc(e.target.value)} placeholder="Brief description" className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-400" />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <button onClick={() => setSaveTemplateDialogBlock(null)} className="text-sm text-gray-600 hover:text-gray-800 px-4 py-2 rounded-lg border border-gray-200 transition-colors">Cancel</button>
+          <button
+            disabled={!saveTemplateBlockName.trim() || saveBlockTemplateMutation.isPending}
+            onClick={() => {
+              if (!saveTemplateDialogBlock || !saveTemplateBlockName.trim()) return;
+              saveBlockTemplateMutation.mutate({ name: saveTemplateBlockName.trim(), description: saveTemplateBlockDesc.trim() || undefined, blockType: saveTemplateDialogBlock.type, blockData: saveTemplateDialogBlock.data ?? {} });
+            }}
+            className="text-sm bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saveBlockTemplateMutation.isPending ? "Saving..." : "Save Template"}
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
     </>
   );
 }
 
-// ─── Block Templates Tab (reused from LessonBlockEditor pattern) ─────────────
+// ─── Block Templates Tab (reused from LessonBlockEditor pattern) ─────────────────
 
 function FunnelBlockTemplatesTab({ onInsert }: { onInsert: (block: Block) => void }) {
   const [search, setSearch] = useState("");

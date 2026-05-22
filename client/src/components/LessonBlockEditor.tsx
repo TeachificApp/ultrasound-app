@@ -12,6 +12,7 @@ import {
 import {
   SortableContext, verticalListSortingStrategy, arrayMove,
 } from "@dnd-kit/sortable";
+import { restrictToFirstScrollableAncestor } from "@dnd-kit/modifiers";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,6 +68,27 @@ export default function LessonBlockEditor({
   const [blockSearch, setBlockSearch] = useState("");
 
   const updateLesson = trpc.lmsAdmin.updateLesson.useMutation();
+
+  // Save-as-template state
+  const [saveTemplateDialogBlock, setSaveTemplateDialogBlock] = useState<Block | null>(null);
+  const [saveTemplateName, setSaveTemplateName] = useState("");
+  const [saveTemplateDesc, setSaveTemplateDesc] = useState("");
+  const utils = trpc.useUtils();
+  const saveBlockTemplateMutation = trpc.blockTemplates.save.useMutation({
+    onSuccess: () => {
+      toast.success("Block saved as template!");
+      utils.blockTemplates.list.invalidate();
+      setSaveTemplateDialogBlock(null);
+      setSaveTemplateName("");
+      setSaveTemplateDesc("");
+    },
+    onError: (e: any) => toast.error(`Save failed: ${e.message}`),
+  });
+  const handleSaveBlockAsTemplate = useCallback((block: Block) => {
+    setSaveTemplateName("");
+    setSaveTemplateDesc("");
+    setSaveTemplateDialogBlock(block);
+  }, []);
 
   // Fetch all courses for the course picker
   const { data: coursesData } = trpc.lmsAdmin.listCourses.useQuery(
@@ -302,7 +324,7 @@ export default function LessonBlockEditor({
       scrollToBlock(newBlock.id);
     }}>
     <>
-    <div className="fixed inset-0 z-50 flex bg-black/40">
+    <div className="fixed inset-0 z-40 flex bg-black/40">
       {/* Main editor panel */}
       <div className="flex flex-col w-full max-w-6xl mx-auto bg-white shadow-2xl overflow-hidden">
         {/* Header */}
@@ -388,7 +410,7 @@ export default function LessonBlockEditor({
                 )}
               </div>
             ) : (
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <DndContext sensors={sensors} modifiers={[restrictToFirstScrollableAncestor]} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
                   {blocks.map((block, idx) => (
                     <div
@@ -406,7 +428,7 @@ export default function LessonBlockEditor({
                         onDuplicate={() => duplicateBlock(block.id)}
                         onMoveUp={idx > 0 ? () => moveBlock(block.id, -1) : undefined}
                         onMoveDown={idx < blocks.length - 1 ? () => moveBlock(block.id, 1) : undefined}
-                        onSaveAsTemplate={(block) => block}
+                        onSaveAsTemplate={handleSaveBlockAsTemplate}
                       />
                     </div>
                   ))}
@@ -668,6 +690,44 @@ export default function LessonBlockEditor({
             }}
           />
         )}
+      </DialogContent>
+    </Dialog>
+    {/* Save Block as Template Dialog */}
+    <Dialog open={!!saveTemplateDialogBlock} onOpenChange={(open) => { if (!open) setSaveTemplateDialogBlock(null); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-teal-700 flex items-center gap-2">
+            Save Block as Template
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div>
+            <label className="text-xs font-semibold text-gray-600 mb-1 block">Template Name <span className="text-red-500">*</span></label>
+            <input type="text" value={saveTemplateName} onChange={e => setSaveTemplateName(e.target.value)} placeholder="e.g. Hero Banner" className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-400" autoFocus />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-600 mb-1 block">Description <span className="text-gray-400">(optional)</span></label>
+            <input type="text" value={saveTemplateDesc} onChange={e => setSaveTemplateDesc(e.target.value)} placeholder="Brief description" className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-400" />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <button onClick={() => setSaveTemplateDialogBlock(null)} className="text-sm text-gray-600 hover:text-gray-800 px-4 py-2 rounded-lg border border-gray-200 transition-colors">Cancel</button>
+          <button
+            disabled={!saveTemplateName.trim() || saveBlockTemplateMutation.isPending}
+            onClick={() => {
+              if (!saveTemplateDialogBlock || !saveTemplateName.trim()) return;
+              saveBlockTemplateMutation.mutate({
+                name: saveTemplateName.trim(),
+                description: saveTemplateDesc.trim() || undefined,
+                blockType: saveTemplateDialogBlock.type,
+                blockData: saveTemplateDialogBlock.data ?? {},
+              });
+            }}
+            className="text-sm bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saveBlockTemplateMutation.isPending ? "Saving..." : "Save Template"}
+          </button>
+        </div>
       </DialogContent>
     </Dialog>
     </>

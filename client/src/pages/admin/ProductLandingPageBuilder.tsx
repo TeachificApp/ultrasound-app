@@ -21,6 +21,7 @@ import {
   verticalListSortingStrategy,
   arrayMove,
 } from "@dnd-kit/sortable";
+import { restrictToFirstScrollableAncestor } from "@dnd-kit/modifiers";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,7 +31,7 @@ import { toast } from "sonner";
 import { type Block, type BlockType } from "@/components/BlockPreview";
 import { uid, BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, SortableBlock } from "./LandingPageBuilder";
 import {
-  ArrowLeft, Save, Eye, Plus, Palette, X, Layers, BookOpen, Copy, Search,
+  ArrowLeft, Save, Eye, Plus, Palette, X, Layers, BookOpen, Copy, Search, BookmarkPlus,
 } from "lucide-react";
 
 export default function ProductLandingPageBuilder() {
@@ -50,6 +51,27 @@ export default function ProductLandingPageBuilder() {
   const [pickerTab, setPickerTab] = useState<"catalog" | "from_pages" | "templates">("catalog");
   const [selectedSourceProductId, setSelectedSourceProductId] = useState<number | null>(null);
   const [blockSearch, setBlockSearch] = useState("");
+
+  // Save-as-template dialog state
+  const [saveTemplateDialogBlock, setSaveTemplateDialogBlock] = useState<Block | null>(null);
+  const [saveTemplateName, setSaveTemplateName] = useState("");
+  const [saveTemplateDesc, setSaveTemplateDesc] = useState("");
+  const utils = trpc.useUtils();
+  const saveBlockTemplateMutation = trpc.blockTemplates.save.useMutation({
+    onSuccess: () => {
+      toast.success("Block saved as template!");
+      utils.blockTemplates.list.invalidate();
+      setSaveTemplateDialogBlock(null);
+      setSaveTemplateName("");
+      setSaveTemplateDesc("");
+    },
+    onError: (e: any) => toast.error(`Save failed: ${e.message}`),
+  });
+  const handleSaveBlockAsTemplate = useCallback((block: Block) => {
+    setSaveTemplateName("");
+    setSaveTemplateDesc("");
+    setSaveTemplateDialogBlock(block);
+  }, []);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -168,7 +190,7 @@ export default function ProductLandingPageBuilder() {
 
   return (
     <>
-    <div className="fixed inset-0 z-50 flex flex-col bg-gray-50" style={{ fontFamily: "Inter, sans-serif" }}>
+    <div className="fixed inset-0 z-40 flex flex-col bg-gray-50" style={{ fontFamily: "Inter, sans-serif" }}>
       {/* Top Bar */}
       <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200 shadow-sm flex-shrink-0">
         <div className="flex items-center gap-3">
@@ -243,7 +265,7 @@ export default function ProductLandingPageBuilder() {
             </div>
           ) : (
             <div className="bg-white min-h-full shadow-sm mx-auto" style={{ maxWidth: "900px" }}>
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <DndContext sensors={sensors} modifiers={[restrictToFirstScrollableAncestor]} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
                   {blocks.map((block, idx) => (
                     <SortableBlock
@@ -255,6 +277,7 @@ export default function ProductLandingPageBuilder() {
                       onDuplicate={() => duplicateBlock(block.id)}
                       onMoveUp={idx > 0 ? () => setBlocks(prev => arrayMove(prev, idx, idx - 1)) : undefined}
                       onMoveDown={idx < blocks.length - 1 ? () => setBlocks(prev => arrayMove(prev, idx, idx + 1)) : undefined}
+                      onSaveAsTemplate={handleSaveBlockAsTemplate}
                     />
                   ))}
                 </SortableContext>
@@ -403,11 +426,34 @@ export default function ProductLandingPageBuilder() {
         )}
       </DialogContent>
     </Dialog>
+    {/* ── Save Block as Template Dialog ── */}
+    <Dialog open={!!saveTemplateDialogBlock} onOpenChange={(open) => { if (!open) setSaveTemplateDialogBlock(null); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-teal-700 flex items-center gap-2">
+            <BookmarkPlus className="w-4 h-4" /> Save Block as Template
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div>
+            <label className="text-xs font-semibold text-gray-600 mb-1 block">Template Name <span className="text-red-500">*</span></label>
+            <input type="text" value={saveTemplateName} onChange={e => setSaveTemplateName(e.target.value)} placeholder="e.g. Hero Banner — Teal" className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-400" autoFocus />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-600 mb-1 block">Description <span className="text-gray-400">(optional)</span></label>
+            <input type="text" value={saveTemplateDesc} onChange={e => setSaveTemplateDesc(e.target.value)} placeholder="Brief description" className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-400" />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <button onClick={() => setSaveTemplateDialogBlock(null)} className="text-sm text-gray-600 hover:text-gray-800 px-4 py-2 rounded-lg border border-gray-200 transition-colors">Cancel</button>
+          <button disabled={!saveTemplateName.trim() || saveBlockTemplateMutation.isPending} onClick={() => { if (!saveTemplateDialogBlock || !saveTemplateName.trim()) return; saveBlockTemplateMutation.mutate({ name: saveTemplateName.trim(), description: saveTemplateDesc.trim() || undefined, blockType: saveTemplateDialogBlock.type, blockData: saveTemplateDialogBlock.data ?? {} }); }} className="text-sm bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">{saveBlockTemplateMutation.isPending ? "Saving…" : "Save Template"}</button>
+        </div>
+      </DialogContent>
+    </Dialog>
     </>
   );
 }
 
-// ─── Block Templates Tab ──────────────────────────────────────────────────────
 function ProductBlockTemplatesTab({ onInsert }: { onInsert: (block: Block) => void }) {
   const [search, setSearch] = useState("");
   const { data: templates, isLoading } = trpc.blockTemplates.list.useQuery({ search: search || undefined });

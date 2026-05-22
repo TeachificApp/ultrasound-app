@@ -237,6 +237,8 @@
 - [x] Verify and fix AI case generator for AAUS category types (updated prompts, AIUM/SVU/ACR/ARDMS guidelines)
 
 ## Bugs
+- [x] Fix drag-and-drop in all page builders (LandingPageBuilder, DownloadLandingPageBuilder, ProductLandingPageBuilder, FunnelPageEditor, FunnelBuilder, LessonBlockEditor) — applied restrictToFirstScrollableAncestor modifier to fix overflow-y-auto parent issue
+- [x] Fix save-as-template in all page builders — added proper dialog + mutation + onSaveAsTemplate prop to all builders (was missing or no-op in Download, Product, Lesson, Funnel builders)
 - [x] Fix magic link 404 — /auth/magic route returns 404 on published app (added /auth/magic route in App.tsx)
 - [x] Magic link login fails on app.allaboutultrasound.com — "failed query" DB error (missing users columns — fixed via ALTER TABLE)
 - [x] Thinkific webhook: new enrollments create free members only, welcome email suppressed
