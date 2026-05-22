@@ -128,11 +128,21 @@ async function startServer() {
 
   // Debug endpoint to check brand detection from hostname
   app.get("/api/debug/brand", (req, res) => {
-    const hostname = req.hostname || req.headers.host?.split(":")[0] || "";
+    const xAppHostname = req.headers["x-app-hostname"] || "";
     const xForwardedHost = req.headers["x-forwarded-host"] || "";
-    const brand = detectBrandFromHostname(hostname);
-    const brandMode = detectBrandMode(hostname);
-    res.json({ hostname, xForwardedHost, brand, brandMode });
+    const origin = req.headers["origin"] || "";
+    const referer = req.headers["referer"] || "";
+    const host = req.headers.host || "";
+    const reqHostname = req.hostname || "";
+    function extractH(url: string) { try { return new URL(url).hostname; } catch { return ""; } }
+    const resolved = (Array.isArray(xAppHostname) ? xAppHostname[0] : xAppHostname)
+      || (Array.isArray(xForwardedHost) ? xForwardedHost[0] : xForwardedHost)
+      || extractH(Array.isArray(origin) ? origin[0] : origin)
+      || extractH(Array.isArray(referer) ? referer[0] : referer)
+      || host || reqHostname || "";
+    const brand = detectBrandFromHostname(resolved);
+    const brandMode = detectBrandMode(resolved);
+    res.json({ resolved, xAppHostname, xForwardedHost, origin, referer, host, reqHostname, brand, brandMode });
   });
   // Build version debug endpoint to verify deployed code
   app.get("/api/debug/build-version", (_req, res) => {

@@ -71,11 +71,22 @@ export async function createContext(
 
   // Behind a reverse proxy (trust proxy=1), req.hostname may return the internal host.
   // Priority: X-App-Hostname (sent by tRPC client with window.location.hostname — most reliable)
-  //         → X-Forwarded-Host → Host header → req.hostname
+  //         → X-Forwarded-Host → Origin → Referer → Host header → req.hostname
+  // NOTE: X-App-Hostname may be stripped by Cloud Run proxy, so Origin/Referer are critical fallbacks.
   const appHostname = opts.req.headers["x-app-hostname"];
   const forwardedHost = opts.req.headers["x-forwarded-host"];
+  const originHeader = opts.req.headers["origin"] || "";
+  const refererHeader = opts.req.headers["referer"] || "";
+  // Extract hostname from Origin/Referer URL
+  function extractHostname(url: string): string {
+    try { return new URL(url).hostname; } catch { return ""; }
+  }
+  const originHostname = extractHostname(Array.isArray(originHeader) ? originHeader[0] : originHeader);
+  const refererHostname = extractHostname(Array.isArray(refererHeader) ? refererHeader[0] : refererHeader);
   const hostname = (Array.isArray(appHostname) ? appHostname[0] : appHostname)
     || (Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost)
+    || originHostname
+    || refererHostname
     || opts.req.headers.host
     || opts.req.hostname
     || "";
