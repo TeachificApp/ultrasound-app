@@ -3518,7 +3518,7 @@ export default function LandingPageBuilder() {
                   name: saveTemplateName.trim(),
                   description: saveTemplateDesc.trim() || undefined,
                   blockType: saveTemplateDialogBlock.type,
-                  blockData: saveTemplateDialogBlock.data ?? {},
+                  blockData: JSON.parse(JSON.stringify(saveTemplateDialogBlock.data ?? {})),
                 },
                 { onSuccess: () => { setSaveTemplateDialogBlock(null); } }
               );

@@ -446,7 +446,7 @@ export default function ProductLandingPageBuilder() {
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <button onClick={() => setSaveTemplateDialogBlock(null)} className="text-sm text-gray-600 hover:text-gray-800 px-4 py-2 rounded-lg border border-gray-200 transition-colors">Cancel</button>
-          <button disabled={!saveTemplateName.trim() || saveBlockTemplateMutation.isPending} onClick={() => { if (!saveTemplateDialogBlock || !saveTemplateName.trim()) return; saveBlockTemplateMutation.mutate({ name: saveTemplateName.trim(), description: saveTemplateDesc.trim() || undefined, blockType: saveTemplateDialogBlock.type, blockData: saveTemplateDialogBlock.data ?? {} }); }} className="text-sm bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">{saveBlockTemplateMutation.isPending ? "Saving…" : "Save Template"}</button>
+          <button disabled={!saveTemplateName.trim() || saveBlockTemplateMutation.isPending} onClick={() => { if (!saveTemplateDialogBlock || !saveTemplateName.trim()) return; saveBlockTemplateMutation.mutate({ name: saveTemplateName.trim(), description: saveTemplateDesc.trim() || undefined, blockType: saveTemplateDialogBlock.type, blockData: JSON.parse(JSON.stringify(saveTemplateDialogBlock.data ?? {})) }); }} className="text-sm bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">{saveBlockTemplateMutation.isPending ? "Saving…" : "Save Template"}</button>
         </div>
       </DialogContent>
     </Dialog>
