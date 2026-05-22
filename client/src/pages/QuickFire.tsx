@@ -9,6 +9,7 @@
  */
 
 import { useState, useMemo, useEffect } from "react";
+import { isIHeartEchoDomain } from "@/hooks/useSubdomain";
 import { isVideoUrl } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -827,7 +828,18 @@ export default function QuickFire() {
   if (!isAuthenticated) {
     const catMap: Record<string, number> = (todaySetQuery.data as any)?.categoryMap ?? {};
     const todayQs: any[] = (todaySetQuery.data as any)?.questions ?? [];
-    const CATS_UNAUTH = [
+    // Detect IHE from server-returned categoryMap keys (most reliable — works even if domain detection fails)
+    const serverHasIHEKeys = Object.keys(catMap).some(k => ["adultEcho","pediatricEcho","acs"].includes(k));
+    const useIHECatsUnauth = isIHeartEchoDomain() || serverHasIHEKeys;
+    const CATS_UNAUTH = useIHECatsUnauth ? [
+      { key: "Adult Echo", label: "Adult Echo", Icon: Heart, desc: "Adult Echocardiography", mapKey: "adultEcho" },
+      { key: "Pediatric Echo", label: "Pediatric Echo", Icon: Baby, desc: "Pediatric Echocardiography", mapKey: "pediatricEcho" },
+      { key: "ACS", label: "ACS", Icon: Activity, desc: "Acute Coronary Syndrome", mapKey: "acs" },
+      { key: "Fetal Echo", label: "Fetal Echo", Icon: Heart, desc: "Fetal Echocardiography", mapKey: "fetalEcho" },
+      { key: "ECG", label: "ECG", Icon: Activity, desc: "Electrocardiography", mapKey: "ecg" },
+      { key: "POCUS", label: "POCUS", Icon: Wind, desc: "Point-of-Care Ultrasound", mapKey: "pocus" },
+      { key: "Physics", label: "Physics", Icon: Activity, desc: "Ultrasound Physics", mapKey: "physics" },
+    ] : [
       { key: "Abdominal", label: "Abdominal", Icon: Activity, desc: "Abdominal Ultrasound", mapKey: "abdominal" },
       { key: "Small Parts", label: "Small Parts", Icon: Scan, desc: "Small Parts Ultrasound", mapKey: "smallParts" },
       { key: "Pelvic/Gyn", label: "Pelvic/Gyn", Icon: Activity, desc: "Pelvic/Gynecologic Ultrasound", mapKey: "pelvicGyn" },
@@ -839,7 +851,7 @@ export default function QuickFire() {
       { key: "MSK", label: "MSK", Icon: Activity, desc: "Musculoskeletal Ultrasound", mapKey: "msk" },
       { key: "POCUS", label: "POCUS", Icon: Wind, desc: "Point-of-Care Ultrasound", mapKey: "pocus" },
       { key: "Physics", label: "Physics", Icon: Activity, desc: "Ultrasound Physics", mapKey: "physics" },
-    ] as const;
+    ];
 
     // If a category is active, show the question player (read-only, sign-in to submit)
     if (activeCategory) {
@@ -970,7 +982,7 @@ export default function QuickFire() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {CATS_UNAUTH.map((cat) => {
+              {CATS_UNAUTH.filter((cat) => catMap[cat.mapKey] != null).map((cat) => {
                 const qId = catMap[cat.mapKey];
                 const q = qId ? todayQs.find((tq: any) => tq.id === qId) : null;
                 return (
@@ -1331,9 +1343,21 @@ export default function QuickFire() {
                   const categoryMap: Record<string, number> = (todaySet as any)?.categoryMap ?? {};
                   const todayQuestions: any[] = (todaySet as any)?.questions ?? [];
                   const todayAttempts: Record<number, any> = (todaySet as any)?.userAttempts ?? {};
-                  const catPrefs = categoryPrefsQuery.data ?? { abdominal: true, smallParts: true, pelvicGyn: true, ob1st: true, ob2nd3rd: true, fetalEcho: true, breast: true, vascular: true, msk: true, pocus: true, physics: true };
+                  // Detect IHE from server-returned categoryMap keys (most reliable)
+                  const serverHasIHEKeysAuth = Object.keys(categoryMap).some(k => ["adultEcho","pediatricEcho","acs"].includes(k));
+                  const useIHECatsAuth = isIHeartEchoDomain() || serverHasIHEKeysAuth;
+                  const IHE_DEFAULT_PREFS_AUTH = { adultEcho: true, pediatricEcho: true, acs: true, fetalEcho: true, ecg: true, pocus: true, physics: true };
+                  const catPrefs = categoryPrefsQuery.data ?? (useIHECatsAuth ? IHE_DEFAULT_PREFS_AUTH : { abdominal: true, smallParts: true, pelvicGyn: true, ob1st: true, ob2nd3rd: true, fetalEcho: true, breast: true, vascular: true, msk: true, pocus: true, physics: true });
 
-                  const CATS = [
+                  const CATS = useIHECatsAuth ? [
+                    { key: "Adult Echo", label: "Adult Echo", Icon: Heart, desc: "Adult Echocardiography", prefKey: "adultEcho" as const, mapKey: "adultEcho", isPocus: false },
+                    { key: "Pediatric Echo", label: "Pediatric Echo", Icon: Baby, desc: "Pediatric Echocardiography", prefKey: "pediatricEcho" as const, mapKey: "pediatricEcho", isPocus: false },
+                    { key: "ACS", label: "ACS", Icon: Activity, desc: "Acute Coronary Syndrome", prefKey: "acs" as const, mapKey: "acs", isPocus: false },
+                    { key: "Fetal Echo", label: "Fetal Echo", Icon: Heart, desc: "Fetal Echocardiography", prefKey: "fetalEcho" as const, mapKey: "fetalEcho", isPocus: false },
+                    { key: "ECG", label: "ECG", Icon: Activity, desc: "Electrocardiography", prefKey: "ecg" as const, mapKey: "ecg", isPocus: false },
+                    { key: "POCUS", label: "POCUS", Icon: Wind, desc: "Point-of-Care Ultrasound", prefKey: "pocus" as const, mapKey: "pocus", isPocus: false },
+                    { key: "Physics", label: "Physics", Icon: Activity, desc: "Ultrasound Physics", prefKey: "physics" as const, mapKey: "physics", isPocus: false },
+                  ] : [
                     { key: "Abdominal", label: "Abdominal", Icon: Activity, desc: "Abdominal Ultrasound", prefKey: "abdominal" as const, mapKey: "abdominal", isPocus: false },
                     { key: "Small Parts", label: "Small Parts", Icon: Scan, desc: "Small Parts Ultrasound", prefKey: "smallParts" as const, mapKey: "smallParts", isPocus: false },
                     { key: "Pelvic/Gyn", label: "Pelvic/Gyn", Icon: Activity, desc: "Pelvic/Gynecologic Ultrasound", prefKey: "pelvicGyn" as const, mapKey: "pelvicGyn", isPocus: false },
@@ -1347,7 +1371,7 @@ export default function QuickFire() {
                     { key: "Physics", label: "Physics", Icon: Activity, desc: "Ultrasound Physics & Instrumentation", prefKey: "physics" as const, mapKey: "physics", isPocus: false },
                   ];
 
-                  const enabledCats = CATS.filter((c) => catPrefs[c.prefKey] !== false);
+                  const enabledCats = CATS.filter((c) => catPrefs[c.prefKey] !== false && categoryMap[c.mapKey] != null);
                   const allDone = enabledCats.length > 0 && enabledCats.every((c) => {
                     const qId = categoryMap[c.mapKey];
                     return qId && todayAttempts[qId] !== undefined;
@@ -1422,7 +1446,7 @@ export default function QuickFire() {
                       </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {CATS.map((cat) => {
+                      {CATS.filter((cat) => categoryMap[cat.mapKey] != null).map((cat) => {
                         const isDisabled = catPrefs[cat.prefKey] === false;
                         const qId = categoryMap[cat.mapKey];
                         const q = todayQuestions.find((q: any) => q.id === qId);
