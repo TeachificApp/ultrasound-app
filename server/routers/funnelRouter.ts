@@ -901,13 +901,29 @@ export const funnelPublicRouter = router({
       if (!page) throw new TRPCError({ code: "NOT_FOUND", message: "Page not found" });
       // Track page view
       await db.execute(sql`UPDATE funnel_pages SET views = views + 1 WHERE id = ${page.id}`);
-      // Get next page info if connected
+      // Get next page info — prefer explicit nextPageId, fall back to next sort_order
       let nextPage = null;
       if (page.nextPageId) {
         const [np] = await db
           .select({ slug: funnelPages.slug, title: funnelPages.title, pageType: funnelPages.pageType })
           .from(funnelPages)
           .where(eq(funnelPages.id, page.nextPageId));
+        nextPage = np || null;
+      }
+      if (!nextPage) {
+        // Fall back to the next page by sort_order in the same funnel
+        const [np] = await db
+          .select({ slug: funnelPages.slug, title: funnelPages.title, pageType: funnelPages.pageType })
+          .from(funnelPages)
+          .where(
+            and(
+              eq(funnelPages.funnelId, funnel.id),
+              sql`${funnelPages.sortOrder} > ${page.sortOrder}`,
+              eq(funnelPages.isActive, true)
+            )
+          )
+          .orderBy(asc(funnelPages.sortOrder))
+          .limit(1);
         nextPage = np || null;
       }
       return { funnel, page, nextPage };
