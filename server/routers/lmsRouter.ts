@@ -1727,18 +1727,20 @@ export const lmsAdminRouter = router({
       showInstructor: z.enum(["inherit", "show", "hide"]).optional(),
       prerequisiteLessonId: z.number().int().nullable().optional(),
       isPrerequisite: z.boolean().optional(),
+      commentsEnabled: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const { id, requireVideoCompletion, requireManualComplete, isPrerequisite, ...rest } = input;
+      const { id, requireVideoCompletion, requireManualComplete, isPrerequisite, commentsEnabled, ...rest } = input;
       const updates: Record<string, unknown> = Object.fromEntries(
         Object.entries(rest).filter(([, v]) => v !== undefined)
       );
       if (requireVideoCompletion !== undefined) updates.requireVideoCompletion = requireVideoCompletion ? 1 : 0;
       if (requireManualComplete !== undefined) updates.requireManualComplete = requireManualComplete ? 1 : 0;
       if (isPrerequisite !== undefined) updates.isPrerequisite = isPrerequisite;
+      if (commentsEnabled !== undefined) updates.commentsEnabled = commentsEnabled ? 1 : 0;
       // Convert null dripDays to 0 (no drip)
       if (updates.dripDays === null) updates.dripDays = 0;
       // Keep isPreview in sync with previewMode for backward compat

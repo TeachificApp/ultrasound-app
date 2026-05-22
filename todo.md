@@ -2478,3 +2478,19 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] "Move out" button on column child blocks to eject back to main canvas
 - [x] DragOverlay ghost preview while dragging
 - [x] Visual drop zone highlight (teal ring + bg) when hovering over a column
+
+## Lesson Commenting System (May 2026)
+- [x] Add `commentsEnabled` boolean column to `lmsLessons` table (default false)
+- [x] Add `commentBanned` boolean column to `users` table (default false, silent — no notification)
+- [x] Create `lessonComments` table (id, lessonId, userId, content, createdAt, deletedAt, deletedByAdminId)
+- [x] Run migration SQL for all schema changes
+- [x] tRPC: `lessonComments.list` — enrolled users, paginated, excludes soft-deleted
+- [x] tRPC: `lessonComments.add` — protected, checks commentsEnabled + not commentBanned (ban is silent)
+- [x] tRPC: `lessonComments.delete` — admin only, soft-delete with deletedByAdminId
+- [x] tRPC: `lessonComments.adminList` — cross-lesson paginated list with search (name/content/lesson title)
+- [x] tRPC: `lessonComments.banUser` — admin only, toggle banned boolean (silent, no notification)
+- [x] Student UI: LessonCommentSection component at bottom of CoursePlayer, only shown when commentsEnabled
+- [x] Admin UI: commentsEnabled toggle in lesson editor (LMSAdmin.tsx)
+- [x] Admin UI: AdminLessonComments page — delete comments, ban/unban users, search across all lessons
+- [x] Admin nav: "Lesson Comments" link in LMSLayout and MembersLayout admin dropdown
+- [x] 16 vitest tests for comment validation, permission enforcement, soft-delete, and schema structure

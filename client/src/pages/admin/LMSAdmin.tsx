@@ -2950,6 +2950,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
   const [dripDays, setDripDays] = useState(String(lesson.dripDays ?? ""));
   const [showInstructor, setShowInstructor] = useState<"inherit" | "show" | "hide">(lesson.showInstructor ?? "inherit");
   const [isPrerequisite, setIsPrerequisite] = useState<boolean>(!!lesson.isPrerequisite);
+  const [commentsEnabled, setCommentsEnabled] = useState<boolean>(!!(lesson as any).commentsEnabled);
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<{ id: number; title: string; s3Url: string; mediaType: string } | null>(null);
 
@@ -2966,6 +2967,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
     setDripDays(String(lessonShallow.dripDays ?? ""));
     setShowInstructor(lessonShallow.showInstructor ?? "inherit");
     setIsPrerequisite(!!lessonShallow.isPrerequisite);
+    setCommentsEnabled(!!(lessonShallow as any).commentsEnabled);
   }, [lessonShallow.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync state when full lesson data arrives (content/videoContent/embedUrl may be empty until then)
@@ -3009,6 +3011,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
       dripDays: dripDays.trim() ? parseInt(dripDays) : null,
       showInstructor,
       isPrerequisite,
+      commentsEnabled,
       content: (lesson.type === "text" || lesson.type === "video" || lesson.type === "download" || lesson.type === "video_text") ? (content || null) : undefined,
       videoContent: lesson.type === "video_text" ? (videoContent || null) : undefined,
       embedUrl: lesson.type === "embed" ? (embedUrl || null) : undefined,
@@ -3198,6 +3201,13 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
             <Switch checked={requireManualComplete} onCheckedChange={setRequireManualComplete} id="edit-req-manual" />
             <Label htmlFor="edit-req-manual" className="text-sm">Show "Mark Complete" button (manual completion)</Label>
           </div>
+
+          {/* Comments toggle */}
+          <div className="flex items-center gap-2">
+            <Switch checked={commentsEnabled} onCheckedChange={setCommentsEnabled} id="edit-comments-enabled" />
+            <Label htmlFor="edit-comments-enabled" className="text-sm">Enable student discussion / comments on this lesson</Label>
+          </div>
+
           {/* Drip scheduling */}
           <div className="border border-gray-200 rounded-lg p-4 space-y-2 bg-gray-50">
             <p className="text-sm font-semibold text-gray-700 flex items-center gap-1.5"><Clock className="w-4 h-4 text-teal-600" /> Drip Schedule</p>

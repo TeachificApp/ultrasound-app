@@ -10,7 +10,7 @@ import { Link, useLocation } from "wouter";
 import {
   LogIn, LogOut, Settings, ChevronDown,
   GraduationCap, FolderOpen, ExternalLink, LayoutDashboard,
-  BookOpen, Menu, X, ShieldCheck
+  BookOpen, Menu, X, ShieldCheck, MessageSquare
 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -163,6 +163,11 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
                           <Link href="/admin/media-repository" onClick={() => setAccountOpen(false)}>
                             <div className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer flex items-center gap-2">
                               <FolderOpen className="w-3.5 h-3.5 text-gray-500" /> Media Repository
+                            </div>
+                          </Link>
+                          <Link href="/admin/lesson-comments" onClick={() => setAccountOpen(false)}>
+                            <div className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer flex items-center gap-2">
+                              <MessageSquare className="w-3.5 h-3.5 text-gray-500" /> Lesson Comments
                             </div>
                           </Link>
                         </>

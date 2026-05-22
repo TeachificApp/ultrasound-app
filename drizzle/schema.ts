@@ -79,6 +79,8 @@ export const users = mysqlTable("users", {
   unsubscribedAt: timestamp("unsubscribedAt"),
   // Unique token used in unsubscribe links — generated on first campaign send
   unsubscribeToken: varchar("unsubscribeToken", { length: 64 }),
+  // Comment ban: when true, user cannot post lesson comments (silent — no notification sent)
+  commentBanned: boolean("commentBanned").default(false).notNull(),
 });
 
 export type User = typeof users.$inferSelect;
@@ -2835,6 +2837,8 @@ export const lmsLessons = mysqlTable("lms_lessons", {
   isPrerequisite: boolean("is_prerequisite").default(false).notNull(),
   // Legacy: kept for DB compatibility but no longer used in logic
   prerequisiteLessonId: int("prerequisite_lesson_id"),
+  // Comments: when true, enrolled students can post comments on this lesson
+  commentsEnabled: boolean("comments_enabled").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -4090,3 +4094,18 @@ export const ssoTokens = mysqlTable("sso_tokens", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 export type SsoToken = typeof ssoTokens.$inferSelect;
+
+// ─── Lesson Comments ─────────────────────────────────────────────────────────
+export const lessonComments = mysqlTable("lesson_comments", {
+  id: int("id").autoincrement().primaryKey(),
+  lessonId: int("lesson_id").notNull(),
+  userId: int("user_id").notNull(),
+  content: text("content").notNull(),
+  // Soft delete: set by admin, comment hidden from students but preserved in DB
+  deletedAt: timestamp("deleted_at"),
+  deletedByAdminId: int("deleted_by_admin_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type LessonComment = typeof lessonComments.$inferSelect;
+export type InsertLessonComment = typeof lessonComments.$inferInsert;

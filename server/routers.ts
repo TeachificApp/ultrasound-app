@@ -43,6 +43,7 @@ import { embeddedCheckoutRouter } from "./routers/embeddedCheckoutRouter";
 import { adminUserRouter } from "./routers/adminUserRouter";
 import { blockTemplatesRouter } from "./routers/blockTemplatesRouter";
 import { ssoRouter } from "./routers/ssoRouter";
+import { lessonCommentsRouter } from "./routers/lessonCommentsRouter";
 import {
   getUserById,
   getUsersByIds,
@@ -1901,6 +1902,7 @@ export const appRouter = router({
   dashboard: dashboardRouter,
   embeddedCheckout: embeddedCheckoutRouter,
   adminUser: adminUserRouter,
+  lessonComments: lessonCommentsRouter,
 
   // ─── Physician Over-Read Workflow (Step 1 & Step 2) ──────────────────────────
   physicianOverRead: router({

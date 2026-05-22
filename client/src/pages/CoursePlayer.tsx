@@ -25,6 +25,8 @@ import { cn } from "@/lib/utils";
 import LessonEffectPlayer, { fireLessonCompleteEffect } from "@/components/LessonEffectPlayer";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
 
+import LessonCommentSection from "@/components/LessonCommentSection";
+
 // Lazy-load the heavy editor so it doesn't bloat the initial bundle
 const LessonBlockEditor = lazy(() => import("@/components/LessonBlockEditor"));
 
@@ -1561,6 +1563,14 @@ export default function CoursePlayer() {
                         </Button>
                       ) : null}
                     </div>
+                  )}
+
+                  {/* ── Lesson Comments ── */}
+                  {selectedLessonId && lessonData && (
+                    <LessonCommentSection
+                      lessonId={selectedLessonId}
+                      commentsEnabled={!!(lessonData as any).commentsEnabled}
+                    />
                   )}
                 </div>
 
