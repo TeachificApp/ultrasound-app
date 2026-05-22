@@ -1,6 +1,6 @@
 /**
  * lessonCommentsRouter.ts
- * Per-lesson commenting system for LMS courses.
+ * Per-lesson commenting system for LMS courses with reply threading.
  *
  * Admin controls:
  *   - adminList: paginated list of all comments across all lessons (with optional search)
@@ -8,18 +8,18 @@
  *   - banUser: ban or unban a user from commenting (silent — no notification sent)
  *
  * Student controls:
- *   - list: paginated list of visible comments for a lesson (enrolled users only)
- *   - add: post a new comment (checks commentsEnabled + not commentBanned)
+ *   - list: paginated list of visible top-level comments for a lesson, each with nested replies
+ *   - add: post a new comment or reply (checks commentsEnabled + not commentBanned)
  */
 import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
 import { lessonComments, lmsLessons, lmsCourses, users } from "../../drizzle/schema";
-import { eq, and, isNull, desc, asc, like, or, sql } from "drizzle-orm";
+import { eq, and, isNull, desc, asc, like, or, inArray } from "drizzle-orm";
 
 export const lessonCommentsRouter = router({
-  // ─── Student: list visible comments for a lesson ─────────────────────────────
+  // ─── Student: list visible comments for a lesson (top-level + replies) ────────
   list: protectedProcedure
     .input(z.object({
       lessonId: z.number().int().positive(),
@@ -37,12 +37,14 @@ export const lessonCommentsRouter = router({
       if (!lesson) throw new TRPCError({ code: "NOT_FOUND", message: "Lesson not found" });
       if (!lesson.commentsEnabled) return { comments: [], hasMore: false };
 
-      const rows = await db
+      // Fetch all non-deleted comments for this lesson (top-level and replies)
+      const allRows = await db
         .select({
           id: lessonComments.id,
           lessonId: lessonComments.lessonId,
           userId: lessonComments.userId,
           content: lessonComments.content,
+          parentId: lessonComments.parentId,
           createdAt: lessonComments.createdAt,
           authorName: users.name,
           authorDisplayName: users.displayName,
@@ -57,23 +59,35 @@ export const lessonCommentsRouter = router({
             isNull(lessonComments.deletedAt),
           )
         )
-        .orderBy(asc(lessonComments.createdAt))
-        .limit(input.limit + 1);
+        .orderBy(asc(lessonComments.createdAt));
 
-      const hasMore = rows.length > input.limit;
-      const comments = rows.slice(0, input.limit).map(r => ({
-        ...r,
-        isOwn: r.userId === ctx.user.id,
+      // Separate top-level and replies
+      const topLevel = allRows.filter(r => !r.parentId);
+      const replies = allRows.filter(r => !!r.parentId);
+
+      // Paginate top-level comments
+      const paginated = topLevel.slice(0, input.limit + 1);
+      const hasMore = paginated.length > input.limit;
+      const pageComments = paginated.slice(0, input.limit);
+
+      // Attach replies to their parent
+      const comments = pageComments.map(c => ({
+        ...c,
+        isOwn: c.userId === ctx.user.id,
+        replies: replies
+          .filter(r => r.parentId === c.id)
+          .map(r => ({ ...r, isOwn: r.userId === ctx.user.id })),
       }));
 
       return { comments, hasMore };
     }),
 
-  // ─── Student: add a comment ───────────────────────────────────────────────────
+  // ─── Student: add a comment or reply ─────────────────────────────────────────
   add: protectedProcedure
     .input(z.object({
       lessonId: z.number().int().positive(),
       content: z.string().min(1).max(2000).trim(),
+      parentId: z.number().int().positive().optional(), // omit for top-level
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -97,10 +111,22 @@ export const lessonCommentsRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "Comments are not enabled for this lesson" });
       }
 
+      // If replying, verify parent exists and belongs to the same lesson
+      if (input.parentId) {
+        const [parent] = await db.select({ id: lessonComments.id, parentId: lessonComments.parentId })
+          .from(lessonComments)
+          .where(and(eq(lessonComments.id, input.parentId), eq(lessonComments.lessonId, input.lessonId), isNull(lessonComments.deletedAt)))
+          .limit(1);
+        if (!parent) throw new TRPCError({ code: "NOT_FOUND", message: "Parent comment not found" });
+        // Prevent nested replies (only 1 level deep)
+        if (parent.parentId) throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot reply to a reply" });
+      }
+
       const result = await db.insert(lessonComments).values({
         lessonId: input.lessonId,
         userId: ctx.user.id,
         content: input.content,
+        parentId: input.parentId ?? null,
       });
 
       return { id: Number((result as any)[0]?.insertId ?? 0), success: true };
@@ -139,6 +165,7 @@ export const lessonCommentsRouter = router({
           lessonId: lessonComments.lessonId,
           userId: lessonComments.userId,
           content: lessonComments.content,
+          parentId: lessonComments.parentId,
           createdAt: lessonComments.createdAt,
           lessonTitle: lmsLessons.title,
           courseTitle: lmsCourses.title,

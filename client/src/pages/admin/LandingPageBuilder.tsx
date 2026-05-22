@@ -2568,30 +2568,140 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
 // ─── Sortable Block Card ──────────────────────────────────────────────────────
 
 // ─── Column Drop Zone ─────────────────────────────────────────────────────────
-function ColumnDropZone({ id, blocks, activeDragId, isTargeted, onMoveOut }: {
+function ColumnDropZone({ id, blocks, activeDragId, isTargeted, onMoveOut, onAddBlock }: {
   id: string; blocks: Block[]; activeDragId: UniqueIdentifier | null;
   isTargeted?: boolean;
   onMoveOut: (childBlockId: string) => void;
+  onAddBlock: (block: Block) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
-  // isTargeted comes from parent (tracked via onDragOver state); isOver is from dnd-kit
+  const [pickerOpen, setPickerOpen] = useState(false);
+  // isTargeted comes from parent (tracked via pointermove); isOver is from dnd-kit
   const isActive = isTargeted || (isOver && activeDragId != null);
   return (
-    <div ref={setNodeRef} style={{ pointerEvents: "all" }} className={`flex-1 min-h-[120px] rounded-lg transition-all ${isActive ? "ring-2 ring-teal-400 bg-teal-50" : "bg-gray-50/50"}`}>
+    <div ref={setNodeRef} data-col-zone={id} style={{ pointerEvents: "all" }} className={`flex-1 min-h-[120px] rounded-lg transition-all ${isActive ? "ring-2 ring-teal-400 bg-teal-50" : "bg-gray-50/50"}`}>
       {blocks.length === 0 ? (
-        <div className={`h-full min-h-[120px] flex flex-col items-center justify-center gap-1 text-xs rounded-lg border-2 border-dashed transition-all ${isActive ? "border-teal-400 text-teal-600 bg-teal-50" : "border-gray-200 text-gray-400"}`}>
-          {isActive ? <><span className="text-lg">+</span><span>Drop here</span></> : <span>Drag blocks here</span>}
+        <div className={`h-full min-h-[120px] flex flex-col items-center justify-center gap-2 text-xs rounded-lg border-2 border-dashed transition-all ${isActive ? "border-teal-400 text-teal-600 bg-teal-50" : "border-gray-200 text-gray-400"}`}>
+          {isActive ? <><span className="text-lg">+</span><span>Drop here</span></> : (
+            <>
+              <span>Drag blocks here</span>
+              <button onClick={e => { e.stopPropagation(); setPickerOpen(true); }}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-500 text-white text-[10px] font-medium hover:bg-teal-600 transition-colors">
+                <Plus size={10} /> Add Block
+              </button>
+            </>
+          )}
         </div>
       ) : (
-        <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
-          <div className="space-y-1 p-1">
-            {blocks.map(b => (
-              <ColumnChildBlock key={b.id} block={b} onMoveOut={() => onMoveOut(b.id)} />
-            ))}
+        <>
+          <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-1 p-1">
+              {blocks.map(b => (
+                <ColumnChildBlock key={b.id} block={b} onMoveOut={() => onMoveOut(b.id)} />
+              ))}
+            </div>
+          </SortableContext>
+          {/* Add block button below existing blocks */}
+          <div className="px-1 pb-1">
+            <button onClick={e => { e.stopPropagation(); setPickerOpen(true); }}
+              className="w-full flex items-center justify-center gap-1 py-1.5 rounded-lg border border-dashed border-gray-200 text-gray-400 text-[10px] hover:border-teal-400 hover:text-teal-600 hover:bg-teal-50 transition-colors">
+              <Plus size={10} /> Add Block
+            </button>
           </div>
-        </SortableContext>
+        </>
       )}
+      <ColumnBlockPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} onAddBlock={onAddBlock} />
     </div>
+  );
+}
+
+// ─── Column Block Picker Dialog ─────────────────────────────────────────────
+function ColumnBlockPickerDialog({ open, onOpenChange, onAddBlock }: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onAddBlock: (block: Block) => void;
+}) {
+  const [tab, setTab] = useState<"catalog" | "templates">("catalog");
+  const [cat, setCat] = useState("Content");
+  const [search, setSearch] = useState("");
+  const { data: templates, isLoading: tplLoading } = trpc.blockTemplates.list.useQuery(
+    { search: search || undefined },
+    { enabled: open && tab === "templates" }
+  );
+  const categories = Array.from(new Set(BLOCK_CATALOG.filter(b => b.type !== "column_layout").map(b => b.category)));
+  const catalogItems = BLOCK_CATALOG.filter(b => b.type !== "column_layout" && b.category === cat);
+  return (
+    <Dialog open={open} onOpenChange={v => { onOpenChange(v); if (!v) setSearch(""); }}>
+      <DialogContent className="max-w-lg max-h-[80vh] flex flex-col gap-0 p-0 overflow-hidden">
+        <DialogHeader className="px-4 pt-4 pb-2 shrink-0">
+          <DialogTitle className="text-sm font-semibold">Add Block to Column</DialogTitle>
+        </DialogHeader>
+        {/* Tabs */}
+        <div className="flex border-b border-gray-100 px-4 shrink-0">
+          <button onClick={() => setTab("catalog")} className={cn("px-3 py-2 text-xs font-semibold transition-colors", tab === "catalog" ? "text-teal-700 border-b-2 border-teal-500" : "text-gray-500 hover:text-gray-700")}>Block Catalog</button>
+          <button onClick={() => setTab("templates")} className={cn("px-3 py-2 text-xs font-semibold transition-colors", tab === "templates" ? "text-teal-700 border-b-2 border-teal-500" : "text-gray-500 hover:text-gray-700")}>Saved Templates</button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4">
+          {tab === "catalog" && (
+            <>
+              {/* Category pills */}
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {categories.map(c => (
+                  <button key={c} onClick={() => setCat(c)} className={cn("px-2.5 py-1 rounded-full text-xs font-medium transition-colors", cat === c ? "bg-teal-100 text-teal-700" : "bg-gray-100 text-gray-500 hover:bg-gray-200")}>{c}</button>
+                ))}
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {catalogItems.map(b => (
+                  <button key={b.type} onClick={() => { onAddBlock({ id: uid(), type: b.type, data: { ...b.defaultData } }); onOpenChange(false); }}
+                    className="flex flex-col items-center gap-1.5 p-3 rounded-xl hover:bg-teal-50 border border-transparent hover:border-teal-200 text-gray-600 hover:text-teal-700 transition-all text-center">
+                    <span className="text-teal-500" style={{ fontSize: 20 }}>{b.icon}</span>
+                    <span className="text-[10px] font-medium text-gray-600 truncate w-full text-center">{b.label}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          {tab === "templates" && (
+            <>
+              <div className="relative mb-3">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search saved templates…" className="pl-8 h-8 text-xs" />
+              </div>
+              {tplLoading ? (
+                <p className="text-xs text-gray-400 text-center py-6">Loading…</p>
+              ) : !templates?.length ? (
+                <div className="flex flex-col items-center justify-center py-10 gap-2 text-gray-400">
+                  <Layers className="w-8 h-8 opacity-30" />
+                  <p className="text-xs">No saved block templates yet.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {templates.map((tpl: any) => {
+                    let blockData: Record<string, any> = {};
+                    try { blockData = typeof tpl.blockData === "string" ? JSON.parse(tpl.blockData) : (tpl.blockData ?? {}); } catch { /* ignore */ }
+                    const catalogEntry = BLOCK_CATALOG.find(c => c.type === tpl.blockType);
+                    const block: Block = { id: uid(), type: tpl.blockType as any, data: blockData };
+                    return (
+                      <div key={tpl.id} className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg border border-gray-100 hover:border-teal-200 hover:bg-teal-50 group transition-colors">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {catalogEntry && <span className="shrink-0 text-teal-500" style={{ fontSize: 14 }}>{catalogEntry.icon}</span>}
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-gray-700 truncate">{tpl.name}</p>
+                            {tpl.description && <p className="text-xs text-gray-400 truncate">{tpl.description}</p>}
+                          </div>
+                        </div>
+                        <button onClick={() => { onAddBlock(block); onOpenChange(false); }}
+                          className="shrink-0 px-2.5 py-1 text-xs bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors">Add</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -2612,11 +2722,12 @@ function ColumnChildBlock({ block, onMoveOut }: { block: Block; onMoveOut: () =>
   );
 }
 
-export function SortableBlock({ block, isSelected, onSelect, onDelete, onDuplicate, onMoveUp, onMoveDown, onSaveAsTemplate, coursePrice, courseTitle, activeDragId, activeColumnTarget, onMoveBlockOutOfColumn }: {
+export function SortableBlock({ block, isSelected, onSelect, onDelete, onDuplicate, onMoveUp, onMoveDown, onSaveAsTemplate, coursePrice, courseTitle, activeDragId, activeColumnTarget, onMoveBlockOutOfColumn, onAddBlockToColumn }: {
   block: Block; isSelected: boolean; onSelect: () => void; onDelete: () => void; onDuplicate: () => void; onMoveUp?: () => void; onMoveDown?: () => void; onSaveAsTemplate?: (block: Block) => void; coursePrice?: number; courseTitle?: string;
   activeDragId?: UniqueIdentifier | null;
   activeColumnTarget?: { blockId: string; side: "left" | "right" } | null;
   onMoveBlockOutOfColumn?: (colBlockId: string, side: "left" | "right", childBlockId: string) => void;
+  onAddBlockToColumn?: (colBlockId: string, side: "left" | "right", newBlock: Block) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
 
@@ -2662,6 +2773,7 @@ export function SortableBlock({ block, isSelected, onSelect, onDelete, onDuplica
                   activeDragId={activeDragId ?? null}
                   isTargeted={!!(activeDragId && activeColumnTarget?.blockId === block.id && activeColumnTarget?.side === "left")}
                   onMoveOut={childId => onMoveBlockOutOfColumn?.(block.id, "left", childId)}
+                  onAddBlock={newBlock => onAddBlockToColumn?.(block.id, "left", newBlock)}
                 />
               </div>
               <div style={{ flex: 100 - leftRatio, minWidth: 0 }}>
@@ -2672,6 +2784,7 @@ export function SortableBlock({ block, isSelected, onSelect, onDelete, onDuplica
                   activeDragId={activeDragId ?? null}
                   isTargeted={!!(activeDragId && activeColumnTarget?.blockId === block.id && activeColumnTarget?.side === "right")}
                   onMoveOut={childId => onMoveBlockOutOfColumn?.(block.id, "right", childId)}
+                  onAddBlock={newBlock => onAddBlockToColumn?.(block.id, "right", newBlock)}
                 />
               </div>
             </div>
@@ -2857,26 +2970,45 @@ export default function LandingPageBuilder() {
   const blocksRef = useRef<Block[]>([]);
   blocksRef.current = blocks;
 
+  // Native pointermove handler — uses elementsFromPoint for reliable column zone detection
+  const pointerMoveHandlerRef = useRef<((e: PointerEvent) => void) | null>(null);
+
   const handleDragStart = (event: DragStartEvent) => {
     setActiveDragId(event.active.id);
     setActiveColumnTarget(null);
     activeColumnTargetRef.current = null;
+
+    // Attach a native pointermove listener to detect col zones via data-col-zone attribute
+    const handler = (e: PointerEvent) => {
+      const els = document.elementsFromPoint(e.clientX, e.clientY);
+      let found: { blockId: string; side: "left" | "right" } | null = null;
+      for (const el of els) {
+        const zoneId = (el as HTMLElement).dataset?.colZone;
+        if (zoneId && zoneId.startsWith("col:")) {
+          const parsed = parseColId(zoneId);
+          if (parsed) { found = parsed; break; }
+        }
+      }
+      if (JSON.stringify(found) !== JSON.stringify(activeColumnTargetRef.current)) {
+        activeColumnTargetRef.current = found;
+        setActiveColumnTarget(found);
+      }
+    };
+    pointerMoveHandlerRef.current = handler;
+    document.addEventListener("pointermove", handler);
   };
 
-  // onDragOver fires continuously — use it to track which column zone the pointer is over
-  const handleDragOver = (event: any) => {
-    const overId = event.over?.id ? String(event.over.id) : null;
-    if (overId && overId.startsWith("col:")) {
-      const parsed = parseColId(overId);
-      setActiveColumnTarget(parsed);
-      activeColumnTargetRef.current = parsed;
-    } else {
-      setActiveColumnTarget(null);
-      activeColumnTargetRef.current = null;
-    }
+  // onDragOver kept for compatibility but column detection is now done via pointermove
+  const handleDragOver = (_event: any) => {
+    // No-op: column zone detection is handled by the native pointermove listener above
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
+    // Clean up the native pointermove listener
+    if (pointerMoveHandlerRef.current) {
+      document.removeEventListener("pointermove", pointerMoveHandlerRef.current);
+      pointerMoveHandlerRef.current = null;
+    }
     // Read from ref (not state) to avoid stale closure
     const currentTarget = activeColumnTargetRef.current;
     setActiveDragId(null);
@@ -3122,6 +3254,15 @@ export default function LandingPageBuilder() {
                           const insertAt = colIdx + 1;
                           return [...next.slice(0, insertAt), movedBlock, ...next.slice(insertAt)];
                         });
+                      }}
+                      onAddBlockToColumn={(colBlockId, side, newBlock) => {
+                        setBlocks(prev => prev.map(b => {
+                          if (b.id !== colBlockId) return b;
+                          const colKey = side === "left" ? "leftBlocks" : "rightBlocks";
+                          const existing: Block[] = b.data[colKey] ?? [];
+                          return { ...b, data: { ...b.data, [colKey]: [...existing, newBlock] } };
+                        }));
+                        setSelectedId(newBlock.id);
                       }}
                     />
                   ))}

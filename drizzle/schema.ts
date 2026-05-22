@@ -4101,6 +4101,8 @@ export const lessonComments = mysqlTable("lesson_comments", {
   lessonId: int("lesson_id").notNull(),
   userId: int("user_id").notNull(),
   content: text("content").notNull(),
+  // Reply threading: null = top-level comment, non-null = reply to that comment id
+  parentId: int("parent_id"),
   // Soft delete: set by admin, comment hidden from students but preserved in DB
   deletedAt: timestamp("deleted_at"),
   deletedByAdminId: int("deleted_by_admin_id"),

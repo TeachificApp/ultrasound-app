@@ -2494,3 +2494,23 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Admin UI: AdminLessonComments page — delete comments, ban/unban users, search across all lessons
 - [x] Admin nav: "Lesson Comments" link in LMSLayout and MembersLayout admin dropdown
 - [x] 16 vitest tests for comment validation, permission enforcement, soft-delete, and schema structure
+
+## Column Layout DnD Fix + Template Picker + Reply Threading (May 2026)
+- [ ] Fix drag-and-drop into column_layout zones (rewrite using pointer-event tracking)
+- [ ] Add template block picker inside column left/right zones
+- [ ] Add parentId to lesson_comments table for reply threading
+- [ ] Migrate DB with parentId column
+- [ ] Update lessonComments.list tRPC to return nested replies
+- [ ] Update lessonComments.add tRPC to accept optional parentId
+- [ ] Update LessonCommentSection UI with Reply button and threaded view
+- [ ] Vitest tests for reply threading logic
+
+## Column Layout DnD Fix + Template Picker + Reply Threading (May 2026)
+- [x] Fix column DnD: use document.elementsFromPoint (data-col-zone attr) for reliable pointer-based drop detection
+- [x] Add ColumnBlockPickerDialog inside each column zone (catalog + saved templates tabs)
+- [x] Wire onAddBlockToColumn from main canvas to SortableBlock to ColumnDropZone
+- [x] Add parentId to lesson_comments schema + DB migration
+- [x] Update lessonCommentsRouter.list to return nested replies per top-level comment
+- [x] Update lessonCommentsRouter.add to accept parentId (1-level deep, no nested replies)
+- [x] Rewrite LessonCommentSection with Reply button, threaded reply display, collapse/expand replies
+- [x] 24 vitest tests passing (8 column layout + 16 lesson comments)
