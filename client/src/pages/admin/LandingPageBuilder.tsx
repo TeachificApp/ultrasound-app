@@ -3881,7 +3881,7 @@ function LandingBlockTemplatesTab({ onInsert }: { onInsert: (block: Block) => vo
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  <Button size="sm" variant="outline" className="h-6 text-xs border-teal-300 text-teal-700 hover:bg-teal-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                  <Button size="sm" variant="outline" className="h-6 text-xs border-teal-300 text-teal-700 hover:bg-teal-50"
                     onClick={() => onInsert({ ...block, id: uid() })}>
                     <Plus className="w-3 h-3 mr-1" /> Insert
                   </Button>

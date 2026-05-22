@@ -56,6 +56,7 @@ interface ProviderProps {
 
 export function BlockTemplateLibraryProvider({ children, onInsert }: ProviderProps) {
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveDialogBlock, setSaveDialogBlock] = useState<Block | null>(null);
   const [saveDialogLabel, setSaveDialogLabel] = useState("");
 
@@ -64,9 +65,7 @@ export function BlockTemplateLibraryProvider({ children, onInsert }: ProviderPro
     setSaveDialogBlock(block);
     setSaveDialogLabel(blockLabel ?? block.type);
     setSaveDialogOpen(true);
-  }, []);
-
-  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  }, [setSaveDialogBlock, setSaveDialogLabel, setSaveDialogOpen]);
 
   return (
     <LibraryContext.Provider value={{ openLibrary, saveAsTemplate }}>

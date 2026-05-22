@@ -2541,3 +2541,8 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix DailyChallenge.tsx: hoist useIHECats to be available in Preferences panel scope
 - [x] Fix ensureTodaySet: add brand filter to all fallback question queries
 - [x] Fix dragstart global prevention that was blocking drag-and-drop in page builder
+
+## LandingPageBuilder Fixes (2026-05-22)
+- [x] Fix save-block-as-template: move saveDialogOpen state before useCallback in BlockTemplateLibrary.tsx to fix closure bug
+- [x] Fix add-block-from-template: make Insert button always visible (was opacity-0 until hover)
+- [x] Fix drag-and-drop: remove global dragstart prevention from main.tsx
