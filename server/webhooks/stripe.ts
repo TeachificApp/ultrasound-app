@@ -16,7 +16,7 @@
  */
 import type { Express, Request, Response } from "express";
 import { getDb, getUserByEmail, getOrCreateUserByEmail } from "../db";
-import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases } from "../../drizzle/schema";
+import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses } from "../../drizzle/schema";
 import { and, eq } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
@@ -868,13 +868,29 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
       const bumpPriceArr = bumpPrices ? bumpPrices.split("|").map(Number) : [];
       const bumpsForEmail = bumpTitleArr.map((t, i) => ({ title: t, price: bumpPriceArr[i] ?? 0 })).filter(b => b.title);
       const firstName = customerName ? customerName.split(" ")[0] : "there";
+      // Build a meaningful access URL pointing to the actual content, not the funnel page
+      const brandMode = (meta.brand_mode as string) || "aaus";
+      const baseUrl = brandMode === "iheartecho" ? "https://app.iheartecho.net" : "https://app.allaboutultrasound.com";
+      let loginUrl = `${baseUrl}/my-courses`;
+      if (fulfillmentCourseId) {
+        try {
+          const [courseRow] = await db.select({ slug: lmsCourses.slug }).from(lmsCourses).where(eq(lmsCourses.id, fulfillmentCourseId)).limit(1);
+          if (courseRow?.slug) loginUrl = `${baseUrl}/learn/${courseRow.slug}`;
+        } catch { /* keep default */ }
+      } else if (fulfillmentDownloadId) {
+        loginUrl = `${baseUrl}/my-downloads`;
+      } else if (fulfillmentBundleId) {
+        loginUrl = `${baseUrl}/my-courses`;
+      } else if (fulfillmentBrand) {
+        loginUrl = brandMode === "iheartecho" ? "https://app.iheartecho.net/dashboard" : "https://app.allaboutultrasound.com/dashboard";
+      }
       const { subject, htmlBody, previewText } = buildFunnelPurchaseConfirmationEmail({
         firstName,
         productName,
         amountPaid: amount ?? 0,
         orderBumps: bumpsForEmail.length > 0 ? bumpsForEmail : undefined,
-        loginUrl: meta.success_url || "https://members.allaboutultrasound.com",
-        brandMode: meta.brand_mode as any || "aaus",
+        loginUrl,
+        brandMode: brandMode as any,
       });
       await sendEmail({ to: { name: customerName || firstName, email: customerEmail }, subject, htmlBody, previewText });
       console.log(`[Stripe] Purchase confirmation email sent to ${customerEmail} for "${productName}"`);

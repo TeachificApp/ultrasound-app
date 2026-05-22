@@ -10,8 +10,9 @@ import { useAuth } from "@/_core/hooks/useAuth";
 interface LeadCaptureModalProps {
   open: boolean;
   onClose: () => void;
-  /** Called after lead is successfully stored — execute the original button action */
-  onSuccess: () => void;
+  /** Called after lead is successfully stored — execute the original button action.
+   * Receives the captured name and email so the parent can append them to the redirect URL. */
+  onSuccess: (lead: { name: string; email: string }) => void;
   title?: string;
   subtext?: string;
   tags?: string;
@@ -59,8 +60,11 @@ export default function LeadCaptureModal({
 
   const submitLead = trpc.funnelPublic.submitLead.useMutation({
     onSuccess: () => {
+      // Persist lead data so the next funnel step (checkout form) can auto-populate
+      const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+      try { sessionStorage.setItem("funnel_lead", JSON.stringify({ name: fullName, email })); } catch {}
       onClose();
-      onSuccess();
+      onSuccess({ name: fullName, email });
     },
     onError: (e: any) => toast.error(e.message || "Submission failed"),
   });

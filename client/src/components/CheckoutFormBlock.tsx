@@ -101,9 +101,16 @@ interface CheckoutFormBlockProps {
 function CheckoutFormInner({ data, funnelId, pageId, funnelSlug }: CheckoutFormBlockProps) {
   const d = data as unknown as CheckoutFormData;
 
-  // Auto-populate from funnel lead capture (stored in sessionStorage on previous step)
+  // Auto-populate from funnel lead capture:
+  // Priority: URL params (?name=...&email=...) > sessionStorage funnel_lead > empty
   const savedLead = (() => {
-    try { return JSON.parse(sessionStorage.getItem("funnel_lead") ?? "null") ?? {}; } catch { return {}; }
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const urlName = params.get("name") ?? "";
+      const urlEmail = params.get("email") ?? "";
+      if (urlName || urlEmail) return { name: urlName, email: urlEmail };
+      return JSON.parse(sessionStorage.getItem("funnel_lead") ?? "null") ?? {};
+    } catch { return {}; }
   })();
   const [firstName, setFirstName] = useState(() => {
     const saved = savedLead.name ?? "";

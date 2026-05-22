@@ -869,7 +869,14 @@ function CtaStandaloneBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: 
         <LeadCaptureModal
           open={true}
           onClose={() => setLcOpen(false)}
-          onSuccess={() => { window.location.href = getHref(); }}
+          onSuccess={({ name: ln, email: le }) => {
+            try {
+              const u = new URL(getHref(), window.location.origin);
+              if (ln) u.searchParams.set("name", ln);
+              if (le) u.searchParams.set("email", le);
+              window.location.href = u.toString();
+            } catch { window.location.href = getHref(); }
+          }}
           title={d.leadModalTitle || "Get Instant Access"}
           subtext={d.leadModalSubtext}
           tags={d.leadTags}
@@ -922,7 +929,14 @@ function PricingCtaBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: Rec
         <LeadCaptureModal
           open={true}
           onClose={() => setLcOpen(false)}
-          onSuccess={() => { window.location.href = getHref(); }}
+          onSuccess={({ name: ln, email: le }) => {
+            try {
+              const u = new URL(getHref(), window.location.origin);
+              if (ln) u.searchParams.set("name", ln);
+              if (le) u.searchParams.set("email", le);
+              window.location.href = u.toString();
+            } catch { window.location.href = getHref(); }
+          }}
           title={d.leadModalTitle || "Get Instant Access"}
           subtext={d.leadModalSubtext}
           tags={d.leadTags}
@@ -947,10 +961,18 @@ function LeadCaptureBlock({ data, funnelId, pageId, nextPageUrl }: { data: Recor
       // Persist lead data so the next funnel step (checkout form) can auto-populate
       try { sessionStorage.setItem("funnel_lead", JSON.stringify({ name, email })); } catch {}
       const behavior = data.btnBehavior ?? "none";
+      const buildUrl = (base: string) => {
+        try {
+          const u = new URL(base, window.location.origin);
+          if (name) u.searchParams.set("name", name);
+          if (email) u.searchParams.set("email", email);
+          return u.toString();
+        } catch { return base; }
+      };
       if (behavior === "external_url" && data.btnUrl) {
-        window.location.href = data.btnUrl;
+        window.location.href = buildUrl(data.btnUrl);
       } else if (behavior === "next_funnel_step" && nextPageUrl) {
-        window.location.href = nextPageUrl;
+        window.location.href = buildUrl(nextPageUrl);
       } else {
         toast.success("Thank you! Check your email for access.");
       }
