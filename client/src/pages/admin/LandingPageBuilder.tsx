@@ -14,6 +14,10 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
+  useDroppable,
+  type UniqueIdentifier,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -2559,11 +2563,62 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
 }
 // ─── Sortable Block Card ──────────────────────────────────────────────────────
 
-export function SortableBlock({ block, isSelected, onSelect, onDelete, onDuplicate, onMoveUp, onMoveDown, onSaveAsTemplate, coursePrice, courseTitle }: {
+// ─── Column Drop Zone ─────────────────────────────────────────────────────────
+function ColumnDropZone({ id, blocks, activeDragId, onMoveOut }: {
+  id: string; blocks: Block[]; activeDragId: UniqueIdentifier | null;
+  onMoveOut: (childBlockId: string) => void;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <div ref={setNodeRef} className={`flex-1 min-h-[80px] rounded-lg transition-all ${isOver && activeDragId ? "ring-2 ring-teal-400 bg-teal-50" : "bg-gray-50/50"}`}>
+      {blocks.length === 0 ? (
+        <div className={`h-full min-h-[80px] flex items-center justify-center text-xs rounded-lg border-2 border-dashed transition-all ${isOver && activeDragId ? "border-teal-400 text-teal-600" : "border-gray-200 text-gray-400"}`}>
+          {isOver && activeDragId ? "Drop here" : "Drop blocks here"}
+        </div>
+      ) : (
+        <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
+          <div className="space-y-1 p-1">
+            {blocks.map(b => (
+              <ColumnChildBlock key={b.id} block={b} onMoveOut={() => onMoveOut(b.id)} />
+            ))}
+          </div>
+        </SortableContext>
+      )}
+    </div>
+  );
+}
+
+// ─── Column Child Block (sortable within a column) ────────────────────────────
+function ColumnChildBlock({ block, onMoveOut }: { block: Block; onMoveOut: () => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
+  return (
+    <div ref={setNodeRef} style={style} className="relative group border border-gray-200 rounded bg-white overflow-hidden">
+      <div className="absolute top-1 left-1 z-10 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div {...attributes} {...listeners} className="w-6 h-6 bg-white border border-gray-200 rounded shadow text-gray-400 hover:text-gray-600 flex items-center justify-center cursor-grab active:cursor-grabbing" title="Drag to reorder"><GripVertical size={11} /></div>
+        <button onClick={e => { e.stopPropagation(); onMoveOut(); }} className="w-6 h-6 bg-white border border-gray-200 rounded shadow text-gray-400 hover:text-orange-500 flex items-center justify-center" title="Move out of column"><ArrowRight size={11} /></button>
+      </div>
+      <div className="pointer-events-none">
+        <BlockPreview block={block} />
+      </div>
+    </div>
+  );
+}
+
+export function SortableBlock({ block, isSelected, onSelect, onDelete, onDuplicate, onMoveUp, onMoveDown, onSaveAsTemplate, coursePrice, courseTitle, activeDragId, onMoveBlockOutOfColumn }: {
   block: Block; isSelected: boolean; onSelect: () => void; onDelete: () => void; onDuplicate: () => void; onMoveUp?: () => void; onMoveDown?: () => void; onSaveAsTemplate?: (block: Block) => void; coursePrice?: number; courseTitle?: string;
+  activeDragId?: UniqueIdentifier | null;
+  onMoveBlockOutOfColumn?: (colBlockId: string, side: "left" | "right", childBlockId: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+
+  const isColumnLayout = block.type === "column_layout";
+  const leftBlocks: Block[] = block.data?.leftBlocks ?? [];
+  const rightBlocks: Block[] = block.data?.rightBlocks ?? [];
+  const leftRatio = block.data?.leftRatio ?? 50;
+  const gap = block.data?.gap ?? 32;
+
   return (
     <div ref={setNodeRef} style={style} onClick={onSelect} data-block-id={block.id}
       className={`relative group cursor-pointer border-2 transition-all ${isSelected ? "border-teal-500 shadow-lg shadow-teal-100" : "border-transparent hover:border-teal-200"}`}>
@@ -2581,7 +2636,32 @@ export function SortableBlock({ block, isSelected, onSelect, onDelete, onDuplica
         className={`absolute top-2 left-2 z-10 w-7 h-7 bg-white border border-gray-200 rounded shadow text-gray-400 hover:text-gray-600 flex items-center justify-center cursor-grab active:cursor-grabbing ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity`}
         title="Drag to reorder"><GripVertical size={14} /></div>
       <div style={{ marginTop: block.data?.marginTop ? `${block.data.marginTop}px` : undefined, marginBottom: block.data?.marginBottom ? `${block.data.marginBottom}px` : undefined, paddingTop: block.data?.paddingTop ? `${block.data.paddingTop}px` : undefined, paddingBottom: block.data?.paddingBottom ? `${block.data.paddingBottom}px` : undefined, paddingLeft: block.data?.paddingLeft ? `${block.data.paddingLeft}px` : undefined, paddingRight: block.data?.paddingRight ? `${block.data.paddingRight}px` : undefined }}>
-        <BlockPreview block={block} coursePrice={coursePrice} courseTitle={courseTitle} />
+        {isColumnLayout ? (
+          <div style={{ backgroundColor: block.data?.bgColor ?? "transparent", padding: `${block.data?.paddingY ?? 16}px ${block.data?.paddingX ?? 32}px` }}>
+            <div className="flex items-stretch" style={{ gap: `${gap}px` }}>
+              <div style={{ flex: leftRatio, minWidth: 0 }}>
+                <p className="text-[10px] font-medium text-gray-400 mb-1 uppercase tracking-wide">Left Column</p>
+                <ColumnDropZone
+                  id={`col:${block.id}:left`}
+                  blocks={leftBlocks}
+                  activeDragId={activeDragId ?? null}
+                  onMoveOut={childId => onMoveBlockOutOfColumn?.(block.id, "left", childId)}
+                />
+              </div>
+              <div style={{ flex: 100 - leftRatio, minWidth: 0 }}>
+                <p className="text-[10px] font-medium text-gray-400 mb-1 uppercase tracking-wide">Right Column</p>
+                <ColumnDropZone
+                  id={`col:${block.id}:right`}
+                  blocks={rightBlocks}
+                  activeDragId={activeDragId ?? null}
+                  onMoveOut={childId => onMoveBlockOutOfColumn?.(block.id, "right", childId)}
+                />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <BlockPreview block={block} coursePrice={coursePrice} courseTitle={courseTitle} />
+        )}
       </div>
     </div>
   );
@@ -2703,6 +2783,7 @@ export default function LandingPageBuilder() {
   const [pickerTab, setPickerTab] = useState<"catalog" | "from_pages" | "templates">("catalog");
   const [selectedSourceCourseId, setSelectedSourceCourseId] = useState<number | null>(null);
   const [blockSearch, setBlockSearch] = useState("");
+  const [activeDragId, setActiveDragId] = useState<UniqueIdentifier | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   // Auto-scroll preview canvas to the selected block
@@ -2742,11 +2823,74 @@ export default function LandingPageBuilder() {
     finally { setIsSaving(false); }
   };
 
+  // ─── Cross-list DnD helpers ───────────────────────────────────────────────
+  // Column drop zone IDs use the format: "col:BLOCK_ID:left" or "col:BLOCK_ID:right"
+  const parseColId = (id: UniqueIdentifier): { blockId: string; side: "left" | "right" } | null => {
+    const s = String(id);
+    if (!s.startsWith("col:")) return null;
+    const parts = s.split(":");
+    if (parts.length < 3) return null;
+    return { blockId: parts[1], side: parts[2] as "left" | "right" };
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveDragId(event.active.id);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
+    setActiveDragId(null);
     const { active, over } = event;
-    if (over && active.id !== over.id) {
-      setBlocks(prev => { const oldIndex = prev.findIndex(b => b.id === active.id); const newIndex = prev.findIndex(b => b.id === over.id); return arrayMove(prev, oldIndex, newIndex); });
+    if (!over || active.id === over.id) return;
+
+    const colTarget = parseColId(over.id);
+    if (colTarget) {
+      // Dragging a main-canvas block into a column
+      const draggedBlock = blocks.find(b => b.id === active.id);
+      if (!draggedBlock) return;
+      // Don't allow dropping a column_layout into itself or into another column_layout
+      if (draggedBlock.type === "column_layout") return;
+      setBlocks(prev => {
+        // Remove from main canvas
+        const next = prev.filter(b => b.id !== active.id);
+        // Add to the target column
+        return next.map(b => {
+          if (b.id !== colTarget.blockId) return b;
+          const colKey = colTarget.side === "left" ? "leftBlocks" : "rightBlocks";
+          const existing: Block[] = b.data[colKey] ?? [];
+          return { ...b, data: { ...b.data, [colKey]: [...existing, draggedBlock] } };
+        });
+      });
+      return;
     }
+
+    // Check if dragging within a column (over.id is a block id inside a column)
+    // We need to check if active.id is inside a column block
+    let foundInColumn = false;
+    setBlocks(prev => {
+      const next = prev.map(b => {
+        if (b.type !== "column_layout") return b;
+        for (const side of ["leftBlocks", "rightBlocks"] as const) {
+          const col: Block[] = b.data[side] ?? [];
+          const activeIdx = col.findIndex(cb => cb.id === active.id);
+          const overIdx = col.findIndex(cb => cb.id === over.id);
+          if (activeIdx !== -1 && overIdx !== -1) {
+            foundInColumn = true;
+            return { ...b, data: { ...b.data, [side]: arrayMove(col, activeIdx, overIdx) } };
+          }
+        }
+        return b;
+      });
+      return next;
+    });
+    if (foundInColumn) return;
+
+    // Default: reorder main canvas blocks
+    setBlocks(prev => {
+      const oldIndex = prev.findIndex(b => b.id === active.id);
+      const newIndex = prev.findIndex(b => b.id === over.id);
+      if (oldIndex === -1 || newIndex === -1) return prev;
+      return arrayMove(prev, oldIndex, newIndex);
+    });
   };
 
   const addBlock = useCallback((type: BlockType) => {
@@ -2899,17 +3043,43 @@ export default function LandingPageBuilder() {
             </div>
           ) : (
             <div className="bg-white min-h-full shadow-sm mx-auto" style={{ maxWidth: "900px" }}>
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
                 <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
                   {blocks.map((block, idx) => (
                     <SortableBlock key={block.id} block={block} isSelected={selectedId === block.id}
                       onSelect={() => setSelectedId(block.id)} onDelete={() => deleteBlock(block.id)}
                       onDuplicate={() => duplicateBlock(block.id)} coursePrice={courseInfo?.price} courseTitle={courseInfo?.title}
                       onSaveAsTemplate={handleSaveBlockAsTemplate}
+                      activeDragId={activeDragId}
                       onMoveUp={idx > 0 ? () => setBlocks(prev => arrayMove(prev, idx, idx - 1)) : undefined}
-                      onMoveDown={idx < blocks.length - 1 ? () => setBlocks(prev => arrayMove(prev, idx, idx + 1)) : undefined} />
+                      onMoveDown={idx < blocks.length - 1 ? () => setBlocks(prev => arrayMove(prev, idx, idx + 1)) : undefined}
+                      onMoveBlockOutOfColumn={(colBlockId, side, childBlockId) => {
+                        setBlocks(prev => {
+                          let movedBlock: Block | null = null;
+                          const next = prev.map(b => {
+                            if (b.id !== colBlockId) return b;
+                            const colKey = side === "left" ? "leftBlocks" : "rightBlocks";
+                            const col: Block[] = b.data[colKey] ?? [];
+                            const child = col.find(cb => cb.id === childBlockId);
+                            if (child) movedBlock = child;
+                            return { ...b, data: { ...b.data, [colKey]: col.filter(cb => cb.id !== childBlockId) } };
+                          });
+                          if (!movedBlock) return prev;
+                          const colIdx = next.findIndex(b => b.id === colBlockId);
+                          const insertAt = colIdx + 1;
+                          return [...next.slice(0, insertAt), movedBlock, ...next.slice(insertAt)];
+                        });
+                      }}
+                    />
                   ))}
                 </SortableContext>
+                <DragOverlay>
+                  {activeDragId ? (() => {
+                    const b = blocks.find(bl => bl.id === activeDragId) ??
+                      blocks.flatMap(bl => bl.type === "column_layout" ? [...(bl.data.leftBlocks ?? []), ...(bl.data.rightBlocks ?? [])] : []).find(bl => bl.id === activeDragId);
+                    return b ? <div className="opacity-80 border-2 border-teal-400 rounded shadow-xl bg-white"><BlockPreview block={b} /></div> : null;
+                  })() : null}
+                </DragOverlay>
               </DndContext>
               <div className="flex justify-center py-6 border-t border-dashed border-gray-200">
                 <button

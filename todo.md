@@ -2473,3 +2473,8 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] column_layout public render component in BlockPreview.tsx (recursive BlockPreview rendering for left/right columns)
 - [x] column_layout renders in LMS lesson viewer (CoursePlayer uses BlockPreview — auto-inherited)
 - [x] 8 vitest tests for column_layout block data structure (server/columnLayout.test.ts)
+- [x] Drag-and-drop existing blocks from main canvas into column_layout left/right columns
+- [x] Within-column block reordering via drag (nested SortableContext)
+- [x] "Move out" button on column child blocks to eject back to main canvas
+- [x] DragOverlay ghost preview while dragging
+- [x] Visual drop zone highlight (teal ring + bg) when hovering over a column
