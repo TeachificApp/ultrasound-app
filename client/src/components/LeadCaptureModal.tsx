@@ -33,29 +33,29 @@ export default function LeadCaptureModal({
 }: LeadCaptureModalProps) {
   const { user } = useAuth();
 
-  // Derive initial first/last name from user.name or user.displayName
-  const getInitialName = () => {
-    const fullName = (user?.displayName || user?.name || "").trim();
+  // Derive initial first/last name from user profile (firstName/lastName fields take priority,
+  // then fall back to splitting displayName/name for users who haven't set them yet)
+  const getInitialNames = () => {
+    const u = user as any;
+    if (u?.firstName) return { first: u.firstName, last: u.lastName || "" };
+    const fullName = (u?.displayName || u?.name || "").trim();
     const parts = fullName.split(" ");
-    return {
-      first: parts[0] ?? "",
-      last: parts.slice(1).join(" ") ?? "",
-    };
+    return { first: parts[0] ?? "", last: parts.slice(1).join(" ") ?? "" };
   };
 
-  const [firstName, setFirstName] = useState(() => getInitialName().first);
-  const [lastName, setLastName] = useState(() => getInitialName().last);
-  const [email, setEmail] = useState(() => user?.email ?? "");
+  const [firstName, setFirstName] = useState(() => getInitialNames().first);
+  const [lastName, setLastName] = useState(() => getInitialNames().last);
+  const [email, setEmail] = useState(() => (user as any)?.email ?? "");
 
   // Re-populate if user loads after modal opens
   useEffect(() => {
     if (!user) return;
-    const { first, last } = getInitialName();
+    const { first, last } = getInitialNames();
     if (first) setFirstName(first);
     if (last) setLastName(last);
-    if (user.email) setEmail(user.email);
+    if ((user as any).email) setEmail((user as any).email);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  }, [(user as any)?.id]);
 
   const submitLead = trpc.funnelPublic.submitLead.useMutation({
     onSuccess: () => {

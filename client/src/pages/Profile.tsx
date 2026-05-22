@@ -112,6 +112,8 @@ export default function Profile() {
   });
   const [editMode, setEditMode] = useState(false);
 
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [bio, setBio] = useState("");
@@ -151,6 +153,8 @@ export default function Profile() {
   useEffect(() => {
     if (user) {
       const u = user as any;
+      setFirstName(u.firstName || "");
+      setLastName(u.lastName || "");
       setDisplayName(u.displayName || u.name || "");
       setEmail(u.email || "");
       setBio(u.bio || "");
@@ -249,6 +253,11 @@ export default function Profile() {
   const activeSubscriptions = roles.filter((r: string) => ROLE_CONFIG[r] && r !== "premium_user");
 
   const handleSave = () => {
+    const trimmedFirst = firstName.trim();
+    const trimmedLast = lastName.trim();
+    if (!trimmedFirst) { toast.error("First name is required."); return; }
+    if (!trimmedLast) { toast.error("Last name is required."); return; }
+
     const trimmedName = displayName.trim();
     if (!trimmedName) { toast.error("Display name cannot be empty."); return; }
 
@@ -271,6 +280,8 @@ export default function Profile() {
 
     // Update all non-email fields immediately
     updateProfile.mutate({
+      firstName: trimmedFirst !== (u.firstName || "") ? trimmedFirst : undefined,
+      lastName: trimmedLast !== (u.lastName || "") ? trimmedLast : undefined,
       displayName: trimmedName !== (u.displayName || u.name || "") ? trimmedName : undefined,
       bio: bio.trim() !== (u.bio || "") ? bio.trim() : undefined,
       credentials: credentials.trim() !== (u.credentials || "") ? credentials.trim() : undefined,
@@ -287,6 +298,8 @@ export default function Profile() {
   };
 
   const handleCancel = () => {
+    setFirstName(u.firstName || "");
+    setLastName(u.lastName || "");
     setDisplayName(u.displayName || u.name || "");
     setEmail(u.email || "");
     setBio(u.bio || "");
@@ -634,7 +647,49 @@ export default function Profile() {
                 </div>
 
                 <div className="px-6 py-5 space-y-5">
-                  {/* Name + Email row */}
+                  {/* First + Last Name row */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className={labelClass}>
+                        <User className="w-3 h-3 inline mr-1" />
+                        First Name <span className="text-red-500">*</span>
+                      </label>
+                      {editMode ? (
+                        <input
+                          type="text"
+                          value={firstName}
+                          onChange={e => setFirstName(e.target.value)}
+                          className={inputClass}
+                          placeholder="First name"
+                          maxLength={100}
+                          required
+                        />
+                      ) : (
+                        <div className={readonlyClass}>{(u as any).firstName || "—"}</div>
+                      )}
+                    </div>
+                    <div>
+                      <label className={labelClass}>
+                        <User className="w-3 h-3 inline mr-1" />
+                        Last Name <span className="text-red-500">*</span>
+                      </label>
+                      {editMode ? (
+                        <input
+                          type="text"
+                          value={lastName}
+                          onChange={e => setLastName(e.target.value)}
+                          className={inputClass}
+                          placeholder="Last name"
+                          maxLength={100}
+                          required
+                        />
+                      ) : (
+                        <div className={readonlyClass}>{(u as any).lastName || "—"}</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Display Name + Email row */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className={labelClass}>

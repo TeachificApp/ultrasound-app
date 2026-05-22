@@ -175,6 +175,8 @@ export async function getUsersByIds(ids: number[]) {
 
 export async function updateUserProfile(userId: number, data: {
   email?: string;
+  firstName?: string;
+  lastName?: string;
   displayName?: string;
   name?: string;
   avatarUrl?: string;

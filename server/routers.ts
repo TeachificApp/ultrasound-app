@@ -211,6 +211,8 @@ export const appRouter = router({
     updateProfile: protectedProcedure
       .input(z.object({
         email: z.string().email().optional(),
+        firstName: z.string().min(1).max(100).optional(),
+        lastName: z.string().min(1).max(100).optional(),
         displayName: z.string().min(1).max(100).optional(),
         bio: z.string().max(1000).optional(),
         credentials: z.string().max(200).optional(),
