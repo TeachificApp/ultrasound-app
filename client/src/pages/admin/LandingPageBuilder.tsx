@@ -3019,18 +3019,59 @@ export default function LandingPageBuilder() {
     const activeIdStr = String(active.id);
     const currentBlocks = blocksRef.current;
 
-    // Case 1: Dropping onto a column zone — use the tracked target from onDragOver
+    // Case 1: Dropping onto a column zone — use the tracked target from pointermove
     if (currentTarget) {
-      const draggedBlock = currentBlocks.find(b => b.id === activeIdStr);
+      // First look for the dragged block on the main canvas
+      let draggedBlock = currentBlocks.find(b => b.id === activeIdStr);
+      let sourceColBlockId: string | null = null;
+      let sourceSide: "left" | "right" | null = null;
+
+      // If not on main canvas, look inside all column blocks
+      if (!draggedBlock) {
+        for (const colBlock of currentBlocks) {
+          if (colBlock.type !== "column_layout") continue;
+          for (const side of ["leftBlocks", "rightBlocks"] as const) {
+            const col: Block[] = colBlock.data[side] ?? [];
+            const found = col.find(cb => cb.id === activeIdStr);
+            if (found) {
+              draggedBlock = found;
+              sourceColBlockId = colBlock.id;
+              sourceSide = side === "leftBlocks" ? "left" : "right";
+              break;
+            }
+          }
+          if (draggedBlock) break;
+        }
+      }
+
       if (!draggedBlock) return;
       if (draggedBlock.type === "column_layout") return; // prevent nesting
+
+      // Prevent dropping into the same column it came from
+      if (sourceColBlockId === currentTarget.blockId && sourceSide === currentTarget.side) return;
+
       setBlocks(prev => {
-        const next = prev.filter(b => b.id !== activeIdStr);
+        let next = prev;
+
+        // Remove from source: main canvas or source column
+        if (sourceColBlockId) {
+          // Remove from source column
+          next = next.map(b => {
+            if (b.id !== sourceColBlockId) return b;
+            const srcKey = sourceSide === "left" ? "leftBlocks" : "rightBlocks";
+            return { ...b, data: { ...b.data, [srcKey]: (b.data[srcKey] ?? []).filter((cb: Block) => cb.id !== activeIdStr) } };
+          });
+        } else {
+          // Remove from main canvas
+          next = next.filter(b => b.id !== activeIdStr);
+        }
+
+        // Add to target column
         return next.map(b => {
           if (b.id !== currentTarget.blockId) return b;
           const colKey = currentTarget.side === "left" ? "leftBlocks" : "rightBlocks";
           const existing: Block[] = b.data[colKey] ?? [];
-          return { ...b, data: { ...b.data, [colKey]: [...existing, draggedBlock] } };
+          return { ...b, data: { ...b.data, [colKey]: [...existing, draggedBlock!] } };
         });
       });
       return;

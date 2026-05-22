@@ -16,7 +16,7 @@ import { router, protectedProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
 import { lessonComments, lmsLessons, lmsCourses, users } from "../../drizzle/schema";
-import { eq, and, isNull, desc, asc, like, or, inArray } from "drizzle-orm";
+import { eq, and, isNull, desc, asc, like, or, inArray, sql } from "drizzle-orm";
 
 export const lessonCommentsRouter = router({
   // ─── Student: list visible comments for a lesson (top-level + replies) ────────
@@ -156,6 +156,7 @@ export const lessonCommentsRouter = router({
 
       const whereClause = and(
         isNull(lessonComments.deletedAt),
+        isNull(lessonComments.parentId), // top-level only
         searchFilter,
       );
 
@@ -183,7 +184,62 @@ export const lessonCommentsRouter = router({
         .limit(input.limit + 1);
 
       const hasMore = rows.length > input.limit;
-      return { comments: rows.slice(0, input.limit), hasMore };
+      const pageRows = rows.slice(0, input.limit);
+
+      // Fetch reply counts for returned top-level comments
+      const parentIds = pageRows.map(r => r.id);
+      const replyCounts: Record<number, number> = {};
+      if (parentIds.length > 0) {
+        const countRows = await db
+          .select({
+            parentId: lessonComments.parentId,
+            count: sql<number>`count(*)`.as("count"),
+          })
+          .from(lessonComments)
+          .where(and(inArray(lessonComments.parentId, parentIds), isNull(lessonComments.deletedAt)))
+          .groupBy(lessonComments.parentId);
+        for (const row of countRows) {
+          if (row.parentId != null) replyCounts[row.parentId] = Number(row.count);
+        }
+      }
+
+      return {
+        comments: pageRows.map(r => ({ ...r, replyCount: replyCounts[r.id] ?? 0 })),
+        hasMore,
+      };
+    }),
+
+  // ─── Admin: list replies for a specific top-level comment ───────────────────────
+  adminListReplies: protectedProcedure
+    .input(z.object({ parentId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const rows = await db
+        .select({
+          id: lessonComments.id,
+          userId: lessonComments.userId,
+          content: lessonComments.content,
+          parentId: lessonComments.parentId,
+          createdAt: lessonComments.createdAt,
+          authorName: users.name,
+          authorDisplayName: users.displayName,
+          authorAvatarUrl: users.avatarUrl,
+          authorCommentBanned: users.commentBanned,
+        })
+        .from(lessonComments)
+        .innerJoin(users, eq(lessonComments.userId, users.id))
+        .where(
+          and(
+            eq(lessonComments.parentId, input.parentId),
+            isNull(lessonComments.deletedAt),
+          )
+        )
+        .orderBy(asc(lessonComments.createdAt));
+
+      return { replies: rows };
     }),
 
   // ─── Admin: soft-delete a comment ────────────────────────────────────────────

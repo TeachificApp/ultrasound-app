@@ -2514,3 +2514,9 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Update lessonCommentsRouter.add to accept parentId (1-level deep, no nested replies)
 - [x] Rewrite LessonCommentSection with Reply button, threaded reply display, collapse/expand replies
 - [x] 24 vitest tests passing (8 column layout + 16 lesson comments)
+
+## Drag Between Columns + Admin Reply Moderation (May 2026)
+- [ ] Drag-between-columns: extend pointermove detector to detect col zones in any column block (not just main canvas → column)
+- [ ] Update handleDragEnd to handle column-to-column moves (remove from source column, add to target column)
+- [ ] Admin reply moderation: Show Replies toggle per comment row in AdminLessonComments
+- [ ] Admin reply moderation: delete individual replies from the expanded reply list
