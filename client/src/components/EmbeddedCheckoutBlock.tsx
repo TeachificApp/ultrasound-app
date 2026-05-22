@@ -420,13 +420,13 @@ function DetailsStep({
             onChange={(e) => setEmail(e.target.value)}
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2"
           />
-          {data.showPhone !== false && (
+          {d.showPhone !== false && (
             <input
               type="tel"
-              placeholder={data.requirePhone ? "Phone Number *" : "Phone Number (optional)"}
+              placeholder={d.requirePhone ? "Phone Number *" : "Phone Number (optional)"}
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              required={data.requirePhone === true}
+              required={d.requirePhone === true}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2"
             />
           )}
