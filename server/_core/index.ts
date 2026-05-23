@@ -20,6 +20,7 @@ import { registerUploadMediaRepoRoute } from "../routes/uploadMediaRepo";
 import { registerUploadCourseImageRoute } from "../routes/uploadCourseImage";
 import { registerUploadSocialImageRoute } from "../routes/uploadSocialImage";
 import { registerSsoAutoRoute } from "../routes/ssoAuto";
+import { registerFunnelOgMetaRoutes } from "../routes/funnelOgMeta";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -208,6 +209,8 @@ async function startServer() {
   registerUploadSocialImageRoute(app);
   // Cross-domain silent SSO endpoint — must be before tRPC so it's not caught by the SPA catch-all
   registerSsoAutoRoute(app);
+  // Funnel page OG meta injection — must be before SPA catch-all so crawlers get correct meta tags
+  registerFunnelOgMetaRoutes(app);
   // tRPC API
   app.use(
     "/api/trpc",

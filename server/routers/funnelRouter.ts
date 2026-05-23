@@ -322,11 +322,15 @@ export const funnelRouter = router({
         isHidden: z.boolean().optional(),
         isStandaloneLanding: z.boolean().optional(),
         showNavigationButton: z.boolean().optional(),
+        seoTitle: z.string().nullable().optional(),
+        seoDescription: z.string().nullable().optional(),
+        seoImage: z.string().nullable().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const { id, ...data } = input;
       await db.update(funnelPages).set(data).where(eq(funnelPages.id, id));
       return { success: true };

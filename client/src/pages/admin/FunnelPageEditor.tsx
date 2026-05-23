@@ -209,6 +209,32 @@ export default function FunnelPageEditor() {
   const currentPage = pageData?.page;
   const funnelName = pageData?.funnel?.name ?? "Funnel";
 
+  // SEO / Link Preview state
+  const [showSeoPanel, setShowSeoPanel] = useState(false);
+  const [seoTitle, setSeoTitle] = useState("");
+  const [seoDescription, setSeoDescription] = useState("");
+  const [seoImage, setSeoImage] = useState("");
+  const [seoSaved, setSeoSaved] = useState(false);
+
+  // Populate SEO fields when page data loads
+  useEffect(() => {
+    if (!pageData) return;
+    setSeoTitle(pageData.page.seoTitle ?? "");
+    setSeoDescription(pageData.page.seoDescription ?? "");
+    setSeoImage(pageData.page.seoImage ?? "");
+  }, [pageData]);
+
+  const handleSaveSeo = () => {
+    updatePage.mutate({
+      id: numericPageId,
+      seoTitle: seoTitle.trim() || null,
+      seoDescription: seoDescription.trim() || null,
+      seoImage: seoImage.trim() || null,
+    }, {
+      onSuccess: () => { setSeoSaved(true); setTimeout(() => setSeoSaved(false), 2000); },
+    });
+  };
+
   // Branch rules state
   const [showBranchRules, setShowBranchRules] = useState(false);
   const [editingRule, setEditingRule] = useState<any | null>(null);
@@ -483,6 +509,71 @@ export default function FunnelPageEditor() {
               )}
             </div>
           </div>
+          {/* Link Preview / SEO Panel */}
+          <div className="p-2 border-b border-gray-100">
+            <button
+              onClick={() => setShowSeoPanel(v => !v)}
+              className="w-full flex items-center justify-between text-xs font-semibold text-gray-500 uppercase tracking-wider px-1 py-1 hover:text-teal-700 transition-colors"
+            >
+              <span className="flex items-center gap-1"><Bookmark size={12} /> Link Preview</span>
+              {showSeoPanel ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            </button>
+            {showSeoPanel && (
+              <div className="mt-2 space-y-2 px-1">
+                <p className="text-[10px] text-gray-400">Override what iMessage, WhatsApp, and social media show when this link is shared.</p>
+                <div>
+                  <label className="text-[10px] font-medium text-gray-600 block mb-1">Display Name</label>
+                  <input
+                    className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    placeholder={currentPage?.title ?? "Page title"}
+                    value={seoTitle}
+                    onChange={e => setSeoTitle(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-medium text-gray-600 block mb-1">Description</label>
+                  <textarea
+                    className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+                    rows={3}
+                    placeholder="Short description shown in link previews…"
+                    value={seoDescription}
+                    onChange={e => setSeoDescription(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-medium text-gray-600 block mb-1">Preview Image URL</label>
+                  <input
+                    className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    placeholder="https://…"
+                    value={seoImage}
+                    onChange={e => setSeoImage(e.target.value)}
+                  />
+                  {seoImage && (
+                    <img src={seoImage} alt="Preview" className="mt-1.5 w-full rounded-lg border border-gray-200 object-cover" style={{ maxHeight: 80 }} />
+                  )}
+                </div>
+                {/* Mini preview card */}
+                {(seoTitle || seoDescription) && (
+                  <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                    {seoImage && <img src={seoImage} alt="" className="w-full object-cover" style={{ maxHeight: 60 }} />}
+                    <div className="px-2 py-1.5">
+                      <p className="text-[10px] font-semibold text-gray-800 truncate">{seoTitle || currentPage?.title}</p>
+                      {seoDescription && <p className="text-[9px] text-gray-500 line-clamp-2">{seoDescription}</p>}
+                      <p className="text-[9px] text-teal-600 mt-0.5 truncate">{typeof window !== 'undefined' ? window.location.hostname : 'app.allaboutultrasound.com'}</p>
+                    </div>
+                  </div>
+                )}
+                <button
+                  onClick={handleSaveSeo}
+                  disabled={updatePage.isPending}
+                  className="w-full text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 rounded-lg py-1.5 transition-colors disabled:opacity-50"
+                >
+                  {seoSaved ? "✓ Saved!" : updatePage.isPending ? "Saving…" : "Save Preview Settings"}
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Branch Rules Panel */}
           <div className="p-2 border-b border-gray-100">
             <button

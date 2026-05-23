@@ -2552,3 +2552,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix add-block-from-template: make Insert button always visible (was opacity-0 until hover)
 - [x] Fix drag-and-drop: remove global dragstart prevention from main.tsx
 # Last updated: Fri May 22 19:37:18 UTC 2026
+
+## Funnel Page Link Preview / SEO (May 23 2026)
+- [x] Add seo_title, seo_description, seo_image columns to funnel_pages table (DB migration applied)
+- [x] Add seoTitle, seoDescription, seoImage fields to updatePage tRPC procedure
+- [x] Create server/routes/funnelOgMeta.ts — injects correct OG meta tags into HTML for /f/:funnelSlug/:pageSlug and /p/:pageSlug URLs
+- [x] Register funnelOgMetaRoutes in server/_core/index.ts before SPA catch-all
+- [x] Add "Link Preview" collapsible panel to FunnelPageEditor sidebar with Display Name, Description, Preview Image URL fields, live mini-preview card, and Save button

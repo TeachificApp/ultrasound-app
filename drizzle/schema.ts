@@ -3278,6 +3278,10 @@ export const funnelPages = mysqlTable("funnel_pages", {
   isHidden: boolean("is_hidden").default(false).notNull(), // hide from funnel sequence but keep accessible via direct URL
   isStandaloneLanding: boolean("is_standalone_landing").default(false).notNull(), // serve as standalone landing page at /p/{slug}
   showNavigationButton: boolean("show_navigation_button").default(false).notNull(), // show auto-connect "Continue to..." button at bottom of page
+  // SEO / Link Preview overrides
+  seoTitle: varchar("seo_title", { length: 255 }), // overrides <title> and og:title
+  seoDescription: text("seo_description"),          // overrides meta description and og:description
+  seoImage: varchar("seo_image", { length: 512 }),   // overrides og:image URL
   // Analytics
   views: int("views").default(0).notNull(),
   conversions: int("conversions").default(0).notNull(),
