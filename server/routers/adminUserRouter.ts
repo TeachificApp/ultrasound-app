@@ -567,4 +567,175 @@ export const adminUserRouter = router({
         totalPages: Math.ceil(Number(total) / input.pageSize),
       };
     }),
+
+  // ── Coupon / Promo Code Management ──────────────────────────────────────────
+  createCoupon: protectedProcedure
+    .input(z.object({
+      name: z.string().min(1).max(255),
+      discountType: z.enum(["percent", "fixed"]),
+      discountValue: z.number().positive(),
+      currency: z.string().default("usd"),
+      maxRedemptions: z.number().int().positive().optional(),
+      redeemBy: z.string().optional(),
+      promoCode: z.string().min(1).max(50).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+      if (!STRIPE_SECRET_KEY) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Stripe not configured" });
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2025-01-27.acacia" as any });
+      const couponParams: Record<string, unknown> = {
+        name: input.name,
+        duration: "once",
+        ...(input.discountType === "percent"
+          ? { percent_off: input.discountValue }
+          : { amount_off: Math.round(input.discountValue), currency: input.currency }),
+      };
+      if (input.maxRedemptions) couponParams.max_redemptions = input.maxRedemptions;
+      if (input.redeemBy) couponParams.redeem_by = Math.floor(new Date(input.redeemBy).getTime() / 1000);
+      const coupon = await (stripe.coupons as any).create(couponParams);
+      let promoCodeObj: Record<string, unknown> | null = null;
+      if (input.promoCode) {
+        promoCodeObj = await (stripe.promotionCodes as any).create({
+          coupon: coupon.id,
+          code: input.promoCode.toUpperCase(),
+        });
+      }
+      return { coupon, promoCode: promoCodeObj };
+    }),
+
+  listCoupons: protectedProcedure
+    .input(z.object({
+      limit: z.number().int().min(1).max(100).default(50),
+      startingAfter: z.string().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+      if (!STRIPE_SECRET_KEY) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Stripe not configured" });
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2025-01-27.acacia" as any });
+      const params: Record<string, unknown> = { limit: input.limit };
+      if (input.startingAfter) params.starting_after = input.startingAfter;
+      const coupons = await (stripe.coupons as any).list(params);
+      const couponIds: string[] = coupons.data.map((c: any) => c.id);
+      const promoCodeResults = await Promise.all(
+        couponIds.map((id: string) =>
+          (stripe.promotionCodes as any).list({ coupon: id, limit: 10 }).then((r: any) => r.data)
+        )
+      );
+      const promoCodesByCoupon: Record<string, any[]> = {};
+      couponIds.forEach((id: string, i: number) => { promoCodesByCoupon[id] = promoCodeResults[i]; });
+      return { coupons: coupons.data, hasMore: coupons.has_more, promoCodesByCoupon };
+    }),
+
+  deactivateCoupon: protectedProcedure
+    .input(z.object({ couponId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+      if (!STRIPE_SECRET_KEY) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Stripe not configured" });
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2025-01-27.acacia" as any });
+      await (stripe.coupons as any).del(input.couponId);
+      return { success: true };
+    }),
+
+  deactivatePromoCode: protectedProcedure
+    .input(z.object({ promoCodeId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+      if (!STRIPE_SECRET_KEY) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Stripe not configured" });
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2025-01-27.acacia" as any });
+      await (stripe.promotionCodes as any).update(input.promoCodeId, { active: false });
+      return { success: true };
+    }),
+
+  // ── Sales Analytics ──────────────────────────────────────────────────────────
+  getSalesAnalytics: protectedProcedure
+    .input(z.object({
+      dateFrom: z.string().optional(),
+      dateTo: z.string().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const conditions: any[] = [eq(funnelPurchases.status, "paid")];
+      if (input.dateFrom) conditions.push(gte(funnelPurchases.purchasedAt, new Date(input.dateFrom)));
+      if (input.dateTo) {
+        const toDate = new Date(input.dateTo);
+        toDate.setHours(23, 59, 59, 999);
+        conditions.push(lte(funnelPurchases.purchasedAt, toDate));
+      }
+      const whereClause = and(...conditions);
+      const [summary] = await db
+        .select({
+          totalRevenue: sql<number>`COALESCE(SUM(amount_paid), 0)`,
+          totalSales: sql<number>`COUNT(*)`,
+          avgOrderValue: sql<number>`COALESCE(AVG(amount_paid), 0)`,
+        })
+        .from(funnelPurchases)
+        .where(whereClause);
+      const byProduct = await db
+        .select({
+          productName: funnelPurchases.productName,
+          productType: funnelPurchases.productType,
+          revenue: sql<number>`COALESCE(SUM(amount_paid), 0)`,
+          sales: sql<number>`COUNT(*)`,
+          avgPrice: sql<number>`COALESCE(AVG(amount_paid), 0)`,
+        })
+        .from(funnelPurchases)
+        .where(whereClause)
+        .groupBy(funnelPurchases.productName, funnelPurchases.productType)
+        .orderBy(sql`SUM(amount_paid) DESC`)
+        .limit(100);
+      const byType = await db
+        .select({
+          productType: funnelPurchases.productType,
+          revenue: sql<number>`COALESCE(SUM(amount_paid), 0)`,
+          sales: sql<number>`COUNT(*)`,
+        })
+        .from(funnelPurchases)
+        .where(whereClause)
+        .groupBy(funnelPurchases.productType)
+        .orderBy(sql`SUM(amount_paid) DESC`);
+      const dailySeries = await db
+        .select({
+          date: sql<string>`DATE(purchased_at)`,
+          revenue: sql<number>`COALESCE(SUM(amount_paid), 0)`,
+          sales: sql<number>`COUNT(*)`,
+        })
+        .from(funnelPurchases)
+        .where(whereClause)
+        .groupBy(sql`DATE(purchased_at)`)
+        .orderBy(sql`DATE(purchased_at) ASC`);
+      return {
+        summary: {
+          totalRevenue: Number(summary?.totalRevenue ?? 0),
+          totalSales: Number(summary?.totalSales ?? 0),
+          avgOrderValue: Number(summary?.avgOrderValue ?? 0),
+        },
+        byProduct: byProduct.map(r => ({
+          productName: r.productName,
+          productType: r.productType,
+          revenue: Number(r.revenue),
+          sales: Number(r.sales),
+          avgPrice: Number(r.avgPrice),
+        })),
+        byType: byType.map(r => ({
+          productType: r.productType,
+          revenue: Number(r.revenue),
+          sales: Number(r.sales),
+        })),
+        dailySeries: dailySeries.map(r => ({
+          date: r.date,
+          revenue: Number(r.revenue),
+          sales: Number(r.sales),
+        })),
+      };
+    }),
 });

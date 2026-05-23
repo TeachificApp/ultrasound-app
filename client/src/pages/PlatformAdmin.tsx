@@ -89,6 +89,8 @@ import {
   Activity,
   Award,
   ShoppingCart,
+  Tag,
+  TrendingUp,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import BulkCsvUploadPanel, { type BulkResult } from "@/components/BulkCsvUploadPanel";
@@ -1086,8 +1088,10 @@ export default function PlatformAdmin() {
     { id: "lms", href: "/admin/lms", icon: Library, label: "Education Library", description: "Manage courses, videos, and learning content", color: "#1d4ed8" },
     { id: "funnels", href: "/admin/funnels", icon: LayoutTemplate, label: "Funnel Builder", description: "Build and manage marketing funnels", color: "#be185d" },
     { id: "contacts", href: "/admin/contacts", icon: Users, label: "Contacts", description: "Manage contacts and audience segments", color: "#059669" },
-    { id: "user-analytics", href: "/admin/user-analytics", icon: BarChart2, label: "User Analytics", description: "Detailed analytics for all platform users", color: "#7c3aed" },
-    { id: "sales", href: "/admin/sales", icon: ShoppingCart, label: "Sales", description: "View all sales, process refunds, cancel subscriptions, and resend access emails", color: "#16a34a" },
+    { id: "user-analytics", href: "/admin/user-analytics", icon: BarChart2, label: "User Analytics", description: "Logins, access, course progress, and detailed user profiles", color: "#7c3aed" },
+    { id: "sales-dashboard", href: "/admin/sales-dashboard", icon: TrendingUp, label: "Sales Dashboard", description: "Revenue analytics, per-product breakdown, date filters, and full transaction history", color: "#16a34a" },
+    { id: "discount-codes", href: "/admin/discount-codes", icon: Tag, label: "Discount Codes", description: "Create and manage Stripe coupons and promo codes for all products", color: "#f59e0b" },
+    { id: "sales", href: "/admin/sales", icon: ShoppingCart, label: "Sales (Legacy)", description: "View all sales, process refunds, cancel subscriptions, and resend access emails", color: "#6b7280" },
   ];
 
   // Per-Brand tool cards (auto-scoped to current brand)

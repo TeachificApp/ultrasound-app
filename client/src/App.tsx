@@ -250,6 +250,8 @@ const PhysicianOverReadForm = lazy(() => import("./pages/PhysicianOverReadForm")
 const UserAnalytics = lazy(() => import("./pages/admin/UserAnalytics"));
 const AdminUserDetailPage = lazy(() => import("./pages/admin/AdminUserDetailPage"));
 const AdminSalesPage = lazy(() => import("./pages/admin/AdminSalesPage"));
+const AdminSalesDashboard = lazy(() => import("./pages/admin/AdminSalesDashboard"));
+const AdminDiscountCodesPage = lazy(() => import("./pages/admin/AdminDiscountCodesPage"));
 
 function Router() {
   usePageViewTracker();
@@ -432,6 +434,8 @@ function Router() {
         <Route path="/admin/user-analytics">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><UserAnalytics /></RoleGuard>}</Route>
         <Route path="/admin/users/:userId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminUserDetailPage /></RoleGuard>}</Route>
         <Route path="/admin/sales">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminSalesPage /></RoleGuard>}</Route>
+        <Route path="/admin/sales-dashboard">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminSalesDashboard /></RoleGuard>}</Route>
+        <Route path="/admin/discount-codes">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminDiscountCodesPage /></RoleGuard>}</Route>
         <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
         <Route path="/admin/diy-accreditation">{() => <RoleGuard roles={["diy_admin", "platform_admin", "accreditation_manager"]} allowAdmin={true}><DIYAccreditationAdmin /></RoleGuard>}</Route>
         <Route path="/educator-assist">{() => <EducatorAssist />}</Route>
@@ -597,6 +601,8 @@ function LMSRouter() {
         <Route path="/admin/user-analytics">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><UserAnalytics /></RoleGuard>}</Route>
         <Route path="/admin/users/:userId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminUserDetailPage /></RoleGuard>}</Route>
         <Route path="/admin/sales">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminSalesPage /></RoleGuard>}</Route>
+        <Route path="/admin/sales-dashboard">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminSalesDashboard /></RoleGuard>}</Route>
+        <Route path="/admin/discount-codes">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminDiscountCodesPage /></RoleGuard>}</Route>
         <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
         {/* Auth pages (needed for login flow) */}
         <Route path="/login" component={Login} />
@@ -757,6 +763,8 @@ function IHeartEchoRouter() {
         <Route path="/admin/user-analytics">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><UserAnalytics /></RoleGuard>}</Route>
         <Route path="/admin/users/:userId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminUserDetailPage /></RoleGuard>}</Route>
         <Route path="/admin/sales">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminSalesPage /></RoleGuard>}</Route>
+        <Route path="/admin/sales-dashboard">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminSalesDashboard /></RoleGuard>}</Route>
+        <Route path="/admin/discount-codes">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminDiscountCodesPage /></RoleGuard>}</Route>
         <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
         <Route path="/admin/diy-accreditation">{() => <RoleGuard roles={["diy_admin", "platform_admin", "accreditation_manager"]} allowAdmin={true}><DIYAccreditationAdmin /></RoleGuard>}</Route>
         <Route path="/educator-assist">{() => <RoleGuard roles={["education_manager", "education_admin", "education_student"]} allowAdmin={true}><EducatorAssist /></RoleGuard>}</Route>

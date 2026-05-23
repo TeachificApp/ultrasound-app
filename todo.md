@@ -2576,3 +2576,12 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Register /admin/sales route in App.tsx (all brand variants, platform_admin guard)
 - [x] Add Purchases tab to UserAnalytics UserDetailView: per-user purchase history with inline refund and resend access email actions
 - [x] Student Subscriptions tab already exists in StudentDashboardPage with cancel/reactivate self-service
+
+## Discount Codes & Sales Dashboard (May 23, 2026)
+- [x] Enable allow_promotion_codes on all existing Stripe checkout session creators (LMS courses, quizzes, downloads, products, memberships, funnels)
+- [x] Build AdminDiscountCodesPage (/admin/discount-codes): create Stripe coupons (% or fixed), create promotion codes, list active/inactive codes, deactivate codes, apply globally or restrict to specific products
+- [x] Add tRPC procedures: createCoupon, listCoupons, deactivateCoupon, deactivatePromoCode, getSalesAnalytics
+- [x] Build AdminSalesDashboard (/admin/sales-dashboard): revenue summary cards, daily revenue area chart, per-type bar chart, per-product sortable table, date range filter, export CSV, paginated transaction list
+- [x] Refactor UserAnalytics (/admin/user-analytics): keep logins, access/roles, courses, page views, quiz activity, drill-down to user profile — removed Purchases tab (moved to Sales Dashboard)
+- [x] Add Discount Codes and Sales Dashboard tool cards to PlatformAdmin grid
+- [x] Register /admin/discount-codes and /admin/sales-dashboard routes in App.tsx
