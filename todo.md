@@ -2634,3 +2634,6 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Wire passthrough into CourseLanding video/embed blocks
 - [x] Wire passthrough into DownloadLanding video/embed blocks
 - [x] Add tag helper panel to LandingPageBuilder video/embed settings (shared by all 4 builders)
+
+## Badge Label Fix — May 2026
+- [x] Change "Download" badge label to "Digital Download" in StudentDashboardPage.tsx (line 745) and RelatedProductsBlock.tsx (lines 194, 252)

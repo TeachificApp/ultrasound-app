@@ -191,7 +191,7 @@ interface CardProps {
 
 function ProductCard({ item, accent, textColor, cardBg, showPrice, showDescription, ctaText }: CardProps) {
   const TypeIcon = item.type === "course" ? BookOpen : FileDown;
-  const typeLabel = item.type === "course" ? "Course" : "Download";
+  const typeLabel = item.type === "course" ? "Course" : "Digital Download";
 
   return (
     <div
@@ -249,7 +249,7 @@ function ProductCard({ item, accent, textColor, cardBg, showPrice, showDescripti
 
 function ProductListRow({ item, accent, textColor, cardBg, showPrice, showDescription, ctaText }: CardProps) {
   const TypeIcon = item.type === "course" ? BookOpen : FileDown;
-  const typeLabel = item.type === "course" ? "Course" : "Download";
+  const typeLabel = item.type === "course" ? "Course" : "Digital Download";
 
   return (
     <div

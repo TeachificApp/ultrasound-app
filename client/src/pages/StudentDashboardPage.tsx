@@ -742,7 +742,7 @@ function MyContentTab() {
                   title={d.courseTitle ?? d.productTitle}
                   brand={d.courseBrand}
                   subtitle={`Purchased ${formatDate(d.enrolledAt ?? d.purchasedAt)}`}
-                  badge="Download"
+                  badge="Digital Download"
                   badgeColor="teal"
                   actions={[
                     {
