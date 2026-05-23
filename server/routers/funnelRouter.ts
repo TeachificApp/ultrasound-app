@@ -535,9 +535,9 @@ export const funnelRouter = router({
         .orderBy(asc(funnelPages.sortOrder));
       const thankYouPage = allPages.find(p => p.pageType === "thank_you");
       const successUrl = thankYouPage
-        ? `${input.origin}/f/${funnel.slug}/${thankYouPage.slug}?success=1`
-        : `${input.origin}/f/${funnel.slug}/${page.slug}?success=1`;
-      const cancelUrl = `${input.origin}/f/${funnel.slug}/${page.slug}`;
+        ? `${input.origin}/${funnel.slug}/${thankYouPage.slug}?success=1`
+        : `${input.origin}/${funnel.slug}/${page.slug}?success=1`;
+      const cancelUrl = `${input.origin}/${funnel.slug}/${page.slug}`;
 
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
@@ -1019,14 +1019,14 @@ export const funnelPublicRouter = router({
       const thankYouPage = allPages.find(p => p.pageType === "thank_you");
       const successRedirect = checkoutBlock.data?.successRedirect;
       const resolveSuccessUrl = (redirect: string | undefined) => {
-        if (!redirect) return thankYouPage ? `${input.origin}/f/${funnel.slug}/${thankYouPage.slug}?success=1` : `${input.origin}/f/${funnel.slug}/${page.slug}?success=1`;
+        if (!redirect) return thankYouPage ? `${input.origin}/${funnel.slug}/${thankYouPage.slug}?success=1` : `${input.origin}/${funnel.slug}/${page.slug}?success=1`;
         if (redirect === "__dashboard__") return `${input.origin}/my-dashboard?purchase=success`;
-        if (redirect.startsWith("__funnel__:")) return `${input.origin}/f/${redirect.slice(11)}?success=1`;
+        if (redirect.startsWith("__funnel__:")) return `${input.origin}/${redirect.slice(11)}?success=1`;
         if (redirect.startsWith("http")) return redirect;
         return `${input.origin}${redirect}`;
       };
       const successUrl = resolveSuccessUrl(successRedirect);
-      const cancelUrl = `${input.origin}/f/${funnel.slug}/${page.slug}`;
+      const cancelUrl = `${input.origin}/${funnel.slug}/${page.slug}`;
 
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
@@ -1073,7 +1073,7 @@ export const funnelPublicRouter = router({
         source: "checkout_form",
         ipAddress: ip || null,
         userAgent: ua || null,
-        sourcePage: input.origin ? `${input.origin}/f/${funnel.slug}/${page.slug}` : null,
+        sourcePage: input.origin ? `${input.origin}/${funnel.slug}/${page.slug}` : null,
       });
 
       // Track conversion
@@ -1147,9 +1147,9 @@ export const funnelPublicRouter = router({
       const thankYouPageForRedirect = allPagesForRedirect.find(p => p.pageType === "thank_you");
       const successRedirectRaw = checkoutBlock.data?.successRedirect;
       const resolveSuccessUrl2 = (redirect: string | undefined) => {
-        if (!redirect) return thankYouPageForRedirect ? `${input.origin}/f/${funnel.slug}/${thankYouPageForRedirect.slug}?success=1` : `${input.origin}/f/${funnel.slug}/${page.slug}?success=1`;
+        if (!redirect) return thankYouPageForRedirect ? `${input.origin}/${funnel.slug}/${thankYouPageForRedirect.slug}?success=1` : `${input.origin}/${funnel.slug}/${page.slug}?success=1`;
         if (redirect === "__dashboard__") return `${input.origin}/my-dashboard?purchase=success`;
-        if (redirect.startsWith("__funnel__:")) return `${input.origin}/f/${redirect.slice(11)}?success=1`;
+        if (redirect.startsWith("__funnel__:")) return `${input.origin}/${redirect.slice(11)}?success=1`;
         if (redirect.startsWith("http")) return redirect;
         return `${input.origin}${redirect}`;
       };
@@ -1277,7 +1277,7 @@ export const funnelPublicRouter = router({
           if (productType === "course" && productId) {
             try {
               const [courseRow] = await db.select({ slug: lmsCourses.slug }).from(lmsCourses).where(eq(lmsCourses.id, productId)).limit(1);
-              if (courseRow?.slug) loginUrl = `${baseUrl}/learn/${courseRow.slug}`;
+              if (courseRow?.slug) loginUrl = `${baseUrl}/courses/${courseRow.slug}`;
             } catch { /* keep default */ }
           } else if (productType === "download") {
             loginUrl = `${baseUrl}/my-downloads`;
@@ -1362,7 +1362,7 @@ export const funnelPublicRouter = router({
         source: "checkout_form",
         ipAddress: ip || null,
         userAgent: ua || null,
-        sourcePage: input.origin ? `${input.origin}/f/${funnel.slug}/${page.slug}` : null,
+        sourcePage: input.origin ? `${input.origin}/${funnel.slug}/${page.slug}` : null,
       });
 
       return {

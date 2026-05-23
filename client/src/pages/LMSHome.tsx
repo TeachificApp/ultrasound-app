@@ -125,7 +125,7 @@ export default function LMSHome() {
         ) : featuredCourses && featuredCourses.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
             {featuredCourses.map((course: any) => (
-              <Link key={course.id} href={`/learn/${course.slug}`}>
+              <Link key={course.id} href={`/courses/${course.slug}`}>
                 <div className="group bg-white rounded-xl border border-gray-200 hover:border-[#4ad9e0] hover:shadow-lg transition-all duration-200 overflow-hidden cursor-pointer flex flex-col h-full">
                   <div className="relative h-40 bg-gradient-to-br from-teal-50 to-teal-100 overflow-hidden">
                     {course.coverImageUrl ? (

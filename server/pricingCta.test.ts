@@ -21,7 +21,7 @@ describe("pricing_cta block data", () => {
 
   it("should support item-linked pricing source", () => {
     const blockData = {
-      ctaUrl: "/learn/my-course",
+      ctaUrl: "/courses/my-course",
       priceSource: "item",
       linkedItemId: 42,
       linkedItemType: "course",
@@ -31,7 +31,7 @@ describe("pricing_cta block data", () => {
     };
     expect(blockData.priceSource).toBe("item");
     expect(blockData.linkedItemId).toBe(42);
-    expect(blockData.ctaUrl).toBe("/learn/my-course");
+    expect(blockData.ctaUrl).toBe("/courses/my-course");
   });
 
   it("should default pricePosition to above", () => {
@@ -46,7 +46,7 @@ describe("pricing_cta block data", () => {
   });
 
   it("should handle internal URLs without _blank target", () => {
-    const ctaUrl = "/learn/my-course";
+    const ctaUrl = "/courses/my-course";
     const isExternal = ctaUrl.startsWith("http");
     expect(isExternal).toBe(false);
   });

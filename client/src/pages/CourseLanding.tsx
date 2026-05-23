@@ -2,7 +2,7 @@
  * CourseLanding.tsx
  * Public course landing page — renders blocks from the page builder when available,
  * falls back to the auto-generated layout.
- * Route: /learn/:slug
+ * Route: /courses/:slug
  */
 import { useState, useEffect, useRef } from "react";
 import PromoCodeInput from "@/components/PromoCodeInput";
@@ -431,7 +431,7 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
                             <span style={{ color: isFreePreview ? (d.lessonPreviewIconColor ?? "#0d9488") : (d.lessonTextColor ?? "#374151"), fontWeight: isFreePreview ? 500 : 400 }}>{lesson.title}</span>
                             {isFreePreview && (
                               <a
-                                href={`/learn/${course.slug}/player?lesson=${lesson.id}`}
+                                href={`/courses/${course.slug}/player?lesson=${lesson.id}`}
                                 className="ml-auto text-xs hover:underline font-semibold flex items-center gap-1 shrink-0"
                                 style={{ color: d.lessonPreviewIconColor ?? "#0d9488" }}
                                 onClick={(e) => e.stopPropagation()}
@@ -599,7 +599,7 @@ export default function CourseLanding() {
   const enrollment = myCourses?.find((e: any) => e.courseId === course?.id);
 
   const enrollFree = trpc.lmsLearner.enrollFree.useMutation({
-    onSuccess: () => { toast.success("Enrolled! You now have access to this course."); navigate(`/learn/${slug}/player`); },
+    onSuccess: () => { toast.success("Enrolled! You now have access to this course."); navigate(`/courses/${slug}/player`); },
     onError: (e) => toast.error(`Enrollment failed: ${e.message}`),
   });
   const createCheckout = trpc.lmsLearner.createCheckout.useMutation({
@@ -609,7 +609,7 @@ export default function CourseLanding() {
 
   const handleEnroll = async () => {
     if (!user) { navigate("/login"); return; }
-    if (enrollment) { navigate(`/learn/${slug}/player`); return; }
+    if (enrollment) { navigate(`/courses/${slug}/player`); return; }
     setEnrolling(true);
     try {
       // If a secondary pricing option is selected, use it; otherwise use primary course pricing
@@ -794,7 +794,7 @@ export default function CourseLanding() {
               {enrolling ? "Processing..." : ctaText}<ChevronRight className="w-4 h-4 ml-1" />
             </Button>
             {enrollment && (
-              <Button variant="outline" className="w-full border-teal-300 text-teal-700 hover:bg-teal-50" size="sm" onClick={() => navigate(`/learn/${slug}/overview`)}>
+              <Button variant="outline" className="w-full border-teal-300 text-teal-700 hover:bg-teal-50" size="sm" onClick={() => navigate(`/courses/${slug}/overview`)}>
                 <BookOpen className="w-3.5 h-3.5 mr-1.5" /> Course Overview
               </Button>
             )}

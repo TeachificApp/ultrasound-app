@@ -84,7 +84,7 @@ const LESSON_TYPE_LABELS: Record<string, string> = {
 /** @param slug - either a bare slug ("my-course") or a full path ("my-course/overview") */
 function SsoLearnLinkButton({ slug, label }: { slug: string; label?: string }) {
   const { openLearnLink } = useLearnLink();
-  const path = slug.startsWith("/") ? slug : `/learn/${slug}`;
+  const path = slug.startsWith("/") ? slug : `/courses/${slug}`;
   return (
     <Button size="sm" variant="ghost" className="h-7 text-xs text-gray-500 hover:bg-gray-50"
       onClick={() => openLearnLink(path)}
@@ -985,12 +985,12 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
         <Button
           size="sm" variant="outline"
           className="h-8 text-xs text-teal-600 border-teal-300"
-          onClick={() => openLearnLink(`/learn/${course.slug}/player`)}
+          onClick={() => openLearnLink(`/courses/${course.slug}/player`)}
         >
           <Eye className="w-3 h-3 mr-1" /> Preview Course
         </Button>
         <Button size="sm" variant="outline" className="h-8 text-xs text-purple-600 border-purple-300 hover:bg-purple-50"
-          onClick={() => openLearnLink(`/learn/${course.slug}/player?preview=student`)}
+          onClick={() => openLearnLink(`/courses/${course.slug}/player?preview=student`)}
         >
           <Users className="w-3 h-3 mr-1" /> Preview as Student
         </Button>
@@ -1121,7 +1121,7 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
               <LinkIcon className="w-3 h-3 mr-1" /> Edit Landing Page (Full Builder)
             </Button>
             <Button size="sm" variant="ghost" className="h-8 text-xs text-gray-500 hover:text-teal-600"
-              onClick={() => openLearnLink(`/learn/${course.slug}?preview=admin`)}
+              onClick={() => openLearnLink(`/courses/${course.slug}?preview=admin`)}
             >
               <Eye className="w-3 h-3 mr-1" /> Preview Landing Page
             </Button>

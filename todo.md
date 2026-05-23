@@ -2606,3 +2606,12 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Wire PromoCodeInput into DownloadLanding sidebar buy card
 - [x] Wire PromoCodeInput into CourseLanding sidebar buy card
 - [x] Wire PromoCodeInput into Premium page above pricing cards
+
+## URL Structure Migration & Standalone Pages (2026-05-23)
+- [x] Rename /learn/:slug → /courses/:slug across all routers, pages, server URL builders
+- [x] Rename /f/:slug/:pageSlug → /:slug/:pageSlug (no /f/ prefix) across all routers and server
+- [x] Rename /products/:slug → /product/:slug across all routers and server URL builders
+- [x] Move CourseLanding (/courses/:slug) outside LMSLayout — renders standalone without learn header
+- [x] Move DownloadLanding (/downloads/:slug) outside LMSLayout and MembersLayout — standalone
+- [x] Move ProductLanding (/product/:slug) outside LMSLayout and MembersLayout — standalone
+- [x] Move PublicFunnelPage (/:slug/:pageSlug) outside all layout wrappers — standalone on all domains

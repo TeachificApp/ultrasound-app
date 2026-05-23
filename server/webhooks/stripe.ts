@@ -876,7 +876,7 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
       if (fulfillmentCourseId) {
         try {
           const [courseRow] = await db.select({ slug: lmsCourses.slug }).from(lmsCourses).where(eq(lmsCourses.id, fulfillmentCourseId)).limit(1);
-          if (courseRow?.slug) loginUrl = `${baseUrl}/learn/${courseRow.slug}`;
+          if (courseRow?.slug) loginUrl = `${baseUrl}/courses/${courseRow.slug}`;
         } catch { /* keep default */ }
       } else if (fulfillmentDownloadId) {
         loginUrl = `${baseUrl}/my-downloads`;

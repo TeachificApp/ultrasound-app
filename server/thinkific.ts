@@ -296,7 +296,7 @@ export function buildCourseUrl(slug: string): string {
  * Build the enrollment/checkout URL on the member portal.
  */
 export function buildEnrollUrl(productSlug: string): string {
-  return `https://${MEMBER_DOMAIN}/products/${productSlug}`;
+  return `https://${MEMBER_DOMAIN}/product/${productSlug}`;
 }
 
 // ─── Free Membership Auto-Enrollment ─────────────────────────────────────────

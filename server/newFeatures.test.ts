@@ -342,9 +342,9 @@ describe("Feature 5: Standalone Landing Page", () => {
       isStandaloneLanding: true,
       funnelSlug: "course-funnel",
     };
-    const funnelUrl = `/f/${page.funnelSlug}/${page.slug}`;
+    const funnelUrl = `/${page.funnelSlug}/${page.slug}`;
     const standaloneUrl = `/p/${page.slug}`;
-    expect(funnelUrl).toBe("/f/course-funnel/checkout");
+    expect(funnelUrl).toBe("/course-funnel/checkout");
     expect(standaloneUrl).toBe("/p/checkout");
     // Both URLs should work
     expect(funnelUrl).not.toBe(standaloneUrl);

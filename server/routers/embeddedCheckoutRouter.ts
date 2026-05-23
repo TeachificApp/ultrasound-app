@@ -113,7 +113,7 @@ export const embeddedCheckoutRouter = router({
       const resolveEcSuccessUrl = (redirect: string | undefined) => {
         if (!redirect) return `${input.origin}/?checkout_success=1`;
         if (redirect === "__dashboard__") return `${input.origin}/my-dashboard?purchase=success`;
-        if (redirect.startsWith("__funnel__:")) return `${input.origin}/f/${redirect.slice(11)}?success=1`;
+        if (redirect.startsWith("__funnel__:")) return `${input.origin}/${redirect.slice(11)}?success=1`;
         if (redirect.startsWith("http")) return redirect;
         return `${input.origin}${redirect}`;
       };
@@ -267,7 +267,7 @@ export const embeddedCheckoutRouter = router({
       const resolveSuccessUrl = (redirect: string | undefined) => {
         if (!redirect) return `${input.origin}/?checkout_success=1`;
         if (redirect === "__dashboard__") return `${input.origin}/my-dashboard?purchase=success`;
-        if (redirect.startsWith("__funnel__:")) return `${input.origin}/f/${redirect.slice(11)}?success=1`;
+        if (redirect.startsWith("__funnel__:")) return `${input.origin}/${redirect.slice(11)}?success=1`;
         if (redirect.startsWith("http")) return redirect;
         return `${input.origin}${redirect}`;
       };
@@ -434,7 +434,7 @@ export const embeddedCheckoutRouter = router({
           if (input.lmsCourseId) {
             try {
               const [courseRow] = await db.select({ slug: lmsCourses.slug }).from(lmsCourses).where(eq(lmsCourses.id, input.lmsCourseId)).limit(1);
-              if (courseRow?.slug) loginUrl = `${baseUrl}/learn/${courseRow.slug}`;
+              if (courseRow?.slug) loginUrl = `${baseUrl}/courses/${courseRow.slug}`;
             } catch { /* keep default */ }
           } else if (input.productType === "download") {
             loginUrl = `${baseUrl}/my-downloads`;

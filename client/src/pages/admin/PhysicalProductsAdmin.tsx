@@ -584,7 +584,7 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
           <LinkIcon className="w-3 h-3 mr-1" /> Edit Sales Page
         </Button>
         {product.slug && (
-          <a href={`/products/${product.slug}?preview=admin`} target="_blank" rel="noopener noreferrer">
+          <a href={`/product/${product.slug}?preview=admin`} target="_blank" rel="noopener noreferrer">
             <Button size="sm" variant="ghost" className="text-xs text-gray-500 hover:text-teal-600">
               <Eye className="w-3 h-3 mr-1" /> Preview Sales Page
             </Button>

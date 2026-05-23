@@ -358,7 +358,7 @@ export default function FunnelPageEditor() {
         <div className="flex items-center gap-2">
           {pageData?.funnel?.slug && (currentPage?.slug || numericPageId) && (
             <a
-              href={currentPage?.slug ? `/f/${pageData.funnel.slug}/${currentPage.slug}` : `/f/${pageData.funnel.slug}?preview=${numericPageId}`}
+              href={currentPage?.slug ? `/${pageData.funnel.slug}/${currentPage.slug}` : `/${pageData.funnel.slug}?preview=${numericPageId}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1.5 text-sm text-teal-600 hover:text-teal-700 border border-teal-200 bg-teal-50 hover:bg-teal-100 rounded-lg px-3 py-1.5 transition-colors font-medium"
@@ -461,7 +461,7 @@ export default function FunnelPageEditor() {
                     </button>
                     {pageData?.funnel?.slug && p.slug && (
                       <a
-                        href={`/f/${pageData.funnel.slug}/${p.slug}`}
+                        href={`/${pageData.funnel.slug}/${p.slug}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         title={`Preview: ${p.title}`}

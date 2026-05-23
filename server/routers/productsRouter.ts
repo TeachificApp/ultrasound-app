@@ -237,8 +237,8 @@ export const productsLearnerRouter = router({
           user_id: ctx.user.id.toString(),
           customer_email: ctx.user.email ?? "",
         },
-        success_url: `${origin}/products/${product.slug}?success=1`,
-        cancel_url: `${origin}/products/${product.slug}`,
+        success_url: `${origin}/product/${product.slug}?success=1`,
+        cancel_url: `${origin}/product/${product.slug}`,
       });
       return { checkoutUrl: session.url, free: false };
     }),

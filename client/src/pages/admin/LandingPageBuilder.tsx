@@ -700,8 +700,8 @@ function PricingCtaSettings({ d, set }: { d: Record<string, any>; set: (key: str
     set("linkedItemId", item.id);
     set("linkedItemType", item.type);
     set("linkedItemSlug", item.slug);
-    const urlMap: Record<string, string> = { course: `/learn/${item.slug}`, quiz: `/learn/${item.slug}`, download: `/downloads/${item.slug}`, bundle: `/bundles/${item.slug}`, product: `/products/${item.slug}` };
-    set("ctaUrl", urlMap[item.type] ?? `/learn/${item.slug}`);
+    const urlMap: Record<string, string> = { course: `/courses/${item.slug}`, quiz: `/courses/${item.slug}`, download: `/downloads/${item.slug}`, bundle: `/bundles/${item.slug}`, product: `/product/${item.slug}` };
+    set("ctaUrl", urlMap[item.type] ?? `/courses/${item.slug}`);
     if (item.isFree) {
       set("currentPrice", "Free");
     } else if (item.price > 0) {
@@ -3249,7 +3249,7 @@ export default function LandingPageBuilder() {
             <Bookmark size={14} /> Save as Template
           </button>
           {courseInfo?.slug && (
-            <a href={`/learn/${courseInfo.slug}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-teal-700 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors">
+            <a href={`/courses/${courseInfo.slug}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-teal-700 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors">
               <Eye size={14} /> Preview
             </a>
           )}

@@ -279,11 +279,11 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
     case "cta_standalone":
       return <CtaStandaloneBlock d={d} funnelId={funnelId} pageId={pageId} funnelSlug={funnelSlug} nextPage={nextPage} />;
     case "lead_capture": {
-      const lcNextUrl = nextPage ? (nextPage.slug.startsWith("/") ? nextPage.slug : `/f/${funnelSlug}/${nextPage.slug}`) : undefined;
+      const lcNextUrl = nextPage ? (nextPage.slug.startsWith("/") ? nextPage.slug : `/${funnelSlug}/${nextPage.slug}`) : undefined;
       return <LeadCaptureBlock data={d} funnelId={funnelId} pageId={pageId} nextPageUrl={lcNextUrl} />;
     }
     case "cta_optin": {
-      const optinNextUrl = nextPage ? (nextPage.slug.startsWith("/") ? nextPage.slug : `/f/${funnelSlug}/${nextPage.slug}`) : undefined;
+      const optinNextUrl = nextPage ? (nextPage.slug.startsWith("/") ? nextPage.slug : `/${funnelSlug}/${nextPage.slug}`) : undefined;
       return <CtaOptinBlock data={d} funnelId={funnelId} pageId={pageId} nextPageUrl={optinNextUrl} />;
     }
     case "faq":
@@ -619,7 +619,7 @@ function FunnelCurriculumBlock({ block }: { block: Block }) {
                         </span>
                         {isFreePreview && (
                           <a
-                            href={`/learn/${curriculum.slug}/player?lesson=${lesson.id}`}
+                            href={`/courses/${curriculum.slug}/player?lesson=${lesson.id}`}
                             className="ml-auto text-xs hover:underline font-semibold flex items-center gap-1 shrink-0"
                             style={{ color: d.lessonPreviewIconColor ?? "#0d9488" }}
                             onClick={(e) => e.stopPropagation()}
@@ -670,7 +670,7 @@ function PriceStackBlock({ data: d, funnelSlug, nextPage }: { data: Record<strin
           </p>
         )}
         {d.ctaText && (
-          <a href={d.ctaLink || (nextPage ? `/f/${funnelSlug}/${nextPage.slug}` : "#")}
+          <a href={d.ctaLink || (nextPage ? `/${funnelSlug}/${nextPage.slug}` : "#")}
             className="inline-block px-12 py-5 rounded-xl font-bold text-xl shadow-lg transition-transform hover:scale-105"
             style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#ffffff" }}>
             {d.ctaText}
@@ -719,7 +719,7 @@ function UrgencyOfferBlock({ data: d, funnelSlug, nextPage }: { data: Record<str
         {d.description && <p className="italic text-lg mb-4" style={{ color: d.accentColor ?? "#179ca3" }}>{d.description}</p>}
         {d.bodyHtml && <div className="prose prose-lg max-w-none mb-6" dangerouslySetInnerHTML={{ __html: d.bodyHtml }} />}
         {d.ctaText && (
-          <a href={d.ctaLink || (nextPage ? `/f/${funnelSlug}/${nextPage.slug}` : "#")} className="inline-flex items-center gap-2 font-bold text-lg transition-opacity hover:opacity-80" style={{ color: d.accentColor ?? "#179ca3" }}>
+          <a href={d.ctaLink || (nextPage ? `/${funnelSlug}/${nextPage.slug}` : "#")} className="inline-flex items-center gap-2 font-bold text-lg transition-opacity hover:opacity-80" style={{ color: d.accentColor ?? "#179ca3" }}>
             {d.ctaEmoji && <span>{d.ctaEmoji}</span>}
             {d.ctaText}
           </a>
@@ -760,7 +760,7 @@ function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMed
   const getBtnHref = (btn: typeof heroButtons[0]) => {
     const behavior = btn.behavior ?? "url";
     const np = nextPageRef.current;
-    const nextPageUrl = np ? (np.slug.startsWith("/") ? np.slug : `/f/${funnelSlug}/${np.slug}`) : null;
+    const nextPageUrl = np ? (np.slug.startsWith("/") ? np.slug : `/${funnelSlug}/${np.slug}`) : null;
     if (behavior === "send_email" && btn.emailAddress) return `mailto:${btn.emailAddress}`;
     if (behavior === "next_funnel_step" && nextPageUrl) return nextPageUrl;
     return btn.link || nextPageUrl || "#";
@@ -836,7 +836,7 @@ function CtaStandaloneBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: 
   const getHref = () => {
     const behavior = d.ctaBehavior ?? "url";
     const np = nextPageRef.current;
-    const nextPageUrl = np ? (np.slug.startsWith("/") ? np.slug : `/f/${funnelSlug}/${np.slug}`) : null;
+    const nextPageUrl = np ? (np.slug.startsWith("/") ? np.slug : `/${funnelSlug}/${np.slug}`) : null;
     if (behavior === "send_email" && d.ctaEmailAddress) return `mailto:${d.ctaEmailAddress}`;
     if (behavior === "next_funnel_step" && nextPageUrl) return nextPageUrl;
     return d.ctaLink || nextPageUrl || "#";
@@ -900,7 +900,7 @@ function PricingCtaBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: Rec
   const getHref = () => {
     const behavior = d.ctaBehavior ?? "url";
     const np = nextPageRef.current;
-    const nextPageUrl = np ? (np.slug.startsWith("/") ? np.slug : `/f/${funnelSlug}/${np.slug}`) : null;
+    const nextPageUrl = np ? (np.slug.startsWith("/") ? np.slug : `/${funnelSlug}/${np.slug}`) : null;
     if (behavior === "send_email" && d.ctaEmailAddress) return `mailto:${d.ctaEmailAddress}`;
     if (behavior === "next_funnel_step" && nextPageUrl) return nextPageUrl;
     return d.ctaLink || nextPageUrl || "#";
@@ -1264,15 +1264,15 @@ function FunnelPageContent({ data }: { data: { funnel: any; page: any; nextPage:
             if (result.targetUrl) {
               setResolvedNextUrl(result.targetUrl);
             } else if (result.targetPageSlug && result.targetFunnelSlug) {
-              setResolvedNextUrl(`/f/${result.targetFunnelSlug}/${result.targetPageSlug}`);
+              setResolvedNextUrl(`/${result.targetFunnelSlug}/${result.targetPageSlug}`);
             }
           } else if (nextPage) {
-            setResolvedNextUrl(`/f/${funnel.slug}/${nextPage.slug}`);
+            setResolvedNextUrl(`/${funnel.slug}/${nextPage.slug}`);
           }
           setBranchResolved(true);
         },
         onError: () => {
-          if (nextPage) setResolvedNextUrl(`/f/${funnel.slug}/${nextPage.slug}`);
+          if (nextPage) setResolvedNextUrl(`/${funnel.slug}/${nextPage.slug}`);
           setBranchResolved(true);
         },
       }
@@ -1318,7 +1318,7 @@ function FunnelPageContent({ data }: { data: { funnel: any; page: any; nextPage:
         <div className="px-8 py-8 bg-gray-50 border-t border-gray-200">
           <div className="max-w-3xl mx-auto text-center">
             <a
-              href={`/f/${funnel.slug}/${nextPage.slug}`}
+              href={`/${funnel.slug}/${nextPage.slug}`}
               className="inline-flex items-center gap-2 px-6 py-3 bg-teal-600 text-white rounded-lg font-semibold hover:bg-teal-700 transition-colors"
             >
               Continue to {nextPage.title} <ArrowRight size={18} />

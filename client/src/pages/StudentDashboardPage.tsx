@@ -690,8 +690,8 @@ function MyContentTab() {
                   progressPct={c.progressPct}
                   completed={!!c.completedAt}
                   actions={[
-                    { label: c.completedAt ? "Review Course" : "Continue Learning", icon: Play, href: `/learn/${c.courseSlug}/player` },
-                    { label: "Overview", icon: FileText, href: `/learn/${c.courseSlug}/overview`, secondary: true },
+                    { label: c.completedAt ? "Review Course" : "Continue Learning", icon: Play, href: `/courses/${c.courseSlug}/player` },
+                    { label: "Overview", icon: FileText, href: `/courses/${c.courseSlug}/overview`, secondary: true },
                   ]}
                 />
               ))}
@@ -719,7 +719,7 @@ function MyContentTab() {
                   progressPct={q.progressPct}
                   completed={!!q.completedAt}
                   actions={[
-                    { label: q.completedAt ? "Retake Quiz" : "Take Quiz", icon: Play, href: `/learn/${q.courseSlug}/player` },
+                    { label: q.completedAt ? "Retake Quiz" : "Take Quiz", icon: Play, href: `/courses/${q.courseSlug}/player` },
                   ]}
                 />
               ))}
@@ -748,12 +748,12 @@ function MyContentTab() {
                     {
                       label: "Access Files",
                       icon: Download,
-                      href: d.courseSlug ? `/learn/${d.courseSlug}/player` : `/downloads/${d.productSlug}/files`,
+                      href: d.courseSlug ? `/courses/${d.courseSlug}/player` : `/downloads/${d.productSlug}/files`,
                     },
                     {
                       label: "View Details",
                       icon: FileText,
-                      href: d.courseSlug ? `/learn/${d.courseSlug}` : `/downloads/${d.productSlug}`,
+                      href: d.courseSlug ? `/courses/${d.courseSlug}` : `/downloads/${d.productSlug}`,
                       secondary: true,
                     },
                   ]}
@@ -781,7 +781,7 @@ function MyContentTab() {
                   badgeColor={p.fulfillmentStatus === "delivered" ? "emerald" : p.fulfillmentStatus === "shipped" ? "teal" : "amber"}
                   trackingInfo={p.trackingNumber ? `${p.trackingCarrier ?? ""} ${p.trackingNumber}`.trim() : undefined}
                   actions={[
-                    { label: "View Product", icon: ExternalLink, href: `/products/${p.productSlug}` },
+                    { label: "View Product", icon: ExternalLink, href: `/product/${p.productSlug}` },
                   ]}
                 />
               ))}
@@ -1102,7 +1102,7 @@ function CertificatesTab() {
                 Download
               </a>
               <a
-                href={`/learn/${cert.courseSlug}/overview`}
+                href={`/courses/${cert.courseSlug}/overview`}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
               >
                 <BookOpen className="w-3 h-3" />

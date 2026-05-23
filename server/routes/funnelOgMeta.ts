@@ -163,7 +163,7 @@ function getIndexHtmlPath(): string {
 
 export function registerFunnelOgMetaRoutes(app: Express) {
   // Handle /f/:funnelSlug/:pageSlug
-  app.get("/f/:funnelSlug/:pageSlug", async (req, res, next) => {
+  app.get("/:funnelSlug/:pageSlug", async (req, res, next) => {
     const ua = req.headers["user-agent"] || "";
     // Always inject meta tags (both bots and real users benefit from correct title)
     const seo = await getFunnelPageSeo(req.params.funnelSlug, req.params.pageSlug);

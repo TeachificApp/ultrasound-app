@@ -353,7 +353,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                     </p>
                   )}
                   <div className="flex gap-2 mt-2 flex-wrap">
-                    <a href={`/learn/${e.courseSlug}/overview`} target="_blank" rel="noopener noreferrer"
+                    <a href={`/courses/${e.courseSlug}/overview`} target="_blank" rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200">
                       <ExternalLink className="w-3 h-3" /> View Course
                     </a>

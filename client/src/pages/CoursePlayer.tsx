@@ -1,7 +1,7 @@
 /**
  * CoursePlayer.tsx
  * Enrolled learner's course player — lesson viewer, quiz runner, progress tracking.
- * Route: /learn/:slug/player
+ * Route: /courses/:slug/player
  * Design: Dark teal/navy sidebar with numbered modules, video area, "In This Lesson" panel,
  *         progress bar, Mark Complete button (bottom-right). Matches the All About Ultrasound mockup.
  * Admin extras: WYSIWYG lesson content block editor + student preview toggle.
@@ -773,7 +773,7 @@ export default function CoursePlayer() {
       <div className="text-center py-20 bg-gray-50 min-h-screen">
         <Lock className="w-12 h-12 mx-auto mb-3 text-teal-500" />
         <p className="text-lg font-medium text-gray-800">You are not enrolled in this course</p>
-        <Button className="mt-4 bg-teal-600 hover:bg-teal-700 text-white" onClick={() => navigate(`/learn/${slug}`)}>View Course</Button>
+        <Button className="mt-4 bg-teal-600 hover:bg-teal-700 text-white" onClick={() => navigate(`/courses/${slug}`)}>View Course</Button>
       </div>
     );
   }
@@ -948,7 +948,7 @@ export default function CoursePlayer() {
             <div className="flex gap-3">
               <Button
                 className="flex-1 bg-teal-600 hover:bg-teal-700 text-white"
-                onClick={() => { setShowUpgradePrompt(false); navigate(`/learn/${slug}`); }}
+                onClick={() => { setShowUpgradePrompt(false); navigate(`/courses/${slug}`); }}
               >
                 View Course &amp; Enroll
               </Button>
@@ -964,7 +964,7 @@ export default function CoursePlayer() {
       {!isEnrolled && !adminBypass && hasPreviewLessons && (
         <div className="bg-teal-600 text-white text-center py-2 px-4 text-sm font-medium flex items-center justify-center gap-2 shrink-0 z-50">
           <PlayCircle className="w-4 h-4" />
-          <span>You're viewing a free preview — <button className="underline font-semibold" onClick={() => navigate(`/learn/${slug}`)}>enroll for full access</button></span>
+          <span>You're viewing a free preview — <button className="underline font-semibold" onClick={() => navigate(`/courses/${slug}`)}>enroll for full access</button></span>
           <button
             onClick={() => { setUpgradePromptReason("exit"); setShowUpgradePrompt(true); }}
             className="ml-4 px-2 py-0.5 bg-teal-700 hover:bg-teal-800 rounded text-xs"
@@ -1108,7 +1108,7 @@ export default function CoursePlayer() {
             </button>
             <button
               className="text-teal-500 text-[10px] font-medium flex items-center gap-1 hover:text-teal-700 transition-colors"
-              onClick={() => { setMobileSidebarOpen(false); navigate(`/learn/${slug}/overview`); }}
+              onClick={() => { setMobileSidebarOpen(false); navigate(`/courses/${slug}/overview`); }}
             >
               <BookOpen className="w-3 h-3" /> Course Overview
             </button>
@@ -1148,7 +1148,7 @@ export default function CoursePlayer() {
               <>
                 <button
                   className="text-teal-500 text-[10px] font-medium flex items-center gap-1 mb-2 hover:text-teal-700 transition-colors"
-                  onClick={() => navigate(`/learn/${slug}/overview`)}
+                  onClick={() => navigate(`/courses/${slug}/overview`)}
                 >
                   <BookOpen className="w-3 h-3" /> Course Overview
                 </button>

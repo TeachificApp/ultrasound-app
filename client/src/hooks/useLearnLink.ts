@@ -26,7 +26,7 @@ export function useLearnLink() {
 
   /**
    * Navigate to a learn. path with SSO passthrough.
-   * @param path  e.g. "/education-library" or "/learn/my-course/player"
+   * @param path  e.g. "/education-library" or "/courses/my-course/player"
    * @param newTab  open in a new tab (default: false)
    */
   async function navigateToLearn(path: string, newTab = false) {

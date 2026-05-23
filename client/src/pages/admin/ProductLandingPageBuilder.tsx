@@ -211,7 +211,7 @@ export default function ProductLandingPageBuilder() {
         <div className="flex items-center gap-2">
           {productInfo?.slug && (
             <a
-              href={`/products/${productInfo.slug}`}
+              href={`/product/${productInfo.slug}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-teal-700 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors"

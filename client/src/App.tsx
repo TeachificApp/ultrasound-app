@@ -391,9 +391,9 @@ function Router() {
         {/* Student-facing LMS routes redirect to learn.allaboutultrasound.com */}
         <Route path="/education-library">{() => <SsoRedirect path="/education-library" />}</Route>
         <Route path="/collections/:id">{(params: { id: string }) => <SsoRedirect path={`/collections/${params.id}`} />}</Route>
-        <Route path="/learn/:slug/player">{(params: { slug: string }) => <SsoRedirect path={`/learn/${params.slug}/player`} />}</Route>
-        <Route path="/learn/:slug/overview">{(params: { slug: string }) => <SsoRedirect path={`/learn/${params.slug}/overview`} />}</Route>
-        <Route path="/learn/:slug">{(params: { slug: string }) => <SsoRedirect path={`/learn/${params.slug}`} />}</Route>
+        <Route path="/courses/:slug/player">{(params: { slug: string }) => <SsoRedirect path={`/courses/${params.slug}/player`} />}</Route>
+        <Route path="/courses/:slug/overview">{(params: { slug: string }) => <SsoRedirect path={`/courses/${params.slug}/overview`} />}</Route>
+        <Route path="/courses/:slug">{(params: { slug: string }) => <SsoRedirect path={`/courses/${params.slug}`} />}</Route>
           {/* ── Digital Downloads ───────────────────────────────────────────────────────── */}
         <Route path="/my-downloads" component={MyDownloads} />
         <Route path="/downloads/:slug/files" component={DownloadFiles} />
@@ -405,7 +405,7 @@ function Router() {
         <Route path="/admin/lesson-comments">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminLessonComments /></RoleGuard>}</Route>
         <Route path="/admin/downloads/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><DownloadLandingPageBuilder /></RoleGuard>}</Route>
         {/* ── Physical Products ───────────────────────────────────────────────── */}
-        <Route path="/products/:slug" component={ProductLanding} />
+        <Route path="/product/:slug" component={ProductLanding} />
         <Route path="/admin/products/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ProductLandingPageBuilder /></RoleGuard>}</Route>
 
         {/* ── Admin ───────────────────────────────────────────────────────────── */}
@@ -455,7 +455,7 @@ function Router() {
         <Route path="/accreditation-manager">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AccreditationManager /></RoleGuard>}</Route>
 
         {/* ── Public Funnel Pages ────────────────────────────────────── */}
-        <Route path="/f/:slug/:pageSlug">{() => <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><PublicFunnelPage /></Suspense>}</Route>
+        <Route path="/:slug/:pageSlug">{() => <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><PublicFunnelPage /></Suspense>}</Route>
         <Route path="/p/:slug">{() => <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><StandaloneLandingPage /></Suspense>}</Route>
 
         {/* ── Physician Over-Read (public, token-based) ─────────────────── */}
@@ -483,6 +483,20 @@ function MembersRouter() {
     </div>
   );
   return (
+    <Switch>
+      {/* ── Standalone pages — no MembersLayout header ──────────────────── */}
+      <Route path="/downloads/:slug/files" component={DownloadFiles} />
+      <Route path="/downloads/:slug">
+        <Suspense fallback={pageFallback}><DownloadLanding /></Suspense>
+      </Route>
+      <Route path="/product/:slug">
+        <Suspense fallback={pageFallback}><ProductLanding /></Suspense>
+      </Route>
+      <Route path="/:slug/:pageSlug">
+        <Suspense fallback={pageFallback}><PublicFunnelPage /></Suspense>
+      </Route>
+      {/* ── All other members routes — wrapped in MembersLayout ─────────── */}
+      <Route>
     <MembersLayout>
       <Suspense fallback={pageFallback}>
         <Switch>
@@ -490,8 +504,6 @@ function MembersRouter() {
           {/* /profile removed — profile settings are now in /my-dashboard?tab=profile */}
           <Route path="/profile">{() => { window.location.replace("/my-dashboard?tab=profile"); return null; }}</Route>
           <Route path="/my-downloads" component={MyDownloads} />
-          <Route path="/downloads/:slug/files" component={DownloadFiles} />
-          <Route path="/downloads/:slug" component={DownloadLanding} />
           <Route path="/downloads" component={DownloadsBrowse} />
           {/* Admin routes — comprehensive list so no admin URL falls through to /my-dashboard */}
           <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
@@ -543,6 +555,8 @@ function MembersRouter() {
         </Switch>
       </Suspense>
     </MembersLayout>
+      </Route>
+    </Switch>
   );
 }
 
@@ -562,10 +576,31 @@ function LMSRouter() {
   );
   return (
     <Switch>
-      {/* CoursePlayer — full-screen, no LMSLayout sidebar */}
-      <Route path="/learn/:slug/player">
+      {/* ── Standalone pages — no LMSLayout header/sidebar ─────────────── */}
+      <Route path="/courses/:slug/player">
         <Suspense fallback={pageFallback}>
           <CoursePlayer />
+        </Suspense>
+      </Route>
+      <Route path="/courses/:slug">
+        <Suspense fallback={pageFallback}>
+          <CourseLanding />
+        </Suspense>
+      </Route>
+      <Route path="/downloads/:slug/files" component={DownloadFiles} />
+      <Route path="/downloads/:slug">
+        <Suspense fallback={pageFallback}>
+          <DownloadLanding />
+        </Suspense>
+      </Route>
+      <Route path="/product/:slug">
+        <Suspense fallback={pageFallback}>
+          <ProductLanding />
+        </Suspense>
+      </Route>
+      <Route path="/:slug/:pageSlug">
+        <Suspense fallback={pageFallback}>
+          <PublicFunnelPage />
         </Suspense>
       </Route>
       {/* All other LMS routes — wrapped in LMSLayout */}
@@ -577,13 +612,10 @@ function LMSRouter() {
             <Route path="/" component={LMSHome} />
             <Route path="/education-library" component={EducationLibrary} />
             <Route path="/collections/:id" component={CollectionDetail} />
-            <Route path="/learn/:slug/overview" component={CourseOverview} />
-            <Route path="/learn/:slug" component={CourseLanding} />
+            <Route path="/courses/:slug/overview" component={CourseOverview} />
 
         {/* Digital Downloads */}
         <Route path="/my-downloads" component={MyDownloads} />
-        <Route path="/downloads/:slug/files" component={DownloadFiles} />
-        <Route path="/downloads/:slug" component={DownloadLanding} />
         <Route path="/downloads" component={DownloadsBrowse} />
         <Route path="/bundles/:slug" component={BundleLanding} />
 
@@ -593,7 +625,6 @@ function LMSRouter() {
         <Route path="/admin/lesson-comments">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminLessonComments /></RoleGuard>}</Route>
         <Route path="/admin/downloads/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><DownloadLandingPageBuilder /></RoleGuard>}</Route>
         {/* ── Physical Products ───────────────────────────────────────────────── */}
-        <Route path="/products/:slug" component={ProductLanding} />
         <Route path="/admin/products/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ProductLandingPageBuilder /></RoleGuard>}</Route>
                 <Route path="/admin/media-repository">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MediaRepository /></RoleGuard>}</Route>
         <Route path="/admin/contacts">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><ContactsAdmin /></Suspense></RoleGuard>}</Route>

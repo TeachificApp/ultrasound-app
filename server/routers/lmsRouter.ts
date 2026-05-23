@@ -892,8 +892,8 @@ export const lmsLearnerRouter = router({
         trigger_order_type: "course",
         ...orderBumpCheckout?.metadata,
       };
-      const successUrl = `${input.origin}/learn/${course.slug}/success?session_id={CHECKOUT_SESSION_ID}`;
-      const cancelUrl = `${input.origin}/learn/${course.slug}`;
+      const successUrl = `${input.origin}/courses/${course.slug}/success?session_id={CHECKOUT_SESSION_ID}`;
+      const cancelUrl = `${input.origin}/courses/${course.slug}`;
 
       let session: any;
 
@@ -3495,7 +3495,7 @@ CRITICAL REQUIREMENTS:
         .orderBy(asc(lmsPricingOptions.sortOrder));
       // Build checkout URL for each pricing option
       const buildCheckoutUrl = (optionId?: number) => {
-        const base = `${input.origin}/learn/${course.slug}`;
+        const base = `${input.origin}/courses/${course.slug}`;
         return optionId ? `${base}?pricingOptionId=${optionId}&checkout=1` : `${base}?checkout=1`;
       };
       const buildEmbedCode = (url: string) =>

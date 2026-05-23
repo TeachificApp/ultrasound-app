@@ -33,7 +33,7 @@ function CourseCard({ course, enrolledCourseIds, purchasedProductSlugs }: { cour
     ? (isOwned ? `/downloads/${course.slug}/files` : `/downloads/${course.slug}`)
     : course._source === "sono_quiz"
     ? `/quiz/${course.id}`
-    : (isOwned ? `/learn/${course.slug}/player` : `/learn/${course.slug}`);
+    : (isOwned ? `/courses/${course.slug}/player` : `/courses/${course.slug}`);
   const ctaLabel = isOwned
     ? (course.type === "download" ? "Access Download" : course.type === "quiz" ? "Continue Quiz" : "Continue Learning")
     : (course.type === "quiz" ? "Take Quiz" : course.type === "download" ? "Get Download" : "View Course");

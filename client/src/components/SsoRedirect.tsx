@@ -9,7 +9,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 const LEARN_DOMAIN = "https://learn.allaboutultrasound.com";
 
 interface SsoRedirectProps {
-  path: string; // e.g. "/education-library" or "/learn/my-course/player"
+  path: string; // e.g. "/education-library" or "/courses/my-course/player"
 }
 
 export function SsoRedirect({ path }: SsoRedirectProps) {

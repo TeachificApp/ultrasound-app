@@ -120,7 +120,7 @@ export default function CourseOverview() {
         <div className="text-center">
           <Lock className="w-12 h-12 mx-auto mb-3 text-teal-500" />
           <p className="text-lg font-medium text-gray-800">You are not enrolled in this course</p>
-          <Button className="mt-4 bg-teal-600 hover:bg-teal-700 text-white" onClick={() => navigate(`/learn/${slug}`)}>
+          <Button className="mt-4 bg-teal-600 hover:bg-teal-700 text-white" onClick={() => navigate(`/courses/${slug}`)}>
             View Course Details
           </Button>
         </div>
@@ -233,7 +233,7 @@ export default function CourseOverview() {
 
   const navigateToLesson = (lessonId: number, locked: boolean) => {
     if (locked) return;
-    navigate(`/learn/${slug}/player?lesson=${lessonId}`);
+    navigate(`/courses/${slug}/player?lesson=${lessonId}`);
   };
 
   const renderLessonRow = (lesson: any, section?: any) => {
@@ -312,7 +312,7 @@ export default function CourseOverview() {
                 size="sm"
                 className="text-white gap-1.5"
                 style={gradientStyle}
-                onClick={() => navigate(`/learn/${slug}/player?lesson=${continueLesson.id}`)}
+                onClick={() => navigate(`/courses/${slug}/player?lesson=${continueLesson.id}`)}
               >
                 {!course.hideProgress && completedCount > 0 ? "Continue" : "Start"} <ArrowRight className="w-3.5 h-3.5" />
               </Button>
