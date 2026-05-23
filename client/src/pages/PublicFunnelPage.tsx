@@ -21,6 +21,7 @@ import InlineCheckoutBlock from "@/components/InlineCheckoutBlock";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import AudioBlockPlayer from "@/components/AudioBlockPlayer";
 import LeadCaptureModal from "@/components/LeadCaptureModal";
+import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
 
 // ─── Opt-Out Link Component ─────────────────────────────────────────────────
 
@@ -134,12 +135,13 @@ function CountdownDisplay({ mode, durationMinutes, targetDate, headline, accentC
 
 // ─── Public Block Renderer ───────────────────────────────────────────────────
 
-function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
+function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
   block: Block;
   funnelId: number;
   pageId: number;
   funnelSlug: string;
   nextPage?: { slug: string; title: string; pageType: string } | null;
+  user?: UserParamSource | null;
 }) {
   const d = block.data;
 
@@ -188,16 +190,18 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
         </div>
       );
     case "video": {
-      const isDirectVid = d.embedUrl && /\.(mp4|webm|ogg|mov)([?#]|$)/i.test(d.embedUrl);
+      const rawVidUrl = d.embedUrl ?? "";
+      const resolvedVidUrl = injectUserParams(rawVidUrl, user);
+      const isDirectVid = resolvedVidUrl && /\.(mp4|webm|ogg|mov)([?#]|$)/i.test(resolvedVidUrl);
       const vidContainerStyle: React.CSSProperties = { paddingBottom: d.height ? undefined : (isDirectVid ? undefined : "56.25%"), height: d.height || undefined, borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined };
       return (
         <div className="px-8 py-8">
           <div className="mx-auto" style={{ maxWidth: d.maxWidth ?? "56rem" }}>
-            {d.embedUrl && (
+            {resolvedVidUrl && (
               isDirectVid ? (
                 <div className="overflow-hidden shadow-lg" style={vidContainerStyle}>
                   <video
-                    src={d.embedUrl}
+                    src={resolvedVidUrl}
                     autoPlay={d.autoplay ?? false}
                     muted={d.muted ?? true}
                     loop={d.loop ?? false}
@@ -209,7 +213,7 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
               ) : (
                 <div className="relative w-full overflow-hidden shadow-lg" style={vidContainerStyle}>
                   <iframe
-                    src={d.autoplay ? `${d.embedUrl}${d.embedUrl.includes('?') ? '&' : '?'}autoplay=1${d.muted !== false ? '&mute=1' : ''}${d.loop ? '&loop=1' : ''}` : d.embedUrl}
+                    src={d.autoplay ? `${resolvedVidUrl}${resolvedVidUrl.includes('?') ? '&' : '?'}autoplay=1${d.muted !== false ? '&mute=1' : ''}${d.loop ? '&loop=1' : ''}` : resolvedVidUrl}
                     className="absolute inset-0 w-full h-full"
                     allowFullScreen
                     allow="autoplay; fullscreen"
@@ -458,7 +462,7 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage }: {
         <div className="px-8 py-8">
           <div className="max-w-4xl mx-auto">
             {d.embedCode ? (
-              <div dangerouslySetInnerHTML={{ __html: d.embedCode }} style={{ height: d.height ?? 400 }} />
+              <div dangerouslySetInnerHTML={{ __html: injectUserParamsIntoHtml(d.embedCode, user) }} style={{ height: d.height ?? 400 }} />
             ) : (
               <div className="h-64 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">Embed placeholder</div>
             )}
@@ -1223,6 +1227,7 @@ export default function PublicFunnelPage() {
 // Inner component so hooks are always called (no early returns before hooks)
 function FunnelPageContent({ data }: { data: { funnel: any; page: any; nextPage: any } }) {
   const { funnel, page, nextPage } = data;
+  const { user: pageUser } = useAuth();
 
   let blocks: Block[] = [];
   try {
@@ -1296,6 +1301,7 @@ function FunnelPageContent({ data }: { data: { funnel: any; page: any; nextPage:
             pageId={page.id}
             funnelSlug={funnel.slug}
             nextPage={effectiveNextPage}
+            user={pageUser}
           />
         </div>
       ))}

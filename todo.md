@@ -2615,3 +2615,22 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Move DownloadLanding (/downloads/:slug) outside LMSLayout and MembersLayout — standalone
 - [x] Move ProductLanding (/product/:slug) outside LMSLayout and MembersLayout — standalone
 - [x] Move PublicFunnelPage (/:slug/:pageSlug) outside all layout wrappers — standalone on all domains
+
+## User Profile URL Parameter Passthrough (2026-05-23)
+- [ ] Build injectUserParams(url, user) utility — replaces {{name}}, {{email}}, {{firstName}}, {{lastName}}, {{userId}} and also appends as query params
+- [ ] Build useUserUrlParams() hook — reads auth user and returns injectUserParams bound to current user
+- [ ] Wire passthrough into all iframe/embed block renderers in PublicFunnelPage
+- [ ] Wire passthrough into all iframe/embed block renderers in CourseLanding and DownloadLanding BlockPreview
+- [ ] Wire passthrough into all iframe/embed block renderers in ProductLanding BlockPreview
+- [ ] Add copy-paste tag reference panel to URL inputs in FunnelPageEditor embed blocks
+- [ ] Add copy-paste tag reference panel to URL inputs in LandingPageBuilder embed blocks
+- [ ] Add copy-paste tag reference panel to URL inputs in DownloadLandingPageBuilder embed blocks
+- [ ] Add copy-paste tag reference panel to URL inputs in ProductLandingPageBuilder embed blocks
+
+## User Profile URL Parameter Passthrough
+- [x] Build injectUserParams utility (client/src/lib/userUrlParams.ts)
+- [x] Build UserParamTagsHelper copy-paste component
+- [x] Wire passthrough into PublicFunnelPage video/embed blocks
+- [x] Wire passthrough into CourseLanding video/embed blocks
+- [x] Wire passthrough into DownloadLanding video/embed blocks
+- [x] Add tag helper panel to LandingPageBuilder video/embed settings (shared by all 4 builders)

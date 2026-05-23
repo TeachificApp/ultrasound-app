@@ -21,6 +21,7 @@ import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } fro
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import { useState, useEffect } from "react";
 import PromoCodeInput from "@/components/PromoCodeInput";
+import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
 
 // ─── Block type (matches builder) ─────────────────────────────────────────────
 interface Block { id: string; type: string; data: Record<string, any>; }
@@ -52,8 +53,8 @@ function CountdownTimer({ targetDate, textColor }: { targetDate?: string; textCo
 }
 
 // ─── Block Renderer ───────────────────────────────────────────────────────────
-function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug }: {
-  block: Block; onBuy: () => void; buying: boolean; price: string; hasPurchased: boolean; slug: string;
+function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: {
+  block: Block; onBuy: () => void; buying: boolean; price: string; hasPurchased: boolean; slug: string; user?: UserParamSource | null;
 }) {
   const d = block.data;
   switch (block.type) {
@@ -130,11 +131,12 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug }: {
       } else if (embedUrl.includes("youtu.be/")) {
         embedUrl = `https://www.youtube.com/embed/${embedUrl.split("youtu.be/")[1]}`;
       }
+      const resolvedVidUrl = injectUserParams(embedUrl, user);
       return (
         <div className="px-8 py-6 max-w-4xl mx-auto">
-          {embedUrl && (
+          {resolvedVidUrl && (
             <div className="relative w-full overflow-hidden shadow" style={{ paddingBottom: d.height ? undefined : "56.25%", height: d.height || undefined, borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined }}>
-              <iframe src={embedUrl} className="absolute inset-0 w-full h-full" allowFullScreen title="Video" />
+              <iframe src={resolvedVidUrl} className="absolute inset-0 w-full h-full" allowFullScreen title="Video" />
             </div>
           )}
         </div>
@@ -327,7 +329,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug }: {
         <div className="px-8 py-6">
           <div className="max-w-4xl mx-auto">
             {d.embedCode ? (
-              <div dangerouslySetInnerHTML={{ __html: d.embedCode }} style={{ height: d.height ?? 400 }} />
+              <div dangerouslySetInnerHTML={{ __html: injectUserParamsIntoHtml(d.embedCode, user) }} style={{ height: d.height ?? 400 }} />
             ) : (
               <div className="w-full bg-gray-100 rounded-lg flex items-center justify-center text-gray-400" style={{ height: d.height ?? 400 }}>Embed placeholder</div>
             )}
@@ -644,7 +646,7 @@ export default function DownloadLanding() {
       <div className="min-h-screen bg-white">
         {blocks.map(block => (
           <div key={block.id} style={{ marginTop: block.data?.marginTop ? `${block.data.marginTop}px` : undefined, marginBottom: block.data?.marginBottom ? `${block.data.marginBottom}px` : undefined, paddingTop: block.data?.paddingTop ? `${block.data.paddingTop}px` : undefined, paddingBottom: block.data?.paddingBottom ? `${block.data.paddingBottom}px` : undefined, paddingLeft: block.data?.paddingLeft ? `${block.data.paddingLeft}px` : undefined, paddingRight: block.data?.paddingRight ? `${block.data.paddingRight}px` : undefined }}>
-            <RenderBlock block={block} onBuy={handleBuy} buying={checkoutMut.isPending} price={price} hasPurchased={hasPurchased} slug={slug!} />
+            <RenderBlock block={block} onBuy={handleBuy} buying={checkoutMut.isPending} price={price} hasPurchased={hasPurchased} slug={slug!} user={user} />
           </div>
         ))}
         {/* Before-checkout order bump */}

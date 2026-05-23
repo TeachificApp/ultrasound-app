@@ -20,6 +20,7 @@ import OrderBumpOffer from "@/components/OrderBumpOffer";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import type { Block } from "@/components/BlockPreview";
+import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -105,10 +106,10 @@ function CountdownTimer({ targetDate, textColor }: { targetDate: string; textCol
 
 // ─── Block Renderer ────────────────────────────────────────────────────────────
 
-function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selectedPricingOptionId, onSelectPricingOption, slug, enrollment }: {
+function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selectedPricingOptionId, onSelectPricingOption, slug, enrollment, user }: {
   block: Block; course: any; onEnroll: () => void; enrolling: boolean; ctaText: string; price: string;
   selectedPricingOptionId?: number; onSelectPricingOption?: (id: number | undefined) => void;
-  slug?: string; enrollment?: any;
+  slug?: string; enrollment?: any; user?: UserParamSource | null;
 }) {
   const d = block.data;
   switch (block.type) {
@@ -174,23 +175,25 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
           {d.caption && <p className="text-sm text-gray-500 mt-2">{d.caption}</p>}
         </div>
       );
-    case "video":
+    case "video": {
+      const resolvedVidUrl = injectUserParams(d.embedUrl ?? "", user);
       return (
         <div className="px-8 py-6">
           <div className="mx-auto" style={{ maxWidth: d.maxWidth ?? "100%" }}>
-            {d.embedUrl && (
+            {resolvedVidUrl && (
               <div className="relative w-full overflow-hidden shadow" style={{ paddingBottom: d.height ? undefined : "56.25%", height: d.height || undefined, borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined }}>
-                <iframe src={d.embedUrl} className="absolute inset-0 w-full h-full" allowFullScreen title="Video" />
+                <iframe src={resolvedVidUrl} className="absolute inset-0 w-full h-full" allowFullScreen title="Video" />
               </div>
             )}
             {d.caption && <p className="text-sm text-gray-500 mt-2 text-center">{d.caption}</p>}
           </div>
         </div>
       );
+    }
     case "embed":
       return (
         <div className="px-8 py-6">
-          {d.embedCode ? <div dangerouslySetInnerHTML={{ __html: d.embedCode }} style={{ height: d.height ?? 400 }} /> : null}
+          {d.embedCode ? <div dangerouslySetInnerHTML={{ __html: injectUserParamsIntoHtml(d.embedCode, user) }} style={{ height: d.height ?? 400 }} /> : null}
           {d.caption && <p className="text-sm text-gray-500 mt-2 text-center">{d.caption}</p>}
         </div>
       );
@@ -672,7 +675,7 @@ export default function CourseLanding() {
       <div className="min-h-screen bg-white">
         {blocks.map(block => (
           <div key={block.id} style={{ marginTop: block.data?.marginTop ? `${block.data.marginTop}px` : undefined, marginBottom: block.data?.marginBottom ? `${block.data.marginBottom}px` : undefined, paddingTop: block.data?.paddingTop ? `${block.data.paddingTop}px` : undefined, paddingBottom: block.data?.paddingBottom ? `${block.data.paddingBottom}px` : undefined, paddingLeft: block.data?.paddingLeft ? `${block.data.paddingLeft}px` : undefined, paddingRight: block.data?.paddingRight ? `${block.data.paddingRight}px` : undefined }}>
-            <RenderBlock block={block} course={course} onEnroll={handleEnroll} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} />
+            <RenderBlock block={block} course={course} onEnroll={handleEnroll} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} />
           </div>
         ))}
         {/* Before-checkout order bump */}
