@@ -16,7 +16,7 @@ interface UserParamTagsHelperProps {
   compact?: boolean;
 }
 
-export function UserParamTagsHelper({ className = "", compact = false }: UserParamTagsHelperProps) {
+export default function UserParamTagsHelper({ className = "", compact = false }: UserParamTagsHelperProps) {
   const [copiedTag, setCopiedTag] = useState<string | null>(null);
 
   const handleCopy = (tag: string) => {
