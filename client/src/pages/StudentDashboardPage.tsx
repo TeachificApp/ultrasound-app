@@ -805,8 +805,8 @@ function MyContentTab() {
                   </div>
                   <div className="flex items-center gap-3 ml-4 shrink-0">
                     <span className="text-sm font-semibold text-gray-800">{formatCurrency(p.amountPaid, p.currency)}</span>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 font-medium capitalize">
-                      {p.productType ?? "purchase"}
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 font-medium">
+                      {p.productType === "download" ? "Digital Download" : p.productType === "course" ? "Course" : p.productType === "quiz" ? "Quiz" : p.productType ? p.productType.charAt(0).toUpperCase() + p.productType.slice(1) : "Purchase"}
                     </span>
                     <button
                       onClick={() => setReceiptPurchase(p)}
@@ -836,7 +836,7 @@ function MyContentTab() {
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="font-semibold text-gray-900">{receiptPurchase.productName}</p>
-                    <p className="text-xs text-gray-500 mt-0.5 capitalize">{receiptPurchase.productType ?? "purchase"}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{receiptPurchase.productType === "download" ? "Digital Download" : receiptPurchase.productType === "course" ? "Course" : receiptPurchase.productType === "quiz" ? "Quiz" : receiptPurchase.productType ? receiptPurchase.productType.charAt(0).toUpperCase() + receiptPurchase.productType.slice(1) : "Purchase"}</p>
                   </div>
                   <span className="text-sm font-bold text-gray-900">{formatCurrency(receiptPurchase.amountPaid, receiptPurchase.currency)}</span>
                 </div>
