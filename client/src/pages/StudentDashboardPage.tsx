@@ -617,6 +617,26 @@ type ContentSubTab = "courses" | "quizzes" | "downloads" | "products" | "purchas
 function MyContentTab() {
   const { data, isLoading } = trpc.dashboard.getMyContent.useQuery();
   const [contentTab, setContentTab] = useState<ContentSubTab>("courses");
+  const [autoTabSet, setAutoTabSet] = useState(false);
+  const [receiptPurchase, setReceiptPurchase] = useState<any | null>(null);
+
+  // Auto-select first non-empty tab once data loads
+  useEffect(() => {
+    if (!data || autoTabSet) return;
+    const tabOrder: ContentSubTab[] = ["courses", "quizzes", "downloads", "products", "purchases"];
+    const counts: Record<ContentSubTab, number> = {
+      courses:   data.courses?.length ?? 0,
+      quizzes:   data.quizzes?.length ?? 0,
+      downloads: data.downloads?.length ?? 0,
+      products:  data.physicalProducts?.length ?? 0,
+      purchases: data.funnelPurchases?.length ?? 0,
+    };
+    const firstNonEmpty = tabOrder.find(t => counts[t] > 0);
+    if (firstNonEmpty) {
+      setContentTab(firstNonEmpty);
+    }
+    setAutoTabSet(true);
+  }, [data, autoTabSet]);
 
   if (isLoading) return <LoadingSpinner />;
 
@@ -776,23 +796,96 @@ function MyContentTab() {
           {(data?.funnelPurchases?.length ?? 0) === 0 ? (
             <EmptyState icon={ShoppingCart} title="No purchases yet" description="Complete a checkout to see your purchases here." />
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100">
               {(data?.funnelPurchases ?? []).map((p: any) => (
-                <ContentCard
-                  key={p.id}
-                  title={p.productName}
-                  subtitle={`Purchased ${formatDate(p.purchasedAt)} · ${formatCurrency(p.amountPaid, p.currency)}`}
-                  badge={p.productType ?? "Purchase"}
-                  badgeColor="teal"
-                  actions={[
-                    { label: "View Receipt", icon: FileText, href: `/my-dashboard?tab=content` },
-                  ]}
-                />
+                <div key={p.id} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm text-gray-900 truncate">{p.productName}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{formatDate(p.purchasedAt)}</p>
+                  </div>
+                  <div className="flex items-center gap-3 ml-4 shrink-0">
+                    <span className="text-sm font-semibold text-gray-800">{formatCurrency(p.amountPaid, p.currency)}</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 font-medium capitalize">
+                      {p.productType ?? "purchase"}
+                    </span>
+                    <button
+                      onClick={() => setReceiptPurchase(p)}
+                      className="text-xs text-teal-600 hover:text-teal-800 font-medium flex items-center gap-1 underline-offset-2 hover:underline"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      Receipt
+                    </button>
+                  </div>
+                </div>
               ))}
             </div>
           )}
         </div>
       )}
+
+      {/* Receipt Modal */}
+      <Dialog open={!!receiptPurchase} onOpenChange={(open) => { if (!open) setReceiptPurchase(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Purchase Receipt</DialogTitle>
+            <DialogDescription>Order details for your purchase</DialogDescription>
+          </DialogHeader>
+          {receiptPurchase && (
+            <div className="space-y-4">
+              <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="font-semibold text-gray-900">{receiptPurchase.productName}</p>
+                    <p className="text-xs text-gray-500 mt-0.5 capitalize">{receiptPurchase.productType ?? "purchase"}</p>
+                  </div>
+                  <span className="text-sm font-bold text-gray-900">{formatCurrency(receiptPurchase.amountPaid, receiptPurchase.currency)}</span>
+                </div>
+                {receiptPurchase.orderBumps && (() => {
+                  try {
+                    const bumps = typeof receiptPurchase.orderBumps === "string"
+                      ? JSON.parse(receiptPurchase.orderBumps)
+                      : receiptPurchase.orderBumps;
+                    if (Array.isArray(bumps) && bumps.length > 0) {
+                      return (
+                        <div className="border-t border-gray-200 pt-3 space-y-1.5">
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Add-ons</p>
+                          {bumps.map((b: any, i: number) => (
+                            <div key={i} className="flex justify-between text-sm">
+                              <span className="text-gray-700">{b.title}</span>
+                              <span className="text-gray-700">{formatCurrency(b.price, "usd")}</span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    }
+                  } catch { /* ignore */ }
+                  return null;
+                })()}
+                <div className="border-t border-gray-200 pt-3 flex justify-between">
+                  <span className="text-sm font-semibold text-gray-700">Total Paid</span>
+                  <span className="text-sm font-bold text-teal-700">{formatCurrency(receiptPurchase.amountPaid, receiptPurchase.currency)}</span>
+                </div>
+              </div>
+              <div className="text-xs text-gray-500 space-y-1">
+                <div className="flex justify-between">
+                  <span>Date</span>
+                  <span>{formatDate(receiptPurchase.purchasedAt)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Status</span>
+                  <span className="capitalize text-green-600 font-medium">{receiptPurchase.status ?? "paid"}</span>
+                </div>
+                {receiptPurchase.sourceType && (
+                  <div className="flex justify-between">
+                    <span>Source</span>
+                    <span className="capitalize">{receiptPurchase.sourceType}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

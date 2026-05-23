@@ -9,8 +9,8 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { publicProcedure, router } from "../_core/trpc";
-import { getDb } from "../db";
-import { funnelPurchases, lmsEnrollments, brandMemberships, digitalPurchases } from "../../drizzle/schema";
+import { getDb, getOrCreateUserByEmail } from "../db";
+import { funnelPurchases, lmsEnrollments, brandMemberships, digitalPurchases, lmsCourses } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendEmail, buildFunnelPurchaseConfirmationEmail } from "../_core/email";
@@ -260,7 +260,7 @@ export const embeddedCheckoutRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       const customerName = [input.firstName, input.lastName].filter(Boolean).join(" ") || undefined;
-      const userId = ctx.user?.id ?? null;
+      let userId = ctx.user?.id ?? null;
 
       // Resolve success URL
       const resolveSuccessUrl = (redirect: string | undefined) => {
@@ -271,6 +271,46 @@ export const embeddedCheckoutRouter = router({
         return `${input.origin}${redirect}`;
       };
       const successUrl = resolveSuccessUrl(input.successRedirect);
+
+      // ── Auto-create account for guests ──────────────────────────────────────
+      const brandMode = "aaus"; // default; could be extended via input if needed
+      const baseUrl = brandMode === "iheartecho" ? "https://app.iheartecho.net" : "https://app.allaboutultrasound.com";
+      if (!userId) {
+        try {
+          const nameParts = (customerName || "").split(" ");
+          const result = await getOrCreateUserByEmail({
+            email: input.email,
+            firstName: nameParts[0] || undefined,
+            lastName: nameParts.slice(1).join(" ") || undefined,
+            name: customerName || undefined,
+          });
+          userId = result.user.id;
+          if (result.isNew && result.resetToken) {
+            try {
+              const { buildPasswordResetEmail, sendEmail: _sendEmail } = await import("../_core/email");
+              const setPasswordUrl = `${baseUrl}/auth/reset-password?token=${result.resetToken}`;
+              const firstName = input.firstName || nameParts[0] || "there";
+              const emailContent = buildPasswordResetEmail({
+                firstName,
+                resetUrl: setPasswordUrl,
+                brandMode: brandMode as any,
+              });
+              await _sendEmail({
+                to: { name: customerName || firstName, email: input.email },
+                subject: `Your account is ready — set your password to access ${input.productName || "your purchase"}`,
+                htmlBody: emailContent.htmlBody,
+                previewText: `Set your password to access your ${input.productName || "purchase"} on All About Ultrasound`,
+              });
+              console.log(`[FreeOrder] Sent set-password email to ${input.email} (new user ${userId})`);
+            } catch (emailErr) {
+              console.error(`[FreeOrder] Failed to send set-password email:`, emailErr);
+            }
+          }
+        } catch (err) {
+          console.error("[FreeOrder] Failed to create/find user:", err);
+        }
+      }
+      // ── END AUTO-ACCOUNT CREATION ────────────────────────────────────────────
 
       // Record the free purchase
       await db.insert(funnelPurchases).values({
@@ -388,14 +428,29 @@ export const embeddedCheckoutRouter = router({
       if (input.email) {
         try {
           const firstName = customerName ? customerName.split(" ")[0] : "there";
+          // Build a meaningful access URL pointing to the actual content
+          let loginUrl = `${baseUrl}/my-courses`;
+          if (input.lmsCourseId) {
+            try {
+              const [courseRow] = await db.select({ slug: lmsCourses.slug }).from(lmsCourses).where(eq(lmsCourses.id, input.lmsCourseId)).limit(1);
+              if (courseRow?.slug) loginUrl = `${baseUrl}/learn/${courseRow.slug}`;
+            } catch { /* keep default */ }
+          } else if (input.productType === "download") {
+            loginUrl = `${baseUrl}/my-downloads`;
+          } else if (input.productType === "bundle") {
+            loginUrl = `${baseUrl}/my-courses`;
+          } else if (input.fulfillmentBrand) {
+            loginUrl = `${baseUrl}/dashboard`;
+          }
           const { subject, htmlBody, previewText } = buildFunnelPurchaseConfirmationEmail({
             firstName,
             productName: input.productName,
             amountPaid: 0,
-            loginUrl: successUrl,
-            brandMode: "aaus",
+            loginUrl,
+            brandMode: brandMode as any,
           });
           await sendEmail({ to: { name: customerName || firstName, email: input.email }, subject, htmlBody, previewText });
+          console.log(`[FreeOrder] Confirmation email sent to ${input.email}`);
         } catch (err) {
           console.error(`[FreeOrder] Failed to send confirmation email:`, err);
         }

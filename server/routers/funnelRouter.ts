@@ -6,8 +6,8 @@
 import { z } from "zod";
 import { router, protectedProcedure, publicProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
-import { getDb } from "../db";
-import { funnels, funnelPages, funnelLeads, funnelTemplates, lmsCourses, lmsLandingPages, digitalProducts, digitalBundles, funnelBranchRules, funnelBranchConditions, emailCampaigns } from "../../drizzle/schema";
+import { getDb, getOrCreateUserByEmail } from "../db";
+import { funnels, funnelPages, funnelLeads, funnelTemplates, lmsCourses, lmsLandingPages, digitalProducts, digitalBundles, funnelBranchRules, funnelBranchConditions, emailCampaigns, funnelPurchases, lmsEnrollments, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships } from "../../drizzle/schema";
 import { eq, and, asc, desc, sql } from "drizzle-orm";
 import { evaluateBranchRules, type VisitorContext } from "../lib/funnelBranchEngine";
 
@@ -1135,6 +1135,168 @@ export const funnelPublicRouter = router({
         }
       }
 
+      // ── FREE PRODUCT PATH ($0 total) ────────────────────────────────────────
+      // Find thank you page for success redirect (needed for both free and paid paths)
+      const allPagesForRedirect = await db.select().from(funnelPages)
+        .where(eq(funnelPages.funnelId, funnel.id))
+        .orderBy(asc(funnelPages.sortOrder));
+      const thankYouPageForRedirect = allPagesForRedirect.find(p => p.pageType === "thank_you");
+      const successRedirectRaw = checkoutBlock.data?.successRedirect;
+      const resolveSuccessUrl2 = (redirect: string | undefined) => {
+        if (!redirect) return thankYouPageForRedirect ? `${input.origin}/f/${funnel.slug}/${thankYouPageForRedirect.slug}?success=1` : `${input.origin}/f/${funnel.slug}/${page.slug}?success=1`;
+        if (redirect === "__dashboard__") return `${input.origin}/my-dashboard?purchase=success`;
+        if (redirect.startsWith("__funnel__:")) return `${input.origin}/f/${redirect.slice(11)}?success=1`;
+        if (redirect.startsWith("http")) return redirect;
+        return `${input.origin}${redirect}`;
+      };
+      const successUrl = resolveSuccessUrl2(successRedirectRaw);
+
+      if (totalAmount === 0) {
+        // Free product — bypass Stripe entirely
+        const customerName = `${input.firstName || ""} ${input.lastName || ""}`.trim();
+        const brandMode = (checkoutBlock.data?.brandMode as string) || "aaus";
+        const baseUrl = brandMode === "iheartecho" ? "https://app.iheartecho.net" : "https://app.allaboutultrasound.com";
+
+        // 1. Create or find user account
+        let resolvedUserId: number | null = ctx.user?.id ?? null;
+        let isNewUser = false;
+        let resetToken: string | null = null;
+        if (!resolvedUserId) {
+          try {
+            const nameParts = customerName.split(" ");
+            const result = await getOrCreateUserByEmail({
+              email: input.email,
+              firstName: nameParts[0] || undefined,
+              lastName: nameParts.slice(1).join(" ") || undefined,
+              name: customerName || undefined,
+            });
+            resolvedUserId = result.user.id;
+            isNewUser = result.isNew;
+            resetToken = result.resetToken;
+          } catch (err) {
+            console.error("[FreeCheckout] Failed to create/find user:", err);
+          }
+        }
+
+        // 2. Send welcome + set-password email for new accounts
+        if (isNewUser && resetToken && resolvedUserId) {
+          try {
+            const { buildPasswordResetEmail, sendEmail: _sendEmail } = await import("../_core/email");
+            const setPasswordUrl = `${baseUrl}/auth/reset-password?token=${resetToken}`;
+            const firstName = input.firstName || customerName.split(" ")[0] || "there";
+            const emailContent = buildPasswordResetEmail({
+              firstName,
+              resetUrl: setPasswordUrl,
+              brandMode: brandMode as any,
+            });
+            await _sendEmail({
+              to: { name: customerName || firstName, email: input.email },
+              subject: `Your account is ready — set your password to access ${selectedProduct.name || "your purchase"}`,
+              htmlBody: emailContent.htmlBody,
+              previewText: `Set your password to access your ${selectedProduct.name || "purchase"} on ${brandMode === "iheartecho" ? "iHeartEcho" : "All About Ultrasound"}`,
+            });
+            console.log(`[FreeCheckout] Sent set-password email to ${input.email} (new user ${resolvedUserId})`);
+          } catch (emailErr) {
+            console.error(`[FreeCheckout] Failed to send set-password email:`, emailErr);
+          }
+        }
+
+        // 3. Record the purchase
+        const freeOrderRef = `free_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        await db.insert(funnelPurchases).values({
+          userId: resolvedUserId || null,
+          email: input.email,
+          name: customerName || null,
+          phone: input.phone || null,
+          productName: selectedProduct.name ?? "Free Product",
+          productType: selectedProduct.productType ?? selectedProduct.type ?? "other",
+          orderBumps: null,
+          amountPaid: 0,
+          currency: "usd",
+          stripePaymentIntentId: freeOrderRef,
+          sourceType: "funnel",
+          sourceFunnelId: funnel.id,
+          sourceFunnelPageId: page.id,
+          status: "paid",
+        });
+
+        // 4. Grant access based on product type
+        const productType = selectedProduct.productType ?? selectedProduct.type ?? "";
+        const productId = selectedProduct.productId ? parseInt(String(selectedProduct.productId)) : null;
+        if (resolvedUserId && productId) {
+          if (productType === "course") {
+            const [existingEnrollment] = await db.select({ id: lmsEnrollments.id })
+              .from(lmsEnrollments)
+              .where(and(eq(lmsEnrollments.userId, resolvedUserId), eq(lmsEnrollments.courseId, productId)))
+              .limit(1);
+            if (!existingEnrollment) {
+              await db.insert(lmsEnrollments).values({ userId: resolvedUserId, courseId: productId, orderId: null, affiliateCode: null });
+              console.log(`[FreeCheckout] Enrolled user ${resolvedUserId} in course ${productId}`);
+            }
+          } else if (productType === "download") {
+            const [existingDl] = await db.select({ id: digitalPurchases.id })
+              .from(digitalPurchases)
+              .where(and(eq(digitalPurchases.userId, resolvedUserId), eq(digitalPurchases.productId, productId)))
+              .limit(1);
+            if (!existingDl) {
+              await db.insert(digitalPurchases).values({ userId: resolvedUserId, productId, stripeCheckoutSessionId: freeOrderRef });
+              console.log(`[FreeCheckout] Granted download access: user ${resolvedUserId}, product ${productId}`);
+            }
+          } else if (productType === "bundle") {
+            const [existingBundle] = await db.select({ id: digitalBundlePurchases.id })
+              .from(digitalBundlePurchases)
+              .where(and(eq(digitalBundlePurchases.userId, resolvedUserId), eq(digitalBundlePurchases.bundleId, productId)))
+              .limit(1);
+            if (!existingBundle) {
+              await db.insert(digitalBundlePurchases).values({ userId: resolvedUserId, bundleId: productId, stripeCheckoutSessionId: freeOrderRef });
+              const bundleItems = await db.select().from(digitalBundleItems).where(eq(digitalBundleItems.bundleId, productId));
+              for (const item of bundleItems) {
+                const [existingDl] = await db.select({ id: digitalPurchases.id }).from(digitalPurchases)
+                  .where(and(eq(digitalPurchases.userId, resolvedUserId!), eq(digitalPurchases.productId, item.productId))).limit(1);
+                if (!existingDl) {
+                  await db.insert(digitalPurchases).values({ userId: resolvedUserId!, productId: item.productId, stripeCheckoutSessionId: freeOrderRef });
+                }
+              }
+              console.log(`[FreeCheckout] Granted bundle access: user ${resolvedUserId}, bundle ${productId}`);
+            }
+          }
+        }
+
+        // 5. Track conversion
+        await db.execute(sql`UPDATE funnel_pages SET conversions = conversions + 1 WHERE id = ${page.id}`);
+
+        // 6. Send purchase confirmation email
+        try {
+          const { sendEmail, buildFunnelPurchaseConfirmationEmail } = await import("../_core/email");
+          const firstName = input.firstName || customerName.split(" ")[0] || "there";
+          let loginUrl = `${baseUrl}/my-courses`;
+          if (productType === "course" && productId) {
+            try {
+              const [courseRow] = await db.select({ slug: lmsCourses.slug }).from(lmsCourses).where(eq(lmsCourses.id, productId)).limit(1);
+              if (courseRow?.slug) loginUrl = `${baseUrl}/learn/${courseRow.slug}`;
+            } catch { /* keep default */ }
+          } else if (productType === "download") {
+            loginUrl = `${baseUrl}/my-downloads`;
+          } else if (productType === "bundle") {
+            loginUrl = `${baseUrl}/my-courses`;
+          }
+          const { subject, htmlBody, previewText } = buildFunnelPurchaseConfirmationEmail({
+            firstName,
+            productName: selectedProduct.name ?? "Free Product",
+            amountPaid: 0,
+            loginUrl,
+            brandMode: brandMode as any,
+          });
+          await sendEmail({ to: { name: customerName || firstName, email: input.email }, subject, htmlBody, previewText });
+          console.log(`[FreeCheckout] Confirmation email sent to ${input.email}`);
+        } catch (emailErr) {
+          console.error(`[FreeCheckout] Failed to send confirmation email:`, emailErr);
+        }
+
+        return { freeSuccess: true, successUrl };
+      }
+      // ── END FREE PRODUCT PATH ────────────────────────────────────────────────
+
       if (totalAmount < 50) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Minimum charge amount is $0.50" });
       }
@@ -1147,21 +1309,6 @@ export const funnelPublicRouter = router({
       if (bumpDetails.length > 0) {
         description += " + " + bumpDetails.join(", ");
       }
-
-      // Find thank you page for success redirect
-      const allPages = await db.select().from(funnelPages)
-        .where(eq(funnelPages.funnelId, funnel.id))
-        .orderBy(asc(funnelPages.sortOrder));
-      const thankYouPage = allPages.find(p => p.pageType === "thank_you");
-      const successRedirect = checkoutBlock.data?.successRedirect;
-      const resolveSuccessUrl2 = (redirect: string | undefined) => {
-        if (!redirect) return thankYouPage ? `${input.origin}/f/${funnel.slug}/${thankYouPage.slug}?success=1` : `${input.origin}/f/${funnel.slug}/${page.slug}?success=1`;
-        if (redirect === "__dashboard__") return `${input.origin}/my-dashboard?purchase=success`;
-        if (redirect.startsWith("__funnel__:")) return `${input.origin}/f/${redirect.slice(11)}?success=1`;
-        if (redirect.startsWith("http")) return redirect;
-        return `${input.origin}${redirect}`;
-      };
-      const successUrl = resolveSuccessUrl2(successRedirect);
 
       // Create PaymentIntent
       const paymentIntent = await stripe.paymentIntents.create({
