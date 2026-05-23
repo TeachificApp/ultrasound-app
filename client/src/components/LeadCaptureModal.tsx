@@ -96,31 +96,39 @@ export default function LeadCaptureModal({
           {subtext && <DialogDescription>{subtext}</DialogDescription>}
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-3 mt-2">
+          {user && (
+            <p className="text-xs text-teal-700 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2">
+              Continuing as <strong>{(user as any).email}</strong>
+            </p>
+          )}
           <div className="flex gap-2">
             <Input
               type="text"
               placeholder="First name"
               value={firstName}
-              onChange={e => setFirstName(e.target.value)}
+              onChange={e => !user && setFirstName(e.target.value)}
+              readOnly={!!user}
               required
-              className="h-11"
+              className={`h-11 ${user ? "bg-gray-50 text-gray-500" : ""}`}
             />
             <Input
               type="text"
               placeholder="Last name"
               value={lastName}
-              onChange={e => setLastName(e.target.value)}
+              onChange={e => !user && setLastName(e.target.value)}
+              readOnly={!!user}
               required
-              className="h-11"
+              className={`h-11 ${user ? "bg-gray-50 text-gray-500" : ""}`}
             />
           </div>
           <Input
             type="email"
             placeholder="Your email address"
             value={email}
-            onChange={e => setEmail(e.target.value)}
+            onChange={e => !user && setEmail(e.target.value)}
+            readOnly={!!user}
             required
-            className="h-11"
+            className={`h-11 ${user ? "bg-gray-50 text-gray-500" : ""}`}
           />
           <Button
             type="submit"

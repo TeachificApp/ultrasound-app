@@ -4,6 +4,7 @@
  * Displays the block-based content and handles lead capture + checkout CTAs.
  */
 import { useState, useEffect, useRef } from "react";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { ButtonSubtext } from "@/lib/ctaSubtext";
@@ -951,8 +952,19 @@ function PricingCtaBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: Rec
 // ─── Lead Capture Block ──────────────────────────────────────────────────────
 
 function LeadCaptureBlock({ data, funnelId, pageId, nextPageUrl }: { data: Record<string, any>; funnelId: number; pageId: number; nextPageUrl?: string }) {
+  const { user } = useAuth();
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
+
+  // Autopopulate from logged-in user
+  useEffect(() => {
+    if (user) {
+      const fullName = user.displayName ?? user.name ?? [user.firstName, user.lastName].filter(Boolean).join(" ") ?? "";
+      if (fullName) setName(fullName);
+      if (user.email) setEmail(user.email);
+    }
+  }, [user?.id]);
+
   const [submitted, setSubmitted] = useState(false);
 
   const submitLead = trpc.funnelPublic.submitLead.useMutation({

@@ -6,6 +6,7 @@
  * Stripe payment, order bumps, terms, and submit.
  */
 import { useState, useMemo, useEffect } from "react";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { loadStripe } from "@stripe/stripe-js";
 import {
   Elements,
@@ -100,9 +101,9 @@ interface CheckoutFormBlockProps {
 
 function CheckoutFormInner({ data, funnelId, pageId, funnelSlug }: CheckoutFormBlockProps) {
   const d = data as unknown as CheckoutFormData;
+  const { user, logout } = useAuth();
 
-  // Auto-populate from funnel lead capture:
-  // Priority: URL params (?name=...&email=...) > sessionStorage funnel_lead > empty
+  // Auto-populate priority: logged-in user > URL params > sessionStorage funnel_lead > empty
   const savedLead = (() => {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -112,17 +113,27 @@ function CheckoutFormInner({ data, funnelId, pageId, funnelSlug }: CheckoutFormB
       return JSON.parse(sessionStorage.getItem("funnel_lead") ?? "null") ?? {};
     } catch { return {}; }
   })();
-  const [firstName, setFirstName] = useState(() => {
-    const saved = savedLead.name ?? "";
-    const parts = saved.trim().split(" ");
-    return parts[0] ?? "";
-  });
-  const [lastName, setLastName] = useState(() => {
-    const saved = savedLead.name ?? "";
-    const parts = saved.trim().split(" ");
-    return parts.slice(1).join(" ") ?? "";
-  });
-  const [email, setEmail] = useState(() => savedLead.email ?? "");
+
+  // Derive initial values — logged-in user takes highest priority
+  const initFirstName = user?.firstName ?? user?.displayName?.split(" ")[0] ?? user?.name?.split(" ")[0] ?? savedLead.name?.split(" ")[0] ?? "";
+  const initLastName = user?.lastName ?? user?.displayName?.split(" ").slice(1).join(" ") ?? user?.name?.split(" ").slice(1).join(" ") ?? savedLead.name?.split(" ").slice(1).join(" ") ?? "";
+  const initEmail = user?.email ?? savedLead.email ?? "";
+
+  const [firstName, setFirstName] = useState(initFirstName);
+  const [lastName, setLastName] = useState(initLastName);
+  const [email, setEmail] = useState(initEmail);
+
+  // Sync state when user auth loads (handles async auth resolution)
+  useEffect(() => {
+    if (user) {
+      const fn = user.firstName ?? user.displayName?.split(" ")[0] ?? user.name?.split(" ")[0] ?? "";
+      const ln = user.lastName ?? user.displayName?.split(" ").slice(1).join(" ") ?? user.name?.split(" ").slice(1).join(" ") ?? "";
+      if (fn) setFirstName(fn);
+      if (ln) setLastName(ln);
+      if (user.email) setEmail(user.email);
+    }
+  }, [user?.id]);
+
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [address2, setAddress2] = useState("");
@@ -346,29 +357,45 @@ function CheckoutFormInner({ data, funnelId, pageId, funnelSlug }: CheckoutFormB
       {d.showContactInfo !== false && (
         <fieldset className="border border-gray-300 rounded-lg p-5 mb-5">
           <legend className="text-xs font-bold tracking-wider text-gray-600 px-2 uppercase">Contact Information</legend>
+          {/* Logged-in user notice */}
+          {user && (
+            <div className="mb-3 flex items-center gap-2 text-xs text-teal-700 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2">
+              <span>Purchasing as <strong>{user.email}</strong></span>
+              <button
+                type="button"
+                onClick={logout}
+                className="ml-auto text-xs text-teal-600 underline hover:text-teal-800 whitespace-nowrap"
+              >
+                Log out to use a different email
+              </button>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3 mb-3">
             <input
               type="text"
               placeholder="First Name"
               value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+              onChange={(e) => !user && setFirstName(e.target.value)}
+              readOnly={!!user}
+              className={`w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 ${user ? "bg-gray-50 text-gray-500 cursor-default" : ""}`}
             />
             <input
               type="text"
               placeholder="Last Name"
               value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+              onChange={(e) => !user && setLastName(e.target.value)}
+              readOnly={!!user}
+              className={`w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 ${user ? "bg-gray-50 text-gray-500 cursor-default" : ""}`}
             />
           </div>
           <input
             type="email"
             placeholder="Email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => !user && setEmail(e.target.value)}
+            readOnly={!!user}
             required
-            className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-teal-400"
+            className={`w-full border border-gray-200 rounded-lg px-4 py-3 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-teal-400 ${user ? "bg-gray-50 text-gray-500 cursor-default" : ""}`}
           />
           {d.showPhone !== false && (
             <input
