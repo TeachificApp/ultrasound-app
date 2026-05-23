@@ -2652,3 +2652,11 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Write Cloudflare proxy setup guide (references/cloudflare-proxy-setup.md)
 - [ ] Set CANONICAL_ROOT_DOMAIN=allaboutultrasound.com secret in Manus project settings
 - [ ] Deploy Worker to Cloudflare and add route rules (see setup guide)
+
+## Subdomain Routing Architecture — May 2026
+- [x] Define LEARN_APP_URL, MEMBERS_APP_URL, ROOT_DOMAIN_URL constants in useSubdomain.ts
+- [x] Update SsoRedirect to support targetOrigin parameter for members subdomain
+- [x] Update main Router: landing pages → root domain, player/files → learn, account → members
+- [x] Update LMSRouter: strip landing pages, keep player/files routes only
+- [x] Update Cloudflare Worker: add education-library proxy path, route to learn/members/app correctly
+- [x] 25 vitest tests passing for subdomain routing logic

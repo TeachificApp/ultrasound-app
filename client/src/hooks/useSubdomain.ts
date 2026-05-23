@@ -49,6 +49,12 @@ const ACCREDITATION_HOSTNAMES = [
 
 /** The canonical iHeartEcho app URL — used for all outbound links */
 export const IHEARTECHO_APP_URL = "https://app.iheartecho.net";
+/** The canonical learn subdomain — course/quiz/download/product player access only */
+export const LEARN_APP_URL = "https://learn.allaboutultrasound.com";
+/** The canonical members subdomain — profile, dashboard, subscriptions */
+export const MEMBERS_APP_URL = "https://members.allaboutultrasound.com";
+/** The canonical root domain — landing pages, education library, funnels (Cloudflare proxied) */
+export const ROOT_DOMAIN_URL = "https://allaboutultrasound.com";
 
 export function useSubdomain() {
   const isLearnSubdomain = useMemo(() => isLearnDomain(), []);

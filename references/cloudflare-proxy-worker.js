@@ -10,13 +10,16 @@
  *   /downloads/:slug        → digital download landing pages
  *   /bundles/:slug          → bundle landing pages
  *   /product/:slug          → product landing pages
+ *   /education-library      → browsable course/download catalogue
  *   /:slug/:pageSlug        → funnel pages (multi-step funnels)
  *   /p/:slug                → standalone landing pages
  *
  * REDIRECTED paths (send users to the correct subdomain):
- *   /dashboard              → app.allaboutultrasound.com/dashboard
- *   /my-downloads           → app.allaboutultrasound.com/my-downloads
- *   /account, /profile      → app.allaboutultrasound.com/...
+ *   /my-dashboard           → members.allaboutultrasound.com/my-dashboard
+ *   /my-downloads           → members.allaboutultrasound.com/my-downloads
+ *   /account, /profile      → members.allaboutultrasound.com/...
+ *   /courses/:slug/player   → learn.allaboutultrasound.com/courses/:slug/player
+ *   /downloads/:slug/files  → learn.allaboutultrasound.com/downloads/:slug/files
  *   /admin/*                → app.allaboutultrasound.com/admin/...
  *   /login                  → app.allaboutultrasound.com/login
  *   /api/*                  → app.allaboutultrasound.com/api/...
@@ -55,6 +58,8 @@ function shouldProxy(pathname) {
   if (/^\/bundles\/[^/]+\/?$/.test(pathname)) return true;
   if (/^\/product\/[^/]+\/?$/.test(pathname)) return true;
   if (/^\/p\/[^/]+\/?$/.test(pathname)) return true;
+  // Education library catalogue
+  if (/^\/education-library(\/?|\?.*)$/.test(pathname)) return true;
 
   // Funnel pages: /:slug/:pageSlug — two-segment paths that are NOT reserved
   // We check the first segment is not a known app/API prefix.
@@ -71,19 +76,36 @@ function shouldProxy(pathname) {
  * Returns a redirect URL if the path belongs to the authenticated app,
  * or null if it should pass through to the root domain origin.
  */
+const MEMBERS_ORIGIN = "https://members.allaboutultrasound.com";
+const LEARN_ORIGIN = "https://learn.allaboutultrasound.com";
+
 function getAppRedirect(pathname, appOrigin) {
-  const APP_PATHS = [
-    /^\/dashboard(\/|$)/,
-    /^\/admin(\/|$)/,
+  // Player/access paths → learn subdomain
+  if (/^\/courses\/[^/]+\/player(\/|$)/.test(pathname)) return `${LEARN_ORIGIN}${pathname}`;
+  if (/^\/downloads\/[^/]+\/files(\/|$)/.test(pathname)) return `${LEARN_ORIGIN}${pathname}`;
+  if (/^\/courses\/[^/]+\/overview(\/|$)/.test(pathname)) return `${LEARN_ORIGIN}${pathname}`;
+
+  // Account/dashboard paths → members subdomain
+  const MEMBERS_PATHS = [
+    /^\/my-dashboard(\/|$)/,
     /^\/my-downloads(\/|$)/,
     /^\/account(\/|$)/,
     /^\/profile(\/|$)/,
+    /^\/settings(\/|$)/,
+    /^\/notifications(\/|$)/,
+    /^\/upgrade-success(\/|$)/,
+  ];
+  for (const pattern of MEMBERS_PATHS) {
+    if (pattern.test(pathname)) return `${MEMBERS_ORIGIN}${pathname}`;
+  }
+
+  // App-only paths → app subdomain
+  const APP_PATHS = [
+    /^\/admin(\/|$)/,
+    /^\/platform-admin(\/|$)/,
     /^\/login(\/|$)/,
     /^\/logout(\/|$)/,
     /^\/api(\/|$)/,
-    /^\/student(\/|$)/,
-    /^\/settings(\/|$)/,
-    /^\/notifications(\/|$)/,
     /^\/forms(\/|$)/,
   ];
   for (const pattern of APP_PATHS) {

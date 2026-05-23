@@ -1,25 +1,31 @@
 /**
- * SsoRedirect — Performs a cross-domain redirect to learn.allaboutultrasound.com
- * with an SSO token if the user is authenticated, so they don't need to log in again.
+ * SsoRedirect — Performs a cross-domain redirect with an SSO token if the user
+ * is authenticated, so they don't need to log in again on the target subdomain.
+ *
+ * Defaults to learn.allaboutultrasound.com but accepts an explicit `targetOrigin`
+ * for redirecting to members.allaboutultrasound.com or other subdomains.
  */
 import { useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { LEARN_APP_URL, MEMBERS_APP_URL } from "@/hooks/useSubdomain";
 
-const LEARN_DOMAIN = "https://learn.allaboutultrasound.com";
+export { LEARN_APP_URL, MEMBERS_APP_URL };
 
 interface SsoRedirectProps {
-  path: string; // e.g. "/education-library" or "/courses/my-course/player"
+  path: string; // e.g. "/courses/my-course/player" or "/my-dashboard"
+  /** Override the target origin. Defaults to LEARN_APP_URL. */
+  targetOrigin?: string;
 }
 
-export function SsoRedirect({ path }: SsoRedirectProps) {
+export function SsoRedirect({ path, targetOrigin = LEARN_APP_URL }: SsoRedirectProps) {
   const { user, loading } = useAuth();
   const issueToken = trpc.sso.issueToken.useMutation();
 
   useEffect(() => {
     if (loading) return; // wait for auth state
 
-    const destination = LEARN_DOMAIN + (path.startsWith("/") ? path : `/${path}`);
+    const destination = targetOrigin + (path.startsWith("/") ? path : `/${path}`);
 
     if (!user) {
       // Not logged in — redirect without SSO token
