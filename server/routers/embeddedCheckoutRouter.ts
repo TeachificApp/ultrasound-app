@@ -14,6 +14,7 @@ import { funnelPurchases, lmsEnrollments, brandMemberships, digitalPurchases, lm
 import { eq, and } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendEmail, buildFunnelPurchaseConfirmationEmail } from "../_core/email";
+import { generateAutoLoginToken } from "../routes/autoLogin";
 
 const billingAddressSchema = z.object({
   address: z.string(),
@@ -442,15 +443,25 @@ export const embeddedCheckoutRouter = router({
           } else if (input.fulfillmentBrand) {
             loginUrl = `${baseUrl}/dashboard`;
           }
+          // Generate auto-login token so the email link logs them in automatically
+          let autoLoginUrl = loginUrl;
+          if (userId) {
+            try {
+              const token = await generateAutoLoginToken(userId, loginUrl);
+              autoLoginUrl = `${baseUrl}/api/auth/auto-login?token=${token}`;
+            } catch (tokenErr) {
+              console.error(`[FreeOrder] Failed to generate auto-login token for user ${userId}:`, tokenErr);
+            }
+          }
           const { subject, htmlBody, previewText } = buildFunnelPurchaseConfirmationEmail({
             firstName,
             productName: input.productName,
             amountPaid: 0,
-            loginUrl,
+            loginUrl: autoLoginUrl,
             brandMode: brandMode as any,
           });
           await sendEmail({ to: { name: customerName || firstName, email: input.email }, subject, htmlBody, previewText });
-          console.log(`[FreeOrder] Confirmation email sent to ${input.email}`);
+          console.log(`[FreeOrder] Confirmation email sent to ${input.email} (auto-login: ${userId ? 'yes' : 'no'})`);
         } catch (err) {
           console.error(`[FreeOrder] Failed to send confirmation email:`, err);
         }

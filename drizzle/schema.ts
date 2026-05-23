@@ -4115,3 +4115,15 @@ export const lessonComments = mysqlTable("lesson_comments", {
 });
 export type LessonComment = typeof lessonComments.$inferSelect;
 export type InsertLessonComment = typeof lessonComments.$inferInsert;
+
+// ─── Auto-Login Tokens (post-purchase one-time login) ────────────────────────
+export const autoLoginTokens = mysqlTable("auto_login_tokens", {
+  id: int("id").autoincrement().primaryKey(),
+  token: varchar("token", { length: 128 }).notNull().unique(),
+  userId: int("user_id").notNull(),
+  usedAt: timestamp("used_at"),
+  expiresAt: timestamp("expires_at").notNull(),
+  redirectUrl: text("redirect_url"), // where to send the user after login
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type AutoLoginToken = typeof autoLoginTokens.$inferSelect;

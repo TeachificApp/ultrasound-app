@@ -22,6 +22,7 @@ import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
 import { fulfillOrderBumpPurchase } from "../lib/orderBumpCheckout";
 import { sendEmail, buildFunnelPurchaseConfirmationEmail } from "../_core/email";
+import { generateAutoLoginToken } from "../routes/autoLogin";
 
 // Stripe webhook secret — optional but strongly recommended in production
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET ?? "";
@@ -884,16 +885,27 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
       } else if (fulfillmentBrand) {
         loginUrl = brandMode === "iheartecho" ? "https://app.iheartecho.net/dashboard" : "https://app.allaboutultrasound.com/dashboard";
       }
+      // Generate auto-login token so the email link logs them in automatically
+      let autoLoginUrl = loginUrl;
+      if (resolvedUserId) {
+        try {
+          const token = await generateAutoLoginToken(resolvedUserId, loginUrl);
+          autoLoginUrl = `${baseUrl}/api/auth/auto-login?token=${token}`;
+        } catch (tokenErr) {
+          console.error(`[Stripe] Failed to generate auto-login token for user ${resolvedUserId}:`, tokenErr);
+          // Fall back to plain loginUrl
+        }
+      }
       const { subject, htmlBody, previewText } = buildFunnelPurchaseConfirmationEmail({
         firstName,
         productName,
         amountPaid: amount ?? 0,
         orderBumps: bumpsForEmail.length > 0 ? bumpsForEmail : undefined,
-        loginUrl,
+        loginUrl: autoLoginUrl,
         brandMode: brandMode as any,
       });
       await sendEmail({ to: { name: customerName || firstName, email: customerEmail }, subject, htmlBody, previewText });
-      console.log(`[Stripe] Purchase confirmation email sent to ${customerEmail} for "${productName}"`);
+      console.log(`[Stripe] Purchase confirmation email sent to ${customerEmail} for "${productName}" (auto-login: ${resolvedUserId ? 'yes' : 'no'})`);
     } catch (err) {
       console.error(`[Stripe] Failed to send purchase confirmation email to ${customerEmail}:`, err);
     }

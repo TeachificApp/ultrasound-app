@@ -1369,8 +1369,8 @@ function AnalyticsTab() {
 // ─── Main Dashboard Page ──────────────────────────────────────────────────────
 
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
-  { key: "profile",       label: "Profile",       icon: User },
   { key: "content",       label: "My Content",    icon: BookOpen },
+  { key: "profile",       label: "Profile",       icon: User },
   { key: "subscriptions", label: "Subscriptions", icon: CreditCard },
   { key: "certificates",  label: "Certificates",  icon: Award },
 ];
@@ -1382,7 +1382,7 @@ export default function StudentDashboardPage() {
 
   // Parse ?tab= from URL
   const urlTab = new URLSearchParams(search).get("tab") as Tab | null;
-  const initialTab: Tab = urlTab && VALID_TABS.includes(urlTab) ? urlTab : "profile";
+  const initialTab: Tab = urlTab && VALID_TABS.includes(urlTab) ? urlTab : "content";
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
 
   // Keep URL in sync when tab changes.
