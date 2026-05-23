@@ -1,49 +1,25 @@
 /**
- * Funnel Page OG Meta Injection
+ * Funnel Page OG Meta + Canonical Tag Injection
  *
- * When a social media crawler (iMessage, WhatsApp, Twitter, Slack, etc.) fetches
- * a funnel page URL, this middleware intercepts the request and injects the
- * page-specific seoTitle / seoDescription / seoImage into the HTML <head>
- * so that link previews show the correct content.
+ * Intercepts requests for funnel/landing pages and injects:
+ *  - Page-specific <title>, <meta name="description">, and OG tags
+ *  - A <link rel="canonical"> pointing to the SEO root domain when a
+ *    Cloudflare Worker is proxying the page from allaboutultrasound.com.
+ *
+ * Proxy detection: the Cloudflare Worker sends an `x-canonical-host` header
+ * containing the root domain (e.g. "allaboutultrasound.com"). When present,
+ * canonical URLs are built against that host instead of the app subdomain.
  *
  * For real browsers the SPA loads normally — no change in behaviour.
  */
 
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import fs from "fs";
 import path from "path";
 import { getDb } from "../db";
 import { funnels, funnelPages } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
-
-/** User-agent substrings that identify social/link-preview crawlers */
-const BOT_UA_PATTERNS = [
-  "facebookexternalhit",
-  "twitterbot",
-  "linkedinbot",
-  "whatsapp",
-  "slackbot",
-  "telegrambot",
-  "discordbot",
-  "applebot",
-  "imessage",
-  "iMessagePreview",
-  "preview",
-  "crawler",
-  "bot/",
-  "spider",
-  "curl",
-  "wget",
-  "python-requests",
-  "go-http-client",
-  "java/",
-  "okhttp",
-];
-
-function isBotRequest(userAgent: string): boolean {
-  const ua = userAgent.toLowerCase();
-  return BOT_UA_PATTERNS.some((p) => ua.includes(p.toLowerCase()));
-}
+import { ENV } from "../_core/env";
 
 function escapeHtml(str: string): string {
   return str
@@ -53,23 +29,45 @@ function escapeHtml(str: string): string {
     .replace(/>/g, "&gt;");
 }
 
+/**
+ * Resolve the canonical host for a request.
+ * Priority:
+ *  1. x-canonical-host header set by the Cloudflare Worker
+ *  2. CANONICAL_ROOT_DOMAIN env var (fallback for server-side config)
+ *  3. The actual request host (no proxy — use as-is)
+ */
+function getCanonicalHost(req: Request): string {
+  const cfHeader = req.headers["x-canonical-host"];
+  if (cfHeader && typeof cfHeader === "string" && cfHeader.trim()) {
+    return cfHeader.trim();
+  }
+  if (ENV.canonicalRootDomain) {
+    return ENV.canonicalRootDomain;
+  }
+  return req.get("host") ?? "";
+}
+
 function buildMetaTags(opts: {
   title: string;
   description: string;
   imageUrl?: string | null;
+  canonicalUrl: string;
   pageUrl: string;
 }): string {
-  const { title, description, imageUrl, pageUrl } = opts;
+  const { title, description, imageUrl, canonicalUrl, pageUrl } = opts;
   const t = escapeHtml(title);
   const d = escapeHtml(description);
   const img = imageUrl ? escapeHtml(imageUrl) : "";
+  const canon = escapeHtml(canonicalUrl);
+  const ogUrl = escapeHtml(pageUrl);
 
   return [
     `<title>${t}</title>`,
+    `<link rel="canonical" href="${canon}" />`,
     `<meta name="description" content="${d}" />`,
     `<meta property="og:title" content="${t}" />`,
     `<meta property="og:description" content="${d}" />`,
-    `<meta property="og:url" content="${escapeHtml(pageUrl)}" />`,
+    `<meta property="og:url" content="${ogUrl}" />`,
     `<meta property="og:type" content="website" />`,
     img ? `<meta property="og:image" content="${img}" />` : "",
     img ? `<meta property="og:image:width" content="1200" />` : "",
@@ -116,7 +114,7 @@ async function getFunnelPageSeo(
     if (!page) return null;
 
     return {
-      title: page.seoTitle || page.title || funnel.title as string,
+      title: page.seoTitle || page.title || (funnel.title as string),
       description: page.seoDescription || "",
       image: page.seoImage,
     };
@@ -161,11 +159,40 @@ function getIndexHtmlPath(): string {
   return path.resolve(process.cwd(), "dist", "public", "index.html");
 }
 
+function injectSeoIntoHtml(
+  html: string,
+  seo: { title: string; description: string; image?: string | null },
+  req: Request,
+  pathOverride?: string
+): string {
+  const canonicalHost = getCanonicalHost(req);
+  const actualPath = pathOverride ?? req.originalUrl;
+  // Canonical URL always uses https on the canonical host
+  const canonicalUrl = `https://${canonicalHost}${actualPath}`;
+  // OG URL reflects the actual request (may be the subdomain or root)
+  const pageUrl = `${req.protocol}://${req.get("host")}${req.originalUrl}`;
+
+  const metaTags = buildMetaTags({
+    title: seo.title,
+    description: seo.description,
+    imageUrl: seo.image,
+    canonicalUrl,
+    pageUrl,
+  });
+
+  html = html.replace(/<title>[^<]*<\/title>/, `<title>${escapeHtml(seo.title)}</title>`);
+  // Remove any existing canonical tag before injecting ours
+  html = html.replace(/<link\s+rel="canonical"[^>]*\/?>(\s*)?/gi, "");
+  html = html.replace(
+    /<\/head>/,
+    `    <!-- Page SEO -->\n    ${metaTags}\n  </head>`
+  );
+  return html;
+}
+
 export function registerFunnelOgMetaRoutes(app: Express) {
-  // Handle /f/:funnelSlug/:pageSlug
+  // ── Funnel pages: /:funnelSlug/:pageSlug ──────────────────────────────────
   app.get("/:funnelSlug/:pageSlug", async (req, res, next) => {
-    const ua = req.headers["user-agent"] || "";
-    // Always inject meta tags (both bots and real users benefit from correct title)
     const seo = await getFunnelPageSeo(req.params.funnelSlug, req.params.pageSlug);
     if (!seo) return next();
 
@@ -173,25 +200,12 @@ export function registerFunnelOgMetaRoutes(app: Express) {
     if (!fs.existsSync(indexPath)) return next();
 
     let html = fs.readFileSync(indexPath, "utf-8");
-    const pageUrl = `${req.protocol}://${req.get("host")}${req.originalUrl}`;
-    const metaTags = buildMetaTags({
-      title: seo.title,
-      description: seo.description,
-      imageUrl: seo.image,
-      pageUrl,
-    });
-
-    // Replace existing <title> and inject OG tags
-    html = html.replace(/<title>[^<]*<\/title>/, `<title>${escapeHtml(seo.title)}</title>`);
-    html = html.replace(
-      /<\/head>/,
-      `    <!-- Funnel Page SEO -->\n    ${metaTags}\n  </head>`
-    );
+    html = injectSeoIntoHtml(html, seo, req);
 
     res.status(200).set({ "Content-Type": "text/html" }).end(html);
   });
 
-  // Handle /p/:pageSlug (standalone landing pages)
+  // ── Standalone landing pages: /p/:pageSlug ────────────────────────────────
   app.get("/p/:pageSlug", async (req, res, next) => {
     const seo = await getStandalonePageSeo(req.params.pageSlug);
     if (!seo) return next();
@@ -200,19 +214,7 @@ export function registerFunnelOgMetaRoutes(app: Express) {
     if (!fs.existsSync(indexPath)) return next();
 
     let html = fs.readFileSync(indexPath, "utf-8");
-    const pageUrl = `${req.protocol}://${req.get("host")}${req.originalUrl}`;
-    const metaTags = buildMetaTags({
-      title: seo.title,
-      description: seo.description,
-      imageUrl: seo.image,
-      pageUrl,
-    });
-
-    html = html.replace(/<title>[^<]*<\/title>/, `<title>${escapeHtml(seo.title)}</title>`);
-    html = html.replace(
-      /<\/head>/,
-      `    <!-- Funnel Page SEO -->\n    ${metaTags}\n  </head>`
-    );
+    html = injectSeoIntoHtml(html, seo, req);
 
     res.status(200).set({ "Content-Type": "text/html" }).end(html);
   });

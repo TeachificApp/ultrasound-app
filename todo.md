@@ -2644,3 +2644,11 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 
 ## Performance Fix — May 2026
 - [x] Fix N+1 query problem in funnelRouter: funnel.list, getFlowDiagram, listBranchRules now use batch inArray queries instead of per-row loops (was causing /admin/funnels/:id to take 60+ seconds)
+
+## Cloudflare SEO Proxy — May 2026
+- [x] Add CANONICAL_ROOT_DOMAIN env var to server/_core/env.ts
+- [x] Update funnelOgMeta.ts to inject <link rel="canonical"> using x-canonical-host header from Cloudflare Worker
+- [x] Write Cloudflare Worker script (references/cloudflare-proxy-worker.js)
+- [x] Write Cloudflare proxy setup guide (references/cloudflare-proxy-setup.md)
+- [ ] Set CANONICAL_ROOT_DOMAIN=allaboutultrasound.com secret in Manus project settings
+- [ ] Deploy Worker to Cloudflare and add route rules (see setup guide)
