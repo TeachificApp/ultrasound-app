@@ -40,6 +40,17 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [location] = useLocation();
 
+  // Funnel pages (/:slug/:pageSlug) should render without the LMS header.
+  // Detect by checking: two path segments, not starting with any known system prefix.
+  const SYSTEM_PREFIXES = ["/admin", "/courses", "/downloads", "/product", "/media",
+    "/my-", "/auth", "/login", "/register", "/profile", "/platform-admin",
+    "/education-library", "/collections", "/bundles", "/quiz"];
+  const isFunnelPage = (() => {
+    const parts = location.replace(/^\//,"").split("/").filter(Boolean);
+    if (parts.length !== 2) return false;
+    return !SYSTEM_PREFIXES.some(p => location.startsWith(p));
+  })();
+
   const { isAuthenticated, user, loading: authLoading, logout } = useAuth();
   const isAdmin = (user as any)?.role === "admin";
   const appRoles: string[] = (user as any)?.appRoles ?? [];
@@ -49,6 +60,9 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
     if (exact) return location === href;
     return location.startsWith(href);
   }
+
+  // Funnel pages render standalone — no header, no LMS chrome
+  if (isFunnelPage) return <>{children}</>;
 
   return (
     <div className="min-h-screen bg-[#f0fbfc]">

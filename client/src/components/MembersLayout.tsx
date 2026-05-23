@@ -37,6 +37,19 @@ export default function MembersLayout({ children }: { children: React.ReactNode 
     return location.startsWith(href);
   }
 
+  // Funnel pages (/:slug/:pageSlug) and standalone landing pages render without the Members header.
+  const SYSTEM_PREFIXES = ["/admin", "/courses", "/downloads", "/product", "/media",
+    "/my-", "/auth", "/login", "/register", "/profile", "/platform-admin",
+    "/education-library", "/collections", "/bundles", "/quiz"];
+  const isFunnelPage = (() => {
+    const parts = location.replace(/^\//,"").split("/").filter(Boolean);
+    if (parts.length !== 2) return false;
+    return !SYSTEM_PREFIXES.some(p => location.startsWith(p));
+  })();
+
+  // Standalone pages render without Members chrome
+  if (isFunnelPage) return <>{children}</>;
+
   return (
     <div className="min-h-screen bg-[#f0fbfc]">
       {/* Top bar */}

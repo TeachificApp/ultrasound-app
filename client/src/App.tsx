@@ -492,9 +492,6 @@ function MembersRouter() {
       <Route path="/product/:slug">
         <Suspense fallback={pageFallback}><ProductLanding /></Suspense>
       </Route>
-      <Route path="/:slug/:pageSlug">
-        <Suspense fallback={pageFallback}><PublicFunnelPage /></Suspense>
-      </Route>
       {/* ── All other members routes — wrapped in MembersLayout ─────────── */}
       <Route>
     <MembersLayout>
@@ -550,6 +547,10 @@ function MembersRouter() {
           <Route path="/magic-link" component={MagicLinkRequest} />
           <Route path="/auth/magic" component={MagicLinkCallback} />
           <Route path="/register" component={Register} />
+          {/* Funnel pages — catch-all MUST be last so all specific routes above match first */}
+          <Route path="/:slug/:pageSlug">
+            <Suspense fallback={pageFallback}><PublicFunnelPage /></Suspense>
+          </Route>
           {/* Default: redirect to dashboard */}
           <Route>{() => { window.location.replace("/my-dashboard"); return null; }}</Route>
         </Switch>
@@ -598,11 +599,6 @@ function LMSRouter() {
           <ProductLanding />
         </Suspense>
       </Route>
-      <Route path="/:slug/:pageSlug">
-        <Suspense fallback={pageFallback}>
-          <PublicFunnelPage />
-        </Suspense>
-      </Route>
       {/* All other LMS routes — wrapped in LMSLayout */}
       <Route>
         <LMSLayout>
@@ -646,6 +642,12 @@ function LMSRouter() {
 
         <Route path="/media/:slug/:action" component={MediaRedirect} />
         <Route path="/media/:slug" component={MediaRedirect} />
+            {/* Funnel pages — catch-all MUST be last so all specific routes above match first */}
+            <Route path="/:slug/:pageSlug">
+              <Suspense fallback={pageFallback}>
+                <PublicFunnelPage />
+              </Suspense>
+            </Route>
             {/* Fallback */}
             <Route component={NotFound} />
           </Switch>
