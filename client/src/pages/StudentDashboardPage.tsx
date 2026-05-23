@@ -1450,8 +1450,8 @@ export default function StudentDashboardPage() {
                     : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
                 }`}
               >
-                <t.icon className="w-4 h-4" />
-                <span className="hidden sm:inline">{t.label}</span>
+                <t.icon className="w-4 h-4 shrink-0" />
+                <span>{t.label}</span>
               </button>
             ))}
           </div>
