@@ -21,7 +21,7 @@ import { and, eq } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
 import { fulfillOrderBumpPurchase } from "../lib/orderBumpCheckout";
-import { sendEmail, buildFunnelPurchaseConfirmationEmail } from "../_core/email";
+import { sendEmail, buildFunnelPurchaseConfirmationEmail, buildPaymentFailedEmail } from "../_core/email";
 import { generateAutoLoginToken } from "../routes/autoLogin";
 
 // Stripe webhook secret — optional but strongly recommended in production
@@ -912,6 +912,79 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
   }
 }
 
+/**
+ * Handle invoice.payment_failed — retry for 3 days, then cancel subscription and revoke access.
+ * Logic:
+ *   - Always send a payment failed email with a link to update payment method.
+ *   - If attempt_count >= 3 OR next_payment_attempt is null (Stripe gave up), cancel the subscription.
+ */
+async function handleInvoicePaymentFailed(invoice: Record<string, unknown>) {
+  const subscriptionId = invoice.subscription as string | null;
+  const customerEmail = (invoice.customer_email as string) ?? null;
+  const attemptCount = (invoice.attempt_count as number) ?? 1;
+  const nextPaymentAttempt = invoice.next_payment_attempt as number | null;
+  const amountDue = (invoice.amount_due as number) ?? 0;
+
+  console.log(`[Stripe] invoice.payment_failed — sub: ${subscriptionId}, email: ${customerEmail}, attempt: ${attemptCount}, nextAttempt: ${nextPaymentAttempt}`);
+
+  if (!customerEmail) {
+    console.warn("[Stripe] invoice.payment_failed: no customer email — cannot notify user");
+    return;
+  }
+
+  const db = await getDb();
+  if (!db) return;
+
+  // Find the user
+  const user = await getUserByEmail(customerEmail);
+  const firstName = user?.firstName || user?.name?.split(" ")[0] || "there";
+
+  // Determine brand from subscription metadata or membership record
+  let brandMode: "aaus" | "iheartecho" = "aaus";
+  let membership: typeof brandMemberships.$inferSelect | null = null;
+  if (subscriptionId && user) {
+    const [mem] = await db.select().from(brandMemberships)
+      .where(eq(brandMemberships.stripeSubscriptionId, subscriptionId)).limit(1);
+    if (mem) {
+      membership = mem;
+      brandMode = mem.brand === "iheartecho" ? "iheartecho" : "aaus";
+    }
+  }
+
+  const baseUrl = brandMode === "iheartecho" ? "https://app.iheartecho.net" : "https://app.allaboutultrasound.com";
+  const updatePaymentUrl = `${baseUrl}/dashboard`;
+
+  // Send payment failed email
+  const productName = membership ? `Your ${brandMode === "iheartecho" ? "iHeartEcho" : "All About Ultrasound"} Membership` : "Your Subscription";
+  try {
+    const { subject, htmlBody, previewText } = buildPaymentFailedEmail({
+      firstName,
+      productName,
+      updatePaymentUrl,
+      brandMode,
+    });
+    await sendEmail({ to: { name: firstName, email: customerEmail }, subject, htmlBody, previewText });
+    console.log(`[Stripe] Payment failed email sent to ${customerEmail} (attempt ${attemptCount})`);
+  } catch (emailErr) {
+    console.error(`[Stripe] Failed to send payment failed email to ${customerEmail}:`, emailErr);
+  }
+
+  // Cancel subscription if Stripe has given up (attempt_count >= 3 or no next retry)
+  const shouldCancel = attemptCount >= 3 || nextPaymentAttempt === null;
+  if (shouldCancel && subscriptionId && membership) {
+    await db.update(brandMemberships)
+      .set({ status: "cancelled", tier: "free" })
+      .where(eq(brandMemberships.id, membership.id));
+    console.log(`[Stripe] Subscription cancelled after ${attemptCount} failed payment attempts: sub ${subscriptionId}, user ${membership.userId}`);
+    await notifyOwner({
+      title: "⚠️ Subscription Cancelled — Failed Payments",
+      content: `Subscription ${subscriptionId} for ${customerEmail} has been cancelled after ${attemptCount} failed payment attempts. Access revoked.`,
+    });
+  } else if (shouldCancel && subscriptionId && !membership) {
+    console.warn(`[Stripe] invoice.payment_failed: no brand membership found for subscription ${subscriptionId} — cannot revoke access`);
+  }
+}
+
 export function registerStripeWebhook(app: Express) {
   // Raw body needed for Stripe signature verification
   app.post(
@@ -1001,6 +1074,8 @@ export function registerStripeWebhook(app: Express) {
           await handleFunnelPaymentIntentSucceeded(sessionObj);
         } else if (eventType === "customer.subscription.deleted" || eventType === "customer.subscription.updated") {
           await handleBrandSubscriptionLifecycle(sessionObj, eventType);
+        } else if (eventType === "invoice.payment_failed") {
+          await handleInvoicePaymentFailed(sessionObj);
         } else {
           console.log(`[Stripe] Unhandled event type: ${eventType}`);
         }

@@ -33,6 +33,9 @@ import { and, eq, desc, sql } from "drizzle-orm";
 import { storagePut } from "../storage";
 import { generateCertificatePdf } from "../lib/certificateGenerator";
 import { sendCertificateEmail } from "../lib/certificateEmail";
+import { sendEmail, buildFunnelPurchaseConfirmationEmail } from "../_core/email";
+import { generateAutoLoginToken } from "../routes/autoLogin";
+import { or, like, gte, lte } from "drizzle-orm";
 
 async function assertAdmin(ctx: { user: { id: number; role: string } }) {
   if (ctx.user.role !== "admin") {
@@ -436,5 +439,132 @@ export const adminUserRouter = router({
       }
 
       return { refundId: refund.id, status: refund.status };
+    }),
+
+  /** Resend the purchase confirmation + auto-login email for a funnel purchase */
+  resendAccessEmail: protectedProcedure
+    .input(z.object({
+      purchaseId: z.number().int(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const [purchase] = await db
+        .select()
+        .from(funnelPurchases)
+        .where(eq(funnelPurchases.id, input.purchaseId))
+        .limit(1);
+
+      if (!purchase) throw new TRPCError({ code: "NOT_FOUND", message: "Purchase not found" });
+
+      const recipientEmail = purchase.email;
+      const firstName = (purchase.name || recipientEmail.split("@")[0]).split(" ")[0];
+
+      // Generate a fresh auto-login token
+      let loginUrl = `${process.env.VITE_OAUTH_PORTAL_URL || "https://app.allaboutultrasound.com"}/dashboard`;
+      if (purchase.userId) {
+        try {
+          loginUrl = await generateAutoLoginToken(purchase.userId, loginUrl);
+        } catch (e) {
+          console.warn("[ResendEmail] Could not generate auto-login token:", e);
+        }
+      }
+
+      const { subject, htmlBody } = buildFunnelPurchaseConfirmationEmail({
+        firstName,
+        productName: purchase.productName,
+        amountPaid: purchase.amountPaid,
+        orderBumps: purchase.orderBumps ? JSON.parse(purchase.orderBumps as string) : [],
+        loginUrl,
+      });
+
+      const sent = await sendEmail({
+        to: recipientEmail,
+        subject: `[Resent] ${subject}`,
+        htmlBody,
+      });
+
+      return { success: sent };
+    }),
+
+  /** List all sales across funnel purchases and LMS orders for the admin sales page */
+  listAllSales: protectedProcedure
+    .input(z.object({
+      page: z.number().int().min(1).default(1),
+      pageSize: z.number().int().min(1).max(100).default(50),
+      status: z.enum(["all", "paid", "pending", "refunded", "failed"]).default("all"),
+      search: z.string().optional(),
+      dateFrom: z.string().optional(), // ISO date string
+      dateTo: z.string().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const offset = (input.page - 1) * input.pageSize;
+
+      // Build WHERE conditions
+      const conditions: any[] = [];
+      if (input.status !== "all") {
+        conditions.push(eq(funnelPurchases.status, input.status as any));
+      }
+      if (input.dateFrom) {
+        conditions.push(gte(funnelPurchases.purchasedAt, new Date(input.dateFrom)));
+      }
+      if (input.dateTo) {
+        const toDate = new Date(input.dateTo);
+        toDate.setHours(23, 59, 59, 999);
+        conditions.push(lte(funnelPurchases.purchasedAt, toDate));
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const rows = await db
+        .select({
+          id: funnelPurchases.id,
+          email: funnelPurchases.email,
+          name: funnelPurchases.name,
+          userId: funnelPurchases.userId,
+          productName: funnelPurchases.productName,
+          productType: funnelPurchases.productType,
+          amountPaid: funnelPurchases.amountPaid,
+          currency: funnelPurchases.currency,
+          status: funnelPurchases.status,
+          stripePaymentIntentId: funnelPurchases.stripePaymentIntentId,
+          sourceType: funnelPurchases.sourceType,
+          orderBumps: funnelPurchases.orderBumps,
+          purchasedAt: funnelPurchases.purchasedAt,
+        })
+        .from(funnelPurchases)
+        .where(whereClause)
+        .orderBy(desc(funnelPurchases.purchasedAt))
+        .limit(input.pageSize)
+        .offset(offset);
+
+      // Apply search filter in JS (for email + name + productName)
+      const filtered = input.search
+        ? rows.filter(r =>
+            r.email?.toLowerCase().includes(input.search!.toLowerCase()) ||
+            r.name?.toLowerCase().includes(input.search!.toLowerCase()) ||
+            r.productName?.toLowerCase().includes(input.search!.toLowerCase())
+          )
+        : rows;
+
+      // Get total count
+      const [{ total }] = await db
+        .select({ total: sql<number>`count(*)` })
+        .from(funnelPurchases)
+        .where(whereClause);
+
+      return {
+        sales: filtered,
+        total: Number(total),
+        page: input.page,
+        pageSize: input.pageSize,
+        totalPages: Math.ceil(Number(total) / input.pageSize),
+      };
     }),
 });

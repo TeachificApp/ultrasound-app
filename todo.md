@@ -2568,3 +2568,11 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Upgrade aiGenerateCourse server procedure: full lesson body HTML, per-lesson quizzes, complete landing page
 - [x] Upgrade aiCommitCourse to save per-lesson quizzes, lesson content, and landing page heroImageUrl
 - [x] Upgrade preview step to show module/lesson/quiz counts with content snippets
+
+## Payment Failure Auto-Cancel & Sales Admin (May 23, 2026)
+- [x] Add invoice.payment_failed webhook handler: sends payment failed email, cancels subscription + revokes access after 3 failed attempts or when Stripe gives up (next_payment_attempt is null)
+- [x] Build AdminSalesPage (/admin/sales): filterable/searchable sales list, drill-down sheet with refund, resend access email, and cancel subscription actions
+- [x] Add Sales tool card to PlatformAdmin.tsx tool grid
+- [x] Register /admin/sales route in App.tsx (all brand variants, platform_admin guard)
+- [x] Add Purchases tab to UserAnalytics UserDetailView: per-user purchase history with inline refund and resend access email actions
+- [x] Student Subscriptions tab already exists in StudentDashboardPage with cancel/reactivate self-service

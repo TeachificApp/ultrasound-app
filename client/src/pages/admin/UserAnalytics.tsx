@@ -19,8 +19,9 @@ import {
 import {
   Users, LogIn, Eye, PlayCircle, HelpCircle, Download, ArrowLeft,
   ChevronLeft, ChevronRight, TrendingUp, BookOpen, CheckCircle, Clock,
-  Search, SortAsc, SortDesc, Trash2, AlertTriangle,
+  Search, SortAsc, SortDesc, Trash2, AlertTriangle, ShoppingCart, Mail, RotateCcw, RefreshCw,
 } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
@@ -334,7 +335,166 @@ function UserListTab({ onSelectUser, initialSearch = "" }: { onSelectUser: (id: 
   );
 }
 
-// ─── User Detail Drill-Down ──────────────────────────────────────────────────
+// ─── User Purchases Tab ─────────────────────────────────────────────────────
+const STATUS_COLORS: Record<string, string> = {
+  paid: "bg-green-100 text-green-700",
+  pending: "bg-yellow-100 text-yellow-700",
+  refunded: "bg-gray-100 text-gray-600",
+  failed: "bg-red-100 text-red-700",
+};
+
+function UserPurchasesTab({ userId, userName }: { userId: number; userName: string }) {
+  const [selectedPurchaseId, setSelectedPurchaseId] = useState<number | null>(null);
+  const [refundDialogOpen, setRefundDialogOpen] = useState(false);
+  const [refundReason, setRefundReason] = useState<"duplicate" | "fraudulent" | "requested_by_customer">("requested_by_customer");
+
+  const { data, isLoading, refetch } = trpc.adminUser.listAllSales.useQuery({
+    page: 1,
+    pageSize: 100,
+    search: userName,
+  });
+
+  const purchases = (data?.sales ?? []) as Array<{
+    id: number; email: string; name: string | null; userId: number | null;
+    productName: string; productType: string; amountPaid: number; currency: string;
+    status: string; stripePaymentIntentId: string | null; orderBumps: string | null; purchasedAt: Date;
+  }>;
+
+  // Filter to only this user's purchases
+  const userPurchases = purchases.filter(p => p.userId === userId);
+  const selectedPurchase = userPurchases.find(p => p.id === selectedPurchaseId) ?? null;
+
+  const refundMutation = trpc.adminUser.refundPayment.useMutation({
+    onSuccess: () => { toast.success("Refund issued."); setRefundDialogOpen(false); setSelectedPurchaseId(null); refetch(); },
+    onError: e => toast.error(`Refund failed: ${e.message}`),
+  });
+
+  const resendMutation = trpc.adminUser.resendAccessEmail.useMutation({
+    onSuccess: () => toast.success("Access email resent."),
+    onError: e => toast.error(`Resend failed: ${e.message}`),
+  });
+
+  if (isLoading) return <div className="flex items-center justify-center py-8 text-gray-400"><RefreshCw className="w-5 h-5 animate-spin mr-2" /> Loading purchases…</div>;
+
+  if (userPurchases.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-gray-400 gap-2">
+        <ShoppingCart className="w-8 h-8 opacity-30" />
+        <p className="text-sm">No purchases found for this user</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <Card className="border border-gray-200">
+        <CardContent className="p-0">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-600">Product</th>
+                <th className="text-right px-3 py-2.5 text-xs font-semibold text-gray-600">Amount</th>
+                <th className="text-right px-3 py-2.5 text-xs font-semibold text-gray-600">Date</th>
+                <th className="text-right px-3 py-2.5 text-xs font-semibold text-gray-600">Status</th>
+                <th className="px-3 py-2.5"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {userPurchases.map(p => (
+                <tr key={p.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-2.5">
+                    <div className="font-medium text-gray-900 truncate max-w-[200px]">{p.productName}</div>
+                    <div className="text-xs text-gray-400 capitalize">{p.productType?.replace(/_/g, " ")}</div>
+                  </td>
+                  <td className="px-3 py-2.5 text-right text-sm font-medium text-gray-900">
+                    {new Intl.NumberFormat("en-US", { style: "currency", currency: (p.currency || "usd").toUpperCase() }).format(p.amountPaid / 100)}
+                  </td>
+                  <td className="px-3 py-2.5 text-right text-xs text-gray-500">{fmtDateTime(p.purchasedAt)}</td>
+                  <td className="px-3 py-2.5 text-right">
+                    <Badge className={`${STATUS_COLORS[p.status] ?? "bg-gray-100 text-gray-600"} border-0 text-xs`}>
+                      {p.status}
+                    </Badge>
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <div className="flex items-center gap-1 justify-end">
+                      <Button
+                        size="sm" variant="ghost"
+                        className="h-7 w-7 p-0 text-blue-400 hover:bg-blue-50 hover:text-blue-600"
+                        title="Resend access email"
+                        disabled={resendMutation.isPending}
+                        onClick={() => resendMutation.mutate({ purchaseId: p.id })}
+                      >
+                        <Mail className="w-3.5 h-3.5" />
+                      </Button>
+                      {p.status === "paid" && p.stripePaymentIntentId && (
+                        <Button
+                          size="sm" variant="ghost"
+                          className="h-7 w-7 p-0 text-red-400 hover:bg-red-50 hover:text-red-600"
+                          title="Issue refund"
+                          onClick={() => { setSelectedPurchaseId(p.id); setRefundDialogOpen(true); }}
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
+
+      {/* Refund Dialog */}
+      <Dialog open={refundDialogOpen} onOpenChange={setRefundDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <RotateCcw className="w-5 h-5" /> Issue Refund
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            {selectedPurchase && (
+              <p className="text-sm text-gray-600">
+                Refund <strong>{new Intl.NumberFormat("en-US", { style: "currency", currency: (selectedPurchase.currency || "usd").toUpperCase() }).format(selectedPurchase.amountPaid / 100)}</strong> for <strong>{selectedPurchase.productName}</strong>?
+              </p>
+            )}
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-1">Reason</label>
+              <Select value={refundReason} onValueChange={(v) => setRefundReason(v as typeof refundReason)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="requested_by_customer">Requested by Customer</SelectItem>
+                  <SelectItem value="duplicate">Duplicate</SelectItem>
+                  <SelectItem value="fraudulent">Fraudulent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRefundDialogOpen(false)}>Cancel</Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white gap-2"
+              disabled={refundMutation.isPending || !selectedPurchase?.stripePaymentIntentId}
+              onClick={() => {
+                if (!selectedPurchase?.stripePaymentIntentId) return;
+                refundMutation.mutate({
+                  stripePaymentIntentId: selectedPurchase.stripePaymentIntentId,
+                  purchaseId: selectedPurchase.id,
+                  reason: refundReason,
+                });
+              }}
+            >
+              {refundMutation.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+              Issue Refund
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function UserDetailView({ userId, onBack }: { userId: number; onBack: () => void }) {
   const { data, isLoading, refetch } = trpc.analyticsAdmin.userDetail.useQuery({ userId });
   const [tab, setTab] = useState("overview");
@@ -410,6 +570,7 @@ function UserDetailView({ userId, onBack }: { userId: number; onBack: () => void
           <TabsTrigger value="pages" className="text-xs">Pages</TabsTrigger>
           <TabsTrigger value="logins" className="text-xs">Logins</TabsTrigger>
           <TabsTrigger value="downloads" className="text-xs">Downloads</TabsTrigger>
+          <TabsTrigger value="purchases" className="text-xs">Purchases</TabsTrigger>
         </TabsList>
 
         {/* Courses */}
@@ -655,6 +816,11 @@ function UserDetailView({ userId, onBack }: { userId: number; onBack: () => void
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Purchases */}
+        <TabsContent value="purchases">
+          <UserPurchasesTab userId={userId} userName={user.name || user.email || "User"} />
         </TabsContent>
       </Tabs>
 

@@ -948,3 +948,36 @@ export function buildFunnelPurchaseConfirmationEmail(opts: {
   `, opts.brandMode);
   return { subject, htmlBody, previewText };
 }
+
+/** Payment failed / subscription past-due notification */
+export function buildPaymentFailedEmail(opts: {
+  firstName: string;
+  productName: string;
+  updatePaymentUrl: string;
+  brandMode?: BrandMode;
+}): { subject: string; htmlBody: string; previewText: string } {
+  const subject = `Action required: Payment failed for ${opts.productName}`;
+  const previewText = `We couldn't process your payment for ${opts.productName}. Please update your billing info.`;
+  const htmlBody = emailWrapper(`
+    <h2 style="margin:0 0 8px;font-size:20px;color:${brandDark};font-family:Georgia,serif;">
+      Payment Failed, ${opts.firstName}
+    </h2>
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
+      We were unable to process your payment for <strong>${opts.productName}</strong>. Your access will remain active for the next 3 days while we retry the charge.
+    </p>
+    <p style="margin:0 0 20px;font-size:14px;color:#475569;line-height:1.6;">
+      To avoid losing access, please update your payment method before the retry period ends.
+    </p>
+    <div style="text-align:center;margin:28px 0;">
+      <a href="${opts.updatePaymentUrl}"
+        style="display:inline-block;background:#ef4444;color:#ffffff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;" target="_blank" rel="noopener noreferrer">
+        Update Payment Method
+      </a>
+    </div>
+    <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.5;">
+      Questions? Contact us at
+      <a href="mailto:support@allaboutultrasound.com" style="color:${brandColor};" target="_blank" rel="noopener noreferrer">support@allaboutultrasound.com</a>.
+    </p>
+  `, opts.brandMode);
+  return { subject, htmlBody, previewText };
+}

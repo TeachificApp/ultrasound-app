@@ -88,6 +88,7 @@ import {
   Volume2,
   Activity,
   Award,
+  ShoppingCart,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import BulkCsvUploadPanel, { type BulkResult } from "@/components/BulkCsvUploadPanel";
@@ -1086,6 +1087,7 @@ export default function PlatformAdmin() {
     { id: "funnels", href: "/admin/funnels", icon: LayoutTemplate, label: "Funnel Builder", description: "Build and manage marketing funnels", color: "#be185d" },
     { id: "contacts", href: "/admin/contacts", icon: Users, label: "Contacts", description: "Manage contacts and audience segments", color: "#059669" },
     { id: "user-analytics", href: "/admin/user-analytics", icon: BarChart2, label: "User Analytics", description: "Detailed analytics for all platform users", color: "#7c3aed" },
+    { id: "sales", href: "/admin/sales", icon: ShoppingCart, label: "Sales", description: "View all sales, process refunds, cancel subscriptions, and resend access emails", color: "#16a34a" },
   ];
 
   // Per-Brand tool cards (auto-scoped to current brand)
