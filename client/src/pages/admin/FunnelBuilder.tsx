@@ -671,11 +671,14 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
         <div className="flex items-center gap-6 text-sm text-gray-600">
           <span className="flex items-center gap-1.5"><Eye size={14} /> {funnel.totalViews} views</span>
           <span className="flex items-center gap-1.5"><BarChart3 size={14} /> {funnel.totalConversions} conversions</span>
-          {funnel.status === "active" && (
-            <a href={`/${funnel.slug}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-teal-600 hover:text-teal-700">
-              <ExternalLink size={14} /> /f/{funnel.slug}
-            </a>
-          )}
+          {funnel.status === "active" && (() => {
+            const base = funnel.customDomain ? `https://${funnel.customDomain}` : window.location.origin;
+            return (
+              <a href={`${base}/${funnel.slug}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-teal-600 hover:text-teal-700">
+                <ExternalLink size={14} /> {funnel.customDomain ? `${funnel.customDomain}/` : ""}{funnel.slug}
+              </a>
+            );
+          })()}
         </div>
       </div>
 

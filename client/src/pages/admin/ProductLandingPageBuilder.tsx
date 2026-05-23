@@ -81,6 +81,12 @@ export default function ProductLandingPageBuilder() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
+  // Platform settings for publish domain
+  const { data: platformSettings } = trpc.lmsGroup.getPlatformSettings.useQuery();
+  const productPublishBase = platformSettings?.productPublishDomain
+    ? `https://${platformSettings.productPublishDomain}`
+    : window.location.origin;
+
   const { isLoading, data: lpData } = trpc.productsAdmin.getLandingBlocks.useQuery(
     { productId: numericProductId },
     { enabled: !isNaN(numericProductId) }
@@ -211,7 +217,7 @@ export default function ProductLandingPageBuilder() {
         <div className="flex items-center gap-2">
           {productInfo?.slug && (
             <a
-              href={`/product/${productInfo.slug}`}
+              href={`${productPublishBase}/product/${productInfo.slug}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-teal-700 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors"

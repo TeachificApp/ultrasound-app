@@ -2660,3 +2660,14 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Update LMSRouter: strip landing pages, keep player/files routes only
 - [x] Update Cloudflare Worker: add education-library proxy path, route to learn/members/app correctly
 - [x] 25 vitest tests passing for subdomain routing logic
+
+## Domain Routing Refactor (replacing Cloudflare proxy — May 2026)
+- [x] Revert App.tsx ROOT_DOMAIN_URL redirects — courses/downloads/products/funnels render directly without redirecting
+- [x] Add publishDomain setting to platform settings (DB + admin UI dropdown of custom domains)
+- [x] LMSRouter: serve courses/*, quiz/*, education-library on learn.allaboutultrasound.com
+- [x] Funnel/download/product public URLs use admin-selected publish domain
+- [x] Education library reverts to learn.allaboutultrasound.com/education-library
+
+## Sales Dashboard Merge
+- [x] Merge "Sales Dashboard" (AdminSalesDashboard) and "Sales (Legacy)" (AdminSalesPage) into a single unified sales page
+- [x] Remove the duplicate entry from the admin tools grid

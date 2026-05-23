@@ -84,6 +84,12 @@ export default function DownloadLandingPageBuilder() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
+  // Platform settings for publish domain
+  const { data: platformSettings } = trpc.lmsGroup.getPlatformSettings.useQuery();
+  const downloadPublishBase = platformSettings?.downloadPublishDomain
+    ? `https://${platformSettings.downloadPublishDomain}`
+    : window.location.origin;
+
   // Load page data
   const { isLoading, data: lpData } = trpc.downloadsAdmin.getLandingBlocks.useQuery(
     { productId: numericProductId },
@@ -217,7 +223,7 @@ export default function DownloadLandingPageBuilder() {
         <div className="flex items-center gap-2">
           {productInfo?.slug && (
             <a
-              href={`/downloads/${productInfo.slug}`}
+              href={`${downloadPublishBase}/downloads/${productInfo.slug}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-teal-700 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors"

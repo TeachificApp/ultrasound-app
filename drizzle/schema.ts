@@ -3733,6 +3733,11 @@ export const platformSettings = mysqlTable("platform_settings", {
   // e.g. ["app.allaboutultrasound.com", "iheartecho.com", "courses.mysite.com"]
   // Used by funnel domain selector to populate available domains dynamically
   customDomains: text("custom_domains"),
+  // ── Publish domains per content type ──
+  // Which custom domain funnels/downloads/products are published on (null = use app subdomain)
+  funnelPublishDomain: varchar("funnel_publish_domain", { length: 255 }),
+  downloadPublishDomain: varchar("download_publish_domain", { length: 255 }),
+  productPublishDomain: varchar("product_publish_domain", { length: 255 }),
   // ── Future platform-wide toggles go here ──
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });

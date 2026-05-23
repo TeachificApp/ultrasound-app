@@ -1013,6 +1013,110 @@ function EnrollmentEmailSettingsPanel() {
   );
 }
 
+// ─── Publish Domain Settings Panel ──────────────────────────────────────────
+function PublishDomainPanel() {
+  const { data: settings, isLoading, refetch } = trpc.lmsGroup.getPlatformSettings.useQuery();
+  const { data: domainsData } = trpc.lmsAdmin.getCustomDomains.useQuery();
+  const [funnelDomain, setFunnelDomain] = useState<string>("");
+  const [downloadDomain, setDownloadDomain] = useState<string>("");
+  const [productDomain, setProductDomain] = useState<string>("");
+  const [dirty, setDirty] = useState(false);
+
+  const domains: string[] = domainsData?.domains ?? [];
+  const domainOptions = ["", ...domains]; // empty = use app subdomain
+
+  useEffect(() => {
+    if (settings) {
+      setFunnelDomain(settings.funnelPublishDomain ?? "");
+      setDownloadDomain(settings.downloadPublishDomain ?? "");
+      setProductDomain(settings.productPublishDomain ?? "");
+      setDirty(false);
+    }
+  }, [settings]);
+
+  const updateSettings = trpc.lmsGroup.updatePlatformSettings.useMutation({
+    onSuccess: () => { toast.success("Publish domain settings saved."); setDirty(false); refetch(); },
+    onError: (e: { message: string }) => toast.error(e.message),
+  });
+
+  const handleSave = () => {
+    updateSettings.mutate({
+      funnelPublishDomain: funnelDomain || null,
+      downloadPublishDomain: downloadDomain || null,
+      productPublishDomain: productDomain || null,
+    });
+  };
+
+  const DomainSelect = ({ value, onChange, label, description }: { value: string; onChange: (v: string) => void; label: string; description: string }) => (
+    <div className="space-y-1.5">
+      <Label className="text-sm font-medium text-gray-700">{label}</Label>
+      <Select value={value} onValueChange={(v) => { onChange(v === "__app__" ? "" : v); setDirty(true); }}>
+        <SelectTrigger className="text-sm">
+          <SelectValue placeholder="Use app subdomain (default)" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__app__">Use app subdomain (default)</SelectItem>
+          {domains.map(d => (
+            <SelectItem key={d} value={d}>{d}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <p className="text-xs text-gray-400">{description}</p>
+    </div>
+  );
+
+  return (
+    <Card className="mb-6 border-0 shadow-sm">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-semibold text-gray-800 flex items-center gap-2">
+          <Globe className="w-4 h-4 text-teal-600" />
+          Publish Domain Settings
+        </CardTitle>
+        <p className="text-xs text-gray-500 mt-1">
+          Choose which custom domain each content type is published on. Domains are managed in the Domain Management panel above.
+          Funnels publish at the root (e.g. yourdomain.com/funnel-slug), downloads at /download/*, products at /product/*.
+        </p>
+      </CardHeader>
+      <CardContent className="pt-0 space-y-5">
+        {isLoading ? (
+          <div className="h-24 bg-gray-50 rounded-lg animate-pulse" />
+        ) : (
+          <>
+            <DomainSelect
+              value={funnelDomain || "__app__"}
+              onChange={setFunnelDomain}
+              label="Funnels Publish Domain"
+              description="Funnel pages will be served at this domain (e.g. allaboutultrasound.com/funnel-slug)."
+            />
+            <DomainSelect
+              value={downloadDomain || "__app__"}
+              onChange={setDownloadDomain}
+              label="Downloads Publish Domain"
+              description="Download landing pages will be served at this domain (e.g. yourdomain.com/download/slug)."
+            />
+            <DomainSelect
+              value={productDomain || "__app__"}
+              onChange={setProductDomain}
+              label="Products Publish Domain"
+              description="Product landing pages will be served at this domain (e.g. yourdomain.com/product/slug)."
+            />
+            <div className="flex justify-end">
+              <Button
+                onClick={handleSave}
+                disabled={!dirty || updateSettings.isPending}
+                className="bg-teal-600 hover:bg-teal-700 text-white"
+                size="sm"
+              >
+                {updateSettings.isPending ? "Saving…" : "Save Settings"}
+              </Button>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Tool Card Types ─────────────────────────────────────────────────────────
 
 type ToolCard = {
@@ -1089,9 +1193,8 @@ export default function PlatformAdmin() {
     { id: "funnels", href: "/admin/funnels", icon: LayoutTemplate, label: "Funnel Builder", description: "Build and manage marketing funnels", color: "#be185d" },
     { id: "contacts", href: "/admin/contacts", icon: Users, label: "Contacts", description: "Manage contacts and audience segments", color: "#059669" },
     { id: "user-analytics", href: "/admin/user-analytics", icon: BarChart2, label: "User Analytics", description: "Logins, access, course progress, and detailed user profiles", color: "#7c3aed" },
-    { id: "sales-dashboard", href: "/admin/sales-dashboard", icon: TrendingUp, label: "Sales Dashboard", description: "Revenue analytics, per-product breakdown, date filters, and full transaction history", color: "#16a34a" },
+    { id: "sales-dashboard", href: "/admin/sales-dashboard", icon: TrendingUp, label: "Sales Dashboard", description: "Revenue analytics, per-product breakdown, transaction management, refunds, and resend access emails", color: "#16a34a" },
     { id: "discount-codes", href: "/admin/discount-codes", icon: Tag, label: "Discount Codes", description: "Create and manage Stripe coupons and promo codes for all products", color: "#f59e0b" },
-    { id: "sales", href: "/admin/sales", icon: ShoppingCart, label: "Sales (Legacy)", description: "View all sales, process refunds, cancel subscriptions, and resend access emails", color: "#6b7280" },
   ];
 
   // Per-Brand tool cards (auto-scoped to current brand)
@@ -1686,6 +1789,9 @@ export default function PlatformAdmin() {
 
         {/* Domain Management */}
         <DomainManagementPanel />
+
+        {/* Publish Domain Settings */}
+        <PublishDomainPanel />
 
         {/* Enrollment Email Settings */}
         <EnrollmentEmailSettingsPanel />

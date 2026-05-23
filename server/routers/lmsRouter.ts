@@ -3853,6 +3853,9 @@ export const lmsGroupRouter = router({
       enrollmentEmailEnabled: z.boolean().optional(),
       enrollmentEmailSubject: z.string().max(255).nullable().optional(),
       enrollmentEmailIntro: z.string().nullable().optional(),
+      funnelPublishDomain: z.string().max(255).nullable().optional(),
+      downloadPublishDomain: z.string().max(255).nullable().optional(),
+      productPublishDomain: z.string().max(255).nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });

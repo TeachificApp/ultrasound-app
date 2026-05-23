@@ -388,29 +388,27 @@ function Router() {
         <Route path="/soundbytes" component={SoundBytes} />
 
         {/* ── LMS — Education Library ─────────────────────────────────────────────── */}
-        {/* education-library → root domain (Cloudflare proxy) */}
-        <Route path="/education-library">{() => { window.location.replace(`${ROOT_DOMAIN_URL}/education-library`); return null; }}</Route>
+        <Route path="/education-library">{() => { window.location.replace(`${LEARN_APP_URL}/education-library`); return null; }}</Route>
         {/* collections → learn subdomain (authenticated access) */}
         <Route path="/collections/:id">{(params: { id: string }) => <SsoRedirect path={`/collections/${params.id}`} />}</Route>
         {/* Course player/overview → learn subdomain; landing → root domain */}
         <Route path="/courses/:slug/player">{(params: { slug: string }) => <SsoRedirect path={`/courses/${params.slug}/player`} />}</Route>
         <Route path="/courses/:slug/overview">{(params: { slug: string }) => <SsoRedirect path={`/courses/${params.slug}/overview`} />}</Route>
-        <Route path="/courses/:slug">{(params: { slug: string }) => { window.location.replace(`${ROOT_DOMAIN_URL}/courses/${params.slug}`); return null; }}</Route>
+        <Route path="/courses/:slug">{(params: { slug: string }) => { window.location.replace(`${LEARN_APP_URL}/courses/${params.slug}`); return null; }}</Route>
           {/* ── Digital Downloads ────────────────────────────────────────────────────────────────────────────── */}
         {/* my-downloads → members subdomain; files → learn subdomain; landing → root domain */}
         <Route path="/my-downloads">{() => <SsoRedirect path="/my-downloads" targetOrigin={MEMBERS_APP_URL} />}</Route>
         <Route path="/downloads/:slug/files">{(params: { slug: string }) => <SsoRedirect path={`/downloads/${params.slug}/files`} />}</Route>
-        <Route path="/downloads/:slug">{(params: { slug: string }) => { window.location.replace(`${ROOT_DOMAIN_URL}/downloads/${params.slug}`); return null; }}</Route>
+        <Route path="/downloads/:slug" component={DownloadLanding} />
         <Route path="/downloads" component={DownloadsBrowse} />
-        {/* Bundle landing → root domain */}
-        <Route path="/bundles/:slug">{(params: { slug: string }) => { window.location.replace(`${ROOT_DOMAIN_URL}/bundles/${params.slug}`); return null; }}</Route>
+        <Route path="/bundles/:slug" component={BundleLanding} />
         <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
         <Route path="/admin/lms/:courseId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LandingPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/lesson-comments">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminLessonComments /></RoleGuard>}</Route>
         <Route path="/admin/downloads/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><DownloadLandingPageBuilder /></RoleGuard>}</Route>
         {/* ── Physical Products ────────────────────────────────────────────────────────────────────────────── */}
         {/* Product landing → root domain */}
-        <Route path="/product/:slug">{(params: { slug: string }) => { window.location.replace(`${ROOT_DOMAIN_URL}/product/${params.slug}`); return null; }}</Route>
+        <Route path="/product/:slug" component={ProductLanding} />
         <Route path="/admin/products/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ProductLandingPageBuilder /></RoleGuard>}</Route>
 
         {/* ── Admin ───────────────────────────────────────────────────────────── */}
@@ -438,7 +436,7 @@ function Router() {
         <Route path="/admin/sharing-monitor">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><SharingMonitor /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/user-analytics">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><UserAnalytics /></RoleGuard>}</Route>
         <Route path="/admin/users/:userId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminUserDetailPage /></RoleGuard>}</Route>
-        <Route path="/admin/sales">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminSalesPage /></RoleGuard>}</Route>
+        <Route path="/admin/sales">{() => { window.location.replace("/admin/sales-dashboard"); return null; }}</Route>
         <Route path="/admin/sales-dashboard">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminSalesDashboard /></RoleGuard>}</Route>
         <Route path="/admin/discount-codes">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminDiscountCodesPage /></RoleGuard>}</Route>
         <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
@@ -489,15 +487,12 @@ function MembersRouter() {
   );
   return (
     <Switch>
-      {/* Landing pages belong on the root domain (Cloudflare proxy) — redirect strays */}
+      {/* Redirect course/education routes to learn subdomain */}
       <Route path="/downloads/:slug/files">{(params: { slug: string }) => { window.location.replace(`${LEARN_APP_URL}/downloads/${params.slug}/files`); return null; }}</Route>
-      <Route path="/downloads/:slug">{(params: { slug: string }) => { window.location.replace(`${ROOT_DOMAIN_URL}/downloads/${params.slug}`); return null; }}</Route>
-      <Route path="/product/:slug">{(params: { slug: string }) => { window.location.replace(`${ROOT_DOMAIN_URL}/product/${params.slug}`); return null; }}</Route>
       <Route path="/courses/:slug/player">{(params: { slug: string }) => { window.location.replace(`${LEARN_APP_URL}/courses/${params.slug}/player`); return null; }}</Route>
       <Route path="/courses/:slug/overview">{(params: { slug: string }) => { window.location.replace(`${LEARN_APP_URL}/courses/${params.slug}/overview`); return null; }}</Route>
-      <Route path="/courses/:slug">{(params: { slug: string }) => { window.location.replace(`${ROOT_DOMAIN_URL}/courses/${params.slug}`); return null; }}</Route>
-      <Route path="/bundles/:slug">{(params: { slug: string }) => { window.location.replace(`${ROOT_DOMAIN_URL}/bundles/${params.slug}`); return null; }}</Route>
-      <Route path="/education-library">{() => { window.location.replace(`${ROOT_DOMAIN_URL}/education-library`); return null; }}</Route>
+      <Route path="/courses/:slug">{(params: { slug: string }) => { window.location.replace(`${LEARN_APP_URL}/courses/${params.slug}`); return null; }}</Route>
+      <Route path="/education-library">{() => { window.location.replace(`${LEARN_APP_URL}/education-library`); return null; }}</Route>
       {/* ── All other members routes — wrapped in MembersLayout ─────────── */}
       <Route>
     <MembersLayout>
@@ -590,11 +585,11 @@ function LMSRouter() {
         </Suspense>
       </Route>
       <Route path="/downloads/:slug/files" component={DownloadFiles} />
-      {/* Landing pages belong on the root domain (Cloudflare proxy) — redirect strays */}
-      <Route path="/courses/:slug">{(params: { slug: string }) => { window.location.replace(`${ROOT_DOMAIN_URL}/courses/${params.slug}`); return null; }}</Route>
-      <Route path="/downloads/:slug">{(params: { slug: string }) => { window.location.replace(`${ROOT_DOMAIN_URL}/downloads/${params.slug}`); return null; }}</Route>
-      <Route path="/product/:slug">{(params: { slug: string }) => { window.location.replace(`${ROOT_DOMAIN_URL}/product/${params.slug}`); return null; }}</Route>
-      <Route path="/bundles/:slug">{(params: { slug: string }) => { window.location.replace(`${ROOT_DOMAIN_URL}/bundles/${params.slug}`); return null; }}</Route>
+      {/* Course/download landing pages render directly on learn subdomain */}
+      <Route path="/courses/:slug" component={CourseLanding} />
+      <Route path="/downloads/:slug" component={DownloadLanding} />
+      <Route path="/product/:slug" component={ProductLanding} />
+      <Route path="/bundles/:slug" component={BundleLanding} />
       {/* All other LMS routes — wrapped in LMSLayout */}
       <Route>
         <LMSLayout>
@@ -602,16 +597,14 @@ function LMSRouter() {
           <Switch>
             {/* LMS Home */}
             <Route path="/" component={LMSHome} />
-            {/* education-library belongs on root domain — redirect strays */}
-            <Route path="/education-library">{() => { window.location.replace(`${ROOT_DOMAIN_URL}/education-library`); return null; }}</Route>
+            <Route path="/education-library" component={EducationLibrary} />
             <Route path="/collections/:id" component={CollectionDetail} />
             <Route path="/courses/:slug/overview" component={CourseOverview} />
 
         {/* Digital Downloads */}
         <Route path="/my-downloads" component={MyDownloads} />
         <Route path="/downloads" component={DownloadsBrowse} />
-        {/* Bundle landing belongs on root domain — redirect strays */}
-        <Route path="/bundles/:slug">{(params: { slug: string }) => { window.location.replace(`${ROOT_DOMAIN_URL}/bundles/${params.slug}`); return null; }}</Route>
+        <Route path="/bundles/:slug" component={BundleLanding} />
 
         {/* Admin (platform_admin only) */}
         <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
@@ -625,7 +618,7 @@ function LMSRouter() {
         <Route path="/admin/sharing-monitor">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><SharingMonitor /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/user-analytics">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><UserAnalytics /></RoleGuard>}</Route>
         <Route path="/admin/users/:userId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminUserDetailPage /></RoleGuard>}</Route>
-        <Route path="/admin/sales">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminSalesPage /></RoleGuard>}</Route>
+        <Route path="/admin/sales">{() => { window.location.replace("/admin/sales-dashboard"); return null; }}</Route>
         <Route path="/admin/sales-dashboard">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminSalesDashboard /></RoleGuard>}</Route>
         <Route path="/admin/discount-codes">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminDiscountCodesPage /></RoleGuard>}</Route>
         <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
@@ -793,7 +786,7 @@ function IHeartEchoRouter() {
         <Route path="/admin/sharing-monitor">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><SharingMonitor /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/user-analytics">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><UserAnalytics /></RoleGuard>}</Route>
         <Route path="/admin/users/:userId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminUserDetailPage /></RoleGuard>}</Route>
-        <Route path="/admin/sales">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminSalesPage /></RoleGuard>}</Route>
+        <Route path="/admin/sales">{() => { window.location.replace("/admin/sales-dashboard"); return null; }}</Route>
         <Route path="/admin/sales-dashboard">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminSalesDashboard /></RoleGuard>}</Route>
         <Route path="/admin/discount-codes">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminDiscountCodesPage /></RoleGuard>}</Route>
         <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>

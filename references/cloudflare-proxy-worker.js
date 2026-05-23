@@ -13,6 +13,11 @@
  *   /education-library      → browsable course/download catalogue
  *   /:slug/:pageSlug        → funnel pages (multi-step funnels)
  *   /p/:slug                → standalone landing pages
+ *   /assets/*               → Vite-built JS/CSS/images (SPA assets)
+ *   /api/trpc/*             → tRPC API calls from proxied pages
+ *   /manifest.json          → PWA manifest
+ *   /favicon.ico            → favicon
+ *   /robots.txt             → robots file
  *
  * REDIRECTED paths (send users to the correct subdomain):
  *   /my-dashboard           → members.allaboutultrasound.com/my-dashboard
@@ -22,15 +27,18 @@
  *   /downloads/:slug/files  → learn.allaboutultrasound.com/downloads/:slug/files
  *   /admin/*                → app.allaboutultrasound.com/admin/...
  *   /login                  → app.allaboutultrasound.com/login
- *   /api/*                  → app.allaboutultrasound.com/api/...
  *
- * PASS-THROUGH (served by whatever is on the root domain today):
+ * WWW HANDLING:
+ *   All requests to www.allaboutultrasound.com are 301 redirected to
+ *   allaboutultrasound.com (non-www) to consolidate SEO authority.
+ *
+ * PASS-THROUGH (served by Weebly on the root domain):
  *   Everything else (blog, marketing pages, etc.)
  *
  * ─── Configuration ────────────────────────────────────────────────────────
  * Set these as Worker environment variables in the Cloudflare dashboard:
  *
- *   APP_ORIGIN   = https://app.allaboutultrasound.com
+ *   APP_ORIGIN   = https://ultrasound-urcfdrve.manus.space
  *   ROOT_DOMAIN  = allaboutultrasound.com
  *
  * ─── Canonical URL signal ─────────────────────────────────────────────────
@@ -42,7 +50,7 @@
 
 // ── Configurable constants ─────────────────────────────────────────────────
 // These are overridden by Worker environment variables when deployed.
-const DEFAULT_APP_ORIGIN = "https://app.allaboutultrasound.com";
+const DEFAULT_APP_ORIGIN = "https://ultrasound-urcfdrve.manus.space";
 const DEFAULT_ROOT_DOMAIN = "allaboutultrasound.com";
 
 // ── Path matchers ──────────────────────────────────────────────────────────
@@ -52,17 +60,28 @@ const DEFAULT_ROOT_DOMAIN = "allaboutultrasound.com";
  * Order matters: more specific patterns must come before catch-alls.
  */
 function shouldProxy(pathname) {
+  // Static assets required for the SPA to render
+  if (pathname.startsWith("/assets/")) return true;
+
+  // API calls from proxied pages (tRPC, OAuth callbacks, etc.)
+  if (pathname.startsWith("/api/")) return true;
+
+  // PWA / meta files
+  if (pathname === "/manifest.json") return true;
+  if (pathname === "/favicon.ico") return true;
+  if (pathname === "/robots.txt") return true;
+
   // Explicit static landing-page prefixes
   if (/^\/courses\/[^/]+\/?$/.test(pathname)) return true;
   if (/^\/downloads\/[^/]+\/?$/.test(pathname)) return true;
   if (/^\/bundles\/[^/]+\/?$/.test(pathname)) return true;
   if (/^\/product\/[^/]+\/?$/.test(pathname)) return true;
   if (/^\/p\/[^/]+\/?$/.test(pathname)) return true;
+
   // Education library catalogue
   if (/^\/education-library(\/?|\?.*)$/.test(pathname)) return true;
 
   // Funnel pages: /:slug/:pageSlug — two-segment paths that are NOT reserved
-  // We check the first segment is not a known app/API prefix.
   const twoSegment = pathname.match(/^\/([^/]+)\/([^/]+)\/?$/);
   if (twoSegment) {
     const first = twoSegment[1];
@@ -99,13 +118,12 @@ function getAppRedirect(pathname, appOrigin) {
     if (pattern.test(pathname)) return `${MEMBERS_ORIGIN}${pathname}`;
   }
 
-  // App-only paths → app subdomain
+  // App-only paths → app subdomain (but NOT /api — we proxy that)
   const APP_PATHS = [
     /^\/admin(\/|$)/,
     /^\/platform-admin(\/|$)/,
     /^\/login(\/|$)/,
     /^\/logout(\/|$)/,
-    /^\/api(\/|$)/,
     /^\/forms(\/|$)/,
   ];
   for (const pattern of APP_PATHS) {
@@ -122,7 +140,7 @@ const RESERVED_PREFIXES = new Set([
   "notifications", "forms", "learn", "f", "p", "media",
   "blog", "about", "contact", "pricing", "terms", "privacy",
   "_next", "static", "assets", "favicon.ico", "robots.txt",
-  "sitemap.xml",
+  "sitemap.xml", "platform-admin", "upgrade-success",
 ]);
 
 // ── Worker entry point ─────────────────────────────────────────────────────
@@ -134,42 +152,106 @@ export default {
 
     const url = new URL(request.url);
     const { pathname, search } = url;
+    const hostname = url.hostname;
 
-    // 1. Redirect known app-only paths to the app subdomain
+    // ─── 0. www → non-www 301 redirect ──────────────────────────────────
+    // Consolidate all traffic to the non-www root domain for SEO.
+    if (hostname === `www.${rootDomain}`) {
+      const canonicalUrl = `https://${rootDomain}${pathname}${search}`;
+      return Response.redirect(canonicalUrl, 301);
+    }
+
+    // ─── 1. Health check endpoint for debugging ─────────────────────────
+    if (pathname === "/worker-ping") {
+      return new Response("WORKER IS ALIVE", {
+        status: 200,
+        headers: { "content-type": "text/plain" },
+      });
+    }
+
+    // ─── 2. Redirect known app-only paths to the correct subdomain ──────
     const appRedirect = getAppRedirect(pathname, appOrigin);
     if (appRedirect) {
       return Response.redirect(`${appRedirect}${search}`, 302);
     }
 
-    // 2. Proxy public landing/funnel pages
+    // ─── 3. Proxy public landing/funnel pages + assets ──────────────────
     if (shouldProxy(pathname)) {
       const targetUrl = `${appOrigin}${pathname}${search}`;
 
       // Clone the request and add the canonical host header so the Express
       // server knows to emit canonical URLs pointing to the root domain.
+      const proxyHeaders = new Headers(request.headers);
+      proxyHeaders.set("x-canonical-host", rootDomain);
+      proxyHeaders.set("x-forwarded-for", request.headers.get("cf-connecting-ip") || "");
+      proxyHeaders.set("x-forwarded-host", rootDomain);
+      // Remove the host header so it doesn't conflict with the target
+      proxyHeaders.delete("host");
+
       const proxyRequest = new Request(targetUrl, {
         method: request.method,
-        headers: (() => {
-          const h = new Headers(request.headers);
-          h.set("x-canonical-host", rootDomain);
-          // Forward the real visitor IP for analytics/rate-limiting
-          h.set("x-forwarded-for", request.headers.get("cf-connecting-ip") || "");
-          // Prevent the app from redirecting based on Host header mismatches
-          h.set("x-forwarded-host", rootDomain);
-          return h;
-        })(),
+        headers: proxyHeaders,
         body: request.method !== "GET" && request.method !== "HEAD" ? request.body : null,
-        redirect: "manual",
+        redirect: "manual", // Don't auto-follow redirects — we handle them
       });
 
-      const response = await fetch(proxyRequest);
+      let response = await fetch(proxyRequest);
 
-      // Rewrite the response so the browser sees the root domain URL.
-      // Strip the x-frame-options header so the page can be embedded if needed.
+      // ─── Handle redirects from origin ────────────────────────────────
+      // If the origin returns a 3xx redirect (e.g., trailing slash normalization),
+      // follow it internally up to 3 hops so the browser never sees a redirect
+      // to the raw app origin domain.
+      let redirectCount = 0;
+      while (response.status >= 300 && response.status < 400 && redirectCount < 3) {
+        const location = response.headers.get("location");
+        if (!location) break;
+
+        // Resolve relative redirects against the target URL
+        const redirectUrl = new URL(location, targetUrl);
+
+        // If the redirect points to the app origin, follow it internally
+        // Otherwise (external redirect), rewrite it to the root domain and pass through
+        if (redirectUrl.origin === appOrigin) {
+          const followHeaders = new Headers(request.headers);
+          followHeaders.set("x-canonical-host", rootDomain);
+          followHeaders.set("x-forwarded-for", request.headers.get("cf-connecting-ip") || "");
+          followHeaders.set("x-forwarded-host", rootDomain);
+          followHeaders.delete("host");
+
+          const followRequest = new Request(redirectUrl.toString(), {
+            method: "GET",
+            headers: followHeaders,
+            redirect: "manual",
+          });
+          response = await fetch(followRequest);
+          redirectCount++;
+        } else {
+          // External redirect — rewrite the location to use root domain if applicable
+          // and pass through to the browser
+          break;
+        }
+      }
+
+      // If we exhausted redirects or got a redirect to an external domain, return it
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get("location");
+        if (location) {
+          // Rewrite any redirect pointing to the app origin → root domain
+          const rewrittenLocation = location.replace(appOrigin, `https://${rootDomain}`);
+          return Response.redirect(rewrittenLocation, response.status);
+        }
+      }
+
+      // Rewrite the response headers
       const newHeaders = new Headers(response.headers);
       newHeaders.delete("x-frame-options");
-      // Tell Cloudflare to cache HTML for 60 seconds (adjust as needed)
-      if (response.headers.get("content-type")?.includes("text/html")) {
+
+      // Cache static assets aggressively, HTML briefly
+      const contentType = response.headers.get("content-type") || "";
+      if (pathname.startsWith("/assets/")) {
+        // Vite assets have content hashes — cache for 1 year
+        newHeaders.set("cache-control", "public, max-age=31536000, immutable");
+      } else if (contentType.includes("text/html")) {
         newHeaders.set("cache-control", "public, max-age=60, stale-while-revalidate=300");
       }
 
@@ -180,7 +262,7 @@ export default {
       });
     }
 
-    // 3. Pass through to whatever is on the root domain (WordPress, static site, etc.)
+    // ─── 4. Pass through to Weebly (root domain origin) ────────────────
     return fetch(request);
   },
 };

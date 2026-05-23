@@ -1,14 +1,9 @@
 /**
- * AdminSalesDashboard.tsx
- * Comprehensive sales analytics dashboard for admins:
- * - Summary KPI cards (revenue, orders, AOV)
- * - Daily revenue area chart (recharts)
- * - Revenue by product type donut breakdown
- * - Per-product sortable table
- * - Full paginated sales transaction list with filters
- * - Refund and resend-access-email actions
+ * AdminSalesDashboard.tsx — Unified Sales Dashboard
+ * Merges analytics (KPIs, charts, product breakdown) with full transaction management
+ * (detail sheet, refund, resend access email, order bumps).
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,15 +12,35 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  BarChart, Bar, Cell, Legend,
+  BarChart, Bar, Cell,
 } from "recharts";
 import {
   DollarSign, ShoppingCart, TrendingUp, RefreshCw, Download,
   Mail, RotateCcw, ChevronUp, ChevronDown, ChevronsUpDown,
-  Calendar, Search, Filter,
+  Calendar, Search, Filter, ExternalLink, User, Package, XCircle,
+  ChevronLeft, ChevronRight,
 } from "lucide-react";
+import { Link } from "wouter";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+type Sale = {
+  id: number;
+  email: string;
+  name: string | null;
+  userId: number | null;
+  productName: string;
+  productType: string;
+  amountPaid: number;
+  currency: string;
+  status: string;
+  stripePaymentIntentId: string | null;
+  sourceType: string | null;
+  orderBumps: string | null;
+  purchasedAt: Date;
+};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function fmtCurrency(cents: number, currency = "usd") {
@@ -39,26 +54,16 @@ function fmtDateTime(d: Date | string) {
 }
 
 const TYPE_COLORS: Record<string, string> = {
-  course: "#189aa1",
-  download: "#4ad9e0",
-  membership: "#0e4a50",
-  physical: "#f59e0b",
-  bundle: "#8b5cf6",
-  other: "#6b7280",
+  course: "#189aa1", download: "#4ad9e0", membership: "#0e4a50",
+  physical: "#f59e0b", bundle: "#8b5cf6", other: "#6b7280",
 };
 const TYPE_LABELS: Record<string, string> = {
-  course: "Course",
-  download: "Download",
-  membership: "Membership",
-  physical: "Physical",
-  bundle: "Bundle",
-  other: "Other",
+  course: "Course", download: "Download", membership: "Membership",
+  physical: "Physical", bundle: "Bundle", other: "Other",
 };
 const STATUS_COLORS: Record<string, string> = {
-  paid: "bg-green-100 text-green-700",
-  pending: "bg-yellow-100 text-yellow-700",
-  refunded: "bg-gray-100 text-gray-600",
-  failed: "bg-red-100 text-red-700",
+  paid: "bg-green-100 text-green-700", pending: "bg-yellow-100 text-yellow-700",
+  refunded: "bg-gray-100 text-gray-600", failed: "bg-red-100 text-red-700",
 };
 
 // ─── Date Range Presets ───────────────────────────────────────────────────────
@@ -75,13 +80,12 @@ function getPresetDates(preset: DatePreset): { from: string; to: string } {
   if (preset === "30d") return { from: from(30), to };
   if (preset === "90d") return { from: from(90), to };
   if (preset === "365d") return { from: from(365), to };
-  return { from: "", to: "" }; // "all" or "custom"
+  return { from: "", to: "" };
 }
 
 // ─── Sort Helper ─────────────────────────────────────────────────────────────
 type SortKey = "productName" | "revenue" | "sales" | "avgPrice";
 type SortDir = "asc" | "desc";
-
 function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) {
   if (col !== sortKey) return <ChevronsUpDown className="w-3.5 h-3.5 text-gray-300 ml-1 inline" />;
   return sortDir === "asc"
@@ -90,30 +94,28 @@ function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; s
 }
 
 // ─── Refund Dialog ────────────────────────────────────────────────────────────
-function RefundDialog({ sale, open, onClose, onDone }: {
-  sale: any; open: boolean; onClose: () => void; onDone: () => void;
-}) {
+function RefundDialog({ sale, open, onClose, onDone }: { sale: any; open: boolean; onClose: () => void; onDone: () => void }) {
   const [reason, setReason] = useState<"duplicate" | "fraudulent" | "requested_by_customer">("requested_by_customer");
   const refundMutation = trpc.adminUser.refundPayment.useMutation({
     onSuccess: () => { toast.success("Refund issued"); onDone(); onClose(); },
     onError: e => toast.error(`Refund failed: ${e.message}`),
   });
+  if (!sale) return null;
   return (
-    <Dialog open={open} onOpenChange={o => !o && onClose()}>
-      <DialogContent className="max-w-sm">
+    <Dialog open={open} onOpenChange={o => { if (!o) onClose(); }}>
+      <DialogContent>
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-red-600">
-            <RotateCcw className="w-5 h-5" /> Issue Refund
+          <DialogTitle className="flex items-center gap-2">
+            <RotateCcw className="w-5 h-5 text-red-500" /> Confirm Refund
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-3 py-2">
-          {sale && (
-            <p className="text-sm text-gray-600">
-              Refund <strong>{fmtCurrency(sale.amountPaid, sale.currency)}</strong> for <strong>{sale.productName}</strong> to {sale.email}?
-            </p>
-          )}
+        <div className="space-y-4 py-2">
+          <p className="text-sm text-gray-600">
+            This will issue a full refund of <strong>{fmtCurrency(sale.amountPaid, sale.currency)}</strong> to{" "}
+            <strong>{sale.email}</strong>. This action cannot be undone.
+          </p>
           <div>
-            <label className="text-sm font-medium text-gray-700 block mb-1">Reason</label>
+            <label className="text-sm font-medium text-gray-700 block mb-1">Refund Reason</label>
             <Select value={reason} onValueChange={v => setReason(v as typeof reason)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -128,15 +130,173 @@ function RefundDialog({ sale, open, onClose, onDone }: {
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button
             className="bg-red-600 hover:bg-red-700 text-white gap-2"
-            disabled={refundMutation.isPending || !sale?.stripePaymentIntentId}
-            onClick={() => sale && refundMutation.mutate({ stripePaymentIntentId: sale.stripePaymentIntentId, purchaseId: sale.id, reason })}
+            disabled={refundMutation.isPending}
+            onClick={() => {
+              if (!sale.stripePaymentIntentId) return;
+              refundMutation.mutate({ stripePaymentIntentId: sale.stripePaymentIntentId, purchaseId: sale.id, reason });
+            }}
           >
             {refundMutation.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
-            Refund
+            Issue Refund
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ─── Sale Detail Sheet ────────────────────────────────────────────────────────
+function SaleDetailSheet({ sale, onClose, onRefunded }: { sale: Sale | null; onClose: () => void; onRefunded: () => void }) {
+  const [refundDialogOpen, setRefundDialogOpen] = useState(false);
+  const [refundReason, setRefundReason] = useState<"duplicate" | "fraudulent" | "requested_by_customer">("requested_by_customer");
+
+  const refundMutation = trpc.adminUser.refundPayment.useMutation({
+    onSuccess: () => { toast.success("Refund issued successfully."); setRefundDialogOpen(false); onRefunded(); onClose(); },
+    onError: err => toast.error(`Refund failed: ${err.message}`),
+  });
+  const resendMutation = trpc.adminUser.resendAccessEmail.useMutation({
+    onSuccess: () => toast.success("Access email resent."),
+    onError: err => toast.error(`Resend failed: ${err.message}`),
+  });
+
+  if (!sale) return null;
+
+  const orderBumps = sale.orderBumps ? (() => {
+    try { return JSON.parse(sale.orderBumps as string) as Array<{ title: string; price: number }>; }
+    catch { return []; }
+  })() : [];
+
+  const canRefund = sale.status === "paid" && !!sale.stripePaymentIntentId;
+  const canResend = !!sale.email;
+
+  return (
+    <>
+      <Sheet open={!!sale} onOpenChange={open => { if (!open) onClose(); }}>
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader className="pb-4 border-b">
+            <SheetTitle className="flex items-center gap-2 text-gray-900">
+              <ShoppingCart className="w-5 h-5 text-green-600" /> Sale #{sale.id}
+            </SheetTitle>
+          </SheetHeader>
+          <div className="py-4 space-y-5">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-500">Status</span>
+              <Badge className={`${STATUS_COLORS[sale.status] ?? "bg-gray-100 text-gray-600"} border-0`}>
+                {sale.status.charAt(0).toUpperCase() + sale.status.slice(1)}
+              </Badge>
+            </div>
+            <div className="rounded-xl bg-gray-50 p-4 space-y-2">
+              <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <User className="w-4 h-4 text-gray-400" /> Customer
+              </div>
+              <div className="text-sm text-gray-900">{sale.name || "—"}</div>
+              <div className="text-sm text-gray-500">{sale.email}</div>
+              {sale.userId && (
+                <Link href={`/admin/users/${sale.userId}`}>
+                  <a className="text-xs text-teal-600 hover:underline flex items-center gap-1">
+                    View user profile <ExternalLink className="w-3 h-3" />
+                  </a>
+                </Link>
+              )}
+            </div>
+            <div className="rounded-xl bg-gray-50 p-4 space-y-2">
+              <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <Package className="w-4 h-4 text-gray-400" /> Product
+              </div>
+              <div className="text-sm text-gray-900 font-medium">{sale.productName}</div>
+              <div className="text-xs text-gray-500 capitalize">{sale.productType?.replace(/_/g, " ")}</div>
+              {orderBumps.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-gray-200">
+                  <div className="text-xs font-medium text-gray-500 mb-1">Order Bumps</div>
+                  {orderBumps.map((bump, i) => (
+                    <div key={i} className="flex justify-between text-xs text-gray-600">
+                      <span>{bump.title}</span>
+                      <span>{fmtCurrency(bump.price)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="rounded-xl bg-gray-50 p-4 space-y-2">
+              <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <DollarSign className="w-4 h-4 text-gray-400" /> Payment
+              </div>
+              <div className="text-xl font-bold text-gray-900">{fmtCurrency(sale.amountPaid, sale.currency)}</div>
+              {sale.stripePaymentIntentId && (
+                <div className="text-xs text-gray-400 font-mono break-all">{sale.stripePaymentIntentId}</div>
+              )}
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="flex items-center gap-1.5 text-gray-500">
+                <Calendar className="w-4 h-4" /> Purchased
+              </span>
+              <span className="text-gray-700">{fmtDate(sale.purchasedAt)}</span>
+            </div>
+            <div className="pt-2 border-t space-y-2">
+              <Button
+                variant="outline" className="w-full gap-2 justify-start"
+                disabled={!canResend || resendMutation.isPending}
+                onClick={() => resendMutation.mutate({ purchaseId: sale.id })}
+              >
+                {resendMutation.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4 text-blue-500" />}
+                Resend Access Email
+              </Button>
+              <Button
+                variant="outline" className="w-full gap-2 justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
+                disabled={!canRefund}
+                onClick={() => setRefundDialogOpen(true)}
+              >
+                <RotateCcw className="w-4 h-4" />
+                Issue Refund
+                {!canRefund && sale.status === "refunded" && (
+                  <span className="ml-auto text-xs text-gray-400">Already refunded</span>
+                )}
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+      <Dialog open={refundDialogOpen} onOpenChange={setRefundDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RotateCcw className="w-5 h-5 text-red-500" /> Confirm Refund
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-gray-600">
+              This will issue a full refund of <strong>{fmtCurrency(sale.amountPaid, sale.currency)}</strong> to{" "}
+              <strong>{sale.email}</strong>. This action cannot be undone.
+            </p>
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-1">Refund Reason</label>
+              <Select value={refundReason} onValueChange={v => setRefundReason(v as typeof refundReason)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="requested_by_customer">Requested by Customer</SelectItem>
+                  <SelectItem value="duplicate">Duplicate</SelectItem>
+                  <SelectItem value="fraudulent">Fraudulent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRefundDialogOpen(false)}>Cancel</Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white gap-2"
+              disabled={refundMutation.isPending}
+              onClick={() => {
+                if (!sale.stripePaymentIntentId) return;
+                refundMutation.mutate({ stripePaymentIntentId: sale.stripePaymentIntentId, purchaseId: sale.id, reason: refundReason });
+              }}
+            >
+              {refundMutation.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+              Issue Refund
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -148,9 +308,10 @@ export default function AdminSalesDashboard() {
   const [sortKey, setSortKey] = useState<SortKey>("revenue");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "paid" | "pending" | "refunded" | "failed">("all");
   const [page, setPage] = useState(1);
-  const [refundSale, setRefundSale] = useState<any | null>(null);
+  const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
 
   const { from: presetFrom, to: presetTo } = getPresetDates(preset);
   const dateFrom = preset === "custom" ? customFrom : (preset === "all" ? "" : presetFrom);
@@ -162,15 +323,9 @@ export default function AdminSalesDashboard() {
     dateFrom: dateFrom || undefined, dateTo: dateTo || undefined,
   });
 
-  const resendMutation = trpc.adminUser.resendAccessEmail.useMutation({
-    onSuccess: () => toast.success("Access email resent"),
-    onError: e => toast.error(`Failed: ${e.message}`),
-  });
-
   const analytics = analyticsQuery.data;
   const sales = salesQuery.data;
 
-  // Sort product table
   const sortedProducts = useMemo(() => {
     const rows = [...(analytics?.byProduct ?? [])];
     rows.sort((a, b) => {
@@ -187,7 +342,8 @@ export default function AdminSalesDashboard() {
     else { setSortKey(key); setSortDir("desc"); }
   };
 
-  // CSV export
+  const handleSearch = useCallback(() => { setSearch(searchInput.trim()); setPage(1); }, [searchInput]);
+
   const exportCsv = () => {
     if (!sales?.sales) return;
     const header = ["Date", "Customer", "Email", "Product", "Type", "Amount", "Status"];
@@ -206,15 +362,27 @@ export default function AdminSalesDashboard() {
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <TrendingUp className="w-6 h-6 text-[#189aa1]" /> Sales Dashboard
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">Revenue analytics, product performance, and transaction history</p>
+        <div className="flex items-center gap-3">
+          <Link href="/admin">
+            <a className="text-gray-400 hover:text-gray-600 transition-colors">
+              <ChevronLeft className="w-5 h-5" />
+            </a>
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <TrendingUp className="w-6 h-6 text-[#189aa1]" /> Sales Dashboard
+            </h1>
+            <p className="text-sm text-gray-500 mt-1">Revenue analytics, product performance, and transaction management</p>
+          </div>
         </div>
-        <Button variant="outline" className="gap-2 text-sm" onClick={exportCsv}>
-          <Download className="w-4 h-4" /> Export CSV
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" className="gap-2 text-sm" onClick={() => { salesQuery.refetch(); analyticsQuery.refetch(); }} disabled={salesQuery.isLoading}>
+            <RefreshCw className={`w-4 h-4 ${salesQuery.isLoading ? "animate-spin" : ""}`} /> Refresh
+          </Button>
+          <Button variant="outline" className="gap-2 text-sm" onClick={exportCsv}>
+            <Download className="w-4 h-4" /> Export CSV
+          </Button>
+        </div>
       </div>
 
       {/* Date Range Filter */}
@@ -307,7 +475,6 @@ export default function AdminSalesDashboard() {
 
       {/* Revenue by Type + Product Table */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* By Type Bar Chart */}
         {analytics && analytics.byType.length > 0 && (
           <Card className="border border-gray-200 lg:col-span-1">
             <CardHeader className="pb-2">
@@ -331,8 +498,6 @@ export default function AdminSalesDashboard() {
             </CardContent>
           </Card>
         )}
-
-        {/* Per-Product Table */}
         <Card className={`border border-gray-200 ${analytics?.byType.length ? "lg:col-span-2" : "lg:col-span-3"}`}>
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold text-gray-800">Revenue by Product</CardTitle>
@@ -386,14 +551,25 @@ export default function AdminSalesDashboard() {
       <Card className="border border-gray-200">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between flex-wrap gap-3">
-            <CardTitle className="text-base font-semibold text-gray-800">Transactions</CardTitle>
+            <CardTitle className="text-base font-semibold text-gray-800">
+              Transactions
+              {sales?.total !== undefined && (
+                <span className="ml-2 text-sm font-normal text-gray-400">({sales.total.toLocaleString()} total)</span>
+              )}
+            </CardTitle>
             <div className="flex items-center gap-2 flex-wrap">
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                <Input
-                  value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
-                  placeholder="Search customer, product…" className="pl-8 h-8 w-52 text-sm"
-                />
+              <div className="flex gap-2">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <Input
+                    value={searchInput} onChange={e => setSearchInput(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && handleSearch()}
+                    placeholder="Search customer, product…" className="pl-8 h-8 w-52 text-sm"
+                  />
+                </div>
+                <Button size="sm" onClick={handleSearch} style={{ background: "#189aa1" }} className="text-white h-8">
+                  <Search className="w-3.5 h-3.5" />
+                </Button>
               </div>
               <Select value={statusFilter} onValueChange={v => { setStatusFilter(v as any); setPage(1); }}>
                 <SelectTrigger className="h-8 w-32 text-sm"><Filter className="w-3.5 h-3.5 mr-1" /><SelectValue /></SelectTrigger>
@@ -405,6 +581,12 @@ export default function AdminSalesDashboard() {
                   <SelectItem value="failed">Failed</SelectItem>
                 </SelectContent>
               </Select>
+              {(search || statusFilter !== "all") && (
+                <Button variant="ghost" size="sm" className="h-8 text-gray-500 gap-1"
+                  onClick={() => { setSearch(""); setSearchInput(""); setStatusFilter("all"); setPage(1); }}>
+                  <XCircle className="w-3.5 h-3.5" /> Clear
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -418,16 +600,15 @@ export default function AdminSalesDashboard() {
                   <th className="text-left px-3 py-2.5 text-xs font-semibold text-gray-600">Product</th>
                   <th className="text-right px-3 py-2.5 text-xs font-semibold text-gray-600">Amount</th>
                   <th className="text-right px-3 py-2.5 text-xs font-semibold text-gray-600">Status</th>
-                  <th className="px-3 py-2.5"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {salesQuery.isLoading ? (
-                  <tr><td colSpan={6} className="text-center py-8 text-gray-400"><RefreshCw className="w-4 h-4 animate-spin inline mr-2" />Loading…</td></tr>
+                  <tr><td colSpan={5} className="text-center py-8 text-gray-400"><RefreshCw className="w-4 h-4 animate-spin inline mr-2" />Loading…</td></tr>
                 ) : (sales?.sales ?? []).length === 0 ? (
-                  <tr><td colSpan={6} className="text-center py-8 text-gray-400">No transactions found</td></tr>
+                  <tr><td colSpan={5} className="text-center py-8 text-gray-400">No transactions found</td></tr>
                 ) : (sales?.sales ?? []).map(s => (
-                  <tr key={s.id} className="hover:bg-gray-50">
+                  <tr key={s.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setSelectedSale(s as Sale)}>
                     <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">{fmtDateTime(s.purchasedAt)}</td>
                     <td className="px-3 py-2.5">
                       <div className="font-medium text-gray-900 text-sm">{s.name || "—"}</div>
@@ -448,39 +629,23 @@ export default function AdminSalesDashboard() {
                         {s.status}
                       </Badge>
                     </td>
-                    <td className="px-3 py-2.5">
-                      <div className="flex items-center gap-1 justify-end">
-                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-blue-400 hover:bg-blue-50 hover:text-blue-600"
-                          title="Resend access email" disabled={resendMutation.isPending}
-                          onClick={() => resendMutation.mutate({ purchaseId: s.id })}>
-                          <Mail className="w-3.5 h-3.5" />
-                        </Button>
-                        {s.status === "paid" && s.stripePaymentIntentId && (
-                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-400 hover:bg-red-50 hover:text-red-600"
-                            title="Issue refund" onClick={() => setRefundSale(s)}>
-                            <RotateCcw className="w-3.5 h-3.5" />
-                          </Button>
-                        )}
-                      </div>
-                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          {/* Pagination */}
           {sales && sales.totalPages > 1 && (
             <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
               <span className="text-xs text-gray-500">
                 Showing {((page - 1) * 25) + 1}–{Math.min(page * 25, sales.total)} of {sales.total}
               </span>
               <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="h-7 px-3 text-xs">
-                  Previous
+                <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="h-7 px-3 text-xs gap-1">
+                  <ChevronLeft className="w-3.5 h-3.5" /> Previous
                 </Button>
                 <span className="text-xs text-gray-500">Page {page} of {sales.totalPages}</span>
-                <Button size="sm" variant="outline" disabled={page >= sales.totalPages} onClick={() => setPage(p => p + 1)} className="h-7 px-3 text-xs">
-                  Next
+                <Button size="sm" variant="outline" disabled={page >= sales.totalPages} onClick={() => setPage(p => p + 1)} className="h-7 px-3 text-xs gap-1">
+                  Next <ChevronRight className="w-3.5 h-3.5" />
                 </Button>
               </div>
             </div>
@@ -488,12 +653,11 @@ export default function AdminSalesDashboard() {
         </CardContent>
       </Card>
 
-      {/* Refund Dialog */}
-      <RefundDialog
-        sale={refundSale}
-        open={!!refundSale}
-        onClose={() => setRefundSale(null)}
-        onDone={() => { salesQuery.refetch(); analyticsQuery.refetch(); }}
+      {/* Sale Detail Sheet */}
+      <SaleDetailSheet
+        sale={selectedSale}
+        onClose={() => setSelectedSale(null)}
+        onRefunded={() => { salesQuery.refetch(); analyticsQuery.refetch(); }}
       />
     </div>
   );
