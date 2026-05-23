@@ -2637,3 +2637,7 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 
 ## Badge Label Fix — May 2026
 - [x] Change "Download" badge label to "Digital Download" in StudentDashboardPage.tsx (line 745) and RelatedProductsBlock.tsx (lines 194, 252)
+
+## Legacy URL Redirects — May 2026
+- [x] Add server-side 301 redirects: /learn/:slug → /courses/:slug, /f/:slug/:pageSlug → /:slug/:pageSlug, /f/:slug → /:slug, /products/:slug → /product/:slug
+- [x] Add vitest tests for all 4 redirect patterns (13 tests passing)

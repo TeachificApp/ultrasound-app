@@ -222,6 +222,28 @@ async function startServer() {
       createContext,
     })
   );
+  // ── Legacy URL 301 redirects ────────────────────────────────────────────────
+  // /learn/:slug → /courses/:slug  (old LMS course URL structure)
+  app.get("/learn/:slug", (req, res) => {
+    const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+    res.redirect(301, `/courses/${req.params.slug}${qs}`);
+  });
+  // /f/:slug/:pageSlug → /:slug/:pageSlug  (old funnel URL structure with /f/ prefix)
+  app.get("/f/:slug/:pageSlug", (req, res) => {
+    const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+    res.redirect(301, `/${req.params.slug}/${req.params.pageSlug}${qs}`);
+  });
+  // /f/:slug → /:slug  (old funnel root without page slug)
+  app.get("/f/:slug", (req, res) => {
+    const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+    res.redirect(301, `/${req.params.slug}${qs}`);
+  });
+  // /products/:slug → /product/:slug  (old product URL structure)
+  app.get("/products/:slug", (req, res) => {
+    const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+    res.redirect(301, `/product/${req.params.slug}${qs}`);
+  });
+
   // Redirect /media/:slug → /api/media/:slug (backward-compat for stored URLs without /api/ prefix)
   app.get("/media/:slug", (req, res) => {
     const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
