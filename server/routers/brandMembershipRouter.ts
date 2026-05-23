@@ -120,6 +120,7 @@ export const brandMembershipRouter = router({
     .input(z.object({
       interval: z.enum(["monthly", "annual", "lifetime"]).default("monthly"),
       origin: z.string().url(),
+      promoCode: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const brand = ctx.brand;
@@ -137,12 +138,22 @@ export const brandMembershipRouter = router({
 
       const isLifetime = input.interval === "lifetime";
 
+      // Resolve promo code if provided
+      let discounts: Array<{ promotion_code: string }> | undefined;
+      if (input.promoCode) {
+        try {
+          const promoCodes = await stripe.promotionCodes.list({ code: input.promoCode.toUpperCase(), active: true, limit: 1 });
+          if (promoCodes.data[0]) discounts = [{ promotion_code: promoCodes.data[0].id }];
+        } catch { /* ignore */ }
+      }
+      const promoOpts = discounts ? { discounts } : { allow_promotion_codes: true };
+
       if (isLifetime) {
         // One-time payment for lifetime access
         const session = await stripe.checkout.sessions.create({
           mode: "payment",
           customer_email: ctx.user.email ?? undefined,
-          allow_promotion_codes: true,
+          ...promoOpts,
           line_items: [{
             price_data: {
               currency: productConfig.currency,
@@ -178,7 +189,7 @@ export const brandMembershipRouter = router({
       const session = await stripe.checkout.sessions.create({
         mode: "subscription",
         customer_email: ctx.user.email ?? undefined,
-        allow_promotion_codes: true,
+        ...promoOpts,
         line_items: [{
           price_data: {
             currency: productConfig.currency,

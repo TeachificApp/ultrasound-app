@@ -822,6 +822,7 @@ export const lmsLearnerRouter = router({
       // Optional: ID of a secondary pricing option (from lms_pricing_options)
       // When provided, the checkout uses that option's price/type instead of the course primary price
       pricingOptionId: z.number().optional(),
+      promoCode: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -896,6 +897,16 @@ export const lmsLearnerRouter = router({
 
       let session: any;
 
+      // Resolve promo code to a Stripe promotion code ID if provided
+      let discounts: Array<{ promotion_code: string }> | undefined;
+      if (input.promoCode) {
+        try {
+          const promoCodes = await stripe.promotionCodes.list({ code: input.promoCode.toUpperCase(), active: true, limit: 1 });
+          if (promoCodes.data[0]) discounts = [{ promotion_code: promoCodes.data[0].id }];
+        } catch { /* ignore — checkout still works without promo */ }
+      }
+      const promoOpts = discounts ? { discounts } : { allow_promotion_codes: true };
+
       const productName = pricingOptionLabel ? `${course.title} — ${pricingOptionLabel}` : course.title;
 
       if (pricingType === "one_time") {
@@ -913,7 +924,7 @@ export const lmsLearnerRouter = router({
         session = await stripe.checkout.sessions.create({
           mode: "payment",
           customer_email: ctx.user.email ?? undefined,
-          allow_promotion_codes: true,
+          ...promoOpts,
           line_items: [lineItem, ...(orderBumpCheckout ? [orderBumpCheckout.lineItem] : [])],
           success_url: successUrl, cancel_url: cancelUrl,
           client_reference_id: ctx.user.id.toString(),
@@ -950,7 +961,7 @@ export const lmsLearnerRouter = router({
         session = await stripe.checkout.sessions.create({
           mode: "subscription",
           customer_email: ctx.user.email ?? undefined,
-          allow_promotion_codes: true,
+          ...promoOpts,
           line_items: [{ price: stripePriceId, quantity: 1 }, ...(orderBumpCheckout ? [orderBumpCheckout.lineItem] : [])],
           success_url: successUrl, cancel_url: cancelUrl,
           client_reference_id: ctx.user.id.toString(),
@@ -1002,7 +1013,7 @@ export const lmsLearnerRouter = router({
         session = await stripe.checkout.sessions.create({
           mode: hasInstallments ? "subscription" : "payment",
           customer_email: ctx.user.email ?? undefined,
-          allow_promotion_codes: true,
+          ...promoOpts,
           line_items: [...lineItems, ...(orderBumpCheckout ? [orderBumpCheckout.lineItem] : [])],
           success_url: successUrl, cancel_url: cancelUrl,
           client_reference_id: ctx.user.id.toString(),

@@ -5,6 +5,7 @@
  * Route: /learn/:slug
  */
 import { useState, useEffect, useRef } from "react";
+import PromoCodeInput from "@/components/PromoCodeInput";
 import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { ButtonSubtext } from "@/lib/ctaSubtext";
@@ -589,6 +590,7 @@ export default function CourseLanding() {
   const [enrolling, setEnrolling] = useState(false);
   const [selectedOrderBumpId, setSelectedOrderBumpId] = useState<number | undefined>();
   const [selectedPricingOptionId, setSelectedPricingOptionId] = useState<number | undefined>();
+  const [promoCode, setPromoCode] = useState<string | null>(null);
   const isPreview = new URLSearchParams(window.location.search).get("preview") === "admin";
   const autoCheckout = new URLSearchParams(window.location.search).get("checkout") === "1";
 
@@ -615,17 +617,18 @@ export default function CourseLanding() {
         ? (course?.pricingOptions?.find((o: any) => o.id === selectedPricingOptionId)?.pricingType ?? course?.pricingType)
         : (course?.pricingType ?? (course?.isFree ? "free" : "one_time"));
       if (resolvedPricingType === "free") await enrollFree.mutateAsync({ courseSlug: slug! });
-      else await createCheckout.mutateAsync({ courseSlug: slug!, seats: 1, origin: window.location.origin, orderBumpId: selectedOrderBumpId, pricingOptionId: selectedPricingOptionId });
+      else await createCheckout.mutateAsync({ courseSlug: slug!, seats: 1, origin: window.location.origin, orderBumpId: selectedOrderBumpId, pricingOptionId: selectedPricingOptionId, promoCode: promoCode ?? undefined });
     } finally { setEnrolling(false); }
   };
 
   // Auto-trigger checkout when ?checkout=1 is in the URL (used by BSLinkField product links)
+  // MUST be before early returns to comply with React Rules of Hooks
   useEffect(() => {
     if (autoCheckout && course && !isLoading) {
       handleEnroll();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoCheckout, !!course, isLoading]);
+  }, [autoCheckout, course?.id, isLoading]);
 
   if (isLoading) {
     return (
@@ -915,6 +918,11 @@ export default function CourseLanding() {
             )}
             {pricingType === "trial_then_subscription" && (
               <p className="text-xs text-gray-500">{course.trialDays ?? 7}-day free trial, then billed {course.subscriptionInterval ?? "monthly"}</p>
+            )}
+            {!enrollment && pricingType !== "free" && (
+              <PromoCodeInput
+                onApply={(code, _discount) => setPromoCode(code)}
+              />
             )}
             <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold" size="lg" onClick={handleEnroll} disabled={enrolling || enrollFree.isPending || createCheckout.isPending}>
               {enrolling ? "Processing..." : (selectedPricingOptionId ? (course.pricingOptions?.find((o: any) => o.id === selectedPricingOptionId)?.ctaLabel ?? ctaText) : ctaText)}

@@ -20,6 +20,7 @@ import OrderBumpOffer from "@/components/OrderBumpOffer";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import { useState, useEffect } from "react";
+import PromoCodeInput from "@/components/PromoCodeInput";
 
 // ─── Block type (matches builder) ─────────────────────────────────────────────
 interface Block { id: string; type: string; data: Record<string, any>; }
@@ -558,6 +559,8 @@ export default function DownloadLanding() {
   const { slug } = useParams<{ slug: string }>();
   const { user } = useAuth();
   const [selectedOrderBumpId, setSelectedOrderBumpId] = useState<number | undefined>();
+  const [promoCode, setPromoCode] = useState<string | null>(null);
+  const [promoDiscountText, setPromoDiscountText] = useState<string | null>(null);
   const isPreview = new URLSearchParams(window.location.search).get("preview") === "admin";
   const autoCheckout = new URLSearchParams(window.location.search).get("checkout") === "1";
   const { data: product, isLoading, error } = trpc.downloads.getBySlug.useQuery({ slug: slug!, preview: isPreview || undefined });
@@ -579,6 +582,19 @@ export default function DownloadLanding() {
     },
     onError: (e) => toast.error(e.message),
   });
+
+  // Auto-trigger checkout when ?checkout=1 is in the URL (used by BSLinkField product links)
+  // MUST be before early returns to comply with React Rules of Hooks
+  useEffect(() => {
+    if (autoCheckout && product && !isLoading) {
+      if (!user) {
+        window.location.href = getLoginUrl();
+        return;
+      }
+      checkoutMut.mutate({ productId: product.id, orderBumpId: undefined });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoCheckout, product?.id, isLoading]);
 
   if (isLoading) {
     return (
@@ -613,16 +629,8 @@ export default function DownloadLanding() {
       window.location.href = getLoginUrl();
       return;
     }
-    checkoutMut.mutate({ productId: product.id, orderBumpId: selectedOrderBumpId });
+    checkoutMut.mutate({ productId: product.id, orderBumpId: selectedOrderBumpId, promoCode: promoCode ?? undefined });
   };
-
-  // Auto-trigger checkout when ?checkout=1 is in the URL (used by BSLinkField product links)
-  useEffect(() => {
-    if (autoCheckout && product && !isLoading) {
-      handleBuy();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoCheckout, !!product, isLoading]);
 
   // ── Parse landing page blocks ──
   let blocks: Block[] = [];
@@ -765,8 +773,14 @@ export default function DownloadLanding() {
           {/* Sidebar */}
           <div className="space-y-4">
             <Card className="sticky top-4">
-              <CardContent className="p-6 text-center">
-                <div className="text-3xl font-bold text-teal-700 mb-2">{price}</div>
+              <CardContent className="p-6">
+                <div className="text-3xl font-bold text-teal-700 mb-3 text-center">{price}</div>
+                {!hasPurchased && !product.isFree && (
+                  <PromoCodeInput
+                    className="mb-3"
+                    onApply={(code, discount) => { setPromoCode(code); setPromoDiscountText(discount); }}
+                  />
+                )}
                 {hasPurchased ? (
                   <Link href={`/downloads/${slug}/files`}>
                     <Button className="w-full" size="lg">
@@ -778,7 +792,7 @@ export default function DownloadLanding() {
                     {checkoutMut.isPending ? "Processing..." : product.isFree ? "Get It Free" : "Buy Now"}
                   </Button>
                 )}
-                <p className="text-xs text-gray-400 mt-3">Instant digital delivery</p>
+                <p className="text-xs text-gray-400 mt-3 text-center">Instant digital delivery</p>
               </CardContent>
             </Card>
           </div>

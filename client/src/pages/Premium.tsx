@@ -17,6 +17,7 @@ import { trpc } from "@/lib/trpc";
 import Layout from "@/components/Layout";
 import { detectBrand } from "@/hooks/useBrand";
 import { toast } from "sonner";
+import PromoCodeInput from "@/components/PromoCodeInput";
 
 // ─── Countdown timer hook ─────────────────────────────────────────────────────
 // Counts down to a fixed "offer end" date — 14 days from a hard-coded epoch.
@@ -161,6 +162,7 @@ export default function Premium() {
   const [, navigate] = useLocation();
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [promoCode, setPromoCode] = useState<string | null>(null);
 
   const brand = detectBrand();
   const isIHE = brand === "iheartecho";
@@ -360,6 +362,16 @@ export default function Premium() {
               </div>
             )}
 
+            {/* ── Promo Code ───────────────────────────────────────────────── */}
+            {user && !status?.isPremium && (
+              <div className="max-w-xs mx-auto mb-4">
+                <PromoCodeInput
+                  onApply={(code, _discount) => setPromoCode(code)}
+                  className="bg-white/10 rounded-xl p-3"
+                />
+              </div>
+            )}
+
             {/* ── Pricing Cards ─────────────────────────────────────────────── */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 text-left">
 
@@ -382,7 +394,7 @@ export default function Premium() {
                   ) : user ? (
                     <CheckoutBtn
                       label="Get Monthly"
-                      onPay={() => singleMonthly.mutate({ interval: "monthly", origin: window.location.origin })}
+                      onPay={() => singleMonthly.mutate({ interval: "monthly", origin: window.location.origin, promoCode: promoCode ?? undefined })}
                       isPending={singleMonthly.isPending}
                       variant="teal"
                     />
@@ -415,7 +427,7 @@ export default function Premium() {
                   ) : user ? (
                     <CheckoutBtn
                       label="Get Lifetime Access"
-                      onPay={() => singleLifetime.mutate({ interval: "lifetime", origin: window.location.origin })}
+                      onPay={() => singleLifetime.mutate({ interval: "lifetime", origin: window.location.origin, promoCode: promoCode ?? undefined })}
                       isPending={singleLifetime.isPending}
                       variant="gold"
                     />

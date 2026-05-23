@@ -156,9 +156,39 @@ export const downloadsLearnerRouter = router({
     return purchases;
   }),
 
+  /** Validate a Stripe promotion code and return discount details */
+  validatePromoCode: publicProcedure
+    .input(z.object({ code: z.string().min(1) }))
+    .query(async ({ input }) => {
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      try {
+        const promoCodes = await stripe.promotionCodes.list({ code: input.code.toUpperCase(), active: true, limit: 1 });
+        const promoCode = promoCodes.data[0];
+        if (!promoCode) return { valid: false as const, message: "Invalid or expired promo code" };
+        const coupon = promoCode.coupon as any;
+        if (!coupon.valid) return { valid: false as const, message: "This promo code is no longer active" };
+        const discountText = coupon.percent_off
+          ? `${coupon.percent_off}% off`
+          : coupon.amount_off
+          ? `$${(coupon.amount_off / 100).toFixed(2)} off`
+          : "Discount applied";
+        return {
+          valid: true as const,
+          promoCodeId: promoCode.id,
+          discountText,
+          percentOff: coupon.percent_off as number | null,
+          amountOff: coupon.amount_off as number | null,
+          currency: coupon.currency as string | null,
+        };
+      } catch {
+        return { valid: false as const, message: "Invalid promo code" };
+      }
+    }),
+
   /** Create Stripe checkout session for a digital product */
   createCheckout: protectedProcedure
-    .input(z.object({ productId: z.number(), orderBumpId: z.number().optional() }))
+    .input(z.object({ productId: z.number(), orderBumpId: z.number().optional(), promoCode: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
@@ -212,11 +242,19 @@ export const downloadsLearnerRouter = router({
         },
         quantity: 1,
       }];
+      // Resolve promo code ID if provided
+      let discounts: Array<{ promotion_code: string }> | undefined;
+      if (input.promoCode) {
+        try {
+          const promoCodes = await stripe.promotionCodes.list({ code: input.promoCode.toUpperCase(), active: true, limit: 1 });
+          if (promoCodes.data[0]) discounts = [{ promotion_code: promoCodes.data[0].id }];
+        } catch { /* ignore invalid codes — checkout still works */ }
+      }
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
         customer_email: ctx.user.email ?? undefined,
         client_reference_id: ctx.user.id.toString(),
-        allow_promotion_codes: true,
+        ...(discounts ? { discounts } : { allow_promotion_codes: true }),
         line_items: [...primaryLineItem, ...(orderBumpCheckout ? [orderBumpCheckout.lineItem] : [])],
         metadata: {
           type: "digital_download",

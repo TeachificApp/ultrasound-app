@@ -2585,3 +2585,24 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Refactor UserAnalytics (/admin/user-analytics): keep logins, access/roles, courses, page views, quiz activity, drill-down to user profile — removed Purchases tab (moved to Sales Dashboard)
 - [x] Add Discount Codes and Sales Dashboard tool cards to PlatformAdmin grid
 - [x] Register /admin/discount-codes and /admin/sales-dashboard routes in App.tsx
+
+## Promo Code in Checkout Forms (May 23, 2026)
+- [x] Fix: React error #310 in DownloadLanding (useEffect after early return — hooks order violation)
+- [ ] Server: validatePromoCode procedure (checks Stripe promo code, returns discount details)
+- [ ] Server: accept promoCode input in createCheckout for downloads, courses, products, memberships
+- [ ] Client: PromoCodeInput shared component (input + apply button + discount badge + price preview)
+- [ ] Client: Wire PromoCodeInput into DownloadLanding buy buttons
+- [ ] Client: Wire PromoCodeInput into CourseLanding buy buttons
+- [ ] Client: Wire PromoCodeInput into ProductLanding buy buttons
+- [ ] Client: Wire PromoCodeInput into Premium page membership checkout
+
+## Promo Code in Checkout Forms & Hooks Fix (2026-05-23)
+- [x] Fix: React error #310 in DownloadLanding — useEffect after early return (hooks order violation)
+- [x] Add promoCode optional input to downloadsLearner.createCheckout server procedure
+- [x] Add promoCode optional input to lms.createCheckout server procedure (all 3 session types)
+- [x] Add promoCode optional input to productsLearner.createCheckout server procedure
+- [x] Add promoCode optional input to brandMembership.createCheckout server procedure
+- [x] Create shared PromoCodeInput component (validates via validatePromoCode, shows discount text, clearable)
+- [x] Wire PromoCodeInput into DownloadLanding sidebar buy card
+- [x] Wire PromoCodeInput into CourseLanding sidebar buy card
+- [x] Wire PromoCodeInput into Premium page above pricing cards

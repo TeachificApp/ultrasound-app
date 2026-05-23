@@ -151,6 +151,7 @@ export const productsLearnerRouter = router({
     .input(z.object({
       productId: z.number(),
       pricingOptionId: z.number().optional(),
+      promoCode: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -200,11 +201,19 @@ export const productsLearnerRouter = router({
         ? (JSON.parse(product.shippingCountries) as string[])
         : ["US", "CA", "GB", "AU", "NZ"];
 
+      // Resolve promo code if provided
+      let discounts: Array<{ promotion_code: string }> | undefined;
+      if (input.promoCode) {
+        try {
+          const promoCodes = await stripe.promotionCodes.list({ code: input.promoCode.toUpperCase(), active: true, limit: 1 });
+          if (promoCodes.data[0]) discounts = [{ promotion_code: promoCodes.data[0].id }];
+        } catch { /* ignore */ }
+      }
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
         customer_email: ctx.user.email ?? undefined,
         client_reference_id: ctx.user.id.toString(),
-        allow_promotion_codes: true,
+        ...(discounts ? { discounts } : { allow_promotion_codes: true }),
         // Always collect shipping address for native physical products
         shipping_address_collection: {
           allowed_countries: allowedCountries as any,
