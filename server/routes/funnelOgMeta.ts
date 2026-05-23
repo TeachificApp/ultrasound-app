@@ -92,7 +92,7 @@ async function getFunnelPageSeo(
     if (!db) return null;
 
     const [funnel] = await db
-      .select({ id: funnels.id, title: funnels.title })
+      .select({ id: funnels.id, title: funnels.name })
       .from(funnels)
       .where(eq(funnels.slug, funnelSlug))
       .limit(1);
@@ -116,7 +116,7 @@ async function getFunnelPageSeo(
     if (!page) return null;
 
     return {
-      title: page.seoTitle || page.title || funnel.title,
+      title: page.seoTitle || page.title || funnel.title as string,
       description: page.seoDescription || "",
       image: page.seoImage,
     };

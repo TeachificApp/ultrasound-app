@@ -1508,6 +1508,7 @@ export const funnelAdminRouter = router({
     .query(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       // ── Funnels (other than current) with their pages ──
       const allFunnelsList = await db
