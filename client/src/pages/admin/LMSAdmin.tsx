@@ -210,6 +210,10 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
   const [aiDuration, setAiDuration] = useState("");
   const [aiPreview, setAiPreview] = useState<any>(null);
   const [aiStep, setAiStep] = useState<"input"|"preview">("input");
+  const [aiModuleCount, setAiModuleCount] = useState(5);
+  const [aiLessonsPerModule, setAiLessonsPerModule] = useState(4);
+  const [aiStarterContent, setAiStarterContent] = useState("");
+  const [aiGenerateQuizzes, setAiGenerateQuizzes] = useState(true);
 
   const create = trpc.lmsAdmin.createCourse.useMutation({
     onSuccess: (data) => { toast.success("Course created!"); onCreated(data.id); },
@@ -442,10 +446,56 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
                     </div>
                   </div>
                   {type !== "quiz" && (
-                    <div>
-                      <Label className="text-sm">Estimated Duration (minutes, optional)</Label>
-                      <Input value={aiDuration} onChange={e => setAiDuration(e.target.value)} placeholder="e.g. 120" className="mt-1" type="number" min="5" />
-                    </div>
+                    <>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-sm">Number of Modules: <span className="font-bold text-teal-600">{aiModuleCount}</span></Label>
+                          <input
+                            type="range" min={3} max={20} step={1}
+                            value={aiModuleCount}
+                            onChange={e => setAiModuleCount(Number(e.target.value))}
+                            className="mt-2 w-full accent-teal-600"
+                          />
+                          <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>3</span><span>20</span></div>
+                        </div>
+                        <div>
+                          <Label className="text-sm">Lessons per Module: <span className="font-bold text-teal-600">{aiLessonsPerModule}</span></Label>
+                          <input
+                            type="range" min={3} max={10} step={1}
+                            value={aiLessonsPerModule}
+                            onChange={e => setAiLessonsPerModule(Number(e.target.value))}
+                            className="mt-2 w-full accent-teal-600"
+                          />
+                          <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>3</span><span>10</span></div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-900 rounded-md border">
+                        <input
+                          type="checkbox"
+                          id="aiGenerateQuizzes"
+                          checked={aiGenerateQuizzes}
+                          onChange={e => setAiGenerateQuizzes(e.target.checked)}
+                          className="accent-teal-600 w-4 h-4"
+                        />
+                        <label htmlFor="aiGenerateQuizzes" className="text-sm cursor-pointer">
+                          Generate a <strong>5-question quiz</strong> after each lesson
+                        </label>
+                      </div>
+                      <div>
+                        <Label className="text-sm">Starter Content / Outline (optional)</Label>
+                        <textarea
+                          value={aiStarterContent}
+                          onChange={e => setAiStarterContent(e.target.value)}
+                          placeholder="Paste your existing outline, notes, syllabus, or any content you want the AI to use as the foundation. The AI will follow your structure and terminology."
+                          className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring min-h-[120px] resize-none"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Optional — provide an existing outline, syllabus, or notes to guide the AI.</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm">Estimated Duration (minutes, optional)</Label>
+                        <Input value={aiDuration} onChange={e => setAiDuration(e.target.value)} placeholder="e.g. 120" className="mt-1" type="number" min="5" />
+                      </div>
+                    </>
                   )}
                 </div>
               ) : (
@@ -464,26 +514,43 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
                       <span className="font-semibold text-teal-700 dark:text-teal-400">Subtitle:</span>
                       <Input value={aiPreview?.subtitle ?? ""} onChange={e => setAiPreview((p: any) => ({ ...p, subtitle: e.target.value }))} className="mt-1" />
                     </div>
-                    {type !== "quiz" && Array.isArray(aiPreview?.sections) && (
-                      <div>
-                        <span className="font-semibold text-teal-700 dark:text-teal-400">Curriculum ({aiPreview.sections.length} sections):</span>
-                        <div className="mt-2 space-y-2">
-                          {aiPreview.sections.map((sec: any, si: number) => (
-                            <div key={si} className="border rounded p-2">
-                              <div className="font-medium text-xs text-gray-700 dark:text-gray-300">{si + 1}. {sec.title}</div>
-                              <div className="mt-1 pl-3 space-y-1">
-                                {sec.lessons?.map((les: any, li: number) => (
-                                  <div key={li} className="text-xs text-gray-500 flex items-center gap-1">
-                                    <span className="text-gray-400">{li + 1}.</span> {les.title}
-                                    <span className="ml-auto text-gray-400">{les.type} {les.durationMinutes ? `· ${les.durationMinutes}m` : ""}</span>
-                                  </div>
-                                ))}
+                    {type !== "quiz" && Array.isArray(aiPreview?.sections) && (() => {
+                      const totalLessons = aiPreview.sections.reduce((a: number, s: any) => a + (s.lessons?.length ?? 0), 0);
+                      const totalQuizzes = aiPreview.sections.reduce((a: number, s: any) =>
+                        a + (s.lessons?.filter((l: any) => l.quiz?.questions?.length > 0).length ?? 0), 0);
+                      return (
+                        <div>
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="font-semibold text-teal-700 dark:text-teal-400">Curriculum</span>
+                            <span className="text-xs bg-teal-100 dark:bg-teal-900 text-teal-700 dark:text-teal-300 px-2 py-0.5 rounded-full">{aiPreview.sections.length} modules</span>
+                            <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">{totalLessons} lessons</span>
+                            {totalQuizzes > 0 && <span className="text-xs bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded-full">{totalQuizzes} quizzes</span>}
+                          </div>
+                          <div className="mt-2 space-y-2">
+                            {aiPreview.sections.map((sec: any, si: number) => (
+                              <div key={si} className="border rounded p-2">
+                                <div className="font-medium text-xs text-gray-700 dark:text-gray-300 mb-1">{si + 1}. {sec.title}</div>
+                                <div className="pl-3 space-y-1">
+                                  {sec.lessons?.map((les: any, li: number) => (
+                                    <div key={li} className="text-xs text-gray-500">
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-gray-400">{li + 1}.</span>
+                                        <span className="font-medium text-gray-700 dark:text-gray-300">{les.title}</span>
+                                        <span className="ml-auto text-gray-400 shrink-0">{les.durationMinutes ? `${les.durationMinutes}m` : ""}</span>
+                                        {les.quiz?.questions?.length > 0 && <span className="text-purple-500 shrink-0">+quiz</span>}
+                                      </div>
+                                      {les.content && (
+                                        <div className="mt-0.5 pl-4 text-gray-400 line-clamp-2" dangerouslySetInnerHTML={{ __html: les.content.replace(/<[^>]+>/g, ' ').slice(0, 120) + '...' }} />
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                     {type === "quiz" && Array.isArray(aiPreview?.questions) && (
                       <div>
                         <span className="font-semibold text-teal-700 dark:text-teal-400">Questions ({aiPreview.questions.length}):</span>
@@ -546,6 +613,10 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
                 targetAudience: aiAudience.trim() || undefined,
                 difficultyLevel: aiDifficulty,
                 estimatedDurationMinutes: aiDuration ? parseInt(aiDuration) : undefined,
+                moduleCount: aiModuleCount,
+                lessonsPerModule: aiLessonsPerModule,
+                starterContent: aiStarterContent.trim() || undefined,
+                generateQuizzes: aiGenerateQuizzes,
               })}
             >
               {aiGenerate.isPending ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Generating...</> : <><Sparkles className="w-4 h-4 mr-1" /> Generate Preview</>}

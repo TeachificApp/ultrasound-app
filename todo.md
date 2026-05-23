@@ -2559,3 +2559,12 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Create server/routes/funnelOgMeta.ts — injects correct OG meta tags into HTML for /f/:funnelSlug/:pageSlug and /p/:pageSlug URLs
 - [x] Register funnelOgMetaRoutes in server/_core/index.ts before SPA catch-all
 - [x] Add "Link Preview" collapsible panel to FunnelPageEditor sidebar with Display Name, Description, Preview Image URL fields, live mini-preview card, and Save button
+
+## AI Course Generation Upgrade (May 2026)
+- [x] Add module count slider (3-20) to AI course generation modal
+- [x] Add lessons per module slider (3-10) to AI course generation modal
+- [x] Add starter content / outline textarea to AI course generation modal
+- [x] Add per-lesson 5-question quiz generation toggle
+- [x] Upgrade aiGenerateCourse server procedure: full lesson body HTML, per-lesson quizzes, complete landing page
+- [x] Upgrade aiCommitCourse to save per-lesson quizzes, lesson content, and landing page heroImageUrl
+- [x] Upgrade preview step to show module/lesson/quiz counts with content snippets

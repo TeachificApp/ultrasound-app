@@ -2726,6 +2726,11 @@ Rules:
       targetAudience: z.string().max(500).optional(),
       difficultyLevel: z.enum(["beginner", "intermediate", "advanced"]).optional(),
       estimatedDurationMinutes: z.number().int().min(5).max(600).optional(),
+      // New: configurable structure
+      moduleCount: z.number().int().min(3).max(20).default(5),
+      lessonsPerModule: z.number().int().min(3).max(10).default(4),
+      starterContent: z.string().max(20000).optional(), // optional outline / existing content
+      generateQuizzes: z.boolean().default(true), // generate 5-question quiz per lesson
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -2733,15 +2738,23 @@ Rules:
       const systemPrompt = `You are an expert medical education curriculum designer specializing in ultrasound and echocardiography for All About Ultrasound™ and iHeartEcho™.
 You create structured, clinically accurate, and pedagogically sound course content.
 Always use United States English spelling.
-Return ONLY valid JSON — no markdown, no code fences, no extra text.`;
+Return ONLY valid JSON — no markdown, no code fences, no extra text.
+IMPORTANT: Each lesson content must be comprehensive — minimum 300 words of rich HTML with clinical context, key concepts, step-by-step techniques, and practical tips.
+IMPORTANT: Each lesson must include exactly 5 MCQ quiz questions with 4 options each.
+IMPORTANT: The landing page must have fully written, publication-ready content — not placeholders.`;
 
       const isQuiz = input.productType === "quiz";
+      const { moduleCount, lessonsPerModule, starterContent, generateQuizzes } = input;
+
+      const starterSection = starterContent
+        ? `\n\nSTARTER CONTENT / OUTLINE PROVIDED BY AUTHOR (use this as the primary source of truth for topics, structure, and terminology):\n---\n${starterContent}\n---\n`
+        : "";
 
       const userPrompt = isQuiz
         ? `Create a standalone quiz on the following ultrasound/echocardiography topics:
 "${input.topics}"
 ${input.targetAudience ? `Target audience: ${input.targetAudience}` : ""}
-${input.difficultyLevel ? `Difficulty: ${input.difficultyLevel}` : ""}
+${input.difficultyLevel ? `Difficulty: ${input.difficultyLevel}` : ""}${starterSection}
 
 Return a JSON object with this exact structure:
 {
@@ -2770,7 +2783,9 @@ Generate 10-20 high-quality MCQ questions. Each question must have exactly 4 opt
 "${input.topics}"
 ${input.targetAudience ? `Target audience: ${input.targetAudience}` : ""}
 ${input.difficultyLevel ? `Difficulty: ${input.difficultyLevel}` : ""}
-${input.estimatedDurationMinutes ? `Estimated duration: ${input.estimatedDurationMinutes} minutes` : ""}
+${input.estimatedDurationMinutes ? `Estimated duration: ${input.estimatedDurationMinutes} minutes` : ""}${starterSection}
+
+Generate EXACTLY ${moduleCount} modules (sections) with EXACTLY ${lessonsPerModule} lessons each.
 
 Return a JSON object with this exact structure:
 {
@@ -2778,27 +2793,47 @@ Return a JSON object with this exact structure:
   "subtitle": "One-line subtitle",
   "sections": [
     {
-      "title": "Section title",
+      "title": "Module title",
       "lessons": [
         {
           "title": "Lesson title",
           "type": "text",
-          "durationMinutes": 10,
-          "content": "<p>Detailed lesson content in HTML. Include clinical context, key concepts, and practical tips. Minimum 150 words per lesson.</p>"
+          "durationMinutes": 15,
+          "learningObjectives": ["Objective 1", "Objective 2", "Objective 3"],
+          "content": "<h2>Introduction</h2><p>Detailed lesson content in HTML — minimum 300 words. Include clinical context, anatomy, scanning technique, key concepts, clinical pearls, and practical tips. Use <h2>, <h3>, <ul>, <ol>, <strong>, <em> tags for structure.</p>",
+          "imageSearchQuery": "ultrasound [specific anatomy/technique] clinical image",
+          ${generateQuizzes ? `"quiz": {
+            "questions": [
+              {
+                "question": "Clinical question text?",
+                "options": ["Option A", "Option B", "Option C", "Option D"],
+                "correctAnswer": "Option A",
+                "explanation": "Clinical explanation of why this is correct"
+              }
+            ]
+          }` : '"quiz": null'}
         }
       ]
     }
   ],
   "landingPage": {
-    "heroTitle": "Engaging hero headline",
-    "heroSubtitle": "One sentence description",
+    "heroTitle": "Compelling course headline (not a placeholder)",
+    "heroSubtitle": "One powerful sentence describing the transformation or outcome",
     "ctaText": "Enroll Now",
-    "whatYouLearn": "<ul><li>Learning outcome 1</li><li>Learning outcome 2</li><li>Learning outcome 3</li><li>Learning outcome 4</li><li>Learning outcome 5</li></ul>",
-    "bodyContent": "<p>2-3 paragraph HTML description of the course</p>",
-    "requirements": "<p>Prerequisites and who this course is designed for</p>"
+    "whatYouLearn": "<ul><li>Specific learning outcome 1</li><li>Specific learning outcome 2</li><li>Specific learning outcome 3</li><li>Specific learning outcome 4</li><li>Specific learning outcome 5</li><li>Specific learning outcome 6</li></ul>",
+    "bodyContent": "<h2>About This Course</h2><p>3-4 paragraph fully written HTML description. First paragraph: what the course covers and why it matters clinically. Second paragraph: who will benefit most. Third paragraph: what makes this course unique. Fourth paragraph: what students will be able to do after completing it.</p>",
+    "requirements": "<h3>Who This Course Is For</h3><ul><li>Specific audience type 1</li><li>Specific audience type 2</li></ul><h3>Prerequisites</h3><p>Any required background knowledge or equipment.</p>",
+    "heroImageSearchQuery": "ultrasound ${input.topics.split(' ').slice(0,3).join(' ')} clinical professional"
   }
 }
-Generate 3-6 sections with 2-5 lessons each. Lesson types can be: text, video (for placeholder), quiz.`;
+
+CRITICAL REQUIREMENTS:
+- EXACTLY ${moduleCount} sections in the sections array
+- EXACTLY ${lessonsPerModule} lessons in each section's lessons array
+- Each lesson content must be minimum 300 words of rich HTML
+- Each lesson quiz must have EXACTLY 5 questions with 4 options each
+- All landing page fields must be fully written — NO placeholders like "[Topic]" or "[Description]"
+- imageSearchQuery should be a specific, descriptive search query for a relevant medical/ultrasound image`;
 
       const response = await invokeLLM({
         messages: [
@@ -2865,7 +2900,8 @@ Generate 3-6 sections with 2-5 lessons each. Lesson types can be: text, video (f
           if (Array.isArray(sec.lessons)) {
             for (let li = 0; li < sec.lessons.length; li++) {
               const les = sec.lessons[li];
-              const lesType = ["video", "text", "quiz", "download"].includes(les.type) ? les.type : "text";
+              // Always use "text" type for AI-generated lessons (quiz is attached separately)
+              const lesType = ["video", "download", "embed", "video_text"].includes(les.type) ? les.type : "text";
               const [lesResult] = await db.insert(lmsLessons).values({
                 courseId,
                 sectionId,
@@ -2874,11 +2910,44 @@ Generate 3-6 sections with 2-5 lessons each. Lesson types can be: text, video (f
                 position: li,
                 content: les.content ?? null,
                 durationMinutes: les.durationMinutes ?? null,
+                learningObjectives: Array.isArray(les.learningObjectives) ? JSON.stringify(les.learningObjectives) : null,
                 mediaAssetId: null,
               }).$returningId();
-              if (lesType === "quiz") {
-                await db.insert(lmsQuizzes).values({ lessonId: lesResult.id, title: les.title });
+
+              // If the lesson has an embedded quiz, create a separate quiz lesson right after it
+              if (les.quiz && Array.isArray(les.quiz.questions) && les.quiz.questions.length > 0) {
+                const quizLessonTitle = `${les.title} — Quiz`;
+                const [quizLesResult] = await db.insert(lmsLessons).values({
+                  courseId,
+                  sectionId,
+                  title: quizLessonTitle,
+                  type: "quiz",
+                  position: li + 0.5, // will be re-ordered below
+                  content: null,
+                  durationMinutes: 5,
+                  mediaAssetId: null,
+                }).$returningId();
+                const [quizResult] = await db.insert(lmsQuizzes).values({ lessonId: quizLesResult.id, title: quizLessonTitle }).$returningId();
+                for (let qi = 0; qi < les.quiz.questions.length; qi++) {
+                  const q = les.quiz.questions[qi];
+                  await db.insert(lmsQuizQuestions).values({
+                    quizId: quizResult.id,
+                    question: q.question,
+                    type: "mcq",
+                    options: Array.isArray(q.options) ? JSON.stringify(q.options) : null,
+                    correctAnswer: q.correctAnswer,
+                    explanation: q.explanation ?? null,
+                    position: qi,
+                  });
+                }
               }
+            }
+            // Fix positions after inserting (re-number sequentially)
+            const allLessons = await db.select({ id: lmsLessons.id }).from(lmsLessons)
+              .where(eq(lmsLessons.sectionId, sectionId))
+              .orderBy(asc(lmsLessons.position));
+            for (let idx = 0; idx < allLessons.length; idx++) {
+              await db.update(lmsLessons).set({ position: idx }).where(eq(lmsLessons.id, allLessons[idx].id));
             }
           }
         }
