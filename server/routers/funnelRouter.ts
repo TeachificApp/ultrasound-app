@@ -1630,6 +1630,7 @@ export const funnelAdminRouter = router({
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       // Get max sort order for target funnel
       const existing = await db.select({ sortOrder: funnelPages.sortOrder }).from(funnelPages).where(eq(funnelPages.funnelId, input.targetFunnelId)).orderBy(desc(funnelPages.sortOrder)).limit(1);
