@@ -2641,3 +2641,6 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 ## Legacy URL Redirects — May 2026
 - [x] Add server-side 301 redirects: /learn/:slug → /courses/:slug, /f/:slug/:pageSlug → /:slug/:pageSlug, /f/:slug → /:slug, /products/:slug → /product/:slug
 - [x] Add vitest tests for all 4 redirect patterns (13 tests passing)
+
+## Performance Fix — May 2026
+- [x] Fix N+1 query problem in funnelRouter: funnel.list, getFlowDiagram, listBranchRules now use batch inArray queries instead of per-row loops (was causing /admin/funnels/:id to take 60+ seconds)

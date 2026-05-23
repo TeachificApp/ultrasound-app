@@ -8,7 +8,7 @@ import { router, protectedProcedure, publicProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb, getOrCreateUserByEmail } from "../db";
 import { funnels, funnelPages, funnelLeads, funnelTemplates, lmsCourses, lmsLandingPages, digitalProducts, digitalBundles, funnelBranchRules, funnelBranchConditions, emailCampaigns, funnelPurchases, lmsEnrollments, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships } from "../../drizzle/schema";
-import { eq, and, asc, desc, sql } from "drizzle-orm";
+import { eq, and, asc, desc, sql, inArray } from "drizzle-orm";
 import { evaluateBranchRules, type VisitorContext } from "../lib/funnelBranchEngine";
 
 function slugify(text: string): string {
@@ -46,17 +46,19 @@ export const funnelRouter = router({
       .select()
       .from(funnels)
       .orderBy(asc(funnels.sortOrder), desc(funnels.updatedAt));
-    // Get page counts for each funnel
-    const result = [];
-    for (const funnel of rows) {
-      const pages = await db
-        .select()
-        .from(funnelPages)
-        .where(eq(funnelPages.funnelId, funnel.id))
-        .orderBy(asc(funnelPages.sortOrder));
-      result.push({ ...funnel, pages });
+    if (rows.length === 0) return [];
+    // Batch-fetch all pages in a single query instead of N+1 loop
+    const allPages = await db
+      .select()
+      .from(funnelPages)
+      .where(inArray(funnelPages.funnelId, rows.map(f => f.id)))
+      .orderBy(asc(funnelPages.sortOrder));
+    const pagesByFunnelId = new Map<number, typeof allPages>();
+    for (const page of allPages) {
+      if (!pagesByFunnelId.has(page.funnelId)) pagesByFunnelId.set(page.funnelId, []);
+      pagesByFunnelId.get(page.funnelId)!.push(page);
     }
-    return result;
+    return rows.map(funnel => ({ ...funnel, pages: pagesByFunnelId.get(funnel.id) ?? [] }));
   }),
 
   /** Reorder funnels by updating sortOrder */
@@ -685,25 +687,35 @@ export const funnelRouter = router({
         .from(funnelPages)
         .where(eq(funnelPages.funnelId, input.funnelId))
         .orderBy(asc(funnelPages.sortOrder));
-      const pagesWithRules = [];
-      for (const page of pages) {
-        const rules = await db
-          .select()
-          .from(funnelBranchRules)
-          .where(eq(funnelBranchRules.funnelPageId, page.id))
-          .orderBy(asc(funnelBranchRules.priority));
-        const rulesWithConditions = [];
-        for (const rule of rules) {
-          const conditions = await db
+      if (pages.length === 0) return [];
+      // Batch-fetch all branch rules for all pages in 2 queries instead of N*M
+      const pageIds = pages.map(p => p.id);
+      const allRules = await db
+        .select()
+        .from(funnelBranchRules)
+        .where(inArray(funnelBranchRules.funnelPageId, pageIds))
+        .orderBy(asc(funnelBranchRules.priority));
+      const ruleIds = allRules.map(r => r.id);
+      const allConditions = ruleIds.length > 0
+        ? await db
             .select()
             .from(funnelBranchConditions)
-            .where(eq(funnelBranchConditions.ruleId, rule.id))
-            .orderBy(asc(funnelBranchConditions.id));
-          rulesWithConditions.push({ ...rule, conditions });
-        }
-        pagesWithRules.push({ ...page, branchRules: rulesWithConditions });
+            .where(inArray(funnelBranchConditions.ruleId, ruleIds))
+            .orderBy(asc(funnelBranchConditions.id))
+        : [];
+      // Group conditions by ruleId
+      const conditionsByRuleId = new Map<number, typeof allConditions>();
+      for (const cond of allConditions) {
+        if (!conditionsByRuleId.has(cond.ruleId)) conditionsByRuleId.set(cond.ruleId, []);
+        conditionsByRuleId.get(cond.ruleId)!.push(cond);
       }
-      return pagesWithRules;
+      // Group rules (with conditions) by pageId
+      const rulesByPageId = new Map<number, Array<(typeof allRules)[0] & { conditions: typeof allConditions }>>();
+      for (const rule of allRules) {
+        if (!rulesByPageId.has(rule.funnelPageId)) rulesByPageId.set(rule.funnelPageId, []);
+        rulesByPageId.get(rule.funnelPageId)!.push({ ...rule, conditions: conditionsByRuleId.get(rule.id) ?? [] });
+      }
+      return pages.map(page => ({ ...page, branchRules: rulesByPageId.get(page.id) ?? [] }));
     }),
 
   // ─── Branch Rules CRUD ────────────────────────────────────────────────
@@ -719,16 +731,19 @@ export const funnelRouter = router({
         .from(funnelBranchRules)
         .where(eq(funnelBranchRules.funnelPageId, input.pageId))
         .orderBy(asc(funnelBranchRules.priority));
-      const result = [];
-      for (const rule of rules) {
-        const conditions = await db
-          .select()
-          .from(funnelBranchConditions)
-          .where(eq(funnelBranchConditions.ruleId, rule.id))
-          .orderBy(asc(funnelBranchConditions.id));
-        result.push({ ...rule, conditions });
+      if (rules.length === 0) return [];
+      // Batch-fetch all conditions in one query instead of N+1
+      const allConditions = await db
+        .select()
+        .from(funnelBranchConditions)
+        .where(inArray(funnelBranchConditions.ruleId, rules.map(r => r.id)))
+        .orderBy(asc(funnelBranchConditions.id));
+      const conditionsByRuleId = new Map<number, typeof allConditions>();
+      for (const cond of allConditions) {
+        if (!conditionsByRuleId.has(cond.ruleId)) conditionsByRuleId.set(cond.ruleId, []);
+        conditionsByRuleId.get(cond.ruleId)!.push(cond);
       }
-      return result;
+      return rules.map(rule => ({ ...rule, conditions: conditionsByRuleId.get(rule.id) ?? [] }));
     }),
 
   /** Create or update a branch rule (upsert by id) */
