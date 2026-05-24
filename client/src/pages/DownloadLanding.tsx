@@ -19,7 +19,7 @@ import { getLoginUrl } from "@/const";
 import OrderBumpOffer from "@/components/OrderBumpOffer";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import PromoCodeInput from "@/components/PromoCodeInput";
 import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
 
@@ -27,22 +27,38 @@ import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from
 interface Block { id: string; type: string; data: Record<string, any>; }
 
 // ─── Countdown Timer ─────────────────────────────────────────────────────────
-function CountdownTimer({ targetDate, textColor }: { targetDate?: string; textColor: string }) {
+function CountdownTimer({ mode, durationMinutes, targetDate, textColor }: { mode?: string; durationMinutes?: number; targetDate?: string; textColor: string }) {
+  const endRef = useRef<number | null>(null);
   const [time, setTime] = useState({ days: 0, hours: 0, mins: 0, secs: 0 });
+  const resolvedMode = mode ?? (targetDate ? "event" : "on_load");
   useEffect(() => {
-    if (!targetDate) return;
-    const target = new Date(targetDate).getTime();
+    if (resolvedMode === "event" && targetDate) {
+      endRef.current = new Date(targetDate).getTime();
+    } else {
+      const storageKey = `countdown_dl_${durationMinutes ?? 90}`;
+      const stored = sessionStorage.getItem(storageKey);
+      if (stored) {
+        endRef.current = Number(stored);
+      } else {
+        endRef.current = Date.now() + (durationMinutes ?? 90) * 60 * 1000;
+        sessionStorage.setItem(storageKey, String(endRef.current));
+      }
+    }
     const tick = () => {
-      const diff = Math.max(0, target - Date.now());
+      if (!endRef.current) return;
+      const diff = Math.max(0, endRef.current - Date.now());
       setTime({ days: Math.floor(diff / 86400000), hours: Math.floor((diff % 86400000) / 3600000), mins: Math.floor((diff % 3600000) / 60000), secs: Math.floor((diff % 60000) / 1000) });
     };
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [targetDate]);
+  }, [resolvedMode, durationMinutes, targetDate]);
+  const units: Array<[string, number]> = resolvedMode === "event"
+    ? [["Days", time.days], ["Hours", time.hours], ["Mins", time.mins], ["Secs", time.secs]]
+    : [["Hours", time.hours], ["Mins", time.mins], ["Secs", time.secs]];
   return (
     <div className="flex justify-center gap-4">
-      {([["Days", time.days], ["Hours", time.hours], ["Mins", time.mins], ["Secs", time.secs]] as const).map(([label, val]) => (
+      {units.map(([label, val]) => (
         <div key={label} className="bg-white/20 rounded-xl px-6 py-4 min-w-[80px] text-center">
           <div className="text-4xl font-bold" style={{ color: textColor }}>{String(val).padStart(2, "0")}</div>
           <div className="text-sm opacity-80 mt-1" style={{ color: textColor }}>{label}</div>
@@ -406,7 +422,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
       return (
         <div className="px-8 py-10 text-center" style={{ backgroundColor: d.bgColor ?? "#179ca3" }}>
           {d.headline && <h2 className="text-2xl font-bold mb-6" style={{ color: d.textColor ?? "#fff" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
-          <CountdownTimer targetDate={d.targetDate} textColor={d.textColor ?? "#fff"} />
+          <CountdownTimer mode={d.mode} durationMinutes={d.durationMinutes} targetDate={d.targetDate} textColor={d.textColor ?? "#fff"} />
         </div>
       );
     case "flip_cards":

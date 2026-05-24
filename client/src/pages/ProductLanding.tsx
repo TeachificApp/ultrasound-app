@@ -43,6 +43,50 @@ function ShopifyEmbed({ embedCode }: { embedCode: string }) {
   return <div ref={ref} className="shopify-embed-container" />;
 }
 
+// ─── Countdown Timer ─────────────────────────────────────────────────────────
+function ProductCountdownTimer({ mode, durationMinutes, targetDate, headline, textColor, bgColor }: { mode: string; durationMinutes?: number; targetDate?: string; headline?: string; textColor: string; bgColor: string }) {
+  const endRef = useRef<number | null>(null);
+  const [time, setTime] = useState({ days: 0, hours: 0, mins: 0, secs: 0 });
+  useEffect(() => {
+    if (mode === "event" && targetDate) {
+      endRef.current = new Date(targetDate).getTime();
+    } else {
+      const storageKey = `countdown_pl_${durationMinutes ?? 90}`;
+      const stored = sessionStorage.getItem(storageKey);
+      if (stored) {
+        endRef.current = Number(stored);
+      } else {
+        endRef.current = Date.now() + (durationMinutes ?? 90) * 60 * 1000;
+        sessionStorage.setItem(storageKey, String(endRef.current));
+      }
+    }
+    const tick = () => {
+      if (!endRef.current) return;
+      const diff = Math.max(0, endRef.current - Date.now());
+      setTime({ days: Math.floor(diff / 86400000), hours: Math.floor((diff % 86400000) / 3600000), mins: Math.floor((diff % 3600000) / 60000), secs: Math.floor((diff % 60000) / 1000) });
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [mode, durationMinutes, targetDate]);
+  const units: Array<[string, number]> = mode === "event"
+    ? [["Days", time.days], ["Hours", time.hours], ["Mins", time.mins], ["Secs", time.secs]]
+    : [["Hours", time.hours], ["Mins", time.mins], ["Secs", time.secs]];
+  return (
+    <div className="px-8 py-10 text-center" style={{ backgroundColor: bgColor }}>
+      {headline && <h2 className="text-2xl font-bold mb-6" style={{ color: textColor }} dangerouslySetInnerHTML={{ __html: headline }} />}
+      <div className="flex justify-center gap-4">
+        {units.map(([label, val]) => (
+          <div key={label} className="bg-white/20 rounded-xl px-6 py-4 min-w-[80px]">
+            <div className="text-4xl font-bold" style={{ color: textColor }}>{String(val).padStart(2, "0")}</div>
+            <div className="text-sm opacity-80 mt-1" style={{ color: textColor }}>{label}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Block Renderer ───────────────────────────────────────────────────────────
 function RenderBlock({ block, onBuy, buying, price, slug }: {
   block: Block; onBuy: () => void; buying: boolean; price: string; slug: string;
@@ -146,6 +190,10 @@ function RenderBlock({ block, onBuy, buying, price, slug }: {
           </div>
         </div>
       );
+    case "countdown": {
+      const resolvedMode = d.mode ?? (d.targetDate ? "event" : "on_load");
+      return <ProductCountdownTimer mode={resolvedMode} durationMinutes={d.durationMinutes} targetDate={d.targetDate} headline={d.headline} textColor={d.textColor ?? "#fff"} bgColor={d.bgColor ?? "#179ca3"} />;
+    }
     case "divider":
       return <div style={{ height: `${d.height ?? 2}px`, backgroundColor: d.color ?? "#e5e7eb", margin: `${d.marginY ?? 0}px 0` }} />;
     case "spacer":
