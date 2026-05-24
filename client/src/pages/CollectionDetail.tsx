@@ -16,7 +16,7 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
 };
 
 function CourseCard({ course }: { course: any }) {
-  const price = course.isFree ? "Free" : `$${(course.price / 100).toFixed(0)}`;
+  const price = course.isFree ? "Free" : `$${(course.price / 100).toFixed(2)}`;
   return (
     <Link href={`/courses/${course.slug}`}>
       <div className="group bg-white rounded-xl border border-gray-200 hover:border-teal-400 hover:shadow-lg transition-all duration-200 overflow-hidden cursor-pointer flex flex-col h-full">

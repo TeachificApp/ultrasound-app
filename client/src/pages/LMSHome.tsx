@@ -148,7 +148,7 @@ export default function LMSHome() {
                     )}
                     <div className="mt-auto flex items-center justify-between">
                       <span className="text-sm font-bold text-[#189aa1]">
-                        {course.isFree ? "Free" : `$${(course.price / 100).toFixed(0)}`}
+                        {course.isFree ? "Free" : `$${(course.price / 100).toFixed(2)}`}
                       </span>
                       {course.instructor && (
                         <span className="text-xs text-gray-400 truncate ml-2">

@@ -36,20 +36,20 @@ function formatPrice(c: any): string {
   if (pt === "trial_then_subscription") {
     const trialDays = c.trialDays ?? 7;
     const intervalLabel: Record<string, string> = { monthly: "/mo", quarterly: "/qtr", annual: "/yr" };
-    return `${trialDays}-day free trial, then $${(c.price / 100).toFixed(0)}${intervalLabel[c.subscriptionInterval ?? "monthly"] ?? "/mo"}`;
+    return `${trialDays}-day free trial, then $${(c.price / 100).toFixed(2)}${intervalLabel[c.subscriptionInterval ?? "monthly"] ?? "/mo"}`;
   }
   if (pt === "subscription") {
     const intervalLabel: Record<string, string> = { monthly: "/mo", quarterly: "/qtr", annual: "/yr" };
-    return `$${(c.price / 100).toFixed(0)}${intervalLabel[c.subscriptionInterval ?? "monthly"] ?? "/mo"}`;
+    return `$${(c.price / 100).toFixed(2)}${intervalLabel[c.subscriptionInterval ?? "monthly"] ?? "/mo"}`;
   }
   if (pt === "payment_plan") {
-    const dp = c.downPayment ? `$${(c.downPayment / 100).toFixed(0)} down` : "";
+    const dp = c.downPayment ? `$${(c.downPayment / 100).toFixed(2)} down` : "";
     const inst = c.installmentCount && c.installmentAmount
-      ? ` + ${c.installmentCount}×$${(c.installmentAmount / 100).toFixed(0)}`
+      ? ` + ${c.installmentCount}×$${(c.installmentAmount / 100).toFixed(2)}`
       : "";
-    return dp + inst || `$${(c.price / 100).toFixed(0)}`;
+    return dp + inst || `$${(c.price / 100).toFixed(2)}`;
   }
-  return `$${(c.price / 100).toFixed(0)}`;
+  return `$${(c.price / 100).toFixed(2)}`;
 }
 
 function formatPricingOption(opt: any): string {
@@ -57,16 +57,16 @@ function formatPricingOption(opt: any): string {
   if (pt === "free") return "Free";
   if (pt === "subscription") {
     const intervalLabel: Record<string, string> = { monthly: "/mo", quarterly: "/qtr", annual: "/yr" };
-    return `$${(opt.price / 100).toFixed(0)}${intervalLabel[opt.subscriptionInterval ?? "monthly"] ?? "/mo"}`;
+    return `$${(opt.price / 100).toFixed(2)}${intervalLabel[opt.subscriptionInterval ?? "monthly"] ?? "/mo"}`;
   }
   if (pt === "payment_plan") {
-    const dp = opt.downPayment ? `$${(opt.downPayment / 100).toFixed(0)} down` : "";
+const dp = opt.downPayment ? `$${(opt.downPayment / 100).toFixed(2)} down` : "";
     const inst = opt.installmentCount && opt.installmentAmount
-      ? ` + ${opt.installmentCount}\u00d7$${(opt.installmentAmount / 100).toFixed(0)}`
+      ? ` + ${opt.installmentCount}×$${(opt.installmentAmount / 100).toFixed(2)}`
       : "";
-    return dp + inst || `$${(opt.price / 100).toFixed(0)}`;
+    return dp + inst || `$${(opt.price / 100).toFixed(2)}`;
   }
-  return `$${(opt.price / 100).toFixed(0)}`;
+  return `$${(opt.price / 100).toFixed(2)}`;
 }
 
 function accessLabel(c: any): string {

@@ -1512,6 +1512,112 @@ export const funnelPublicRouter = router({
                 targetUrl: result.targetUrl,
       };
     }),
+
+  /**
+   * Create a Stripe Checkout Session from a direct-checkout CTA button on any landing page.
+   * No authentication required — works for anonymous visitors.
+   * Fulfillment is handled by the existing Stripe webhook (handleFunnelPaymentIntentSucceeded).
+   */
+  createDirectCheckout: publicProcedure
+    .input(
+      z.object({
+        productType: z.enum(["course", "download", "product", "bundle"]),
+        productId: z.number().int().positive(),
+        origin: z.string(),
+        email: z.string().email().optional(),
+        promoCode: z.string().optional(),
+        funnelId: z.number().optional(),
+        pageId: z.number().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      // ── Resolve product details ──────────────────────────────────────────────
+      let productName = "";
+      let unitAmount = 0; // in cents
+      let currency = "usd";
+      if (input.productType === "course") {
+        const [course] = await db.select({ id: lmsCourses.id, title: lmsCourses.title, price: lmsCourses.price, currency: lmsCourses.currency, isFree: lmsCourses.isFree, pricingType: lmsCourses.pricingType })
+          .from(lmsCourses).where(eq(lmsCourses.id, input.productId)).limit(1);
+        if (!course) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });
+        if (course.isFree || course.pricingType === "free" || !course.price) throw new TRPCError({ code: "BAD_REQUEST", message: "Course is free — use free enrollment" });
+        productName = course.title;
+        unitAmount = course.price;
+        currency = course.currency ?? "usd";
+      } else if (input.productType === "download") {
+        const [prod] = await db.select({ id: digitalProducts.id, title: digitalProducts.title, price: digitalProducts.price })
+          .from(digitalProducts).where(eq(digitalProducts.id, input.productId)).limit(1);
+        if (!prod) throw new TRPCError({ code: "NOT_FOUND", message: "Download not found" });
+        if (!prod.price) throw new TRPCError({ code: "BAD_REQUEST", message: "Product has no price" });
+        productName = prod.title;
+        unitAmount = prod.price;
+      } else if (input.productType === "bundle") {
+        const [bundle] = await db.select({ id: digitalBundles.id, title: digitalBundles.title, discountPrice: digitalBundles.discountPrice, originalPrice: digitalBundles.originalPrice })
+          .from(digitalBundles).where(eq(digitalBundles.id, input.productId)).limit(1);
+        if (!bundle) throw new TRPCError({ code: "NOT_FOUND", message: "Bundle not found" });
+        const bundlePrice = bundle.discountPrice || bundle.originalPrice;
+        if (!bundlePrice) throw new TRPCError({ code: "BAD_REQUEST", message: "Bundle has no price" });
+        productName = bundle.title;
+        unitAmount = bundlePrice;
+      } else {
+        // physical product
+        const { physicalProducts } = await import("../../drizzle/schema");
+        const [prod] = await db.select({ id: physicalProducts.id, title: physicalProducts.title, price: physicalProducts.price })
+          .from(physicalProducts).where(eq(physicalProducts.id, input.productId)).limit(1);
+        if (!prod) throw new TRPCError({ code: "NOT_FOUND", message: "Product not found" });
+        if (!prod.price) throw new TRPCError({ code: "BAD_REQUEST", message: "Product has no price" });
+        productName = prod.title;
+        unitAmount = prod.price;
+      }
+      // ── Build Stripe session ─────────────────────────────────────────────────
+      const successUrl = `${input.origin}/my-dashboard?purchase=success&product=${encodeURIComponent(productName)}`;
+      const cancelUrl = `${input.origin}`;
+      const sessionParams: any = {
+        mode: "payment",
+        allow_promotion_codes: true,
+        line_items: [{
+          price_data: {
+            currency,
+            product_data: { name: productName },
+            unit_amount: unitAmount,
+          },
+          quantity: 1,
+        }],
+        metadata: {
+          type: "funnel_form_purchase",
+          product_type: input.productType,
+          product_id: input.productId.toString(),
+          product_name: productName.slice(0, 490),
+          customer_email: input.email ?? "",
+          funnel_id: input.funnelId?.toString() ?? "",
+          funnel_page_id: input.pageId?.toString() ?? "",
+          user_id: ctx.user?.id?.toString() ?? "",
+          success_url: successUrl.slice(0, 490),
+        },
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+      };
+      if (input.email) sessionParams.customer_email = input.email;
+      // Apply promo code if provided
+      if (input.promoCode) {
+        try {
+          const promoCodes = await stripe.promotionCodes.list({ code: input.promoCode, active: true, limit: 1 });
+          if (promoCodes.data.length > 0) {
+            sessionParams.discounts = [{ promotion_code: promoCodes.data[0].id }];
+            delete sessionParams.allow_promotion_codes;
+          }
+        } catch { /* ignore promo code errors */ }
+      }
+      const session = await stripe.checkout.sessions.create(sessionParams);
+      // Track conversion on the funnel page if context provided
+      if (input.pageId) {
+        await db.execute(sql`UPDATE funnel_pages SET conversions = conversions + 1 WHERE id = ${input.pageId}`);
+      }
+      return { checkoutUrl: session.url };
+    }),
 });
 
 // ─── Funnel Admin Extended Router ─────────────────────────────────────────────

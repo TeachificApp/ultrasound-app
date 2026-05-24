@@ -2680,3 +2680,16 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix sales page scraping CSS patterns to match actual Thinkific page structure
 - [x] Fallback landing page generation from API data when scraping fails
 - [x] Direct enrollment into lms_enrollments (no pending state, no notifications)
+
+## Checkout CTA on Landing Pages (May 2026)
+- [ ] Add "checkout" as a CTA action type in block settings (alongside "url", "scroll", etc.)
+- [ ] Block settings: when "checkout" selected, show product/course selector dropdown
+- [ ] Server: createCheckoutSession procedure for landing page CTA (course/quiz/download/product)
+- [ ] Post-payment: auto-login via magic token in success_url, redirect to /my-dashboard
+- [ ] BlockPreview + public page renderers: handle checkout action (call tRPC, open Stripe URL)
+
+## Direct Checkout CTA (May 2026)
+- [x] Add "Direct Checkout (Stripe)" behavior option to hero block buttons, cta_standalone, and pricing_cta block editors in LandingPageBuilder
+- [x] Add funnelPublic.createDirectCheckout tRPC procedure (public, no auth required) — resolves product details from DB, creates Stripe Checkout session with success_url=/my-dashboard
+- [x] Handle direct_checkout behavior in PublicFunnelPage.tsx for all 3 block types (hero, cta_standalone, pricing_cta)
+- [x] Show "Direct Checkout (Stripe)" badge in BlockPreview.tsx for all 3 block types

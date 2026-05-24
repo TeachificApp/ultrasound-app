@@ -67,6 +67,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
                       style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
                       {btn.text}
                     </button>
+                    {(btn as any).behavior === "direct_checkout" && <span className="text-[10px] bg-teal-700/80 text-white rounded px-1.5 py-0.5">→ Stripe Checkout</span>}
                     {btn.showStrikethrough && btn.strikethroughPrice && (
                       <span className="text-xs text-white/60 line-through">{btn.strikethroughPrice}</span>
                     )}
@@ -355,6 +356,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
           {d.subtext && <p className="text-gray-600 mb-6 max-w-xl mx-auto" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           {priceAbove && priceBlock}
           {ctaBtn}
+          {d.ctaBehavior === "direct_checkout" && <p className="text-[10px] text-teal-600 mt-1">→ Stripe Checkout</p>}
           {!priceAbove && priceBlock}
           <ButtonSubtext d={d} />
         </div>
@@ -370,6 +372,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
           )}
           {d.displayPrice && <p className="text-3xl font-bold mb-4" style={{ color: d.ctaColor ?? "#179ca3" }}>{d.displayPrice}</p>}
           <a href={d.ctaLink ?? "#"} className={`inline-block px-8 py-3 rounded-lg font-semibold shadow ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`} style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>{d.ctaText ?? "Get Started"}</a>
+          {d.ctaBehavior === "direct_checkout" && <p className="text-[10px] text-teal-600 mt-1">→ Stripe Checkout</p>}
           <ButtonSubtext d={d} />
           {(d.showOptOut || d.optOutEnabled) && d.optOutText && (
             <div className="mt-3"><a href={d.optOutUrl || d.optOutCustomUrl || "#"} className="text-xs text-gray-400 underline hover:text-gray-600">{d.optOutText}</a></div>

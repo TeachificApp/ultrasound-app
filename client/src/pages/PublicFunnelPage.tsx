@@ -738,7 +738,7 @@ function UrgencyOfferBlock({ data: d, funnelSlug, nextPage }: { data: Record<str
 
 function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMedia, placement, isHorizontal, funnelId, pageId, funnelSlug, nextPage }: {
   d: Record<string, any>;
-  heroButtons: Array<{ text: string; color: string; textColor: string; link: string; style: string; animation?: string; leadCapture?: boolean; leadModalTitle?: string; leadModalSubtext?: string; leadTags?: string; behavior?: string; emailAddress?: string; showOptOut?: boolean; optOutText?: string; optOutUrl?: string }>;
+  heroButtons: Array<{ text: string; color: string; textColor: string; link: string; style: string; animation?: string; leadCapture?: boolean; leadModalTitle?: string; leadModalSubtext?: string; leadTags?: string; behavior?: string; emailAddress?: string; showOptOut?: boolean; optOutText?: string; optOutUrl?: string; checkoutProductType?: string; checkoutProductId?: number; checkoutPromoCode?: string }>;
   heroBg: React.CSSProperties;
   bgType: string;
   hasInlineMedia: boolean;
@@ -750,11 +750,31 @@ function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMed
   nextPage?: { slug: string; title: string; pageType: string } | null;
 }) {
   const [lcModal, setLcModal] = useState<{ btn: typeof heroButtons[0] } | null>(null);
-  // Use ref so callbacks always read the latest resolved nextPage, not a stale closure
+  const [checkoutLoadingIdx, setCheckoutLoadingIdx] = useState<number | null>(null);
   const nextPageRef = useRef(nextPage);
   nextPageRef.current = nextPage;
+  const createDirectCheckout = trpc.funnelPublic.createDirectCheckout.useMutation();
 
-  const handleBtnClick = (e: React.MouseEvent, btn: typeof heroButtons[0]) => {
+  const handleBtnClick = async (e: React.MouseEvent, btn: typeof heroButtons[0], idx: number) => {
+    const behavior = btn.behavior ?? "url";
+    if (behavior === "direct_checkout") {
+      e.preventDefault();
+      if (!btn.checkoutProductId || !btn.checkoutProductType) { toast.error("No product configured for this button."); return; }
+      setCheckoutLoadingIdx(idx);
+      try {
+        const result = await createDirectCheckout.mutateAsync({
+          productType: btn.checkoutProductType as any,
+          productId: Number(btn.checkoutProductId),
+          origin: window.location.origin,
+          promoCode: btn.checkoutPromoCode || undefined,
+          funnelId,
+          pageId,
+        });
+        if (result.checkoutUrl) window.open(result.checkoutUrl, "_blank");
+      } catch (err: any) { toast.error(err.message || "Failed to start checkout"); }
+      finally { setCheckoutLoadingIdx(null); }
+      return;
+    }
     if (btn.leadCapture) {
       e.preventDefault();
       setLcModal({ btn });
@@ -767,6 +787,7 @@ function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMed
     const nextPageUrl = np ? (np.slug.startsWith("/") ? np.slug : `/${funnelSlug}/${np.slug}`) : null;
     if (behavior === "send_email" && btn.emailAddress) return `mailto:${btn.emailAddress}`;
     if (behavior === "next_funnel_step" && nextPageUrl) return nextPageUrl;
+    if (behavior === "direct_checkout") return "#";
     return btn.link || nextPageUrl || "#";
   };
 
@@ -791,10 +812,10 @@ function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMed
               <div key={i} className="flex flex-col items-center gap-1">
                 <a
                   href={getBtnHref(btn)}
-                  onClick={e => handleBtnClick(e, btn)}
-                  className={`px-8 py-3 rounded-lg font-semibold text-lg shadow-lg inline-block transition-transform hover:scale-105 cursor-pointer ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
+                  onClick={e => handleBtnClick(e, btn, i)}
+                  className={`px-8 py-3 rounded-lg font-semibold text-lg shadow-lg inline-block transition-transform hover:scale-105 cursor-pointer ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""} ${checkoutLoadingIdx === i ? "opacity-70 pointer-events-none" : ""}`}
                   style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
-                  {btn.text}
+                  {checkoutLoadingIdx === i ? "Redirecting..." : btn.text}
                 </a>
                 {btn.showOptOut && btn.optOutText && (
                   <a href={btn.optOutUrl || "#"} className="text-xs text-white/60 underline hover:text-white/80 cursor-pointer">{btn.optOutText}</a>
@@ -833,9 +854,10 @@ function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMed
 
 function CtaStandaloneBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: Record<string, any>; funnelId: number; pageId: number; funnelSlug: string; nextPage?: { slug: string } | null }) {
   const [lcOpen, setLcOpen] = useState(false);
-  // Use ref so onSuccess always reads the latest resolved nextPage, not a stale closure
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const nextPageRef = useRef(nextPage);
   nextPageRef.current = nextPage;
+  const createDirectCheckout = trpc.funnelPublic.createDirectCheckout.useMutation();
 
   const getHref = () => {
     const behavior = d.ctaBehavior ?? "url";
@@ -843,6 +865,7 @@ function CtaStandaloneBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: 
     const nextPageUrl = np ? (np.slug.startsWith("/") ? np.slug : `/${funnelSlug}/${np.slug}`) : null;
     if (behavior === "send_email" && d.ctaEmailAddress) return `mailto:${d.ctaEmailAddress}`;
     if (behavior === "next_funnel_step" && nextPageUrl) return nextPageUrl;
+    if (behavior === "direct_checkout") return "#";
     return d.ctaLink || nextPageUrl || "#";
   };
 
@@ -850,7 +873,26 @@ function CtaStandaloneBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: 
     ? { backgroundColor: "transparent", color: d.ctaColor ?? "#179ca3", border: `2px solid ${d.btnBorderColor ?? d.ctaColor ?? "#179ca3"}` }
     : { backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#ffffff", border: `2px solid ${d.btnBorderColor ?? d.ctaColor ?? "#179ca3"}` };
 
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = async (e: React.MouseEvent) => {
+    const behavior = d.ctaBehavior ?? "url";
+    if (behavior === "direct_checkout") {
+      e.preventDefault();
+      if (!d.checkoutProductId || !d.checkoutProductType) { toast.error("No product configured for this button."); return; }
+      setCheckoutLoading(true);
+      try {
+        const result = await createDirectCheckout.mutateAsync({
+          productType: d.checkoutProductType as any,
+          productId: Number(d.checkoutProductId),
+          origin: window.location.origin,
+          promoCode: d.checkoutPromoCode || undefined,
+          funnelId,
+          pageId,
+        });
+        if (result.checkoutUrl) window.open(result.checkoutUrl, "_blank");
+      } catch (err: any) { toast.error(err.message || "Failed to start checkout"); }
+      finally { setCheckoutLoading(false); }
+      return;
+    }
     if (d.leadCapture) {
       e.preventDefault();
       setLcOpen(true);
@@ -863,9 +905,9 @@ function CtaStandaloneBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: 
         <h2 className="text-2xl font-bold mb-3 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />
         {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
         <a href={getHref()} onClick={handleClick}
-          className={`inline-block px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-transform hover:scale-105 cursor-pointer ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
+          className={`inline-block px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-transform hover:scale-105 cursor-pointer ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""} ${checkoutLoading ? "opacity-70 pointer-events-none" : ""}`}
           style={btnStyle}>
-          {d.ctaText ?? "Get Started"}
+          {checkoutLoading ? "Redirecting..." : (d.ctaText ?? "Get Started")}
         </a>
         <ButtonSubtext d={d} />
         <OptOutLink d={d} />
@@ -897,9 +939,10 @@ function CtaStandaloneBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: 
 
 function PricingCtaBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: Record<string, any>; funnelId: number; pageId: number; funnelSlug: string; nextPage?: { slug: string } | null }) {
   const [lcOpen, setLcOpen] = useState(false);
-  // Use ref so onSuccess always reads the latest resolved nextPage, not a stale closure
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const nextPageRef = useRef(nextPage);
   nextPageRef.current = nextPage;
+  const createDirectCheckout = trpc.funnelPublic.createDirectCheckout.useMutation();
 
   const getHref = () => {
     const behavior = d.ctaBehavior ?? "url";
@@ -907,10 +950,30 @@ function PricingCtaBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: Rec
     const nextPageUrl = np ? (np.slug.startsWith("/") ? np.slug : `/${funnelSlug}/${np.slug}`) : null;
     if (behavior === "send_email" && d.ctaEmailAddress) return `mailto:${d.ctaEmailAddress}`;
     if (behavior === "next_funnel_step" && nextPageUrl) return nextPageUrl;
+    if (behavior === "direct_checkout") return "#";
     return d.ctaLink || nextPageUrl || "#";
   };
 
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = async (e: React.MouseEvent) => {
+    const behavior = d.ctaBehavior ?? "url";
+    if (behavior === "direct_checkout") {
+      e.preventDefault();
+      if (!d.checkoutProductId || !d.checkoutProductType) { toast.error("No product configured for this button."); return; }
+      setCheckoutLoading(true);
+      try {
+        const result = await createDirectCheckout.mutateAsync({
+          productType: d.checkoutProductType as any,
+          productId: Number(d.checkoutProductId),
+          origin: window.location.origin,
+          promoCode: d.checkoutPromoCode || undefined,
+          funnelId,
+          pageId,
+        });
+        if (result.checkoutUrl) window.open(result.checkoutUrl, "_blank");
+      } catch (err: any) { toast.error(err.message || "Failed to start checkout"); }
+      finally { setCheckoutLoading(false); }
+      return;
+    }
     if (d.leadCapture) {
       e.preventDefault();
       setLcOpen(true);
@@ -923,9 +986,9 @@ function PricingCtaBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: Rec
         <h2 className="text-3xl font-bold mb-4 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />
         {d.subtext && <p className="text-lg text-gray-600 mb-8" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
         <a href={getHref()} onClick={handleClick}
-          className={`inline-block px-10 py-4 rounded-xl font-bold text-xl shadow-lg transition-transform hover:scale-105 cursor-pointer ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
+          className={`inline-block px-10 py-4 rounded-xl font-bold text-xl shadow-lg transition-transform hover:scale-105 cursor-pointer ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""} ${checkoutLoading ? "opacity-70 pointer-events-none" : ""}`}
           style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#ffffff" }}>
-          {d.ctaText ?? "Get Started"}
+          {checkoutLoading ? "Redirecting..." : (d.ctaText ?? "Get Started")}
         </a>
         <ButtonSubtext d={d} />
         <OptOutLink d={d} />

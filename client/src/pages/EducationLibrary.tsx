@@ -25,7 +25,7 @@ const BRAND_LABELS: Record<string, string> = {
 };
 
 function CourseCard({ course, enrolledCourseIds, purchasedProductSlugs }: { course: any; enrolledCourseIds: Set<number>; purchasedProductSlugs: Set<string> }) {
-  const price = course.isFree ? "Free" : `$${(course.price / 100).toFixed(0)}`;
+  const price = course.isFree ? "Free" : `$${(course.price / 100).toFixed(2)}`;
   const isOwned = course._source === "digital_product"
     ? purchasedProductSlugs.has(course.slug)
     : enrolledCourseIds.has(course.id);
