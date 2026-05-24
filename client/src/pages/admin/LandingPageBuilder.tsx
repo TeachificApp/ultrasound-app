@@ -712,11 +712,6 @@ function PricingCtaSettings({ d, set }: { d: Record<string, any>; set: (key: str
 
   return (
     <div className="space-y-3">
-      <div>
-        <label className="text-xs text-gray-500 block mb-1">CTA Button URL</label>
-        <DebouncedInput value={d.ctaUrl ?? ""} onChange={v => set("ctaUrl", v)} className="h-8 text-xs" placeholder="https://... or /learn/course-slug" />
-        <p className="text-[10px] text-gray-400 mt-0.5">Any URL — external site, internal page, checkout, booking link, etc.</p>
-      </div>
       <div className="border border-gray-200 rounded-lg p-3 space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-xs font-medium text-gray-600">Pricing Display</p>
