@@ -97,10 +97,10 @@ export default function FunnelPageEditor() {
         id: numericPageId,
         blocks: JSON.stringify(blocks),
       });
-      // Invalidate the cache so re-entry always loads fresh data from DB
+      // Invalidate the cache so the NEXT mount of this page loads fresh data from DB.
+      // Do NOT reset loadedPageId here — that would cause the useEffect to immediately
+      // re-run with stale cached pageData and overwrite blocks with the pre-save state.
       utils.funnel.getPageById.invalidate({ id: numericPageId });
-      // Reset loadedPageId so the useEffect guard doesn't block a fresh reload
-      setLoadedPageId(null);
     } finally {
       setIsSaving(false);
     }
