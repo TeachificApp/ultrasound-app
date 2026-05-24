@@ -50,6 +50,8 @@ export default function ProductLandingPageBuilder() {
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [pickerTab, setPickerTab] = useState<"catalog" | "from_pages" | "templates">("catalog");
   const [selectedSourceProductId, setSelectedSourceProductId] = useState<number | null>(null);
+  const [selectedSourceFunnelId, setSelectedSourceFunnelId] = useState<number | null>(null);
+  const [selectedSourceFunnelPageId, setSelectedSourceFunnelPageId] = useState<number | null>(null);
   const [blockSearch, setBlockSearch] = useState("");
 
   // Save-as-template dialog state
@@ -171,14 +173,30 @@ export default function ProductLandingPageBuilder() {
       return Array.isArray(parsed) ? parsed : [];
     } catch { return []; }
   }, [selectedSourceProductId, productsWithBlocks]);
+  // Block picker: fetch funnels with pages (for funnel page source)
+  const { data: funnelsWithPages } = trpc.funnelAdmin.getFunnelsWithPages.useQuery(
+    undefined,
+    { enabled: addMenuOpen && pickerTab === "from_pages" }
+  );
+  const sourceFunnelPageBlocks = useMemo<Block[]>(() => {
+    if (!selectedSourceFunnelId || !selectedSourceFunnelPageId || !funnelsWithPages) return [];
+    const funnel = funnelsWithPages.find((f: any) => f.id === selectedSourceFunnelId);
+    const page = funnel?.pages.find((p: any) => p.id === selectedSourceFunnelPageId);
+    if (!page?.blocks) return [];
+    try {
+      const parsed = typeof page.blocks === "string" ? JSON.parse(page.blocks) : page.blocks;
+      return Array.isArray(parsed) ? parsed : [];
+    } catch { return []; }
+  }, [selectedSourceFunnelId, selectedSourceFunnelPageId, funnelsWithPages]);
+  const activeSourceBlocks = selectedSourceFunnelPageId ? sourceFunnelPageBlocks : sourceProductBlocks;
   const filteredSourceBlocks = useMemo(() => {
-    if (!blockSearch.trim()) return sourceProductBlocks;
+    if (!blockSearch.trim()) return activeSourceBlocks;
     const q = blockSearch.toLowerCase();
-    return sourceProductBlocks.filter((b: Block) =>
+    return activeSourceBlocks.filter((b: Block) =>
       b.type.toLowerCase().includes(q) ||
       JSON.stringify(b.data).toLowerCase().includes(q)
     );
-  }, [sourceProductBlocks, blockSearch]);
+  }, [activeSourceBlocks, blockSearch]);
   const copyBlockFromSource = (block: Block) => {
     const copy: Block = { ...block, id: uid() };
     setBlocks(prev => [...prev, copy]);
@@ -187,8 +205,8 @@ export default function ProductLandingPageBuilder() {
     setAddMenuOpen(false);
   };
   const copyAllBlocksFromSource = () => {
-    if (!sourceProductBlocks.length) return;
-    const copies = sourceProductBlocks.map((b: Block) => ({ ...b, id: uid() }));
+    if (!activeSourceBlocks.length) return;
+    const copies = activeSourceBlocks.map((b: Block) => ({ ...b, id: uid() }));
     setBlocks(prev => [...prev, ...copies]);
     toast.success(`${copies.length} block${copies.length > 1 ? "s" : ""} copied!`);
     setAddMenuOpen(false);
@@ -372,7 +390,7 @@ export default function ProductLandingPageBuilder() {
                 <select
                   className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400"
                   value={selectedSourceProductId ?? ""}
-                  onChange={e => { setSelectedSourceProductId(e.target.value ? Number(e.target.value) : null); setBlockSearch(""); }}
+                  onChange={e => { setSelectedSourceProductId(e.target.value ? Number(e.target.value) : null); setSelectedSourceFunnelId(null); setSelectedSourceFunnelPageId(null); setBlockSearch(""); }}
                 >
                   <option value="">— select product —</option>
                   {productsWithBlocks?.map((p: any) => (
@@ -380,12 +398,40 @@ export default function ProductLandingPageBuilder() {
                   ))}
                 </select>
               </div>
+              <div className="border-t border-gray-100 pt-2">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Funnel Page</label>
+                <select
+                  className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400"
+                  value={selectedSourceFunnelId ?? ""}
+                  onChange={e => { setSelectedSourceFunnelId(e.target.value ? Number(e.target.value) : null); setSelectedSourceFunnelPageId(null); setSelectedSourceProductId(null); setBlockSearch(""); }}
+                >
+                  <option value="">— select funnel —</option>
+                  {funnelsWithPages?.map((f: any) => (
+                    <option key={f.id} value={f.id}>{f.name}</option>
+                  ))}
+                </select>
+                {selectedSourceFunnelId && (() => {
+                  const pages = funnelsWithPages?.find((f: any) => f.id === selectedSourceFunnelId)?.pages ?? [];
+                  return pages.length === 0 ? (
+                    <p className="text-xs text-gray-400 mt-1">No pages with blocks.</p>
+                  ) : (
+                    <div className="space-y-1 mt-1">
+                      {pages.map((p: any) => (
+                        <button key={p.id} onClick={() => { setSelectedSourceFunnelPageId(p.id); setBlockSearch(""); }}
+                          className={cn("w-full text-left text-xs px-2 py-1.5 rounded-lg transition-colors", selectedSourceFunnelPageId === p.id ? "bg-teal-50 text-teal-700 font-semibold border border-teal-200" : "text-gray-600 hover:bg-gray-50")}>
+                          {p.title}<span className="text-[10px] text-gray-400 ml-1 capitalize">({p.pageType})</span>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
             <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-              {!selectedSourceProductId ? (
+              {!selectedSourceProductId && !selectedSourceFunnelPageId ? (
                 <div className="flex flex-col items-center justify-center h-full text-gray-400 text-xs gap-2">
                   <BookOpen className="w-8 h-8 opacity-30" />
-                  <p>Select a product to browse its sales page blocks</p>
+                  <p>Select a product or funnel page to browse its blocks</p>
                 </div>
               ) : (
                 <>
@@ -394,9 +440,9 @@ export default function ProductLandingPageBuilder() {
                       <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" />
                       <Input value={blockSearch} onChange={e => setBlockSearch(e.target.value)} placeholder="Search blocks…" className="pl-7 h-7 text-xs" />
                     </div>
-                    {sourceProductBlocks.length > 0 && (
+                    {activeSourceBlocks.length > 0 && (
                       <Button size="sm" variant="outline" className="h-7 text-xs border-teal-300 text-teal-700 hover:bg-teal-50 shrink-0" onClick={copyAllBlocksFromSource}>
-                        <Copy className="w-3 h-3 mr-1" /> Copy All ({sourceProductBlocks.length})
+                        <Copy className="w-3 h-3 mr-1" /> Copy All ({activeSourceBlocks.length})
                       </Button>
                     )}
                   </div>

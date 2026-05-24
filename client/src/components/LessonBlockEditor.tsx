@@ -65,6 +65,8 @@ export default function LessonBlockEditor({
   // Block-from-lessons state
   const [selectedSourceCourseId, setSelectedSourceCourseId] = useState<number | null>(courseId ?? null);
   const [selectedSourceLessonId, setSelectedSourceLessonId] = useState<number | null>(null);
+  const [selectedSourceFunnelId, setSelectedSourceFunnelId] = useState<number | null>(null);
+  const [selectedSourceFunnelPageId, setSelectedSourceFunnelPageId] = useState<number | null>(null);
   const [blockSearch, setBlockSearch] = useState("");
 
   const updateLesson = trpc.lmsAdmin.updateLesson.useMutation();
@@ -102,6 +104,12 @@ export default function LessonBlockEditor({
     { enabled: addMenuOpen && pickerTab === "from_lessons" && !!selectedSourceCourseId }
   );
 
+  // Fetch funnels with pages (for funnel page source)
+  const { data: funnelsWithPages } = trpc.funnelAdmin.getFunnelsWithPages.useQuery(
+    undefined,
+    { enabled: addMenuOpen && pickerTab === "from_lessons" }
+  );
+
   // Parse blocks for the selected source lesson
   const sourceLessonBlocks = useMemo<Block[]>(() => {
     if (!selectedSourceLessonId || !sourceLessons) return [];
@@ -117,14 +125,27 @@ export default function LessonBlockEditor({
     }
   }, [selectedSourceLessonId, sourceLessons]);
 
+  // Parse blocks for the selected funnel page
+  const sourceFunnelPageBlocks = useMemo<Block[]>(() => {
+    if (!selectedSourceFunnelId || !selectedSourceFunnelPageId || !funnelsWithPages) return [];
+    const funnel = funnelsWithPages.find((f: any) => f.id === selectedSourceFunnelId);
+    const page = funnel?.pages.find((p: any) => p.id === selectedSourceFunnelPageId);
+    if (!page?.blocks) return [];
+    try {
+      const parsed = typeof page.blocks === "string" ? JSON.parse(page.blocks) : page.blocks;
+      return Array.isArray(parsed) ? parsed : [];
+    } catch { return []; }
+  }, [selectedSourceFunnelId, selectedSourceFunnelPageId, funnelsWithPages]);
+
+  const activeSourceBlocks = selectedSourceFunnelPageId ? sourceFunnelPageBlocks : sourceLessonBlocks;
   const filteredSourceBlocks = useMemo(() => {
-    if (!blockSearch.trim()) return sourceLessonBlocks;
+    if (!blockSearch.trim()) return activeSourceBlocks;
     const q = blockSearch.toLowerCase();
-    return sourceLessonBlocks.filter(b =>
+    return activeSourceBlocks.filter(b =>
       b.type.toLowerCase().includes(q) ||
       JSON.stringify(b.data).toLowerCase().includes(q)
     );
-  }, [sourceLessonBlocks, blockSearch]);
+  }, [activeSourceBlocks, blockSearch]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -171,8 +192,8 @@ export default function LessonBlockEditor({
   };
 
   const copyAllBlocksFromLesson = () => {
-    if (!sourceLessonBlocks.length) return;
-    const copies = sourceLessonBlocks.map(b => ({ ...b, id: uid() }));
+    if (!activeSourceBlocks.length) return;
+    const copies = activeSourceBlocks.map(b => ({ ...b, id: uid() }));
     setBlocks(bs => [...bs, ...copies]);
     toast.success(`${copies.length} block${copies.length > 1 ? "s" : ""} copied!`);
     setAddMenuOpen(false);
@@ -586,7 +607,7 @@ export default function LessonBlockEditor({
                       {sourceLessons.map(l => (
                         <button
                           key={l.id}
-                          onClick={() => { setSelectedSourceLessonId(l.id); setBlockSearch(""); }}
+                          onClick={() => { setSelectedSourceLessonId(l.id); setSelectedSourceFunnelId(null); setSelectedSourceFunnelPageId(null); setBlockSearch(""); }}
                           className={cn(
                             "w-full text-left text-xs px-2 py-1.5 rounded-lg transition-colors",
                             selectedSourceLessonId === l.id
@@ -601,14 +622,42 @@ export default function LessonBlockEditor({
                   )}
                 </div>
               )}
+              <div className="border-t border-gray-100 pt-2">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Funnel Page</label>
+                <select
+                  className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400"
+                  value={selectedSourceFunnelId ?? ""}
+                  onChange={e => { setSelectedSourceFunnelId(e.target.value ? Number(e.target.value) : null); setSelectedSourceFunnelPageId(null); setSelectedSourceCourseId(null); setSelectedSourceLessonId(null); setBlockSearch(""); }}
+                >
+                  <option value="">— select funnel —</option>
+                  {funnelsWithPages?.map((f: any) => (
+                    <option key={f.id} value={f.id}>{f.name}</option>
+                  ))}
+                </select>
+                {selectedSourceFunnelId && (() => {
+                  const pages = funnelsWithPages?.find((f: any) => f.id === selectedSourceFunnelId)?.pages ?? [];
+                  return pages.length === 0 ? (
+                    <p className="text-xs text-gray-400 mt-1">No pages with blocks.</p>
+                  ) : (
+                    <div className="space-y-1 mt-1">
+                      {pages.map((p: any) => (
+                        <button key={p.id} onClick={() => { setSelectedSourceFunnelPageId(p.id); setBlockSearch(""); }}
+                          className={cn("w-full text-left text-xs px-2 py-1.5 rounded-lg transition-colors", selectedSourceFunnelPageId === p.id ? "bg-teal-50 text-teal-700 font-semibold border border-teal-200" : "text-gray-600 hover:bg-gray-50")}>
+                          {p.title}<span className="text-[10px] text-gray-400 ml-1 capitalize">({p.pageType})</span>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
 
             {/* Right: Block list */}
             <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-              {!selectedSourceLessonId ? (
+              {!selectedSourceLessonId && !selectedSourceFunnelPageId ? (
                 <div className="flex flex-col items-center justify-center h-full text-gray-400 text-xs gap-2">
                   <BookOpen className="w-8 h-8 opacity-30" />
-                  <p>Select a lesson to browse its blocks</p>
+                  <p>Select a lesson or funnel page to browse its blocks</p>
                 </div>
               ) : (
                 <>
@@ -622,14 +671,14 @@ export default function LessonBlockEditor({
                         className="pl-7 h-7 text-xs"
                       />
                     </div>
-                    {sourceLessonBlocks.length > 0 && (
+                    {activeSourceBlocks.length > 0 && (
                       <Button
                         size="sm"
                         variant="outline"
                         className="h-7 text-xs border-teal-300 text-teal-700 hover:bg-teal-50 shrink-0"
                         onClick={copyAllBlocksFromLesson}
                       >
-                        <Copy className="w-3 h-3 mr-1" /> Copy All ({sourceLessonBlocks.length})
+                        <Copy className="w-3 h-3 mr-1" /> Copy All ({activeSourceBlocks.length})
                       </Button>
                     )}
                   </div>

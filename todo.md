@@ -2693,3 +2693,4 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add funnelPublic.createDirectCheckout tRPC procedure (public, no auth required) — resolves product details from DB, creates Stripe Checkout session with success_url=/my-dashboard
 - [x] Handle direct_checkout behavior in PublicFunnelPage.tsx for all 3 block types (hero, cta_standalone, pricing_cta)
 - [x] Show "Direct Checkout (Stripe)" badge in BlockPreview.tsx for all 3 block types
+- [x] Add funnel pages as source in "Copy from Other Pages" tab (LandingPageBuilder, DownloadLandingPageBuilder, ProductLandingPageBuilder, LessonBlockEditor)
