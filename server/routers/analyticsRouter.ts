@@ -18,6 +18,7 @@ import {
   lmsLessons,
   digitalDownloadEvents,
   digitalProducts,
+  digitalPurchases,
   users,
 } from "../../drizzle/schema";
 
@@ -79,7 +80,7 @@ export const analyticsTrackRouter = router({
       // Login history (last 30)
       const logins = await db.select({
         id: userLoginEvents.id,
-        ip: userLoginEvents.ip,
+        ip: userLoginEvents.ipAddress,
         userAgent: userLoginEvents.userAgent,
         createdAt: userLoginEvents.createdAt,
       }).from(userLoginEvents)
@@ -191,8 +192,13 @@ export const analyticsAdminRouter = router({
       const from = input.from ? new Date(input.from) : new Date(Date.now() - 30 * 86400_000);
       const to = input.to ? new Date(input.to) : new Date();
 
-      const [loginCount] = await db.select({ c: count() }).from(userLoginEvents)
+      // Active users = users who signed in within the window (lastSignedIn is reliably updated on every login)
+      const [activeUsersRow] = await db.select({ c: count() }).from(users)
+        .where(and(gte(users.lastSignedIn, from), lte(users.lastSignedIn, to)));
+      // Login count: prefer user_login_events if populated, otherwise fall back to active users
+      const [loginEventRow] = await db.select({ c: count() }).from(userLoginEvents)
         .where(and(gte(userLoginEvents.createdAt, from), lte(userLoginEvents.createdAt, to)));
+      const loginCount = loginEventRow.c > 0 ? loginEventRow.c : activeUsersRow.c;
       const [pageViewCount] = await db.select({ c: count() }).from(userPageViewEvents)
         .where(and(gte(userPageViewEvents.createdAt, from), lte(userPageViewEvents.createdAt, to)));
       const [videoPlayCount] = await db.select({ c: count() }).from(lmsVideoEvents)
@@ -203,17 +209,21 @@ export const analyticsAdminRouter = router({
         .where(and(gte(lmsQuizAttempts.createdAt, from), lte(lmsQuizAttempts.createdAt, to)));
       const [downloadCount] = await db.select({ c: count() }).from(digitalDownloadEvents)
         .where(and(gte(digitalDownloadEvents.downloadedAt, from), lte(digitalDownloadEvents.downloadedAt, to)));
-      const [uniqueActiveUsers] = await db.select({ c: sql<number>`COUNT(DISTINCT user_id)` }).from(userLoginEvents)
-        .where(and(gte(userLoginEvents.createdAt, from), lte(userLoginEvents.createdAt, to)));
+      const [purchaseCount] = await db.select({ c: count() }).from(digitalPurchases)
+        .where(and(gte(digitalPurchases.purchasedAt, from), lte(digitalPurchases.purchasedAt, to)));
+      const [enrollmentCount] = await db.select({ c: count() }).from(lmsEnrollments)
+        .where(and(gte(lmsEnrollments.enrolledAt, from), lte(lmsEnrollments.enrolledAt, to)));
 
       return {
-        logins: loginCount.c,
+        logins: loginCount,
         pageViews: pageViewCount.c,
         videoPlays: videoPlayCount.c,
         videoCompletes: videoCompleteCount.c,
         quizAttempts: quizCount.c,
         downloads: downloadCount.c,
-        activeUsers: uniqueActiveUsers.c,
+        activeUsers: activeUsersRow.c,
+        purchases: purchaseCount.c,
+        enrollments: enrollmentCount.c,
       };
     }),
 
@@ -235,13 +245,14 @@ export const analyticsAdminRouter = router({
       let rows: { date: string; value: number }[] = [];
 
       if (input.metric === "logins") {
+        // Use users.lastSignedIn for daily login trend (more reliable than user_login_events)
         const data = await db.select({
-          date: sql<string>`DATE(created_at)`,
+          date: sql<string>`DATE(lastSignedIn)`,
           value: count(),
-        }).from(userLoginEvents)
-          .where(and(gte(userLoginEvents.createdAt, from), lte(userLoginEvents.createdAt, to)))
-          .groupBy(sql`DATE(created_at)`)
-          .orderBy(sql`DATE(created_at)`);
+        }).from(users)
+          .where(and(gte(users.lastSignedIn, from), lte(users.lastSignedIn, to)))
+          .groupBy(sql`DATE(lastSignedIn)`)
+          .orderBy(sql`DATE(lastSignedIn)`);
         rows = data.map(r => ({ date: r.date, value: r.value }));
       } else if (input.metric === "pageViews") {
         const data = await db.select({
@@ -312,8 +323,8 @@ export const analyticsAdminRouter = router({
           u.email,
           u.role,
           u.created_at AS joinedAt,
-          (SELECT MAX(created_at) FROM user_login_events WHERE user_id = u.id) AS lastLogin,
-          (SELECT COUNT(*) FROM user_login_events WHERE user_id = u.id) AS loginCount,
+          u.lastSignedIn AS lastLogin,
+          CASE WHEN u.lastSignedIn IS NOT NULL THEN 1 ELSE 0 END AS loginCount,
           (SELECT COUNT(*) FROM user_page_view_events WHERE user_id = u.id) AS pageViewCount,
           (SELECT COUNT(*) FROM lms_video_events WHERE user_id = u.id AND event_type = 'play') AS videoPlayCount,
           (SELECT COUNT(*) FROM lms_video_events WHERE user_id = u.id AND event_type = 'complete') AS videoCompleteCount,

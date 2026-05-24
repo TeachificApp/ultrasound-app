@@ -20,6 +20,7 @@ import {
   Users, LogIn, Eye, PlayCircle, HelpCircle, Download, ArrowLeft,
   ChevronLeft, ChevronRight, TrendingUp, BookOpen, CheckCircle, Clock,
   Search, SortAsc, SortDesc, Trash2, AlertTriangle, Mail, RefreshCw,
+  ShoppingCart, GraduationCap,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -89,6 +90,8 @@ function OverviewTab({ from, to }: { from: string; to: string }) {
             <StatCard icon={<PlayCircle className="w-5 h-5 text-orange-600" />} label="Video Plays" value={overview.videoPlays} sub={`${overview.videoCompletes} completed`} color="bg-orange-50" />
             <StatCard icon={<HelpCircle className="w-5 h-5 text-pink-600" />} label="Quiz Attempts" value={overview.quizAttempts} color="bg-pink-50" />
             <StatCard icon={<Download className="w-5 h-5 text-green-600" />} label="Downloads" value={overview.downloads} color="bg-green-50" />
+            <StatCard icon={<ShoppingCart className="w-5 h-5 text-emerald-600" />} label="Purchases" value={(overview as any).purchases ?? 0} color="bg-emerald-50" />
+            <StatCard icon={<GraduationCap className="w-5 h-5 text-indigo-600" />} label="Enrollments" value={(overview as any).enrollments ?? 0} color="bg-indigo-50" />
           </>
         ) : null}
       </div>

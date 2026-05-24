@@ -2699,3 +2699,13 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix button animations not applied on public landing pages: added ctaAnimation class to pricing_cta and cta_standalone buttons in DownloadLanding.tsx, CourseLanding.tsx, and ProductLanding.tsx
 - [x] Fix reviews block using wrong field name (d.items → d.reviews) in DownloadLanding.tsx
 - [x] Confirmed BlockPreview.tsx (used by lesson pages inside CoursePlayer) already has correct animation classes and d.reviews — no fix needed there
+
+## Bug Fixes — User Analytics (May 24, 2026)
+- [x] Fix Active Users showing 0 — now reads from users.lastSignedIn (213 active users in 30d)
+- [x] Fix Logins showing 0 — falls back to users.lastSignedIn count when user_login_events is empty
+- [x] Fix Daily Trend logins chart — now uses users.lastSignedIn grouped by date
+- [x] Fix userList lastLogin column — now reads users.lastSignedIn instead of MAX(user_login_events.created_at)
+- [x] Add Purchases stat card to overview (reads digital_purchases.purchased_at)
+- [x] Add Enrollments stat card to overview (reads lms_enrollments.enrolled_at)
+- [x] Fix userLoginEvents.ip → userLoginEvents.ipAddress field name mismatch in myActivity
+- [x] Add analyticsRouter.overview.test.ts — 8 tests all passing
