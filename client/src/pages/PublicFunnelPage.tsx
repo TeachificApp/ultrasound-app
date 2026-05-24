@@ -21,6 +21,7 @@ import InlineCheckoutBlock from "@/components/InlineCheckoutBlock";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import AudioBlockPlayer from "@/components/AudioBlockPlayer";
 import LeadCaptureModal from "@/components/LeadCaptureModal";
+import PromoCodeInput from "@/components/PromoCodeInput";
 import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
 
 // ─── Opt-Out Link Component ─────────────────────────────────────────────────
@@ -751,6 +752,7 @@ function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMed
 }) {
   const [lcModal, setLcModal] = useState<{ btn: typeof heroButtons[0] } | null>(null);
   const [checkoutLoadingIdx, setCheckoutLoadingIdx] = useState<number | null>(null);
+  const [heroPromoCode, setHeroPromoCode] = useState<string | null>(null);
   const nextPageRef = useRef(nextPage);
   nextPageRef.current = nextPage;
   const createDirectCheckout = trpc.funnelPublic.createDirectCheckout.useMutation();
@@ -766,7 +768,7 @@ function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMed
           productType: btn.checkoutProductType as any,
           productId: Number(btn.checkoutProductId),
           origin: window.location.origin,
-          promoCode: btn.checkoutPromoCode || undefined,
+          promoCode: heroPromoCode || undefined,
           funnelId,
           pageId,
         });
@@ -807,6 +809,11 @@ function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMed
             {d.headline2 && <><br /><span style={d.headline2Color ? { color: d.headline2Color } : undefined} dangerouslySetInnerHTML={{ __html: d.headline2 }} /></>}
           </h1>
           {d.subheadline && <p className="text-xl opacity-90 mb-8 max-w-2xl" dangerouslySetInnerHTML={{ __html: d.subheadline }} />}
+          {!d.hideButtons && heroButtons.some(b => (b.behavior ?? "url") === "direct_checkout") && (
+            <div className="mb-4 max-w-xs">
+              <PromoCodeInput onApply={(code, _) => setHeroPromoCode(code)} />
+            </div>
+          )}
           {!d.hideButtons && <div className="flex flex-wrap gap-3" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
             {heroButtons.map((btn, i) => (
               <div key={i} className="flex flex-col items-center gap-1">
@@ -855,6 +862,7 @@ function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMed
 function CtaStandaloneBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: Record<string, any>; funnelId: number; pageId: number; funnelSlug: string; nextPage?: { slug: string } | null }) {
   const [lcOpen, setLcOpen] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [promoCode, setPromoCode] = useState<string | null>(null);
   const nextPageRef = useRef(nextPage);
   nextPageRef.current = nextPage;
   const createDirectCheckout = trpc.funnelPublic.createDirectCheckout.useMutation();
@@ -884,7 +892,7 @@ function CtaStandaloneBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: 
           productType: d.checkoutProductType as any,
           productId: Number(d.checkoutProductId),
           origin: window.location.origin,
-          promoCode: d.checkoutPromoCode || undefined,
+          promoCode: promoCode || undefined,
           funnelId,
           pageId,
         });
@@ -904,6 +912,11 @@ function CtaStandaloneBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: 
       <div className="max-w-3xl mx-auto">
         <h2 className="text-2xl font-bold mb-3 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />
         {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
+        {(d.ctaBehavior ?? "url") === "direct_checkout" && (
+          <div className="mb-4 max-w-xs mx-auto">
+            <PromoCodeInput onApply={(code, _) => setPromoCode(code)} />
+          </div>
+        )}
         <a href={getHref()} onClick={handleClick}
           className={`inline-block px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-transform hover:scale-105 cursor-pointer ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""} ${checkoutLoading ? "opacity-70 pointer-events-none" : ""}`}
           style={btnStyle}>
@@ -940,6 +953,7 @@ function CtaStandaloneBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: 
 function PricingCtaBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: Record<string, any>; funnelId: number; pageId: number; funnelSlug: string; nextPage?: { slug: string } | null }) {
   const [lcOpen, setLcOpen] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [promoCode, setPromoCode] = useState<string | null>(null);
   const nextPageRef = useRef(nextPage);
   nextPageRef.current = nextPage;
   const createDirectCheckout = trpc.funnelPublic.createDirectCheckout.useMutation();
@@ -965,7 +979,7 @@ function PricingCtaBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: Rec
           productType: d.checkoutProductType as any,
           productId: Number(d.checkoutProductId),
           origin: window.location.origin,
-          promoCode: d.checkoutPromoCode || undefined,
+          promoCode: promoCode || undefined,
           funnelId,
           pageId,
         });
@@ -985,6 +999,11 @@ function PricingCtaBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: Rec
       <div className="max-w-2xl mx-auto text-center">
         <h2 className="text-3xl font-bold mb-4 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />
         {d.subtext && <p className="text-lg text-gray-600 mb-8" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
+        {(d.ctaBehavior ?? "url") === "direct_checkout" && (
+          <div className="mb-6 max-w-xs mx-auto">
+            <PromoCodeInput onApply={(code, _) => setPromoCode(code)} />
+          </div>
+        )}
         <a href={getHref()} onClick={handleClick}
           className={`inline-block px-10 py-4 rounded-xl font-bold text-xl shadow-lg transition-transform hover:scale-105 cursor-pointer ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""} ${checkoutLoading ? "opacity-70 pointer-events-none" : ""}`}
           style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#ffffff" }}>

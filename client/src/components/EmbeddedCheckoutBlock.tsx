@@ -18,6 +18,7 @@ import {
   useElements,
 } from "@stripe/react-stripe-js";
 import { trpc } from "@/lib/trpc";
+import PromoCodeInput from "@/components/PromoCodeInput";
 import { toast } from "sonner";
 import {
   Loader2,
@@ -272,6 +273,7 @@ function DetailsStep({
     selectedProductIdx: number;
     addedBumps: Set<number>;
     totalAmount: number;
+    promoCode?: string;
   }) => void;
 }) {
   const [firstName, setFirstName] = useState("");
@@ -289,6 +291,7 @@ function DetailsStep({
   const [shippingState, setShippingState] = useState("");
   const [shippingPostalCode, setShippingPostalCode] = useState("");
   const [shippingCountry, setShippingCountry] = useState("US");
+  const [promoCode, setPromoCode] = useState<string | null>(null);
 
   const products = d.products ?? [];
   const orderBumps = d.orderBumps ?? [];
@@ -324,6 +327,7 @@ function DetailsStep({
       lastName,
       email,
       phone,
+      promoCode: promoCode || undefined,
       shippingAddress: shouldCollectShipping ? {
         name: shippingName || `${firstName} ${lastName}`.trim(),
         line1: shippingLine1,
@@ -514,6 +518,9 @@ function DetailsStep({
         </div>
       )}
 
+      {/* Promo Code */}
+      <PromoCodeInput onApply={(code, _) => setPromoCode(code)} />
+
       {/* Terms */}
       {d.termsText && (
         <label className="flex items-start gap-3 cursor-pointer">
@@ -682,6 +689,7 @@ function EmbeddedCheckoutInner({
     selectedProductIdx: number;
     addedBumps: Set<number>;
     totalAmount: number;
+    promoCode?: string;
   }) => {
     if (previewMode) {
       toast.info("Preview mode — payments are disabled.");
@@ -753,6 +761,7 @@ function EmbeddedCheckoutInner({
         fulfillmentBrand: (d as any).fulfillmentBrand ?? undefined,
         successRedirect: d.successRedirect,
         origin: window.location.origin,
+        promoCode: formData.promoCode || undefined,
       });
       setClientSecret(result.clientSecret);
       setSuccessUrl(result.successUrl);

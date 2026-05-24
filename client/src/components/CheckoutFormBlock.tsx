@@ -7,6 +7,7 @@
  */
 import { useState, useMemo, useEffect } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
+import PromoCodeInput from "@/components/PromoCodeInput";
 import { loadStripe } from "@stripe/stripe-js";
 import {
   Elements,
@@ -145,6 +146,7 @@ function CheckoutFormInner({ data, funnelId, pageId, funnelSlug }: CheckoutFormB
   const [addedBumps, setAddedBumps] = useState<Set<number>>(new Set());
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
+  const [promoCode, setPromoCode] = useState<string | null>(null);
 
   // Payment intent state
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -235,10 +237,11 @@ function CheckoutFormInner({ data, funnelId, pageId, funnelSlug }: CheckoutFormB
         selectedProductIndex: selectedProductIdx,
         addedBumpIndexes: Array.from(addedBumps),
         billingAddress: d.showBillingInfo ? { address, address2, country, state, city, postalCode } : undefined,
+        promoCode: promoCode || undefined,
       });
 
-      setClientSecret(result.clientSecret);
-      setSuccessUrl(result.successUrl);
+      setClientSecret(result.clientSecret ?? null);
+      setSuccessUrl(result.successUrl ?? null);
     } catch {
       // Error handled by mutation onError
     } finally {
@@ -600,6 +603,9 @@ function CheckoutFormInner({ data, funnelId, pageId, funnelSlug }: CheckoutFormB
           </div>
         )}
       </div>
+
+      {/* Promo Code */}
+      <PromoCodeInput onApply={(code, _) => setPromoCode(code)} />
 
       {/* Terms */}
       {d.termsText && (

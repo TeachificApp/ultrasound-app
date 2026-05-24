@@ -85,6 +85,8 @@ export const embeddedCheckoutRouter = router({
           brand: z.string().optional(),
           label: z.string(),
         })).optional(),
+        // Optional promo code to validate and apply
+        promoCode: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -96,6 +98,34 @@ export const embeddedCheckoutRouter = router({
       for (const bump of input.selectedBumps) {
         if (bump.price > 0) totalAmount += bump.price;
       }
+
+      // Apply promo code discount if provided
+      let discountApplied = 0;
+      let promoCodeId: string | undefined;
+      if (input.promoCode) {
+        const Stripe2 = (await import("stripe")).default;
+        const stripe2 = new Stripe2(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+        try {
+          const promoCodes = await stripe2.promotionCodes.list({ code: input.promoCode, active: true, limit: 1 });
+          if (promoCodes.data.length > 0) {
+            const promoCodeObj = promoCodes.data[0];
+            promoCodeId = promoCodeObj.id;
+            const coupon = promoCodeObj.coupon;
+            if (coupon.percent_off) {
+              discountApplied = Math.round(totalAmount * (coupon.percent_off / 100));
+            } else if (coupon.amount_off) {
+              discountApplied = Math.min(coupon.amount_off, totalAmount);
+            }
+            totalAmount = Math.max(50, totalAmount - discountApplied);
+          } else {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid or expired promo code" });
+          }
+        } catch (e: any) {
+          if (e instanceof TRPCError) throw e;
+          // Stripe API error — ignore silently and proceed without discount
+        }
+      }
+
       if (totalAmount < 50) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Minimum charge amount is $0.50" });
       }
@@ -142,6 +172,9 @@ export const embeddedCheckoutRouter = router({
       if (input.lmsCourseId) metadata.fulfillment_course_id = input.lmsCourseId.toString();
       if (input.fulfillmentBrand) metadata.fulfillment_brand = input.fulfillmentBrand;
       if (input.productId) metadata.product_id = input.productId.toString();
+      if (input.promoCode) metadata.promo_code = input.promoCode.slice(0, 100);
+      if (discountApplied > 0) metadata.discount_applied = discountApplied.toString();
+      if (promoCodeId) metadata.promo_code_id = promoCodeId;
       // Note: additionalAccess items are stored in block data and resolved server-side
       // from the page blocks after payment — not passed through Stripe metadata.
 

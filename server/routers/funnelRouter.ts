@@ -1117,6 +1117,7 @@ export const funnelPublicRouter = router({
           city: z.string(),
           postalCode: z.string(),
         }).optional(),
+        promoCode: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -1316,13 +1317,33 @@ export const funnelPublicRouter = router({
       }
       // ── END FREE PRODUCT PATH ────────────────────────────────────────────────
 
-      if (totalAmount < 50) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Minimum charge amount is $0.50" });
-      }
-
       const Stripe = (await import("stripe")).default;
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
 
+      // Apply promo code discount if provided
+      let discountApplied = 0;
+      if (input.promoCode) {
+        try {
+          const promoCodes = await stripe.promotionCodes.list({ code: input.promoCode, active: true, limit: 1 });
+          if (promoCodes.data.length > 0) {
+            const coupon = promoCodes.data[0].coupon;
+            if (coupon.percent_off) {
+              discountApplied = Math.round(totalAmount * (coupon.percent_off / 100));
+            } else if (coupon.amount_off) {
+              discountApplied = Math.min(coupon.amount_off, totalAmount);
+            }
+            totalAmount = Math.max(50, totalAmount - discountApplied);
+          } else {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid or expired promo code" });
+          }
+        } catch (e: any) {
+          if (e instanceof TRPCError) throw e;
+        }
+      }
+
+      if (totalAmount < 50) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Minimum charge amount is $0.50" });
+      }
       // Build description for the payment
       let description = selectedProduct.name;
       if (bumpDetails.length > 0) {

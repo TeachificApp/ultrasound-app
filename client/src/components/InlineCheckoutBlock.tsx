@@ -21,6 +21,7 @@ import {
   useElements,
 } from "@stripe/react-stripe-js";
 import { trpc } from "@/lib/trpc";
+import PromoCodeInput from "@/components/PromoCodeInput";
 import { toast } from "sonner";
 import {
   Lock, CheckCircle2, Plus, Minus, ChevronDown, ChevronUp,
@@ -183,6 +184,7 @@ function InlineCheckoutInner({ data, onSuccess }: InnerFormProps) {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [addedBumps,  setAddedBumps]  = useState<Set<number>>(new Set());
   const [termsOk,     setTermsOk]     = useState(false);
+  const [promoCode,   setPromoCode]   = useState<string | null>(null);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [submitting,  setSubmitting]  = useState(false);
   const [cardError,   setCardError]   = useState<string | null>(null);
@@ -295,6 +297,7 @@ function InlineCheckoutInner({ data, onSuccess }: InnerFormProps) {
         // for the webhook to process. additionalAccess array is resolved server-side from block data.
         lmsCourseId: data.lmsCourseId,
         fulfillmentBrand: data.fulfillmentBrand,
+        promoCode: promoCode || undefined,
       });
 
       // 2. Confirm card payment with Stripe
@@ -676,6 +679,9 @@ function InlineCheckoutInner({ data, onSuccess }: InnerFormProps) {
               </div>
             )}
           </div>
+
+          {/* ── Promo Code ──────────────────────────────────────────────── */}
+          <PromoCodeInput onApply={(code, _) => setPromoCode(code)} />
 
           {/* ── Terms ───────────────────────────────────────────────────── */}
           {data.termsText && (
