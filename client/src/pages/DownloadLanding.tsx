@@ -86,7 +86,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
                   <div key={i} className="flex flex-col items-center gap-1">
                     <button onClick={btn.link ? () => { window.location.href = btn.link; } : hasPurchased ? () => { window.location.href = `/downloads/${slug}/files`; } : onBuy}
                       disabled={buying}
-                      className="px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-opacity hover:opacity-90 disabled:opacity-60"
+                      className={`px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-opacity hover:opacity-90 disabled:opacity-60 ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
                       style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
                       {hasPurchased ? "Access Files" : btn.text}
                     </button>

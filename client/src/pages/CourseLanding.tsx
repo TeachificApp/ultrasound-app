@@ -138,7 +138,7 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
                 {buttons.map((btn, i) => (
                   <div key={i} className="flex flex-col items-center gap-1">
                     <button onClick={btn.link ? () => window.location.href = btn.link : onEnroll}
-                      className="px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-opacity hover:opacity-90"
+                      className={`px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-opacity hover:opacity-90 ${(btn as any).animation && (btn as any).animation !== "none" ? `animate-${(btn as any).animation}-btn` : ""}`}
                       style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
                       {btn.text}
                     </button>
