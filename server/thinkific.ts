@@ -444,15 +444,17 @@ export interface ThinkificContent {
   name: string;
   position: number;
   chapter_id: number;
-  course_id: number;
   contentable_type: string;
-  free_preview: boolean;
+  free: boolean | undefined;
   take_url: string | null;
-  description: string | null;
-  video_url: string | null;
-  html_description: string | null;
-  duration_in_seconds: number | null;
-  permanent_url: string | null;
+  // Fields below are NOT returned by the API but kept for type compat
+  course_id?: number;
+  free_preview?: boolean;
+  description?: string | null;
+  video_url?: string | null;
+  html_description?: string | null;
+  duration_in_seconds?: number | null;
+  permanent_url?: string | null;
 }
 
 export interface ThinkificInstructor {

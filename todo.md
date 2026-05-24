@@ -2671,3 +2671,12 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 ## Sales Dashboard Merge
 - [x] Merge "Sales Dashboard" (AdminSalesDashboard) and "Sales (Legacy)" (AdminSalesPage) into a single unified sales page
 - [x] Remove the duplicate entry from the admin tools grid
+
+## Thinkific Import Fix (May 2026)
+- [x] Fix ThinkificContent interface to match actual API response (free vs free_preview, no html_description/video_url/duration)
+- [x] Fix mapContentType to handle actual Thinkific types (HtmlItem, Iframe) + infer from take_url path
+- [x] Fix scrapeThinkificSalesPage URL to use custom domain (member.allaboutultrasound.com) instead of subdomain.thinkific.com
+- [x] Fix enrollment progress conversion (percentage_completed "1.0" = 100%)
+- [x] Fix sales page scraping CSS patterns to match actual Thinkific page structure
+- [x] Fallback landing page generation from API data when scraping fails
+- [x] Direct enrollment into lms_enrollments (no pending state, no notifications)

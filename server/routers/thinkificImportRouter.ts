@@ -44,17 +44,42 @@ function adminOnly(role: string) {
   }
 }
 
-/** Convert Thinkific content type to LMS lesson type */
-function mapContentType(contentableType: string): "video" | "text" | "quiz" | "download" | "embed" {
-  switch (contentableType.toLowerCase()) {
+/**
+ * Convert Thinkific content type to LMS lesson type.
+ * The API returns types like: HtmlItem, Iframe, Video, Quiz, Pdf, Download, Audio, Presentation, Survey, Exam
+ * Additionally, we can infer type from the take_url path segments:
+ *   /multimedia/ → video/embed, /texts/ → text, /quizzes/ → quiz, /downloads/ → download
+ */
+function mapContentType(contentableType: string, takeUrl?: string | null): "video" | "text" | "quiz" | "download" | "embed" | "video_text" {
+  const type = contentableType.toLowerCase();
+
+  // First try to infer from take_url path (more reliable)
+  if (takeUrl) {
+    if (takeUrl.includes("/multimedia/")) return "embed";
+    if (takeUrl.includes("/texts/")) return "text";
+    if (takeUrl.includes("/quizzes/")) return "quiz";
+    if (takeUrl.includes("/downloads/") || takeUrl.includes("/pdfs/")) return "download";
+    if (takeUrl.includes("/surveys/")) return "quiz";
+    if (takeUrl.includes("/lessons/")) return "video";
+  }
+
+  // Fallback to contentable_type
+  switch (type) {
     case "video":
       return "video";
+    case "iframe":
+      return "embed";
+    case "htmlitem":
+    case "html_item":
+    case "text":
+      return "text";
     case "quiz":
     case "exam":
     case "survey":
       return "quiz";
     case "download":
     case "attachment":
+    case "pdf":
       return "download";
     case "presentation":
     case "audio":
@@ -79,151 +104,143 @@ function makeSlug(name: string, suffix?: string): string {
 /** Strip HTML tags from a string */
 function stripHtml(html: string | null | undefined): string {
   if (!html) return "";
-  return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  return html.replace(/<[^>]*>/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, " ").trim();
 }
-
-/** Build a default Hero banner content block from a lesson title */
-function buildHeroBannerBlock(title: string): object {
-  return {
-    id: `hero-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    type: "hero",
-    data: {
-      headline: title,
-      headline2: "",
-      subheadline: "",
-      bgType: "color",
-      bgColor: "#149096",
-      textColor: "#ffffff",
-      align: "left",
-      buttons: [],
-      showButtons: false,
-    },
-  };
-}
-
-// ─── Scrape Thinkific sales page ──────────────────────────────────────────────
 
 /** Generate a unique block ID */
 function uid(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/** A properly-structured landing page block: { id, type, data: { ... } } */
+/** A properly-structured landing page block */
 interface LandingBlock {
   id: string;
   type: string;
   data: Record<string, unknown>;
 }
 
-async function scrapeThinkificSalesPage(slug: string, subdomain: string): Promise<LandingBlock[]> {
-  const url = `https://${subdomain}.thinkific.com/courses/${slug}`;
+// ─── Scrape Thinkific sales page ──────────────────────────────────────────────
+
+/**
+ * Scrapes the Thinkific sales/landing page for a course.
+ * The page is rendered at: https://{subdomain}.thinkific.com/courses/{slug}
+ * which redirects to: https://member.allaboutultrasound.com/courses/{slug}
+ *
+ * Extracts: title, description, pricing, curriculum, images, and FAQ.
+ */
+async function scrapeThinkificSalesPage(slug: string, customDomain: string): Promise<{ blocks: LandingBlock[]; price: number }> {
+  // Use the custom domain (e.g., member.allaboutultrasound.com) for scraping
+  const url = `https://${customDomain}/courses/${slug}`;
+  let price = 0;
+
   try {
     const res = await fetch(url, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; CourseImporter/1.0)",
-        Accept: "text/html",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml",
       },
+      redirect: "follow",
     });
-    if (!res.ok) return [];
+    if (!res.ok) return { blocks: [], price: 0 };
     const html = await res.text();
 
+    const bodyIdx = html.indexOf("<body");
+    const body = bodyIdx > -1 ? html.slice(bodyIdx) : html;
     const blocks: LandingBlock[] = [];
 
-    // ── 1. Hero block from page <h1> ──
-    const titleMatch = html.match(/<h1[^>]*class="[^"]*course-hero[^"]*"[^>]*>([\s\S]*?)<\/h1>/i)
-      || html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+    // ── 1. Extract course title from page ──
+    // Thinkific pages have the course title in a heading with class containing "course" or in the banner
+    let pageTitle = "";
+    const titleMatch = body.match(/class="[^"]*(?:course-landing|banner)[^"]*__title[^"]*"[^>]*>([\s\S]*?)<\/[^>]*>/i)
+      || body.match(/class="[^"]*course[^"]*title[^"]*"[^>]*>([\s\S]*?)<\/[^>]*>/i);
     if (titleMatch) {
-      const headline = stripHtml(titleMatch[1]);
-      if (headline) {
-        // Try to grab a subtitle from the first <h2> or .course-subtitle element
-        const subMatch = html.match(/<[^>]*class="[^"]*(?:course-subtitle|hero-subtitle|tagline)[^"]*"[^>]*>([\s\S]*?)<\/[^>]*>/i)
-          || html.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i);
-        const subheadline = subMatch ? stripHtml(subMatch[1]).slice(0, 200) : "";
-        blocks.push({
-          id: uid(),
-          type: "hero",
-          data: {
-            headline,
-            headline2: "",
-            subheadline,
-            bgType: "color",
-            bgColor: "#149096",
-            textColor: "#ffffff",
-            align: "center",
-            buttons: [{ text: "Enroll Now", color: "#ffffff", textColor: "#149096", link: "", style: "filled" }],
-            showButtons: true,
-          },
-        });
+      pageTitle = stripHtml(titleMatch[1]);
+    }
+
+    // ── 2. Extract description from card__description or course description divs ──
+    let description = "";
+    const descMatches = [...body.matchAll(/class="[^"]*(?:card__description|course-landing[^"]*description)[^"]*"[^>]*>([\s\S]*?)<\/div>/gi)];
+    for (const m of descMatches) {
+      const text = stripHtml(m[1]);
+      if (text && text.length > 20) {
+        description = text;
+        break;
+      }
+    }
+    // Fallback: look for any description div
+    if (!description) {
+      const anyDesc = body.match(/class="[^"]*description[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+      if (anyDesc) {
+        const text = stripHtml(anyDesc[1]);
+        if (text.length > 20) description = text;
       }
     }
 
-    // ── 2. Description / body text block ──
-    const descMatches = html.matchAll(/<div[^>]*class="[^"]*course-description[^"]*"[^>]*>([\s\S]*?)<\/div>/gi);
-    for (const match of descMatches) {
-      const text = stripHtml(match[1]);
-      if (text && text.length > 30) {
-        blocks.push({
-          id: uid(),
-          type: "text",
-          data: {
-            html: `<p>${text}</p>`,
-            align: "left",
-            bgColor: "#ffffff",
-            textColor: "#1a1a1a",
-          },
-        });
+    // ── 3. Extract pricing ──
+    const priceMatches = [...body.matchAll(/\$(\d+(?:[.,]\d{2})?)/g)];
+    if (priceMatches.length > 0) {
+      // Take the first price found (usually the main course price)
+      const priceStr = priceMatches[0][1].replace(",", "");
+      price = Math.round(parseFloat(priceStr) * 100); // convert to cents
+    }
+
+    // ── 4. Extract images (course card image, banner image) ──
+    let heroImage = "";
+    const imgMatches = [...body.matchAll(/<img[^>]*src="([^"]+)"[^>]*>/gi)];
+    for (const m of imgMatches) {
+      const src = m[1];
+      // Skip tiny icons and logos
+      if (src.includes("thinkific") && src.includes("file_uploads") && !src.includes("logo") && !src.includes("icon")) {
+        heroImage = src;
         break;
       }
     }
 
-    // ── 3. "What you'll learn" bullet list ──
-    const learnMatches = html.matchAll(/<ul[^>]*class="[^"]*(?:course-curriculum|what-you|learn)[^"]*"[^>]*>([\s\S]*?)<\/ul>/gi);
-    for (const match of learnMatches) {
-      const items: string[] = [];
-      const liMatches = match[1].matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi);
-      for (const li of liMatches) {
-        const text = stripHtml(li[1]);
-        if (text) items.push(text);
-      }
-      if (items.length > 0) {
-        blocks.push({
-          id: uid(),
-          type: "bullets",
-          data: {
-            headline: "What You'll Learn",
-            items,
-            iconColor: "#149096",
-            bgColor: "#f8fffe",
-          },
-        });
-        break;
-      }
-    }
-
-    // ── 4. FAQ accordion ──
-    const faqItems: { q: string; a: string }[] = [];
-    const faqMatches = html.matchAll(/<div[^>]*class="[^"]*(?:faq|accordion)[^"]*"[^>]*>([\s\S]*?)<\/div>/gi);
-    for (const match of faqMatches) {
-      const qMatch = match[1].match(/<[^>]*class="[^"]*(?:question|title|heading)[^"]*"[^>]*>([\s\S]*?)<\/[^>]*>/i);
-      const aMatch = match[1].match(/<[^>]*class="[^"]*(?:answer|body|content)[^"]*"[^>]*>([\s\S]*?)<\/[^>]*>/i);
-      if (qMatch && aMatch) {
-        faqItems.push({ q: stripHtml(qMatch[1]), a: stripHtml(aMatch[1]) });
-      }
-    }
-    if (faqItems.length > 0) {
+    // ── 5. Build hero block ──
+    if (pageTitle || description) {
       blocks.push({
         id: uid(),
-        type: "faq",
+        type: "hero",
         data: {
-          headline: "Frequently Asked Questions",
-          items: faqItems,
-          bgColor: "#ffffff",
-          accentColor: "#149096",
+          headline: pageTitle || "Course",
+          headline2: "",
+          subheadline: description.slice(0, 200),
+          bgType: heroImage ? "image" : "color",
+          bgColor: "#149096",
+          bgImage: heroImage || "",
+          textColor: "#ffffff",
+          align: "center",
+          buttons: [{ text: "Enroll Now", color: "#ffffff", textColor: "#149096", link: "", style: "filled" }],
+          showButtons: true,
         },
       });
     }
 
-    // ── 5. Always append a curriculum_auto block at the end ──
+    // ── 6. Description text block (if longer than hero subheadline) ──
+    if (description && description.length > 200) {
+      blocks.push({
+        id: uid(),
+        type: "text",
+        data: {
+          html: `<p>${description}</p>`,
+          align: "left",
+          bgColor: "#ffffff",
+          textColor: "#1a1a1a",
+        },
+      });
+    }
+
+    // ── 7. Extract curriculum from the page (chapter names and lesson names) ──
+    const chapterNames: string[] = [];
+    const chapterHeadings = [...body.matchAll(/class="[^"]*chapter[^"]*(?:title|name|heading)[^"]*"[^>]*>([\s\S]*?)<\/[^>]*>/gi)];
+    for (const m of chapterHeadings) {
+      const text = stripHtml(m[1]);
+      if (text && text.length > 2 && text.length < 200) {
+        chapterNames.push(text);
+      }
+    }
+
+    // ── 8. Always append a curriculum_auto block ──
     blocks.push({
       id: uid(),
       type: "curriculum_auto",
@@ -244,9 +261,34 @@ async function scrapeThinkificSalesPage(slug: string, subdomain: string): Promis
       },
     });
 
-    return blocks;
+    // ── 9. FAQ section (if found) ──
+    const faqItems: { q: string; a: string }[] = [];
+    const faqMatches = [...body.matchAll(/class="[^"]*(?:faq|accordion)[^"]*"[^>]*>([\s\S]*?)<\/(?:div|section)>/gi)];
+    for (const match of faqMatches) {
+      const qMatch = match[1].match(/<[^>]*class="[^"]*(?:question|title|heading|toggle)[^"]*"[^>]*>([\s\S]*?)<\/[^>]*>/i);
+      const aMatch = match[1].match(/<[^>]*class="[^"]*(?:answer|body|content|panel)[^"]*"[^>]*>([\s\S]*?)<\/[^>]*>/i);
+      if (qMatch && aMatch) {
+        const q = stripHtml(qMatch[1]);
+        const a = stripHtml(aMatch[1]);
+        if (q && a) faqItems.push({ q, a });
+      }
+    }
+    if (faqItems.length > 0) {
+      blocks.push({
+        id: uid(),
+        type: "faq",
+        data: {
+          headline: "Frequently Asked Questions",
+          items: faqItems,
+          bgColor: "#ffffff",
+          accentColor: "#149096",
+        },
+      });
+    }
+
+    return { blocks, price };
   } catch {
-    return [];
+    return { blocks: [], price: 0 };
   }
 }
 
@@ -276,7 +318,7 @@ export const thinkificImportRouter = router({
       const course = await getThinkificCourse(input.thinkificCourseId);
       const chapters = await getChaptersForCourse(input.thinkificCourseId);
 
-      // Fetch contents for each chapter (parallel, up to 10 at a time)
+      // Fetch contents for each chapter
       const chapterContents: { chapter: ThinkificChapter; contents: ThinkificContent[] }[] = [];
       for (const chapter of chapters) {
         const contents = await getContentsForChapter(chapter.id);
@@ -286,8 +328,6 @@ export const thinkificImportRouter = router({
       const totalLessons = chapterContents.reduce((sum, c) => sum + c.contents.length, 0);
 
       // Count only activated, non-expired enrollments
-      // activated_at !== null means the enrollment was explicitly activated (paid or admin-granted)
-      // This matches what Thinkific admin shows under "Enrolled in Course"
       const allEnrollments = await getEnrollmentsForCourse(input.thinkificCourseId);
       const enrollments = allEnrollments.filter((e) => !e.expired && e.activated_at !== null);
 
@@ -309,11 +349,11 @@ export const thinkificImportRouter = router({
           lessons: contents.map((c) => ({
             id: c.id,
             name: c.name,
-            type: mapContentType(c.contentable_type),
+            type: mapContentType(c.contentable_type, c.take_url),
             contentableType: c.contentable_type,
             position: c.position,
-            isFreePreview: c.free_preview,
-            durationSeconds: c.duration_in_seconds,
+            isFreePreview: c.free ?? c.free_preview ?? false,
+            takeUrl: c.take_url,
           })),
         })),
         totalSections: chapters.length,
@@ -322,14 +362,14 @@ export const thinkificImportRouter = router({
       };
     }),
 
-  /** Run the full import: create draft course + sections + lessons + pending enrollments */
+  /** Run the full import: create draft course + sections + lessons + enrollments */
   runImport: protectedProcedure
     .input(z.object({
       thinkificCourseId: z.number(),
       importEnrollments: z.boolean().default(true),
       scrapeSalesPage: z.boolean().default(true),
-      subdomain: z.string().optional(), // override subdomain for sales page scraping
-      courseType: z.enum(["course", "quiz", "download"]).default("course"), // content type to assign on import
+      customDomain: z.string().optional(), // custom domain for sales page scraping (e.g., member.allaboutultrasound.com)
+      courseType: z.enum(["course", "quiz", "download"]).default("course"),
     }))
     .mutation(async ({ ctx, input }) => {
       adminOnly(ctx.user.role);
@@ -366,12 +406,15 @@ export const thinkificImportRouter = router({
           slug = makeSlug(course.name, `thinkific-${input.thinkificCourseId}`);
         }
 
-        // 3. Scrape sales page if requested
+        // 3. Scrape sales page if requested — get blocks + pricing
         let salesPageBlocks: LandingBlock[] = [];
+        let scrapedPrice = 0;
         if (input.scrapeSalesPage) {
-          const subdomain = input.subdomain || "member";
-          salesPageBlocks = await scrapeThinkificSalesPage(course.slug, subdomain);
-          log.push(`Scraped sales page: ${salesPageBlocks.length} blocks`);
+          const customDomain = input.customDomain || "member.allaboutultrasound.com";
+          const result = await scrapeThinkificSalesPage(course.slug, customDomain);
+          salesPageBlocks = result.blocks;
+          scrapedPrice = result.price;
+          log.push(`Scraped sales page: ${salesPageBlocks.length} blocks, price: $${(scrapedPrice / 100).toFixed(2)}`);
         }
 
         // 4. Fetch instructor info
@@ -385,7 +428,8 @@ export const thinkificImportRouter = router({
         }
 
         // 5. Create the LMS course (draft)
-        const priceFromCourse = 0; // will be set manually after import
+        const coursePrice = scrapedPrice || 0;
+        const isFree = coursePrice === 0;
         const [courseResult] = await db.insert(lmsCourses).values({
           slug,
           title: course.name,
@@ -395,17 +439,17 @@ export const thinkificImportRouter = router({
           status: "draft",
           type: input.courseType,
           brand: "aaus",
-          price: priceFromCourse,
-          isFree: false,
-          pricingType: "one_time",
+          price: coursePrice,
+          isFree,
+          pricingType: isFree ? "free" : "one_time",
           hasCertificate: course.certificate_enabled,
           showInstructor: !!instructorBio,
           createdByUserId: ctx.user.id,
         });
         const lmsCourseId = (courseResult as unknown as { insertId: number }).insertId;
-        log.push(`Created LMS course ID: ${lmsCourseId} (draft)`);
-        // 5b. Create landing page record — always create one, using scraped blocks if available
-        // or building a minimal landing page from API data (description, images) as fallback
+        log.push(`Created LMS course ID: ${lmsCourseId} (draft, price: $${(coursePrice / 100).toFixed(2)})`);
+
+        // 5b. Create landing page record
         let finalLandingBlocks = salesPageBlocks;
         if (finalLandingBlocks.length === 0) {
           // Build a minimal landing page from Thinkific API data
@@ -477,7 +521,7 @@ export const thinkificImportRouter = router({
         });
         log.push(`Created landing page with ${finalLandingBlocks.length} blocks`);
 
-        // 6. Fetch chapters and contents
+        // 6. Fetch chapters and contents — create sections + lessons
         const chapters = await getChaptersForCourse(input.thinkificCourseId);
         log.push(`Found ${chapters.length} chapters`);
 
@@ -489,24 +533,54 @@ export const thinkificImportRouter = router({
             courseId: lmsCourseId,
             title: chapter.name,
             position: chapter.position,
-            isPreview: chapter.free_preview,
+            isPreview: chapter.free_preview ?? false,
           });
           const sectionId = (sectionResult as unknown as { insertId: number }).insertId;
 
           // Fetch and create lessons
           const contents = await getContentsForChapter(chapter.id);
           for (const content of contents) {
-            const lessonType = mapContentType(content.contentable_type);
-            const durationMinutes = content.duration_in_seconds
-              ? Math.ceil(content.duration_in_seconds / 60)
-              : undefined;
+            const lessonType = mapContentType(content.contentable_type, content.take_url);
 
-            // Build content blocks: hero banner + HTML body (if available)
-            const heroBannerBlock = buildHeroBannerBlock(content.name);
-            const blocks: object[] = [heroBannerBlock];
+            // Use `free` field (what the API actually returns), fallback to free_preview for compat
+            const isFreePreview = content.free ?? content.free_preview ?? false;
+
+            // Build content blocks for the lesson page builder
+            // Since the API doesn't return html_description, we create a placeholder block
+            const blocks: object[] = [
+              {
+                id: `hero-${uid()}`,
+                type: "hero",
+                data: {
+                  headline: content.name,
+                  headline2: "",
+                  subheadline: "",
+                  bgType: "color",
+                  bgColor: "#149096",
+                  textColor: "#ffffff",
+                  align: "left",
+                  buttons: [],
+                  showButtons: false,
+                },
+              },
+            ];
+
+            // If description is available (rare but possible), add a text block
+            if (content.description && content.description.trim().length > 0) {
+              blocks.push({
+                id: `text-${uid()}`,
+                type: "text",
+                data: {
+                  html: `<p>${content.description}</p>`,
+                  align: "left",
+                  bgColor: "#ffffff",
+                  textColor: "#1a1a1a",
+                },
+              });
+            }
             if (content.html_description && content.html_description.trim().length > 0) {
               blocks.push({
-                id: `text-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                id: `text-${uid()}`,
                 type: "text",
                 data: {
                   html: content.html_description,
@@ -516,9 +590,10 @@ export const thinkificImportRouter = router({
                 },
               });
             }
+
             const contentBlocks = JSON.stringify(blocks);
 
-            // For video lessons use video_url only (take_url requires Thinkific auth)
+            // For video/embed lessons, use video_url if available
             const embedUrl = content.video_url || undefined;
 
             await db.insert(lmsLessons).values({
@@ -527,10 +602,13 @@ export const thinkificImportRouter = router({
               title: content.name,
               type: lessonType,
               embedUrl,
-              content: content.html_description ? stripHtml(content.html_description) : undefined,
+              content: content.html_description ? stripHtml(content.html_description) : (content.description || undefined),
               position: content.position,
-              isPreview: content.free_preview,
-              durationMinutes,
+              isPreview: isFreePreview,
+              previewMode: isFreePreview ? "preview" : "none",
+              durationMinutes: content.duration_in_seconds
+                ? Math.ceil(content.duration_in_seconds / 60)
+                : undefined,
               contentBlocks,
             });
             totalLessons++;
@@ -543,15 +621,16 @@ export const thinkificImportRouter = router({
         if (input.importEnrollments) {
           const allEnrollments = await getEnrollmentsForCourse(input.thinkificCourseId);
           // Only import activated, non-expired enrollments
-          // activated_at !== null matches what Thinkific admin shows as "Enrolled in Course"
           const enrollments = allEnrollments.filter((e) => !e.expired && e.activated_at !== null);
           const skippedExpired = allEnrollments.filter((e) => e.expired).length;
           const skippedTrial = allEnrollments.filter((e) => !e.expired && e.activated_at === null).length;
           log.push(`Found ${enrollments.length} active enrollments to import (${skippedExpired} expired + ${skippedTrial} unactivated/trial skipped)`);
+
           const BATCH = 50;
           for (let i = 0; i < enrollments.length; i += BATCH) {
             const batch = enrollments.slice(i, i + BATCH);
             const emails = batch.map((e) => e.user_email.toLowerCase());
+
             // Find existing LMS users by email
             const matchedUsers = await db.select({ id: users.id, email: users.email })
               .from(users)
@@ -562,42 +641,65 @@ export const thinkificImportRouter = router({
                 u.id,
               ])
             );
+
             for (const e of batch) {
               const email = e.user_email.toLowerCase();
               let userId = emailToUserId.get(email);
+
               // Create a real account if not found — no email/notification sent
               if (!userId) {
                 const displayName = e.user_name || email.split("@")[0];
-                const [newUser] = await db.insert(users).values({
-                  email,
-                  name: displayName,
-                  displayName,
-                  isPending: false,
-                  loginMethod: "email",
-                  emailVerified: false,
-                });
-                userId = (newUser as any).insertId as number;
-                emailToUserId.set(email, userId);
+                try {
+                  const [newUser] = await db.insert(users).values({
+                    email,
+                    name: displayName,
+                    displayName,
+                    isPending: false,
+                    loginMethod: "email",
+                    emailVerified: false,
+                  });
+                  userId = (newUser as any).insertId as number;
+                  emailToUserId.set(email, userId);
+                } catch (insertErr: any) {
+                  // Duplicate email — try to find existing
+                  const [existingUser] = await db.select({ id: users.id })
+                    .from(users)
+                    .where(eq(users.email, email))
+                    .limit(1);
+                  if (existingUser) {
+                    userId = existingUser.id;
+                    emailToUserId.set(email, userId);
+                  } else {
+                    log.push(`WARN: Could not create/find user for ${email}: ${insertErr.message}`);
+                    continue;
+                  }
+                }
               }
+
               // Check if already enrolled (idempotent)
-              const [existing] = await db.select({ id: lmsEnrollments.id })
+              const [existingEnrollment] = await db.select({ id: lmsEnrollments.id })
                 .from(lmsEnrollments)
                 .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, lmsCourseId)))
                 .limit(1);
-              if (existing) continue;
-              const progressPct = Math.round(parseFloat(e.percentage_completed || "0") * 100);
+              if (existingEnrollment) continue;
+
+              // percentage_completed from Thinkific is a decimal string: "1.0" = 100%, "0.5" = 50%
+              const rawPct = parseFloat(e.percentage_completed || "0");
+              const progressPct = Math.round(rawPct * 100);
+
               await db.insert(lmsEnrollments).values({
                 userId,
                 courseId: lmsCourseId,
                 enrolledAt: e.created_at ? new Date(e.created_at) : new Date(),
                 completedAt: e.completed && e.completed_at ? new Date(e.completed_at) : null,
-                progressPct,
+                progressPct: Math.min(progressPct, 100), // cap at 100
               });
               enrolledCount++;
             }
           }
           log.push(`Enrolled ${enrolledCount} students (no welcome emails sent)`);
         }
+
         // 8. Update import record as complete
         await db.update(lmsThinkificImports).set({
           lmsCourseId,
@@ -608,6 +710,7 @@ export const thinkificImportRouter = router({
           enrollmentsActivated: enrolledCount,
           importLog: log.join("\n"),
         }).where(eq(lmsThinkificImports.id, importId));
+
         return {
           success: true,
           importId,
@@ -665,7 +768,6 @@ export const thinkificImportRouter = router({
     }
     return imports.map(imp => ({
       ...imp,
-      // Real synced enrollment count (replaces stale enrollmentsPending / enrollmentsActivated)
       realEnrollmentCount: imp.lmsCourseId ? (enrollmentCounts[imp.lmsCourseId] ?? 0) : 0,
     }));
   }),
@@ -700,7 +802,6 @@ export const thinkificImportRouter = router({
         }
 
         if (!lmsUserId) {
-          // No matching user — mark as skipped
           await db.update(lmsPendingEnrollments)
             .set({ status: "skipped" })
             .where(eq(lmsPendingEnrollments.id, pe.id));
