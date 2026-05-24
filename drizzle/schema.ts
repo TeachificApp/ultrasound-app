@@ -4132,3 +4132,22 @@ export const autoLoginTokens = mysqlTable("auto_login_tokens", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 export type AutoLoginToken = typeof autoLoginTokens.$inferSelect;
+
+// ─── Coupon Metadata ─────────────────────────────────────────────────────────
+// Stores product targeting and subscription duration alongside Stripe coupon IDs.
+// Stripe coupons don't natively support internal product restrictions, so we
+// keep a local shadow record keyed by stripe_coupon_id.
+export const couponMetadata = mysqlTable("coupon_metadata", {
+  id: int("id").autoincrement().primaryKey(),
+  stripeCouponId: varchar("stripe_coupon_id", { length: 255 }).notNull().unique(),
+  // "site_wide" = applies to everything; "specific" = restricted to productKeys below
+  scope: varchar("scope", { length: 32 }).notNull().default("site_wide"),
+  // JSON array of product keys like ["course:42", "download:7", "product:3", "bundle:1", "membership:2"]
+  productKeys: text("product_keys"),
+  // Stripe coupon duration: "once" | "forever" | "repeating"
+  duration: varchar("duration", { length: 32 }).notNull().default("once"),
+  // Only used when duration = "repeating"
+  durationInMonths: int("duration_in_months"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull().$defaultFn(() => Date.now()),
+  updatedAt: bigint("updated_at", { mode: "number" }).notNull().$defaultFn(() => Date.now()),
+});

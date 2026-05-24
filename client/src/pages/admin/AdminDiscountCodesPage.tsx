@@ -25,9 +25,10 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Link } from "wouter";
 import {
   Tag, Plus, Trash2, RefreshCw, ChevronDown, ChevronUp,
-  Percent, DollarSign, Calendar, Hash, CheckCircle, XCircle,
+  Percent, DollarSign, Calendar, Hash, CheckCircle, XCircle, ChevronRight, LayoutDashboard,
 } from "lucide-react";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -306,6 +307,15 @@ export default function AdminDiscountCodesPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-1.5 text-sm text-gray-500">
+        <Link href="/platform-admin" className="flex items-center gap-1 hover:text-[#189aa1] transition-colors">
+          <LayoutDashboard className="w-3.5 h-3.5" /> Platform Admin
+        </Link>
+        <ChevronRight className="w-3.5 h-3.5 text-gray-300" />
+        <span className="text-gray-700 font-medium">Discount Codes</span>
+      </nav>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

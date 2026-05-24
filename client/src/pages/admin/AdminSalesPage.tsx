@@ -42,6 +42,7 @@ import {
   DollarSign,
   User,
   Package,
+  LayoutDashboard,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -336,24 +337,26 @@ export default function AdminSalesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+      {/* Breadcrumb + Header */}
       <div className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Link href="/admin">
-              <a className="text-gray-400 hover:text-gray-600 transition-colors">
-                <ChevronLeft className="w-5 h-5" />
-              </a>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-2.5 pb-0">
+          <nav className="flex items-center gap-1.5 text-xs text-gray-500">
+            <Link href="/platform-admin" className="flex items-center gap-1 hover:text-[#189aa1] transition-colors">
+              <LayoutDashboard className="w-3 h-3" /> Platform Admin
             </Link>
-            <div>
-              <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <ShoppingCart className="w-5 h-5 text-green-600" />
-                Sales
-              </h1>
-              <p className="text-xs text-gray-500 mt-0.5">
-                {total.toLocaleString()} total sale{total !== 1 ? "s" : ""}
-              </p>
-            </div>
+            <ChevronRight className="w-3 h-3 text-gray-300" />
+            <span className="text-gray-700 font-medium">Sales</span>
+          </nav>
+        </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <ShoppingCart className="w-5 h-5 text-green-600" />
+              Sales
+            </h1>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {total.toLocaleString()} total sale{total !== 1 ? "s" : ""}
+            </p>
           </div>
           <Button
             variant="outline"

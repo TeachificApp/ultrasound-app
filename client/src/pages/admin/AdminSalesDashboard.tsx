@@ -21,7 +21,7 @@ import {
   DollarSign, ShoppingCart, TrendingUp, RefreshCw, Download,
   Mail, RotateCcw, ChevronUp, ChevronDown, ChevronsUpDown,
   Calendar, Search, Filter, ExternalLink, User, Package, XCircle,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, LayoutDashboard,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -360,20 +360,22 @@ export default function AdminSalesDashboard() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-1.5 text-sm text-gray-500">
+        <Link href="/platform-admin" className="flex items-center gap-1 hover:text-[#189aa1] transition-colors">
+          <LayoutDashboard className="w-3.5 h-3.5" /> Platform Admin
+        </Link>
+        <ChevronRight className="w-3.5 h-3.5 text-gray-300" />
+        <span className="text-gray-700 font-medium">Sales Dashboard</span>
+      </nav>
+
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <Link href="/admin">
-            <a className="text-gray-400 hover:text-gray-600 transition-colors">
-              <ChevronLeft className="w-5 h-5" />
-            </a>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <TrendingUp className="w-6 h-6 text-[#189aa1]" /> Sales Dashboard
-            </h1>
-            <p className="text-sm text-gray-500 mt-1">Revenue analytics, product performance, and transaction management</p>
-          </div>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <TrendingUp className="w-6 h-6 text-[#189aa1]" /> Sales Dashboard
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">Revenue analytics, product performance, and transaction management</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" className="gap-2 text-sm" onClick={() => { salesQuery.refetch(); analyticsQuery.refetch(); }} disabled={salesQuery.isLoading}>
