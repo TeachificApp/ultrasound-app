@@ -82,6 +82,8 @@ export default function FunnelPageEditor() {
     setBlocks(getDefaultBlocks(pageData.page.pageType, pageData.page.title));
   }, [pageData, numericPageId, loadedPageId]);
 
+  const utils = trpc.useUtils();
+
   // Save blocks
   const updatePage = trpc.funnel.updatePage.useMutation({
     onSuccess: () => toast.success("Page saved!"),
@@ -95,6 +97,10 @@ export default function FunnelPageEditor() {
         id: numericPageId,
         blocks: JSON.stringify(blocks),
       });
+      // Invalidate the cache so re-entry always loads fresh data from DB
+      utils.funnel.getPageById.invalidate({ id: numericPageId });
+      // Reset loadedPageId so the useEffect guard doesn't block a fresh reload
+      setLoadedPageId(null);
     } finally {
       setIsSaving(false);
     }
@@ -255,7 +261,6 @@ export default function FunnelPageEditor() {
       setIsSavingTemplate(false);
     }
   };
-  const utils = trpc.useUtils();
 
   const { data: branchRules = [] } = trpc.funnel.listBranchRules.useQuery(
     { pageId: numericPageId },
