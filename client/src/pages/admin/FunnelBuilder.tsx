@@ -760,6 +760,8 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
                   nextPage={nextPage}
                   isLast={idx === localPages.length - 1}
                   funnelId={funnelId}
+                  funnelSlug={funnel.slug}
+                  funnelCustomDomain={funnel.customDomain}
                   onEditPage={onEditPage}
                   onDuplicate={() => duplicatePage.mutate({ id: page.id })}
                   onCopyPage={() => setCopyPageDialog({ pageId: page.id, pageTitle: page.title })}
@@ -1219,7 +1221,7 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
 // ─── Sortable Funnel Page Row ────────────────────────────────────────────────
 
 function SortableFunnelPageRow({
-  page, idx, meta, nextPage, isLast, funnelId, onEditPage, onDuplicate, onCopyPage, onRename, onEditSlug, onDelete, onMoveUp, onMoveDown,
+  page, idx, meta, nextPage, isLast, funnelId, funnelSlug, funnelCustomDomain, onEditPage, onDuplicate, onCopyPage, onRename, onEditSlug, onDelete, onMoveUp, onMoveDown,
 }: {
   page: FunnelPage;
   idx: number;
@@ -1227,6 +1229,8 @@ function SortableFunnelPageRow({
   nextPage: FunnelPage | null | undefined;
   isLast: boolean;
   funnelId: number;
+  funnelSlug: string;
+  funnelCustomDomain?: string | null;
   onEditPage: (funnelId: number, pageId: number) => void;
   onDuplicate: () => void;
   onCopyPage: () => void;
@@ -1309,6 +1313,15 @@ function SortableFunnelPageRow({
             )}
           </div>
           <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <a
+              href={`${funnelCustomDomain ? `https://${funnelCustomDomain}` : window.location.origin}/${funnelSlug}/${page.slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-lg"
+              title="Preview this page"
+            >
+              <ExternalLink size={12} /> Preview
+            </a>
             <button onClick={() => onEditPage(funnelId, page.id)} className="text-xs text-teal-600 hover:text-teal-700 flex items-center gap-1 bg-teal-50 px-2 py-1 rounded-lg">
               <Pencil size={12} /> Edit Page
             </button>
