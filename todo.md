@@ -2694,3 +2694,8 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Handle direct_checkout behavior in PublicFunnelPage.tsx for all 3 block types (hero, cta_standalone, pricing_cta)
 - [x] Show "Direct Checkout (Stripe)" badge in BlockPreview.tsx for all 3 block types
 - [x] Add funnel pages as source in "Copy from Other Pages" tab (LandingPageBuilder, DownloadLandingPageBuilder, ProductLandingPageBuilder, LessonBlockEditor)
+
+## Bug Fixes — Button Animations & Reviews Block (May 2026)
+- [x] Fix button animations not applied on public landing pages: added ctaAnimation class to pricing_cta and cta_standalone buttons in DownloadLanding.tsx, CourseLanding.tsx, and ProductLanding.tsx
+- [x] Fix reviews block using wrong field name (d.items → d.reviews) in DownloadLanding.tsx
+- [x] Confirmed BlockPreview.tsx (used by lesson pages inside CoursePlayer) already has correct animation classes and d.reviews — no fix needed there

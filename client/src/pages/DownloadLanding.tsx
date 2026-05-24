@@ -203,7 +203,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
           <button
             onClick={hasPurchased ? () => { window.location.href = `/downloads/${slug}/files`; } : onBuy}
             disabled={buying}
-            className="px-10 py-4 rounded-xl font-bold text-lg shadow-lg disabled:opacity-60 transition-opacity hover:opacity-90"
+            className={`px-10 py-4 rounded-xl font-bold text-lg shadow-lg disabled:opacity-60 transition-opacity hover:opacity-90 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
             style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}
           >
             {buying ? "Processing…" : hasPurchased ? "Access Your Files" : (d.ctaText ?? `Buy Now — ${price}`)}
@@ -223,7 +223,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
           <button
             onClick={d.link ? () => { window.location.href = d.link; } : hasPurchased ? () => { window.location.href = `/downloads/${slug}/files`; } : onBuy}
             disabled={buying}
-            className={`inline-block px-8 py-3 rounded-lg font-semibold shadow disabled:opacity-60 transition-opacity hover:opacity-90 ${d.size === "lg" ? "text-lg px-10 py-4" : ""}`}
+            className={`inline-block px-8 py-3 rounded-lg font-semibold shadow disabled:opacity-60 transition-opacity hover:opacity-90 ${d.size === "lg" ? "text-lg px-10 py-4" : ""} ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
             style={{ backgroundColor: d.color ?? d.ctaColor ?? "#179ca3", color: d.textColor ?? d.ctaTextColor ?? "#fff" }}
           >
             {hasPurchased ? "Access Files" : (d.text ?? d.ctaText ?? "Buy Now")}
@@ -261,7 +261,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
           <div className="max-w-4xl mx-auto">
             {d.headline && <h2 className="text-2xl font-bold mb-6 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <div className="grid md:grid-cols-2 gap-4">
-              {(d.items ?? []).map((item: any, i: number) => (
+              {(d.reviews ?? []).map((item: any, i: number) => (
                 <div key={i} className="p-5 rounded-lg border bg-white shadow-sm">
                   <div className="flex items-center gap-1 mb-2">
                     {Array.from({ length: item.rating ?? 5 }).map((_, j) => <span key={j} className="text-yellow-400">★</span>)}

@@ -361,7 +361,7 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
           {d.headline && <h2 className="text-3xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6 max-w-xl mx-auto" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           {d.showPrice && <div className="mb-6">{d.showOriginalPrice && d.originalPrice && <p className="text-xl text-gray-400 line-through mb-1">${d.originalPrice}</p>}<p className="text-4xl font-bold" style={{ color: d.ctaColor ?? "#179ca3" }}>{price}</p></div>}
-          <button onClick={onEnroll} disabled={enrolling} className="px-10 py-4 rounded-xl font-bold text-lg shadow-lg disabled:opacity-60 transition-opacity hover:opacity-90" style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
+          <button onClick={onEnroll} disabled={enrolling} className={`px-10 py-4 rounded-xl font-bold text-lg shadow-lg disabled:opacity-60 transition-opacity hover:opacity-90 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`} style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
             {enrolling ? "Processing…" : (d.ctaText ?? ctaText)}
           </button>
           <ButtonSubtext d={d} />
@@ -373,7 +373,7 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
           {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           <button onClick={d.ctaLink ? () => window.location.href = d.ctaLink : onEnroll} disabled={enrolling}
-            className="inline-block px-8 py-3 rounded-lg font-semibold shadow disabled:opacity-60 transition-opacity hover:opacity-90" style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
+            className={`inline-block px-8 py-3 rounded-lg font-semibold shadow disabled:opacity-60 transition-opacity hover:opacity-90 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`} style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
             {d.ctaText ?? ctaText}
           </button>
           <ButtonSubtext d={d} />
