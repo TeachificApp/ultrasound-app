@@ -1154,7 +1154,7 @@ export const thinkificImportRouter = router({
               }
 
               const htmlDesc = detail?.html_description || (detail as any)?.body || content.html_description || null;
-              const plainDesc = detail?.description || content.description || null;
+              const plainDesc = (detail as any)?.description || (content as any).description || null;
               if (htmlDesc && htmlDesc.trim().length > 0) {
                 blocks.push({ id: `text-${uid()}`, type: "text", data: { html: htmlDesc, align: "left", bgColor: "#ffffff", textColor: "#1a1a1a" } });
               } else if (plainDesc && plainDesc.trim().length > 0) {
@@ -1169,7 +1169,7 @@ export const thinkificImportRouter = router({
               if (detail?.download_url) {
                 blocks.push({
                   id: `download-${uid()}`, type: "download",
-                  data: { url: detail.download_url, fileName: detail.file_name || content.name, fileSize: detail.file_size || null, mimeType: detail.content_type || null, bgColor: "#f9fafb", accentColor: "#149096" },
+                  data: { url: detail.download_url, fileName: (detail as any).file_name || content.name, fileSize: (detail as any).file_size || null, mimeType: (detail as any).content_type || null, bgColor: "#f9fafb", accentColor: "#149096" },
                 });
               }
 
