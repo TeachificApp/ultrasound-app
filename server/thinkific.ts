@@ -691,6 +691,8 @@ export interface ThinkificLessonContent {
   // Quiz / Exam
   questions?: ThinkificContentQuestion[];
   pass_percent?: number | null;
+  randomize_questions?: boolean;
+  show_answers?: boolean;
   // Iframe / multimedia
   iframe_url?: string | null;
   // Duration
