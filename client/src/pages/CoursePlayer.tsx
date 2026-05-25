@@ -872,7 +872,20 @@ export default function CoursePlayer() {
   // ────────────────────────────────────────────────────────────────────────────
 
   const isEnrolled = !!data.enrollment;
-    const isPreviewLesson = selectedLessonId ? (() => {
+  // Free preview enrollment: enrolled but only has preview access (not full course)
+  const isFreePreviewEnrollment = data.enrollment?.enrollmentType === "free_preview";
+
+  // 3-minute upgrade prompt for free preview enrollees
+  useEffect(() => {
+    if (!isFreePreviewEnrollment || !isEnrolled) return;
+    const timer = setTimeout(() => {
+      setUpgradePromptReason("entry");
+      setShowUpgradePrompt(true);
+    }, 3 * 60 * 1000); // 3 minutes
+    return () => clearTimeout(timer);
+  }, [isFreePreviewEnrollment, isEnrolled]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const isPreviewLesson = selectedLessonId ? (() => {
     const l = allLessons.find((ll: any) => ll.id === selectedLessonId);
     const pm = l?.previewMode ?? (l?.isPreview ? "preview" : "none");
     return pm === "preview" || (pm === "preview_hide_after_purchase" && !isEnrolled);
@@ -882,8 +895,14 @@ export default function CoursePlayer() {
     const lesson = allLessons.find((l: any) => l.id === lessonId);
     const pm = lesson?.previewMode ?? (lesson?.isPreview ? "preview" : "none");
     const isAccessible = pm === "preview" || (pm === "preview_hide_after_purchase" && !isEnrolled);
+    // Unenrolled users: block non-preview lessons
     if (!isEnrolled && !adminBypass && lesson && !isAccessible) {
-      // Show upgrade prompt when trying to access non-preview content
+      setUpgradePromptReason("locked_lesson");
+      setShowUpgradePrompt(true);
+      return;
+    }
+    // Free preview enrollees: block non-preview lessons (they have limited enrollment)
+    if (isFreePreviewEnrollment && !adminBypass && lesson && pm === "none") {
       setUpgradePromptReason("locked_lesson");
       setShowUpgradePrompt(true);
       return;
@@ -970,6 +989,20 @@ export default function CoursePlayer() {
             className="ml-4 px-2 py-0.5 bg-teal-700 hover:bg-teal-800 rounded text-xs"
           >
             Upgrade
+          </button>
+        </div>
+      )}
+
+      {/* Free Preview Enrollment Banner (registered preview-only students) */}
+      {isFreePreviewEnrollment && !adminBypass && (
+        <div className="bg-amber-500 text-white text-center py-2 px-4 text-sm font-medium flex items-center justify-center gap-2 shrink-0 z-50">
+          <Eye className="w-4 h-4" />
+          <span>You have free preview access — preview lessons only</span>
+          <button
+            onClick={() => { setUpgradePromptReason("entry"); setShowUpgradePrompt(true); }}
+            className="ml-4 px-2 py-0.5 bg-amber-600 hover:bg-amber-700 rounded text-xs font-semibold"
+          >
+            Upgrade to Full Course
           </button>
         </div>
       )}

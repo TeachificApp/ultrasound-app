@@ -2877,6 +2877,8 @@ export const lmsEnrollments = mysqlTable("lms_enrollments", {
   groupId: int("group_id"),
   affiliateCode: varchar("affiliate_code", { length: 64 }),
   orderId: int("order_id"),
+  // Enrollment type: 'full' = paid/full access, 'free_preview' = free preview only (limited to preview lessons)
+  enrollmentType: mysqlEnum("enrollment_type", ["full", "free_preview"]).default("full").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 export type LmsEnrollment = typeof lmsEnrollments.$inferSelect;

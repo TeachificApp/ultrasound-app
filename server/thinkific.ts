@@ -417,7 +417,9 @@ export interface ThinkificCourse {
   slug: string;
   subtitle: string | null;
   description: string | null;
-  card_image_url: string | null;
+  course_card_image_url: string | null; // Correct field name returned by Thinkific API
+  /** @deprecated Use course_card_image_url instead */
+  card_image_url?: string | null;       // Not returned by API — kept for backward compat
   banner_image_url: string | null;
   instructor_id: number | null;
   course_card_text: string | null;
@@ -571,4 +573,192 @@ export async function getThinkificInstructor(instructorId: number): Promise<Thin
   } catch {
     return null;
   }
+}
+
+// ─── Admin Session Auth (for lesson content scraping) ────────────────────────
+//
+// The Thinkific public API v1 does NOT expose lesson body content through
+// /contents/{id} — it only returns metadata. The actual html_description,
+// video IDs, and rich content are only accessible via the course player API,
+// which requires an authenticated user session.
+//
+// This helper authenticates as the site admin using email + password to obtain
+// a session cookie, then uses that session to call the internal course player
+// API at /api/course_player/v2/contents/{id}.
+
+interface ThinkificAdminSession {
+  cookie: string;
+  expiresAt: number; // Unix ms — sessions last ~24h, we refresh after 20h
+}
+
+let _adminSession: ThinkificAdminSession | null = null;
+
+/**
+ * Sign in to Thinkific as the site admin and return the session cookie string.
+ * Caches the session for 20 hours before refreshing.
+ */
+export async function getThinkificAdminSession(): Promise<string> {
+  const now = Date.now();
+  if (_adminSession && _adminSession.expiresAt > now) {
+    return _adminSession.cookie;
+  }
+
+  const email = ENV.thinkificAdminEmail;
+  const password = ENV.thinkificAdminPassword;
+  const subdomain = ENV.thinkificSubdomain;
+
+  if (!email || !password) {
+    throw new Error(
+      "[Thinkific] THINKIFIC_ADMIN_EMAIL and THINKIFIC_ADMIN_PASSWORD are required for lesson content scraping. " +
+      "Add them in Settings → Secrets."
+    );
+  }
+
+  const res = await fetch(`https://${subdomain}.thinkific.com/users/sign_in`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      "X-Requested-With": "XMLHttpRequest",
+    },
+    body: JSON.stringify({ user: { email, password } }),
+  });
+
+  // Thinkific returns HTTP 200 with HTML on successful login (it's a redirect page),
+  // or HTTP 200 with JSON containing status=FAILED on bad credentials.
+  // The session cookie is the authoritative indicator of success.
+  const setCookieHeader = res.headers.get("set-cookie") ?? "";
+  const sessionMatch = setCookieHeader.match(/_thinkific_session=([^;]+)/);
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`[Thinkific] Admin sign-in failed ${res.status}: ${body.substring(0, 200)}`);
+  }
+
+  // If JSON response, check for explicit FAILED status
+  const contentType = res.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) {
+    const data = await res.json() as { data?: { status?: string; errors?: { message: string }[] } };
+    if (data?.data?.status === "FAILED") {
+      const msg = data.data.errors?.[0]?.message ?? "unknown error";
+      throw new Error(`[Thinkific] Admin sign-in rejected: ${msg}. Check THINKIFIC_ADMIN_EMAIL and THINKIFIC_ADMIN_PASSWORD.`);
+    }
+  } else {
+    // HTML response — consume body to free connection
+    await res.text().catch(() => "");
+  }
+
+  if (!sessionMatch) {
+    throw new Error("[Thinkific] Admin sign-in returned HTTP 200 but no session cookie. Check THINKIFIC_ADMIN_EMAIL and THINKIFIC_ADMIN_PASSWORD.");
+  }
+
+  const cookie = `_thinkific_session=${sessionMatch[1]}`;
+  _adminSession = { cookie, expiresAt: now + 20 * 60 * 60 * 1000 }; // 20h
+  console.log("[Thinkific] Admin session refreshed successfully.");
+  return cookie;
+}
+
+/**
+ * Invalidate the cached admin session (call after 401 responses).
+ */
+export function invalidateThinkificAdminSession(): void {
+  _adminSession = null;
+}
+
+/**
+ * Full lesson content detail returned by the Thinkific course player API.
+ * This is the ONLY way to get html_description, video IDs, and rich content
+ * because the public API v1 /contents/{id} does not expose them.
+ */
+export interface ThinkificLessonContent {
+  id: number;
+  name: string;
+  contentable_type: string;
+  // Text / HTML lessons
+  html_description?: string | null;
+  body?: string | null;
+  // Video lessons
+  wistia_hashed_id?: string | null;
+  youtube_video_id?: string | null;
+  vimeo_video_id?: string | null;
+  video_url?: string | null;
+  // Download / file
+  download_url?: string | null;
+  file_name?: string | null;
+  content_type?: string | null;
+  // Presentation
+  slide_urls?: string[] | null;
+  // Quiz / Exam
+  questions?: ThinkificContentQuestion[];
+  pass_percent?: number | null;
+  // Iframe / multimedia
+  iframe_url?: string | null;
+  // Duration
+  duration_in_seconds?: number | null;
+}
+
+/**
+ * Fetch full lesson content using the Thinkific course player API.
+ * Falls back to null on error (e.g., auth failure, rate limit).
+ *
+ * NOTE: Requires THINKIFIC_ADMIN_EMAIL and THINKIFIC_ADMIN_PASSWORD secrets.
+ */
+export async function getContentDetailWithSession(
+  contentId: number,
+  courseSlug: string
+): Promise<ThinkificLessonContent | null> {
+  const subdomain = ENV.thinkificSubdomain;
+  const memberDomain = "member.allaboutultrasound.com";
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const sessionCookie = await getThinkificAdminSession();
+
+      // Try the internal course player API first
+      const playerRes = await fetch(
+        `https://${memberDomain}/api/course_player/v2/contents/${contentId}`,
+        {
+          headers: {
+            "Cookie": sessionCookie,
+            "Accept": "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+          },
+        }
+      );
+
+      if (playerRes.status === 401) {
+        invalidateThinkificAdminSession();
+        continue; // retry with fresh session
+      }
+
+      if (!playerRes.ok) {
+        // Try the subdomain portal as fallback
+        const fallbackRes = await fetch(
+          `https://${subdomain}.thinkific.com/api/course_player/v2/contents/${contentId}`,
+          {
+            headers: {
+              "Cookie": sessionCookie,
+              "Accept": "application/json",
+              "X-Requested-With": "XMLHttpRequest",
+            },
+          }
+        );
+        if (!fallbackRes.ok) {
+          console.warn(`[Thinkific] getContentDetailWithSession: ${contentId} returned ${playerRes.status}/${fallbackRes.status}`);
+          return null;
+        }
+        return fallbackRes.json() as Promise<ThinkificLessonContent>;
+      }
+
+      return playerRes.json() as Promise<ThinkificLessonContent>;
+    } catch (err) {
+      console.error(`[Thinkific] getContentDetailWithSession error for ${contentId}:`, err);
+      if (attempt === 0) {
+        invalidateThinkificAdminSession();
+        continue;
+      }
+      return null;
+    }
+  }
+  return null;
 }

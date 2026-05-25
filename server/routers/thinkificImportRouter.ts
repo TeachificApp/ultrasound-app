@@ -31,11 +31,13 @@ import {
   getChaptersForCourse,
   getContentsForChapter,
   getContentDetail,
+  getContentDetailWithSession,
   getEnrollmentsForCourse,
   getThinkificInstructor,
   type ThinkificChapter,
   type ThinkificContent,
   type ThinkificContentDetail,
+  type ThinkificLessonContent,
 } from "../thinkific";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -337,7 +339,7 @@ export const thinkificImportRouter = router({
       slug: c.slug,
       subtitle: c.subtitle,
       status: c.status,
-      cardImageUrl: c.card_image_url,
+      cardImageUrl: c.course_card_image_url,
       createdAt: c.created_at,
     }));
   }),
@@ -370,7 +372,7 @@ export const thinkificImportRouter = router({
           slug: course.slug,
           subtitle: course.subtitle,
           description: course.description,
-          cardImageUrl: course.card_image_url,
+          cardImageUrl: course.course_card_image_url,
           status: course.status,
         },
         sections: chapterContents.map(({ chapter, contents }) => ({
@@ -422,6 +424,7 @@ export const thinkificImportRouter = router({
       try {
         // 1. Fetch course details
         const course = await getThinkificCourse(input.thinkificCourseId);
+        const courseSlug = course.slug; // used by session-based content fetcher
         log.push(`Fetched course: ${course.name}`);
 
         // Update import record with course name
@@ -468,7 +471,7 @@ export const thinkificImportRouter = router({
           title: course.name,
           subtitle: course.subtitle || undefined,
           description: course.description ? stripHtml(course.description) : undefined,
-          coverImageUrl: course.card_image_url || undefined,
+          coverImageUrl: course.course_card_image_url || undefined,
           status: "draft",
           type: input.courseType,
           brand: "aaus",
@@ -547,7 +550,7 @@ export const thinkificImportRouter = router({
           courseId: lmsCourseId,
           heroTitle: course.name,
           heroSubtitle: course.subtitle || undefined,
-          heroImageUrl: course.card_image_url || undefined,
+          heroImageUrl: course.course_card_image_url || undefined,
           ctaText: "Enroll Now",
           isCustom: true,
           blocks: JSON.stringify(finalLandingBlocks),
@@ -579,10 +582,20 @@ export const thinkificImportRouter = router({
             const isFreePreview = content.free ?? content.free_preview ?? false;
 
             // Fetch full content detail (html_description, video_url, quiz questions, etc.)
-            // Rate-limited to 120 req/min — add a small delay between requests
-            const detail: ThinkificContentDetail | null = await getContentDetail(content.id);
+            // The public API v1 /contents/{id} does NOT return lesson body content.
+            // Use the admin session-based course player API first; fall back to public API.
+            let detail: ThinkificContentDetail | ThinkificLessonContent | null = null;
+            try {
+              detail = await getContentDetailWithSession(content.id, courseSlug);
+            } catch {
+              // Admin credentials not configured — fall back to public API (returns metadata only)
+            }
+            if (!detail) {
+              detail = await getContentDetail(content.id);
+            }
             if (detail) {
-              log.push(`  Fetched detail for lesson "${content.name}" (type: ${content.contentable_type})`);
+              const hasContent = !!(detail as any).html_description || !!(detail as any).wistia_hashed_id || !!(detail as any).youtube_video_id;
+              log.push(`  Fetched detail for lesson "${content.name}" (type: ${content.contentable_type})${hasContent ? ' ✓ has content' : ' (metadata only)'}`);
             }
 
             // Resolve the best video URL from the detail
@@ -1036,6 +1049,10 @@ export const thinkificImportRouter = router({
       const thinkificCourseId = importRecord.thinkificCourseId;
       log.push(`Resyncing LMS course ${input.lmsCourseId} from Thinkific course ${thinkificCourseId}`);
 
+      // Fetch the Thinkific course to get the slug (needed for session-based content fetching)
+      const thinkificCourseData = await getThinkificCourse(thinkificCourseId);
+      const courseSlug = thinkificCourseData.slug;
+
       let lessonsUpdated = 0;
       let enrollmentsUpdated = 0;
       let landingPageUpdated = false;
@@ -1043,8 +1060,7 @@ export const thinkificImportRouter = router({
       try {
         // ─── 0. Always update cover image from Thinkific ──────────────────────────────────
         try {
-          const thinkificCourseForImage = await getThinkificCourse(thinkificCourseId);
-          const newCoverUrl = thinkificCourseForImage.card_image_url || thinkificCourseForImage.banner_image_url;
+          const newCoverUrl = thinkificCourseData.course_card_image_url || thinkificCourseData.banner_image_url;
           if (newCoverUrl) {
             await db.update(lmsCourses).set({ coverImageUrl: newCoverUrl }).where(eq(lmsCourses.id, input.lmsCourseId));
             log.push(`Updated cover image: ${newCoverUrl}`);
@@ -1062,7 +1078,17 @@ export const thinkificImportRouter = router({
             const contents = await getContentsForChapter(chapter.id);
             for (const content of contents) {
               // Fetch full detail for this lesson
-              const detail: ThinkificContentDetail | null = await getContentDetail(content.id);
+              // The public API v1 does NOT return lesson body content.
+              // Use admin session-based course player API first; fall back to public API.
+              let detail: ThinkificContentDetail | ThinkificLessonContent | null = null;
+              try {
+                detail = await getContentDetailWithSession(content.id, courseSlug);
+              } catch {
+                // Admin credentials not configured — fall back to public API (metadata only)
+              }
+              if (!detail) {
+                detail = await getContentDetail(content.id);
+              }
 
               // Resolve embed URL
               let embedUrl: string | undefined;

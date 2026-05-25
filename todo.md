@@ -2732,3 +2732,28 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix card image not updating in syncThinkificEnrollments mutation (removed !course.coverImageUrl guard — now always updates)
 - [x] Fix card image not updating in resyncCourse procedure (added step 0: always fetch and update cover image first)
 - [x] Add Re-sync button to course Settings tab (Thinkific Re-sync section with toggles for content/enrollments/landing page)
+
+## Free Preview Registration Link (May 2026)
+- [ ] Detect lessons marked as free/free preview in LMS course
+- [ ] Generate a shareable free preview registration link for the course
+- [ ] Display the free preview link in course settings panel (only when free lessons exist)
+- [ ] Add copy-to-clipboard button for the link
+
+## Free Preview Enrollment System (May 2026)
+- [x] Add getCourseFreePreviewLessons tRPC procedure (returns lessons where previewMode != 'none')
+- [x] Generate shareable free preview link ({origin}/learn/{slug}?preview=1) in CourseSettingsForm
+- [x] Show free preview lesson list + copy link panel in CourseSettingsForm (only when preview lessons exist)
+- [x] Add enrollmentType field to lms_enrollments schema: 'full' | 'free_preview'
+- [x] Migrate DB: add enrollment_type column to lms_enrollments
+- [x] Update enrollment creation logic: ?preview=1 route creates free_preview enrollment
+- [x] Show "Free Preview" badge in student analytics table (admin LMS student list)
+- [x] Show "Free Preview" badge in student profile detail panel (admin view)
+- [x] Show upgrade prompt in course player 3 minutes after accessing free preview content
+- [x] Upgrade prompt links to the course's own checkout/purchase page (not premium app access)
+- [x] Dismiss upgrade prompt with "Maybe Later" (re-shows on next lesson load)
+
+## Lesson Type Change (May 2026)
+- [x] Add lesson type selector to lesson editor (allow changing type after creation)
+- [x] Add updateLessonType tRPC procedure (or extend updateLesson to accept lessonType)
+- [x] Show free preview badge in CourseUsersTab student list (enrollmentType = 'free_preview')
+- [x] Add 3-minute upgrade prompt timer in CoursePlayer for free_preview enrollees

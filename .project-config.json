@@ -15,10 +15,10 @@
   ],
   "git_remote": {
     "repo_url": "s3://vida-prod-gitrepo/webdev-git/310519663401463434/UrcfdRVE8J6mpMNR48QuFe",
-    "access_key_id": "ASIAZV3A2ECZITM7GSVT",
-    "secret_access_key": "jAHxWtS+j7tbK/E7hvyskCqsC+cb+efHp1LAiYdA",
-    "session_token": "IQoJb3JpZ2luX2VjEH0aCXVzLWVhc3QtMSJHMEUCIQCyPVQbM+Aya5VG42WLBtyvCX2v7tF2SMQUyfWMMt0BHAIgdc2jAnkCQHwsjYNSRrtCnPQ1vobX331SGEhx0UO5l2Aq9QMIRhAEGgw2NjUzODYwOTg4NjYiDMRdNxCEtRyzF508zSrSA/RQOCB8lUp51iNQXJbtuswGtEwgRkKqaHw/KsDfPVHNkXiI9jSDhnxijhMA1auO4wRIEetFhPa12oD28kwzTLeN98GslQZ2Oc2iDsK8vX8RH3WV2bExCnz/ooBjM60aMFlb6lmdefuZk2IJLw/jhrCgLnkXPE/a2wUnXFdN5b3MW8ZfDTWiviSdJYudxHBk4yYlHoRUVfDqDSm9/1kwi9TpBaBHM5ha2Zuoeze0eddUNHJkAE+eNjTG64Av9VNNvTLSNrDCAS3+ZYx+ihYi3dpEcTiO34XQz+0unCVmJukeNaDJTcTOG0PnR9deCqWcdd+qJ6MCYiIc+zgg5/TJGueuKE86eLdfBhoFb78reBBkQ/M7qkPGtunnYjekt5rdIH/1jzvwMc/b4U5iX3MZKeO238h9FptZa81Vg98fnldyd4laq4O8S4KUmsZ8w3O+hI7tfGZ6E4F5ULX96ZGIqfmgmREoMr3+Wd1JqX/GLYd9lKsAIKf9rh70PDgwHqWe7wCEISD+889ZX+lyxkEnmyNF9k/00D6Q4H54PfLSrn+lCvqPAQCveD38ob1LZkbh8ankTh4sjitSuHF+rTyInJu06JyegSGrpXwrayh0zGwsRKEw1fvJ0AY6nQH91+s4N3G6+gkMIDeZKT2jqk/nvJmCBZ8YPjhlMVev+90jZoOluXaoCzWDuRro2E5naHqa6C/3bE+yAg3tFhZgjaSUCPpXcAWNHO6Pnd0nJdp9FduNvxWs6Fw+KCxihFeRvOO+76H7Tiav3V7ZekNCYkSkX6a9X0xNPN8CNRM2QY0YzkrVpmkDLl6YcjgntCKCpqohYKPNosTcymCB",
-    "expiration": "2026-05-24T16:25:57.000Z"
+    "access_key_id": "ASIAZV3A2ECZMJ3AXCBW",
+    "secret_access_key": "uJwzdngpzbvLwQvK4C602EmcT2sf96x06dThdF1A",
+    "session_token": "IQoJb3JpZ2luX2VjEJL//////////wEaCXVzLWVhc3QtMSJIMEYCIQCeEJhhUBYCjFyZzvecEJyG8IBXJrX6fLCgyD/RkrolfgIhAKrP0rzmQ/C4vJ4FUaVlC9O3Asj9FDXdgs4I1hEdBWdaKvUDCFoQBBoMNjY1Mzg2MDk4ODY2IgxkLSJBmCBG/kpui1Aq0gMyZCHdEEWeGWSachc6vabiVVryMaWv88gKurFASUuih4BxS66bWY+2EuXHQoZTi1g1Eh1XHS9fBK7CxH8SCe/8rh+VTKMAeONUfLHo4p8NjJWPcBUOMN1JlNQ2xqnQBuuRpKW1NdBv/lKGIrjX+Hg7H+y105qREnDyuS9CQmw0/ExqjX13t+h6OQ7zN+99AQma+GgHK6FfjgJMCylCq88nUgRT76nFoJ8qnqSWr4AugWtVWMIDdJ2o7iIEsKt4ezefzFSQ+9QW79qTCXItx9QJdIVSWW35Jambmm7xhwStTjZOxBjN85glJ3r+UcsnlFppDO2Ew0YwtdaJyTcruSiVaoWXma+OeO3SHfxQVAUcsixeSYNVaHUEFq8CTUR/kJcue4L4qd19M+zH8v/CDW51mB3i0fN7FTgyW/thLxm88ZS3Asv2HiVDrcub/FuWha02QBC2+BJ8h7HvKFGoTAkvNqdk0R/Yc09Y3sNJyILYlIV69+61qELXjNEG6gKeZMw5s+6sxsuqT9bR8nkwY2rXs3B4/PK5KVyIdDtWnT1vnxlKn9LWsV8Ydg6o7z23BEJcJw87kP3+AprTzsRpGM8NM9n/CD+i9SavNGHXaf7XuCQ0MIDBztAGOpwBbVTkti52AH3GTz9O8ucMWkqMSimRkdHXLRrELR7cnbPcVbzceKDWss46YHuNz3iKW43c0CJRNzzADC6OoQp+y7D3oOIPXUNOxw+yc31/w2v4kLkVUDaK1qFemtSLYNcnvHnAuCHXJ5vKz9OOX89g0ONe9rp6F0W+J53fw5i6yWelhzN7zxYJMvjxILsl91ihKpP+PWGdfTq+f5wF",
+    "expiration": "2026-05-25T13:06:08.000Z"
   },
   "name": "ultrasound-assist",
   "path": "/home/ubuntu/ultrasound-assist",
@@ -42,6 +42,8 @@
     "SENDGRID_FROM_NAME": "AllAboutUltrasound",
     "STRIPE_SECRET_KEY": "sk_test_51TPUwfPvVOPkJOleK10zMqQh19aefmBQVewhDDUItZ5cvIiErbuzllYzyuMCkcKz5lSo4ZosYF4KOV2DnpH2EouN00ht9ZTaZo",
     "STRIPE_WEBHOOK_SECRET": "whsec_g1kzUUoKCgKShca6rmxJsxpOG97kfWl9",
+    "THINKIFIC_ADMIN_EMAIL": "admin@allaboutultrasound.com",
+    "THINKIFIC_ADMIN_PASSWORD": "Spring2019!",
     "THINKIFIC_API_KEY": "123ead08ade92984918f53e649805f5d",
     "THINKIFIC_SUBDOMAIN": "allaboutultrasound",
     "VITE_ANALYTICS_ENDPOINT": "https://manus-analytics.com",

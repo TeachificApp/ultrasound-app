@@ -12,7 +12,7 @@
 
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { and, desc, eq, isNull, sql, asc, isNotNull, max, inArray } from "drizzle-orm";
+import { and, desc, eq, isNull, sql, asc, isNotNull, max, inArray, or } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
@@ -692,12 +692,16 @@ export const lmsLearnerRouter = router({
         // Check enrollment
         const [enrollment] = await db.select().from(lmsEnrollments)
           .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, resolvedCourseId))).limit(1);
-        if (pm === "preview_hide_after_purchase" && enrollment) {
-          // Purchased — hide this lesson (it was a pre-purchase teaser)
+        if (pm === "preview_hide_after_purchase" && enrollment && enrollment.enrollmentType !== "free_preview") {
+          // Purchased (full access) — hide this lesson (it was a pre-purchase teaser)
           throw new TRPCError({ code: "FORBIDDEN", message: "This preview lesson is no longer available after purchase" });
         }
         if (pm === "none" && !enrollment) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Enrollment required" });
+        }
+        // Free preview enrollees can only access preview lessons
+        if (pm === "none" && enrollment?.enrollmentType === "free_preview") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Full course enrollment required to access this lesson" });
         }
       }
 
@@ -2446,7 +2450,7 @@ Rules:
       // 2. Always update the course cover image from Thinkific (overwrite any stale/missing value)
       try {
         const thinkificCourse = await getThinkificCourse(thinkificCourseId);
-        const newImageUrl = thinkificCourse.card_image_url || thinkificCourse.banner_image_url;
+         const newImageUrl = thinkificCourse.course_card_image_url || thinkificCourse.banner_image_url;
         if (newImageUrl) {
           await db.update(lmsCourses).set({ coverImageUrl: newImageUrl }).where(eq(lmsCourses.id, input.courseId));
           console.log(`[syncThinkific] Updated cover image for course ${input.courseId}: ${newImageUrl}`);
@@ -3672,6 +3676,87 @@ CRITICAL REQUIREMENTS:
         .from(physicalProducts)
         .orderBy(asc(physicalProducts.title));
       return products.filter(p => p.landingBlocks && p.landingBlocks.length > 2);
+    }),
+
+  /**
+   * Get all lessons in a course that are marked as free preview (previewMode != 'none').
+   * Also returns the course slug for building the shareable preview link.
+   */
+  getCourseFreePreviewLessons: protectedProcedure
+    .input(z.object({ courseId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Get course slug
+      const [course] = await db
+        .select({ slug: lmsCourses.slug, title: lmsCourses.title, pricingType: lmsCourses.pricingType, price: lmsCourses.price })
+        .from(lmsCourses)
+        .where(eq(lmsCourses.id, input.courseId))
+        .limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      // Get all preview lessons (previewMode = 'preview' or 'preview_hide_after_purchase')
+      const lessons = await db
+        .select({
+          id: lmsLessons.id,
+          title: lmsLessons.title,
+          previewMode: lmsLessons.previewMode,
+          isPreview: lmsLessons.isPreview,
+          position: lmsLessons.position,
+          lessonType: lmsLessons.lessonType,
+        })
+        .from(lmsLessons)
+        .where(
+          and(
+            eq(lmsLessons.courseId, input.courseId),
+            or(
+              eq(lmsLessons.previewMode, "preview"),
+              eq(lmsLessons.previewMode, "preview_hide_after_purchase"),
+              eq(lmsLessons.isPreview, true)
+            )
+          )
+        )
+        .orderBy(asc(lmsLessons.position));
+      return {
+        courseSlug: course.slug,
+        courseTitle: course.title,
+        pricingType: course.pricingType,
+        price: course.price,
+        lessons: lessons.map(l => ({
+          id: l.id,
+          title: l.title,
+          previewMode: l.previewMode ?? (l.isPreview ? "preview" : "none"),
+          lessonType: l.lessonType,
+        })),
+      };
+    }),
+
+  /**
+   * Create a free preview enrollment for a user (enrollmentType = 'free_preview').
+   * Called when a user registers via the free preview link.
+   */
+  createFreePreviewEnrollment: protectedProcedure
+    .input(z.object({ courseId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Check if already enrolled
+      const [existing] = await db
+        .select({ id: lmsEnrollments.id, enrollmentType: lmsEnrollments.enrollmentType })
+        .from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, input.courseId)))
+        .limit(1);
+      if (existing) {
+        // Already enrolled (full or preview) — return existing
+        return { enrollmentId: existing.id, enrollmentType: existing.enrollmentType, created: false };
+      }
+      const [result] = await db.insert(lmsEnrollments).values({
+        userId: ctx.user.id,
+        courseId: input.courseId,
+        enrollmentType: "free_preview",
+        progressPct: 0,
+      });
+      return { enrollmentId: (result as any).insertId, enrollmentType: "free_preview", created: true };
     }),
 });
 

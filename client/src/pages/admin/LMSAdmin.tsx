@@ -1882,6 +1882,44 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
     </div>
   );
 }
+
+// ─── Free Preview Link Panel ──────────────────────────────────────────────────
+function FreePreviewLinkPanel({ courseId }: { courseId: number }) {
+  const { data, isLoading } = trpc.lmsAdmin.getCourseFreePreviewLessons.useQuery({ courseId });
+  const [copied, setCopied] = useState(false);
+  if (isLoading) return null;
+  if (!data || data.lessons.length === 0) return null;
+  const previewUrl = `${window.location.origin}/courses/${data.courseSlug}/player?preview=1`;
+  const handleCopy = () => {
+    navigator.clipboard.writeText(previewUrl).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+  };
+  return (
+    <div className="rounded-xl border border-green-200 bg-green-50 p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <PlayCircle className="w-4 h-4 text-green-700" />
+        <h3 className="text-sm font-semibold text-green-800">Free Preview Registration Link</h3>
+        <span className="ml-auto text-xs text-green-600 font-medium">{data.lessons.length} preview lesson{data.lessons.length !== 1 ? 's' : ''}</span>
+      </div>
+      <p className="text-xs text-green-700">Share this link so students can register and access the free preview lessons without purchasing the full course.</p>
+      <div className="space-y-1">
+        {data.lessons.map((l: any) => (
+          <div key={l.id} className="flex items-center gap-2 text-xs text-green-800">
+            <Eye className="w-3 h-3 text-green-500 shrink-0" />
+            <span className="truncate">{l.title}</span>
+            {l.previewMode === 'preview_hide_after_purchase' && <span className="shrink-0 text-green-500 italic">(hides after purchase)</span>}
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center gap-2">
+        <input readOnly value={previewUrl} className="flex-1 text-xs bg-white border border-green-300 rounded-md px-3 py-1.5 text-green-900 font-mono truncate focus:outline-none" onClick={e => (e.target as HTMLInputElement).select()} />
+        <Button size="sm" variant="outline" className="border-green-400 text-green-700 hover:bg-green-100 shrink-0 h-8" onClick={handleCopy}>
+          {copied ? <><CheckCircle className="w-3 h-3 mr-1" /> Copied!</> : <><Copy className="w-3 h-3 mr-1" /> Copy</>}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Landing Page Editor ──────────────────────────────────────────────────────
 
 function LandingPageEditor({ courseId, landingPage, courseType, onSave, saving }: { courseId: number; landingPage: any; courseType?: string; onSave: (data: any) => void; saving: boolean }) {
@@ -3085,6 +3123,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
 
   const [activeTab, setActiveTab] = useState<"settings" | "content" | "quiz">("settings");
   const [title, setTitle] = useState(lesson.title);
+  const [lessonType, setLessonType] = useState<"video" | "text" | "quiz" | "download" | "embed" | "video_text">(lesson.type ?? "text");
   const [content, setContent] = useState(lesson.content ?? "");
   const [videoContent, setVideoContent] = useState(lesson.videoContent ?? "");
   const [embedUrl, setEmbedUrl] = useState(lesson.embedUrl ?? "");
@@ -3104,6 +3143,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
   // Reset all lesson state when navigating to a different lesson
   useEffect(() => {
     setTitle(lessonShallow.title ?? "");
+    setLessonType(lessonShallow.type ?? "text");
     setContent(lessonShallow.content ?? "");
     setVideoContent(lessonShallow.videoContent ?? "");
     setEmbedUrl(lessonShallow.embedUrl ?? "");
@@ -3120,6 +3160,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
   // Sync state when full lesson data arrives (content/videoContent/embedUrl may be empty until then)
   useEffect(() => {
     if (fullLesson) {
+      setLessonType(fullLesson.type ?? "text");
       setContent(fullLesson.content ?? "");
       setVideoContent(fullLesson.videoContent ?? "");
       setEmbedUrl(fullLesson.embedUrl ?? "");
@@ -3150,18 +3191,19 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
     update.mutate({
       id: lesson.id,
       title: title.trim(),
+      type: lessonType,
       previewMode,
       durationMinutes: durationMinutes ? parseInt(durationMinutes) : null,
       // Auto-enable requireVideoCompletion when lesson is a prerequisite gate (video lessons only)
-      requireVideoCompletion: (isPrerequisite && (lesson.type === "video" || lesson.type === "video_text")) ? true : requireVideoCompletion,
+      requireVideoCompletion: (isPrerequisite && (lessonType === "video" || lessonType === "video_text")) ? true : requireVideoCompletion,
       requireManualComplete,
       dripDays: dripDays.trim() ? parseInt(dripDays) : null,
       showInstructor,
       isPrerequisite,
       commentsEnabled,
-      content: (lesson.type === "text" || lesson.type === "video" || lesson.type === "download" || lesson.type === "video_text") ? (content || null) : undefined,
-      videoContent: lesson.type === "video_text" ? (videoContent || null) : undefined,
-      embedUrl: lesson.type === "embed" ? (embedUrl || null) : undefined,
+      content: (lessonType === "text" || lessonType === "video" || lessonType === "download" || lessonType === "video_text") ? (content || null) : undefined,
+      videoContent: lessonType === "video_text" ? (videoContent || null) : undefined,
+      embedUrl: lessonType === "embed" ? (embedUrl || null) : undefined,
       mediaAssetId: selectedAsset?.id ?? undefined,
     }, {
       onSuccess: () => { if (andClose && onSavedAndClose) { onSavedAndClose(); } else { onSaved(); } },
@@ -3219,7 +3261,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
           >
             Lesson Editor
           </button>
-          {lesson.type === "quiz" && (
+          {lessonType === "quiz" && (
             <button
               onClick={() => setActiveTab("quiz")}
               className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-colors flex items-center gap-1.5 ${
@@ -3242,6 +3284,26 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
             <Label className="text-sm">Title</Label>
             <Input value={title} onChange={e => setTitle(e.target.value)} className="mt-1" />
           </div>
+
+          {/* Lesson Type Selector */}
+          <div className="border border-amber-200 rounded-lg p-4 bg-amber-50/40 space-y-2">
+            <Label className="text-sm font-semibold text-amber-800">Lesson Type</Label>
+            <Select value={lessonType} onValueChange={(v) => setLessonType(v as typeof lessonType)}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="text">Text — rich text / HTML content</SelectItem>
+                <SelectItem value="video">Video — video URL or media asset</SelectItem>
+                <SelectItem value="video_text">Video + Text — video with description</SelectItem>
+                <SelectItem value="download">Download — file download link</SelectItem>
+                <SelectItem value="embed">Embed — iframe / external URL</SelectItem>
+                <SelectItem value="quiz">Quiz — question &amp; answer quiz</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-amber-700">Changing the type updates how this lesson is displayed in the player. Content fields below will update accordingly — save to apply.</p>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-sm">Duration (min)</Label>
@@ -3250,16 +3312,16 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
           </div>
 
           {/* Content fields by type */}
-          {lesson.type === "text" && (
+          {lessonType === "text" && (
             <div>
               <Label className="text-sm">Lesson Description</Label>
               <div className="mt-1"><RichTextEditor value={content} onChange={setContent} /></div>
             </div>
           )}
-          {(lesson.type === "video" || lesson.type === "download") && (
+          {(lessonType === "video" || lessonType === "download") && (
             <div>
               <div className="flex items-center justify-between mb-1">
-                <Label className="text-sm">{lesson.type === "video" ? "Video URL" : "Download URL"}</Label>
+                <Label className="text-sm">{lessonType === "video" ? "Video URL" : "Download URL"}</Label>
                 <Button size="sm" variant="outline" className="h-6 text-xs text-teal-600 border-teal-300 hover:bg-teal-50" onClick={() => setMediaPickerOpen(true)}>
                   Pick from Media Repository
                 </Button>
@@ -3275,7 +3337,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
               <p className="text-xs text-gray-400 mt-1">Upload video to Media Repository first, then pick it above — or paste a direct URL (Vimeo, YouTube, Wistia, etc.)</p>
             </div>
           )}
-          {lesson.type === "video_text" && (
+          {lessonType === "video_text" && (
             <div className="space-y-3">
               <div>
                 <div className="flex items-center justify-between mb-1">
@@ -3300,14 +3362,14 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
               </div>
             </div>
           )}
-          {lesson.type === "embed" && (
+          {lessonType === "embed" && (
             <div>
               <Label className="text-sm">Embed URL (iframe src)</Label>
               <Input value={embedUrl} onChange={e => setEmbedUrl(e.target.value)} placeholder="https://..." className="mt-1" />
               <p className="text-xs text-gray-400 mt-1">Paste the full URL to embed (YouTube, Vimeo, SCORM, H5P, etc.)</p>
             </div>
           )}
-          {lesson.type === "quiz" && (
+          {lessonType === "quiz" && (
             <div className="px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg text-xs text-purple-700">
               Use the Quiz Builder button to manage questions for this quiz lesson.
             </div>
@@ -3338,7 +3400,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
           </div>
 
           {/* Completion toggles */}
-          {(lesson.type === "video" || lesson.type === "video_text") && (
+          {(lessonType === "video" || lessonType === "video_text") && (
             <div className="flex items-center gap-2">
               <Switch checked={requireVideoCompletion} onCheckedChange={setRequireVideoCompletion} id="edit-req-video" />
               <Label htmlFor="edit-req-video" className="text-sm">Require video completion before marking complete</Label>
@@ -3406,7 +3468,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
                 onCheckedChange={v => {
                   setIsPrerequisite(v);
                   // Auto-enable requireVideoCompletion for video lessons when marked as prerequisite
-                  if (v && (lesson.type === "video" || lesson.type === "video_text")) setRequireVideoCompletion(true);
+                  if (v && (lessonType === "video" || lessonType === "video_text")) setRequireVideoCompletion(true);
                 }}
                 id="edit-is-prerequisite"
               />
@@ -3416,10 +3478,10 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
               <div className="text-xs text-orange-700 bg-orange-100 rounded-md px-3 py-2 space-y-1">
                 <p className="font-semibold">🔒 Prerequisite gate active</p>
                 <p>All lessons that appear <strong>after</strong> this one in the course will be locked until this lesson is completed.</p>
-                {(lesson.type === "video" || lesson.type === "video_text") && (
+                {(lessonType === "video" || lessonType === "video_text") && (
                   <p className="text-orange-600">Video completion is automatically required for prerequisite lessons.</p>
                 )}
-                {!(lesson.type === "video" || lesson.type === "video_text") && !requireManualComplete && (
+                {!(lessonType === "video" || lessonType === "video_text") && !requireManualComplete && (
                   <p className="text-orange-600">Since this lesson has no video and no Mark Complete button, the gate will be satisfied when the student <strong>opens</strong> this lesson.</p>
                 )}
               </div>
@@ -3497,7 +3559,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
       )}
 
       {/* Quiz Builder Tab (quiz-type lessons only) */}
-      {activeTab === "quiz" && lesson.type === "quiz" && (
+      {activeTab === "quiz" && lessonType === "quiz" && (
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-2xl mx-auto px-6 py-6">
             <QuizBuilderInline lesson={lesson} courseId={lesson.courseId} />
@@ -4970,7 +5032,14 @@ function CourseUsersTab({ courseId }: { courseId: number }) {
                 <tr key={e.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3">
                     <div>
-                      <p className="font-medium text-gray-900 text-sm">{e.user?.displayName || e.user?.name || "Unknown"}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-gray-900 text-sm">{e.user?.displayName || e.user?.name || "Unknown"}</p>
+                        {e.enrollmentType === "free_preview" && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-700 border border-green-200">
+                            <Eye className="w-2.5 h-2.5" /> Preview
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-gray-400">{e.user?.email ?? "—"}</p>
                     </div>
                   </td>
@@ -4989,9 +5058,14 @@ function CourseUsersTab({ courseId }: { courseId: number }) {
                     {e.lastActivityAt ? new Date(e.lastActivityAt).toLocaleDateString() : "—"}
                   </td>
                   <td className="px-4 py-3">
-                    <Badge className={`text-xs ${e.accessType === "group" ? "bg-blue-100 text-blue-700" : e.accessType === "free" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
-                      {e.accessType ?? "direct"}
-                    </Badge>
+                    <div className="flex flex-col gap-1">
+                      <Badge className={`text-xs ${e.accessType === "group" ? "bg-blue-100 text-blue-700" : e.accessType === "free" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
+                        {e.accessType ?? "direct"}
+                      </Badge>
+                      {e.enrollmentType === "free_preview" && (
+                        <Badge className="text-xs bg-amber-100 text-amber-700 border border-amber-200">free preview</Badge>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <Button
