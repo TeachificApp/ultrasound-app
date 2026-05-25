@@ -129,22 +129,25 @@ function setCorsHeaders(res: Response) {
 
 // ─── OPTIONS preflight handler for all /media routes ────────────────────────
 // Required for cross-origin <img> and fetch() preflight requests
-router.options("/api/media/:slug", (req: Request, res: Response) => {
-  setCorsHeaders(res);
-  res.status(204).end();
-});
-router.options("/api/media/:slug/embed", (req: Request, res: Response) => {
-  setCorsHeaders(res);
-  res.status(204).end();
-});
-router.options("/api/media/:slug/info", (req: Request, res: Response) => {
-  setCorsHeaders(res);
-  res.status(204).end();
-});
-router.options("/api/media/:slug/download", (req: Request, res: Response) => {
-  setCorsHeaders(res);
-  res.status(204).end();
-});
+// Both /api/media/ and /media/ prefixes are supported (original stored URLs use /media/)
+for (const prefix of ["/api/media", "/media"]) {
+  router.options(`${prefix}/:slug`, (req: Request, res: Response) => {
+    setCorsHeaders(res);
+    res.status(204).end();
+  });
+  router.options(`${prefix}/:slug/embed`, (req: Request, res: Response) => {
+    setCorsHeaders(res);
+    res.status(204).end();
+  });
+  router.options(`${prefix}/:slug/info`, (req: Request, res: Response) => {
+    setCorsHeaders(res);
+    res.status(204).end();
+  });
+  router.options(`${prefix}/:slug/download`, (req: Request, res: Response) => {
+    setCorsHeaders(res);
+    res.status(204).end();
+  });
+}
 
 // ─── GET /media/:slug — serve content inline (no forced download) ────────────
 
@@ -194,7 +197,9 @@ function proxyInline(
     });
 }
 
-router.get("/api/media/:slug", async (req: Request, res: Response) => {
+// Serve on both /api/media/:slug (new) and /media/:slug (original stored URLs — never redirect)
+for (const slugPath of ["/api/media/:slug", "/media/:slug"]) {
+router.get(slugPath, async (req: Request, res: Response) => {
   setCorsHeaders(res);
   const token = (req.query.token as string) || undefined;
   const result = await resolveMedia(req.params.slug, token);
@@ -246,10 +251,12 @@ router.get("/api/media/:slug", async (req: Request, res: Response) => {
     res
   );
 });
+} // end for slugPath
 
 // ─── GET /media/:slug/download — force file download (Content-Disposition: attachment) ───
-
-router.get("/api/media/:slug/download", async (req: Request, res: Response) => {
+// Serve on both /api/media/:slug/download and /media/:slug/download (original stored URLs)
+for (const slugPath of ["/api/media/:slug/download", "/media/:slug/download"]) {
+router.get(slugPath, async (req: Request, res: Response) => {
   setCorsHeaders(res);
   const token = (req.query.token as string) || undefined;
   const result = await resolveMedia(req.params.slug, token);
@@ -292,10 +299,12 @@ router.get("/api/media/:slug/download", async (req: Request, res: Response) => {
       if (!res.headersSent) res.status(502).send("Failed to fetch media file.");
     });
 });
+} // end for slugPath (download)
 
-// ─── GET /media/:slug/info — JSON metadata ────────────────────────────────────────────
-
-router.get("/api/media/:slug/info", async (req: Request, res: Response) => {
+// ─── GET /media/:slug/info — JSON metadata ────────────────────────────────────────────────────────────────────────────────────
+// Serve on both /api/media/:slug/info and /media/:slug/info (original stored URLs)
+for (const slugPath of ["/api/media/:slug/info", "/media/:slug/info"]) {
+router.get(slugPath, async (req: Request, res: Response) => {
   setCorsHeaders(res);
   const token = (req.query.token as string) || undefined;
   const result = await resolveMedia(req.params.slug, token);
@@ -315,10 +324,12 @@ router.get("/api/media/:slug/info", async (req: Request, res: Response) => {
     versionNumber: result.version?.versionNumber ?? null,
   });
 });
+} // end for slugPath (info)
 
-// ─── GET /media/:slug/embed — responsive HTML embed viewer ───────────────────
-
-router.get("/api/media/:slug/embed", async (req: Request, res: Response) => {
+// ─── GET /media/:slug/embed — responsive HTML embed viewer ────────────────────────────────────────────────────────────────────────────────────
+// Serve on both /api/media/:slug/embed and /media/:slug/embed (original stored URLs)
+for (const slugPath of ["/api/media/:slug/embed", "/media/:slug/embed"]) {
+router.get(slugPath, async (req: Request, res: Response) => {
   setCorsHeaders(res);
   const token = (req.query.token as string) || undefined;
   const result = await resolveMedia(req.params.slug, token);
@@ -339,6 +350,7 @@ router.get("/api/media/:slug/embed", async (req: Request, res: Response) => {
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.send(buildEmbedPage({ asset, version, fileUrl, mimeType, mediaType, tokenParam }));
 });
+} // end for slugPath (embed)
 
 // ─── HTML helpers ─────────────────────────────────────────────────────────────
 
