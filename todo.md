@@ -2767,3 +2767,8 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Serve extracted SCORM files via /api/media/:slug/scorm-files/* static file handler
 - [x] Update /media/:slug embed page: detect scorm mediaType, render iframe pointing to /api/media/:slug/scorm-launch instead of download buttons
 - [x] Cache extracted SCORM files in /tmp/scorm-cache/:slug/ to avoid re-extracting on every view
+## SCORM ZIP Renderer Fixes (May 2026)
+- [x] Fix: ZIP mediaType was not triggering SCORM iframe — now all ZIP/scorm/lms mediaTypes use iframe
+- [x] Fix: Unified /scorm/* route so relative asset paths in SCORM HTML resolve correctly
+- [x] Fix: URL-decode req.path before path.join (Express does not decode wildcard paths)
+- [x] Fix: Resolve relative asset paths relative to launch file's parent directory (for nested ZIPs)

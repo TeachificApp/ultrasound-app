@@ -252,11 +252,22 @@ for (const prefix of ["/api/media", "/media"]) {
   });
 }
 
-// ─── GET /media/:slug/scorm-launch — serve extracted SCORM launch file ────────
-// This route extracts the SCORM ZIP on first request and serves the launch HTML.
-// Subsequent requests are served from the temp cache.
+// ─── GET /media/:slug/scorm-launch — redirect to /scorm/ for backward compat ──
+// The /scorm/* route below handles everything; this keeps old links working.
 for (const slugPath of ["/api/media/:slug/scorm-launch", "/media/:slug/scorm-launch"]) {
-  router.get(slugPath, async (req: Request, res: Response) => {
+  router.get(slugPath, (req: Request, res: Response) => {
+    const token = (req.query.token as string) || undefined;
+    const tokenParam = token ? `?token=${encodeURIComponent(token)}` : "";
+    res.redirect(302, `/api/media/${req.params.slug}/scorm/${tokenParam}`);
+  });
+} // end for slugPath (scorm-launch redirect)
+
+// ─── GET /media/:slug/scorm/* — unified SCORM content server ─────────────────
+// Serves the SCORM launch file at /scorm/ and all assets at /scorm/path/to/asset.
+// Because all content is under the same URL prefix, relative paths in the SCORM
+// HTML resolve correctly without needing a <base> tag injection.
+for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
+  router.get([slugPath, `${slugPath}/*`], async (req: Request, res: Response) => {
     setCorsHeaders(res);
     const token = (req.query.token as string) || undefined;
     const result = await resolveMedia(req.params.slug, token);
@@ -266,51 +277,55 @@ for (const slugPath of ["/api/media/:slug/scorm-launch", "/media/:slug/scorm-lau
     if (!result.version) { res.status(404).send(errorPage("No file available.")); return; }
 
     const { asset, version } = result;
-    const fileUrl = version.s3Url;
 
-    const extracted = await extractScormZip(asset.slug, fileUrl);
+    // Extract SCORM ZIP on first request; subsequent requests use the cache.
+    const extracted = await extractScormZip(asset.slug, version.s3Url);
     if (!extracted) {
-      res.status(500).send(errorPage("Failed to extract SCORM package. Please try downloading the ZIP directly."));
+      res.status(500).send(errorPage("Failed to extract SCORM package."));
       return;
     }
 
-    const launchPath = path.join(extracted.cacheDir, extracted.launchFile);
-    if (!fs.existsSync(launchPath)) {
-      res.status(404).send(errorPage(`Launch file not found: ${extracted.launchFile}`));
-      return;
-    }
+    const { launchFile, cacheDir } = extracted;
 
-    res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.setHeader("Cache-Control", "public, max-age=3600");
-    res.sendFile(launchPath);
-  });
-} // end for slugPath (scorm-launch)
-
-// ─── GET /media/:slug/scorm-files/* — serve extracted SCORM asset files ──────
-// Serves JS, CSS, images, fonts, and other assets from the extracted SCORM cache.
-for (const slugPath of ["/api/media/:slug/scorm-files", "/media/:slug/scorm-files"]) {
-  router.get(`${slugPath}/*`, async (req: Request, res: Response) => {
-    setCorsHeaders(res);
-    const token = (req.query.token as string) || undefined;
-    const result = await resolveMedia(req.params.slug, token);
-
-    if (!result) { res.status(404).send("Not found"); return; }
-    if (!result.allowed) { res.status(403).send("Access denied"); return; }
-
-    const { asset } = result;
-    const cacheDir = path.join(SCORM_CACHE_DIR, asset.slug);
-    if (!fs.existsSync(cacheDir)) {
-      res.status(404).send("SCORM package not yet extracted — visit /scorm-launch first");
-      return;
-    }
-
-    // Extract the file path after /scorm-files/
+    // Determine which file to serve:
+    // - /scorm/  or  /scorm  → serve the launch file
+    // - /scorm/path/to/asset → serve that asset relative to the cache root
     const prefix = slugPath.replace(":slug", req.params.slug);
-    const filePath = req.path.replace(`${prefix}/`, "");
-    const fullPath = path.join(cacheDir, filePath);
+    // Decode URI components since Express does NOT decode req.path for wildcard routes
+    const rawRelative = req.path.replace(prefix, "").replace(/^\//, "");
+    const relativePath = decodeURIComponent(rawRelative);
+
+    // The launch file may be nested inside a sub-folder (e.g. 'CourseName/index.html').
+    // Relative asset paths in the HTML resolve relative to /scorm/ (the iframe src),
+    // so 'data/foo.js' resolves to /scorm/data/foo.js — but the actual file lives at
+    // cacheDir/CourseName/data/foo.js.  We try the direct path first, then fall back
+    // to looking inside the launch file's parent directory.
+    const launchDir = path.dirname(launchFile); // e.g. 'CourseName'
+    let targetFile: string;
+    let fullPath: string;
+    if (relativePath === "") {
+      // Root request → serve the launch file
+      targetFile = launchFile;
+      fullPath = path.join(cacheDir, launchFile);
+    } else {
+      // Try direct path first (works when ZIP extracts flat or path already includes folder)
+      const directPath = path.join(cacheDir, relativePath);
+      // Then try relative to the launch file's directory
+      const launchRelPath = path.join(cacheDir, launchDir, relativePath);
+      if (fs.existsSync(directPath)) {
+        targetFile = relativePath;
+        fullPath = directPath;
+      } else if (launchDir !== "." && fs.existsSync(launchRelPath)) {
+        targetFile = path.join(launchDir, relativePath);
+        fullPath = launchRelPath;
+      } else {
+        targetFile = relativePath;
+        fullPath = directPath; // will 404 below
+      }
+    }
 
     // Security: prevent path traversal
-    if (!fullPath.startsWith(cacheDir + path.sep) && fullPath !== cacheDir) {
+    if (!fullPath.startsWith(cacheDir + path.sep) && fullPath !== path.join(cacheDir, launchFile)) {
       res.status(403).send("Forbidden");
       return;
     }
@@ -323,7 +338,7 @@ for (const slugPath of ["/api/media/:slug/scorm-files", "/media/:slug/scorm-file
     res.setHeader("Cache-Control", "public, max-age=3600");
     res.sendFile(fullPath);
   });
-} // end for slugPath (scorm-files)
+} // end for slugPath (scorm)
 
 // ─── GET /media/:slug — serve content inline (no forced download) ────────────
 
@@ -700,38 +715,18 @@ function buildEmbedPage(opts: EmbedPageOptions): string {
       <iframe src="${escHtml(fileUrl)}" style="width:100%;height:100%;border:none;"
               allow="autoplay; fullscreen"
               title="${escHtml(asset.title)}"></iframe>`;
-  } else if (mediaType === "scorm" || mediaType === "lms") {
+  } else if (mediaType === "scorm" || mediaType === "lms" || mediaType === "zip" ||
+             mimeType === "application/zip" || mimeType === "application/x-zip-compressed" ||
+             mimeType === "application/x-zip" || mimeType === "application/octet-stream" && (fileUrl.endsWith(".zip") || fileUrl.includes(".zip?"))) {
     needsMobileBanner = true;
-    // SCORM/LMS content: always render in an iframe.
-    // For ZIP files, use the /scorm-launch route which extracts the ZIP server-side
-    // and serves the HTML entry point. For non-ZIP URLs (already an HTML file), embed directly.
-    const isZip = fileUrl.endsWith(".zip") || fileUrl.includes(".zip?");
-    const iframeSrc = isZip
-      ? `/api/media/${escHtml(slug)}/scorm-launch${escHtml(tokenParam)}`
-      : escHtml(fileUrl);
+    // SCORM/LMS/ZIP content: always render in an iframe via the scorm-launch route.
+    // The server extracts the ZIP, parses imsmanifest.xml, and serves the HTML entry point.
+    const iframeSrc = `/api/media/${escHtml(slug)}/scorm/${escHtml(tokenParam)}`;
     contentHtml = `
       ${mobileBanner}
       <iframe src="${iframeSrc}" style="width:100%;height:100%;border:none;"
               allow="autoplay; fullscreen"
               title="${escHtml(asset.title)}"></iframe>`;
-  } else if (mediaType === "zip") {
-    // Generic ZIP: show a viewer page with open and download options
-    contentHtml = `
-      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:16px;padding:clamp(20px,5vw,40px);background:#fafafa;">
-        <div style="font-size:56px;">🗜️</div>
-        <div style="text-align:center;">
-          <p style="font-size:18px;font-weight:700;color:#111827;margin:0 0 6px;">${escHtml(asset.title)}</p>
-          <p style="font-size:13px;color:#6b7280;margin:0;">ZIP Archive</p>
-        </div>
-        <div class="action-group">
-          <a href="${escHtml(fileUrl)}" target="_blank" rel="noopener" class="action-btn action-btn-primary">
-            &#x1F517; Open File
-          </a>
-          <a href="${escHtml(fileUrl)}" download class="action-btn action-btn-secondary">
-            &#x2B07; Download
-          </a>
-        </div>
-      </div>`;
   } else {
     // Generic fallback: open-in-new-tab + download
     contentHtml = `
