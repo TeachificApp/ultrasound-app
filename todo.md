@@ -2757,3 +2757,13 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add updateLessonType tRPC procedure (or extend updateLesson to accept lessonType)
 - [x] Show free preview badge in CourseUsersTab student list (enrollmentType = 'free_preview')
 - [x] Add 3-minute upgrade prompt timer in CoursePlayer for free_preview enrollees
+
+## Funnel Root URL 404 Fix (May 2026)
+- [x] Add getFirstPage procedure to funnelPublic router (takes funnelSlug, returns first page by sortOrder)
+- [x] Add FunnelRootRedirect component that auto-redirects /:slug to /:slug/:firstPageSlug
+- [x] Add /:slug route in App.tsx (before /:slug/:pageSlug) that renders FunnelRootRedirect
+## SCORM HTML Renderer (May 2026)
+- [x] Build server-side SCORM ZIP extractor: download ZIP from S3, extract to temp dir, find launch file (imsmanifest.xml → launch, or index.html)
+- [x] Serve extracted SCORM files via /api/media/:slug/scorm-files/* static file handler
+- [x] Update /media/:slug embed page: detect scorm mediaType, render iframe pointing to /api/media/:slug/scorm-launch instead of download buttons
+- [x] Cache extracted SCORM files in /tmp/scorm-cache/:slug/ to avoid re-extracting on every view

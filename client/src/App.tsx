@@ -6,8 +6,9 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import MediaRedirect from "@/pages/MediaRedirect";
-import { Route, Switch, useLocation } from "wouter";
+import { Route, Switch, useLocation, useParams, Redirect } from "wouter";
 import { useEffect, lazy, Suspense } from "react";
+import { trpc } from "./lib/trpc";
 import ErrorBoundary from "./components/ErrorBoundary";
 import DemoModeBanner from "./components/DemoModeBanner";
 import GetAppBanner from "./components/GetAppBanner";
@@ -458,6 +459,7 @@ function Router() {
         <Route path="/accreditation-manager">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AccreditationManager /></RoleGuard>}</Route>
 
         {/* ── Public Funnel Pages ────────────────────────────────────── */}
+        <Route path="/:slug">{() => <FunnelRootRedirect />}</Route>
         <Route path="/:slug/:pageSlug">{() => <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><PublicFunnelPage /></Suspense>}</Route>
         <Route path="/p/:slug">{() => <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><StandaloneLandingPage /></Suspense>}</Route>
 
@@ -549,6 +551,7 @@ function MembersRouter() {
           <Route path="/auth/magic" component={MagicLinkCallback} />
           <Route path="/register" component={Register} />
           {/* Funnel pages — catch-all MUST be last so all specific routes above match first */}
+          <Route path="/:slug"><FunnelRootRedirect /></Route>
           <Route path="/:slug/:pageSlug">
             <Suspense fallback={pageFallback}><PublicFunnelPage /></Suspense>
           </Route>
@@ -634,6 +637,7 @@ function LMSRouter() {
         <Route path="/media/:slug/:action" component={MediaRedirect} />
         <Route path="/media/:slug" component={MediaRedirect} />
             {/* Funnel pages — catch-all MUST be last so all specific routes above match first */}
+            <Route path="/:slug"><FunnelRootRedirect /></Route>
             <Route path="/:slug/:pageSlug">
               <Suspense fallback={pageFallback}>
                 <PublicFunnelPage />
@@ -806,6 +810,35 @@ function IHeartEchoRouter() {
       </Switch>
     </Suspense>
   );
+}
+
+/**
+ * FunnelRootRedirect — When a visitor lands on /:slug (no page slug),
+ * fetch the first active page of that funnel and redirect to /:slug/:firstPageSlug.
+ */
+function FunnelRootRedirect() {
+  const params = useParams<{ slug: string }>();
+  const slug = params.slug || "";
+  const { data, error } = trpc.funnelPublic.getFirstPage.useQuery(
+    { funnelSlug: slug },
+    { enabled: !!slug, retry: false }
+  );
+
+  if (error) {
+    // Not a funnel slug — show 404
+    return <NotFound />;
+  }
+
+  if (!data) {
+    // Loading
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  return <Redirect to={`/${data.funnelSlug}/${data.firstPageSlug}`} />;
 }
 
 /** Mounts the upgrade prompt only for free, authenticated, non-admin users */

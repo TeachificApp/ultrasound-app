@@ -898,6 +898,26 @@ export const funnelPublicRouter = router({
        return { funnel: funnel || null, page };
     }),
 
+  /** Get the first page of a funnel by slug — used to redirect /:slug → /:slug/:firstPageSlug */
+  getFirstPage: publicProcedure
+    .input(z.object({ funnelSlug: z.string() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      const [funnel] = await db
+        .select()
+        .from(funnels)
+        .where(eq(funnels.slug, input.funnelSlug));
+      if (!funnel) throw new TRPCError({ code: "NOT_FOUND", message: "Funnel not found" });
+      const [firstPage] = await db
+        .select({ slug: funnelPages.slug, title: funnelPages.title })
+        .from(funnelPages)
+        .where(and(eq(funnelPages.funnelId, funnel.id), eq(funnelPages.isActive, true)))
+        .orderBy(asc(funnelPages.sortOrder))
+        .limit(1);
+      if (!firstPage) throw new TRPCError({ code: "NOT_FOUND", message: "No active pages in funnel" });
+      return { funnelSlug: funnel.slug, firstPageSlug: firstPage.slug };
+    }),
+
   /** Get a specific funnel page (public) */
   getPage: publicProcedure
     .input(z.object({ funnelSlug: z.string(), pageSlug: z.string() }))
