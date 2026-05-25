@@ -2722,3 +2722,13 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Update lesson import to use rich text as primary content block (video block first, then html_description as text block, plus embed/download/quiz blocks when present)
 - [x] Add resyncCourse procedure: re-fetches all lesson content, enrollments, progress, and re-scrapes landing page
 - [x] Add Re-sync button to admin Thinkific import page for previously imported courses
+
+## Thinkific Import Fixes (May 2026)
+- [x] Add Re-sync button to LMS Admin course settings panel (Thinkific sync banner) for already-imported courses
+- [x] Fix course card image not transferring during import (card_image_url should populate coverImageUrl)
+
+## Thinkific Card Image Sync Fix (May 2026)
+- [x] Fix card image not syncing during initial import (coverImageUrl column confirmed, import already sets it)
+- [x] Fix card image not updating in syncThinkificEnrollments mutation (removed !course.coverImageUrl guard — now always updates)
+- [x] Fix card image not updating in resyncCourse procedure (added step 0: always fetch and update cover image first)
+- [x] Add Re-sync button to course Settings tab (Thinkific Re-sync section with toggles for content/enrollments/landing page)

@@ -2443,18 +2443,16 @@ Rules:
       }
       const thinkificCourseId = importRecord.thinkificCourseId;
 
-      // 2. Optionally update the course cover image from Thinkific
-      const [course] = await db.select({ id: lmsCourses.id, coverImageUrl: lmsCourses.coverImageUrl }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
-      if (course) {
-        try {
-          const thinkificCourse = await getThinkificCourse(thinkificCourseId);
-          const newImageUrl = thinkificCourse.card_image_url || thinkificCourse.banner_image_url;
-          if (newImageUrl && !course.coverImageUrl) {
-            await db.update(lmsCourses).set({ coverImageUrl: newImageUrl }).where(eq(lmsCourses.id, input.courseId));
-          }
-        } catch (e) {
-          console.warn("[syncThinkific] Could not fetch course image:", e);
+      // 2. Always update the course cover image from Thinkific (overwrite any stale/missing value)
+      try {
+        const thinkificCourse = await getThinkificCourse(thinkificCourseId);
+        const newImageUrl = thinkificCourse.card_image_url || thinkificCourse.banner_image_url;
+        if (newImageUrl) {
+          await db.update(lmsCourses).set({ coverImageUrl: newImageUrl }).where(eq(lmsCourses.id, input.courseId));
+          console.log(`[syncThinkific] Updated cover image for course ${input.courseId}: ${newImageUrl}`);
         }
+      } catch (e) {
+        console.warn("[syncThinkific] Could not fetch course image:", e);
       }
 
       // 3. Fetch all enrollments from Thinkific

@@ -1330,6 +1330,24 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
     onError: (e) => toast.error(e.message),
   });
 
+  // Thinkific resync
+  const { data: syncInfo } = trpc.lmsAdmin.getThinkificSyncInfo.useQuery({ courseId: course.id });
+  const [resyncContent, setResyncContent] = useState(true);
+  const [resyncEnrollments, setResyncEnrollments] = useState(true);
+  const [resyncLandingPage, setResyncLandingPage] = useState(true);
+  const [resyncResult, setResyncResult] = useState<{ lessonsUpdated: number; enrollmentsUpdated: number; landingPageUpdated: boolean; log: string[] } | null>(null);
+  const [showResyncLog, setShowResyncLog] = useState(false);
+  const resyncCourse = trpc.thinkificImport.resyncCourse.useMutation({
+    onSuccess: (result) => {
+      setResyncResult(result);
+      toast.success(`Re-sync complete — ${result.lessonsUpdated} lessons, ${result.enrollmentsUpdated} enrollments updated`);
+      if (result.log?.some(l => l.startsWith('Updated cover image'))) {
+        setCoverImageUrl(result.log.find(l => l.startsWith('Updated cover image'))?.replace('Updated cover image: ', '') ?? coverImageUrl);
+      }
+    },
+    onError: (e) => toast.error(`Re-sync failed: ${e.message}`),
+  });
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
       {/* Top Save Button */}
@@ -1769,6 +1787,64 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
           </div>
         </div>
       </div>
+      {/* Thinkific Re-sync Section — only shown for Thinkific-imported courses */}
+      {syncInfo && (
+        <div className="border border-blue-200 rounded-lg p-4 space-y-3 bg-blue-50">
+          <div className="flex items-center gap-2">
+            <RefreshCw className="w-4 h-4 text-blue-600" />
+            <div>
+              <h3 className="text-sm font-semibold text-blue-800">Thinkific Re-sync</h3>
+              <p className="text-xs text-blue-500">Source: <span className="font-medium">{syncInfo.thinkificCourseName}</span>{syncInfo.lastSyncedAt && ` · Last synced ${new Date(syncInfo.lastSyncedAt).toLocaleString()}`}</p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-blue-800">Lesson content &amp; cover image</p>
+                <p className="text-xs text-blue-500">Re-fetches all lesson content blocks and updates the course card image</p>
+              </div>
+              <Switch checked={resyncContent} onCheckedChange={setResyncContent} />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-blue-800">Enrollments &amp; progress</p>
+                <p className="text-xs text-blue-500">Syncs student enrollments and completion percentages</p>
+              </div>
+              <Switch checked={resyncEnrollments} onCheckedChange={setResyncEnrollments} />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-blue-800">Landing page</p>
+                <p className="text-xs text-blue-500">Re-scrapes the Thinkific sales page to refresh landing page blocks</p>
+              </div>
+              <Switch checked={resyncLandingPage} onCheckedChange={setResyncLandingPage} />
+            </div>
+          </div>
+          <Button
+            size="sm"
+            className="bg-blue-600 hover:bg-blue-700 text-white h-8"
+            disabled={resyncCourse.isPending || (!resyncContent && !resyncEnrollments && !resyncLandingPage)}
+            onClick={() => resyncCourse.mutate({ lmsCourseId: course.id, resyncContent, resyncEnrollments, resyncLandingPage })}
+          >
+            {resyncCourse.isPending ? (
+              <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Re-syncing...</>
+            ) : (
+              <><RefreshCw className="w-3 h-3 mr-1" /> Re-sync from Thinkific</>
+            )}
+          </Button>
+          {resyncResult && (
+            <div className="mt-2 rounded-md bg-white border border-blue-200 p-3 text-xs space-y-1">
+              <p className="font-medium text-blue-800">Re-sync complete</p>
+              <p className="text-blue-600">{resyncResult.lessonsUpdated} lesson{resyncResult.lessonsUpdated !== 1 ? 's' : ''} updated · {resyncResult.enrollmentsUpdated} enrollment{resyncResult.enrollmentsUpdated !== 1 ? 's' : ''} synced{resyncResult.landingPageUpdated ? ' · Landing page refreshed' : ''}</p>
+              <button className="text-blue-400 underline text-xs" onClick={() => setShowResyncLog(v => !v)}>{showResyncLog ? 'Hide' : 'Show'} sync log</button>
+              {showResyncLog && (
+                <pre className="mt-1 text-xs text-gray-500 bg-gray-50 rounded p-2 max-h-40 overflow-y-auto whitespace-pre-wrap">{resyncResult.log.join('\n')}</pre>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       <Button
         className="bg-teal-600 hover:bg-teal-700 text-white"
         disabled={saving}

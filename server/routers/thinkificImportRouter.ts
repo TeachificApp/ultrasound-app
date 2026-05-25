@@ -1041,6 +1041,18 @@ export const thinkificImportRouter = router({
       let landingPageUpdated = false;
 
       try {
+        // ─── 0. Always update cover image from Thinkific ──────────────────────────────────
+        try {
+          const thinkificCourseForImage = await getThinkificCourse(thinkificCourseId);
+          const newCoverUrl = thinkificCourseForImage.card_image_url || thinkificCourseForImage.banner_image_url;
+          if (newCoverUrl) {
+            await db.update(lmsCourses).set({ coverImageUrl: newCoverUrl }).where(eq(lmsCourses.id, input.lmsCourseId));
+            log.push(`Updated cover image: ${newCoverUrl}`);
+          }
+        } catch (e) {
+          log.push(`WARN: Could not update cover image: ${e instanceof Error ? e.message : String(e)}`);
+        }
+
         // ─── 1. Re-sync lesson content ────────────────────────────────────────────────────
         if (input.resyncContent) {
           const chapters = await getChaptersForCourse(thinkificCourseId);
