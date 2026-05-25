@@ -83,6 +83,32 @@ export const platformAdminRouter = router({
     return countUsers();
   }),
 
+  /** Get brand-specific premium user count from brandMemberships */
+  brandStats: protectedProcedure
+    .input(z.object({ brand: z.enum(["aaus", "iheartecho"]) }))
+    .query(async ({ ctx, input }) => {
+      const roles = await getUserRoles(ctx.user.id);
+      if (ctx.user.role !== "admin" && !roles.includes("platform_admin")) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      const { getDb } = await import("../db");
+      const db = await getDb();
+      if (!db) return { premiumCount: 0 };
+      const { brandMemberships } = await import("../../drizzle/schema");
+      const { eq, and, count } = await import("drizzle-orm");
+      const [row] = await db
+        .select({ total: count() })
+        .from(brandMemberships)
+        .where(
+          and(
+            eq(brandMemberships.brand, input.brand),
+            eq(brandMemberships.tier, "premium"),
+            eq(brandMemberships.status, "active")
+          )
+        );
+      return { premiumCount: row?.total ?? 0 };
+    }),
+
   /** Get roles for a specific user */
   getUserRoles: protectedProcedure
     .input(z.object({ userId: z.number() }))

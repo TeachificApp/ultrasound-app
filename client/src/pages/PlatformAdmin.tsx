@@ -1321,6 +1321,11 @@ export default function PlatformAdmin() {
     { enabled: !!isAdmin },
   );
 
+  const { data: brandStats } = trpc.platformAdmin.brandStats.useQuery(
+    { brand: dualBrand },
+    { enabled: !!isAdmin },
+  );
+
   const assignRoleMutation = trpc.platformAdmin.assignRole.useMutation({
     onSuccess: () => {
       toast.success("Role assigned successfully.");
@@ -1424,7 +1429,7 @@ export default function PlatformAdmin() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[
             { label: "Total Users", value: userCount ?? 0, icon: Users, color: "#189aa1" },
-            { label: "Premium Users", value: (users ?? []).filter(u => u.roles.includes("premium_user")).length, icon: Crown, color: "#d97706" },
+            { label: `Premium Users (${dualBrand === "aaus" ? "AAUS" : "iHE"})`, value: brandStats?.premiumCount ?? 0, icon: Crown, color: "#d97706" },
             { label: "DIY Admins", value: (users ?? []).filter(u => u.roles.includes("diy_admin")).length, icon: ClipboardList, color: "#0d9488" },
             { label: "DIY Users", value: (users ?? []).filter(u => u.roles.includes("diy_user")).length, icon: Stethoscope, color: "#2563eb" },
           ].map(({ label, value, icon: Icon, color }) => (
