@@ -9,7 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
-import { ArrowRight, BookOpen, CheckCircle, AlertCircle, Loader2, Users, FileText, ChevronDown, ChevronRight, ExternalLink, Search } from "lucide-react";
+import {
+  ArrowRight, BookOpen, CheckCircle, AlertCircle, Loader2, Users,
+  FileText, ChevronDown, ChevronRight, ExternalLink, Search, RefreshCw,
+} from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -67,6 +70,23 @@ export default function ThinkificImporter() {
   } | null>(null);
   const [importResultOpen, setImportResultOpen] = useState(false);
 
+  // Resync state
+  const [resyncTargetId, setResyncTargetId] = useState<number | null>(null); // lmsCourseId
+  const [resyncTargetName, setResyncTargetName] = useState<string>("");
+  const [resyncDialogOpen, setResyncDialogOpen] = useState(false);
+  const [resyncOptions, setResyncOptions] = useState({
+    resyncContent: true,
+    resyncEnrollments: true,
+    resyncLandingPage: true,
+  });
+  const [resyncResult, setResyncResult] = useState<{
+    lessonsUpdated: number;
+    enrollmentsUpdated: number;
+    landingPageUpdated: boolean;
+    log: string[];
+  } | null>(null);
+  const [resyncResultOpen, setResyncResultOpen] = useState(false);
+
   // Queries
   const { data: courses, isLoading: loadingCourses, error: coursesError } = trpc.thinkificImport.listCourses.useQuery();
   const { data: preview, isLoading: loadingPreview } = trpc.thinkificImport.previewImport.useQuery(
@@ -75,12 +95,15 @@ export default function ThinkificImporter() {
   );
   const { data: imports } = trpc.thinkificImport.listImports.useQuery();
 
+  const utils = trpc.useUtils();
+
   // Mutations
   const runImport = trpc.thinkificImport.runImport.useMutation({
     onSuccess: (data) => {
       setImportResult(data);
       setPreviewOpen(false);
       setImportResultOpen(true);
+      utils.thinkificImport.listImports.invalidate();
       toast.success(`Import complete! ${data.lessonsImported} lessons imported as draft.`);
     },
     onError: (err) => {
@@ -88,7 +111,6 @@ export default function ThinkificImporter() {
     },
   });
 
-  const utils = trpc.useUtils();
   const activateEnrollments = trpc.thinkificImport.activatePendingEnrollments.useMutation({
     onSuccess: (data) => {
       toast.success(`Enrollments activated: ${data.activated} students enrolled, ${data.skipped} skipped.`);
@@ -96,6 +118,19 @@ export default function ThinkificImporter() {
     },
     onError: (err) => {
       toast.error(`Activation failed: ${err.message}`);
+    },
+  });
+
+  const resyncCourse = trpc.thinkificImport.resyncCourse.useMutation({
+    onSuccess: (data) => {
+      setResyncResult(data);
+      setResyncDialogOpen(false);
+      setResyncResultOpen(true);
+      utils.thinkificImport.listImports.invalidate();
+      toast.success(`Re-sync complete! ${data.lessonsUpdated} lessons updated, ${data.enrollmentsUpdated} enrollments synced.`);
+    },
+    onError: (err) => {
+      toast.error(`Re-sync failed: ${err.message}`);
     },
   });
 
@@ -119,6 +154,22 @@ export default function ThinkificImporter() {
       importEnrollments: importOptions.importEnrollments,
       scrapeSalesPage: importOptions.scrapeSalesPage,
       courseType: importOptions.courseType,
+    });
+  }
+
+  function handleOpenResync(lmsCourseId: number, courseName: string) {
+    setResyncTargetId(lmsCourseId);
+    setResyncTargetName(courseName);
+    setResyncDialogOpen(true);
+  }
+
+  function handleRunResync() {
+    if (!resyncTargetId) return;
+    resyncCourse.mutate({
+      lmsCourseId: resyncTargetId,
+      resyncContent: resyncOptions.resyncContent,
+      resyncEnrollments: resyncOptions.resyncEnrollments,
+      resyncLandingPage: resyncOptions.resyncLandingPage,
     });
   }
 
@@ -172,7 +223,7 @@ export default function ThinkificImporter() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap justify-end">
                     <Badge variant={imp.status === "complete" ? "default" : imp.status === "failed" ? "destructive" : "secondary"}>
                       {imp.status}
                     </Badge>
@@ -184,7 +235,20 @@ export default function ThinkificImporter() {
                         disabled={activateEnrollments.isPending}
                       >
                         <Users className="w-3 h-3 mr-1" />
-                        Activate Pending Enrollments
+                        Activate Pending
+                      </Button>
+                    )}
+                    {/* Re-sync button — only for successfully imported courses */}
+                    {imp.status === "complete" && imp.lmsCourseId && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-teal-300 text-teal-700 hover:bg-teal-50"
+                        onClick={() => handleOpenResync(imp.lmsCourseId!, imp.thinkificCourseName)}
+                        disabled={resyncCourse.isPending}
+                      >
+                        <RefreshCw className="w-3 h-3 mr-1" />
+                        Re-sync
                       </Button>
                     )}
                     {imp.lmsCourseId && (
@@ -302,7 +366,7 @@ export default function ThinkificImporter() {
         </CardContent>
       </Card>
 
-      {/* Preview + import dialog */}
+      {/* ── Preview + import dialog ─────────────────────────────────────────── */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -448,7 +512,7 @@ export default function ThinkificImporter() {
         </DialogContent>
       </Dialog>
 
-      {/* Import result dialog */}
+      {/* ── Import result dialog ────────────────────────────────────────────── */}
       <Dialog open={importResultOpen} onOpenChange={setImportResultOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -492,6 +556,143 @@ export default function ThinkificImporter() {
                     Open in LMS Builder
                   </a>
                 </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Re-sync options dialog ──────────────────────────────────────────── */}
+      <Dialog open={resyncDialogOpen} onOpenChange={setResyncDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RefreshCw className="w-5 h-5 text-teal-600" />
+              Re-sync Course from Thinkific
+            </DialogTitle>
+            <DialogDescription>
+              Pull the latest content, enrollments, and sales page from Thinkific for <strong>{resyncTargetName}</strong>.
+              Existing lesson content blocks will be overwritten with fresh data.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-3 p-4 rounded-lg border bg-gray-50">
+              <h4 className="font-semibold text-sm text-gray-700">Re-sync Options</h4>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="font-medium text-sm">Lesson content</Label>
+                  <p className="text-xs text-gray-500">Re-fetch rich text, video, quiz, and download blocks for every lesson</p>
+                </div>
+                <Switch
+                  checked={resyncOptions.resyncContent}
+                  onCheckedChange={(v) => setResyncOptions(prev => ({ ...prev, resyncContent: v }))}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="font-medium text-sm">Enrollments &amp; progress</Label>
+                  <p className="text-xs text-gray-500">Upsert all active enrollments and update completion percentages</p>
+                </div>
+                <Switch
+                  checked={resyncOptions.resyncEnrollments}
+                  onCheckedChange={(v) => setResyncOptions(prev => ({ ...prev, resyncEnrollments: v }))}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="font-medium text-sm">Landing page</Label>
+                  <p className="text-xs text-gray-500">Re-scrape the Thinkific sales page and update landing page blocks</p>
+                </div>
+                <Switch
+                  checked={resyncOptions.resyncLandingPage}
+                  onCheckedChange={(v) => setResyncOptions(prev => ({ ...prev, resyncLandingPage: v }))}
+                />
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">
+              <strong>Note:</strong> Re-syncing lesson content will overwrite existing content blocks. This may take a few minutes for large courses due to Thinkific API rate limits (120 requests/min).
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2 border-t">
+            <Button variant="outline" onClick={() => setResyncDialogOpen(false)}>Cancel</Button>
+            <Button
+              onClick={handleRunResync}
+              disabled={resyncCourse.isPending || (!resyncOptions.resyncContent && !resyncOptions.resyncEnrollments && !resyncOptions.resyncLandingPage)}
+              className="bg-teal-600 hover:bg-teal-700 text-white"
+            >
+              {resyncCourse.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Re-syncing…
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Start Re-sync
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Re-sync result dialog ───────────────────────────────────────────── */}
+      <Dialog open={resyncResultOpen} onOpenChange={setResyncResultOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-500" />
+              Re-sync Complete
+            </DialogTitle>
+            <DialogDescription>
+              The course has been updated with the latest data from Thinkific.
+            </DialogDescription>
+          </DialogHeader>
+          {resyncResult && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="p-3 rounded-lg bg-blue-50">
+                  <p className="text-2xl font-bold text-blue-700">{resyncResult.lessonsUpdated}</p>
+                  <p className="text-xs text-blue-600">Lessons Updated</p>
+                </div>
+                <div className="p-3 rounded-lg bg-teal-50">
+                  <p className="text-2xl font-bold text-teal-700">{resyncResult.enrollmentsUpdated}</p>
+                  <p className="text-xs text-teal-600">Enrollments Synced</p>
+                </div>
+                <div className="p-3 rounded-lg bg-green-50">
+                  <p className="text-2xl font-bold text-green-700">{resyncResult.landingPageUpdated ? "Yes" : "No"}</p>
+                  <p className="text-xs text-green-600">Landing Page</p>
+                </div>
+              </div>
+
+              {/* Log output */}
+              {resyncResult.log.length > 0 && (
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-gray-500 hover:text-gray-700 font-medium">View sync log ({resyncResult.log.length} entries)</summary>
+                  <div className="mt-2 p-3 rounded bg-gray-50 border font-mono text-gray-700 max-h-48 overflow-y-auto space-y-0.5">
+                    {resyncResult.log.map((line, i) => (
+                      <p key={i} className={line.startsWith("ERROR") ? "text-red-600" : line.startsWith("WARN") ? "text-amber-600" : ""}>{line}</p>
+                    ))}
+                  </div>
+                </details>
+              )}
+
+              <div className="flex justify-end gap-3">
+                <Button variant="outline" onClick={() => setResyncResultOpen(false)}>Close</Button>
+                {resyncTargetId && (
+                  <Button className="bg-[#149096] hover:bg-[#107a7f] text-white" asChild>
+                    <a href={`/admin/lms?courseId=${resyncTargetId}`}>
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Open in LMS Builder
+                    </a>
+                  </Button>
+                )}
               </div>
             </div>
           )}

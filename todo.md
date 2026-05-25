@@ -2716,3 +2716,9 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add video block to lesson contentBlocks when video URL is available
 - [x] Add quiz block to lesson contentBlocks when quiz questions are available
 - [x] Fix landing page scrape to try public Thinkific subdomain first instead of member portal (which requires login)
+
+## Thinkific Full Resync (May 2026)
+- [x] Extend getContentDetail to include images, attachments, download_url, content_type-specific fields
+- [x] Update lesson import to use rich text as primary content block (video block first, then html_description as text block, plus embed/download/quiz blocks when present)
+- [x] Add resyncCourse procedure: re-fetches all lesson content, enrollments, progress, and re-scrapes landing page
+- [x] Add Re-sync button to admin Thinkific import page for previously imported courses

@@ -597,33 +597,25 @@ export const thinkificImportRouter = router({
               embedUrl = `https://player.vimeo.com/video/${detail.vimeo_video_id}`;
             }
 
-            // Build content blocks for the lesson page builder
+            // ─── Build content blocks ───────────────────────────────────────────
+            // Strategy: rich text block is the PRIMARY container for all lesson content.
+            // Most Thinkific lessons are rich text + video + inline images + embed links.
+            // Supplementary blocks (video, embed, download, quiz) are added when present.
             const blocks: object[] = [];
 
-            // Hero block with lesson title
-            blocks.push({
-              id: `hero-${uid()}`,
-              type: "hero",
-              data: {
-                headline: content.name,
-                headline2: "",
-                subheadline: "",
-                bgType: "color",
-                bgColor: "#149096",
-                textColor: "#ffffff",
-                align: "left",
-                buttons: [],
-                showButtons: false,
-              },
-            });
-
-            // Video block if video URL found
-            if (embedUrl && (lessonType === "video" || lessonType === "embed")) {
+            // 1. VIDEO block — placed first so it appears above the text description
+            if (embedUrl) {
+              // Determine provider label for the video block
+              let videoProvider = "url";
+              if (detail?.wistia_hashed_id) videoProvider = "wistia";
+              else if (detail?.youtube_video_id) videoProvider = "youtube";
+              else if (detail?.vimeo_video_id) videoProvider = "vimeo";
               blocks.push({
                 id: `video-${uid()}`,
                 type: "video",
                 data: {
                   url: embedUrl,
+                  provider: videoProvider,
                   caption: "",
                   bgColor: "#000000",
                   autoplay: false,
@@ -631,8 +623,16 @@ export const thinkificImportRouter = router({
               });
             }
 
-            // HTML description block (primary content)
-            const htmlDesc = detail?.html_description || content.html_description;
+            // 2. RICH TEXT block — primary content container
+            //    html_description contains the full rich HTML body including inline images.
+            //    body/description are fallbacks for content types that use different field names.
+            const htmlDesc =
+              detail?.html_description ||
+              (detail as any)?.body ||
+              content.html_description ||
+              null;
+            const plainDesc = detail?.description || content.description || null;
+
             if (htmlDesc && htmlDesc.trim().length > 0) {
               blocks.push({
                 id: `text-${uid()}`,
@@ -644,33 +644,67 @@ export const thinkificImportRouter = router({
                   textColor: "#1a1a1a",
                 },
               });
-            } else {
-              // Fallback: plain description
-              const plainDesc = detail?.description || content.description;
-              if (plainDesc && plainDesc.trim().length > 0) {
-                blocks.push({
-                  id: `text-${uid()}`,
-                  type: "text",
-                  data: {
-                    html: `<p>${plainDesc}</p>`,
-                    align: "left",
-                    bgColor: "#ffffff",
-                    textColor: "#1a1a1a",
-                  },
-                });
-              }
+            } else if (plainDesc && plainDesc.trim().length > 0) {
+              // Wrap plain text in a paragraph so the text block renders correctly
+              blocks.push({
+                id: `text-${uid()}`,
+                type: "text",
+                data: {
+                  html: `<p>${plainDesc}</p>`,
+                  align: "left",
+                  bgColor: "#ffffff",
+                  textColor: "#1a1a1a",
+                },
+              });
             }
 
-            // Quiz block — if this is a quiz/exam and questions are available
-            if ((lessonType === "quiz") && detail?.questions && detail.questions.length > 0) {
+            // 3. EMBED block — for iframe/multimedia content types that have a take_url
+            //    but no video ID (e.g., external tool embeds, H5P, etc.)
+            if (
+              lessonType === "embed" &&
+              !embedUrl &&
+              content.take_url
+            ) {
+              blocks.push({
+                id: `embed-${uid()}`,
+                type: "embed",
+                data: {
+                  url: content.take_url,
+                  caption: "",
+                  bgColor: "#f9fafb",
+                },
+              });
+            }
+
+            // 4. DOWNLOAD block — for PDF/file attachment content types
+            if (detail?.download_url) {
+              blocks.push({
+                id: `download-${uid()}`,
+                type: "download",
+                data: {
+                  url: detail.download_url,
+                  fileName: detail.file_name || content.name,
+                  fileSize: detail.file_size || null,
+                  mimeType: detail.content_type || null,
+                  bgColor: "#f9fafb",
+                  accentColor: "#149096",
+                },
+              });
+            }
+
+            // 5. QUIZ block — for quiz/exam/survey content types with questions
+            if (detail?.questions && detail.questions.length > 0) {
               const quizQuestions = detail.questions.map((q) => ({
                 id: `q-${q.id}`,
                 text: q.text,
                 type: q.question_type === "true_false" ? "true_false" : "multiple_choice",
+                explanation: q.explanation || null,
+                imageUrl: q.image_url || null,
                 answers: (q.answers ?? []).map((a) => ({
                   id: `a-${a.id}`,
                   text: a.text,
                   correct: a.correct,
+                  imageUrl: (a as any).image_url || null,
                 })),
               }));
               blocks.push({
@@ -679,8 +713,9 @@ export const thinkificImportRouter = router({
                 data: {
                   title: content.name,
                   questions: quizQuestions,
-                  passingScore: 70,
-                  showCorrectAnswers: true,
+                  passingScore: detail.pass_percent ?? 70,
+                  randomizeQuestions: detail.randomize_questions ?? false,
+                  showCorrectAnswers: detail.show_answers ?? true,
                   bgColor: "#f9fafb",
                   accentColor: "#149096",
                 },
@@ -964,5 +999,246 @@ export const thinkificImportRouter = router({
           progressPct: p.thinkificProgressPct,
         })),
       };
+    }),
+
+  /**
+   * Re-sync an already-imported course:
+   *  • Re-fetches all lesson content (html_description, video, quiz, download) and updates contentBlocks
+   *  • Re-syncs enrollments (upserts from Thinkific, updates progress)
+   *  • Re-scrapes the Thinkific sales/landing page and updates lms_landing_pages blocks
+   *
+   * Input: { lmsCourseId } — the local LMS course ID (from a previous import)
+   * Optional: { customDomain } — used for sales page scraping
+   */
+  resyncCourse: protectedProcedure
+    .input(z.object({
+      lmsCourseId: z.number(),
+      customDomain: z.string().optional(),
+      resyncContent: z.boolean().default(true),
+      resyncEnrollments: z.boolean().default(true),
+      resyncLandingPage: z.boolean().default(true),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      adminOnly(ctx.user.role);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      const log: string[] = [];
+
+      // Look up the import record to get the Thinkific course ID
+      const [importRecord] = await db.select()
+        .from(lmsThinkificImports)
+        .where(eq(lmsThinkificImports.lmsCourseId, input.lmsCourseId))
+        .limit(1);
+      if (!importRecord) {
+        throw new TRPCError({ code: "NOT_FOUND", message: `No import record found for LMS course ID ${input.lmsCourseId}` });
+      }
+      const thinkificCourseId = importRecord.thinkificCourseId;
+      log.push(`Resyncing LMS course ${input.lmsCourseId} from Thinkific course ${thinkificCourseId}`);
+
+      let lessonsUpdated = 0;
+      let enrollmentsUpdated = 0;
+      let landingPageUpdated = false;
+
+      try {
+        // ─── 1. Re-sync lesson content ────────────────────────────────────────────────────
+        if (input.resyncContent) {
+          const chapters = await getChaptersForCourse(thinkificCourseId);
+          log.push(`Found ${chapters.length} chapters`);
+
+          for (const chapter of chapters) {
+            const contents = await getContentsForChapter(chapter.id);
+            for (const content of contents) {
+              // Fetch full detail for this lesson
+              const detail: ThinkificContentDetail | null = await getContentDetail(content.id);
+
+              // Resolve embed URL
+              let embedUrl: string | undefined;
+              if (detail?.video_url) {
+                embedUrl = detail.video_url;
+              } else if (detail?.wistia_hashed_id) {
+                embedUrl = `https://fast.wistia.net/embed/iframe/${detail.wistia_hashed_id}`;
+              } else if (detail?.youtube_video_id) {
+                embedUrl = `https://www.youtube.com/embed/${detail.youtube_video_id}`;
+              } else if (detail?.vimeo_video_id) {
+                embedUrl = `https://player.vimeo.com/video/${detail.vimeo_video_id}`;
+              }
+
+              // Build content blocks (same logic as import)
+              const blocks: object[] = [];
+
+              if (embedUrl) {
+                let videoProvider = "url";
+                if (detail?.wistia_hashed_id) videoProvider = "wistia";
+                else if (detail?.youtube_video_id) videoProvider = "youtube";
+                else if (detail?.vimeo_video_id) videoProvider = "vimeo";
+                blocks.push({
+                  id: `video-${uid()}`,
+                  type: "video",
+                  data: { url: embedUrl, provider: videoProvider, caption: "", bgColor: "#000000", autoplay: false },
+                });
+              }
+
+              const htmlDesc = detail?.html_description || (detail as any)?.body || content.html_description || null;
+              const plainDesc = detail?.description || content.description || null;
+              if (htmlDesc && htmlDesc.trim().length > 0) {
+                blocks.push({ id: `text-${uid()}`, type: "text", data: { html: htmlDesc, align: "left", bgColor: "#ffffff", textColor: "#1a1a1a" } });
+              } else if (plainDesc && plainDesc.trim().length > 0) {
+                blocks.push({ id: `text-${uid()}`, type: "text", data: { html: `<p>${plainDesc}</p>`, align: "left", bgColor: "#ffffff", textColor: "#1a1a1a" } });
+              }
+
+              const lessonType = mapContentType(content.contentable_type, content.take_url);
+              if (lessonType === "embed" && !embedUrl && content.take_url) {
+                blocks.push({ id: `embed-${uid()}`, type: "embed", data: { url: content.take_url, caption: "", bgColor: "#f9fafb" } });
+              }
+
+              if (detail?.download_url) {
+                blocks.push({
+                  id: `download-${uid()}`, type: "download",
+                  data: { url: detail.download_url, fileName: detail.file_name || content.name, fileSize: detail.file_size || null, mimeType: detail.content_type || null, bgColor: "#f9fafb", accentColor: "#149096" },
+                });
+              }
+
+              if (detail?.questions && detail.questions.length > 0) {
+                const quizQuestions = detail.questions.map((q) => ({
+                  id: `q-${q.id}`, text: q.text,
+                  type: q.question_type === "true_false" ? "true_false" : "multiple_choice",
+                  explanation: q.explanation || null, imageUrl: q.image_url || null,
+                  answers: (q.answers ?? []).map((a) => ({ id: `a-${a.id}`, text: a.text, correct: a.correct, imageUrl: (a as any).image_url || null })),
+                }));
+                blocks.push({
+                  id: `quiz-${uid()}`, type: "quiz",
+                  data: { title: content.name, questions: quizQuestions, passingScore: detail.pass_percent ?? 70, randomizeQuestions: detail.randomize_questions ?? false, showCorrectAnswers: detail.show_answers ?? true, bgColor: "#f9fafb", accentColor: "#149096" },
+                });
+              }
+
+              const durationSecs = detail?.duration_in_seconds ?? content.duration_in_seconds;
+
+              // Find the matching lesson by courseId + title + position
+              const [existingLesson] = await db.select({ id: lmsLessons.id })
+                .from(lmsLessons)
+                .where(and(
+                  eq(lmsLessons.courseId, input.lmsCourseId),
+                  eq(lmsLessons.position, content.position),
+                ))
+                .limit(1);
+
+              if (existingLesson) {
+                await db.update(lmsLessons)
+                  .set({
+                    title: content.name,
+                    type: lessonType,
+                    embedUrl,
+                    content: htmlDesc ? stripHtml(htmlDesc) : (plainDesc || undefined),
+                    durationMinutes: durationSecs ? Math.ceil(durationSecs / 60) : undefined,
+                    contentBlocks: JSON.stringify(blocks),
+                  })
+                  .where(eq(lmsLessons.id, existingLesson.id));
+                lessonsUpdated++;
+              }
+            }
+          }
+          log.push(`Updated ${lessonsUpdated} lessons with fresh content`);
+        }
+
+        // ─── 2. Re-sync enrollments ────────────────────────────────────────────────────────
+        if (input.resyncEnrollments) {
+          const allEnrollments = await getEnrollmentsForCourse(thinkificCourseId);
+          const activeEnrollments = allEnrollments.filter((e) => !e.expired && e.activated_at !== null);
+          log.push(`Found ${activeEnrollments.length} active Thinkific enrollments`);
+
+          const BATCH = 50;
+          for (let i = 0; i < activeEnrollments.length; i += BATCH) {
+            const batch = activeEnrollments.slice(i, i + BATCH);
+            const emails = batch.map((e) => e.user_email.toLowerCase());
+
+            const matchedUsers = await db.select({ id: users.id, email: users.email })
+              .from(users)
+              .where(inArray(users.email, emails));
+            const emailToUserId = new Map(
+              matchedUsers.map((u: { id: number; email: string | null }) => [
+                (u.email ?? "").toLowerCase(), u.id,
+              ])
+            );
+
+            for (const e of batch) {
+              const email = e.user_email.toLowerCase();
+              let userId = emailToUserId.get(email);
+
+              if (!userId) {
+                const displayName = e.user_name || email.split("@")[0];
+                try {
+                  const [newUser] = await db.insert(users).values({
+                    email, name: displayName, displayName, isPending: false, loginMethod: "email", emailVerified: false,
+                  });
+                  userId = (newUser as any).insertId as number;
+                  emailToUserId.set(email, userId);
+                } catch {
+                  const [existingUser] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+                  if (existingUser) { userId = existingUser.id; emailToUserId.set(email, userId); }
+                  else continue;
+                }
+              }
+
+              const rawPct = parseFloat(e.percentage_completed || "0");
+              const progressPct = Math.min(Math.round(rawPct * 100), 100);
+
+              // Upsert: update progress if already enrolled, insert if not
+              const [existing] = await db.select({ id: lmsEnrollments.id })
+                .from(lmsEnrollments)
+                .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, input.lmsCourseId)))
+                .limit(1);
+
+              if (existing) {
+                await db.update(lmsEnrollments)
+                  .set({ progressPct, completedAt: e.completed && e.completed_at ? new Date(e.completed_at) : null })
+                  .where(eq(lmsEnrollments.id, existing.id));
+              } else {
+                await db.insert(lmsEnrollments).values({
+                  userId, courseId: input.lmsCourseId,
+                  enrolledAt: e.created_at ? new Date(e.created_at) : new Date(),
+                  completedAt: e.completed && e.completed_at ? new Date(e.completed_at) : null,
+                  progressPct,
+                });
+              }
+              enrollmentsUpdated++;
+            }
+          }
+          log.push(`Synced ${enrollmentsUpdated} enrollments`);
+        }
+
+        // ─── 3. Re-scrape landing page ───────────────────────────────────────────────────────
+        if (input.resyncLandingPage) {
+          const course = await getThinkificCourse(thinkificCourseId);
+          const customDomain = input.customDomain || "";
+          const { blocks: newBlocks } = await scrapeThinkificSalesPage(course.slug, customDomain);
+          if (newBlocks.length > 0) {
+            // Update existing landing page record for this course
+            await db.update(lmsLandingPages)
+              .set({ blocks: JSON.stringify(newBlocks) })
+              .where(eq(lmsLandingPages.courseId, input.lmsCourseId));
+            landingPageUpdated = true;
+            log.push(`Re-scraped landing page: ${newBlocks.length} blocks`);
+          } else {
+            log.push(`Landing page scrape returned 0 blocks — keeping existing blocks`);
+          }
+        }
+
+        // Update import record with resync timestamp
+        await db.update(lmsThinkificImports)
+          .set({
+            status: "complete",
+            lessonsImported: lessonsUpdated,
+            enrollmentsActivated: enrollmentsUpdated,
+            importLog: `[RESYNC ${new Date().toISOString()}]\n${log.join("\n")}`,
+          })
+          .where(eq(lmsThinkificImports.lmsCourseId, input.lmsCourseId));
+
+        return { success: true, lessonsUpdated, enrollmentsUpdated, landingPageUpdated, log };
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        log.push(`ERROR: ${errorMessage}`);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Resync failed: ${errorMessage}` });
+      }
     }),
 });

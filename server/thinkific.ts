@@ -468,32 +468,62 @@ export interface ThinkificInstructor {
   avatar_image_url: string | null;
 }
 
+// ─── Rich Content Detail ─────────────────────────────────────────────────────
+
+export interface ThinkificContentAnswer {
+  id: number;
+  text: string;
+  correct: boolean;
+  image_url?: string | null;
+}
+
+export interface ThinkificContentQuestion {
+  id: number;
+  text: string;
+  question_type: string; // "multiple_choice" | "true_false" | "short_answer" | "file_upload"
+  correct_answer?: string | null;
+  explanation?: string | null;
+  image_url?: string | null;
+  answers?: ThinkificContentAnswer[];
+}
+
 /**
  * Full content detail returned by GET /contents/{id}.
- * Includes html_description, video_url, quiz questions, etc.
+ * Covers all Thinkific content types: Text, Video, Download, Presentation, Quiz, Exam, Survey, Assignment.
  */
 export interface ThinkificContentDetail extends ThinkificContent {
+  // Common
   description: string | null;
-  html_description: string | null;
-  video_url: string | null;
+  html_description: string | null; // rich HTML body — Text lessons include inline <img> tags with full URLs
+  body?: string | null;            // alias used by some content types
   duration_in_seconds: number | null;
   permanent_url: string | null;
-  // Quiz/exam questions
-  questions?: Array<{
-    id: number;
-    text: string;
-    question_type: string; // "multiple_choice" | "true_false" | "short_answer"
-    correct_answer?: string;
-    answers?: Array<{
-      id: number;
-      text: string;
-      correct: boolean;
-    }>;
-  }>;
-  // Video-specific
+
+  // Video
+  video_url?: string | null;
   wistia_hashed_id?: string | null;
   youtube_video_id?: string | null;
   vimeo_video_id?: string | null;
+  video_id?: string | null;
+
+  // Download / File attachment
+  download_url?: string | null;    // direct download link
+  file_name?: string | null;
+  file_size?: number | null;       // bytes
+  content_type?: string | null;    // MIME type
+
+  // Presentation
+  slide_urls?: string[] | null;
+
+  // Quiz / Exam / Survey
+  questions?: ThinkificContentQuestion[];
+  pass_percent?: number | null;
+  randomize_questions?: boolean;
+  show_answers?: boolean;
+
+  // Assignment
+  assignment_due_date?: string | null;
+  assignment_instructions?: string | null;
 }
 
 /**
