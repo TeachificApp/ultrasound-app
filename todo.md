@@ -2709,3 +2709,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add Enrollments stat card to overview (reads lms_enrollments.enrolled_at)
 - [x] Fix userLoginEvents.ip → userLoginEvents.ipAddress field name mismatch in myActivity
 - [x] Add analyticsRouter.overview.test.ts — 8 tests all passing
+
+## Thinkific Import Improvements (May 2026)
+- [x] Add getContentDetail to fetch full lesson content (html_description, video_url, quiz questions) per lesson
+- [x] Fix lesson import to use detail fields for embedUrl, content, durationMinutes, and contentBlocks
+- [x] Add video block to lesson contentBlocks when video URL is available
+- [x] Add quiz block to lesson contentBlocks when quiz questions are available
+- [x] Fix landing page scrape to try public Thinkific subdomain first instead of member portal (which requires login)

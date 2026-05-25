@@ -468,6 +468,47 @@ export interface ThinkificInstructor {
   avatar_image_url: string | null;
 }
 
+/**
+ * Full content detail returned by GET /contents/{id}.
+ * Includes html_description, video_url, quiz questions, etc.
+ */
+export interface ThinkificContentDetail extends ThinkificContent {
+  description: string | null;
+  html_description: string | null;
+  video_url: string | null;
+  duration_in_seconds: number | null;
+  permanent_url: string | null;
+  // Quiz/exam questions
+  questions?: Array<{
+    id: number;
+    text: string;
+    question_type: string; // "multiple_choice" | "true_false" | "short_answer"
+    correct_answer?: string;
+    answers?: Array<{
+      id: number;
+      text: string;
+      correct: boolean;
+    }>;
+  }>;
+  // Video-specific
+  wistia_hashed_id?: string | null;
+  youtube_video_id?: string | null;
+  vimeo_video_id?: string | null;
+}
+
+/**
+ * Fetch full content detail for a single lesson.
+ * Rate limit: 120 req/min — use sparingly in bulk imports.
+ */
+export async function getContentDetail(contentId: number): Promise<ThinkificContentDetail | null> {
+  try {
+    return await thinkificFetch<ThinkificContentDetail>(`/contents/${contentId}`);
+  } catch (err) {
+    console.error(`[Thinkific] Failed to fetch content detail for ${contentId}:`, err);
+    return null;
+  }
+}
+
 export async function getThinkificCourse(courseId: number): Promise<ThinkificCourse> {
   return thinkificFetch<ThinkificCourse>(`/courses/${courseId}`);
 }

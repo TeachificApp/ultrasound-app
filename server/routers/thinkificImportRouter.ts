@@ -30,10 +30,12 @@ import {
   getThinkificCourse,
   getChaptersForCourse,
   getContentsForChapter,
+  getContentDetail,
   getEnrollmentsForCourse,
   getThinkificInstructor,
   type ThinkificChapter,
   type ThinkificContent,
+  type ThinkificContentDetail,
 } from "../thinkific";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -129,20 +131,50 @@ interface LandingBlock {
  * Extracts: title, description, pricing, curriculum, images, and FAQ.
  */
 async function scrapeThinkificSalesPage(slug: string, customDomain: string): Promise<{ blocks: LandingBlock[]; price: number }> {
-  // Use the custom domain (e.g., member.allaboutultrasound.com) for scraping
-  const url = `https://${customDomain}/courses/${slug}`;
+  // Try the public Thinkific subdomain first (no login required), then fall back to custom domain
+  const { ENV } = await import("../_core/env");
+  const thinkificSubdomain = ENV.thinkificSubdomain;
+  const urlsToTry: string[] = [];
+  if (thinkificSubdomain) {
+    urlsToTry.push(`https://${thinkificSubdomain}.thinkific.com/courses/${slug}`);
+  }
+  // Only try custom domain if it's NOT a member portal (those require login)
+  if (customDomain && !customDomain.startsWith("member.")) {
+    urlsToTry.push(`https://${customDomain}/courses/${slug}`);
+  }
+  // Always try the generic Thinkific subdomain as last resort
+  if (!thinkificSubdomain) {
+    urlsToTry.push(`https://${customDomain}/courses/${slug}`);
+  }
+
+  let html = "";
   let price = 0;
 
+  for (const url of urlsToTry) {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          Accept: "text/html,application/xhtml+xml",
+        },
+        redirect: "follow",
+      });
+      if (!res.ok) continue;
+      const text = await res.text();
+      // Check if we got a real page (not a login redirect)
+      if (text.includes("login") && text.includes("password") && !text.includes("course-landing")) {
+        continue; // skip login pages
+      }
+      html = text;
+      break;
+    } catch {
+      continue;
+    }
+  }
+
+  if (!html) return { blocks: [], price: 0 };
+
   try {
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml",
-      },
-      redirect: "follow",
-    });
-    if (!res.ok) return { blocks: [], price: 0 };
-    const html = await res.text();
 
     const bodyIdx = html.indexOf("<body");
     const body = bodyIdx > -1 ? html.slice(bodyIdx) : html;
@@ -410,7 +442,8 @@ export const thinkificImportRouter = router({
         let salesPageBlocks: LandingBlock[] = [];
         let scrapedPrice = 0;
         if (input.scrapeSalesPage) {
-          const customDomain = input.customDomain || "member.allaboutultrasound.com";
+          // Use provided custom domain, or empty string so scraper tries Thinkific subdomain first
+          const customDomain = input.customDomain || "";
           const result = await scrapeThinkificSalesPage(course.slug, customDomain);
           salesPageBlocks = result.blocks;
           scrapedPrice = result.price;
@@ -545,56 +578,120 @@ export const thinkificImportRouter = router({
             // Use `free` field (what the API actually returns), fallback to free_preview for compat
             const isFreePreview = content.free ?? content.free_preview ?? false;
 
-            // Build content blocks for the lesson page builder
-            // Since the API doesn't return html_description, we create a placeholder block
-            const blocks: object[] = [
-              {
-                id: `hero-${uid()}`,
-                type: "hero",
-                data: {
-                  headline: content.name,
-                  headline2: "",
-                  subheadline: "",
-                  bgType: "color",
-                  bgColor: "#149096",
-                  textColor: "#ffffff",
-                  align: "left",
-                  buttons: [],
-                  showButtons: false,
-                },
-              },
-            ];
+            // Fetch full content detail (html_description, video_url, quiz questions, etc.)
+            // Rate-limited to 120 req/min — add a small delay between requests
+            const detail: ThinkificContentDetail | null = await getContentDetail(content.id);
+            if (detail) {
+              log.push(`  Fetched detail for lesson "${content.name}" (type: ${content.contentable_type})`);
+            }
 
-            // If description is available (rare but possible), add a text block
-            if (content.description && content.description.trim().length > 0) {
+            // Resolve the best video URL from the detail
+            let embedUrl: string | undefined;
+            if (detail?.video_url) {
+              embedUrl = detail.video_url;
+            } else if (detail?.wistia_hashed_id) {
+              embedUrl = `https://fast.wistia.net/embed/iframe/${detail.wistia_hashed_id}`;
+            } else if (detail?.youtube_video_id) {
+              embedUrl = `https://www.youtube.com/embed/${detail.youtube_video_id}`;
+            } else if (detail?.vimeo_video_id) {
+              embedUrl = `https://player.vimeo.com/video/${detail.vimeo_video_id}`;
+            }
+
+            // Build content blocks for the lesson page builder
+            const blocks: object[] = [];
+
+            // Hero block with lesson title
+            blocks.push({
+              id: `hero-${uid()}`,
+              type: "hero",
+              data: {
+                headline: content.name,
+                headline2: "",
+                subheadline: "",
+                bgType: "color",
+                bgColor: "#149096",
+                textColor: "#ffffff",
+                align: "left",
+                buttons: [],
+                showButtons: false,
+              },
+            });
+
+            // Video block if video URL found
+            if (embedUrl && (lessonType === "video" || lessonType === "embed")) {
+              blocks.push({
+                id: `video-${uid()}`,
+                type: "video",
+                data: {
+                  url: embedUrl,
+                  caption: "",
+                  bgColor: "#000000",
+                  autoplay: false,
+                },
+              });
+            }
+
+            // HTML description block (primary content)
+            const htmlDesc = detail?.html_description || content.html_description;
+            if (htmlDesc && htmlDesc.trim().length > 0) {
               blocks.push({
                 id: `text-${uid()}`,
                 type: "text",
                 data: {
-                  html: `<p>${content.description}</p>`,
+                  html: htmlDesc,
                   align: "left",
                   bgColor: "#ffffff",
                   textColor: "#1a1a1a",
                 },
               });
+            } else {
+              // Fallback: plain description
+              const plainDesc = detail?.description || content.description;
+              if (plainDesc && plainDesc.trim().length > 0) {
+                blocks.push({
+                  id: `text-${uid()}`,
+                  type: "text",
+                  data: {
+                    html: `<p>${plainDesc}</p>`,
+                    align: "left",
+                    bgColor: "#ffffff",
+                    textColor: "#1a1a1a",
+                  },
+                });
+              }
             }
-            if (content.html_description && content.html_description.trim().length > 0) {
+
+            // Quiz block — if this is a quiz/exam and questions are available
+            if ((lessonType === "quiz") && detail?.questions && detail.questions.length > 0) {
+              const quizQuestions = detail.questions.map((q) => ({
+                id: `q-${q.id}`,
+                text: q.text,
+                type: q.question_type === "true_false" ? "true_false" : "multiple_choice",
+                answers: (q.answers ?? []).map((a) => ({
+                  id: `a-${a.id}`,
+                  text: a.text,
+                  correct: a.correct,
+                })),
+              }));
               blocks.push({
-                id: `text-${uid()}`,
-                type: "text",
+                id: `quiz-${uid()}`,
+                type: "quiz",
                 data: {
-                  html: content.html_description,
-                  align: "left",
-                  bgColor: "#ffffff",
-                  textColor: "#1a1a1a",
+                  title: content.name,
+                  questions: quizQuestions,
+                  passingScore: 70,
+                  showCorrectAnswers: true,
+                  bgColor: "#f9fafb",
+                  accentColor: "#149096",
                 },
               });
             }
 
             const contentBlocks = JSON.stringify(blocks);
 
-            // For video/embed lessons, use video_url if available
-            const embedUrl = content.video_url || undefined;
+            const htmlDescForContent = detail?.html_description || content.html_description;
+            const plainDescForContent = detail?.description || content.description;
+            const durationSecs = detail?.duration_in_seconds ?? content.duration_in_seconds;
 
             await db.insert(lmsLessons).values({
               courseId: lmsCourseId,
@@ -602,12 +699,14 @@ export const thinkificImportRouter = router({
               title: content.name,
               type: lessonType,
               embedUrl,
-              content: content.html_description ? stripHtml(content.html_description) : (content.description || undefined),
+              content: htmlDescForContent
+                ? stripHtml(htmlDescForContent)
+                : (plainDescForContent || undefined),
               position: content.position,
               isPreview: isFreePreview,
               previewMode: isFreePreview ? "preview" : "none",
-              durationMinutes: content.duration_in_seconds
-                ? Math.ceil(content.duration_in_seconds / 60)
+              durationMinutes: durationSecs
+                ? Math.ceil(durationSecs / 60)
                 : undefined,
               contentBlocks,
             });
