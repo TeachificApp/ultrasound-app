@@ -2740,6 +2740,7 @@ export const lmsCourses = mysqlTable("lms_courses", {
   metaKeywords: text("meta_keywords"),
   // Completion certificate
   hasCertificate: boolean("has_certificate").default(false).notNull(),
+  certificateTemplateId: int("certificate_template_id"), // FK to lms_certificate_templates.id (null = default template)
   // Featured: admin-selectable to show on LMS home page
   isFeatured: boolean("is_featured").default(false).notNull(),
   // Drip: unlock all immediately (false) or by schedule (true)
@@ -3025,6 +3026,37 @@ export const lmsPageTemplates = mysqlTable("lms_page_templates", {
 export type LmsPageTemplate = typeof lmsPageTemplates.$inferSelect;
 export type NewLmsPageTemplate = typeof lmsPageTemplates.$inferInsert;
 
+// ─── LMS Certificate Templates ───────────────────────────────────────────────
+
+export const lmsCertificateTemplates = mysqlTable("lms_certificate_templates", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 200 }).notNull(),
+  description: text("description"),
+  // Visual design
+  backgroundImageUrl: text("background_image_url"),
+  logoUrl: text("logo_url"),
+  primaryColor: varchar("primary_color", { length: 20 }).default("#189aa1").notNull(),
+  accentColor: varchar("accent_color", { length: 20 }).default("#c9a84c").notNull(),
+  textColor: varchar("text_color", { length: 20 }).default("#0e1e2e").notNull(),
+  fontFamily: varchar("font_family", { length: 100 }).default("Helvetica").notNull(),
+  // Signature block
+  signatureName: varchar("signature_name", { length: 200 }),
+  signatureTitle: varchar("signature_title", { length: 200 }),
+  signatureImageUrl: text("signature_image_url"),
+  // Footer / legal text
+  footerText: text("footer_text"),
+  // Organization name shown on the certificate
+  organizationName: varchar("organization_name", { length: 200 }).default("All About Ultrasound").notNull(),
+  // Layout variant: classic | modern | minimal
+  layout: mysqlEnum("layout", ["classic", "modern", "minimal"]).default("classic").notNull(),
+  isDefault: boolean("is_default").default(false).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type LmsCertificateTemplate = typeof lmsCertificateTemplates.$inferSelect;
+export type InsertLmsCertificateTemplate = typeof lmsCertificateTemplates.$inferInsert;
+
 // ─── LMS Certificates ─────────────────────────────────────────────────────────
 
 export const lmsCertificates = mysqlTable("lms_certificates", {
@@ -3033,6 +3065,7 @@ export const lmsCertificates = mysqlTable("lms_certificates", {
   courseId: int("course_id").notNull(),
   enrollmentId: int("enrollment_id").notNull(),
   certificateUrl: text("certificate_url").notNull(),
+  templateId: int("template_id"), // FK to lms_certificate_templates.id (null = legacy/default)
   issuedAt: timestamp("issued_at").defaultNow().notNull(),
 });
 export type LmsCertificate = typeof lmsCertificates.$inferSelect;
@@ -3186,14 +3219,25 @@ export type DigitalBundlePurchase = typeof digitalBundlePurchases.$inferSelect;
 // ─── Order Bumps ────────────────────────────────────────────────────────────
 export const orderBumps = mysqlTable("order_bumps", {
   id: int("id").autoincrement().primaryKey(),
-  // The trigger product — when a user buys this, the bump is offered
-  triggerType: mysqlEnum("trigger_type", ["course", "download", "bundle", "physical"]).notNull(),
-  triggerProductId: int("trigger_product_id").notNull(),
+  // Standalone mode — not tied to a specific trigger purchase (direct-link only)
+  isStandalone: boolean("is_standalone").default(false).notNull(),
+  // Presentation mode — widget (inline at checkout) or landing_page (full page at /order-bump/{slug})
+  presentationMode: mysqlEnum("presentation_mode", ["widget", "landing_page"]).default("widget").notNull(),
+  slug: varchar("slug", { length: 255 }), // URL slug for landing page mode
+  // Full block-builder JSON for landing page mode
+  pageBlocks: longtext("page_blocks"), // JSON array of blocks
+  // Conditional branching — show only if user has/has not purchased specific products
+  conditionType: mysqlEnum("condition_type", ["none", "has_purchased", "has_not_purchased"]).default("none").notNull(),
+  conditionProductType: mysqlEnum("condition_product_type", ["course", "quiz", "download", "bundle", "physical"]),
+  conditionProductId: int("condition_product_id"),
+  // The trigger product — when a user buys this, the bump is offered (nullable for standalone)
+  triggerType: mysqlEnum("trigger_type", ["course", "quiz", "download", "bundle", "physical"]).notNull().default("course"),
+  triggerProductId: int("trigger_product_id").default(0).notNull(),
   // The bump offer — what product is being offered as the bump
-  bumpType: mysqlEnum("bump_type", ["course", "download", "bundle", "physical"]).notNull(),
-  bumpProductId: int("bump_product_id").notNull(),
+  bumpType: mysqlEnum("bump_type", ["course", "quiz", "download", "bundle", "physical"]).notNull().default("download"),
+  bumpProductId: int("bump_product_id").default(0).notNull(),
   // When to show the bump
-  timing: mysqlEnum("timing", ["before_checkout", "after_checkout"]).default("after_checkout").notNull(),
+  timing: mysqlEnum("timing", ["before_checkout", "after_checkout", "direct_link"]).default("after_checkout").notNull(),
   // Pricing
   bumpPrice: int("bump_price").default(0).notNull(), // cents — special bump price (0 = use product's normal price)
   discountLabel: varchar("discount_label", { length: 255 }), // e.g. "50% OFF — Today Only!"

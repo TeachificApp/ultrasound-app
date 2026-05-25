@@ -659,6 +659,170 @@ function BSLinkField({ data, onSet, label, field, value, onChange }: {
   );
 }
 
+// ─── CTAActionPicker ─────────────────────────────────────────────────────────
+type CTAAction =
+  | "url" | "send_email" | "next_funnel_step" | "direct_checkout"
+  | "free_preview" | "group_purchase" | "order_bump_lp"
+  | "scroll_to_section" | "open_popup" | "download_file";
+
+const CTA_ACTION_LABELS: Record<CTAAction, string> = {
+  url: "Link to URL",
+  send_email: "Send Email",
+  next_funnel_step: "Next Funnel Step",
+  direct_checkout: "Direct Checkout (Stripe)",
+  free_preview: "Direct to Checkout (Free Preview)",
+  group_purchase: "Direct to Checkout (Group Purchase)",
+  order_bump_lp: "Order Bump Landing Page",
+  scroll_to_section: "Scroll to Section",
+  open_popup: "Open Video / Form / Popup",
+  download_file: "Download File",
+};
+
+function CTAActionPicker({
+  label = "Button Action",
+  behaviorValue,
+  onBehaviorChange,
+  linkValue,
+  onLinkChange,
+  emailValue,
+  onEmailChange,
+  productCatalog,
+  orderBumpsList,
+  funnelList: _funnelList,
+  orderBumpIdValue,
+  onOrderBumpIdChange,
+  anchorValue,
+  onAnchorChange,
+  popupValue,
+  onPopupChange,
+  downloadValue,
+  onDownloadChange,
+  checkoutProductTypeValue,
+  checkoutProductIdValue,
+  onCheckoutProductChange,
+}: {
+  label?: string;
+  behaviorValue: string;
+  onBehaviorChange: (v: string) => void;
+  linkValue?: string;
+  onLinkChange?: (v: string) => void;
+  emailValue?: string;
+  onEmailChange?: (v: string) => void;
+  productCatalog?: Array<{ id: number; type: string; name: string; price: number }>;
+  orderBumpsList?: Array<{ id: number; headline?: string | null; slug?: string | null; bumpType: string; bumpProductId: number }>;
+  funnelList?: Array<{ id: number; name: string; slug: string; pages?: Array<{ id: number; name: string; slug: string }> }>;
+  orderBumpIdValue?: number | null;
+  onOrderBumpIdChange?: (v: number | null) => void;
+  anchorValue?: string;
+  onAnchorChange?: (v: string) => void;
+  popupValue?: string;
+  onPopupChange?: (v: string) => void;
+  downloadValue?: string;
+  onDownloadChange?: (v: string) => void;
+  checkoutProductTypeValue?: string;
+  checkoutProductIdValue?: number | null;
+  onCheckoutProductChange?: (type: string, id: number | null) => void;
+}) {
+  const behavior = (behaviorValue ?? "url") as CTAAction;
+  const isCheckoutBehavior = behavior === "direct_checkout" || behavior === "free_preview" || behavior === "group_purchase";
+  return (
+    <div className="space-y-2">
+      <div>
+        <label className="text-xs text-gray-500 block mb-1">{label}</label>
+        <Select value={behavior} onValueChange={onBehaviorChange}>
+          <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {(Object.entries(CTA_ACTION_LABELS) as [CTAAction, string][]).map(([val, lbl]) => (
+              <SelectItem key={val} value={val}>{lbl}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      {behavior === "url" && (
+        <BSLinkField label="Link URL" value={linkValue ?? ""} onChange={onLinkChange ?? (() => {})} />
+      )}
+      {behavior === "send_email" && (
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Email Address</label>
+          <DebouncedInput value={emailValue ?? ""} onChange={onEmailChange ?? (() => {})} className="h-7 text-xs" placeholder="e.g. hello@example.com" />
+        </div>
+      )}
+      {behavior === "next_funnel_step" && (
+        <p className="text-[10px] text-teal-600 bg-teal-50 rounded px-2 py-1">Button will navigate to the next page in the funnel sequence.</p>
+      )}
+      {isCheckoutBehavior && (
+        <div className={`space-y-2 rounded p-2 border ${
+          behavior === "direct_checkout" ? "bg-teal-50 border-teal-200" :
+          behavior === "free_preview" ? "bg-blue-50 border-blue-200" :
+          "bg-purple-50 border-purple-200"
+        }`}>
+          <p className={`text-[10px] font-medium ${
+            behavior === "direct_checkout" ? "text-teal-700" :
+            behavior === "free_preview" ? "text-blue-700" :
+            "text-purple-700"
+          }`}>
+            {behavior === "direct_checkout" && "Opens Stripe Checkout. After payment, user is sent to /my-dashboard."}
+            {behavior === "free_preview" && "Opens Stripe Checkout with a 100% discount (free preview). Product must support free enrollment."}
+            {behavior === "group_purchase" && "Opens Stripe Checkout for group/team purchase. Buyer can specify number of seats."}
+          </p>
+          <div>
+            <label className="text-xs text-gray-500 block mb-0.5">Product</label>
+            <select
+              value={checkoutProductIdValue ? `${checkoutProductTypeValue}:${checkoutProductIdValue}` : ""}
+              onChange={e => { const [type, id] = e.target.value.split(":"); onCheckoutProductChange?.(type || "", id ? Number(id) : null); }}
+              className="w-full h-7 text-xs rounded border border-gray-200 px-2"
+            >
+              <option value="">-- Select product --</option>
+              {(productCatalog ?? []).map(p => (
+                <option key={`${p.type}:${p.id}`} value={`${p.type}:${p.id}`}>{p.name} ({p.type}) — ${(p.price / 100).toFixed(2)}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+      {behavior === "order_bump_lp" && (
+        <div className="space-y-2 bg-orange-50 border border-orange-200 rounded p-2">
+          <p className="text-[10px] text-orange-700 font-medium">Navigates to an Order Bump landing page (/order-bump/slug).</p>
+          <div>
+            <label className="text-xs text-gray-500 block mb-0.5">Order Bump</label>
+            <select
+              value={orderBumpIdValue ?? ""}
+              onChange={e => onOrderBumpIdChange?.(e.target.value ? Number(e.target.value) : null)}
+              className="w-full h-7 text-xs rounded border border-gray-200 px-2"
+            >
+              <option value="">-- Select order bump --</option>
+              {(orderBumpsList ?? []).filter(b => b.slug).map(b => (
+                <option key={b.id} value={b.id}>{b.headline ?? `Order Bump #${b.id}`} ({b.slug})</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+      {behavior === "scroll_to_section" && (
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Section Anchor ID</label>
+          <DebouncedInput value={anchorValue ?? ""} onChange={onAnchorChange ?? (() => {})} className="h-7 text-xs" placeholder="e.g. pricing or #pricing" />
+          <p className="text-[10px] text-gray-400 mt-0.5">Add <code className="bg-gray-100 px-0.5 rounded">id="pricing"</code> to a section block, then enter <code className="bg-gray-100 px-0.5 rounded">pricing</code> here.</p>
+        </div>
+      )}
+      {behavior === "open_popup" && (
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Video / Form / Popup URL or Embed Code</label>
+          <DebouncedInput value={popupValue ?? ""} onChange={onPopupChange ?? (() => {})} className="h-7 text-xs" placeholder="https://youtube.com/... or &lt;iframe ...&gt;" />
+          <p className="text-[10px] text-gray-400 mt-0.5">YouTube, Vimeo, Wistia URLs and iframe embed codes are supported.</p>
+        </div>
+      )}
+      {behavior === "download_file" && (
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">File URL</label>
+          <DebouncedInput value={downloadValue ?? ""} onChange={onDownloadChange ?? (() => {})} className="h-7 text-xs" placeholder="https://... (direct file URL)" />
+          <p className="text-[10px] text-gray-400 mt-0.5">Triggers a file download when clicked. Use a direct link to a PDF, ZIP, etc.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Course selector for curriculum_auto block when used on funnel pages */
 function CurriculumCourseSelector({ d, set }: { d: Record<string, any>; set: (key: string, val: any) => void }) {
   const { data: coursesData } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", type: "course", pageSize: 200 });
@@ -1646,6 +1810,8 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
   const [uploading, setUploading] = useState<string | null>(null);
   const uploadMedia = trpc.auth.uploadPageMedia.useMutation();
   const { data: productCatalog } = trpc.funnel.listAllProducts.useQuery(undefined, { staleTime: 60_000 });
+  const { data: orderBumpsList } = trpc.orderBumpsAdmin.list.useQuery(undefined, { staleTime: 60_000 });
+  const { data: funnelList } = trpc.funnel.list.useQuery(undefined, { staleTime: 60_000 });
   // Sensors for drag-and-drop (must be at top level, not inside switch)
   const reviewSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const listSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
@@ -1745,6 +1911,57 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
             </div>
           </div>
           <BSAlignField data={d} onSet={set} label="Text Alignment" field="align" />
+          {/* Clickable Hero Section */}
+          <div className="border-t pt-3 mt-3">
+            <div className="flex items-center gap-2 mb-2">
+              <input type="checkbox" id="hero-clickable" checked={d.heroClickable ?? false} onChange={e => set("heroClickable", e.target.checked)} className="rounded" />
+              <label htmlFor="hero-clickable" className="text-xs text-gray-700 font-medium">Make entire hero section clickable</label>
+            </div>
+            {d.heroClickable && (
+              <div className="pl-1 space-y-1">
+                <p className="text-[10px] text-gray-400 mb-2">The whole hero area becomes a clickable region. Individual buttons still work independently.</p>
+                <CTAActionPicker
+                  label="Hero Click Action"
+                  behaviorValue={d.heroBehavior ?? "url"}
+                  onBehaviorChange={v => set("heroBehavior", v)}
+                  linkValue={d.heroLink ?? ""}
+                  onLinkChange={v => set("heroLink", v)}
+                  emailValue={d.heroEmail ?? ""}
+                  onEmailChange={v => set("heroEmail", v)}
+                  productCatalog={productCatalog}
+                  orderBumpsList={orderBumpsList}
+                  funnelList={funnelList}
+                  orderBumpIdValue={d.heroOrderBumpId ?? null}
+                  onOrderBumpIdChange={v => set("heroOrderBumpId", v)}
+                  anchorValue={d.heroScrollAnchor ?? ""}
+                  onAnchorChange={v => set("heroScrollAnchor", v)}
+                  popupValue={d.heroPopupUrl ?? ""}
+                  onPopupChange={v => set("heroPopupUrl", v)}
+                  downloadValue={d.heroDownloadUrl ?? ""}
+                  onDownloadChange={v => set("heroDownloadUrl", v)}
+                  checkoutProductTypeValue={d.heroCheckoutProductType}
+                  checkoutProductIdValue={d.heroCheckoutProductId ?? null}
+                  onCheckoutProductChange={(type, id) => { set("heroCheckoutProductType", type || undefined); set("heroCheckoutProductId", id ?? undefined); }}
+                />
+              </div>
+            )}
+          </div>
+          {/* Hero Bottom Border */}
+          <div className="border-t pt-3 mt-1">
+            <div className="flex items-center gap-2 mb-2">
+              <input type="checkbox" id="hero-bottom-border" checked={d.heroBottomBorder ?? false} onChange={e => set("heroBottomBorder", e.target.checked)} className="rounded" />
+              <label htmlFor="hero-bottom-border" className="text-xs text-gray-700 font-medium">Hero bottom border</label>
+            </div>
+            {d.heroBottomBorder && (
+              <div className="pl-1 space-y-2">
+                <BSColorField data={d} onSet={set} label="Border Color" field="heroBottomBorderColor" />
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Border Thickness (px)</label>
+                  <input type="number" min={1} max={20} value={d.heroBottomBorderWidth ?? 4} onChange={e => set("heroBottomBorderWidth", Number(e.target.value))} className="w-full h-7 text-xs rounded border border-gray-200 px-2" />
+                </div>
+              </div>
+            )}
+          </div>
           <div className="flex items-center gap-2 mb-1"><input type="checkbox" checked={d.hideButtons ?? false} onChange={e => set("hideButtons", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Hide buttons on page</label></div>
           {!d.hideButtons && <div>
             <div className="flex items-center justify-between mb-2">
@@ -1756,23 +1973,31 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
                 <div key={idx} className="border border-gray-200 rounded-lg p-2 space-y-2">
                   <div className="flex items-center justify-between"><span className="text-xs font-medium text-gray-600">Button {idx + 1}</span>{buttons.length > 1 && <button onClick={() => removeBtn(idx)} className="text-red-400 hover:text-red-600"><X size={12} /></button>}</div>
                   <div><label className="text-xs text-gray-400 block mb-0.5">Label</label><DebouncedInput value={btn.text} onChange={v => setBtn(idx, "text", v)} className="h-7 text-xs" /></div>
-                  <div><label className="text-xs text-gray-400 block mb-0.5">Button Action</label><Select value={btn.behavior ?? "url"} onValueChange={v => setBtn(idx, "behavior", v)}><SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="url">Link to URL</SelectItem><SelectItem value="send_email">Send Email</SelectItem><SelectItem value="next_funnel_step">Next Funnel Step</SelectItem><SelectItem value="direct_checkout">Direct Checkout (Stripe)</SelectItem></SelectContent></Select></div>
-                  {(btn.behavior ?? "url") === "url" && <BSLinkField label="Link" value={btn.link ?? ""} onChange={v => setBtn(idx, "link", v)} />}
+                  <CTAActionPicker
+                    label="Button Action"
+                    behaviorValue={btn.behavior ?? "url"}
+                    onBehaviorChange={v => setBtn(idx, "behavior", v)}
+                    linkValue={btn.link ?? ""}
+                    onLinkChange={v => setBtn(idx, "link", v)}
+                    emailValue={btn.emailAddress ?? ""}
+                    onEmailChange={v => setBtn(idx, "emailAddress", v)}
+                    productCatalog={productCatalog}
+                    orderBumpsList={orderBumpsList}
+                    funnelList={funnelList}
+                    orderBumpIdValue={btn.orderBumpId ?? null}
+                    onOrderBumpIdChange={v => setBtn(idx, "orderBumpId", v)}
+                    anchorValue={btn.scrollAnchor ?? ""}
+                    onAnchorChange={v => setBtn(idx, "scrollAnchor", v)}
+                    popupValue={btn.popupUrl ?? ""}
+                    onPopupChange={v => setBtn(idx, "popupUrl", v)}
+                    downloadValue={btn.downloadUrl ?? ""}
+                    onDownloadChange={v => setBtn(idx, "downloadUrl", v)}
+                    checkoutProductTypeValue={btn.checkoutProductType}
+                    checkoutProductIdValue={btn.checkoutProductId ?? null}
+                    onCheckoutProductChange={(type, id) => setBtnMulti(idx, { checkoutProductType: type || undefined, checkoutProductId: id ?? undefined })}
+                  />
                   {(btn.behavior ?? "url") === "send_email" && (
                     <HeroSendEmailSettings btn={btn} idx={idx} setBtn={setBtn} setBtnMulti={setBtnMulti} />
-                  )}
-                  {(btn.behavior ?? "url") === "next_funnel_step" && <p className="text-[10px] text-teal-600 bg-teal-50 rounded px-2 py-1">Button will navigate to the next page in the funnel sequence.</p>}
-                  {(btn.behavior ?? "url") === "direct_checkout" && (
-                    <div className="space-y-2 bg-teal-50 border border-teal-200 rounded p-2">
-                      <p className="text-[10px] text-teal-700 font-medium">Opens Stripe Checkout. After payment, user is sent to /my-dashboard.</p>
-                      <div><label className="text-xs text-gray-500 block mb-0.5">Product</label>
-                        <select value={btn.checkoutProductId ? `${btn.checkoutProductType}:${btn.checkoutProductId}` : ""} onChange={e => { const [type, id] = e.target.value.split(":"); setBtnMulti(idx, { checkoutProductType: type || undefined, checkoutProductId: id ? Number(id) : undefined }); }} className="w-full h-7 text-xs rounded border border-gray-200 px-2">
-                          <option value="">-- Select product --</option>
-                          {(productCatalog ?? []).map(p => <option key={`${p.type}:${p.id}`} value={`${p.type}:${p.id}`}>{p.name} ({p.type}) — ${(p.price / 100).toFixed(2)}</option>)}
-                        </select>
-                      </div>
-
-                    </div>
                   )}
                   <div><label className="text-xs text-gray-400 block mb-0.5">Style</label><div className="flex gap-1">{(["filled", "outline"] as const).map(s => <button key={s} onClick={() => setBtn(idx, "style", s)} className={`flex-1 py-1 text-xs rounded border capitalize ${btn.style === s ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>{s}</button>)}</div></div>
                   <div className="flex items-center gap-2"><label className="text-xs text-gray-400 w-16 flex-shrink-0">Color</label><input type="color" value={btn.color} onChange={e => setBtn(idx, "color", e.target.value)} className="w-7 h-7 rounded cursor-pointer border border-gray-200" /><DebouncedInput value={btn.color} onChange={v => setBtn(idx, "color", v)} className="h-7 text-xs flex-1" /></div>
@@ -1841,8 +2066,30 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
             <BSTextField data={d} onSet={set} label="Caption" field="caption" />
             {/* Link */}
             <div className="border border-gray-100 rounded p-2 space-y-2">
-              <p className="text-xs font-semibold text-gray-600">Link (optional)</p>
-              <DebouncedInput value={d.linkUrl ?? ""} onChange={v => set("linkUrl", v)} className="h-8 text-sm" placeholder="https://example.com" />
+              <p className="text-xs font-semibold text-gray-600">Link Action (optional)</p>
+              <CTAActionPicker
+                label="Click Action"
+                behaviorValue={d.linkBehavior ?? "url"}
+                onBehaviorChange={v => set("linkBehavior", v)}
+                linkValue={d.linkUrl ?? ""}
+                onLinkChange={v => set("linkUrl", v)}
+                emailValue={d.linkEmailAddress ?? ""}
+                onEmailChange={v => set("linkEmailAddress", v)}
+                productCatalog={productCatalog}
+                orderBumpsList={orderBumpsList}
+                funnelList={funnelList}
+                orderBumpIdValue={d.linkOrderBumpId ?? null}
+                onOrderBumpIdChange={v => set("linkOrderBumpId", v)}
+                anchorValue={d.linkScrollAnchor ?? ""}
+                onAnchorChange={v => set("linkScrollAnchor", v)}
+                popupValue={d.linkPopupUrl ?? ""}
+                onPopupChange={v => set("linkPopupUrl", v)}
+                downloadValue={d.linkDownloadUrl ?? ""}
+                onDownloadChange={v => set("linkDownloadUrl", v)}
+                checkoutProductTypeValue={d.linkCheckoutProductType}
+                checkoutProductIdValue={d.linkCheckoutProductId ?? null}
+                onCheckoutProductChange={(type, id) => { set("linkCheckoutProductType", type); set("linkCheckoutProductId", id); }}
+              />
               <div className="flex items-center gap-2">
                 <input type="checkbox" checked={d.openInNewTab ?? true} onChange={e => set("openInNewTab", e.target.checked)} className="rounded" />
                 <label className="text-xs text-gray-600">Open in new tab</label>
@@ -1998,6 +2245,7 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
         <div className="space-y-3">
           <BSTextField data={d} onSet={set} label="Section Headline" field="headline" />
           <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
+          <BSColorField data={d} onSet={set} label="Card Background" field="cardBgColor" />
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs text-gray-500 font-medium">Reviews</label>
@@ -2057,22 +2305,29 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
           <BSTextField data={d} onSet={set} label="Headline" field="headline" />
           <BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline />
           <BSTextField data={d} onSet={set} label="CTA Button Text" field="ctaText" />
-          <div><label className="text-xs text-gray-500 block mb-1">Button Action</label><Select value={d.ctaBehavior ?? "url"} onValueChange={v => set("ctaBehavior", v)}><SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="url">Link to URL</SelectItem><SelectItem value="send_email">Send Email</SelectItem><SelectItem value="next_funnel_step">Next Funnel Step</SelectItem><SelectItem value="direct_checkout">Direct Checkout (Stripe)</SelectItem></SelectContent></Select></div>
-          {(d.ctaBehavior ?? "url") === "url" && <BSLinkField label="Button Link" value={d.ctaLink ?? ""} onChange={v => set("ctaLink", v)} />}
-          {(d.ctaBehavior ?? "url") === "send_email" && <div><label className="text-xs text-gray-500 block mb-1">Email Address</label><DebouncedInput value={d.ctaEmailAddress ?? ""} onChange={v => set("ctaEmailAddress", v)} className="h-7 text-xs" placeholder="e.g. hello@example.com" /></div>}
-          {(d.ctaBehavior ?? "url") === "next_funnel_step" && <p className="text-[10px] text-teal-600 bg-teal-50 rounded px-2 py-1">Button will navigate to the next page in the funnel sequence.</p>}
-          {(d.ctaBehavior ?? "url") === "direct_checkout" && (
-            <div className="space-y-2 bg-teal-50 border border-teal-200 rounded p-2">
-              <p className="text-[10px] text-teal-700 font-medium">Opens Stripe Checkout. After payment, user is sent to /my-dashboard.</p>
-              <div><label className="text-xs text-gray-500 block mb-0.5">Product</label>
-                <select value={d.checkoutProductId ? `${d.checkoutProductType}:${d.checkoutProductId}` : ""} onChange={e => { const [type, id] = e.target.value.split(":"); onChangeRef.current({ ...dataRef.current, checkoutProductType: type || undefined, checkoutProductId: id ? Number(id) : undefined }); }} className="w-full h-7 text-xs rounded border border-gray-200 px-2">
-                  <option value="">-- Select product --</option>
-                  {(productCatalog ?? []).map(p => <option key={`${p.type}:${p.id}`} value={`${p.type}:${p.id}`}>{p.name} ({p.type}) — ${(p.price / 100).toFixed(2)}</option>)}
-                </select>
-              </div>
-
-            </div>
-          )}
+          <CTAActionPicker
+            label="Button Action"
+            behaviorValue={d.ctaBehavior ?? "url"}
+            onBehaviorChange={v => set("ctaBehavior", v)}
+            linkValue={d.ctaLink ?? ""}
+            onLinkChange={v => set("ctaLink", v)}
+            emailValue={d.ctaEmailAddress ?? ""}
+            onEmailChange={v => set("ctaEmailAddress", v)}
+            productCatalog={productCatalog}
+            orderBumpsList={orderBumpsList}
+            funnelList={funnelList}
+            orderBumpIdValue={d.ctaOrderBumpId ?? null}
+            onOrderBumpIdChange={v => set("ctaOrderBumpId", v)}
+            anchorValue={d.ctaScrollAnchor ?? ""}
+            onAnchorChange={v => set("ctaScrollAnchor", v)}
+            popupValue={d.ctaPopupUrl ?? ""}
+            onPopupChange={v => set("ctaPopupUrl", v)}
+            downloadValue={d.ctaDownloadUrl ?? ""}
+            onDownloadChange={v => set("ctaDownloadUrl", v)}
+            checkoutProductTypeValue={d.checkoutProductType}
+            checkoutProductIdValue={d.checkoutProductId ?? null}
+            onCheckoutProductChange={(type, id) => { set("checkoutProductType", type); set("checkoutProductId", id); }}
+          />
           <BSColorField data={d} onSet={set} label="CTA Color" field="ctaColor" />
           <BSColorField data={d} onSet={set} label="CTA Text Color" field="ctaTextColor" />
           <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
@@ -2130,7 +2385,29 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
         </div>
       );
     case "cta_standalone":
-      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Headline" field="headline" /><div className="border border-gray-200 rounded-lg p-3 space-y-2"><p className="text-xs font-semibold text-gray-600">Price Display</p><div className="flex items-center gap-2"><input type="checkbox" checked={d.showStrikethrough ?? false} onChange={e => set("showStrikethrough", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show strikethrough price</label></div>{(d.showStrikethrough ?? false) && <DebouncedInput value={d.strikethroughPrice ?? ""} onChange={v => set("strikethroughPrice", v)} className="h-7 text-xs" placeholder="e.g. $497" />}<BSTextField data={d} onSet={set} label="Current Price (display only)" field="displayPrice" placeholder="e.g. $197" /></div><BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline /><BSTextField data={d} onSet={set} label="Button Text" field="ctaText" /><div><label className="text-xs text-gray-500 block mb-1">Button Action</label><Select value={d.ctaBehavior ?? "url"} onValueChange={v => set("ctaBehavior", v)}><SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="url">Link to URL</SelectItem><SelectItem value="send_email">Send Email</SelectItem><SelectItem value="next_funnel_step">Next Funnel Step</SelectItem><SelectItem value="direct_checkout">Direct Checkout (Stripe)</SelectItem></SelectContent></Select></div>{(d.ctaBehavior ?? "url") === "url" && <BSLinkField label="Button Link" value={d.ctaLink ?? ""} onChange={v => set("ctaLink", v)} />}{(d.ctaBehavior ?? "url") === "send_email" && <div><label className="text-xs text-gray-500 block mb-1">Email Address</label><DebouncedInput value={d.ctaEmailAddress ?? ""} onChange={v => set("ctaEmailAddress", v)} className="h-7 text-xs" placeholder="e.g. hello@example.com" /></div>}{(d.ctaBehavior ?? "url") === "next_funnel_step" && <p className="text-[10px] text-teal-600 bg-teal-50 rounded px-2 py-1">Button will navigate to the next page in the funnel sequence.</p>}{(d.ctaBehavior ?? "url") === "direct_checkout" && <div className="space-y-2 bg-teal-50 border border-teal-200 rounded p-2"><p className="text-[10px] text-teal-700 font-medium">Opens Stripe Checkout. After payment, user is sent to /my-dashboard.</p><div><label className="text-xs text-gray-500 block mb-0.5">Product</label><select value={d.checkoutProductId ? `${d.checkoutProductType}:${d.checkoutProductId}` : ""} onChange={e => { const [type, id] = e.target.value.split(":"); onChangeRef.current({ ...dataRef.current, checkoutProductType: type || undefined, checkoutProductId: id ? Number(id) : undefined }); }} className="w-full h-7 text-xs rounded border border-gray-200 px-2"><option value="">-- Select product --</option>{(productCatalog ?? []).map(p => <option key={`${p.type}:${p.id}`} value={`${p.type}:${p.id}`}>{p.name} ({p.type}) — ${(p.price / 100).toFixed(2)}</option>)}</select></div></div>}<BSColorField data={d} onSet={set} label="Button Color" field="ctaColor" /><BSColorField data={d} onSet={set} label="Button Text Color" field="ctaTextColor" /><BSColorField data={d} onSet={set} label="Button Border / Outline Color" field="btnBorderColor" /><div><label className="text-xs text-gray-500 block mb-1">Button Style</label><div className="flex gap-1">{(["filled","outline"] as const).map(s=><button key={s} onClick={()=>set("btnStyle",s)} className={`flex-1 py-1 text-xs rounded border capitalize ${(d.btnStyle??"filled")===s?"bg-teal-600 text-white border-teal-600":"border-gray-200 text-gray-600"}`}>{s}</button>)}</div></div><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div className="border border-teal-100 bg-teal-50/50 rounded-lg p-3 space-y-2"><div className="flex items-center gap-2"><input type="checkbox" id="cta-lc" checked={d.leadCapture??false} onChange={e=>set("leadCapture",e.target.checked)} className="rounded" /><label htmlFor="cta-lc" className="text-xs text-teal-700 font-medium">Collect lead before action</label></div>{(d.leadCapture??false)&&(<div className="space-y-1 pl-1"><p className="text-[10px] text-gray-400">A name/email modal will appear before the button action executes.</p><BSTextField data={d} onSet={set} label="Modal Title" field="leadModalTitle" placeholder="e.g. Get Instant Access" /><BSTextField data={d} onSet={set} label="Modal Subtext" field="leadModalSubtext" placeholder="Optional" /><BSTextField data={d} onSet={set} label="Tags (comma-separated)" field="leadTags" placeholder="e.g. webinar, free-guide" /></div>)}</div><div><label className="text-xs text-gray-500 block mb-1">Button Animation</label><Select value={d.ctaAnimation ?? "none"} onValueChange={v => set("ctaAnimation", v)}><SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem><SelectItem value="pulse">Pulse</SelectItem><SelectItem value="bounce">Bounce</SelectItem><SelectItem value="shake">Shake</SelectItem><SelectItem value="glow">Glow</SelectItem></SelectContent></Select></div><BSAlignField data={d} onSet={set} label="Text Alignment" field="align" /><div className="border-t pt-3 mt-1 space-y-2"><p className="text-xs font-medium text-gray-500">Button Subtext (below button)</p><BSTextField data={d} onSet={set} label="Subtext text" field="buttonSubtext" placeholder="e.g. No credit card required" /><BSLinkField label="Subtext URL (optional)" value={d.buttonSubtextUrl ?? ""} onChange={v => set("buttonSubtextUrl", v)} /><BSColorField data={d} onSet={set} label="Subtext Color" field="buttonSubtextColor" /><div><label className="text-xs text-gray-500 block mb-1">Subtext Size</label><select value={d.buttonSubtextSize ?? "xs"} onChange={e => set("buttonSubtextSize", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="xs">Extra Small (xs)</option><option value="sm">Small (sm)</option><option value="base">Base</option><option value="lg">Large (lg)</option></select></div><div><label className="text-xs text-gray-500 block mb-1">Subtext Style</label><div className="flex gap-2"><button type="button" onClick={() => set("buttonSubtextItalic", !(d.buttonSubtextItalic ?? false))} className={`px-2 py-1 text-xs rounded border ${(d.buttonSubtextItalic ?? false) ? "bg-teal-50 border-teal-400 text-teal-700" : "border-gray-200 text-gray-500"}`}><em>Italic</em></button><button type="button" onClick={() => set("buttonSubtextBold", !(d.buttonSubtextBold ?? false))} className={`px-2 py-1 text-xs rounded border ${(d.buttonSubtextBold ?? false) ? "bg-teal-50 border-teal-400 text-teal-700" : "border-gray-200 text-gray-500"}`}><strong>Bold</strong></button></div></div></div><OptOutSettings d={d} set={set} /></div>);
+      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Headline" field="headline" /><div className="border border-gray-200 rounded-lg p-3 space-y-2"><p className="text-xs font-semibold text-gray-600">Price Display</p><div className="flex items-center gap-2"><input type="checkbox" checked={d.showStrikethrough ?? false} onChange={e => set("showStrikethrough", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show strikethrough price</label></div>{(d.showStrikethrough ?? false) && <DebouncedInput value={d.strikethroughPrice ?? ""} onChange={v => set("strikethroughPrice", v)} className="h-7 text-xs" placeholder="e.g. $497" />}<BSTextField data={d} onSet={set} label="Current Price (display only)" field="displayPrice" placeholder="e.g. $197" /></div><BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline /><BSTextField data={d} onSet={set} label="Button Text" field="ctaText" /><CTAActionPicker
+            label="Button Action"
+            behaviorValue={d.ctaBehavior ?? "url"}
+            onBehaviorChange={v => set("ctaBehavior", v)}
+            linkValue={d.ctaLink ?? ""}
+            onLinkChange={v => set("ctaLink", v)}
+            emailValue={d.ctaEmailAddress ?? ""}
+            onEmailChange={v => set("ctaEmailAddress", v)}
+            productCatalog={productCatalog}
+            orderBumpsList={orderBumpsList}
+            funnelList={funnelList}
+            orderBumpIdValue={d.ctaOrderBumpId ?? null}
+            onOrderBumpIdChange={v => set("ctaOrderBumpId", v)}
+            anchorValue={d.ctaScrollAnchor ?? ""}
+            onAnchorChange={v => set("ctaScrollAnchor", v)}
+            popupValue={d.ctaPopupUrl ?? ""}
+            onPopupChange={v => set("ctaPopupUrl", v)}
+            downloadValue={d.ctaDownloadUrl ?? ""}
+            onDownloadChange={v => set("ctaDownloadUrl", v)}
+            checkoutProductTypeValue={d.checkoutProductType}
+            checkoutProductIdValue={d.checkoutProductId ?? null}
+            onCheckoutProductChange={(type, id) => { set("checkoutProductType", type); set("checkoutProductId", id); }}
+          /><BSColorField data={d} onSet={set} label="Button Color" field="ctaColor" /><BSColorField data={d} onSet={set} label="Button Text Color" field="ctaTextColor" /><BSColorField data={d} onSet={set} label="Button Border / Outline Color" field="btnBorderColor" /><div><label className="text-xs text-gray-500 block mb-1">Button Style</label><div className="flex gap-1">{(["filled","outline"] as const).map(s=><button key={s} onClick={()=>set("btnStyle",s)} className={`flex-1 py-1 text-xs rounded border capitalize ${(d.btnStyle??"filled")===s?"bg-teal-600 text-white border-teal-600":"border-gray-200 text-gray-600"}`}>{s}</button>)}</div></div><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div className="border border-teal-100 bg-teal-50/50 rounded-lg p-3 space-y-2"><div className="flex items-center gap-2"><input type="checkbox" id="cta-lc" checked={d.leadCapture??false} onChange={e=>set("leadCapture",e.target.checked)} className="rounded" /><label htmlFor="cta-lc" className="text-xs text-teal-700 font-medium">Collect lead before action</label></div>{(d.leadCapture??false)&&(<div className="space-y-1 pl-1"><p className="text-[10px] text-gray-400">A name/email modal will appear before the button action executes.</p><BSTextField data={d} onSet={set} label="Modal Title" field="leadModalTitle" placeholder="e.g. Get Instant Access" /><BSTextField data={d} onSet={set} label="Modal Subtext" field="leadModalSubtext" placeholder="Optional" /><BSTextField data={d} onSet={set} label="Tags (comma-separated)" field="leadTags" placeholder="e.g. webinar, free-guide" /></div>)}</div><div><label className="text-xs text-gray-500 block mb-1">Button Animation</label><Select value={d.ctaAnimation ?? "none"} onValueChange={v => set("ctaAnimation", v)}><SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem><SelectItem value="pulse">Pulse</SelectItem><SelectItem value="bounce">Bounce</SelectItem><SelectItem value="shake">Shake</SelectItem><SelectItem value="glow">Glow</SelectItem></SelectContent></Select></div><BSAlignField data={d} onSet={set} label="Text Alignment" field="align" /><div className="border-t pt-3 mt-1 space-y-2"><p className="text-xs font-medium text-gray-500">Button Subtext (below button)</p><BSTextField data={d} onSet={set} label="Subtext text" field="buttonSubtext" placeholder="e.g. No credit card required" /><BSLinkField label="Subtext URL (optional)" value={d.buttonSubtextUrl ?? ""} onChange={v => set("buttonSubtextUrl", v)} /><BSColorField data={d} onSet={set} label="Subtext Color" field="buttonSubtextColor" /><div><label className="text-xs text-gray-500 block mb-1">Subtext Size</label><select value={d.buttonSubtextSize ?? "xs"} onChange={e => set("buttonSubtextSize", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="xs">Extra Small (xs)</option><option value="sm">Small (sm)</option><option value="base">Base</option><option value="lg">Large (lg)</option></select></div><div><label className="text-xs text-gray-500 block mb-1">Subtext Style</label><div className="flex gap-2"><button type="button" onClick={() => set("buttonSubtextItalic", !(d.buttonSubtextItalic ?? false))} className={`px-2 py-1 text-xs rounded border ${(d.buttonSubtextItalic ?? false) ? "bg-teal-50 border-teal-400 text-teal-700" : "border-gray-200 text-gray-500"}`}><em>Italic</em></button><button type="button" onClick={() => set("buttonSubtextBold", !(d.buttonSubtextBold ?? false))} className={`px-2 py-1 text-xs rounded border ${(d.buttonSubtextBold ?? false) ? "bg-teal-50 border-teal-400 text-teal-700" : "border-gray-200 text-gray-500"}`}><strong>Bold</strong></button></div></div></div><OptOutSettings d={d} set={set} /></div>);
     case "lead_capture":
       return <LeadCaptureSettings d={d} set={set} />;
     case "cta_optin":
@@ -2198,7 +2475,29 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
                     <DebouncedInput value={product.ctaText} onChange={v => set("products", products.map((p, j) => j === i ? { ...p, ctaText: v } : p))} className="h-7 text-xs" placeholder="CTA" />
                   </div>
                   <DebouncedInput value={(product as any).strikethroughPrice ?? ""} onChange={v => set("products", products.map((p, j) => j === i ? { ...p, strikethroughPrice: v } : p))} className="h-7 text-xs" placeholder="Strikethrough price (e.g. $99, display only)" />
-                  <BSLinkField label="CTA Link" value={product.ctaLink ?? ""} onChange={v => set("products", products.map((p, j) => j === i ? { ...p, ctaLink: v } : p))} />
+                  <CTAActionPicker
+                    label="CTA Action"
+                    behaviorValue={product.ctaBehavior ?? "url"}
+                    onBehaviorChange={v => set("products", products.map((p, j) => j === i ? { ...p, ctaBehavior: v } : p))}
+                    linkValue={product.ctaLink ?? ""}
+                    onLinkChange={v => set("products", products.map((p, j) => j === i ? { ...p, ctaLink: v } : p))}
+                    emailValue={product.ctaEmailAddress ?? ""}
+                    onEmailChange={v => set("products", products.map((p, j) => j === i ? { ...p, ctaEmailAddress: v } : p))}
+                    productCatalog={productCatalog}
+                    orderBumpsList={orderBumpsList}
+                    funnelList={funnelList}
+                    orderBumpIdValue={product.ctaOrderBumpId ?? null}
+                    onOrderBumpIdChange={v => set("products", products.map((p, j) => j === i ? { ...p, ctaOrderBumpId: v } : p))}
+                    anchorValue={product.ctaScrollAnchor ?? ""}
+                    onAnchorChange={v => set("products", products.map((p, j) => j === i ? { ...p, ctaScrollAnchor: v } : p))}
+                    popupValue={product.ctaPopupUrl ?? ""}
+                    onPopupChange={v => set("products", products.map((p, j) => j === i ? { ...p, ctaPopupUrl: v } : p))}
+                    downloadValue={product.ctaDownloadUrl ?? ""}
+                    onDownloadChange={v => set("products", products.map((p, j) => j === i ? { ...p, ctaDownloadUrl: v } : p))}
+                    checkoutProductTypeValue={product.checkoutProductType}
+                    checkoutProductIdValue={product.checkoutProductId ?? null}
+                    onCheckoutProductChange={(type, id) => set("products", products.map((p, j) => j === i ? { ...p, checkoutProductType: type, checkoutProductId: id } : p))}
+                  />
                   <DebouncedInput value={product.fulfillment ?? ""} onChange={v => set("products", products.map((p, j) => j === i ? { ...p, fulfillment: v } : p))} className="h-7 text-xs" placeholder="Fulfillment note" />
                   <DebouncedInput value={product.imageUrl ?? ""} onChange={v => set("products", products.map((p, j) => j === i ? { ...p, imageUrl: v } : p))} className="h-7 text-xs" placeholder="Image URL" />
                 </div>
@@ -2281,7 +2580,29 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
             <BSTextField data={d} onSet={set} label="Final Price" field="finalPrice" placeholder="$2497" />
           </div>
           <BSTextField data={d} onSet={set} label="CTA Button Text" field="ctaText" />
-          <BSLinkField label="CTA Link" value={d.ctaLink ?? ""} onChange={v => set("ctaLink", v)} />
+          <CTAActionPicker
+            label="CTA Action"
+            behaviorValue={d.ctaBehavior ?? "url"}
+            onBehaviorChange={v => set("ctaBehavior", v)}
+            linkValue={d.ctaLink ?? ""}
+            onLinkChange={v => set("ctaLink", v)}
+            emailValue={d.ctaEmailAddress ?? ""}
+            onEmailChange={v => set("ctaEmailAddress", v)}
+            productCatalog={productCatalog}
+            orderBumpsList={orderBumpsList}
+            funnelList={funnelList}
+            orderBumpIdValue={d.ctaOrderBumpId ?? null}
+            onOrderBumpIdChange={v => set("ctaOrderBumpId", v)}
+            anchorValue={d.ctaScrollAnchor ?? ""}
+            onAnchorChange={v => set("ctaScrollAnchor", v)}
+            popupValue={d.ctaPopupUrl ?? ""}
+            onPopupChange={v => set("ctaPopupUrl", v)}
+            downloadValue={d.ctaDownloadUrl ?? ""}
+            onDownloadChange={v => set("ctaDownloadUrl", v)}
+            checkoutProductTypeValue={d.checkoutProductType}
+            checkoutProductIdValue={d.checkoutProductId ?? null}
+            onCheckoutProductChange={(type, id) => { set("checkoutProductType", type); set("checkoutProductId", id); }}
+          />
           <BSColorField data={d} onSet={set} label="CTA Color" field="ctaColor" />
           <BSColorField data={d} onSet={set} label="CTA Text Color" field="ctaTextColor" />
           <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
@@ -2306,7 +2627,29 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
             <BSTextField data={d} onSet={set} label="CTA Emoji" field="ctaEmoji" placeholder="\uD83D\uDC4D" />
             <div className="col-span-2"><BSTextField data={d} onSet={set} label="CTA Text" field="ctaText" placeholder="Add on now for $X" /></div>
           </div>
-          <BSLinkField label="CTA Link" value={d.ctaLink ?? ""} onChange={v => set("ctaLink", v)} />
+          <CTAActionPicker
+            label="CTA Action"
+            behaviorValue={d.ctaBehavior ?? "url"}
+            onBehaviorChange={v => set("ctaBehavior", v)}
+            linkValue={d.ctaLink ?? ""}
+            onLinkChange={v => set("ctaLink", v)}
+            emailValue={d.ctaEmailAddress ?? ""}
+            onEmailChange={v => set("ctaEmailAddress", v)}
+            productCatalog={productCatalog}
+            orderBumpsList={orderBumpsList}
+            funnelList={funnelList}
+            orderBumpIdValue={d.ctaOrderBumpId ?? null}
+            onOrderBumpIdChange={v => set("ctaOrderBumpId", v)}
+            anchorValue={d.ctaScrollAnchor ?? ""}
+            onAnchorChange={v => set("ctaScrollAnchor", v)}
+            popupValue={d.ctaPopupUrl ?? ""}
+            onPopupChange={v => set("ctaPopupUrl", v)}
+            downloadValue={d.ctaDownloadUrl ?? ""}
+            onDownloadChange={v => set("ctaDownloadUrl", v)}
+            checkoutProductTypeValue={d.checkoutProductType}
+            checkoutProductIdValue={d.checkoutProductId ?? null}
+            onCheckoutProductChange={(type, id) => { set("checkoutProductType", type); set("checkoutProductId", id); }}
+          />
           <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
           <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
           <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />
@@ -2317,8 +2660,7 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
     case "inline_checkout": {
       const icProds: Array<{ name: string; description: string; price: number; imageUrl: string; type: string; strikethroughPrice?: string; productId?: number }> = d.products ?? [];
       const icBumps: Array<{ title: string; headline: string; description: string; price: number; imageUrl: string; ctaText: string; ctaEmoji: string; animation: string }> = d.orderBumps ?? [];
-      // eslint-disable-next-line react-hooks/rules-of-hooks
-      const { data: icCatalog } = trpc.funnel.listAllProducts.useQuery(undefined, { staleTime: 60_000 });
+      const icCatalog = productCatalog;
       return (
         <div className="space-y-4">
           <div className="text-xs text-teal-700 bg-teal-50 border border-teal-200 rounded p-2">
@@ -2438,8 +2780,7 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
     case "embedded_checkout": {
       const ecProds: Array<{ name: string; description: string; price: number; imageUrl: string; type: string; strikethroughPrice?: string; productId?: number }> = d.products ?? [];
       const ecBumps: Array<{ title: string; headline: string; description: string; price: number; imageUrl: string; ctaText: string; highlightColor: string; animation: string }> = d.orderBumps ?? [];
-      // eslint-disable-next-line react-hooks/rules-of-hooks
-      const { data: ecCatalog } = trpc.funnel.listAllProducts.useQuery(undefined, { staleTime: 60_000 });
+      const ecCatalog = productCatalog;
       return (
         <div className="space-y-4">
           <div className="text-xs text-teal-700 bg-teal-50 border border-teal-200 rounded p-2">
@@ -3095,7 +3436,7 @@ function ColumnDropZone({ id, blocks, activeDragId, isTargeted, onMoveOut, onAdd
   return (
     <div ref={setNodeRef} data-col-zone={id} style={{ pointerEvents: "all" }} className={`flex-1 min-h-[120px] rounded-lg transition-all ${isActive ? "ring-2 ring-teal-400 bg-teal-50" : "bg-gray-50/50"}`}>
       {blocks.length === 0 ? (
-        <div className={`h-full min-h-[120px] flex flex-col items-center justify-center gap-2 text-xs rounded-lg border-2 border-dashed transition-all ${isActive ? "border-teal-400 text-teal-600 bg-teal-50" : "border-gray-200 text-gray-400"}`}>
+        <div data-col-zone={id} className={`h-full min-h-[120px] flex flex-col items-center justify-center gap-2 text-xs rounded-lg border-2 border-dashed transition-all ${isActive ? "border-teal-400 text-teal-600 bg-teal-50" : "border-gray-200 text-gray-400"}`}>
           {isActive ? <><span className="text-lg">+</span><span>Drop here</span></> : (
             <>
               <span>Drag blocks here</span>
@@ -3109,9 +3450,9 @@ function ColumnDropZone({ id, blocks, activeDragId, isTargeted, onMoveOut, onAdd
       ) : (
         <>
           <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
-            <div className="space-y-1 p-1">
+            <div data-col-zone={id} className="space-y-1 p-1">
               {blocks.map(b => (
-                <ColumnChildBlock key={b.id} block={b} onMoveOut={() => onMoveOut(b.id)} />
+                <ColumnChildBlock key={b.id} block={b} onMoveOut={() => onMoveOut(b.id)} colZoneId={id} />
               ))}
             </div>
           </SortableContext>
@@ -3220,11 +3561,11 @@ function ColumnBlockPickerDialog({ open, onOpenChange, onAddBlock }: {
 }
 
 // ─── Column Child Block (sortable within a column) ────────────────────────────
-function ColumnChildBlock({ block, onMoveOut }: { block: Block; onMoveOut: () => void }) {
+function ColumnChildBlock({ block, onMoveOut, colZoneId }: { block: Block; onMoveOut: () => void; colZoneId?: string }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
-  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1, pointerEvents: isDragging ? "none" as const : undefined };
   return (
-    <div ref={setNodeRef} style={style} className="relative group border border-gray-200 rounded bg-white overflow-hidden">
+    <div ref={setNodeRef} style={style} data-col-zone={colZoneId} className="relative group border border-gray-200 rounded bg-white overflow-hidden">
       <div className="absolute top-1 left-1 z-10 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
         <div {...attributes} {...listeners} className="w-6 h-6 bg-white border border-gray-200 rounded shadow text-gray-400 hover:text-gray-600 flex items-center justify-center cursor-grab active:cursor-grabbing" title="Drag to reorder"><GripVertical size={11} /></div>
         <button onClick={e => { e.stopPropagation(); onMoveOut(); }} className="w-6 h-6 bg-white border border-gray-200 rounded shadow text-gray-400 hover:text-orange-500 flex items-center justify-center" title="Move out of column"><ArrowRight size={11} /></button>
@@ -3255,6 +3596,9 @@ export function SortableBlock({ block, isSelected, onSelect, onDelete, onDuplica
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? (isColumnLayout ? 1 : 0.5) : 1,
+    // When dragging a non-column block, disable pointer events so elementsFromPoint
+    // can detect column drop zones underneath the dragged ghost element
+    pointerEvents: (isDragging && !isColumnLayout) ? "none" as const : undefined,
   };
   const leftRatio = block.data?.leftRatio ?? 50;
   const gap = block.data?.gap ?? 32;
@@ -3813,7 +4157,10 @@ export default function LandingPageBuilder() {
                 onDragStart={handleDragStart}
                 onDragOver={handleDragOver}
                 onDragEnd={handleDragEnd}>
-                <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
+                <SortableContext items={[
+                    ...blocks.map(b => b.id),
+                    ...blocks.flatMap(b => b.type === "column_layout" ? [...(b.data?.leftBlocks ?? []), ...(b.data?.rightBlocks ?? [])].map((cb: any) => cb.id) : []),
+                  ]} strategy={verticalListSortingStrategy}>
                   {blocks.map((block, idx) => (
                     <SortableBlock key={block.id} block={block} isSelected={selectedId === block.id}
                       onSelect={() => setSelectedId(block.id)} onDelete={() => deleteBlock(block.id)}

@@ -46,6 +46,7 @@ import { LMSSalesTab } from "@/components/LMSSalesTab";
 import DigitalDownloadsAdmin from "./DigitalDownloadsAdmin";
 import PhysicalProductsAdmin from "./PhysicalProductsAdmin";
 import OrderBumpsAdmin from "./OrderBumpsAdmin";
+import CertificateTemplatesAdmin from "./CertificateTemplatesAdmin";
 import LessonBlockEditor from "@/components/LessonBlockEditor";
 import { Block, BlockType, BlockPreview } from "@/components/BlockPreview";
 import { BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, SortableBlock, uid } from "@/pages/admin/LandingPageBuilder";
@@ -1255,6 +1256,28 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
 
 // ─── Course Settings Form ─────────────────────────────────────────────────────
 
+function CertTemplateSelector({ value, onChange }: { value: number | null; onChange: (v: number | null) => void }) {
+  const { data: templates = [] } = trpc.lmsAdmin.listCertificateTemplates.useQuery();
+  return (
+    <Select
+      value={value ? String(value) : "_default"}
+      onValueChange={v => onChange(v === "_default" ? null : Number(v))}
+    >
+      <SelectTrigger className="h-8 text-xs mt-1">
+        <SelectValue placeholder="Default template" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="_default">Default template</SelectItem>
+        {templates.map((t: any) => (
+          <SelectItem key={t.id} value={String(t.id)}>
+            {t.name}{t.isDefault ? " ★" : ""}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (data: any) => void; saving: boolean }) {
    const [uploadingCover, setUploadingCover] = useState(false);
   const handleCoverFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1293,6 +1316,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
   const [installmentAmount, setInstallmentAmount] = useState(String(((course.installmentAmount ?? 0) / 100).toFixed(2)));
   const [installmentIntervalDays, setInstallmentIntervalDays] = useState(String(course.installmentIntervalDays ?? 30));
   const [hasCertificate, setHasCertificate] = useState(course.hasCertificate);
+  const [certificateTemplateId, setCertificateTemplateId] = useState<number | null>((course as any).certificateTemplateId ?? null);
   const [isFeatured, setIsFeatured] = useState(course.isFeatured ?? false);
   const [isDrip, setIsDrip] = useState(course.isDrip ?? false);
   const [hideProgress, setHideProgress] = useState(course.hideProgress ?? false);
@@ -1611,6 +1635,12 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
         <Switch checked={hasCertificate} onCheckedChange={setHasCertificate} id="cert-switch" />
         <Label htmlFor="cert-switch" className="text-sm">Certificate of completion</Label>
       </div>
+      {hasCertificate && (
+        <div className="ml-6 mt-1">
+          <Label className="text-xs text-muted-foreground">Certificate Template</Label>
+          <CertTemplateSelector value={certificateTemplateId} onChange={setCertificateTemplateId} />
+        </div>
+      )}
       <div className="flex items-center gap-2">
         <Switch checked={isFeatured} onCheckedChange={setIsFeatured} id="featured-switch" />
         <Label htmlFor="featured-switch" className="text-sm">Featured on LMS Home Page</Label>
@@ -1732,7 +1762,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
         </div>
         <Button size="sm" variant="outline" className="border-teal-300 text-teal-600 hover:bg-teal-50"
           disabled={updateCourseSettings.isPending}
-          onClick={() => updateCourseSettings.mutate({ courseId: course.id, slug: slug.trim() || course.slug, metaTitle: metaTitle.trim() || undefined, metaDescription: metaDescription.trim() || undefined, status, hasCertificate, isFeatured })}
+          onClick={() => updateCourseSettings.mutate({ courseId: course.id, slug: slug.trim() || course.slug, metaTitle: metaTitle.trim() || undefined, metaDescription: metaDescription.trim() || undefined, status, hasCertificate, certificateTemplateId, isFeatured })}
         >
           {updateCourseSettings.isPending ? "Saving..." : "Save URL & SEO"}
         </Button>
@@ -1861,6 +1891,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
           pricingType,
           isFree: pricingType === "free",
           hasCertificate,
+          certificateTemplateId,
           isFeatured,
           isDrip,
           hideProgress,
@@ -4711,6 +4742,7 @@ export default function LMSAdmin() {
             <TabsTrigger value="analytics" className="text-xs">Analytics</TabsTrigger>
             <TabsTrigger value="collections" className="text-xs">Collections</TabsTrigger>
             <TabsTrigger value="orderbumps" className="text-xs">Order Bumps</TabsTrigger>
+            <TabsTrigger value="certificates" className="text-xs">Certificates</TabsTrigger>
             <TabsTrigger value="thinkific" className="text-xs">Import from Thinkific</TabsTrigger>
           </TabsList>
           <TabsContent value="courses" className="mt-4"><CoursesTab onEdit={setEditingCourseId} typeFilter="course" /></TabsContent>
@@ -4724,6 +4756,7 @@ export default function LMSAdmin() {
           <TabsContent value="analytics" className="mt-4"><AnalyticsTab /></TabsContent>
           <TabsContent value="collections" className="mt-4"><CollectionsTab /></TabsContent>
           <TabsContent value="orderbumps" className="mt-4"><OrderBumpsAdmin /></TabsContent>
+          <TabsContent value="certificates" className="mt-4"><CertificateTemplatesAdmin /></TabsContent>
           <TabsContent value="thinkific" className="mt-4"><ThinkificImporter /></TabsContent>
         </Tabs>
       )}

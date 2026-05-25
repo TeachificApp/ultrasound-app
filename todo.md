@@ -2844,3 +2844,76 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Track free-preview enrollments in lmsEnrollments with enrollmentType = "free_preview"
 - [ ] Admin analytics: per-course free-preview enrollment counts drill-down
 - [ ] Show "Free Preview" enrollment label in user profiles and My Dashboard
+
+## CTA Action Dropdown & Block Enhancements — May 25 2026
+- [ ] Build shared CTAActionField with 7 action types: Manual URL, Send Email, Next Funnel Step, Direct Checkout, Free Preview Enroll, Group Enrollment, Direct Order Bump
+- [ ] Upgrade all hero button behavior dropdowns to use CTAActionField
+- [ ] Upgrade pricing_cta, cta_standalone, price_stack, urgency_offer CTA dropdowns
+- [ ] Upgrade image block link field to CTAActionField
+- [ ] Add clickable-banner toggle to hero/banner blocks (entire banner clickable with same action dropdown)
+- [ ] Add bottom border option to hero/banner blocks (toggle + thickness + color)
+- [ ] Add card background color field to reviews block settings
+- [ ] Handle all new CTA action types in PublicFunnelPage, CourseLanding, BlockPreview renderers
+- [ ] Add server procedure for group checkout CTA (createGroupCheckoutCta)
+- [ ] Wire free-preview enroll CTA action (calls lmsLearner.createFreePreviewEnrollment)
+- [ ] Wire order bump direct link CTA action
+- [ ] Build admin free-preview analytics drill-down (per-course preview enrollment counts)
+- [ ] Show Free Preview enrollment label in user profiles and My Dashboard
+
+## Block Builder Fixes — May 25 2026 (continued)
+- [ ] Fix React error #310: hoist icCatalog/ecCatalog hooks out of switch-case blocks in LandingPageBuilder (inline_checkout, embedded_checkout)
+- [ ] Make all blocks available in all page types (course landing, funnel, download, product, bundle, lesson)
+
+## Order Bumps Fixes — May 25 2026
+- [ ] Fix Order Bumps "Select product" dropdown not loading courses/products
+- [ ] Add standalone/direct-link bump type (not tied to a specific purchase trigger)
+- [ ] Add conditional branching options for showing order bumps
+- [ ] Add direct link option for standalone bumps (accessible via URL, not shown at checkout)
+- [ ] Add "Widget" vs "Landing Page" presentation mode for order bumps
+- [ ] Landing page mode: full block-builder page (like funnel) accessible via direct URL
+
+## Course vs Quiz Language Separation — May 25 2026
+- [ ] Separate "Course" and "Quiz" as distinct types in all admin dropdowns (Order Bumps, CTA blocks, enrollment, etc.)
+- [ ] Show "Quiz" icon/label separately from "Course" in student dashboard, enrollment lists, and checkout
+- [ ] Order Bumps: add "Quiz" as a separate trigger/bump type option
+- [ ] Checkout pages: display correct type label (Course vs Quiz vs Download) in order summary
+- [ ] Student profile/dashboard: label enrollments as Course, Quiz, or Download separately
+
+## Order Bumps Enhancements — May 25 2026
+- [ ] Fix Order Bumps product dropdown not loading courses/quizzes/downloads
+- [ ] Add "Standalone" bump type (not tied to a specific trigger purchase — direct-link only)
+- [ ] Add "Landing Page" presentation mode (full block-builder page at /order-bump/{slug})
+- [ ] Add conditional branching: show bump only if user has/has not purchased specific products
+- [ ] Add slug field to order_bumps table for landing page URL
+- [ ] Add presentationMode field (widget | landing_page) to order_bumps table
+- [ ] Add blocks field (JSON) to order_bumps table for landing page builder
+- [ ] Add isStandalone field to order_bumps table (no trigger required)
+
+## Certificate Builder — May 25 2026
+- [ ] Add certificate_templates table to schema (name, description, backgroundImageUrl, logoUrl, primaryColor, accentColor, fontFamily, signatureName, signatureTitle, signatureImageUrl, footerText, layout, isDefault)
+- [ ] Add certificateTemplateId field to lmsCourses table (FK to certificate_templates)
+- [ ] Run migration for new tables/fields
+- [ ] Build CertificateTemplatesAdmin component (list, create, edit, preview, delete)
+- [ ] Add "Certificates" tab to Education Library admin (LMSAdmin.tsx)
+- [ ] Add template dropdown to course/quiz settings (when hasCertificate is enabled)
+- [ ] Update certificateGenerator.ts to use template fields instead of hardcoded values
+- [ ] Build saved certificates viewer (admin: browse all issued certificates by course/user)
+- [ ] Add certificate preview in student dashboard/profile
+
+## Session — May 25 2026 (Evening)
+- [x] Certificate template CRUD procedures added to lmsRouter (listCertificateTemplates, createCertificateTemplate, updateCertificateTemplate, deleteCertificateTemplate)
+- [x] certificateGenerator.ts updated to accept template fields (backgroundImageUrl, primaryColor, accentColor, fontFamily, signatureName, signatureTitle, logoUrl, footerText)
+- [x] CertificateTemplatesAdmin component created with list/create/edit/delete UI
+- [x] Certificates tab added to LMSAdmin.tsx
+- [x] certificateTemplateId dropdown added to course settings (when hasCertificate enabled)
+- [x] OrderBumpsAdmin product loading bug fixed (queries moved inside OrderBumpEditor component)
+- [x] Quiz added as separate type option in OrderBumpsAdmin
+- [x] Two-column block drag-and-drop fixed (pointer-events, data-col-zone propagation, main SortableContext IDs)
+- [x] Shared CTAActionPicker component built with 10 action options
+- [x] All hero buttons upgraded to CTAActionPicker (10 options)
+- [x] pricing_cta, cta_standalone, price_stack, urgency_offer upgraded to CTAActionPicker
+- [x] image block link field upgraded to CTAActionPicker
+- [x] product_offer_stack per-product CTA upgraded to CTAActionPicker
+- [x] Hero "Make entire hero section clickable" toggle added with CTAActionPicker
+- [x] Hero bottom border toggle added (color + thickness)
+- [x] Reviews block card background color field added

@@ -55,8 +55,27 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       const hasInlineMedia = !!d.inlineMediaUrl;
       const placement = d.inlineMediaPlacement ?? "right";
       const isHorizontal = placement === "left" || placement === "right";
+      const heroClickHandler = d.heroClickable && d.heroBehavior && d.heroBehavior !== "next_funnel_step"
+        ? (() => {
+            const beh = d.heroBehavior as string;
+            if (beh === "url" && d.heroLink) window.open(d.heroLink, "_blank");
+            else if (beh === "send_email" && d.heroEmail) window.location.href = `mailto:${d.heroEmail}`;
+            else if (beh === "scroll_to_section" && d.heroScrollAnchor) {
+              const el = document.getElementById(d.heroScrollAnchor.replace(/^#/, ""));
+              el?.scrollIntoView({ behavior: "smooth" });
+            } else if (beh === "download_file" && d.heroDownloadUrl) window.open(d.heroDownloadUrl, "_blank");
+            else if (beh === "open_popup" && d.heroPopupUrl) window.open(d.heroPopupUrl, "_blank");
+          })
+        : undefined;
+      const heroBottomBorderStyle: React.CSSProperties = d.heroBottomBorder
+        ? { borderBottom: `${d.heroBottomBorderWidth ?? 4}px solid ${d.heroBottomBorderColor ?? "#179ca3"}` }
+        : {};
       return (
-        <div className="relative px-8 py-16 overflow-hidden" style={{ ...heroBg, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left") }}>
+        <div
+          className="relative px-8 py-16 overflow-hidden"
+          style={{ ...heroBg, ...heroBottomBorderStyle, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left"), cursor: heroClickHandler ? "pointer" : undefined }}
+          onClick={heroClickHandler}
+        >
           {bgType === "video" && d.videoUrl && (
             <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
           )}
@@ -276,7 +295,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
           {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
             {(d.reviews ?? []).map((r: any, i: number) => (
-              <div key={i} className="bg-gray-50 rounded-xl p-5 shadow-sm">
+              <div key={i} className="rounded-xl p-5 shadow-sm" style={{ backgroundColor: d.cardBgColor ?? "#f9fafb" }}>
                 <div className="flex items-center gap-1 mb-2">
                   {Array.from({ length: r.rating ?? 5 }).map((_, j) => <span key={j} className="text-yellow-400">★</span>)}
                 </div>

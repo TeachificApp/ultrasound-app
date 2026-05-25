@@ -54,6 +54,8 @@ import {
   lmsArchive,
   sonoQuizzes,
   physicalProducts,
+  lmsCertificateTemplates,
+  orderBumps,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 
@@ -163,7 +165,7 @@ async function issueCertificateIfEnabled(
 ) {
   if (!db) return;
   // Check course has certificate enabled
-  const [course] = await db.select({ hasCertificate: lmsCourses.hasCertificate, title: lmsCourses.title }).from(lmsCourses).where(eq(lmsCourses.id, courseId)).limit(1);
+  const [course] = await db.select({ hasCertificate: lmsCourses.hasCertificate, title: lmsCourses.title, certificateTemplateId: lmsCourses.certificateTemplateId }).from(lmsCourses).where(eq(lmsCourses.id, courseId)).limit(1);
   if (!course?.hasCertificate) return;
 
   // Check if certificate already issued
@@ -178,12 +180,25 @@ async function issueCertificateIfEnabled(
   const learnerName = user.displayName || user.name || "Learner";
   const issuedAt = new Date();
 
+  // Fetch certificate template if assigned
+  let template: any = null;
+  if (course.certificateTemplateId) {
+    const [tmpl] = await db.select().from(lmsCertificateTemplates).where(eq(lmsCertificateTemplates.id, course.certificateTemplateId)).limit(1);
+    template = tmpl ?? null;
+  }
+  if (!template) {
+    // Fall back to default template
+    const [defaultTmpl] = await db.select().from(lmsCertificateTemplates).where(eq(lmsCertificateTemplates.isDefault, true)).limit(1);
+    template = defaultTmpl ?? null;
+  }
+
   // Generate PDF
   const pdfBuffer = await generateCertificatePdf({
     learnerName,
     courseTitle: course.title,
     issuedAt,
     credentials: user.credentials,
+    template,
   });
 
   // Upload PDF to S3
@@ -197,6 +212,7 @@ async function issueCertificateIfEnabled(
     courseId,
     enrollmentId,
     certificateUrl,
+    templateId: template?.id ?? null,
     issuedAt,
   });
 
@@ -1377,6 +1393,7 @@ export const lmsAdminRouter = router({
       installmentAmount: z.number().int().min(0).nullable().optional(),
       installmentIntervalDays: z.number().int().min(1).nullable().optional(),
       hasCertificate: z.boolean().optional(),
+      certificateTemplateId: z.number().int().positive().nullable().optional(),
       isFeatured: z.boolean().optional(),
       isDrip: z.boolean().optional(),
       showInstructor: z.boolean().optional(),
@@ -3988,6 +4005,7 @@ export const lmsGroupRouter = router({
       metaDescription: z.string().max(500).optional(),
       status: z.enum(["draft", "public", "hidden", "private", "archived"]).optional(),
       hasCertificate: z.boolean().optional(),
+      certificateTemplateId: z.number().int().positive().nullable().optional(),
       isFeatured: z.boolean().optional(),
       isDrip: z.boolean().optional(),
       accessDurationDays: z.number().int().positive().nullable().optional(),
@@ -4004,7 +4022,120 @@ export const lmsGroupRouter = router({
       await db.update(lmsCourses).set(fields).where(eq(lmsCourses.id, courseId));
       return { success: true };
     }),
-
+  // ── Certificate Templates ──────────────────────────────────────────────────
+  listCertificateTemplates: protectedProcedure
+    .query(async ({ ctx }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      return db.select().from(lmsCertificateTemplates).orderBy(desc(lmsCertificateTemplates.createdAt));
+    }),
+  createCertificateTemplate: protectedProcedure
+    .input(z.object({
+      name: z.string().min(1).max(200),
+      description: z.string().optional().nullable(),
+      backgroundImageUrl: z.string().optional().nullable(),
+      logoUrl: z.string().optional().nullable(),
+      primaryColor: z.string().default("#189aa1"),
+      accentColor: z.string().default("#c9a84c"),
+      textColor: z.string().default("#0e1e2e"),
+      fontFamily: z.string().default("Helvetica"),
+      signatureName: z.string().optional().nullable(),
+      signatureTitle: z.string().optional().nullable(),
+      signatureImageUrl: z.string().optional().nullable(),
+      footerText: z.string().optional().nullable(),
+      organizationName: z.string().default("All About Ultrasound"),
+      layout: z.enum(["classic", "modern", "minimal"]).default("classic"),
+      isDefault: z.boolean().default(false),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (input.isDefault) {
+        await db.update(lmsCertificateTemplates).set({ isDefault: false });
+      }
+      const [result] = await db.insert(lmsCertificateTemplates).values({ ...input, isActive: true });
+      return { id: (result as any).insertId };
+    }),
+  updateCertificateTemplate: protectedProcedure
+    .input(z.object({
+      id: z.number().int().positive(),
+      name: z.string().min(1).max(200).optional(),
+      description: z.string().optional().nullable(),
+      backgroundImageUrl: z.string().optional().nullable(),
+      logoUrl: z.string().optional().nullable(),
+      primaryColor: z.string().optional(),
+      accentColor: z.string().optional(),
+      textColor: z.string().optional(),
+      fontFamily: z.string().optional(),
+      signatureName: z.string().optional().nullable(),
+      signatureTitle: z.string().optional().nullable(),
+      signatureImageUrl: z.string().optional().nullable(),
+      footerText: z.string().optional().nullable(),
+      organizationName: z.string().optional(),
+      layout: z.enum(["classic", "modern", "minimal"]).optional(),
+      isDefault: z.boolean().optional(),
+      isActive: z.boolean().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { id, ...fields } = input;
+      if (fields.isDefault) {
+        await db.update(lmsCertificateTemplates).set({ isDefault: false });
+      }
+      await db.update(lmsCertificateTemplates).set(fields as any).where(eq(lmsCertificateTemplates.id, id));
+      return { success: true };
+    }),
+  deleteCertificateTemplate: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(lmsCourses).set({ certificateTemplateId: null }).where(eq(lmsCourses.certificateTemplateId, input.id));
+      await db.delete(lmsCertificateTemplates).where(eq(lmsCertificateTemplates.id, input.id));
+      return { success: true };
+    }),
+  listIssuedCertificates: protectedProcedure
+    .input(z.object({
+      courseId: z.number().int().positive().optional(),
+      userId: z.number().int().positive().optional(),
+      page: z.number().int().min(1).default(1),
+      pageSize: z.number().int().min(1).max(100).default(30),
+    }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const conditions: any[] = [];
+      if (input.courseId) conditions.push(eq(lmsCertificates.courseId, input.courseId));
+      if (input.userId) conditions.push(eq(lmsCertificates.userId, input.userId));
+      const offset = (input.page - 1) * input.pageSize;
+      const rows = await db
+        .select({
+          id: lmsCertificates.id,
+          userId: lmsCertificates.userId,
+          courseId: lmsCertificates.courseId,
+          certificateUrl: lmsCertificates.certificateUrl,
+          issuedAt: lmsCertificates.issuedAt,
+          templateId: lmsCertificates.templateId,
+          userName: users.name,
+          userEmail: users.email,
+          courseTitle: lmsCourses.title,
+          courseType: lmsCourses.type,
+        })
+        .from(lmsCertificates)
+        .leftJoin(users, eq(lmsCertificates.userId, users.id))
+        .leftJoin(lmsCourses, eq(lmsCertificates.courseId, lmsCourses.id))
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(lmsCertificates.issuedAt))
+        .limit(input.pageSize)
+        .offset(offset);
+      return rows;
+    }),
   /** AI: Generate quiz questions from lesson content */
   generateQuizFromLesson: protectedProcedure
     .input(z.object({

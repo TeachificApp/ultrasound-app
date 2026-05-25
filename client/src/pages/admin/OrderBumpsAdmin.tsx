@@ -2,12 +2,14 @@
  * OrderBumpsAdmin.tsx
  * Admin panel for managing order bumps — create, edit, delete bump offers
  * with editable landing page content and product connections.
+ *
+ * Fix: Moved product queries INTO OrderBumpEditor so they load when the editor
+ * mounts, not before (parent queries may not be loaded when isCreating=true).
  */
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import RichTextEditor from "@/components/RichTextEditor";
 import {
@@ -17,9 +19,9 @@ import {
 
 type OrderBump = {
   id: number;
-  triggerType: "course" | "download" | "bundle" | "physical";
+  triggerType: "course" | "quiz" | "download" | "bundle" | "physical";
   triggerProductId: number;
-  bumpType: "course" | "download" | "bundle" | "physical";
+  bumpType: "course" | "quiz" | "download" | "bundle" | "physical";
   bumpProductId: number;
   timing: "before_checkout" | "after_checkout";
   bumpPrice: number;
@@ -40,6 +42,7 @@ type OrderBump = {
 
 const TYPE_ICONS: Record<string, React.ReactNode> = {
   course: <BookOpen size={14} className="text-teal-600" />,
+  quiz: <BookOpen size={14} className="text-purple-600" />,
   download: <Download size={14} className="text-blue-600" />,
   bundle: <Layers size={14} className="text-purple-600" />,
   physical: <Package size={14} className="text-amber-600" />,
@@ -51,13 +54,6 @@ export default function OrderBumpsAdmin() {
   const [editingBump, setEditingBump] = useState<OrderBump | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
-  // Get product names for display
-  const { data: coursesResult } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", page: 1, pageSize: 200 });
-  const { data: downloads } = trpc.downloadsAdmin.list.useQuery();
-  const { data: physicalProductsData } = trpc.productsAdmin.list.useQuery();
-  const courses = coursesResult?.courses ?? [];
-  const physicalProducts = physicalProductsData ?? [];
-
   const deleteMutation = trpc.orderBumpsAdmin.delete.useMutation({
     onSuccess: () => { toast.success("Order bump deleted"); utils.orderBumpsAdmin.list.invalidate(); },
     onError: (e) => toast.error(e.message),
@@ -66,16 +62,26 @@ export default function OrderBumpsAdmin() {
     onSuccess: () => { toast.success("Order bump duplicated"); utils.orderBumpsAdmin.list.invalidate(); },
     onError: (e) => toast.error(e.message),
   });
-
   const updateMutation = trpc.orderBumpsAdmin.update.useMutation({
     onSuccess: () => { toast.success("Order bump updated"); utils.orderBumpsAdmin.list.invalidate(); },
     onError: (e) => toast.error(e.message),
   });
 
+  // For display in the list — fetch product names
+  const { data: coursesResult } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", page: 1, pageSize: 200 });
+  const { data: downloads } = trpc.downloadsAdmin.list.useQuery();
+  const { data: physicalProductsData } = trpc.productsAdmin.list.useQuery();
+  const courses = coursesResult?.courses ?? [];
+  const physicalProducts = physicalProductsData ?? [];
+
   function getProductName(type: string, id: number): string {
-    if (type === "course" || type === "quiz") {
-      const course = courses?.find((c: any) => c.id === id);
+    if (type === "course") {
+      const course = courses?.find((c: any) => c.id === id && c.type === "course");
       return course?.title ?? `Course #${id}`;
+    }
+    if (type === "quiz") {
+      const quiz = courses?.find((c: any) => c.id === id && c.type === "quiz");
+      return quiz?.title ?? `Quiz #${id}`;
     }
     if (type === "download") {
       const dl = downloads?.find((d: any) => d.id === id);
@@ -99,9 +105,6 @@ export default function OrderBumpsAdmin() {
     return (
       <OrderBumpEditor
         bump={editingBump}
-        courses={courses ?? []}
-        downloads={downloads ?? []}
-        physicalProducts={physicalProducts ?? []}
         onClose={() => { setIsCreating(false); setEditingBump(null); }}
         onSaved={() => { setIsCreating(false); setEditingBump(null); utils.orderBumpsAdmin.list.invalidate(); }}
       />
@@ -166,19 +169,28 @@ export default function OrderBumpsAdmin() {
 }
 
 // ─── Order Bump Editor ───────────────────────────────────────────────────────
-function OrderBumpEditor({ bump, courses, downloads, physicalProducts, onClose, onSaved }: {
+// Queries are hoisted INTO this component so they load on mount (not before).
+function OrderBumpEditor({ bump, onClose, onSaved }: {
   bump: OrderBump | null;
-  courses: any[];
-  downloads: any[];
-  physicalProducts: any[];
   onClose: () => void;
   onSaved: () => void;
 }) {
   const isNew = !bump;
+
+  // ── Fetch products INSIDE the editor so they are always loaded when needed ──
+  const { data: coursesResult, isLoading: coursesLoading } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", page: 1, pageSize: 200 });
+  const { data: downloads, isLoading: downloadsLoading } = trpc.downloadsAdmin.list.useQuery();
+  const { data: physicalProductsData, isLoading: physLoading } = trpc.productsAdmin.list.useQuery();
+  const allCourses = coursesResult?.courses ?? [];
+  const courses = allCourses.filter((c: any) => c.type === "course");
+  const quizzes = allCourses.filter((c: any) => c.type === "quiz");
+  const physicalProducts = physicalProductsData ?? [];
+  const isLoadingProducts = coursesLoading || downloadsLoading || physLoading;
+
   const [form, setForm] = useState({
-    triggerType: bump?.triggerType ?? "course" as "course" | "download" | "bundle" | "physical",
+    triggerType: bump?.triggerType ?? "course" as "course" | "quiz" | "download" | "bundle" | "physical",
     triggerProductId: bump?.triggerProductId ?? 0,
-    bumpType: bump?.bumpType ?? "download" as "course" | "download" | "bundle" | "physical",
+    bumpType: bump?.bumpType ?? "download" as "course" | "quiz" | "download" | "bundle" | "physical",
     bumpProductId: bump?.bumpProductId ?? 0,
     timing: bump?.timing ?? "after_checkout" as "before_checkout" | "after_checkout",
     bumpPrice: bump?.bumpPrice ?? 0,
@@ -197,11 +209,18 @@ function OrderBumpEditor({ bump, courses, downloads, physicalProducts, onClose, 
     onSuccess: () => { toast.success("Order bump created"); onSaved(); },
     onError: (e) => toast.error(e.message),
   });
-
   const updateMutation = trpc.orderBumpsAdmin.update.useMutation({
     onSuccess: () => { toast.success("Order bump updated"); onSaved(); },
     onError: (e) => toast.error(e.message),
   });
+
+  function getProductsForType(type: string): any[] {
+    if (type === "course") return courses;
+    if (type === "quiz") return quizzes;
+    if (type === "download") return downloads ?? [];
+    if (type === "physical") return physicalProducts;
+    return [];
+  }
 
   function handleSave() {
     if (!form.triggerProductId || !form.bumpProductId) {
@@ -215,12 +234,8 @@ function OrderBumpEditor({ bump, courses, downloads, physicalProducts, onClose, 
     }
   }
 
-  const triggerProducts = form.triggerType === "course" ? courses.filter((c: any) => c.type === "course") :
-    form.triggerType === "download" ? downloads :
-    form.triggerType === "physical" ? physicalProducts : [];
-  const bumpProducts = form.bumpType === "course" ? courses.filter((c: any) => c.type === "course") :
-    form.bumpType === "download" ? downloads :
-    form.bumpType === "physical" ? physicalProducts : [];
+  const triggerProducts = getProductsForType(form.triggerType);
+  const bumpProducts = getProductsForType(form.bumpType);
 
   return (
     <div className="space-y-6">
@@ -229,6 +244,10 @@ function OrderBumpEditor({ bump, courses, downloads, physicalProducts, onClose, 
         <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 text-gray-500"><X size={18} /></button>
       </div>
 
+      {isLoadingProducts && (
+        <div className="text-center py-4 text-sm text-gray-400">Loading products…</div>
+      )}
+
       {/* Trigger & Bump Product Selection */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
         <div>
@@ -236,6 +255,7 @@ function OrderBumpEditor({ bump, courses, downloads, physicalProducts, onClose, 
           <select value={form.triggerType} onChange={e => setForm({ ...form, triggerType: e.target.value as any, triggerProductId: 0 })}
             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm mb-2">
             <option value="course">Course</option>
+            <option value="quiz">Quiz</option>
             <option value="download">Download</option>
             <option value="bundle">Bundle</option>
             <option value="physical">Physical Product</option>
@@ -245,12 +265,16 @@ function OrderBumpEditor({ bump, courses, downloads, physicalProducts, onClose, 
             <option value={0}>— Select product —</option>
             {triggerProducts.map((p: any) => <option key={p.id} value={p.id}>{p.title}</option>)}
           </select>
+          {triggerProducts.length === 0 && !isLoadingProducts && (
+            <p className="text-xs text-amber-600 mt-1">No {form.triggerType}s found.</p>
+          )}
         </div>
         <div>
           <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider block mb-2">Offer them...</label>
           <select value={form.bumpType} onChange={e => setForm({ ...form, bumpType: e.target.value as any, bumpProductId: 0 })}
             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm mb-2">
             <option value="course">Course</option>
+            <option value="quiz">Quiz</option>
             <option value="download">Download</option>
             <option value="bundle">Bundle</option>
             <option value="physical">Physical Product</option>
@@ -260,6 +284,9 @@ function OrderBumpEditor({ bump, courses, downloads, physicalProducts, onClose, 
             <option value={0}>— Select product —</option>
             {bumpProducts.map((p: any) => <option key={p.id} value={p.id}>{p.title}</option>)}
           </select>
+          {bumpProducts.length === 0 && !isLoadingProducts && (
+            <p className="text-xs text-amber-600 mt-1">No {form.bumpType}s found.</p>
+          )}
         </div>
       </div>
 
