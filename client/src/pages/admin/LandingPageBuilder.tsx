@@ -51,7 +51,7 @@ import {
   AlertTriangle, CheckSquare, LayoutGrid, Layers, BookOpen, Tag,
   ChevronDown, ChevronUp, Copy, FolderOpen, BookMarked, Upload, Code,
   ShoppingCart, Package, Link, Mail, Phone, MapPin, Bookmark, BookmarkPlus, Music, UserPlus, Search,
-  SlidersHorizontal,
+  SlidersHorizontal, Radio, Clock,
 } from "lucide-react";
 import AudioBlockEditor from "@/components/AudioBlockEditor";
 import CarouselBlock from "@/components/CarouselBlock";
@@ -132,6 +132,31 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
     defaultData: { headline: "Frequently Asked Questions", items: [{ q: "Who is this course for?", a: "This course is designed for..." }, { q: "How long do I have access?", a: "You get lifetime access." }], bgColor: "#ffffff", accentColor: "#179ca3" } },
   { type: "countdown", label: "Countdown Timer", icon: <Timer size={14} />, category: "Marketing",
     defaultData: { headline: "LIMITED TIME OFFER!", mode: "on_load", durationMinutes: 90, targetDate: "", bgColor: "#ffffff", textColor: "#0e1e2e", accentColor: "#179ca3", showBorder: true } },
+  { type: "countdown_v2", label: "Countdown Timer (Advanced)", icon: <Clock size={14} />, category: "Marketing",
+    defaultData: {
+      headline: "LIMITED TIME OFFER!", subtext: "",
+      mode: "duration", // "duration" | "target_date"
+      durationHours: 1, durationMinutes: 30,
+      targetDate: "", targetTimezone: "local",
+      showDays: true, showHours: true, showMinutes: true, showSeconds: true,
+      expiredText: "This offer has expired.",
+      bgColor: "#0e1e2e", textColor: "#ffffff", accentColor: "#179ca3",
+      digitBg: "#1a2e3e", digitTextColor: "#ffffff", labelColor: "rgba(255,255,255,0.6)",
+      separatorColor: "#179ca3", showBorder: false, borderColor: "#179ca3",
+      digitSize: 56, labelSize: 11, cornerRadius: 8, gap: 12,
+      showHeadline: true, headlineSize: 22, headlineWeight: "700",
+    } },
+  { type: "ticker", label: "Running Ticker / Marquee", icon: <Radio size={14} />, category: "Content",
+    defaultData: {
+      items: ["Welcome to All About Ultrasound!", "New courses available now!", "Expand your clinical skills today!"],
+      separator: "•",
+      direction: "left", speed: 40,
+      pauseOnHover: true,
+      bgColor: "#179ca3", textColor: "#ffffff",
+      fontSize: 15, fontWeight: "500",
+      paddingY: 10, letterSpacing: 0, textTransform: "none",
+      borderTop: "", borderBottom: "",
+    } },
   { type: "alert", label: "Alert / Callout", icon: <AlertTriangle size={14} />, category: "Marketing",
     defaultData: { text: "Limited time offer — enroll today!", alertType: "info", icon: "💡" } },
   { type: "flip_cards", label: "Flip Cards", icon: <Layers size={14} />, category: "Marketing",
@@ -3924,12 +3949,32 @@ export default function LandingPageBuilder() {
   const [saveTemplateDialogBlock, setSaveTemplateDialogBlock] = useState<Block | null>(null);
   const [saveTemplateName, setSaveTemplateName] = useState("");
   const [saveTemplateDesc, setSaveTemplateDesc] = useState("");
+  // Ref to the scrollable canvas container for scoped scrollIntoView
+  const canvasRef = useRef<HTMLDivElement>(null);
+  // Track whether the last selectedId change came from a move action (not a click)
+  const movedBlockRef = useRef<string | null>(null);
 
-  // Auto-scroll preview canvas to the selected block
+  // Auto-scroll preview canvas to the selected block when it moves
   useEffect(() => {
     if (!selectedId) return;
-    const el = document.querySelector(`[data-block-id="${selectedId}"]`);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    // Small delay so the DOM has re-ordered the blocks before we scroll
+    const timer = setTimeout(() => {
+      const el = document.querySelector(`[data-block-id="${selectedId}"]`);
+      if (!el) return;
+      const canvas = canvasRef.current;
+      if (canvas) {
+        // Scroll the canvas container so the block stays centered in view
+        const elRect = el.getBoundingClientRect();
+        const canvasRect = canvas.getBoundingClientRect();
+        const elCenterRelative = elRect.top - canvasRect.top + canvas.scrollTop + elRect.height / 2;
+        const targetScrollTop = elCenterRelative - canvas.clientHeight / 2;
+        canvas.scrollTo({ top: targetScrollTop, behavior: "smooth" });
+      } else {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      movedBlockRef.current = null;
+    }, 50);
+    return () => clearTimeout(timer);
   }, [selectedId]);
 
   const { isLoading, data: lpData } = trpc.lmsAdmin.getLandingPageBlocks.useQuery(
@@ -4266,7 +4311,7 @@ export default function LandingPageBuilder() {
         </div>
 
         {/* Center: Canvas */}
-        <div className="flex-1 overflow-y-auto bg-gray-100">
+        <div ref={canvasRef} className="flex-1 overflow-y-auto bg-gray-100">
           {isLoading ? (
             <div className="flex items-center justify-center h-full text-gray-400">Loading…</div>
           ) : blocks.length === 0 ? (
@@ -4305,8 +4350,18 @@ export default function LandingPageBuilder() {
                       onSaveAsTemplate={handleSaveBlockAsTemplate}
                       activeDragId={activeDragId}
                       activeColumnTarget={activeColumnTarget}
-                      onMoveUp={idx > 0 ? () => setBlocks(prev => arrayMove(prev, idx, idx - 1)) : undefined}
-                      onMoveDown={idx < blocks.length - 1 ? () => setBlocks(prev => arrayMove(prev, idx, idx + 1)) : undefined}
+                      onMoveUp={idx > 0 ? () => {
+                        const blockId = block.id;
+                        setBlocks(prev => arrayMove(prev, idx, idx - 1));
+                        setSelectedId(blockId);
+                        movedBlockRef.current = blockId;
+                      } : undefined}
+                      onMoveDown={idx < blocks.length - 1 ? () => {
+                        const blockId = block.id;
+                        setBlocks(prev => arrayMove(prev, idx, idx + 1));
+                        setSelectedId(blockId);
+                        movedBlockRef.current = blockId;
+                      } : undefined}
                       onMoveBlockOutOfColumn={(colBlockId, side, childBlockId) => {
                         setBlocks(prev => {
                           let movedBlock: Block | null = null;

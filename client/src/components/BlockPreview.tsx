@@ -3,6 +3,7 @@
  * Shared read-only block renderer used by CoursePlayer, CourseOverview, and LandingPageBuilder.
  * Extracted into its own file to break the circular dependency between CoursePlayer and LandingPageBuilder.
  */
+import { useState, useEffect } from "react";
 import { ChevronDown, Globe, Image, Package, Upload, Video } from "lucide-react";
 import CarouselBlock from "@/components/CarouselBlock";
 import InlineCheckoutBlock from "@/components/InlineCheckoutBlock";
@@ -25,7 +26,7 @@ export type BlockType =
   | "related_products" | "embedded_checkout" | "inline_checkout"
   | "lesson_quiz" | "lesson_flashcard"
   | "file_download" | "scorm_embed" | "url_embed"
-  | "column_layout" | "carousel";
+  | "column_layout" | "carousel" | "ticker" | "countdown_v2";
 
 export interface Block {
   id: string;
@@ -994,6 +995,10 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
     }
     case "carousel":
       return <div className="px-4 py-4"><CarouselBlock data={d} /></div>;
+    case "ticker":
+      return <TickerBlockPreview d={d} />;
+    case "countdown_v2":
+      return <CountdownV2BlockPreview d={d} />;
     default:
       return <div className="px-8 py-4 text-gray-400 text-sm text-center">Block preview not available</div>;
   }
@@ -1047,3 +1052,218 @@ function InstructorBlockPreview({ d }: { d: Record<string, any> }) {
   );
 }
 
+
+// ─── Ticker / Marquee Block ───────────────────────────────────────────────────
+
+/**
+ * Shared ticker renderer — used by BlockPreview, CourseLanding, PublicFunnelPage,
+ * DownloadLanding, and LessonBlockEditor.
+ */
+export function TickerBlock({ data: d }: { data: Record<string, any> }) {
+  const items: string[] = d.items?.length ? d.items : ["Welcome to our platform!", "New courses available now!", "Check out our latest resources!"];
+  const sep = d.separator ?? "•";
+  const speed = d.speed ?? 40; // seconds for one full cycle
+  const direction = d.direction ?? "left"; // "left" | "right"
+  const pauseOnHover = d.pauseOnHover !== false;
+  const bgColor = d.bgColor ?? "#179ca3";
+  const textColor = d.textColor ?? "#ffffff";
+  const fontSize = d.fontSize ?? 15;
+  const fontWeight = d.fontWeight ?? "500";
+  const paddingY = d.paddingY ?? 10;
+  const letterSpacing = d.letterSpacing ?? 0;
+  const textTransform = d.textTransform ?? "none";
+  const borderTop = d.borderTop ?? "";
+  const borderBottom = d.borderBottom ?? "";
+
+  // Build the repeated text string (duplicate for seamless loop)
+  const fullText = items.map(i => i.trim()).join(`  ${sep}  `);
+  const animName = direction === "right" ? "ticker-rtl" : "ticker-ltr";
+
+  return (
+    <div
+      className="w-full overflow-hidden select-none"
+      style={{
+        backgroundColor: bgColor,
+        paddingTop: paddingY,
+        paddingBottom: paddingY,
+        borderTop: borderTop || undefined,
+        borderBottom: borderBottom || undefined,
+      }}
+    >
+      <style>{`
+        @keyframes ticker-ltr {
+          0%   { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        @keyframes ticker-rtl {
+          0%   { transform: translateX(-50%); }
+          100% { transform: translateX(0); }
+        }
+        .ticker-track {
+          display: flex;
+          width: max-content;
+          animation: ${animName} ${speed}s linear infinite;
+        }
+        .ticker-track:hover {
+          animation-play-state: ${pauseOnHover ? "paused" : "running"};
+        }
+      `}</style>
+      <div className="ticker-track">
+        {/* Duplicate content twice for seamless loop */}
+        {[0, 1].map(copy => (
+          <span
+            key={copy}
+            className="whitespace-nowrap px-6"
+            style={{
+              color: textColor,
+              fontSize,
+              fontWeight,
+              letterSpacing: letterSpacing ? `${letterSpacing}px` : undefined,
+              textTransform: textTransform as any,
+            }}
+          >
+            {fullText}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TickerBlockPreview({ d }: { d: Record<string, any> }) {
+  return <TickerBlock data={d} />;
+}
+
+// ─── Countdown Timer V2 Block ─────────────────────────────────────────────────
+
+/**
+ * Shared countdown v2 renderer — supports duration mode (hours+minutes from load)
+ * and target-date mode (count down to a specific date/time).
+ */
+export function CountdownV2Block({ data: d }: { data: Record<string, any> }) {
+  const mode: "duration" | "target_date" = d.mode ?? "duration";
+
+  // Compute end time once on mount
+  const [endTime] = useState<number>(() => {
+    if (mode === "target_date" && d.targetDate) {
+      return new Date(d.targetDate).getTime();
+    }
+    const h = Number(d.durationHours ?? 1);
+    const m = Number(d.durationMinutes ?? 30);
+    return Date.now() + (h * 3600 + m * 60) * 1000;
+  });
+
+  const calcRemaining = () => Math.max(0, endTime - Date.now());
+  const [remaining, setRemaining] = useState(calcRemaining);
+
+  useEffect(() => {
+    if (remaining <= 0) return;
+    const id = setInterval(() => setRemaining(calcRemaining()), 1000);
+    return () => clearInterval(id);
+  }, [endTime]);
+
+  const expired = remaining <= 0;
+
+  const totalSec = Math.floor(remaining / 1000);
+  const days    = Math.floor(totalSec / 86400);
+  const hours   = Math.floor((totalSec % 86400) / 3600);
+  const minutes = Math.floor((totalSec % 3600) / 60);
+  const seconds = totalSec % 60;
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+
+  const bgColor      = d.bgColor      ?? "#0e1e2e";
+  const textColor    = d.textColor    ?? "#ffffff";
+  const accentColor  = d.accentColor  ?? "#179ca3";
+  const digitBg      = d.digitBg      ?? "#1a2e3e";
+  const digitText    = d.digitTextColor ?? "#ffffff";
+  const labelColor   = d.labelColor   ?? "rgba(255,255,255,0.6)";
+  const sepColor     = d.separatorColor ?? "#179ca3";
+  const cr           = d.cornerRadius ?? 8;
+  const gap          = d.gap          ?? 12;
+  const digitSize    = d.digitSize    ?? 56;
+  const labelSize    = d.labelSize    ?? 11;
+  const headlineSize = d.headlineSize ?? 22;
+  const headlineWeight = d.headlineWeight ?? "700";
+
+  const showDays    = d.showDays    !== false;
+  const showHours   = d.showHours   !== false;
+  const showMinutes = d.showMinutes !== false;
+  const showSeconds = d.showSeconds !== false;
+
+  const units: Array<{ label: string; value: number; show: boolean }> = [
+    { label: "Days",    value: days,    show: showDays },
+    { label: "Hours",   value: hours,   show: showHours },
+    { label: "Minutes", value: minutes, show: showMinutes },
+    { label: "Seconds", value: seconds, show: showSeconds },
+  ].filter(u => u.show);
+
+  return (
+    <div
+      className={`px-8 py-10 text-center ${d.showBorder ? "border-2" : ""}`}
+      style={{
+        backgroundColor: bgColor,
+        color: textColor,
+        borderColor: d.showBorder ? (d.borderColor ?? accentColor) : undefined,
+        borderRadius: d.showBorder ? `${cr}px` : undefined,
+      }}
+    >
+      {d.showHeadline !== false && d.headline && (
+        <h2
+          className="mb-2"
+          style={{ color: textColor, fontSize: headlineSize, fontWeight: headlineWeight }}
+          dangerouslySetInnerHTML={{ __html: d.headline }}
+        />
+      )}
+      {d.subtext && (
+        <p className="mb-6 opacity-75 text-sm" dangerouslySetInnerHTML={{ __html: d.subtext }} />
+      )}
+      {expired ? (
+        <p className="text-lg font-semibold" style={{ color: accentColor }}>
+          {d.expiredText ?? "This offer has expired."}
+        </p>
+      ) : (
+        <div className="flex justify-center items-center flex-wrap" style={{ gap }}>
+          {units.map((u, i) => (
+            <div key={u.label} className="flex items-center" style={{ gap }}>
+              <div className="flex flex-col items-center">
+                <div
+                  className="flex items-center justify-center font-black tabular-nums"
+                  style={{
+                    backgroundColor: digitBg,
+                    color: digitText,
+                    fontSize: digitSize,
+                    borderRadius: cr,
+                    minWidth: digitSize * 1.4,
+                    padding: `${digitSize * 0.15}px ${digitSize * 0.2}px`,
+                    lineHeight: 1,
+                  }}
+                >
+                  {pad(u.value)}
+                </div>
+                <span
+                  className="mt-1 font-medium uppercase tracking-wider"
+                  style={{ color: labelColor, fontSize: labelSize }}
+                >
+                  {u.label}
+                </span>
+              </div>
+              {i < units.length - 1 && (
+                <span
+                  className="font-black -mt-5"
+                  style={{ color: sepColor, fontSize: digitSize * 0.7 }}
+                >
+                  :
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CountdownV2BlockPreview({ d }: { d: Record<string, any> }) {
+  return <CountdownV2Block data={d} />;
+}
