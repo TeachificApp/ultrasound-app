@@ -138,13 +138,28 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
       else if (bgType === "gradient") heroBg = { background: `linear-gradient(${d.gradientDir ?? "to bottom right"}, ${d.gradientFrom ?? "#179ca3"}, ${d.gradientTo ?? "#0e4a50"})` };
       else if (bgType === "image") heroBg = { backgroundImage: `url(${d.imageUrl})`, backgroundSize: "cover", backgroundPosition: "center" };
       else if (bgType === "video") heroBg = { backgroundColor: "#000" };
-      const buttons: Array<{ text: string; color: string; textColor: string; link: string; style: string }> =
+      const buttons: Array<{ text: string; color: string; textColor: string; link: string; style: string; animation?: string; showStrikethrough?: boolean; strikethroughPrice?: string; showOptOut?: boolean; optOutText?: string; optOutUrl?: string }> =
         d.buttons?.length ? d.buttons : [{ text: d.ctaText ?? "Enroll Now", color: "#fff", textColor: "#179ca3", link: "", style: "filled" }];
       const hasInlineMedia = !!d.inlineMediaUrl;
       const placement = d.inlineMediaPlacement ?? "right";
       const isHorizontal = placement === "left" || placement === "right";
+      const heroBottomBorderStyle: React.CSSProperties = d.heroBottomBorder
+        ? { borderBottom: `${d.heroBottomBorderWidth ?? 4}px solid ${d.heroBottomBorderColor ?? "#179ca3"}` }
+        : {};
+      const heroClickHandler = d.heroClickable && d.heroBehavior && d.heroBehavior !== "next_funnel_step"
+        ? () => {
+            const beh = d.heroBehavior as string;
+            if (beh === "url" && d.heroLink) window.open(d.heroLink, "_blank");
+            else if (beh === "send_email" && d.heroEmail) window.location.href = `mailto:${d.heroEmail}`;
+            else if (beh === "scroll_to_section" && d.heroScrollAnchor) {
+              const el = document.getElementById(d.heroScrollAnchor.replace(/^#/, ""));
+              el?.scrollIntoView({ behavior: "smooth" });
+            } else if (beh === "download_file" && d.heroDownloadUrl) window.open(d.heroDownloadUrl, "_blank");
+            else if (beh === "open_popup" && d.heroPopupUrl) window.open(d.heroPopupUrl, "_blank");
+          }
+        : undefined;
       return (
-        <div className="relative px-8 py-16 overflow-hidden" style={{ ...heroBg, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left"), minHeight: `${d.heroMinHeight ?? 400}px` }}>
+        <div className="relative px-8 py-16 overflow-hidden" style={{ ...heroBg, ...heroBottomBorderStyle, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left"), minHeight: `${d.heroMinHeight ?? 400}px`, cursor: heroClickHandler ? "pointer" : undefined }} onClick={heroClickHandler}>
           {bgType === "video" && d.videoUrl && (
             <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
           )}
@@ -160,6 +175,9 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
                       style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
                       {btn.text}
                     </button>
+                    {btn.showStrikethrough && btn.strikethroughPrice && (
+                      <span className="text-xs text-white/60 line-through">{btn.strikethroughPrice}</span>
+                    )}
                     {btn.showOptOut && btn.optOutText && (
                       <a href={btn.optOutUrl || "#"} className="text-xs text-white/60 underline hover:text-white/80 cursor-pointer">{btn.optOutText}</a>
                     )}

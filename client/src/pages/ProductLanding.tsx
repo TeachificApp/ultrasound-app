@@ -97,29 +97,68 @@ function RenderBlock({ block, onBuy, buying, price, slug }: {
       const buttons = d.buttons ?? [{ text: "Buy Now", color: "#ffffff", textColor: "#179ca3", style: "filled" }];
       const bgType = d.bgType ?? (d.imageUrl ? "image" : "color");
       let bgStyle: React.CSSProperties = {};
-      if (bgType === "image" && d.imageUrl) bgStyle = { backgroundImage: `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url(${d.imageUrl})`, backgroundSize: "cover", backgroundPosition: "center" };
+      if (bgType === "image" && d.imageUrl) bgStyle = { backgroundImage: `url(${d.imageUrl})`, backgroundSize: "cover", backgroundPosition: "center" };
       else if (bgType === "gradient") bgStyle = { background: `linear-gradient(${d.gradientDir ?? "to bottom right"}, ${d.gradientFrom ?? "#179ca3"}, ${d.gradientTo ?? "#0e4a50"})` };
+      else if (bgType === "video") bgStyle = { backgroundColor: "#000" };
       else bgStyle = { backgroundColor: d.bgColor ?? "#179ca3" };
+      const hasInlineMediaPL = !!d.inlineMediaUrl;
+      const placementPL = d.inlineMediaPlacement ?? "right";
+      const isHorizontalPL = placementPL === "left" || placementPL === "right";
+      const heroBottomBorderStylePL: React.CSSProperties = d.heroBottomBorder
+        ? { borderBottom: `${d.heroBottomBorderWidth ?? 4}px solid ${d.heroBottomBorderColor ?? "#179ca3"}` }
+        : {};
+      const heroClickHandlerPL = d.heroClickable && d.heroBehavior && d.heroBehavior !== "next_funnel_step"
+        ? () => {
+            const beh = d.heroBehavior as string;
+            if (beh === "url" && d.heroLink) window.open(d.heroLink, "_blank");
+            else if (beh === "send_email" && d.heroEmail) window.location.href = `mailto:${d.heroEmail}`;
+            else if (beh === "scroll_to_section" && d.heroScrollAnchor) {
+              const el = document.getElementById(d.heroScrollAnchor.replace(/^#/, ""));
+              el?.scrollIntoView({ behavior: "smooth" });
+            } else if (beh === "download_file" && d.heroDownloadUrl) window.open(d.heroDownloadUrl, "_blank");
+            else if (beh === "open_popup" && d.heroPopupUrl) window.open(d.heroPopupUrl, "_blank");
+          }
+        : undefined;
       return (
-        <div style={{ ...bgStyle, color: d.textColor ?? "#fff", textAlign: d.align ?? "left", minHeight: `${d.heroMinHeight ?? 400}px` }} className="px-8 py-20">
-          <div className="max-w-5xl mx-auto">
-            <h1 className="text-4xl font-bold mb-4 leading-tight" dangerouslySetInnerHTML={{ __html: d.headline ?? "" }} />
-            {d.subheadline && <p className="text-xl opacity-90 mb-8" dangerouslySetInnerHTML={{ __html: d.subheadline }} />}
-            <div className="flex flex-wrap gap-3" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
-              {buttons.map((btn: any, i: number) => (
-                <div key={i} className="flex flex-col items-center gap-1">
-                  <button onClick={btn.link ? () => { window.location.href = btn.link; } : onBuy}
-                    disabled={buying}
-                    className={`px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-opacity hover:opacity-90 disabled:opacity-60 ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
-                    style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
-                    {buying ? "Processing…" : btn.text}
-                  </button>
-                  {btn.showOptOut && btn.optOutText && (
-                    <a href={btn.optOutUrl || "#"} className="text-xs text-white/60 underline hover:text-white/80 cursor-pointer">{btn.optOutText}</a>
-                  )}
-                </div>
-              ))}
+        <div className="relative px-8 py-20 overflow-hidden" style={{ ...bgStyle, ...heroBottomBorderStylePL, color: d.textColor ?? "#fff", textAlign: hasInlineMediaPL && isHorizontalPL ? "left" as const : (d.align ?? "left"), minHeight: `${d.heroMinHeight ?? 400}px`, cursor: heroClickHandlerPL ? "pointer" : undefined }} onClick={heroClickHandlerPL}>
+          {bgType === "video" && d.videoUrl && (
+            <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
+          )}
+          <div className={`relative max-w-5xl mx-auto ${hasInlineMediaPL && isHorizontalPL ? "flex items-center gap-10" : ""} ${hasInlineMediaPL && placementPL === "left" ? "flex-row-reverse" : ""}`}>
+            <div className={hasInlineMediaPL && isHorizontalPL ? "flex-1" : "max-w-3xl mx-auto"}>
+              <h1 className="text-4xl font-bold mb-4 leading-tight">
+                <span style={d.headlineColor ? { color: d.headlineColor } : undefined} dangerouslySetInnerHTML={{ __html: d.headline ?? "" }} />
+                {d.headline2 && <><br /><span style={d.headline2Color ? { color: d.headline2Color } : undefined} dangerouslySetInnerHTML={{ __html: d.headline2 }} /></>}
+              </h1>
+              {d.subheadline && <p className="text-xl opacity-90 mb-8" dangerouslySetInnerHTML={{ __html: d.subheadline }} />}
+              {!d.hideButtons && <div className="flex flex-wrap gap-3" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
+                {buttons.map((btn: any, i: number) => (
+                  <div key={i} className="flex flex-col items-center gap-1">
+                    <button onClick={btn.link ? () => { window.location.href = btn.link; } : onBuy}
+                      disabled={buying}
+                      className={`px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-opacity hover:opacity-90 disabled:opacity-60 ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
+                      style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
+                      {buying ? "Processing…" : btn.text}
+                    </button>
+                    {btn.showStrikethrough && btn.strikethroughPrice && (
+                      <span className="text-xs text-white/60 line-through">{btn.strikethroughPrice}</span>
+                    )}
+                    {btn.showOptOut && btn.optOutText && (
+                      <a href={btn.optOutUrl || "#"} className="text-xs text-white/60 underline hover:text-white/80 cursor-pointer">{btn.optOutText}</a>
+                    )}
+                  </div>
+                ))}
+              </div>}
             </div>
+            {hasInlineMediaPL && (
+              <div className={isHorizontalPL ? "flex-1 max-w-md" : "mt-8 max-w-lg mx-auto"}>
+                {d.inlineMediaType === "video" ? (
+                  <video autoPlay muted loop playsInline className="w-full rounded-lg shadow-2xl"><source src={d.inlineMediaUrl} /></video>
+                ) : (
+                  <img src={d.inlineMediaUrl} alt="" className="w-full rounded-lg shadow-2xl" />
+                )}
+              </div>
+            )}
           </div>
         </div>
       );

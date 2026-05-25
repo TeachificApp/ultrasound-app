@@ -86,8 +86,23 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
       const hasInlineMedia = !!d.inlineMediaUrl;
       const placement = d.inlineMediaPlacement ?? "right";
       const isHorizontal = placement === "left" || placement === "right";
+      const heroBottomBorderStyleDL: React.CSSProperties = d.heroBottomBorder
+        ? { borderBottom: `${d.heroBottomBorderWidth ?? 4}px solid ${d.heroBottomBorderColor ?? "#179ca3"}` }
+        : {};
+      const heroClickHandlerDL = d.heroClickable && d.heroBehavior && d.heroBehavior !== "next_funnel_step"
+        ? () => {
+            const beh = d.heroBehavior as string;
+            if (beh === "url" && d.heroLink) window.open(d.heroLink, "_blank");
+            else if (beh === "send_email" && d.heroEmail) window.location.href = `mailto:${d.heroEmail}`;
+            else if (beh === "scroll_to_section" && d.heroScrollAnchor) {
+              const el = document.getElementById(d.heroScrollAnchor.replace(/^#/, ""));
+              el?.scrollIntoView({ behavior: "smooth" });
+            } else if (beh === "download_file" && d.heroDownloadUrl) window.open(d.heroDownloadUrl, "_blank");
+            else if (beh === "open_popup" && d.heroPopupUrl) window.open(d.heroPopupUrl, "_blank");
+          }
+        : undefined;
       return (
-        <div style={{ ...bgStyle, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left"), minHeight: `${d.heroMinHeight ?? 400}px` }} className="relative px-8 py-20 overflow-hidden">
+        <div style={{ ...bgStyle, ...heroBottomBorderStyleDL, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left"), minHeight: `${d.heroMinHeight ?? 400}px`, cursor: heroClickHandlerDL ? "pointer" : undefined }} className="relative px-8 py-20 overflow-hidden" onClick={heroClickHandlerDL}>
           {bgType === "video" && d.videoUrl && (
             <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
           )}
@@ -107,6 +122,9 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
                       style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
                       {hasPurchased ? "Access Files" : btn.text}
                     </button>
+                    {btn.showStrikethrough && btn.strikethroughPrice && (
+                      <span className="text-xs text-white/60 line-through">{btn.strikethroughPrice}</span>
+                    )}
                     {btn.showOptOut && btn.optOutText && (
                       <a href={btn.optOutUrl || "#"} className="text-xs text-white/60 underline hover:text-white/80 cursor-pointer">{btn.optOutText}</a>
                     )}

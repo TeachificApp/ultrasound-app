@@ -124,19 +124,46 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
         bgStyle.backgroundColor = d.bgColor || "#179ca3";
       }
       const align = d.align || "left";
-      const hasInlineMedia = d.inlineMediaUrl && d.inlineMediaType;
+      const hasInlineMediaSL = !!d.inlineMediaUrl;
+      const placementSL = d.inlineMediaPlacement ?? "right";
+      const isHorizontalSL = placementSL === "left" || placementSL === "right";
+      const heroBottomBorderStyleSL: React.CSSProperties = d.heroBottomBorder
+        ? { borderBottom: `${d.heroBottomBorderWidth ?? 4}px solid ${d.heroBottomBorderColor ?? "#179ca3"}` }
+        : {};
+      const heroClickHandlerSL = d.heroClickable && d.heroBehavior && d.heroBehavior !== "next_funnel_step"
+        ? () => {
+            const beh = d.heroBehavior as string;
+            if (beh === "url" && d.heroLink) window.open(d.heroLink, "_blank");
+            else if (beh === "send_email" && d.heroEmail) window.location.href = `mailto:${d.heroEmail}`;
+            else if (beh === "scroll_to_section" && d.heroScrollAnchor) {
+              const el = document.getElementById(d.heroScrollAnchor.replace(/^#/, ""));
+              el?.scrollIntoView({ behavior: "smooth" });
+            } else if (beh === "download_file" && d.heroDownloadUrl) window.open(d.heroDownloadUrl, "_blank");
+            else if (beh === "open_popup" && d.heroPopupUrl) window.open(d.heroPopupUrl, "_blank");
+          }
+        : undefined;
       return (
-        <div className="px-8 py-16 md:py-24" style={{ ...bgStyle, color: d.textColor || "#ffffff", minHeight: `${d.heroMinHeight ?? 400}px` }}>
-          <div className={`max-w-5xl mx-auto ${hasInlineMedia ? "flex flex-col md:flex-row items-center gap-8" : ""}`}>
-            <div className={`${hasInlineMedia ? "flex-1" : "max-w-3xl"} ${align === "center" ? "text-center mx-auto" : align === "right" ? "text-right ml-auto" : ""}`}>
-              <h1 className="text-3xl md:text-5xl font-bold leading-tight mb-4" style={{ color: d.headlineColor || d.textColor || "#ffffff" }}>{d.headline}</h1>
-              {d.headline2 && <h2 className="text-xl md:text-2xl font-semibold mb-4" style={{ color: d.headline2Color || d.textColor || "#ffffff" }}>{d.headline2}</h2>}
-              {d.subheadline && <p className="text-lg md:text-xl opacity-90 mb-6">{d.subheadline}</p>}
-              {d.buttons?.length > 0 && (
+        <div className="relative px-8 py-16 md:py-24 overflow-hidden" style={{ ...bgStyle, ...heroBottomBorderStyleSL, color: d.textColor || "#ffffff", minHeight: `${d.heroMinHeight ?? 400}px`, cursor: heroClickHandlerSL ? "pointer" : undefined }} onClick={heroClickHandlerSL}>
+          {d.bgType === "video" && d.videoUrl && (
+            <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
+          )}
+          <div className={`relative max-w-5xl mx-auto ${hasInlineMediaSL && isHorizontalSL ? "flex items-center gap-10" : ""} ${hasInlineMediaSL && placementSL === "left" ? "flex-row-reverse" : ""}`}>
+            <div className={`${hasInlineMediaSL && isHorizontalSL ? "flex-1" : "max-w-3xl"} ${align === "center" ? "text-center mx-auto" : align === "right" ? "text-right ml-auto" : ""}`}>
+              <h1 className="text-3xl md:text-5xl font-bold leading-tight mb-4" style={{ color: d.headlineColor || d.textColor || "#ffffff" }} dangerouslySetInnerHTML={{ __html: d.headline ?? "" }} />
+              {d.headline2 && <h2 className="text-xl md:text-2xl font-semibold mb-4" style={{ color: d.headline2Color || d.textColor || "#ffffff" }} dangerouslySetInnerHTML={{ __html: d.headline2 }} />}
+              {d.subheadline && <p className="text-lg md:text-xl opacity-90 mb-6" dangerouslySetInnerHTML={{ __html: d.subheadline }} />}
+              {!d.hideButtons && d.buttons?.length > 0 && (
                 <div className={`flex flex-wrap gap-3 ${align === "center" ? "justify-center" : align === "right" ? "justify-end" : ""}`}>
                   {d.buttons.map((btn: any, i: number) => (
                     <div key={i} className="flex flex-col items-center gap-1">
-                      <a href={btn.link || "#"} className="inline-block px-6 py-3 rounded-lg font-semibold text-lg transition-transform hover:scale-105" style={{ backgroundColor: btn.color || "#ffffff", color: btn.textColor || "#179ca3" }}>{btn.text}</a>
+                      <a href={btn.link || "#"}
+                        className={`inline-block px-6 py-3 rounded-lg font-semibold text-lg transition-transform hover:scale-105 ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
+                        style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color || "#fff", border: `2px solid ${btn.color || "#fff"}` } : { backgroundColor: btn.color || "#ffffff", color: btn.textColor || "#179ca3" }}>
+                        {btn.text}
+                      </a>
+                      {btn.showStrikethrough && btn.strikethroughPrice && (
+                        <span className="text-xs text-white/60 line-through">{btn.strikethroughPrice}</span>
+                      )}
                       {btn.showOptOut && btn.optOutText && (
                         <a href={btn.optOutUrl || "#"} className="text-xs text-white/60 underline hover:text-white/80 cursor-pointer">{btn.optOutText}</a>
                       )}
@@ -145,8 +172,8 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
                 </div>
               )}
             </div>
-            {hasInlineMedia && (
-              <div className="flex-1 max-w-lg">
+            {hasInlineMediaSL && (
+              <div className={isHorizontalSL ? "flex-1 max-w-lg" : "mt-8 max-w-lg mx-auto"}>
                 {d.inlineMediaType === "video" ? (
                   <div className="aspect-video rounded-xl overflow-hidden shadow-2xl"><iframe src={d.inlineMediaUrl} className="w-full h-full" allowFullScreen /></div>
                 ) : (

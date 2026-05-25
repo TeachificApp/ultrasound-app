@@ -830,8 +830,26 @@ function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMed
     window.location.href = getBtnHref(btn);
   };
 
+  const heroBottomBorderStyle: React.CSSProperties = d.heroBottomBorder
+    ? { borderBottom: `${d.heroBottomBorderWidth ?? 4}px solid ${d.heroBottomBorderColor ?? "#179ca3"}` }
+    : {};
+  const heroClickHandler = d.heroClickable && d.heroBehavior && d.heroBehavior !== "next_funnel_step"
+    ? (e: React.MouseEvent) => {
+        const beh = d.heroBehavior as string;
+        if (beh === "url" && d.heroLink) window.open(d.heroLink, "_blank");
+        else if (beh === "send_email" && d.heroEmail) window.location.href = `mailto:${d.heroEmail}`;
+        else if (beh === "scroll_to_section" && d.heroScrollAnchor) {
+          const el = document.getElementById(d.heroScrollAnchor.replace(/^#/, ""));
+          el?.scrollIntoView({ behavior: "smooth" });
+        } else if (beh === "download_file" && d.heroDownloadUrl) window.open(d.heroDownloadUrl, "_blank");
+        else if (beh === "open_popup" && d.heroPopupUrl) window.open(d.heroPopupUrl, "_blank");
+        else if (beh === "direct_checkout" && d.heroCheckoutProductId && d.heroCheckoutProductType) {
+          // handled by createDirectCheckout mutation below
+        }
+      }
+    : undefined;
   return (
-    <div className="relative px-8 py-20 overflow-hidden" style={{ ...heroBg, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left"), minHeight: `${d.heroMinHeight ?? 400}px` }}>
+    <div className="relative px-8 py-20 overflow-hidden" style={{ ...heroBg, ...heroBottomBorderStyle, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left"), minHeight: `${d.heroMinHeight ?? 400}px`, cursor: heroClickHandler ? "pointer" : undefined }} onClick={heroClickHandler}>
       {bgType === "video" && d.videoUrl && (
         <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
       )}
@@ -857,6 +875,9 @@ function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMed
                   style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
                   {checkoutLoadingIdx === i ? "Redirecting..." : btn.text}
                 </a>
+                {btn.showStrikethrough && (btn as any).strikethroughPrice && (
+                  <span className="text-xs text-white/60 line-through">{(btn as any).strikethroughPrice}</span>
+                )}
                 {btn.showOptOut && btn.optOutText && (
                   <a href={btn.optOutUrl || "#"} className="text-xs text-white/60 underline hover:text-white/80 cursor-pointer">{btn.optOutText}</a>
                 )}
