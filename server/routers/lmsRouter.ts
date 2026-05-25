@@ -56,6 +56,7 @@ import {
   physicalProducts,
   lmsCertificateTemplates,
   orderBumps,
+  freePreviewEnrollments,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 
@@ -584,6 +585,74 @@ export const lmsPublicRouter = router({
       const [c] = await db.select({ slug: lmsCourses.slug }).from(lmsCourses)
         .where(eq(lmsCourses.id, input.id)).limit(1);
       return c?.slug ?? null;
+    }),
+
+  /**
+   * Guest free-preview enrollment — no login required.
+   * Captures name + email, creates a free_preview_enrollments row, returns an access token.
+   */
+  registerFreePreview: publicProcedure
+    .input(z.object({
+      courseId: z.number(),
+      email: z.string().email(),
+      firstName: z.string().min(1).max(100),
+      lastName: z.string().max(100).optional(),
+      source: z.string().max(128).optional(),
+      utmSource: z.string().max(128).optional(),
+      utmMedium: z.string().max(128).optional(),
+      utmCampaign: z.string().max(128).optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Check if already registered for this course+email
+      const [existing] = await db
+        .select({ id: freePreviewEnrollments.id, accessToken: freePreviewEnrollments.accessToken, accessExpiresAt: freePreviewEnrollments.accessExpiresAt })
+        .from(freePreviewEnrollments)
+        .where(and(eq(freePreviewEnrollments.courseId, input.courseId), eq(freePreviewEnrollments.email, input.email.toLowerCase())))
+        .limit(1);
+      if (existing) {
+        // Already registered — return existing token (refresh expiry)
+        const newExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        await db.update(freePreviewEnrollments)
+          .set({ accessExpiresAt: newExpiry, updatedAt: new Date() })
+          .where(eq(freePreviewEnrollments.id, existing.id));
+        return { accessToken: existing.accessToken, isNew: false };
+      }
+      const accessToken = randomBytes(32).toString("hex");
+      const accessExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      await db.insert(freePreviewEnrollments).values({
+        courseId: input.courseId,
+        email: input.email.toLowerCase(),
+        firstName: input.firstName,
+        lastName: input.lastName ?? null,
+        source: input.source ?? "course_landing",
+        utmSource: input.utmSource ?? null,
+        utmMedium: input.utmMedium ?? null,
+        utmCampaign: input.utmCampaign ?? null,
+        accessToken,
+        accessExpiresAt,
+      });
+      return { accessToken, isNew: true };
+    }),
+
+  /** Check if an access token is valid for a given course (used by player to gate preview lessons). */
+  checkFreePreviewToken: publicProcedure
+    .input(z.object({ courseId: z.number(), accessToken: z.string() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return { valid: false };
+      const [row] = await db
+        .select({ id: freePreviewEnrollments.id, accessExpiresAt: freePreviewEnrollments.accessExpiresAt })
+        .from(freePreviewEnrollments)
+        .where(and(
+          eq(freePreviewEnrollments.courseId, input.courseId),
+          eq(freePreviewEnrollments.accessToken, input.accessToken),
+        ))
+        .limit(1);
+      if (!row) return { valid: false };
+      if (row.accessExpiresAt < new Date()) return { valid: false, expired: true };
+      return { valid: true };
     }),
 });
 
@@ -3866,6 +3935,63 @@ CRITICAL REQUIREMENTS:
       const { rowsAffected } = await db.delete(lmsArchive)
         .where(sql`${lmsArchive.purgeAt} <= ${now}`);
       return { purged: rowsAffected ?? 0 };
+    }),
+
+  /** List free preview enrollments with filters for admin email campaigns */
+  listFreePreviewEnrollments: protectedProcedure
+    .input(z.object({
+      courseId: z.number().optional(),
+      page: z.number().min(1).default(1),
+      pageSize: z.number().min(1).max(100).default(50),
+      search: z.string().optional(),
+    }).optional())
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const p = input ?? {};
+      const page = p.page ?? 1;
+      const pageSize = p.pageSize ?? 50;
+      const offset = (page - 1) * pageSize;
+
+      const conditions: any[] = [];
+      if (p.courseId) conditions.push(eq(freePreviewEnrollments.courseId, p.courseId));
+      if (p.search) {
+        const like = `%${p.search}%`;
+        conditions.push(or(
+          sql`${freePreviewEnrollments.email} LIKE ${like}`,
+          sql`${freePreviewEnrollments.firstName} LIKE ${like}`,
+          sql`${freePreviewEnrollments.lastName} LIKE ${like}`,
+        ));
+      }
+
+      const where = conditions.length > 0 ? and(...conditions) : undefined;
+      const rows = await db.select({
+        id: freePreviewEnrollments.id,
+        courseId: freePreviewEnrollments.courseId,
+        email: freePreviewEnrollments.email,
+        firstName: freePreviewEnrollments.firstName,
+        lastName: freePreviewEnrollments.lastName,
+        source: freePreviewEnrollments.source,
+        utmSource: freePreviewEnrollments.utmSource,
+        utmMedium: freePreviewEnrollments.utmMedium,
+        utmCampaign: freePreviewEnrollments.utmCampaign,
+        accessExpiresAt: freePreviewEnrollments.accessExpiresAt,
+        createdAt: freePreviewEnrollments.createdAt,
+        courseTitle: lmsCourses.title,
+      })
+        .from(freePreviewEnrollments)
+        .leftJoin(lmsCourses, eq(freePreviewEnrollments.courseId, lmsCourses.id))
+        .where(where)
+        .orderBy(desc(freePreviewEnrollments.createdAt))
+        .limit(pageSize)
+        .offset(offset);
+
+      const [{ total }] = await db.select({ total: sql<number>`count(*)` })
+        .from(freePreviewEnrollments)
+        .where(where);
+
+      return { items: rows, total, page, pageSize };
     }),
 });
 

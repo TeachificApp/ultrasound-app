@@ -13,6 +13,9 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { toast } from "sonner";
 import { BookOpen, CheckCircle, ChevronRight, Clock, Download, HelpCircle, Lock, PlayCircle, Star, Users, AlertTriangle, Globe, LayoutGrid, Layers, BookMarked, Timer, Tag, CreditCard, List } from "lucide-react";
@@ -505,14 +508,14 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
                             )}
                             <span style={{ color: isFreePreview ? (d.lessonPreviewIconColor ?? "#0d9488") : (d.lessonTextColor ?? "#374151"), fontWeight: isFreePreview ? 500 : 400 }}>{lesson.title}</span>
                             {isFreePreview && (
-                              <a
-                                href={`/courses/${course.slug}/player?lesson=${lesson.id}`}
-                                className="ml-auto text-xs hover:underline font-semibold flex items-center gap-1 shrink-0"
+                              <button
+                                type="button"
+                                className="ml-auto text-xs hover:underline font-semibold flex items-center gap-1 shrink-0 cursor-pointer"
                                 style={{ color: d.lessonPreviewIconColor ?? "#0d9488" }}
-                                onClick={(e) => e.stopPropagation()}
+                                onClick={(e) => { e.stopPropagation(); handleFreePreviewClick(lesson.id); }}
                               >
                                 <PlayCircle className="w-3 h-3" /> Free Preview
-                              </a>
+                              </button>
                             )}
                           </li>
                         );
@@ -670,6 +673,13 @@ export default function CourseLanding() {
   const [promoCode, setPromoCode] = useState<string | null>(null);
   const isPreview = new URLSearchParams(window.location.search).get("preview") === "admin";
   const autoCheckout = new URLSearchParams(window.location.search).get("checkout") === "1";
+  // Free Preview modal state
+  const [freePreviewOpen, setFreePreviewOpen] = useState(false);
+  const [freePreviewLessonId, setFreePreviewLessonId] = useState<number | null>(null);
+  const [fpFirstName, setFpFirstName] = useState("");
+  const [fpLastName, setFpLastName] = useState("");
+  const [fpEmail, setFpEmail] = useState("");
+  const [fpSubmitting, setFpSubmitting] = useState(false);
 
   const { data: course, isLoading } = trpc.lms.getCourse.useQuery({ slug: slug!, preview: isPreview || undefined }, { enabled: !!slug });
   const { data: myCourses } = trpc.lmsLearner.getMyCourses.useQuery(undefined, { enabled: !!user });
@@ -683,6 +693,48 @@ export default function CourseLanding() {
     onSuccess: (data) => { if (data.checkoutUrl) window.open(data.checkoutUrl, "_blank"); },
     onError: (e) => toast.error(`Checkout failed: ${e.message}`),
   });
+  const registerFreePreview = trpc.lms.registerFreePreview.useMutation();
+
+  const handleFreePreviewClick = (lessonId: number) => {
+    // If user is logged in, grant access directly via lmsLearner.createFreePreviewEnrollment
+    if (user) {
+      navigate(`/courses/${slug}/player?lesson=${lessonId}`);
+      return;
+    }
+    // Guest: show registration modal
+    setFreePreviewLessonId(lessonId);
+    setFpFirstName("");
+    setFpLastName("");
+    setFpEmail("");
+    setFreePreviewOpen(true);
+  };
+
+  const handleFreePreviewSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!course || !freePreviewLessonId) return;
+    setFpSubmitting(true);
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const { accessToken } = await registerFreePreview.mutateAsync({
+        courseId: course.id,
+        email: fpEmail,
+        firstName: fpFirstName,
+        lastName: fpLastName || undefined,
+        source: "course_landing",
+        utmSource: params.get("utm_source") ?? undefined,
+        utmMedium: params.get("utm_medium") ?? undefined,
+        utmCampaign: params.get("utm_campaign") ?? undefined,
+      });
+      setFreePreviewOpen(false);
+      // Store token in sessionStorage so the player can verify access
+      sessionStorage.setItem(`fp_token_${course.id}`, accessToken);
+      navigate(`/courses/${slug}/player?lesson=${freePreviewLessonId}&fp=${accessToken}`);
+    } catch (err: any) {
+      toast.error(err.message ?? "Registration failed");
+    } finally {
+      setFpSubmitting(false);
+    }
+  };
 
   const handleEnroll = async () => {
     if (!user) { navigate("/login"); return; }
@@ -796,6 +848,7 @@ export default function CourseLanding() {
     : { backgroundColor: heroColor };
 
   return (
+    <>
     <div className="min-h-screen bg-gray-50">
       {/* Hero */}
       <div style={heroBg} className="text-white">
@@ -1028,9 +1081,41 @@ export default function CourseLanding() {
         </div>
       </div>
     </div>
+
+    {/* Free Preview Registration Modal */}
+    <Dialog open={freePreviewOpen} onOpenChange={setFreePreviewOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-teal-700">Access Free Preview</DialogTitle>
+          <DialogDescription>
+            Enter your details to unlock free access to this preview lesson. No payment required.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleFreePreviewSubmit} className="space-y-4 mt-2">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="fp-first">First Name <span className="text-red-500">*</span></Label>
+              <Input id="fp-first" value={fpFirstName} onChange={e => setFpFirstName(e.target.value)} placeholder="Jane" required />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="fp-last">Last Name</Label>
+              <Input id="fp-last" value={fpLastName} onChange={e => setFpLastName(e.target.value)} placeholder="Smith" />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="fp-email">Email Address <span className="text-red-500">*</span></Label>
+            <Input id="fp-email" type="email" value={fpEmail} onChange={e => setFpEmail(e.target.value)} placeholder="jane@example.com" required />
+          </div>
+          <p className="text-xs text-gray-500">Your preview access link will be valid for 7 days. We may send you a follow-up email about this course.</p>
+          <Button type="submit" className="w-full bg-teal-600 hover:bg-teal-700 text-white" disabled={fpSubmitting}>
+            {fpSubmitting ? "Granting Access..." : "Watch Free Preview"}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
-
 // ─── Instructor Public Block (fetches from saved profile or uses manual data) ──
 function InstructorPublicBlock({ d }: { d: Record<string, any> }) {
   const instructorId = d.instructorId ? Number(d.instructorId) : null;

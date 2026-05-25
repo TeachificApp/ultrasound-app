@@ -4744,6 +4744,7 @@ export default function LMSAdmin() {
             <TabsTrigger value="orderbumps" className="text-xs">Order Bumps</TabsTrigger>
             <TabsTrigger value="certificates" className="text-xs">Certificates</TabsTrigger>
             <TabsTrigger value="thinkific" className="text-xs">Import from Thinkific</TabsTrigger>
+            <TabsTrigger value="free-previews" className="text-xs">Free Previews</TabsTrigger>
             <TabsTrigger value="trash" className="text-xs text-red-500">🗑 Trash</TabsTrigger>
           </TabsList>
           <TabsContent value="courses" className="mt-4"><CoursesTab onEdit={setEditingCourseId} typeFilter="course" /></TabsContent>
@@ -4759,6 +4760,7 @@ export default function LMSAdmin() {
           <TabsContent value="orderbumps" className="mt-4"><OrderBumpsAdmin /></TabsContent>
           <TabsContent value="certificates" className="mt-4"><CertificateTemplatesAdmin /></TabsContent>
           <TabsContent value="thinkific" className="mt-4"><ThinkificImporter /></TabsContent>
+          <TabsContent value="free-previews" className="mt-4"><FreePreviewEnrollmentsTab /></TabsContent>
           <TabsContent value="trash" className="mt-4"><TrashTab /></TabsContent>
         </Tabs>
       )}

@@ -2930,3 +2930,4 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] LMS Trash tab in LMSAdmin with type filter and purge controls
 - [x] Thinkific import: every lesson gets a hero block with lesson name only (no subtext, no CTA)
 - [x] Course Curriculum (auto) block headline alignment control (Left/Center/Right)
+- [ ] Add Ticker block settings panel in LandingPageBuilder (items text, separator, direction, speed, pause-on-hover, bg color, text color, font size/weight, letter spacing, text transform, padding)

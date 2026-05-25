@@ -2370,6 +2370,138 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
       const items: Array<{ q: string; a: string }> = d.items ?? [];
       return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Section Headline" field="headline" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" /><div><div className="flex items-center justify-between mb-2"><label className="text-xs text-gray-500 font-medium">FAQ Items</label><button onClick={() => set("items", [...items, { q: "Question?", a: "Answer." }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div><div className="space-y-2">{items.map((item, i) => (<div key={i} className="border border-gray-200 rounded p-2 space-y-1"><div className="flex justify-between items-center mb-1"><span className="text-xs text-gray-500">Q{i + 1}</span><button onClick={() => set("items", items.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div><DebouncedInput value={item.q} onChange={v => { const next = items.map((it, j) => j === i ? { ...it, q: v } : it); set("items", next); }} className="h-7 text-xs" placeholder="Question" /><DebouncedTextarea value={item.a} onChange={v => { const next = items.map((it, j) => j === i ? { ...it, a: v } : it); set("items", next); }} className="text-xs min-h-[60px]" placeholder="Answer" /></div>))}</div></div></div>);
     }
+    case "ticker": {
+      const tickerItems: string[] = d.items ?? ["Free Shipping on Orders Over $50", "New Courses Added Weekly", "Join 10,000+ Students"];
+      return (
+        <div className="space-y-3">
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs text-gray-500 font-medium">Ticker Items</label>
+              <button onClick={() => set("items", [...tickerItems, "New item"])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button>
+            </div>
+            <div className="space-y-1">
+              {tickerItems.map((item, i) => (
+                <div key={i} className="flex items-center gap-1">
+                  <DebouncedInput value={item} onChange={v => { const next = [...tickerItems]; next[i] = v; set("items", next); }} className="h-7 text-xs flex-1" placeholder="Ticker text..." />
+                  <button onClick={() => set("items", tickerItems.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 flex-shrink-0"><X size={12} /></button>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Separator</label>
+            <Input value={d.separator ?? " ✦ "} onChange={e => set("separator", e.target.value)} className="h-7 text-xs" placeholder=" ✦ " />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Direction</label>
+            <select value={d.direction ?? "left"} onChange={e => set("direction", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+              <option value="left">Left (default)</option>
+              <option value="right">Right</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Speed (seconds per cycle)</label>
+            <Input type="number" value={d.speed ?? 30} onChange={e => set("speed", Number(e.target.value))} className="h-7 text-xs" min={5} max={120} step={5} />
+          </div>
+          <div className="flex items-center gap-2">
+            <input type="checkbox" checked={d.pauseOnHover !== false} onChange={e => set("pauseOnHover", e.target.checked)} className="rounded" />
+            <label className="text-xs text-gray-600">Pause on hover</label>
+          </div>
+          <BSColorField data={d} onSet={set} label="Background Color" field="bgColor" />
+          <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Font Size</label>
+            <select value={d.fontSize ?? "sm"} onChange={e => set("fontSize", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+              <option value="xs">Extra Small</option>
+              <option value="sm">Small</option>
+              <option value="base">Medium</option>
+              <option value="lg">Large</option>
+              <option value="xl">Extra Large</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Font Weight</label>
+            <select value={d.fontWeight ?? "normal"} onChange={e => set("fontWeight", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+              <option value="normal">Normal</option>
+              <option value="medium">Medium</option>
+              <option value="semibold">Semibold</option>
+              <option value="bold">Bold</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Text Transform</label>
+            <select value={d.textTransform ?? "none"} onChange={e => set("textTransform", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+              <option value="none">None</option>
+              <option value="uppercase">UPPERCASE</option>
+              <option value="lowercase">lowercase</option>
+              <option value="capitalize">Capitalize</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Letter Spacing</label>
+            <select value={d.letterSpacing ?? "normal"} onChange={e => set("letterSpacing", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+              <option value="tighter">Tighter</option>
+              <option value="normal">Normal</option>
+              <option value="wide">Wide</option>
+              <option value="wider">Wider</option>
+              <option value="widest">Widest</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Padding (top/bottom)</label>
+            <select value={d.padding ?? "py-2"} onChange={e => set("padding", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+              <option value="py-1">Compact</option>
+              <option value="py-2">Normal</option>
+              <option value="py-3">Relaxed</option>
+              <option value="py-4">Spacious</option>
+            </select>
+          </div>
+        </div>
+      );
+    }
+    case "countdown_v2": {
+      return (
+        <div className="space-y-3">
+          <BSTextField data={d} onSet={set} label="Headline" field="headline" />
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Mode</label>
+            <select value={d.mode ?? "duration"} onChange={e => set("mode", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+              <option value="duration">Duration from page load</option>
+              <option value="target_date">Count down to specific date</option>
+            </select>
+          </div>
+          {(d.mode ?? "duration") === "duration" ? (
+            <div className="grid grid-cols-2 gap-2">
+              <div><label className="text-xs text-gray-500 block mb-1">Hours</label><Input type="number" value={d.durationHours ?? 0} onChange={e => set("durationHours", Number(e.target.value))} className="h-7 text-xs" min={0} max={999} /></div>
+              <div><label className="text-xs text-gray-500 block mb-1">Minutes</label><Input type="number" value={d.durationMinutes ?? 30} onChange={e => set("durationMinutes", Number(e.target.value))} className="h-7 text-xs" min={0} max={59} /></div>
+            </div>
+          ) : (
+            <div><label className="text-xs text-gray-500 block mb-1">Target Date &amp; Time</label><Input type="datetime-local" value={d.targetDate ?? ""} onChange={e => set("targetDate", e.target.value)} className="h-7 text-xs" /></div>
+          )}
+          <BSTextField data={d} onSet={set} label="Expired Message" field="expiredMessage" placeholder="Offer has ended" />
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex items-center gap-2"><input type="checkbox" checked={d.showDays !== false} onChange={e => set("showDays", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Days</label></div>
+            <div className="flex items-center gap-2"><input type="checkbox" checked={d.showHours !== false} onChange={e => set("showHours", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Hours</label></div>
+            <div className="flex items-center gap-2"><input type="checkbox" checked={d.showMinutes !== false} onChange={e => set("showMinutes", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Minutes</label></div>
+            <div className="flex items-center gap-2"><input type="checkbox" checked={d.showSeconds !== false} onChange={e => set("showSeconds", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Seconds</label></div>
+          </div>
+          <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
+          <BSColorField data={d} onSet={set} label="Digit Background" field="digitBg" />
+          <BSColorField data={d} onSet={set} label="Digit Text Color" field="digitColor" />
+          <BSColorField data={d} onSet={set} label="Label Color" field="labelColor" />
+          <BSColorField data={d} onSet={set} label="Separator Color" field="separatorColor" />
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Corner Radius</label>
+            <select value={d.radius ?? "rounded"} onChange={e => set("radius", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+              <option value="rounded-none">Square</option>
+              <option value="rounded">Rounded</option>
+              <option value="rounded-lg">Large Radius</option>
+              <option value="rounded-full">Pill</option>
+            </select>
+          </div>
+        </div>
+      );
+    }
     case "countdown":
       return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Headline" field="headline" /><div><label className="text-xs text-gray-500 block mb-1">Timer Mode</label><select value={d.mode ?? "on_load"} onChange={e => set("mode", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="on_load">Countdown on page load (minutes)</option><option value="event">Countdown to specific date/time</option></select></div>{(d.mode ?? "on_load") === "on_load" ? (<div><label className="text-xs text-gray-500 block mb-1">Duration (minutes)</label><Input type="number" value={d.durationMinutes ?? 90} onChange={e => set("durationMinutes", Number(e.target.value))} className="h-8 text-sm" min={1} max={10080} /></div>) : (<div><label className="text-xs text-gray-500 block mb-1">Target Date & Time</label><Input type="datetime-local" value={d.targetDate ?? ""} onChange={e => set("targetDate", e.target.value)} className="h-8 text-sm" /></div>)}<BSColorField data={d} onSet={set} label="Background" field="bgColor" /><BSColorField data={d} onSet={set} label="Text Color" field="textColor" /><BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" /><div className="flex items-center gap-2"><input type="checkbox" checked={d.showBorder ?? true} onChange={e => set("showBorder", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show border</label></div></div>);
     case "alert":
