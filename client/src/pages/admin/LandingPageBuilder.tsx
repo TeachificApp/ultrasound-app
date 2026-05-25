@@ -1870,7 +1870,7 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
                 <div><label className="text-xs text-gray-500 block mb-1">Border Width (px)</label><Input type="number" value={d.borderWidth ?? 0} onChange={e => set("borderWidth", Number(e.target.value))} className="h-8 text-sm" min={0} max={20} /></div>
                 <div><label className="text-xs text-gray-500 block mb-1">Border Style</label><div className="flex gap-1">{(["solid","dashed","dotted"] as const).map(s => <button key={s} onClick={() => set("borderStyle", s)} className={`flex-1 py-1 text-xs rounded border capitalize ${(d.borderStyle ?? "solid") === s ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>{s}</button>)}</div></div>
                 <BSColorField data={d} onSet={set} label="Border Color" field="borderColor" />
-              </>;}
+              </>}
             </div>
           </div>
         );

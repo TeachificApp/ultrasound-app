@@ -489,77 +489,34 @@ function MembersRouter() {
   );
   return (
     <Switch>
-      {/* Redirect course/education routes to learn subdomain */}
+      {/* Redirect all course/education/admin routes to the app (learn) subdomain */}
       <Route path="/downloads/:slug/files">{(params: { slug: string }) => { window.location.replace(`${LEARN_APP_URL}/downloads/${params.slug}/files`); return null; }}</Route>
       <Route path="/courses/:slug/player">{(params: { slug: string }) => { window.location.replace(`${LEARN_APP_URL}/courses/${params.slug}/player`); return null; }}</Route>
       <Route path="/courses/:slug/overview">{(params: { slug: string }) => { window.location.replace(`${LEARN_APP_URL}/courses/${params.slug}/overview`); return null; }}</Route>
       <Route path="/courses/:slug">{(params: { slug: string }) => { window.location.replace(`${LEARN_APP_URL}/courses/${params.slug}`); return null; }}</Route>
       <Route path="/education-library">{() => { window.location.replace(`${LEARN_APP_URL}/education-library`); return null; }}</Route>
-      {/* ── All other members routes — wrapped in MembersLayout ─────────── */}
+      {/* Redirect all /admin/* routes to app subdomain */}
+      <Route path="/admin/:rest*">{(params: { rest?: string }) => { window.location.replace(`${LEARN_APP_URL}/admin/${params.rest ?? ""}`); return null; }}</Route>
+      <Route path="/platform-admin">{() => { window.location.replace(`${LEARN_APP_URL}/platform-admin`); return null; }}</Route>
+      {/* ── Members-only routes (user profile / dashboard hub) ─────────── */}
       <Route>
-    <MembersLayout>
-      <Suspense fallback={pageFallback}>
-        <Switch>
-          <Route path="/my-dashboard" component={StudentDashboardPage} />
-          {/* /profile removed — profile settings are now in /my-dashboard?tab=profile */}
-          <Route path="/profile">{() => { window.location.replace("/my-dashboard?tab=profile"); return null; }}</Route>
-          <Route path="/my-downloads" component={MyDownloads} />
-          <Route path="/downloads" component={DownloadsBrowse} />
-          {/* Admin routes — comprehensive list so no admin URL falls through to /my-dashboard */}
-          <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
-          {/* LMS */}
-          <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
-          <Route path="/admin/lms/:courseId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LandingPageBuilder /></RoleGuard>}</Route>
-          {/* Funnels */}
-          <Route path="/admin/funnels/:funnelId/pages/:pageId/edit">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><FunnelPageEditor /></Suspense></RoleGuard>}</Route>
-          <Route path="/admin/funnels/:funnelId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><FunnelBuilder /></Suspense></RoleGuard>}</Route>
-          <Route path="/admin/funnels">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><FunnelBuilder /></Suspense></RoleGuard>}</Route>
-          {/* Landing builders */}
-          <Route path="/admin/downloads/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><DownloadLandingPageBuilder /></RoleGuard>}</Route>
-          <Route path="/admin/products/:productId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ProductLandingPageBuilder /></RoleGuard>}</Route>
-          {/* Forms */}
-          <Route path="/admin/general-forms/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><GeneralFormBuilder /></RoleGuard>}</Route>
-          <Route path="/admin/general-forms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><GeneralFormBuilder /></RoleGuard>}</Route>
-          <Route path="/admin/form-builder/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
-          <Route path="/admin/form-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
-          {/* Email */}
-          <Route path="/admin/email">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><EmailAdmin /></RoleGuard>}</Route>
-          {/* DIY Accreditation */}
-          <Route path="/admin/diy-accreditation">{() => <RoleGuard roles={["diy_admin", "platform_admin", "accreditation_manager"]} allowAdmin={true}><DIYAccreditationAdmin /></RoleGuard>}</Route>
-          <Route path="/accreditation-manager">{() => <RoleGuard roles={["platform_admin", "accreditation_manager"]} allowAdmin={true}><AccreditationManager /></RoleGuard>}</Route>
-          {/* Content & tools */}
-          <Route path="/admin/cases">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminCaseManagement /></RoleGuard>}</Route>
-          <Route path="/admin/quickfire">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuickFireAdmin /></RoleGuard>}</Route>
-          <Route path="/admin/scancoach">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ScanCoachEditor /></RoleGuard>}</Route>
-          <Route path="/admin/navigator">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><NavigatorEditor /></RoleGuard>}</Route>
-          <Route path="/admin/soundbytes">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SoundBytesAdmin /></RoleGuard>}</Route>
-          <Route path="/admin/thinkific-webhook">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ThinkificWebhookAdmin /></RoleGuard>}</Route>
-          <Route path="/admin/challenge-cards">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ChallengeCardGenerator /></RoleGuard>}</Route>
-          <Route path="/admin/social-content">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SocialContentGenerator /></RoleGuard>}</Route>
-          <Route path="/admin/engagement">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><EngagementDashboard /></RoleGuard>}</Route>
-          <Route path="/admin/sonoquiz/host/:sessionId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SonoQuizHost /></RoleGuard>}</Route>
-          <Route path="/admin/sonoquiz">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SonoQuizCreator /></RoleGuard>}</Route>
-          {/* Media & users */}
-          <Route path="/admin/media-repository">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MediaRepository /></RoleGuard>}</Route>
-          <Route path="/admin/contacts">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><ContactsAdmin /></Suspense></RoleGuard>}</Route>
-          <Route path="/admin/sharing-monitor">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><SharingMonitor /></Suspense></RoleGuard>}</Route>
-          <Route path="/admin/user-analytics">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><UserAnalytics /></RoleGuard>}</Route>
-          <Route path="/admin/users/:userId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminUserDetailPage /></RoleGuard>}</Route>
-          {/* Auth */}
-          <Route path="/login" component={Login} />
-          <Route path="/magic-link" component={MagicLinkRequest} />
-          <Route path="/auth/magic" component={MagicLinkCallback} />
-          <Route path="/register" component={Register} />
-          {/* Funnel pages — catch-all MUST be last so all specific routes above match first */}
-          <Route path="/:slug"><FunnelRootRedirect /></Route>
-          <Route path="/:slug/:pageSlug">
-            <Suspense fallback={pageFallback}><PublicFunnelPage /></Suspense>
-          </Route>
-          {/* Default: redirect to dashboard */}
-          <Route>{() => { window.location.replace("/my-dashboard"); return null; }}</Route>
-        </Switch>
-      </Suspense>
-    </MembersLayout>
+        <MembersLayout>
+          <Suspense fallback={pageFallback}>
+            <Switch>
+              <Route path="/my-dashboard" component={StudentDashboardPage} />
+              <Route path="/profile">{() => { window.location.replace("/my-dashboard?tab=profile"); return null; }}</Route>
+              <Route path="/my-downloads" component={MyDownloads} />
+              <Route path="/downloads" component={DownloadsBrowse} />
+              {/* Auth */}
+              <Route path="/login" component={Login} />
+              <Route path="/magic-link" component={MagicLinkRequest} />
+              <Route path="/auth/magic" component={MagicLinkCallback} />
+              <Route path="/register" component={Register} />
+              {/* Default: redirect to dashboard */}
+              <Route>{() => { window.location.replace("/my-dashboard"); return null; }}</Route>
+            </Switch>
+          </Suspense>
+        </MembersLayout>
       </Route>
     </Switch>
   );
