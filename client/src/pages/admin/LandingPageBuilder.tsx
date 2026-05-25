@@ -681,7 +681,7 @@ function CurriculumCourseSelector({ d, set }: { d: Record<string, any>; set: (ke
   );
 }
 
-function PricingCtaSettings({ d, set }: { d: Record<string, any>; set: (key: string, val: any) => void }) {
+function PricingCtaSettings({ d, set, setMany }: { d: Record<string, any>; set: (key: string, val: any) => void; setMany: (patch: Record<string, any>) => void }) {
   const { data: coursesData } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", type: "all", pageSize: 100 });
   const allItems = (coursesData?.courses ?? []).map((c: any) => ({
     id: c.id,
@@ -689,30 +689,81 @@ function PricingCtaSettings({ d, set }: { d: Record<string, any>; set: (key: str
     type: c.type as string,
     slug: c.slug,
     price: c.isFree ? 0 : (c.price ?? 0),
-    isFree: c.isFree,
+    isFree: !!c.isFree,
+    pricingType: (c.pricingType ?? "one_time") as string,
+    subscriptionInterval: (c.subscriptionInterval ?? null) as string | null,
   }));
+
+  // Three modes: "none" | "manual" | "linked"
   const priceSource = d.priceSource ?? "manual";
+
+  // Auto-detect linked item from ctaLink URL when priceSource === "linked"
+  const ctaLink: string = d.ctaLink ?? d.ctaUrl ?? "";
+  const linkedFromUrl = priceSource === "linked"
+    ? allItems.find((item: any) => {
+        const urlMap: Record<string, string> = { course: `/courses/${item.slug}`, quiz: `/courses/${item.slug}`, download: `/downloads/${item.slug}`, bundle: `/bundles/${item.slug}`, product: `/product/${item.slug}` };
+        const expected = urlMap[item.type] ?? `/courses/${item.slug}`;
+        return ctaLink && ctaLink.includes(expected);
+      })
+    : null;
+
+  // When priceSource === "item" (manual item picker), use stored linkedItemId
   const selectedItemId = d.linkedItemId ? Number(d.linkedItemId) : null;
-  const selectedItem = allItems.find((i: any) => i.id === selectedItemId);
+  const selectedItem = priceSource === "item"
+    ? allItems.find((i: any) => i.id === selectedItemId)
+    : null;
+
+  // The item that drives the displayed price
+  const activeItem = priceSource === "linked" ? linkedFromUrl : selectedItem;
+
+  // Format price for display
+  const formatItemPrice = (item: typeof allItems[0]) => {
+    if (item.isFree) return "Free";
+    const dollars = Math.floor(item.price / 100);
+    const cents = item.price % 100;
+    const priceStr = cents === 0 ? `$${dollars}` : `$${dollars}.${String(cents).padStart(2, "0")}`;
+    if (item.pricingType === "subscription" && item.subscriptionInterval) {
+      const intervalLabel: Record<string, string> = { monthly: "/ mo", quarterly: "/ qtr", annual: "/ yr" };
+      return `${priceStr} ${intervalLabel[item.subscriptionInterval] ?? "/ period"}`;
+    }
+    return priceStr;
+  };
 
   const handleItemSelect = (idStr: string) => {
     if (!idStr || idStr === "none") {
-      set("linkedItemId", null);
-      set("linkedItemType", null);
-      set("linkedItemSlug", null);
+      setMany({ linkedItemId: null, linkedItemType: null, linkedItemSlug: null });
       return;
     }
     const item = allItems.find((i: any) => i.id === Number(idStr));
     if (!item) return;
-    set("linkedItemId", item.id);
-    set("linkedItemType", item.type);
-    set("linkedItemSlug", item.slug);
     const urlMap: Record<string, string> = { course: `/courses/${item.slug}`, quiz: `/courses/${item.slug}`, download: `/downloads/${item.slug}`, bundle: `/bundles/${item.slug}`, product: `/product/${item.slug}` };
-    set("ctaUrl", urlMap[item.type] ?? `/courses/${item.slug}`);
-    if (item.isFree) {
-      set("currentPrice", "Free");
-    } else if (item.price > 0) {
-      set("currentPrice", `$${(item.price / 100).toFixed(0)}`);
+    const autoUrl = urlMap[item.type] ?? `/courses/${item.slug}`;
+    const priceDisplay = formatItemPrice(item);
+    const intervalLabel = item.pricingType === "subscription" && item.subscriptionInterval
+      ? ({ monthly: "/ mo", quarterly: "/ qtr", annual: "/ yr" }[item.subscriptionInterval] ?? "")
+      : "";
+    setMany({
+      linkedItemId: item.id,
+      linkedItemType: item.type,
+      linkedItemSlug: item.slug,
+      ctaUrl: autoUrl,
+      ctaLink: autoUrl,
+      currentPrice: priceDisplay,
+      priceInterval: intervalLabel,
+    });
+  };
+
+  // When priceSource changes to "linked", auto-populate from ctaLink if possible
+  const handleSourceChange = (v: string) => {
+    set("priceSource", v);
+    if (v === "none") {
+      setMany({ currentPrice: "", priceInterval: "" });
+    } else if (v === "linked" && linkedFromUrl) {
+      const priceDisplay = formatItemPrice(linkedFromUrl);
+      const intervalLabel = linkedFromUrl.pricingType === "subscription" && linkedFromUrl.subscriptionInterval
+        ? ({ monthly: "/ mo", quarterly: "/ qtr", annual: "/ yr" }[linkedFromUrl.subscriptionInterval] ?? "")
+        : "";
+      setMany({ currentPrice: priceDisplay, priceInterval: intervalLabel });
     }
   };
 
@@ -730,14 +781,27 @@ function PricingCtaSettings({ d, set }: { d: Record<string, any>; set: (key: str
           <>
             <div>
               <label className="text-xs text-gray-500 block mb-1">Price Source</label>
-              <Select value={priceSource} onValueChange={v => set("priceSource", v)}>
+              <Select value={priceSource} onValueChange={handleSourceChange}>
                 <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="none">None (hide price)</SelectItem>
                   <SelectItem value="manual">Manual entry</SelectItem>
-                  <SelectItem value="item">Link to item (course / download / quiz)</SelectItem>
+                  <SelectItem value="linked">Linked — auto from button URL</SelectItem>
+                  <SelectItem value="item">Linked — pick item manually</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Linked from button URL — auto-detected */}
+            {priceSource === "linked" && (
+              <div className="rounded bg-teal-50 border border-teal-200 px-2 py-1.5 text-xs text-teal-700">
+                {linkedFromUrl
+                  ? <><span className="font-medium">{linkedFromUrl.title}</span> — {formatItemPrice(linkedFromUrl)} · auto-detected from button URL</>
+                  : <span className="text-amber-600">No matching item found for the current button URL. Set the button action to "Link to URL" pointing to a course or download first.</span>}
+              </div>
+            )}
+
+            {/* Manual item picker */}
             {priceSource === "item" && (
               <div>
                 <label className="text-xs text-gray-500 block mb-1">Select Item</label>
@@ -747,22 +811,37 @@ function PricingCtaSettings({ d, set }: { d: Record<string, any>; set: (key: str
                     <SelectItem value="none">— None —</SelectItem>
                     {allItems.map((item: any) => (
                       <SelectItem key={item.id} value={String(item.id)}>
-                        [{item.type}] {item.title}
+                        [{item.type}] {item.title} — {formatItemPrice(item)}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {selectedItem && (
+                {activeItem && (
                   <p className="text-xs text-teal-600 mt-1">
-                    {(selectedItem as any).isFree ? "Free" : `$${((selectedItem as any).price / 100).toFixed(0)}`} · URL auto-set
+                    {formatItemPrice(activeItem)} · URL auto-set
                   </p>
                 )}
               </div>
             )}
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Current Price (displayed)</label>
-              <DebouncedInput value={d.currentPrice ?? ""} onChange={v => set("currentPrice", v)} className="h-8 text-xs" placeholder="e.g. $97 or Free" />
-            </div>
+
+            {/* Manual price entry (shown for manual mode, or as override for linked/item) */}
+            {priceSource !== "none" && (
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">
+                  {priceSource === "manual" ? "Price (displayed)" : "Price override (leave blank to use auto)"}
+                </label>
+                <DebouncedInput value={d.currentPrice ?? ""} onChange={v => set("currentPrice", v)} className="h-8 text-xs" placeholder={activeItem ? formatItemPrice(activeItem) : "e.g. $97 or Free"} />
+              </div>
+            )}
+
+            {/* Interval label (auto-filled for subscriptions, but editable) */}
+            {priceSource !== "none" && (
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Billing interval label <span className="text-gray-400">(e.g. / mo, / yr — leave blank for one-time)</span></label>
+                <DebouncedInput value={d.priceInterval ?? ""} onChange={v => set("priceInterval", v)} className="h-8 text-xs" placeholder="/ mo" />
+              </div>
+            )}
+
             <div className="flex items-center gap-2">
               <input type="checkbox" id="showStrikethrough" checked={d.showStrikethroughPrice ?? false} onChange={e => set("showStrikethroughPrice", e.target.checked)} className="rounded" />
               <label htmlFor="showStrikethrough" className="text-xs text-gray-600">Show strikethrough price</label>
@@ -1557,6 +1636,9 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
   const set = useCallback((key: string, value: any) => {
     onChangeRef.current({ ...dataRef.current, [key]: value });
   }, []);
+  const setMany = useCallback((patch: Record<string, any>) => {
+    onChangeRef.current({ ...dataRef.current, ...patch });
+  }, []);
   // Upload hooks — must be at top level (React rules of hooks)
   const bgImageRef = useRef<HTMLInputElement>(null);
   const bgVideoRef = useRef<HTMLInputElement>(null);
@@ -1959,7 +2041,7 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
               </SelectContent>
             </Select>
           </div>
-          <PricingCtaSettings d={d} set={set} />
+          <PricingCtaSettings d={d} set={set} setMany={setMany} />
           <div className="border border-teal-100 bg-teal-50/50 rounded-lg p-3 space-y-2">
             <div className="flex items-center gap-2">
               <input type="checkbox" id="pcta-lc" checked={d.leadCapture??false} onChange={e=>set("leadCapture",e.target.checked)} className="rounded" />

@@ -356,12 +356,15 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       );
     case "pricing_cta": {
       const priceAbove = (d.pricePosition ?? "above") === "above";
-      const priceBlock = d.showPrice && d.currentPrice ? (
+      const priceBlock = d.showPrice && d.currentPrice && d.priceSource !== "none" ? (
         <div className="mb-4">
           {d.showStrikethroughPrice && d.strikethroughPrice && (
             <p className="text-xl text-gray-400 line-through mb-1">{d.strikethroughPrice}</p>
           )}
-          <p className="text-4xl font-bold" style={{ color: d.ctaColor ?? "#179ca3" }}>{d.currentPrice}</p>
+          <p className="text-4xl font-bold" style={{ color: d.ctaColor ?? "#179ca3" }}>
+            {d.currentPrice}
+            {d.priceInterval && <span className="text-xl font-normal text-gray-500 ml-1">{d.priceInterval}</span>}
+          </p>
         </div>
       ) : null;
       const ctaBtn = (

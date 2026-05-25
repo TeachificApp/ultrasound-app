@@ -236,15 +236,35 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
         <div className="px-8 py-12 text-center" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           {d.headline && <h2 className="text-3xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6 max-w-xl mx-auto" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
-          {d.showPrice && <div className="mb-6">{d.showOriginalPrice && d.originalPrice && <p className="text-xl text-gray-400 line-through mb-1">${d.originalPrice}</p>}<p className="text-4xl font-bold" style={{ color: d.ctaColor ?? "#179ca3" }}>{price}</p></div>}
+          {/* Price above button */}
+          {d.showPrice && d.priceSource !== "none" && (d.pricePosition ?? "above") === "above" && (
+            <div className="mb-6">
+              {(d.showStrikethroughPrice && d.strikethroughPrice) && <p className="text-xl text-gray-400 line-through mb-1">{d.strikethroughPrice}</p>}
+              {(d.showOriginalPrice && d.originalPrice && !d.currentPrice) && <p className="text-xl text-gray-400 line-through mb-1">${d.originalPrice}</p>}
+              <p className="text-4xl font-bold" style={{ color: d.ctaColor ?? "#179ca3" }}>
+                {d.currentPrice || price}
+                {d.priceInterval && <span className="text-xl font-normal text-gray-500 ml-1">{d.priceInterval}</span>}
+              </p>
+            </div>
+          )}
           <button
             onClick={hasPurchased ? () => { window.location.href = `/downloads/${slug}/files`; } : onBuy}
             disabled={buying}
             className={`px-10 py-4 rounded-xl font-bold text-lg shadow-lg disabled:opacity-60 transition-opacity hover:opacity-90 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
             style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}
           >
-            {buying ? "Processing…" : hasPurchased ? "Access Your Files" : (d.ctaText ?? `Buy Now — ${price}`)}
+            {buying ? "Processing…" : hasPurchased ? "Access Your Files" : (d.ctaText ?? `Buy Now — ${d.currentPrice || price}`)}
           </button>
+          {/* Price below button */}
+          {d.showPrice && d.priceSource !== "none" && (d.pricePosition ?? "above") === "below" && (
+            <div className="mt-6">
+              {(d.showStrikethroughPrice && d.strikethroughPrice) && <p className="text-xl text-gray-400 line-through mb-1">{d.strikethroughPrice}</p>}
+              <p className="text-4xl font-bold" style={{ color: d.ctaColor ?? "#179ca3" }}>
+                {d.currentPrice || price}
+                {d.priceInterval && <span className="text-xl font-normal text-gray-500 ml-1">{d.priceInterval}</span>}
+              </p>
+            </div>
+          )}
           <ButtonSubtext d={d} />
         </div>
       );

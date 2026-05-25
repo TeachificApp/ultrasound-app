@@ -1021,6 +1021,18 @@ function PricingCtaBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: Rec
       <div className="max-w-2xl mx-auto text-center">
         <h2 className="text-3xl font-bold mb-4 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />
         {d.subtext && <p className="text-lg text-gray-600 mb-8" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
+        {/* Price display */}
+        {d.showPrice && d.currentPrice && d.priceSource !== "none" && (d.pricePosition ?? "above") === "above" && (
+          <div className="mb-6">
+            {d.showStrikethroughPrice && d.strikethroughPrice && (
+              <p className="text-xl text-gray-400 line-through mb-1">{d.strikethroughPrice}</p>
+            )}
+            <p className="text-5xl font-bold" style={{ color: d.ctaColor ?? "#179ca3" }}>
+              {d.currentPrice}
+              {d.priceInterval && <span className="text-2xl font-normal text-gray-500 ml-1">{d.priceInterval}</span>}
+            </p>
+          </div>
+        )}
         {(d.ctaBehavior ?? "url") === "direct_checkout" && (
           <div className="mb-6 max-w-xs mx-auto">
             <PromoCodeInput onApply={(code, _) => setPromoCode(code)} />
@@ -1031,6 +1043,18 @@ function PricingCtaBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: Rec
           style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#ffffff" }}>
           {checkoutLoading ? "Redirecting..." : (d.ctaText ?? "Get Started")}
         </a>
+        {/* Price below button */}
+        {d.showPrice && d.currentPrice && d.priceSource !== "none" && (d.pricePosition ?? "above") === "below" && (
+          <div className="mt-6">
+            {d.showStrikethroughPrice && d.strikethroughPrice && (
+              <p className="text-xl text-gray-400 line-through mb-1">{d.strikethroughPrice}</p>
+            )}
+            <p className="text-5xl font-bold" style={{ color: d.ctaColor ?? "#179ca3" }}>
+              {d.currentPrice}
+              {d.priceInterval && <span className="text-2xl font-normal text-gray-500 ml-1">{d.priceInterval}</span>}
+            </p>
+          </div>
+        )}
         <ButtonSubtext d={d} />
         <OptOutLink d={d} />
       </div>
