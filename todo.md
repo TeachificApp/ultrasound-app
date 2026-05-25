@@ -2793,3 +2793,33 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Register carousel in LandingPageBuilder (catalog entry + BlockSettings case)
 - [ ] Register carousel in LessonBlockEditor (label case)
 - [ ] Add carousel renderer to PublicFunnelPage, CourseLanding, DownloadLanding
+
+## Group Registration System (May 2026)
+- [ ] Schema: add allowGroupPurchase boolean to lms_courses
+- [ ] Schema: add memberName, status (pending/active/revoked) to lms_group_seats
+- [ ] Schema: add groupName override field to lms_groups
+- [ ] Migration: apply schema changes via webdev_execute_sql
+- [ ] Server: createGroupCheckout tRPC procedure (seats quantity, group name, course, Stripe)
+- [ ] Server: Stripe webhook — create lms_group record on paid group order, send invite emails
+- [ ] Server: buildGroupSeatInviteEmail email template
+- [ ] Server: getMemberProgress query (group manager — per-group enrollment + lesson progress)
+- [ ] Server: updateSeat mutation (edit name/email for pending seats)
+- [ ] Server: resendInvite mutation
+- [ ] Server: updateCourseSettings — add allowGroupPurchase field
+- [ ] GroupAdminDashboard page: my groups list with seat counts, used/total
+- [ ] GroupAdminDashboard: seat table per group (assign by email+name, revoke, edit, resend invite)
+- [ ] GroupAdminDashboard: member progress view (lesson completion, quiz scores, last activity)
+- [ ] LMSAdmin: Allow Group Purchase toggle in course settings
+- [ ] LMSAdmin: group purchase URL display + copy button
+- [ ] LandingPageBuilder: CTA block group enrollment link option
+- [ ] Group enrollment landing page (/group-enroll/:token) — accept seat, redirect to course
+- [ ] Post-checkout group success page — redirect to group admin dashboard
+- [ ] App.tsx: wire /group-admin, /group-enroll/:token, /courses/:slug/group-success routes
+
+## Block Content Width Control (May 2026)
+- [ ] Add contentWidth field to all block defaultData in BLOCK_CATALOG (default: "lg")
+- [ ] Add BlockWidthControl shared UI component to BlockSettings in LandingPageBuilder
+- [ ] Apply contentWidth wrapper in BlockPreview renderer
+- [ ] Apply contentWidth wrapper in PublicFunnelPage renderer
+- [ ] Apply contentWidth wrapper in CourseLanding renderer
+- [ ] Apply contentWidth wrapper in DownloadLanding renderer

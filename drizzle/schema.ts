@@ -2774,6 +2774,8 @@ export const lmsCourses = mysqlTable("lms_courses", {
   // Custom text labels — JSON object overriding default terminology per-course
   // e.g. { lesson: "Lecture", section: "Unit", markComplete: "Mark Complete", nextLesson: "Next Lesson", ... }
   customLabels: longtext("custom_labels"),
+  // Group purchase: allow bulk seat purchases for teams/organizations
+  allowGroupPurchase: boolean("allow_group_purchase").default(false).notNull(),
   createdByUserId: int("created_by_user_id").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
@@ -2902,6 +2904,8 @@ export const lmsGroups = mysqlTable("lms_groups", {
   seats: int("seats").default(1).notNull(),
   managerId: int("manager_id"), // FK to users — the group manager
   notes: text("notes"),
+  // Stripe order that created this group (set after webhook fulfillment)
+  orderId: int("order_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -2911,10 +2915,13 @@ export const lmsGroupSeats = mysqlTable("lms_group_seats", {
   id: int("id").autoincrement().primaryKey(),
   groupId: int("group_id").notNull(),
   email: varchar("email", { length: 320 }).notNull(),
+  memberName: varchar("member_name", { length: 255 }), // optional display name
+  status: mysqlEnum("status", ["pending", "active", "revoked"]).default("pending").notNull(),
   assignedAt: timestamp("assigned_at").defaultNow().notNull(),
   enrollmentId: int("enrollment_id"), // set when user accepts and enrolls
   inviteToken: varchar("invite_token", { length: 128 }),
   acceptedAt: timestamp("accepted_at"),
+  lastInviteSentAt: timestamp("last_invite_sent_at"),
 });
 export type LmsGroupSeat = typeof lmsGroupSeats.$inferSelect;
 

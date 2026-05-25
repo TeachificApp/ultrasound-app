@@ -186,13 +186,18 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
           <div className="max-w-3xl mx-auto prose" dangerouslySetInnerHTML={{ __html: d.html ?? "" }} />
         </div>
       );
-    case "image":
+    case "image": {
+      const imgAlignCL = d.align ?? "center";
+      const imgJustifyCL = imgAlignCL === "left" ? "flex-start" : imgAlignCL === "right" ? "flex-end" : "center";
+      const mwCL = d.maxWidth ?? "auto";
+      const imgStyleCL: React.CSSProperties = { maxWidth: mwCL === "auto" ? "100%" : mwCL, width: mwCL === "auto" ? undefined : "100%", height: d.height || "auto", objectFit: "cover", borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined };
       return (
-        <div className="px-8 py-6" style={{ textAlign: (d.align ?? "center") as "left"|"center"|"right" }}>
-          {d.url && <img src={d.url} alt={d.alt ?? ""} className="shadow" style={{ display: "inline-block", maxWidth: d.maxWidth ?? "100%", height: d.height || "auto", objectFit: "cover", borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined }} />}
-          {d.caption && <p className="text-sm text-gray-500 mt-2">{d.caption}</p>}
+        <div className="px-8 py-6" style={{ display: "flex", flexDirection: "column", alignItems: imgJustifyCL }}>
+          {d.url && <img src={d.url} alt={d.alt ?? ""} className="shadow" style={imgStyleCL} />}
+          {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: imgAlignCL as any }}>{d.caption}</p>}
         </div>
       );
+    }
     case "video": {
       const resolvedVidUrl = injectUserParams(d.embedUrl ?? "", user);
       return (

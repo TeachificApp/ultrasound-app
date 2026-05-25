@@ -101,13 +101,14 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
     case "image": {
       const imgAlign = d.align ?? "center";
       const imgJustify = imgAlign === "left" ? "flex-start" : imgAlign === "right" ? "flex-end" : "center";
-      const imgTextAlign = imgAlign as "left" | "right" | "center";
+      const mw = d.maxWidth ?? "auto";
+      const imgStyle: React.CSSProperties = { maxWidth: mw === "auto" ? "100%" : mw, width: mw === "auto" ? undefined : "100%", height: d.height || "auto", objectFit: "cover", borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined };
       return (
-        <div className="px-8 py-6" style={{ textAlign: imgTextAlign }}>
+        <div className="px-8 py-6" style={{ display: "flex", flexDirection: "column", alignItems: imgJustify }}>
           {d.url
-            ? <img src={d.url} alt={d.alt ?? ""} className="shadow" style={{ display: "inline-block", maxWidth: d.maxWidth ?? "100%", height: d.height || "auto", objectFit: "cover", borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined }} />
+            ? <img src={d.url} alt={d.alt ?? ""} className="shadow" style={imgStyle} />
             : <div className="w-full h-40 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400"><Image size={32} /></div>}
-          {d.caption && <p className="text-sm text-gray-500 mt-2">{d.caption}</p>}
+          {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: imgAlign as any }}>{d.caption}</p>}
         </div>
       );
     }

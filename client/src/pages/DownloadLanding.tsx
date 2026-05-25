@@ -133,13 +133,18 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
           <div className="max-w-3xl mx-auto prose" dangerouslySetInnerHTML={{ __html: d.html ?? "" }} />
         </div>
       );
-    case "image":
+    case "image": {
+      const imgAlignDL = d.align ?? "center";
+      const imgJustifyDL = imgAlignDL === "left" ? "flex-start" : imgAlignDL === "right" ? "flex-end" : "center";
+      const mwDL = d.maxWidth ?? "auto";
+      const imgStyleDL: React.CSSProperties = { maxWidth: mwDL === "auto" ? "100%" : mwDL, width: mwDL === "auto" ? undefined : "100%", height: d.height || "auto", objectFit: "cover", borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined };
       return (
-        <div className="px-8 py-6" style={{ textAlign: (d.align ?? "center") as "left"|"center"|"right" }}>
-          {d.url && <img src={d.url} alt={d.alt ?? ""} className="shadow" style={{ display: "inline-block", maxWidth: d.maxWidth ?? "100%", height: d.height || "auto", objectFit: "cover", borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined }} />}
-          {d.caption && <p className="text-sm text-gray-500 mt-2">{d.caption}</p>}
+        <div className="px-8 py-6" style={{ display: "flex", flexDirection: "column", alignItems: imgJustifyDL }}>
+          {d.url && <img src={d.url} alt={d.alt ?? ""} className="shadow" style={imgStyleDL} />}
+          {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: imgAlignDL as any }}>{d.caption}</p>}
         </div>
       );
+    }
     case "video": {
       let embedUrl = d.url ?? "";
       if (embedUrl.includes("youtube.com/watch")) {

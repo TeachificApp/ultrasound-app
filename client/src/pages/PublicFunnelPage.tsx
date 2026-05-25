@@ -182,13 +182,18 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
           <div className="max-w-4xl mx-auto prose prose-lg" dangerouslySetInnerHTML={{ __html: d.html ?? "" }} />
         </div>
       );
-    case "image":
+    case "image": {
+      const imgAlignF = d.align ?? "center";
+      const imgJustifyF = imgAlignF === "left" ? "flex-start" : imgAlignF === "right" ? "flex-end" : "center";
+      const mwF = d.maxWidth ?? "auto";
+      const imgStyleF: React.CSSProperties = { maxWidth: mwF === "auto" ? "100%" : mwF, width: mwF === "auto" ? undefined : "100%", height: d.height || "auto", objectFit: "cover", borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined };
       return (
-        <div className="px-8 py-8" style={{ textAlign: (d.align ?? "center") as "left"|"center"|"right" }}>
-          {d.url && <img src={d.url} alt={d.alt ?? ""} className="shadow-md" style={{ display: "inline-block", maxWidth: d.maxWidth ?? "100%", height: d.height || "auto", objectFit: "cover", borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined }} />}
-          {d.caption && <p className="text-sm text-gray-500 mt-2">{d.caption}</p>}
+        <div className="px-8 py-8" style={{ display: "flex", flexDirection: "column", alignItems: imgJustifyF }}>
+          {d.url && <img src={d.url} alt={d.alt ?? ""} className="shadow-md" style={imgStyleF} />}
+          {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: imgAlignF as any }}>{d.caption}</p>}
         </div>
       );
+    }
     case "video": {
       const rawVidUrl = d.embedUrl ?? "";
       const resolvedVidUrl = injectUserParams(rawVidUrl, user);
