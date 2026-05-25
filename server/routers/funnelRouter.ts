@@ -7,7 +7,7 @@ import { z } from "zod";
 import { router, protectedProcedure, publicProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb, getOrCreateUserByEmail } from "../db";
-import { funnels, funnelPages, funnelLeads, funnelTemplates, lmsCourses, lmsLandingPages, digitalProducts, digitalBundles, funnelBranchRules, funnelBranchConditions, emailCampaigns, funnelPurchases, lmsEnrollments, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships } from "../../drizzle/schema";
+import { funnels, funnelPages, funnelLeads, funnelTemplates, lmsCourses, lmsLandingPages, digitalProducts, digitalBundles, funnelBranchRules, funnelBranchConditions, emailCampaigns, funnelPurchases, lmsEnrollments, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProducts } from "../../drizzle/schema";
 import { eq, and, asc, desc, sql, inArray } from "drizzle-orm";
 import { evaluateBranchRules, type VisitorContext } from "../lib/funnelBranchEngine";
 
@@ -26,17 +26,67 @@ export const funnelRouter = router({
   listAllProducts: protectedProcedure.query(async ({ ctx }) => {
     if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
     const db = await getDb();
-    const [courses, downloads, bundles] = await Promise.all([
+    const [courses, downloads, bundles, physical] = await Promise.all([
       db.select({ id: lmsCourses.id, title: lmsCourses.title, price: lmsCourses.price, thumbnailUrl: lmsCourses.thumbnailUrl }).from(lmsCourses).orderBy(asc(lmsCourses.title)),
       db.select({ id: digitalProducts.id, title: digitalProducts.title, price: digitalProducts.price, thumbnailUrl: digitalProducts.thumbnailUrl }).from(digitalProducts).orderBy(asc(digitalProducts.title)),
       db.select({ id: digitalBundles.id, title: digitalBundles.title, price: digitalBundles.discountPrice, thumbnailUrl: digitalBundles.thumbnailUrl }).from(digitalBundles).orderBy(asc(digitalBundles.title)),
+      db.select({ id: physicalProducts.id, title: physicalProducts.title, price: physicalProducts.price, thumbnailUrl: physicalProducts.thumbnailUrl }).from(physicalProducts).orderBy(asc(physicalProducts.title)),
     ]);
     return [
       ...courses.map(c => ({ id: c.id, type: "course" as const, name: c.title, price: c.price ?? 0, imageUrl: c.thumbnailUrl ?? "" })),
       ...downloads.map(d => ({ id: d.id, type: "download" as const, name: d.title, price: d.price ?? 0, imageUrl: d.thumbnailUrl ?? "" })),
       ...bundles.map(b => ({ id: b.id, type: "bundle" as const, name: b.title, price: b.price ?? 0, imageUrl: b.thumbnailUrl ?? "" })),
+      ...physical.map(p => ({ id: p.id, type: "physical" as const, name: p.title, price: p.price ?? 0, imageUrl: p.thumbnailUrl ?? "" })),
     ];
   }),
+
+  /**
+   * Fetch full product details for a list of {type, id} pairs.
+   * Used by RelatedProductsBlock in manual selection mode.
+   */
+  getProductsByIds: publicProcedure
+    .input(z.object({
+      items: z.array(z.object({ type: z.string(), id: z.number() })),
+    }))
+    .query(async ({ input }) => {
+      if (input.items.length === 0) return [];
+      const db = await getDb();
+
+      const courseIds = input.items.filter(i => i.type === "course").map(i => i.id);
+      const downloadIds = input.items.filter(i => i.type === "download").map(i => i.id);
+      const bundleIds = input.items.filter(i => i.type === "bundle").map(i => i.id);
+      const physicalIds = input.items.filter(i => i.type === "physical").map(i => i.id);
+
+      const [courses, downloads, bundles, physicals] = await Promise.all([
+        courseIds.length > 0
+          ? db.select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug, price: lmsCourses.price, isFree: lmsCourses.isFree, description: lmsCourses.subtitle, imageUrl: lmsCourses.thumbnailUrl }).from(lmsCourses).where(inArray(lmsCourses.id, courseIds))
+          : [],
+        downloadIds.length > 0
+          ? db.select({ id: digitalProducts.id, title: digitalProducts.title, slug: digitalProducts.slug, price: digitalProducts.price, isFree: digitalProducts.isFree, description: digitalProducts.subtitle, imageUrl: digitalProducts.thumbnailUrl }).from(digitalProducts).where(inArray(digitalProducts.id, downloadIds))
+          : [],
+        bundleIds.length > 0
+          ? db.select({ id: digitalBundles.id, title: digitalBundles.title, slug: digitalBundles.slug, price: digitalBundles.discountPrice, description: digitalBundles.description, imageUrl: digitalBundles.thumbnailUrl }).from(digitalBundles).where(inArray(digitalBundles.id, bundleIds))
+          : [],
+        physicalIds.length > 0
+          ? db.select({ id: physicalProducts.id, title: physicalProducts.title, slug: physicalProducts.slug, price: physicalProducts.price, description: physicalProducts.description, imageUrl: physicalProducts.thumbnailUrl }).from(physicalProducts).where(inArray(physicalProducts.id, physicalIds))
+          : [],
+      ]);
+
+      // Preserve the order specified by input.items
+      const map = new Map<string, object>();
+      for (const c of courses as any[]) map.set(`course-${c.id}`, { ...c, type: "course", isFree: c.isFree ?? false, href: `/courses/${c.slug}` });
+      for (const d of downloads as any[]) map.set(`download-${d.id}`, { ...d, type: "download", isFree: d.isFree ?? false, href: `/downloads/${d.slug}` });
+      for (const b of bundles as any[]) map.set(`bundle-${b.id}`, { ...b, type: "bundle", isFree: false, price: b.price ?? 0, href: `/bundles/${b.slug}` });
+      for (const p of physicals as any[]) map.set(`physical-${p.id}`, { ...p, type: "physical", isFree: false, href: `/shop/${p.slug}` });
+
+      return input.items
+        .map(i => map.get(`${i.type}-${i.id}`))
+        .filter(Boolean) as Array<{
+          id: number; type: string; slug: string; title: string;
+          description: string | null; price: number; isFree: boolean;
+          imageUrl: string | null; href: string;
+        }>;
+    }),
 
   /** List all funnels */
   list: protectedProcedure.query(async ({ ctx }) => {

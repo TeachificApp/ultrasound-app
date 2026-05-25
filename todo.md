@@ -2917,3 +2917,9 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Hero "Make entire hero section clickable" toggle added with CTAActionPicker
 - [x] Hero bottom border toggle added (color + thickness)
 - [x] Reviews block card background color field added
+
+## Course Card & Related Products (May 25 2026)
+- [x] Course card layout fix — uniform height, price+button same row, line-clamp-2 title, line-clamp-2 description, flex-1 spacer pins footer
+- [x] Related Products manual selection mode — selectionMode toggle + product picker in BlockSettings
+- [x] funnel.getProductsByIds backend procedure — fetches courses/downloads/bundles/physical by id list for manual mode
+- [x] RelatedProductsBlock updated — handles selectionMode=manual, renders manualItems via getProductsByIds

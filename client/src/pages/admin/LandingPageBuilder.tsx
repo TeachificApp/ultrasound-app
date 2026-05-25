@@ -3026,22 +3026,84 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
           <p className="text-xs text-gray-500 bg-gray-50 p-2 rounded">Secondary pricing option labels are managed in Course Settings → Pricing Options. Each option's label, sublabel, and CTA text can be set there.</p>
         </div>
       );
-    case "related_products":
+    case "related_products": {
+      const selMode = d.selectionMode ?? "auto";
+      const manualItems: Array<{ type: string; id: number }> = d.manualItems ?? [];
+      const [rpSearch, setRpSearch] = React.useState("");
+      const filteredCatalog = (productCatalog ?? []).filter(p =>
+        !rpSearch || p.name.toLowerCase().includes(rpSearch.toLowerCase())
+      );
+      const typeLabels: Record<string, string> = { course: "Course", download: "Download", bundle: "Bundle", physical: "Physical" };
       return (
         <div className="space-y-3">
           <BSTextField data={d} onSet={set} label="Headline" field="headline" />
           <BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline />
+          {/* Selection Mode */}
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Product Type</label>
-            <Select value={d.productType ?? "both"} onValueChange={v => set("productType", v)}>
-              <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="both">Courses &amp; Downloads</SelectItem>
-                <SelectItem value="course">Courses Only</SelectItem>
-                <SelectItem value="download">Downloads Only</SelectItem>
-              </SelectContent>
-            </Select>
+            <label className="text-xs text-gray-500 block mb-1">Selection Mode</label>
+            <div className="flex gap-1">
+              {(["auto", "manual"] as const).map(m => (
+                <button key={m} onClick={() => set("selectionMode", m)} className={`flex-1 py-1 text-xs rounded border capitalize ${selMode === m ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>{m === "auto" ? "Automated" : "Manual Pick"}</button>
+              ))}
+            </div>
           </div>
+          {selMode === "auto" && (
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Product Type</label>
+              <Select value={d.productType ?? "both"} onValueChange={v => set("productType", v)}>
+                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="both">Courses &amp; Downloads</SelectItem>
+                  <SelectItem value="course">Courses Only</SelectItem>
+                  <SelectItem value="download">Downloads Only</SelectItem>
+                  <SelectItem value="bundle">Bundles Only</SelectItem>
+                  <SelectItem value="physical">Physical Products Only</SelectItem>
+                  <SelectItem value="all">All Products</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {selMode === "manual" && (
+            <div className="space-y-2">
+              <label className="text-xs text-gray-500 block">Select Items to Display</label>
+              <Input
+                placeholder="Search products..."
+                value={rpSearch}
+                onChange={e => setRpSearch(e.target.value)}
+                className="h-7 text-xs"
+              />
+              <div className="max-h-48 overflow-y-auto border border-gray-200 rounded divide-y divide-gray-100">
+                {filteredCatalog.length === 0 && (
+                  <div className="text-xs text-gray-400 p-2 text-center">No products found</div>
+                )}
+                {filteredCatalog.map(p => {
+                  const key = `${p.type}-${p.id}`;
+                  const isSelected = manualItems.some(m => m.type === p.type && m.id === p.id);
+                  return (
+                    <div key={key} className={`flex items-center gap-2 px-2 py-1.5 cursor-pointer hover:bg-gray-50 ${isSelected ? "bg-teal-50" : ""}`}
+                      onClick={() => {
+                        const next = isSelected
+                          ? manualItems.filter(m => !(m.type === p.type && m.id === p.id))
+                          : [...manualItems, { type: p.type, id: p.id }];
+                        set("manualItems", next);
+                      }}>
+                      <div className={`w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center ${isSelected ? "bg-teal-600 border-teal-600" : "border-gray-300"}`}>
+                        {isSelected && <svg viewBox="0 0 10 8" className="w-2.5 h-2.5 fill-white"><path d="M1 4l3 3 5-6" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" /></svg>}
+                      </div>
+                      {p.imageUrl && <img src={p.imageUrl} alt="" className="w-6 h-6 rounded object-cover flex-shrink-0" />}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-medium truncate">{p.name}</div>
+                        <div className="text-[10px] text-gray-400">{typeLabels[p.type] ?? p.type} · ${(p.price / 100).toFixed(2)}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {manualItems.length > 0 && (
+                <div className="text-[10px] text-teal-600">{manualItems.length} item{manualItems.length !== 1 ? "s" : ""} selected</div>
+              )}
+            </div>
+          )}
           <div>
             <label className="text-xs text-gray-500 block mb-1">Layout</label>
             <div className="flex gap-1">
@@ -3051,8 +3113,8 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
             </div>
           </div>
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Max Items (1–6)</label>
-            <Input type="number" value={d.maxItems ?? 3} onChange={e => set("maxItems", Math.min(6, Math.max(1, Number(e.target.value))))} className="h-8 text-sm" min={1} max={6} />
+            <label className="text-xs text-gray-500 block mb-1">Max Items (1–12)</label>
+            <Input type="number" value={d.maxItems ?? 3} onChange={e => set("maxItems", Math.min(12, Math.max(1, Number(e.target.value))))} className="h-8 text-sm" min={1} max={12} />
           </div>
           <BSTextField data={d} onSet={set} label="CTA Button Text" field="ctaText" placeholder="Learn More" />
           <div className="flex flex-col gap-2">
@@ -3066,6 +3128,7 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
           <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
         </div>
       );
+    }
     case "divider":
       return (<div className="space-y-3"><div><label className="text-xs text-gray-500 block mb-1">Style</label><div className="flex gap-1">{(["solid", "dashed", "dotted"] as const).map(s => <button key={s} onClick={() => set("style", s)} className={`flex-1 py-1 text-xs rounded border capitalize ${(d.style ?? "solid") === s ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>{s}</button>)}</div></div><BSColorField data={d} onSet={set} label="Color" field="color" /><div><label className="text-xs text-gray-500 block mb-1">Thickness (px)</label><Input type="number" value={d.thickness ?? 1} onChange={e => set("thickness", Number(e.target.value))} className="h-8 text-sm" min={1} max={10} /></div><div><label className="text-xs text-gray-500 block mb-1">Rounding (px)</label><Input type="number" value={d.borderRadius ?? 0} onChange={e => set("borderRadius", Number(e.target.value))} className="h-8 text-sm" min={0} max={20} /></div><div><label className="text-xs text-gray-500 block mb-1">Vertical Spacing (px)</label><Input type="number" value={d.spacing ?? 32} onChange={e => set("spacing", Number(e.target.value))} className="h-8 text-sm" min={0} max={200} /></div></div>);
     case "two_column": {
