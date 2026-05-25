@@ -4744,6 +4744,7 @@ export default function LMSAdmin() {
             <TabsTrigger value="orderbumps" className="text-xs">Order Bumps</TabsTrigger>
             <TabsTrigger value="certificates" className="text-xs">Certificates</TabsTrigger>
             <TabsTrigger value="thinkific" className="text-xs">Import from Thinkific</TabsTrigger>
+            <TabsTrigger value="trash" className="text-xs text-red-500">🗑 Trash</TabsTrigger>
           </TabsList>
           <TabsContent value="courses" className="mt-4"><CoursesTab onEdit={setEditingCourseId} typeFilter="course" /></TabsContent>
           <TabsContent value="quizzes" className="mt-4"><CoursesTab onEdit={setEditingCourseId} typeFilter="quiz" /></TabsContent>
@@ -4758,7 +4759,135 @@ export default function LMSAdmin() {
           <TabsContent value="orderbumps" className="mt-4"><OrderBumpsAdmin /></TabsContent>
           <TabsContent value="certificates" className="mt-4"><CertificateTemplatesAdmin /></TabsContent>
           <TabsContent value="thinkific" className="mt-4"><ThinkificImporter /></TabsContent>
+          <TabsContent value="trash" className="mt-4"><TrashTab /></TabsContent>
         </Tabs>
+      )}
+    </div>
+  );
+}
+
+// ─── Trash Tab ───────────────────────────────────────────────────────────────
+const ITEM_TYPE_LABELS: Record<string, string> = {
+  course: "Course",
+  quiz: "Quiz",
+  download: "Download",
+  product: "Product",
+  bundle: "Bundle",
+};
+const ITEM_TYPE_COLORS: Record<string, string> = {
+  course: "bg-teal-100 text-teal-700",
+  quiz: "bg-purple-100 text-purple-700",
+  download: "bg-blue-100 text-blue-700",
+  product: "bg-orange-100 text-orange-700",
+  bundle: "bg-pink-100 text-pink-700",
+};
+
+function TrashTab() {
+  const [typeFilter, setTypeFilter] = useState<"all" | "course" | "quiz" | "download" | "product" | "bundle">("all");
+  const [confirmPurgeAll, setConfirmPurgeAll] = useState(false);
+
+  const { data, isLoading, refetch } = trpc.lmsAdmin.listArchive.useQuery(
+    typeFilter === "all" ? {} : { itemType: typeFilter },
+    { refetchOnWindowFocus: false }
+  );
+
+  const purgeItem = trpc.lmsAdmin.purgeArchiveItem.useMutation({
+    onSuccess: () => { toast.success("Item permanently deleted"); refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const purgeExpired = trpc.lmsAdmin.purgeExpiredArchive.useMutation({
+    onSuccess: (r) => { toast.success(`Purged ${r.purged} expired item(s)`); refetch(); setConfirmPurgeAll(false); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const items = data?.items ?? [];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-1.5">
+          <Trash2 className="w-4 h-4 text-red-500" />
+          <h2 className="text-sm font-semibold text-gray-800">Trash</h2>
+          <span className="text-xs text-gray-400">(items are permanently purged 30 days after deletion)</span>
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as typeof typeFilter)}>
+            <SelectTrigger className="h-8 text-xs w-36">
+              <SelectValue placeholder="All Types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="course">Courses</SelectItem>
+              <SelectItem value="quiz">Quizzes</SelectItem>
+              <SelectItem value="download">Downloads</SelectItem>
+              <SelectItem value="product">Products</SelectItem>
+              <SelectItem value="bundle">Bundles</SelectItem>
+            </SelectContent>
+          </Select>
+          {confirmPurgeAll ? (
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-red-600">Purge all expired now?</span>
+              <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={() => purgeExpired.mutate()} disabled={purgeExpired.isPending}>Yes, purge</Button>
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setConfirmPurgeAll(false)}>Cancel</Button>
+            </div>
+          ) : (
+            <Button size="sm" variant="outline" className="h-7 text-xs text-red-500 border-red-200" onClick={() => setConfirmPurgeAll(true)}>
+              <Trash2 className="w-3 h-3 mr-1" /> Purge Expired
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+      ) : items.length === 0 ? (
+        <div className="text-center py-16 text-gray-400 text-sm">Trash is empty</div>
+      ) : (
+        <div className="border rounded-lg overflow-hidden">
+          <table className="w-full text-xs">
+            <thead className="bg-gray-50 border-b">
+              <tr>
+                <th className="text-left px-3 py-2 font-medium text-gray-600">Title</th>
+                <th className="text-left px-3 py-2 font-medium text-gray-600">Type</th>
+                <th className="text-left px-3 py-2 font-medium text-gray-600">Deleted</th>
+                <th className="text-left px-3 py-2 font-medium text-gray-600">Purge After</th>
+                <th className="px-3 py-2"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {items.map((item) => (
+                <tr key={item.id} className="hover:bg-gray-50">
+                  <td className="px-3 py-2 font-medium text-gray-800 max-w-xs truncate">{item.title}</td>
+                  <td className="px-3 py-2">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${ITEM_TYPE_COLORS[item.itemType] ?? "bg-gray-100 text-gray-600"}`}>
+                      {ITEM_TYPE_LABELS[item.itemType] ?? item.itemType}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-gray-500">{new Date(item.deletedAt).toLocaleDateString()}</td>
+                  <td className="px-3 py-2 text-gray-500">
+                    {new Date(item.purgeAt) < new Date() ? (
+                      <span className="text-red-500 font-medium">Overdue</span>
+                    ) : (
+                      new Date(item.purgeAt).toLocaleDateString()
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 text-xs text-red-500 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => purgeItem.mutate({ id: item.id })}
+                      disabled={purgeItem.isPending}
+                    >
+                      <Trash2 className="w-3 h-3 mr-1" /> Delete Now
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

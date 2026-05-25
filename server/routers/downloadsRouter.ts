@@ -13,6 +13,7 @@ import {
   digitalBundleItems,
   digitalBundlePurchases,
   users,
+  lmsArchive,
 } from "../../drizzle/schema";
 import { sendEmail } from "../_core/email";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
@@ -543,13 +544,24 @@ export const downloadsAdminRouter = router({
       return { success: true };
     }),
 
-  /** Delete a digital product and its files */
+  /** Archive a digital product to trash (soft delete, purged after 30 days) */
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [product] = await db.select().from(digitalProducts).where(eq(digitalProducts.id, input.id)).limit(1);
+      if (!product) throw new TRPCError({ code: "NOT_FOUND" });
+      const purgeAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      await db.insert(lmsArchive).values({
+        itemType: "download",
+        originalId: product.id,
+        title: product.title,
+        snapshot: JSON.stringify(product),
+        deletedByUserId: ctx.user.id,
+        purgeAt,
+      });
       await db.delete(digitalProductFiles).where(eq(digitalProductFiles.productId, input.id));
       await db.delete(digitalProducts).where(eq(digitalProducts.id, input.id));
       return { success: true };
@@ -737,13 +749,24 @@ export const downloadsAdminRouter = router({
       return { success: true };
     }),
 
-  /** Delete a bundle */
+  /** Archive a bundle to trash (soft delete, purged after 30 days) */
   deleteBundle: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [bundle] = await db.select().from(digitalBundles).where(eq(digitalBundles.id, input.id)).limit(1);
+      if (!bundle) throw new TRPCError({ code: "NOT_FOUND" });
+      const purgeAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      await db.insert(lmsArchive).values({
+        itemType: "bundle",
+        originalId: bundle.id,
+        title: bundle.title,
+        snapshot: JSON.stringify(bundle),
+        deletedByUserId: ctx.user.id,
+        purgeAt,
+      });
       await db.delete(digitalBundleItems).where(eq(digitalBundleItems.bundleId, input.id));
       await db.delete(digitalBundles).where(eq(digitalBundles.id, input.id));
       return { success: true };

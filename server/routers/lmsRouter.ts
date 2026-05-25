@@ -3819,9 +3819,57 @@ CRITICAL REQUIREMENTS:
       });
       return { enrollmentId: (result as any).insertId, enrollmentType: "free_preview", created: true };
     }),
+
+  // ─── Archive / Trash ──────────────────────────────────────────────────────
+
+  /** List all archived items (admin only). Optionally filter by itemType. */
+  listArchive: protectedProcedure
+    .input(z.object({
+      itemType: z.enum(["course", "quiz", "download", "product", "bundle"]).optional(),
+      page: z.number().min(1).default(1),
+      limit: z.number().min(1).max(100).default(50),
+    }).optional())
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const page = input?.page ?? 1;
+      const limit = input?.limit ?? 50;
+      const offset = (page - 1) * limit;
+      const conditions = input?.itemType ? [eq(lmsArchive.itemType, input.itemType)] : [];
+      const items = await db.select().from(lmsArchive)
+        .where(conditions.length ? and(...conditions) : undefined)
+        .orderBy(desc(lmsArchive.deletedAt))
+        .limit(limit)
+        .offset(offset);
+      return { items };
+    }),
+
+  /** Permanently delete an archive record immediately (admin only). */
+  purgeArchiveItem: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(lmsArchive).where(eq(lmsArchive.id, input.id));
+      return { success: true };
+    }),
+
+  /** Purge all archive items whose purgeAt has passed (admin only). */
+  purgeExpiredArchive: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const now = new Date();
+      const { rowsAffected } = await db.delete(lmsArchive)
+        .where(sql`${lmsArchive.purgeAt} <= ${now}`);
+      return { purged: rowsAffected ?? 0 };
+    }),
 });
 
-// ─── Group Manager Router ─────────────────────────────────────────────────────
+// ─── Group Manager Router ─────────────────────────────────────────────────
 
 export const lmsGroupRouter = router({
   /** Get groups managed by the current user */

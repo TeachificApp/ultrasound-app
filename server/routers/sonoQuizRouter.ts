@@ -25,6 +25,7 @@ import {
   sonoQuizParticipants,
   sonoQuizAnswers,
   users,
+  lmsArchive,
 } from "../../drizzle/schema";
 import {
   broadcastLobbyUpdate,
@@ -173,6 +174,18 @@ export const sonoQuizRouter = router({
     .mutation(async ({ ctx, input }) => {
       await requireAdmin(ctx.user.id);
       const db = (await getDb())!;
+      const [quiz] = await db.select().from(sonoQuizzes).where(eq(sonoQuizzes.id, input.quizId)).limit(1);
+      if (quiz) {
+        const purgeAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        await db.insert(lmsArchive).values({
+          itemType: "quiz",
+          originalId: quiz.id,
+          title: quiz.title,
+          snapshot: JSON.stringify(quiz),
+          deletedByUserId: ctx.user.id,
+          purgeAt,
+        });
+      }
       await db.delete(sonoQuizQuestions).where(eq(sonoQuizQuestions.quizId, input.quizId));
       await db.delete(sonoQuizzes).where(
         and(eq(sonoQuizzes.id, input.quizId), eq(sonoQuizzes.createdByUserId, ctx.user.id))

@@ -616,6 +616,24 @@ export const thinkificImportRouter = router({
             // Supplementary blocks (video, embed, download, quiz) are added when present.
             const blocks: object[] = [];
 
+            // 0. HERO block — lesson name only, no subheadline, no CTA buttons
+            blocks.push({
+              id: `hero-${uid()}`,
+              type: "hero",
+              data: {
+                headline: content.name || "Lesson",
+                headline2: "",
+                subheadline: "",
+                bgType: "color",
+                bgColor: "#149096",
+                bgImage: "",
+                textColor: "#ffffff",
+                align: "center",
+                buttons: [],
+                showButtons: false,
+              },
+            });
+
             // 1. VIDEO block — placed first so it appears above the text description
             if (embedUrl) {
               // Determine provider label for the video block
@@ -1104,6 +1122,24 @@ export const thinkificImportRouter = router({
 
               // Build content blocks (same logic as import)
               const blocks: object[] = [];
+
+              // 0. HERO block — lesson name only, no subheadline, no CTA buttons
+              blocks.push({
+                id: `hero-${uid()}`,
+                type: "hero",
+                data: {
+                  headline: content.name || "Lesson",
+                  headline2: "",
+                  subheadline: "",
+                  bgType: "color",
+                  bgColor: "#149096",
+                  bgImage: "",
+                  textColor: "#ffffff",
+                  align: "center",
+                  buttons: [],
+                  showButtons: false,
+                },
+              });
 
               if (embedUrl) {
                 let videoProvider = "url";

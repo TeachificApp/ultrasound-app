@@ -2923,3 +2923,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Related Products manual selection mode — selectionMode toggle + product picker in BlockSettings
 - [x] funnel.getProductsByIds backend procedure — fetches courses/downloads/bundles/physical by id list for manual mode
 - [x] RelatedProductsBlock updated — handles selectionMode=manual, renders manualItems via getProductsByIds
+
+## Archive/Trash System (May 2026)
+- [x] Archive-to-trash for downloads, bundles, quizzes (soft delete with 30-day purge)
+- [x] lmsAdmin.listArchive / purgeArchiveItem / purgeExpiredArchive procedures
+- [x] LMS Trash tab in LMSAdmin with type filter and purge controls
+- [x] Thinkific import: every lesson gets a hero block with lesson name only (no subtext, no CTA)
+- [x] Course Curriculum (auto) block headline alignment control (Left/Center/Right)
