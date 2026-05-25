@@ -562,9 +562,10 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
     case "digital":
     case "physical":
       // These blocks are course/LMS-specific; render a generic CTA for download pages
+      const _hAlign = d.headlineAlign ?? "left";
       return (
         <div className="px-8 py-12 text-center" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          {d.headline && <h2 className={`text-2xl font-bold text-gray-900 mb-3 ${_hAlign === "center" ? "text-center" : _hAlign === "right" ? "text-right" : "text-left"}`} dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           <button onClick={onBuy} disabled={buying}
             className="px-10 py-4 rounded-xl font-bold text-lg shadow-lg disabled:opacity-60 transition-opacity hover:opacity-90"

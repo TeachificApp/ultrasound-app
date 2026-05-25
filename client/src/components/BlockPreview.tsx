@@ -621,9 +621,10 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
     }
     case "curriculum_auto": {
       const cr = d.cornerRadius ?? 12;
+      const hAlign = d.headlineAlign ?? "left";
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          {d.headline && <h2 className="text-2xl font-bold mb-6" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          {d.headline && <h2 className={`text-2xl font-bold mb-6 ${hAlign === "center" ? "text-center" : hAlign === "right" ? "text-right" : "text-left"}`} style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="overflow-hidden max-w-3xl" style={{ border: `1px solid ${d.sectionBorderColor ?? "#e5e7eb"}`, borderRadius: `${cr}px` }}>
             {["Section 1", "Section 2", "Section 3"].map((s, i) => (
               <div key={i} style={{ borderBottom: `1px solid ${d.sectionBorderColor ?? "#e5e7eb"}` }} className="last:border-0">

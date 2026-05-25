@@ -602,6 +602,7 @@ function FunnelCurriculumBlock({ block }: { block: Block }) {
   );
   const cr = d.cornerRadius ?? 12;
   const iconStyle = d.iconStyle ?? "lock";
+  const hAlign = d.headlineAlign ?? "left";
 
   if (!courseId) {
     return (
@@ -622,7 +623,7 @@ function FunnelCurriculumBlock({ block }: { block: Block }) {
   return (
     <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
       {d.headline && (
-        <h2 className="text-2xl font-bold mb-6" style={{ color: d.headlineColor ?? "#111827" }}
+        <h2 className={`text-2xl font-bold mb-6 ${hAlign === "center" ? "text-center" : hAlign === "right" ? "text-right" : "text-left"}`} style={{ color: d.headlineColor ?? "#111827" }}
           dangerouslySetInnerHTML={{ __html: d.headline }} />
       )}
       <div className="overflow-hidden max-w-3xl" style={{ border: `1px solid ${d.sectionBorderColor ?? "#e5e7eb"}`, borderRadius: `${cr}px` }}>

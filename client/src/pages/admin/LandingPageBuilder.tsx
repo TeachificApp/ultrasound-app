@@ -281,7 +281,7 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
     } },
   // ── Smart Sections
   { type: "curriculum_auto", label: "Curriculum (Auto)", icon: <BookOpen size={14} />, category: "Smart",
-    defaultData: { headline: "Course Curriculum", headlineColor: "#111827", bgColor: "#ffffff", showLocked: true,
+    defaultData: { headline: "Course Curriculum", headlineColor: "#111827", headlineAlign: "left", bgColor: "#ffffff", showLocked: true,
       sectionBgColor: "#f9fafb", sectionTextColor: "#1f2937", sectionBorderColor: "#e5e7eb",
       lessonTextColor: "#374151", lessonLockedIconColor: "#d1d5db", lessonPreviewIconColor: "#14b8a6",
       lessonCountColor: "#9ca3af", iconStyle: "lock", cornerRadius: 12 } },
@@ -3004,6 +3004,17 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
             <label className="text-xs text-gray-500 block mb-1">Corner Radius (px)</label>
             <input type="range" min={0} max={24} step={2} value={d.cornerRadius ?? 12} onChange={e => set("cornerRadius", Number(e.target.value))} className="w-full" />
             <span className="text-xs text-gray-400">{d.cornerRadius ?? 12}px</span>
+          </div>
+          <div className="border-t pt-3">
+            <label className="text-xs text-gray-500 block mb-1">Headline Alignment</label>
+            <div className="flex gap-1">
+              {(["left", "center", "right"] as const).map(a => (
+                <button key={a} onClick={() => set("headlineAlign", a)}
+                  className={`flex-1 py-1 rounded text-xs font-medium border capitalize ${(d.headlineAlign ?? "left") === a ? "bg-teal-600 text-white border-teal-600" : "bg-white text-gray-600 border-gray-200"}`}>
+                  {a === "left" ? "⬅ Left" : a === "center" ? "⬛ Center" : "➡ Right"}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="flex items-center gap-2 border-t pt-3">
             <input type="checkbox" checked={d.showLocked ?? true} onChange={e => set("showLocked", e.target.checked)} className="rounded" />
