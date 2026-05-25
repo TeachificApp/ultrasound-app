@@ -370,7 +370,7 @@ export default function LessonBlockEditor({
                 size="sm"
                 variant="outline"
                 onClick={() => {
-                  const url = `${window.location.origin}/learn/${courseSlug}/player?lesson=${lessonId}&preview=admin`;
+                  const url = `https://learn.allaboutultrasound.com/courses/${courseSlug}/player?lesson=${lessonId}&preview=admin`;
                   window.open(url, "_blank", "noopener,noreferrer");
                 }}
                 className="text-xs h-7 border-teal-300 text-teal-700 hover:bg-teal-50"
