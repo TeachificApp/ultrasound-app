@@ -722,6 +722,8 @@ function CTAActionPicker({
   checkoutProductTypeValue?: string;
   checkoutProductIdValue?: number | null;
   onCheckoutProductChange?: (type: string, id: number | null) => void;
+  groupDiscountTiersValue?: Array<{ minSeats: number; discountPercent: number }>;
+  onGroupDiscountTiersChange?: (tiers: Array<{ minSeats: number; discountPercent: number }>) => void;
 }) {
   const behavior = (behaviorValue ?? "url") as CTAAction;
   const isCheckoutBehavior = behavior === "direct_checkout" || behavior === "free_preview" || behavior === "group_purchase";
@@ -778,6 +780,43 @@ function CTAActionPicker({
               ))}
             </select>
           </div>
+          {behavior === "group_purchase" && (
+            <div className="border-t border-purple-200 pt-2 mt-1 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-semibold text-purple-700">Volume Discount Tiers</p>
+                <button
+                  type="button"
+                  onClick={() => onGroupDiscountTiersChange?.([...(groupDiscountTiersValue ?? []), { minSeats: 5, discountPercent: 10 }])}
+                  className="text-[10px] text-purple-600 hover:text-purple-800 flex items-center gap-0.5"
+                ><Plus size={10} /> Add Tier</button>
+              </div>
+              {(groupDiscountTiersValue ?? []).length === 0 && (
+                <p className="text-[10px] text-purple-400 italic">No discount tiers. Buyer pays full price regardless of seat count.</p>
+              )}
+              {(groupDiscountTiersValue ?? []).map((tier, i) => (
+                <div key={i} className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-purple-600 whitespace-nowrap">If seats ≥</span>
+                  <input
+                    type="number" min={1} max={999} value={tier.minSeats}
+                    onChange={e => { const next = [...(groupDiscountTiersValue ?? [])]; next[i] = { ...next[i], minSeats: Number(e.target.value) }; onGroupDiscountTiersChange?.(next); }}
+                    className="w-14 h-6 text-xs rounded border border-purple-200 px-1 text-center"
+                  />
+                  <span className="text-[10px] text-purple-600 whitespace-nowrap">then discount</span>
+                  <input
+                    type="number" min={1} max={100} value={tier.discountPercent}
+                    onChange={e => { const next = [...(groupDiscountTiersValue ?? [])]; next[i] = { ...next[i], discountPercent: Number(e.target.value) }; onGroupDiscountTiersChange?.(next); }}
+                    className="w-14 h-6 text-xs rounded border border-purple-200 px-1 text-center"
+                  />
+                  <span className="text-[10px] text-purple-600">% per seat</span>
+                  <button
+                    type="button"
+                    onClick={() => onGroupDiscountTiersChange?.((groupDiscountTiersValue ?? []).filter((_, j) => j !== i))}
+                    className="ml-auto text-red-400 hover:text-red-600"
+                  ><X size={10} /></button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
       {behavior === "order_bump_lp" && (
@@ -1946,7 +1985,9 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
                   onDownloadChange={v => set("heroDownloadUrl", v)}
                   checkoutProductTypeValue={d.heroCheckoutProductType}
                   checkoutProductIdValue={d.heroCheckoutProductId ?? null}
-                  onCheckoutProductChange={(type, id) => { set("heroCheckoutProductType", type || undefined); set("heroCheckoutProductId", id ?? undefined); }}
+                  onCheckoutProductChange={(type, id) => setMany({ heroCheckoutProductType: type || undefined, heroCheckoutProductId: id ?? undefined })}
+                  groupDiscountTiersValue={d.heroGroupDiscountTiers ?? []}
+                  onGroupDiscountTiersChange={v => set("heroGroupDiscountTiers", v)}
                 />
               </div>
             )}
@@ -2000,6 +2041,8 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
                     checkoutProductTypeValue={btn.checkoutProductType}
                     checkoutProductIdValue={btn.checkoutProductId ?? null}
                     onCheckoutProductChange={(type, id) => setBtnMulti(idx, { checkoutProductType: type || undefined, checkoutProductId: id ?? undefined })}
+                    groupDiscountTiersValue={(btn as any).groupDiscountTiers ?? []}
+                    onGroupDiscountTiersChange={v => setBtnMulti(idx, { groupDiscountTiers: v })}
                   />
                   {(btn.behavior ?? "url") === "send_email" && (
                     <HeroSendEmailSettings btn={btn} idx={idx} setBtn={setBtn} setBtnMulti={setBtnMulti} />
@@ -2093,7 +2136,9 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
                 onDownloadChange={v => set("linkDownloadUrl", v)}
                 checkoutProductTypeValue={d.linkCheckoutProductType}
                 checkoutProductIdValue={d.linkCheckoutProductId ?? null}
-                onCheckoutProductChange={(type, id) => { set("linkCheckoutProductType", type); set("linkCheckoutProductId", id); }}
+                onCheckoutProductChange={(type, id) => setMany({ linkCheckoutProductType: type, linkCheckoutProductId: id })}
+                groupDiscountTiersValue={d.linkGroupDiscountTiers ?? []}
+                onGroupDiscountTiersChange={v => set("linkGroupDiscountTiers", v)}
               />
               <div className="flex items-center gap-2">
                 <input type="checkbox" checked={d.openInNewTab ?? true} onChange={e => set("openInNewTab", e.target.checked)} className="rounded" />
@@ -2331,7 +2376,9 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
             onDownloadChange={v => set("ctaDownloadUrl", v)}
             checkoutProductTypeValue={d.checkoutProductType}
             checkoutProductIdValue={d.checkoutProductId ?? null}
-            onCheckoutProductChange={(type, id) => { set("checkoutProductType", type); set("checkoutProductId", id); }}
+            onCheckoutProductChange={(type, id) => setMany({ checkoutProductType: type, checkoutProductId: id })}
+            groupDiscountTiersValue={d.groupDiscountTiers ?? []}
+            onGroupDiscountTiersChange={v => set("groupDiscountTiers", v)}
           />
           <BSColorField data={d} onSet={set} label="CTA Color" field="ctaColor" />
           <BSColorField data={d} onSet={set} label="CTA Text Color" field="ctaTextColor" />
@@ -2411,7 +2458,9 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
             onDownloadChange={v => set("ctaDownloadUrl", v)}
             checkoutProductTypeValue={d.checkoutProductType}
             checkoutProductIdValue={d.checkoutProductId ?? null}
-            onCheckoutProductChange={(type, id) => { set("checkoutProductType", type); set("checkoutProductId", id); }}
+            onCheckoutProductChange={(type, id) => setMany({ checkoutProductType: type, checkoutProductId: id })}
+            groupDiscountTiersValue={d.groupDiscountTiers ?? []}
+            onGroupDiscountTiersChange={v => set("groupDiscountTiers", v)}
           /><BSColorField data={d} onSet={set} label="Button Color" field="ctaColor" /><BSColorField data={d} onSet={set} label="Button Text Color" field="ctaTextColor" /><BSColorField data={d} onSet={set} label="Button Border / Outline Color" field="btnBorderColor" /><div><label className="text-xs text-gray-500 block mb-1">Button Style</label><div className="flex gap-1">{(["filled","outline"] as const).map(s=><button key={s} onClick={()=>set("btnStyle",s)} className={`flex-1 py-1 text-xs rounded border capitalize ${(d.btnStyle??"filled")===s?"bg-teal-600 text-white border-teal-600":"border-gray-200 text-gray-600"}`}>{s}</button>)}</div></div><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div className="border border-teal-100 bg-teal-50/50 rounded-lg p-3 space-y-2"><div className="flex items-center gap-2"><input type="checkbox" id="cta-lc" checked={d.leadCapture??false} onChange={e=>set("leadCapture",e.target.checked)} className="rounded" /><label htmlFor="cta-lc" className="text-xs text-teal-700 font-medium">Collect lead before action</label></div>{(d.leadCapture??false)&&(<div className="space-y-1 pl-1"><p className="text-[10px] text-gray-400">A name/email modal will appear before the button action executes.</p><BSTextField data={d} onSet={set} label="Modal Title" field="leadModalTitle" placeholder="e.g. Get Instant Access" /><BSTextField data={d} onSet={set} label="Modal Subtext" field="leadModalSubtext" placeholder="Optional" /><BSTextField data={d} onSet={set} label="Tags (comma-separated)" field="leadTags" placeholder="e.g. webinar, free-guide" /></div>)}</div><div><label className="text-xs text-gray-500 block mb-1">Button Animation</label><Select value={d.ctaAnimation ?? "none"} onValueChange={v => set("ctaAnimation", v)}><SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem><SelectItem value="pulse">Pulse</SelectItem><SelectItem value="bounce">Bounce</SelectItem><SelectItem value="shake">Shake</SelectItem><SelectItem value="glow">Glow</SelectItem></SelectContent></Select></div><BSAlignField data={d} onSet={set} label="Text Alignment" field="align" /><div className="border-t pt-3 mt-1 space-y-2"><p className="text-xs font-medium text-gray-500">Button Subtext (below button)</p><BSTextField data={d} onSet={set} label="Subtext text" field="buttonSubtext" placeholder="e.g. No credit card required" /><BSLinkField label="Subtext URL (optional)" value={d.buttonSubtextUrl ?? ""} onChange={v => set("buttonSubtextUrl", v)} /><BSColorField data={d} onSet={set} label="Subtext Color" field="buttonSubtextColor" /><div><label className="text-xs text-gray-500 block mb-1">Subtext Size</label><select value={d.buttonSubtextSize ?? "xs"} onChange={e => set("buttonSubtextSize", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2"><option value="xs">Extra Small (xs)</option><option value="sm">Small (sm)</option><option value="base">Base</option><option value="lg">Large (lg)</option></select></div><div><label className="text-xs text-gray-500 block mb-1">Subtext Style</label><div className="flex gap-2"><button type="button" onClick={() => set("buttonSubtextItalic", !(d.buttonSubtextItalic ?? false))} className={`px-2 py-1 text-xs rounded border ${(d.buttonSubtextItalic ?? false) ? "bg-teal-50 border-teal-400 text-teal-700" : "border-gray-200 text-gray-500"}`}><em>Italic</em></button><button type="button" onClick={() => set("buttonSubtextBold", !(d.buttonSubtextBold ?? false))} className={`px-2 py-1 text-xs rounded border ${(d.buttonSubtextBold ?? false) ? "bg-teal-50 border-teal-400 text-teal-700" : "border-gray-200 text-gray-500"}`}><strong>Bold</strong></button></div></div></div><OptOutSettings d={d} set={set} /></div>);
     case "lead_capture":
       return <LeadCaptureSettings d={d} set={set} />;
@@ -2502,6 +2551,8 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
                     checkoutProductTypeValue={product.checkoutProductType}
                     checkoutProductIdValue={product.checkoutProductId ?? null}
                     onCheckoutProductChange={(type, id) => set("products", products.map((p, j) => j === i ? { ...p, checkoutProductType: type, checkoutProductId: id } : p))}
+                    groupDiscountTiersValue={(product as any).groupDiscountTiers ?? []}
+                    onGroupDiscountTiersChange={v => set("products", products.map((p, j) => j === i ? { ...p, groupDiscountTiers: v } : p))}
                   />
                   <DebouncedInput value={product.fulfillment ?? ""} onChange={v => set("products", products.map((p, j) => j === i ? { ...p, fulfillment: v } : p))} className="h-7 text-xs" placeholder="Fulfillment note" />
                   <DebouncedInput value={product.imageUrl ?? ""} onChange={v => set("products", products.map((p, j) => j === i ? { ...p, imageUrl: v } : p))} className="h-7 text-xs" placeholder="Image URL" />
@@ -2606,7 +2657,9 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
             onDownloadChange={v => set("ctaDownloadUrl", v)}
             checkoutProductTypeValue={d.checkoutProductType}
             checkoutProductIdValue={d.checkoutProductId ?? null}
-            onCheckoutProductChange={(type, id) => { set("checkoutProductType", type); set("checkoutProductId", id); }}
+            onCheckoutProductChange={(type, id) => setMany({ checkoutProductType: type, checkoutProductId: id })}
+            groupDiscountTiersValue={d.groupDiscountTiers ?? []}
+            onGroupDiscountTiersChange={v => set("groupDiscountTiers", v)}
           />
           <BSColorField data={d} onSet={set} label="CTA Color" field="ctaColor" />
           <BSColorField data={d} onSet={set} label="CTA Text Color" field="ctaTextColor" />
@@ -2653,7 +2706,9 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
             onDownloadChange={v => set("ctaDownloadUrl", v)}
             checkoutProductTypeValue={d.checkoutProductType}
             checkoutProductIdValue={d.checkoutProductId ?? null}
-            onCheckoutProductChange={(type, id) => { set("checkoutProductType", type); set("checkoutProductId", id); }}
+            onCheckoutProductChange={(type, id) => setMany({ checkoutProductType: type, checkoutProductId: id })}
+            groupDiscountTiersValue={d.groupDiscountTiers ?? []}
+            onGroupDiscountTiersChange={v => set("groupDiscountTiers", v)}
           />
           <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
           <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
