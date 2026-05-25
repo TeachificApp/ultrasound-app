@@ -101,7 +101,7 @@ function RenderBlock({ block, onBuy, buying, price, slug }: {
       else if (bgType === "gradient") bgStyle = { background: `linear-gradient(${d.gradientDir ?? "to bottom right"}, ${d.gradientFrom ?? "#179ca3"}, ${d.gradientTo ?? "#0e4a50"})` };
       else bgStyle = { backgroundColor: d.bgColor ?? "#179ca3" };
       return (
-        <div style={{ ...bgStyle, color: d.textColor ?? "#fff", textAlign: d.align ?? "left" }} className="px-8 py-20">
+        <div style={{ ...bgStyle, color: d.textColor ?? "#fff", textAlign: d.align ?? "left", minHeight: `${d.heroMinHeight ?? 400}px` }} className="px-8 py-20">
           <div className="max-w-5xl mx-auto">
             <h1 className="text-4xl font-bold mb-4 leading-tight" dangerouslySetInnerHTML={{ __html: d.headline ?? "" }} />
             {d.subheadline && <p className="text-xl opacity-90 mb-8" dangerouslySetInnerHTML={{ __html: d.subheadline }} />}

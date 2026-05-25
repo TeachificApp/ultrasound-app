@@ -126,7 +126,7 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
       const align = d.align || "left";
       const hasInlineMedia = d.inlineMediaUrl && d.inlineMediaType;
       return (
-        <div className="px-8 py-16 md:py-24" style={{ ...bgStyle, color: d.textColor || "#ffffff" }}>
+        <div className="px-8 py-16 md:py-24" style={{ ...bgStyle, color: d.textColor || "#ffffff", minHeight: `${d.heroMinHeight ?? 400}px` }}>
           <div className={`max-w-5xl mx-auto ${hasInlineMedia ? "flex flex-col md:flex-row items-center gap-8" : ""}`}>
             <div className={`${hasInlineMedia ? "flex-1" : "max-w-3xl"} ${align === "center" ? "text-center mx-auto" : align === "right" ? "text-right ml-auto" : ""}`}>
               <h1 className="text-3xl md:text-5xl font-bold leading-tight mb-4" style={{ color: d.headlineColor || d.textColor || "#ffffff" }}>{d.headline}</h1>

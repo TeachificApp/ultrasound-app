@@ -1911,6 +1911,11 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
             </div>
           </div>
           <BSAlignField data={d} onSet={set} label="Text Alignment" field="align" />
+          {/* Hero Min Height */}
+          <div className="border-t pt-3 mt-3">
+            <label className="text-xs text-gray-500 block mb-1">Min Height (px)</label>
+            <input type="number" min={100} max={1200} step={10} value={d.heroMinHeight ?? 400} onChange={e => set("heroMinHeight", Number(e.target.value))} className="w-full h-7 text-xs rounded border border-gray-200 px-2" />
+          </div>
           {/* Clickable Hero Section */}
           <div className="border-t pt-3 mt-3">
             <div className="flex items-center gap-2 mb-2">

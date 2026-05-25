@@ -87,7 +87,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
       const placement = d.inlineMediaPlacement ?? "right";
       const isHorizontal = placement === "left" || placement === "right";
       return (
-        <div style={{ ...bgStyle, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left") }} className="relative px-8 py-20 overflow-hidden">
+        <div style={{ ...bgStyle, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left"), minHeight: `${d.heroMinHeight ?? 400}px` }} className="relative px-8 py-20 overflow-hidden">
           {bgType === "video" && d.videoUrl && (
             <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
           )}
