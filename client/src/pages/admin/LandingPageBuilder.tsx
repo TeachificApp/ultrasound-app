@@ -51,8 +51,10 @@ import {
   AlertTriangle, CheckSquare, LayoutGrid, Layers, BookOpen, Tag,
   ChevronDown, ChevronUp, Copy, FolderOpen, BookMarked, Upload, Code,
   ShoppingCart, Package, Link, Mail, Phone, MapPin, Bookmark, BookmarkPlus, Music, UserPlus, Search,
+  SlidersHorizontal,
 } from "lucide-react";
 import AudioBlockEditor from "@/components/AudioBlockEditor";
+import CarouselBlock from "@/components/CarouselBlock";
 import LessonQuizBlockEditor from "@/components/LessonQuizBlockEditor";
 import LessonFlashcardBlockEditor from "@/components/LessonFlashcardBlockEditor";
 import { BlockTemplateLibraryProvider, OpenTemplateLibraryButton, SaveAsTemplateButton } from "@/components/BlockTemplateLibrary";
@@ -107,6 +109,8 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
     defaultData: { embedCode: "", height: 400, caption: "" } },
   { type: "gallery", label: "Image Gallery", icon: <LayoutGrid size={14} />, category: "Content",
     defaultData: { images: [{ url: "", caption: "" }, { url: "", caption: "" }, { url: "", caption: "" }], columns: 3, bgColor: "#ffffff" } },
+  { type: "carousel", label: "Carousel", icon: <SlidersHorizontal size={14} />, category: "Content",
+    defaultData: { items: [], transition: "slide", autoPlayMs: 4000, showArrows: true, showDots: true, showCaptions: true, bgColor: "#0e1e2e", borderColor: "#189aa1", borderWidth: 2, borderRadius: 12, maxHeight: 480 } },
   // ── Marketing
   { type: "bullets", label: "Feature List", icon: <List size={14} />, category: "Marketing",
     defaultData: { headline: "What You'll Learn", items: ["Key concept one", "Key concept two", "Key concept three"], iconColor: "#179ca3", bgColor: "#f8fffe" } },
@@ -1443,6 +1447,78 @@ function CheckoutFormBlockSettings({
   );
 }
 
+// ─── Sortable Carousel Item (used inside BlockSettings carousel case) ────────────
+function SortableCarouselItem({
+  id, item, index, uploading, onUpdate, onRemove, onUpload,
+}: {
+  id: string;
+  item: { id: string; mediaType: "image" | "video"; url: string; altText?: string; captionTitle?: string; captionBody?: string };
+  index: number;
+  uploading: string | null;
+  onUpdate: (field: string, value: any) => void;
+  onRemove: () => void;
+  onUpload: (file: File) => Promise<void>;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  const fileRef = useRef<HTMLInputElement>(null);
+  const uploadKey = `carousel-item-${id}`;
+  return (
+    <div ref={setNodeRef} style={style} className="border border-gray-200 rounded p-2 space-y-1.5 bg-white">
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-1">
+          <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 p-0.5 rounded" title="Drag to reorder"><GripVertical size={12} /></button>
+          <span className="text-xs text-gray-500">Slide {index + 1}</span>
+        </div>
+        <button onClick={onRemove} className="text-red-400 hover:text-red-600"><X size={10} /></button>
+      </div>
+      {/* Media type toggle */}
+      <div className="grid grid-cols-2 gap-1">
+        <button onClick={() => onUpdate("mediaType", "image")} className={`py-1 text-xs rounded border ${item.mediaType === "image" ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>Image</button>
+        <button onClick={() => onUpdate("mediaType", "video")} className={`py-1 text-xs rounded border ${item.mediaType === "video" ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>Video</button>
+      </div>
+      {/* URL input + upload button */}
+      <div className="flex gap-1">
+        <DebouncedInput value={item.url} onChange={v => onUpdate("url", v)} className="h-7 text-xs flex-1" placeholder={item.mediaType === "video" ? "Video URL" : "Image URL"} />
+        <>
+          <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) onUpload(f); e.target.value = ""; }} />
+          <button onClick={() => fileRef.current?.click()} disabled={uploading === uploadKey} className="flex-shrink-0 h-7 px-2 text-xs border border-gray-200 rounded hover:bg-gray-50 flex items-center gap-1 text-gray-600" title="Upload file">
+            {uploading === uploadKey ? <span className="text-[10px]">...</span> : <Upload size={10} />}
+          </button>
+        </>
+      </div>
+      {/* Alt text */}
+      <DebouncedInput value={item.altText ?? ""} onChange={v => onUpdate("altText", v)} className="h-7 text-xs" placeholder="Alt text (SEO)" />
+      {/* Caption */}
+      <DebouncedInput value={item.captionTitle ?? ""} onChange={v => onUpdate("captionTitle", v)} className="h-7 text-xs" placeholder="Caption title (optional)" />
+      <DebouncedInput value={item.captionBody ?? ""} onChange={v => onUpdate("captionBody", v)} className="h-7 text-xs" placeholder="Caption description (optional)" />
+    </div>
+  );
+}
+
+// ─── Sortable List Item (used inside BlockSettings numbered_list / checklist cases) ────
+function SortableListItem({
+  id, value, index, prefix, onChange, onRemove,
+}: {
+  id: string;
+  value: string;
+  index: number;
+  prefix: React.ReactNode;
+  onChange: (v: string) => void;
+  onRemove: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  return (
+    <div ref={setNodeRef} style={style} className="flex gap-1 items-center">
+      <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 p-0.5 rounded flex-shrink-0" title="Drag to reorder"><GripVertical size={12} /></button>
+      <span className="text-xs text-gray-400 w-5 flex-shrink-0">{prefix}</span>
+      <DebouncedInput value={value} onChange={onChange} className="h-7 text-xs flex-1" />
+      <button onClick={onRemove} className="text-red-400 hover:text-red-600 flex-shrink-0"><X size={12} /></button>
+    </div>
+  );
+}
+
 // ─── Sortable Review Item (used inside BlockSettings reviews case) ────────────
 function SortableReviewItem({
   id, review, index, onUpdate, onRemove,
@@ -1488,8 +1564,10 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
   const [uploading, setUploading] = useState<string | null>(null);
   const uploadMedia = trpc.auth.uploadPageMedia.useMutation();
   const { data: productCatalog } = trpc.funnel.listAllProducts.useQuery(undefined, { staleTime: 60_000 });
-  // Sensors for review drag-and-drop (must be at top level, not inside switch)
+  // Sensors for drag-and-drop (must be at top level, not inside switch)
   const reviewSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const listSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const carouselSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const handleFileUpload = async (file: File, targetField: string, context: string) => {
     if (file.size > 40 * 1024 * 1024) { toast.error("File must be under 40 MB"); return; }
     setUploading(targetField);
@@ -1689,11 +1767,93 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
     }
     case "numbered_list": {
       const items: string[] = d.items ?? [];
-      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Section Headline" field="headline" /><div><div className="flex items-center justify-between mb-2"><label className="text-xs text-gray-500 font-medium">Items</label><button onClick={() => set("items", [...items, "New step"])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div><div className="space-y-1">{items.map((item, i) => (<div key={i} className="flex gap-1 items-center"><span className="text-xs text-gray-400 w-5 flex-shrink-0">{i + 1}.</span><DebouncedInput value={item} onChange={v => { const next = items.map((it, j) => j === i ? v : it); set("items", next); }} className="h-7 text-xs flex-1" /><button onClick={() => set("items", items.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 flex-shrink-0"><X size={12} /></button></div>))}</div></div><BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /></div>);
+      const listItemIds = items.map((_, i) => `nl-item-${i}`);
+      return (
+        <div className="space-y-3">
+          <BSTextField data={d} onSet={set} label="Section Headline" field="headline" />
+          <BSTextField data={d} onSet={set} label="Sub-heading" field="subHeading" />
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs text-gray-500 font-medium">Items</label>
+              <button onClick={() => set("items", [...items, "New step"])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button>
+            </div>
+            <DndContext
+              sensors={listSensors}
+              collisionDetection={closestCenter}
+              modifiers={[restrictToVerticalAxis, restrictToFirstScrollableAncestor]}
+              onDragEnd={({ active, over }) => {
+                if (!over || active.id === over.id) return;
+                const oldIdx = listItemIds.indexOf(active.id as string);
+                const newIdx = listItemIds.indexOf(over.id as string);
+                if (oldIdx !== -1 && newIdx !== -1) set("items", arrayMove(items, oldIdx, newIdx));
+              }}
+            >
+              <SortableContext items={listItemIds} strategy={verticalListSortingStrategy}>
+                <div className="space-y-1">
+                  {items.map((item, i) => (
+                    <SortableListItem
+                      key={listItemIds[i]}
+                      id={listItemIds[i]}
+                      value={item}
+                      index={i}
+                      prefix={`${i + 1}.`}
+                      onChange={v => { const next = items.map((it, j) => j === i ? v : it); set("items", next); }}
+                      onRemove={() => set("items", items.filter((_, j) => j !== i))}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          </div>
+          <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />
+          <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
+        </div>
+      );
     }
     case "checklist": {
       const items: string[] = d.items ?? [];
-      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Section Headline" field="headline" /><div><div className="flex items-center justify-between mb-2"><label className="text-xs text-gray-500 font-medium">Items</label><button onClick={() => set("items", [...items, "New item"])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div><div className="space-y-1">{items.map((item, i) => (<div key={i} className="flex gap-1 items-center"><span className="text-xs text-teal-500 w-5 flex-shrink-0">✓</span><DebouncedInput value={item} onChange={v => { const next = items.map((it, j) => j === i ? v : it); set("items", next); }} className="h-7 text-xs flex-1" /><button onClick={() => set("items", items.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 flex-shrink-0"><X size={12} /></button></div>))}</div></div><BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /></div>);
+      const clItemIds = items.map((_, i) => `cl-item-${i}`);
+      return (
+        <div className="space-y-3">
+          <BSTextField data={d} onSet={set} label="Section Headline" field="headline" />
+          <BSTextField data={d} onSet={set} label="Sub-heading" field="subHeading" />
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs text-gray-500 font-medium">Items</label>
+              <button onClick={() => set("items", [...items, "New item"])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button>
+            </div>
+            <DndContext
+              sensors={listSensors}
+              collisionDetection={closestCenter}
+              modifiers={[restrictToVerticalAxis, restrictToFirstScrollableAncestor]}
+              onDragEnd={({ active, over }) => {
+                if (!over || active.id === over.id) return;
+                const oldIdx = clItemIds.indexOf(active.id as string);
+                const newIdx = clItemIds.indexOf(over.id as string);
+                if (oldIdx !== -1 && newIdx !== -1) set("items", arrayMove(items, oldIdx, newIdx));
+              }}
+            >
+              <SortableContext items={clItemIds} strategy={verticalListSortingStrategy}>
+                <div className="space-y-1">
+                  {items.map((item, i) => (
+                    <SortableListItem
+                      key={clItemIds[i]}
+                      id={clItemIds[i]}
+                      value={item}
+                      index={i}
+                      prefix={<span className="text-teal-500">✓</span>}
+                      onChange={v => { const next = items.map((it, j) => j === i ? v : it); set("items", next); }}
+                      onRemove={() => set("items", items.filter((_, j) => j !== i))}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          </div>
+          <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />
+          <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
+        </div>
+      );
     }
     case "icon_grid": {
       const items: Array<{ icon: string; title: string; text: string }> = d.items ?? [];
@@ -2659,6 +2819,96 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
             <div><label className="text-xs text-gray-500 block mb-1">Left Column Width (%)</label><Input type="number" value={d.leftRatio ?? 50} onChange={e => set("leftRatio", Number(e.target.value))} className="h-8 text-sm" min={20} max={80} /></div>
             <div><label className="text-xs text-gray-500 block mb-1">Gap (px)</label><Input type="number" value={d.gap ?? 32} onChange={e => set("gap", Number(e.target.value))} className="h-8 text-sm" min={0} max={80} /></div>
             <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
+          </div>
+        </div>
+      );
+    }
+    case "carousel": {
+      const items: Array<{ id: string; mediaType: "image" | "video"; url: string; altText?: string; captionTitle?: string; captionBody?: string }> = d.items ?? [];
+      const carouselItemIds = items.map(item => item.id);
+      return (
+        <div className="space-y-3">
+          {/* Live preview */}
+          <div className="rounded overflow-hidden border border-gray-200">
+            <CarouselBlock data={d} />
+          </div>
+          {/* Items list */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs text-gray-500 font-medium">Slides</label>
+              <button onClick={() => set("items", [...items, { id: uid(), mediaType: "image", url: "", altText: "", captionTitle: "", captionBody: "" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add Slide</button>
+            </div>
+            <DndContext
+              sensors={carouselSensors}
+              collisionDetection={closestCenter}
+              modifiers={[restrictToVerticalAxis, restrictToFirstScrollableAncestor]}
+              onDragEnd={({ active, over }) => {
+                if (!over || active.id === over.id) return;
+                const oldIdx = carouselItemIds.indexOf(active.id as string);
+                const newIdx = carouselItemIds.indexOf(over.id as string);
+                if (oldIdx !== -1 && newIdx !== -1) set("items", arrayMove(items, oldIdx, newIdx));
+              }}
+            >
+              <SortableContext items={carouselItemIds} strategy={verticalListSortingStrategy}>
+                <div className="space-y-2">
+                  {items.map((item, i) => (
+                    <SortableCarouselItem
+                      key={item.id}
+                      id={item.id}
+                      item={item}
+                      index={i}
+                      uploading={uploading}
+                      onUpdate={(field, value) => { const next = items.map((it, j) => j === i ? { ...it, [field]: value } : it); set("items", next); }}
+                      onRemove={() => set("items", items.filter((_, j) => j !== i))}
+                      onUpload={async (file) => {
+                        if (file.size > 40 * 1024 * 1024) { toast.error("File must be under 40 MB"); return; }
+                        const uploadKey = `carousel-item-${item.id}`;
+                        setUploading(uploadKey);
+                        try {
+                          const reader = new FileReader();
+                          const dataUri = await new Promise<string>((resolve) => { reader.onload = () => resolve(reader.result as string); reader.readAsDataURL(file); });
+                          const result = await uploadMedia.mutateAsync({ dataUri, mimeType: file.type, fileName: file.name, context: "carousel" });
+                          const next = items.map((it, j) => j === i ? { ...it, url: result.url, mediaType: file.type.startsWith("video") ? "video" : "image" } : it);
+                          set("items", next);
+                        } catch (err: any) { toast.error(err.message || "Upload failed"); }
+                        finally { setUploading(null); }
+                      }}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          </div>
+          {/* Global settings */}
+          <div className="border-t border-gray-100 pt-3 space-y-2">
+            <p className="text-xs font-medium text-gray-500">Display Settings</p>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Transition</label>
+              <Select value={d.transition ?? "slide"} onValueChange={v => set("transition", v)}>
+                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="slide">Slide</SelectItem>
+                  <SelectItem value="fade">Fade</SelectItem>
+                  <SelectItem value="zoom">Zoom</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Auto-play interval (ms, 0 = off)</label>
+              <Input type="number" value={d.autoPlayMs ?? 4000} onChange={e => set("autoPlayMs", Number(e.target.value))} className="h-8 text-sm" min={0} step={500} />
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <label className="flex items-center gap-1 text-xs text-gray-600 cursor-pointer"><input type="checkbox" checked={d.showArrows !== false} onChange={e => set("showArrows", e.target.checked)} className="rounded" /> Arrows</label>
+              <label className="flex items-center gap-1 text-xs text-gray-600 cursor-pointer"><input type="checkbox" checked={d.showDots !== false} onChange={e => set("showDots", e.target.checked)} className="rounded" /> Dots</label>
+              <label className="flex items-center gap-1 text-xs text-gray-600 cursor-pointer"><input type="checkbox" checked={d.showCaptions !== false} onChange={e => set("showCaptions", e.target.checked)} className="rounded" /> Captions</label>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div><label className="text-xs text-gray-500 block mb-1">Max Height (px)</label><Input type="number" value={d.maxHeight ?? 480} onChange={e => set("maxHeight", Number(e.target.value))} className="h-8 text-sm" min={100} max={1200} /></div>
+              <div><label className="text-xs text-gray-500 block mb-1">Border Width (px)</label><Input type="number" value={d.borderWidth ?? 2} onChange={e => set("borderWidth", Number(e.target.value))} className="h-8 text-sm" min={0} max={16} /></div>
+              <div><label className="text-xs text-gray-500 block mb-1">Border Radius (px)</label><Input type="number" value={d.borderRadius ?? 12} onChange={e => set("borderRadius", Number(e.target.value))} className="h-8 text-sm" min={0} max={64} /></div>
+            </div>
+            <BSColorField data={d} onSet={set} label="Background Color" field="bgColor" />
+            <BSColorField data={d} onSet={set} label="Border / Accent Color" field="borderColor" />
           </div>
         </div>
       );

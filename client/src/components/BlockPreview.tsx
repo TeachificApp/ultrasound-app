@@ -4,6 +4,7 @@
  * Extracted into its own file to break the circular dependency between CoursePlayer and LandingPageBuilder.
  */
 import { ChevronDown, Globe, Image, Package, Upload, Video } from "lucide-react";
+import CarouselBlock from "@/components/CarouselBlock";
 import InlineCheckoutBlock from "@/components/InlineCheckoutBlock";
 import AudioBlockPlayer from "@/components/AudioBlockPlayer";
 import { Users } from "lucide-react";
@@ -24,7 +25,7 @@ export type BlockType =
   | "related_products" | "embedded_checkout" | "inline_checkout"
   | "lesson_quiz" | "lesson_flashcard"
   | "file_download" | "scorm_embed" | "url_embed"
-  | "column_layout";
+  | "column_layout" | "carousel";
 
 export interface Block {
   id: string;
@@ -97,13 +98,19 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
           <div className="max-w-3xl mx-auto prose" dangerouslySetInnerHTML={{ __html: d.html ?? "" }} />
         </div>
       );
-    case "image":
+    case "image": {
+      const imgAlign = d.align ?? "center";
+      const imgJustify = imgAlign === "left" ? "flex-start" : imgAlign === "right" ? "flex-end" : "center";
+      const imgTextAlign = imgAlign as "left" | "right" | "center";
       return (
-        <div className="px-8 py-6 text-center">
-          {d.url ? <img src={d.url} alt={d.alt ?? ""} className="mx-auto shadow" style={{ maxWidth: d.maxWidth ?? "100%", height: d.height || "auto", objectFit: "cover", borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined }} /> : <div className="w-full h-40 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400"><Image size={32} /></div>}
+        <div className="px-8 py-6" style={{ textAlign: imgTextAlign }}>
+          {d.url
+            ? <img src={d.url} alt={d.alt ?? ""} className="shadow" style={{ display: "inline-block", maxWidth: d.maxWidth ?? "100%", height: d.height || "auto", objectFit: "cover", borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined }} />
+            : <div className="w-full h-40 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400"><Image size={32} /></div>}
           {d.caption && <p className="text-sm text-gray-500 mt-2">{d.caption}</p>}
         </div>
       );
+    }
     case "video": {
       const isDirectVideo = d.embedUrl && /\.(mp4|webm|ogg|mov)([?#]|$)/i.test(d.embedUrl);
       const containerStyle: React.CSSProperties = { maxWidth: d.maxWidth ?? "100%", height: d.height || undefined, paddingBottom: d.height ? undefined : (isDirectVideo ? undefined : "56.25%"), borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined };
@@ -193,7 +200,9 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
     case "numbered_list":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          {d.headline && <h2 className="text-2xl font-bold mb-2 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          {d.subHeading && <p className="text-gray-500 mb-6 text-base leading-relaxed" dangerouslySetInnerHTML={{ __html: d.subHeading }} />}
+          {!d.subHeading && d.headline && <div className="mb-6" />}
           <div className="space-y-4 max-w-2xl">
             {(d.items ?? []).map((item: string, i: number) => (
               <div key={i} className="flex items-start gap-4">
@@ -207,7 +216,9 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
     case "checklist":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          {d.headline && <h2 className="text-2xl font-bold mb-2 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          {d.subHeading && <p className="text-gray-500 mb-6 text-base leading-relaxed" dangerouslySetInnerHTML={{ __html: d.subHeading }} />}
+          {!d.subHeading && d.headline && <div className="mb-6" />}
           <div className="space-y-3 max-w-2xl">
             {(d.items ?? []).map((item: string, i: number) => (
               <div key={i} className="flex items-start gap-3">
@@ -949,6 +960,8 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
         </div>
       );
     }
+    case "carousel":
+      return <div className="px-4 py-4"><CarouselBlock data={d} /></div>;
     default:
       return <div className="px-8 py-4 text-gray-400 text-sm text-center">Block preview not available</div>;
   }

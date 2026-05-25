@@ -2786,3 +2786,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add checklist renderer in DownloadLanding.tsx
 - [x] Add checklist renderer in PublicFunnelPage.tsx
 - [x] DownloadLandingPageBuilder, ProductLandingPageBuilder, FunnelPageEditor inherit checklist automatically via BLOCK_CATALOG import
+## Carousel Content Block (May 2026)
+- [ ] Add "carousel" to BlockType union in BlockPreview.tsx
+- [ ] Build CarouselBlock renderer: image/video slides, fade/slide/zoom transitions, nav arrows, dot indicators, auto-play, bg/border color
+- [ ] Build CarouselBlockEditor settings panel: add/remove/reorder items (dnd-kit), URL or file upload per item, SEO alt text, caption/description, transition selector, bg color, border color
+- [ ] Register carousel in LandingPageBuilder (catalog entry + BlockSettings case)
+- [ ] Register carousel in LessonBlockEditor (label case)
+- [ ] Add carousel renderer to PublicFunnelPage, CourseLanding, DownloadLanding

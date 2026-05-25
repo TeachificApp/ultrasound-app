@@ -294,6 +294,8 @@ export default function LessonBlockEditor({
         const items: string[] = d?.items ?? [];
         return truncate(d?.headline || items[0] || "Checklist");
       }
+      case "carousel":
+        return `Carousel (${d?.items?.length ?? 0} slides)`;
       case "icon_grid":
         return truncate(d?.headline || "Icon grid");
       case "testimonial":

@@ -19,6 +19,7 @@ import { getLoginUrl } from "@/const";
 import OrderBumpOffer from "@/components/OrderBumpOffer";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
+import CarouselBlock from "@/components/CarouselBlock";
 import { useState, useEffect, useRef } from "react";
 import PromoCodeInput from "@/components/PromoCodeInput";
 import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
@@ -134,8 +135,8 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
       );
     case "image":
       return (
-        <div className="px-8 py-6 text-center">
-          {d.url && <img src={d.url} alt={d.alt ?? ""} className="mx-auto shadow" style={{ maxWidth: d.maxWidth ?? "100%", height: d.height || "auto", objectFit: "cover", borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined }} />}
+        <div className="px-8 py-6" style={{ textAlign: (d.align ?? "center") as "left"|"center"|"right" }}>
+          {d.url && <img src={d.url} alt={d.alt ?? ""} className="shadow" style={{ display: "inline-block", maxWidth: d.maxWidth ?? "100%", height: d.height || "auto", objectFit: "cover", borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined }} />}
           {d.caption && <p className="text-sm text-gray-500 mt-2">{d.caption}</p>}
         </div>
       );
@@ -178,7 +179,9 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           <div className="max-w-2xl mx-auto">
-            {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+            {d.headline && <h2 className="text-2xl font-bold mb-2 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+            {d.subHeading && <p className="text-gray-500 mb-6 text-base leading-relaxed" dangerouslySetInnerHTML={{ __html: d.subHeading }} />}
+            {!d.subHeading && d.headline && <div className="mb-6" />}
             <div className="space-y-4">
               {(d.items ?? []).map((item: string, i: number) => (
                 <div key={i} className="flex items-start gap-4">
@@ -194,7 +197,9 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           <div className="max-w-2xl mx-auto">
-            {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+            {d.headline && <h2 className="text-2xl font-bold mb-2 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+            {d.subHeading && <p className="text-gray-500 mb-6 text-base leading-relaxed" dangerouslySetInnerHTML={{ __html: d.subHeading }} />}
+            {!d.subHeading && d.headline && <div className="mb-6" />}
             <div className="space-y-3">
               {(d.items ?? []).map((item: string, i: number) => (
                 <div key={i} className="flex items-start gap-3">
@@ -524,6 +529,8 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
           </button>
         </div>
       );
+    case "carousel":
+      return <div className="px-4 py-4"><CarouselBlock data={d} /></div>;
     default:
       return null;
   }
