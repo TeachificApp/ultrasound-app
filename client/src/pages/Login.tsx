@@ -13,7 +13,7 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Mail, Loader2, Stethoscope, Activity, BookOpen, Shield, CheckCircle2, Zap, ArrowLeft } from "lucide-react";
+import { Mail, Loader2, Stethoscope, Activity, BookOpen, Shield, CheckCircle2, Zap, ArrowLeft, GraduationCap, Award, Users, Star } from "lucide-react";
 import { isCombinedBrandingDomain, isIHeartEchoDomain } from "@/hooks/useSubdomain";
 
 const LOGO = import.meta.env.VITE_APP_LOGO as string;
@@ -29,22 +29,28 @@ export default function Login() {
     ? "All About Ultrasound™ | iHeartEcho™"
     : "All About Ultrasound™";
   const BRAND_SUBTITLE = isIHE
-    ? "EchoAssist™ Clinical Intelligence"
+    ? "Expert Echocardiography Education & CME"
     : isCombined
-    ? "General, Vascular & Cardiac Ultrasound Clinical Intelligence"
-    : "UltrasoundAssist™ Clinical Intelligence";
+    ? "Expert Ultrasound Education, CME & Registry Review"
+    : "Expert Ultrasound Education & Registry Review";
+  const HERO_HEADLINE = isIHE
+    ? <>World-Class Echo<br /><span style={{ color: "#4ad9e0" }}>Education & CME</span></>
+    : <>Expert Ultrasound<br /><span style={{ color: "#4ad9e0" }}>Education & CME</span></>;
+  const HERO_BODY = isIHE
+    ? "Comprehensive echocardiography education for sonographers, cardiologists, and echo learners — accredited CME courses, registry review, and expert-led learning."
+    : "Comprehensive ultrasound education for sonographers, physicians, and learners — accredited CME courses, registry review, and expert-led learning for every modality.";
   const FEATURES = isIHE
     ? [
-      { icon: Stethoscope, title: "EchoNavigators™", desc: "Adult TTE, TEE, Pediatric, Fetal Echo, Structural Heart & more" },
-      { icon: Activity, title: "EchoAssist™ Calculators", desc: "Guideline-based echo interpretation across all modalities" },
+      { icon: GraduationCap, title: "Accredited CME Courses", desc: "SDMS, ASRT & ARDMS-accepted continuing medical education" },
+      { icon: Award, title: "Registry Review", desc: "Structured prep for RDCS, RCS, and echocardiography boards" },
       { icon: BookOpen, title: "Echo Case Library", desc: "Image, video, and scenario-based echocardiography cases" },
-      { icon: Shield, title: "ScanCoach™ & Reference Values", desc: "Protocol guidance, guideline-based normal echo values" },
+      { icon: Users, title: "Expert Instructors", desc: "Learn from leading sonographers, cardiologists & educators" },
     ]
     : [
-      { icon: Stethoscope, title: "Clinical Navigators", desc: "Abdomen, Pelvic/Gyn, OB, Vascular, POCUS & more" },
-      { icon: Activity, title: "Ultrasound-Assist™ Calculators", desc: "Guideline-based interpretation across all modalities" },
-      { icon: BookOpen, title: "CME & Registry Review", desc: "Accredited courses, registry prep, 500+ ultrasound cases" },
-      { icon: Shield, title: "ScanCoach™ & Reference Values", desc: "Protocol guidance, guideline-based normal values and reference ranges" },
+      { icon: GraduationCap, title: "Accredited CME Courses", desc: "SDMS, ASRT & ARDMS-accepted continuing medical education" },
+      { icon: Award, title: "Registry Review", desc: "Structured prep for RDMS, RVT, RDCS & specialty boards" },
+      { icon: BookOpen, title: "500+ Ultrasound Cases", desc: "Image and video cases across all modalities" },
+      { icon: Users, title: "Expert Instructors", desc: "Learn from leading sonographers, physicians & educators" },
     ];
   const { isAuthenticated, loading } = useAuth();
   const [, navigate] = useLocation();
@@ -118,15 +124,13 @@ export default function Login() {
         <div className="relative my-8 lg:my-0">
           <div className="inline-flex items-center gap-2 rounded-full px-3 py-1 mb-4 border border-white/20 bg-white/10">
             <div className="w-2 h-2 rounded-full bg-[#4ad9e0] animate-pulse" />
-            <span className="text-xs text-white/80 font-medium">Real-time Clinical Decision Support</span>
+            <span className="text-xs text-white/80 font-medium">Trusted by Sonographers Worldwide</span>
           </div>
           <h1 className="text-3xl lg:text-4xl font-black text-white leading-tight mb-4" style={{ fontFamily: "Merriweather, serif" }}>
-            {isIHE ? <>The Complete Echo<br /><span style={{ color: "#4ad9e0" }}>Clinical Intelligence Guide</span></> : <>The Complete Ultrasound<br /><span style={{ color: "#4ad9e0" }}>Clinical Intelligence Guide</span></>}
+            {HERO_HEADLINE}
           </h1>
           <p className="text-white/70 text-sm leading-relaxed max-w-sm">
-            {isIHE
-              ? "Advanced, guideline-based echocardiography intelligence for sonographers, cardiologists, and echo learners — the ultimate pocket reference for real-time echo scanning and clinical decision support."
-              : "Advanced, guideline-based clinical intelligence for sonographers, physicians, and ultrasound learners — the ultimate pocket reference for real-time scanning and clinical decision support."}
+            {HERO_BODY}
           </p>
         </div>
         {/* Features */}
