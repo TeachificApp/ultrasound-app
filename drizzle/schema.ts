@@ -4208,3 +4208,36 @@ export const couponMetadata = mysqlTable("coupon_metadata", {
   createdAt: bigint("created_at", { mode: "number" }).notNull().$defaultFn(() => Date.now()),
   updatedAt: bigint("updated_at", { mode: "number" }).notNull().$defaultFn(() => Date.now()),
 });
+
+// ─── Free Preview Enrollments ─────────────────────────────────────────────────
+// Tracks visitors who register to access free-preview lessons on a course.
+// A record is created before the user has a full account (guest registration).
+// If the visitor later creates an account the userId can be linked.
+export const freePreviewEnrollments = mysqlTable("free_preview_enrollments", {
+  id: int("id").autoincrement().primaryKey(),
+  // The course they registered to preview
+  courseId: int("course_id").notNull(),
+  // Optional: linked user account (set if they are already logged in or sign up later)
+  userId: int("user_id"),
+  // Guest registration fields (always captured)
+  email: varchar("email", { length: 320 }).notNull(),
+  firstName: varchar("first_name", { length: 100 }),
+  lastName: varchar("last_name", { length: 100 }),
+  // Source / campaign tracking
+  source: varchar("source", { length: 128 }), // e.g. "course_landing", "funnel", "email_link"
+  utmSource: varchar("utm_source", { length: 128 }),
+  utmMedium: varchar("utm_medium", { length: 128 }),
+  utmCampaign: varchar("utm_campaign", { length: 128 }),
+  // Access token used to grant preview access without full login
+  accessToken: varchar("access_token", { length: 128 }).notNull().unique(),
+  // When the preview access expires (default 7 days from registration)
+  accessExpiresAt: timestamp("access_expires_at").notNull(),
+  // Whether they have been sent a follow-up email
+  followUpSentAt: timestamp("follow_up_sent_at"),
+  // Admin notes / tags
+  tags: text("tags"), // JSON array of strings
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type FreePreviewEnrollment = typeof freePreviewEnrollments.$inferSelect;
+export type NewFreePreviewEnrollment = typeof freePreviewEnrollments.$inferInsert;

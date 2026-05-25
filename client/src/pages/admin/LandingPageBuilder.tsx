@@ -5,7 +5,7 @@
  * Supports 25+ block types + Template Library (save/reuse pages and blocks).
  */
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams, useLocation } from "wouter";
 import {
   DndContext,
@@ -1857,6 +1857,8 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
   const reviewSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const listSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const carouselSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  // Related Products manual picker search — must be at top level (React rules of hooks)
+  const [rpSearch, setRpSearch] = useState("");
   const handleFileUpload = async (file: File, targetField: string, context: string) => {
     if (file.size > 40 * 1024 * 1024) { toast.error("File must be under 40 MB"); return; }
     setUploading(targetField);
@@ -3029,7 +3031,6 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
     case "related_products": {
       const selMode = d.selectionMode ?? "auto";
       const manualItems: Array<{ type: string; id: number }> = d.manualItems ?? [];
-      const [rpSearch, setRpSearch] = React.useState("");
       const filteredCatalog = (productCatalog ?? []).filter(p =>
         !rpSearch || p.name.toLowerCase().includes(rpSearch.toLowerCase())
       );
