@@ -2296,6 +2296,37 @@ Rules:
       } else {
         await db.insert(lmsLandingPages).values({ courseId: input.courseId, blocks: blocksJson, isCustom: true });
       }
+      // Auto-enable group purchase on courses linked via group_purchase CTA action
+      const courseIdsToEnableGroup = new Set<number>();
+      const collectGroupCourseIds = (blocks: any[]) => {
+        for (const block of blocks) {
+          const checkBehavior = (behavior: string | undefined, productType: string | undefined, productId: number | undefined) => {
+            if (behavior === "group_purchase" && productType === "course" && productId) {
+              courseIdsToEnableGroup.add(productId);
+            }
+          };
+          checkBehavior(block.heroBehavior, block.heroCheckoutProductType, block.heroCheckoutProductId);
+          checkBehavior(block.ctaBehavior, block.checkoutProductType, block.checkoutProductId);
+          checkBehavior(block.linkBehavior, block.linkCheckoutProductType, block.linkCheckoutProductId);
+          if (Array.isArray(block.buttons)) {
+            for (const btn of block.buttons) {
+              checkBehavior(btn.behavior, btn.checkoutProductType, btn.checkoutProductId);
+            }
+          }
+          if (Array.isArray(block.products)) {
+            for (const p of block.products) {
+              checkBehavior(p.ctaBehavior, p.checkoutProductType, p.checkoutProductId);
+            }
+          }
+          // Recurse into column blocks
+          if (Array.isArray(block.leftBlocks)) collectGroupCourseIds(block.leftBlocks);
+          if (Array.isArray(block.rightBlocks)) collectGroupCourseIds(block.rightBlocks);
+        }
+      };
+      collectGroupCourseIds(input.blocks);
+      for (const cid of courseIdsToEnableGroup) {
+        await db.update(lmsCourses).set({ allowGroupPurchase: true }).where(eq(lmsCourses.id, cid));
+      }
       return { success: true };
     }),
   // ── Page Templates ──

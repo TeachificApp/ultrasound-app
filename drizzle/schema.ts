@@ -2776,7 +2776,7 @@ export const lmsCourses = mysqlTable("lms_courses", {
   // e.g. { lesson: "Lecture", section: "Unit", markComplete: "Mark Complete", nextLesson: "Next Lesson", ... }
   customLabels: longtext("custom_labels"),
   // Group purchase: allow bulk seat purchases for teams/organizations
-  allowGroupPurchase: boolean("allow_group_purchase").default(false).notNull(),
+  allowGroupPurchase: boolean("allow_group_purchase").default(true).notNull(),
   createdByUserId: int("created_by_user_id").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),

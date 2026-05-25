@@ -700,6 +700,8 @@ function CTAActionPicker({
   checkoutProductTypeValue,
   checkoutProductIdValue,
   onCheckoutProductChange,
+  groupDiscountTiersValue,
+  onGroupDiscountTiersChange,
 }: {
   label?: string;
   behaviorValue: string;
