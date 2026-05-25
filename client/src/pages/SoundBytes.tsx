@@ -403,8 +403,8 @@ export default function SoundBytes() {
                 </h2>
                 <p className="text-white/60 text-sm mb-5 leading-relaxed">
                   {isIHE
-                    ? "Create a free iHeartEcho™ account to access SoundBytes. Free members get the first clip per category. Upgrade to Premium for unlimited access."
-                    : "Create a free All About Ultrasound™ account to access SoundBytes. Free members get the first clip per category. Upgrade to Premium for unlimited access."}
+                    ? "Create a free iHeartEcho™ account to access SoundBytes. Free members get the first 3 clips per category. Upgrade to Premium for unlimited access."
+                    : "Create a free All About Ultrasound™ account to access SoundBytes. Free members get the first 3 clips per category. Upgrade to Premium for unlimited access."}
                 </p>
                 <div className="flex flex-col gap-2">
                   <a href={getLoginUrl()} className="block">
@@ -444,7 +444,7 @@ export default function SoundBytes() {
                       <div>
                         <p className="text-white font-semibold text-sm">Unlock All SoundBytes</p>
                         <p className="text-white/60 text-xs">
-                          Free members get 1 clip per category. Premium unlocks everything.
+                          Free members get 3 clips per category. Premium unlocks everything.
                         </p>
                       </div>
                     </div>

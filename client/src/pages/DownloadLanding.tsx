@@ -23,6 +23,7 @@ import CarouselBlock from "@/components/CarouselBlock";
 import { useState, useEffect, useRef } from "react";
 import PromoCodeInput from "@/components/PromoCodeInput";
 import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
+import { CountdownV2Block, ImageLinkWrapper } from "@/components/BlockPreview";
 
 // ─── Block type (matches builder) ─────────────────────────────────────────────
 interface Block { id: string; type: string; data: Record<string, any>; }
@@ -159,7 +160,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
       const imgElDL = d.url ? <img src={d.url} alt={d.alt ?? ""} className={d.showShadow !== false ? "shadow" : ""} style={imgStyleDL} /> : null;
       return (
         <div className="px-8 py-6" style={{ display: "flex", flexDirection: "column", alignItems: imgJustifyDL }}>
-          {imgElDL && (d.linkUrl ? <a href={d.linkUrl} target={d.openInNewTab !== false ? "_blank" : undefined} rel="noopener noreferrer" style={{ display: "inline-block" }}>{imgElDL}</a> : imgElDL)}
+          {imgElDL && <ImageLinkWrapper d={d}>{imgElDL}</ImageLinkWrapper>}
           {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: imgAlignDL as any }}>{d.caption}</p>}
         </div>
       );
@@ -490,6 +491,27 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
           <CountdownTimer mode={d.mode} durationMinutes={d.durationMinutes} targetDate={d.targetDate} textColor={d.textColor ?? "#fff"} />
         </div>
       );
+    case "ticker": {
+      const tickerItems: string[] = d.items ?? ["Welcome!"];
+      const sep = d.separator ?? " ✦ ";
+      const content = [...tickerItems, ...tickerItems].join(sep);
+      const speed = d.speed ?? 30;
+      const dir = d.direction === "right" ? "ticker-right" : "ticker-left";
+      const fontSizeMap: Record<string, string> = { xs: "0.75rem", sm: "0.875rem", base: "1rem", lg: "1.125rem", xl: "1.25rem" };
+      const fontWeightMap: Record<string, string> = { normal: "400", medium: "500", semibold: "600", bold: "700" };
+      const letterSpacingMap: Record<string, string> = { tighter: "-0.05em", normal: "0", wide: "0.025em", wider: "0.05em", widest: "0.1em" };
+      return (
+        <div className={`overflow-hidden ${d.padding ?? "py-2"}`} style={{ backgroundColor: d.bgColor ?? "#0f766e" }}>
+          <style>{`@keyframes ticker-left{from{transform:translateX(0)}to{transform:translateX(-50%)}} @keyframes ticker-right{from{transform:translateX(-50%)}to{transform:translateX(0)}}`}</style>
+          <div style={{ display: "flex", whiteSpace: "nowrap", animation: `${dir} ${speed}s linear infinite`, willChange: "transform", color: d.textColor ?? "#ffffff", fontSize: fontSizeMap[d.fontSize ?? "sm"] ?? "0.875rem", fontWeight: fontWeightMap[d.fontWeight ?? "normal"] ?? "400", letterSpacing: letterSpacingMap[d.letterSpacing ?? "normal"] ?? "0", textTransform: (d.textTransform === "none" ? "none" : d.textTransform) as any }}>
+            <span style={{ paddingRight: "4rem" }}>{content}</span>
+            <span style={{ paddingRight: "4rem" }}>{content}</span>
+          </div>
+        </div>
+      );
+    }
+    case "countdown_v2":
+      return <CountdownV2Block data={d} />;
     case "flip_cards":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>

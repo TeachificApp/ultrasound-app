@@ -93,6 +93,7 @@ import EmbeddedCheckoutBlock from "@/components/EmbeddedCheckoutBlock";
 import InlineCheckoutBlock from "@/components/InlineCheckoutBlock";
 import AudioBlockPlayer from "@/components/AudioBlockPlayer";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
+import { ImageLinkWrapper } from "@/components/BlockPreview";
 
 function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block: Block; funnelId: number; pageId: number; funnelSlug: string }) {
   const d = block.data;
@@ -191,13 +192,19 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
           <div className="max-w-3xl mx-auto prose prose-lg" dangerouslySetInnerHTML={{ __html: d.html || "" }} />
         </div>
       );
-    case "image":
-      return d.url ? (
-        <div className="px-8 py-6" style={{ textAlign: d.align || "center" }}>
-          <div className="max-w-4xl mx-auto"><img src={d.url} alt={d.alt || ""} className="rounded-lg shadow-md" style={{ maxWidth: d.maxWidth || "100%" }} /></div>
-          {d.caption && <p className="text-sm text-gray-500 mt-2 text-center">{d.caption}</p>}
+    case "image": {
+      const imgAlignSL = d.align ?? "center";
+      const imgJustifySL = imgAlignSL === "left" ? "flex-start" : imgAlignSL === "right" ? "flex-end" : "center";
+      const mwSL = d.maxWidth ?? "auto";
+      const imgStyleSL: React.CSSProperties = { maxWidth: mwSL === "auto" ? "100%" : mwSL, width: mwSL === "auto" ? undefined : "100%", height: d.height || "auto", objectFit: "cover", borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.noBorder ? "none" : (d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined) };
+      const imgElSL = d.url ? <img src={d.url} alt={d.alt ?? ""} className={d.showShadow !== false ? "shadow-md" : ""} style={imgStyleSL} /> : null;
+      return imgElSL ? (
+        <div className="px-8 py-6" style={{ display: "flex", flexDirection: "column", alignItems: imgJustifySL }}>
+          <ImageLinkWrapper d={d}>{imgElSL}</ImageLinkWrapper>
+          {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: imgAlignSL as any }}>{d.caption}</p>}
         </div>
       ) : null;
+    }
     case "video":
       if (!d.embedUrl) return null;
       const isDirectVidSL = /\.(mp4|webm|ogg|mov)([?#]|$)/i.test(d.embedUrl);

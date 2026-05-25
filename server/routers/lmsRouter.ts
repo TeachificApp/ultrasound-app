@@ -59,6 +59,7 @@ import {
   freePreviewEnrollments,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
+import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -633,6 +634,32 @@ export const lmsPublicRouter = router({
         accessToken,
         accessExpiresAt,
       });
+      // Fetch course title for confirmation email
+      const [course] = await db
+        .select({ title: lmsCourses.title, slug: lmsCourses.slug })
+        .from(lmsCourses)
+        .where(eq(lmsCourses.id, input.courseId))
+        .limit(1);
+      if (course) {
+        try {
+          const previewUrl = `https://app.allaboutultrasound.com/courses/${course.slug}?preview_token=${accessToken}`;
+          const emailData = buildFreePreviewConfirmationEmail({
+            firstName: input.firstName,
+            courseTitle: course.title,
+            previewUrl,
+            accessExpiresAt,
+          });
+          await sendEmail({
+            to: { name: input.firstName + (input.lastName ? ` ${input.lastName}` : ""), email: input.email.toLowerCase() },
+            subject: emailData.subject,
+            htmlBody: emailData.htmlBody,
+            previewText: emailData.previewText,
+          });
+        } catch (emailErr) {
+          // Non-fatal — log but don't fail the registration
+          console.error("[FreePreview] Failed to send confirmation email:", emailErr);
+        }
+      }
       return { accessToken, isNew: true };
     }),
 
@@ -3992,6 +4019,68 @@ CRITICAL REQUIREMENTS:
         .where(where);
 
       return { items: rows, total, page, pageSize };
+    }),
+
+  /** Export free preview enrollments as CSV data (admin only) */
+  exportFreePreviewEnrollmentsCsv: protectedProcedure
+    .input(z.object({
+      courseId: z.number().optional(),
+      search: z.string().optional(),
+    }).optional())
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const p = input ?? {};
+      const conditions: any[] = [];
+      if (p.courseId) conditions.push(eq(freePreviewEnrollments.courseId, p.courseId));
+      if (p.search) {
+        const like = `%${p.search}%`;
+        conditions.push(or(
+          sql`${freePreviewEnrollments.email} LIKE ${like}`,
+          sql`${freePreviewEnrollments.firstName} LIKE ${like}`,
+          sql`${freePreviewEnrollments.lastName} LIKE ${like}`,
+        ));
+      }
+      const where = conditions.length > 0 ? and(...conditions) : undefined;
+      const rows = await db.select({
+        id: freePreviewEnrollments.id,
+        email: freePreviewEnrollments.email,
+        firstName: freePreviewEnrollments.firstName,
+        lastName: freePreviewEnrollments.lastName,
+        source: freePreviewEnrollments.source,
+        utmSource: freePreviewEnrollments.utmSource,
+        utmMedium: freePreviewEnrollments.utmMedium,
+        utmCampaign: freePreviewEnrollments.utmCampaign,
+        accessExpiresAt: freePreviewEnrollments.accessExpiresAt,
+        createdAt: freePreviewEnrollments.createdAt,
+        courseTitle: lmsCourses.title,
+      })
+        .from(freePreviewEnrollments)
+        .leftJoin(lmsCourses, eq(freePreviewEnrollments.courseId, lmsCourses.id))
+        .where(where)
+        .orderBy(desc(freePreviewEnrollments.createdAt));
+
+      // Build CSV string server-side
+      const headers = ["ID", "First Name", "Last Name", "Email", "Course", "Source", "UTM Source", "UTM Medium", "UTM Campaign", "Access Expires", "Enrolled At"];
+      const escape = (v: string | null | undefined) => `"${(v ?? "").replace(/"/g, '""')}"`;
+      const csvLines = [
+        headers.join(","),
+        ...rows.map(r => [
+          r.id,
+          escape(r.firstName),
+          escape(r.lastName),
+          escape(r.email),
+          escape(r.courseTitle),
+          escape(r.source),
+          escape(r.utmSource),
+          escape(r.utmMedium),
+          escape(r.utmCampaign),
+          r.accessExpiresAt ? new Date(r.accessExpiresAt).toISOString() : "",
+          r.createdAt ? new Date(r.createdAt).toISOString() : "",
+        ].join(",")),
+      ];
+      return { csv: csvLines.join("\n"), count: rows.length };
     }),
 });
 

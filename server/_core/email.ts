@@ -981,3 +981,46 @@ export function buildPaymentFailedEmail(opts: {
   `, opts.brandMode);
   return { subject, htmlBody, previewText };
 }
+
+/** Free Preview enrollment confirmation email */
+export function buildFreePreviewConfirmationEmail(opts: {
+  firstName: string;
+  courseTitle: string;
+  previewUrl: string;
+  accessExpiresAt: Date;
+  brandMode?: BrandMode;
+}): { subject: string; htmlBody: string; previewText: string } {
+  const bc = getBrandDisplayConfig(opts.brandMode || "aaus");
+  const subject = `Your free preview access to "${opts.courseTitle}" is ready`;
+  const previewText = `You're registered for a free preview of ${opts.courseTitle}. Click to start watching.`;
+  const expiryStr = opts.accessExpiresAt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  const htmlBody = emailWrapper(`
+    <h2 style="margin:0 0 8px;font-size:20px;color:${brandDark};font-family:Georgia,serif;">
+      Your Free Preview is Ready, ${opts.firstName}!
+    </h2>
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
+      You've been registered for a <strong>free preview</strong> of:
+    </p>
+    <div style="background:#f0fbfc;border-left:3px solid ${brandColor};padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 20px;">
+      <p style="margin:0;font-size:16px;font-weight:700;color:${brandDark};">${opts.courseTitle}</p>
+      <p style="margin:6px 0 0;font-size:13px;color:#64748b;">Preview access expires: ${expiryStr}</p>
+    </div>
+    <p style="margin:0 0 20px;font-size:14px;color:#475569;line-height:1.6;">
+      Click the button below to start your free preview. Your access link is unique to you — please don't share it.
+    </p>
+    <div style="text-align:center;margin:28px 0;">
+      <a href="${opts.previewUrl}"
+        style="display:inline-block;background:linear-gradient(135deg,${brandColor},#4ad9e0);color:#ffffff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;" target="_blank" rel="noopener noreferrer">
+        Start Free Preview
+      </a>
+    </div>
+    <p style="margin:0 0 12px;font-size:13px;color:#64748b;line-height:1.5;">
+      Want unlimited access? Upgrade to <strong>${bc.displayName} Premium</strong> to unlock all courses, flashcards, SoundBytes, and the full clinical intelligence suite.
+    </p>
+    <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.5;">
+      Questions? Contact us at
+      <a href="mailto:${bc.supportEmail}" style="color:${brandColor};" target="_blank" rel="noopener noreferrer">${bc.supportEmail}</a>.
+    </p>
+  `, opts.brandMode);
+  return { subject, htmlBody, previewText };
+}

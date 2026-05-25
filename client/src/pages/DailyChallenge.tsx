@@ -98,7 +98,7 @@ const IHE_CATS = [
 ] as const;
 
 const IHE_DEFAULT_PREFS = { adultEcho: true, pediatricEcho: true, acs: true, fetalEcho: true, ecg: true, pocus: true, physics: true };
-const AAUS_DEFAULT_PREFS = { abdominal: true, smallParts: true, pelvicGyn: true, ob1st: true, ob2nd3rd: true, fetalEcho: true, breast: true, vascular: true, msk: true, pocus: true, physics: true };
+const AAUS_DEFAULT_PREFS = { abdominal: true, obgyn: true, smallParts: true, vascular: true, msk: true, pocus: true };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -111,7 +111,7 @@ type AnswerResult = {
 
 type LeaderboardPeriod = "7d" | "30d" | "allTime";
 
-const CATEGORY_TAGS = ["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics"] as const;
+const CATEGORY_TAGS = ["Abdominal", "OB/Gyn", "Small Parts", "Vascular", "MSK", "POCUS"] as const;
 const DIFFICULTY_OPTIONS = ["beginner", "intermediate", "advanced"] as const;
 
 const TYPE_LABELS: Record<string, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
@@ -131,15 +131,17 @@ const DIFFICULTY_COLORS: Record<string, string> = {
 
 const CATEGORY_COLORS: Record<string, string> = {
   "Abdominal": "bg-[#189aa1]/10 text-[#189aa1]",
+  "OB/Gyn": "bg-pink-100 text-pink-700",
+  "Small Parts": "bg-teal-100 text-teal-700",
+  "Vascular": "bg-sky-100 text-sky-700",
+  "MSK": "bg-indigo-100 text-indigo-700",
+  "POCUS": "bg-teal-100 text-teal-700",
+  // Legacy colors for old category values still in DB
   "Pelvic/Gyn": "bg-pink-100 text-pink-700",
   "OB 1st Trimester": "bg-purple-100 text-purple-700",
   "OB 2nd/3rd Trimester": "bg-violet-100 text-violet-700",
   "Fetal Echo": "bg-rose-100 text-rose-700",
-  "Vascular": "bg-sky-100 text-sky-700",
-  "POCUS": "bg-teal-100 text-teal-700",
-  "Small Parts": "bg-teal-100 text-teal-700",
   "Breast": "bg-fuchsia-100 text-fuchsia-700",
-  "MSK": "bg-indigo-100 text-indigo-700",
   "Physics": "bg-yellow-100 text-yellow-700",
 };
 
@@ -174,7 +176,7 @@ function SubmitQuestionTab({ isAuthenticated }: { isAuthenticated: boolean }) {
   // Form state
   const [submitterName, setSubmitterName] = useState("");
   const [submitterLinkedIn, setSubmitterLinkedIn] = useState("");
-  const [category, setCategory] = useState<"Abdominal" | "Small Parts" | "Pelvic/Gyn" | "OB 1st Trimester" | "OB 2nd/3rd Trimester" | "Fetal Echo" | "Breast" | "Vascular" | "MSK" | "POCUS" | "Physics">("Abdominal");
+  const [category, setCategory] = useState<"Abdominal" | "OB/Gyn" | "Small Parts" | "Vascular" | "MSK" | "POCUS">("Abdominal");
   const [difficulty, setDifficulty] = useState<"beginner" | "intermediate" | "advanced">("intermediate");
   const [question, setQuestion] = useState("");
   const [options, setOptions] = useState(["", "", "", ""]);
@@ -264,7 +266,7 @@ function SubmitQuestionTab({ isAuthenticated }: { isAuthenticated: boolean }) {
             <Select value={category} onValueChange={(v) => setCategory(v as any)}>
               <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {(["Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular", "MSK", "POCUS", "Physics"] as const).map((c) => (
+                {(["Abdominal", "OB/Gyn", "Small Parts", "Vascular", "MSK", "POCUS"] as const).map((c) => (
                   <SelectItem key={c} value={c}>{c}</SelectItem>
                 ))}
               </SelectContent>
@@ -515,16 +517,18 @@ export default function QuickFire() {
   // Map display names to server camelCase keys
   const CAT_DISPLAY_TO_KEY: Record<string, string> = {
     "Abdominal": "abdominal",
+    "OB/Gyn": "obgyn",
     "Small Parts": "smallParts",
-    "Pelvic/Gyn": "pelvicGyn",
-    "OB 1st Trimester": "ob1st",
-    "OB 2nd/3rd Trimester": "ob2nd3rd",
-    "Fetal Echo": "fetalEcho",
-    "Breast": "breast",
     "Vascular": "vascular",
     "MSK": "msk",
     "POCUS": "pocus",
-    "Physics": "physics",
+    // Legacy keys for backward compat
+    "Pelvic/Gyn": "obgyn",
+    "OB 1st Trimester": "obgyn",
+    "OB 2nd/3rd Trimester": "obgyn",
+    "Fetal Echo": "obgyn",
+    "Breast": "smallParts",
+    "Physics": "pocus",
   };
   // Store the clicked question object directly to avoid re-derivation timing issues
   const [activeCatQDirect, setActiveCatQDirect] = useState<any>(null);
@@ -1010,7 +1014,7 @@ export default function QuickFire() {
   const catPrefsForBanner = categoryPrefsQuery.data ?? (useBannerIHECats ? IHE_DEFAULT_PREFS : AAUS_DEFAULT_PREFS);
   const enabledCatKeysForBanner = (useBannerIHECats
     ? ["adultEcho", "pediatricEcho", "acs", "fetalEcho", "ecg", "pocus", "physics"]
-    : ["abdominal", "smallParts", "pelvicGyn", "ob1st", "ob2nd3rd", "fetalEcho", "breast", "vascular", "msk", "pocus", "physics"]
+    : ["abdominal", "obgyn", "smallParts", "vascular", "msk", "pocus"]
   ).filter(
     (k) => (catPrefsForBanner as any)[k] !== false && catMapForBanner[k] != null
   );
@@ -1227,16 +1231,11 @@ export default function QuickFire() {
                     ? (IHE_CATS as unknown as { key: string; prefKey: string; Icon: any; label: string; mapKey: string }[])
                     : [
                     { cat: "Abdominal" as const, prefKey: "abdominal" as const, Icon: Stethoscope, label: "Abdominal", mapKey: "abdominal" },
+                    { cat: "OB/Gyn" as const, prefKey: "obgyn" as const, Icon: Baby, label: "OB/Gyn", mapKey: "obgyn" },
                     { cat: "Small Parts" as const, prefKey: "smallParts" as const, Icon: Scan, label: "Small Parts", mapKey: "smallParts" },
-                    { cat: "Pelvic/Gyn" as const, prefKey: "pelvicGyn" as const, Icon: Circle, label: "Pelvic/Gyn", mapKey: "pelvicGyn" },
-                    { cat: "OB 1st Trimester" as const, prefKey: "ob1st" as const, Icon: Baby, label: "OB 1st Tri", mapKey: "ob1st" },
-                    { cat: "OB 2nd/3rd Trimester" as const, prefKey: "ob2nd3rd" as const, Icon: Baby, label: "OB 2nd/3rd", mapKey: "ob2nd3rd" },
-                    { cat: "Fetal Echo" as const, prefKey: "fetalEcho" as const, Icon: Heart, label: "Fetal Echo", mapKey: "fetalEcho" },
-                    { cat: "Breast" as const, prefKey: "breast" as const, Icon: Microscope, label: "Breast", mapKey: "breast" },
                     { cat: "Vascular" as const, prefKey: "vascular" as const, Icon: Activity, label: "Vascular", mapKey: "vascular" },
                     { cat: "MSK" as const, prefKey: "msk" as const, Icon: Bone, label: "MSK", mapKey: "msk" },
                     { cat: "POCUS" as const, prefKey: "pocus" as const, Icon: Wind, label: "POCUS", mapKey: "pocus" },
-                    { cat: "Physics" as const, prefKey: "physics" as const, Icon: FlaskConical, label: "Physics", mapKey: "physics" },
                   ] as { cat?: string; key?: string; prefKey: string; Icon: any; label: string; mapKey: string }[]
                   ).filter(({ mapKey }) => {
                     // Only show preference toggles for categories that have questions available today
@@ -1315,16 +1314,11 @@ export default function QuickFire() {
                   const catPrefs = categoryPrefsQuery.data ?? (localUseIHECats ? IHE_DEFAULT_PREFS : AAUS_DEFAULT_PREFS);
                   const CATS = localUseIHECats ? (IHE_CATS as unknown as { key: string; label: string; Icon: any; desc: string; prefKey: string; mapKey: string }[]) : [
                     { key: "Abdominal", label: "Abdominal", Icon: Stethoscope, desc: "Abdominal Ultrasound", prefKey: "abdominal" as const, mapKey: "abdominal" },
+                    { key: "OB/Gyn", label: "OB/Gyn", Icon: Baby, desc: "OB & Gynecologic Ultrasound", prefKey: "obgyn" as const, mapKey: "obgyn" },
                     { key: "Small Parts", label: "Small Parts", Icon: Scan, desc: "Small Parts Ultrasound", prefKey: "smallParts" as const, mapKey: "smallParts" },
-                    { key: "Pelvic/Gyn", label: "Pelvic/Gyn", Icon: Circle, desc: "Pelvic/Gynecologic Ultrasound", prefKey: "pelvicGyn" as const, mapKey: "pelvicGyn" },
-                    { key: "OB 1st Trimester", label: "OB 1st Tri", Icon: Baby, desc: "1st Trimester Obstetric", prefKey: "ob1st" as const, mapKey: "ob1st" },
-                    { key: "OB 2nd/3rd Trimester", label: "OB 2nd/3rd", Icon: Baby, desc: "2nd/3rd Trimester Obstetric", prefKey: "ob2nd3rd" as const, mapKey: "ob2nd3rd" },
-                    { key: "Fetal Echo", label: "Fetal Echo", Icon: Heart, desc: "Fetal Echocardiography", prefKey: "fetalEcho" as const, mapKey: "fetalEcho" },
-                    { key: "Breast", label: "Breast", Icon: Microscope, desc: "Breast Ultrasound", prefKey: "breast" as const, mapKey: "breast" },
                     { key: "Vascular", label: "Vascular", Icon: Activity, desc: "Vascular Duplex", prefKey: "vascular" as const, mapKey: "vascular" },
                     { key: "MSK", label: "MSK", Icon: Bone, desc: "Musculoskeletal Ultrasound", prefKey: "msk" as const, mapKey: "msk" },
                     { key: "POCUS", label: "POCUS", Icon: Wind, desc: "Point-of-Care Ultrasound", prefKey: "pocus" as const, mapKey: "pocus" },
-                    { key: "Physics", label: "Physics", Icon: FlaskConical, desc: "Ultrasound Physics & Instrumentation", prefKey: "physics" as const, mapKey: "physics" },
                   ];
                   // Only show categories that have a question available today (non-null in categoryMap)
                   const enabledCats = CATS.filter((c) => catPrefs[c.prefKey] !== false && categoryMap[c.mapKey] != null);
@@ -2707,6 +2701,29 @@ export default function QuickFire() {
         {/* ── TAB: Leaderboard ─────────────────────────────────────────────── */}
         {activeTab === "leaderboard" && (
           <>
+            {!isPremium && (
+              <PremiumPearlGate type="premium" featureName="Leaderboard">
+                <div className="space-y-3 pointer-events-none">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h2 className="text-base font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>Echo Ninja Leaderboard</h2>
+                      <p className="text-xs text-gray-500">Top performers by correct answers</p>
+                    </div>
+                  </div>
+                  {["Dr. Sarah M.", "EchoNinja42", "CardioSono", "HeartWatcher", "SonoExpert"].map((name, i) => (
+                    <div key={i} className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-4">
+                      <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ background: i === 0 ? "#f59e0b" : i === 1 ? "#9ca3af" : i === 2 ? "#b45309" : "#189aa1" }}>{i + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-800">{name}</p>
+                        <p className="text-xs text-gray-400">{(500 - i * 87)} correct answers</p>
+                      </div>
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700">{(30 - i * 3)} day streak</span>
+                    </div>
+                  ))}
+                </div>
+              </PremiumPearlGate>
+            )}
+            {isPremium && <>
             <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
               <div>
                 <h2 className="text-base font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>Echo Ninja Leaderboard</h2>
@@ -2819,6 +2836,7 @@ export default function QuickFire() {
                 </div>
               </div>
             )}
+            </>}
           </>
         )}
 

@@ -21,6 +21,7 @@ import { Package, Check, ShoppingCart, ArrowLeft, ExternalLink } from "lucide-re
 import { Link } from "wouter";
 import { getLoginUrl } from "@/const";
 import { useState, useEffect, useRef } from "react";
+import { ImageLinkWrapper } from "@/components/BlockPreview";
 
 // ─── Block type (matches builder) ─────────────────────────────────────────────
 interface Block { id: string; type: string; data: Record<string, any>; }
@@ -169,13 +170,19 @@ function RenderBlock({ block, onBuy, buying, price, slug }: {
           <div className="max-w-3xl mx-auto prose prose-gray max-w-none" dangerouslySetInnerHTML={{ __html: d.content ?? "" }} />
         </div>
       );
-    case "image":
-      return d.url ? (
-        <div className="px-8 py-6" style={{ backgroundColor: d.bgColor ?? "#ffffff", textAlign: d.align ?? "center" }}>
-          <img src={d.url} alt={d.alt ?? ""} className="max-w-full mx-auto rounded-lg shadow" style={{ maxWidth: d.maxWidth ?? "100%" }} />
-          {d.caption && <p className="text-sm text-gray-500 mt-2 text-center">{d.caption}</p>}
+    case "image": {
+      const imgAlignPL = d.align ?? "center";
+      const imgJustifyPL = imgAlignPL === "left" ? "flex-start" : imgAlignPL === "right" ? "flex-end" : "center";
+      const mwPL = d.maxWidth ?? "auto";
+      const imgStylePL: React.CSSProperties = { maxWidth: mwPL === "auto" ? "100%" : mwPL, width: mwPL === "auto" ? undefined : "100%", height: d.height || "auto", objectFit: "cover", borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.noBorder ? "none" : (d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined) };
+      const imgElPL = d.url ? <img src={d.url} alt={d.alt ?? ""} className={d.showShadow !== false ? "shadow" : ""} style={imgStylePL} /> : null;
+      return imgElPL ? (
+        <div className="px-8 py-6" style={{ backgroundColor: d.bgColor ?? "#ffffff", display: "flex", flexDirection: "column", alignItems: imgJustifyPL }}>
+          <ImageLinkWrapper d={d}>{imgElPL}</ImageLinkWrapper>
+          {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: imgAlignPL as any }}>{d.caption}</p>}
         </div>
       ) : null;
+    }
     case "bullets":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>

@@ -70,10 +70,11 @@ export default function OrderBumpsAdmin() {
   // For display in the list — fetch product names
   const { data: coursesResult } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", page: 1, pageSize: 200 });
   const { data: downloads } = trpc.downloadsAdmin.list.useQuery();
-  const { data: physicalProductsData } = trpc.productsAdmin.list.useQuery();
+    const { data: physicalProductsData } = trpc.productsAdmin.list.useQuery();
+  const { data: bundlesListData } = trpc.downloadsAdmin.listBundles.useQuery();
   const courses = coursesResult?.courses ?? [];
   const physicalProducts = physicalProductsData ?? [];
-
+  const bundlesList = bundlesListData ?? [];
   function getProductName(type: string, id: number): string {
     if (type === "course") {
       const course = courses?.find((c: any) => c.id === id && c.type === "course");
@@ -87,11 +88,15 @@ export default function OrderBumpsAdmin() {
       const dl = downloads?.find((d: any) => d.id === id);
       return dl?.title ?? `Download #${id}`;
     }
+    if (type === "bundle") {
+      const bundle = bundlesList?.find((b: any) => b.id === id);
+      return bundle?.title ?? `Bundle #${id}`;
+    }
     if (type === "physical") {
       const prod = physicalProducts?.find((p: any) => p.id === id);
       return prod?.title ?? `Physical Product #${id}`;
     }
-    return `Bundle #${id}`;
+    return `Product #${id}`;
   }
 
   function toggleActive(bump: OrderBump) {
@@ -181,11 +186,13 @@ function OrderBumpEditor({ bump, onClose, onSaved }: {
   const { data: coursesResult, isLoading: coursesLoading } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", page: 1, pageSize: 200 });
   const { data: downloads, isLoading: downloadsLoading } = trpc.downloadsAdmin.list.useQuery();
   const { data: physicalProductsData, isLoading: physLoading } = trpc.productsAdmin.list.useQuery();
+  const { data: bundlesData, isLoading: bundlesLoading } = trpc.downloadsAdmin.listBundles.useQuery();
   const allCourses = coursesResult?.courses ?? [];
   const courses = allCourses.filter((c: any) => c.type === "course");
   const quizzes = allCourses.filter((c: any) => c.type === "quiz");
   const physicalProducts = physicalProductsData ?? [];
-  const isLoadingProducts = coursesLoading || downloadsLoading || physLoading;
+  const bundles = bundlesData ?? [];
+  const isLoadingProducts = coursesLoading || downloadsLoading || physLoading || bundlesLoading;
 
   const [form, setForm] = useState({
     triggerType: bump?.triggerType ?? "course" as "course" | "quiz" | "download" | "bundle" | "physical",
@@ -218,6 +225,7 @@ function OrderBumpEditor({ bump, onClose, onSaved }: {
     if (type === "course") return courses;
     if (type === "quiz") return quizzes;
     if (type === "download") return downloads ?? [];
+    if (type === "bundle") return bundles;
     if (type === "physical") return physicalProducts;
     return [];
   }

@@ -13,6 +13,50 @@ import { trpc } from "@/lib/trpc";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import { ButtonSubtext } from "@/lib/ctaSubtext";
 
+/**
+ * Wraps an image element with the correct click action based on the CTAActionPicker behavior.
+ * Handles: url, send_email, scroll_to_section, open_popup, download_file.
+ * For checkout/funnel behaviors the image is not wrapped (no-op).
+ */
+export function ImageLinkWrapper({ d, children }: { d: Record<string, any>; children: React.ReactNode }) {
+  const behavior: string = d.linkBehavior ?? (d.linkUrl ? "url" : "");
+  const newTab = d.openInNewTab !== false;
+  const style: React.CSSProperties = { display: "inline-block", cursor: "pointer" };
+
+  if (!behavior) return <>{children}</>;
+
+  if (behavior === "url" && d.linkUrl) {
+    return <a href={d.linkUrl} target={newTab ? "_blank" : undefined} rel="noopener noreferrer" style={style}>{children}</a>;
+  }
+  if (behavior === "send_email" && d.linkEmailAddress) {
+    return <a href={`mailto:${d.linkEmailAddress}`} style={style}>{children}</a>;
+  }
+  if (behavior === "download_file" && d.linkDownloadUrl) {
+    return <a href={d.linkDownloadUrl} download target="_blank" rel="noopener noreferrer" style={style}>{children}</a>;
+  }
+  if (behavior === "scroll_to_section" && d.linkScrollAnchor) {
+    const anchor = d.linkScrollAnchor.replace(/^#/, "");
+    return (
+      <span style={style} onClick={() => {
+        const el = document.getElementById(anchor);
+        if (el) el.scrollIntoView({ behavior: "smooth" });
+      }}>{children}</span>
+    );
+  }
+  if (behavior === "open_popup" && d.linkPopupUrl) {
+    // Open in a centered popup window
+    return (
+      <span style={style} onClick={() => {
+        const w = 800, h = 600;
+        const left = window.screenX + (window.outerWidth - w) / 2;
+        const top = window.screenY + (window.outerHeight - h) / 2;
+        window.open(d.linkPopupUrl, "_blank", `width=${w},height=${h},left=${left},top=${top},resizable=yes,scrollbars=yes`);
+      }}>{children}</span>
+    );
+  }
+  return <>{children}</>;
+}
+
 export type BlockType =
   | "hero" | "text" | "image" | "video" | "audio" | "bullets" | "testimonial"
   | "pricing_cta" | "divider" | "two_column" | "divided_columns" | "spacer"
@@ -135,7 +179,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
         : <div className="w-full h-40 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400"><Image size={32} /></div>;
       return (
         <div className="px-8 py-6" style={{ display: "flex", flexDirection: "column", alignItems: imgJustify }}>
-          {d.url && d.linkUrl ? <a href={d.linkUrl} target={d.openInNewTab !== false ? "_blank" : undefined} rel="noopener noreferrer" style={{ display: "inline-block" }}>{imgEl}</a> : imgEl}
+          <ImageLinkWrapper d={d}>{imgEl}</ImageLinkWrapper>
           {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: imgAlign as any }}>{d.caption}</p>}
         </div>
       );

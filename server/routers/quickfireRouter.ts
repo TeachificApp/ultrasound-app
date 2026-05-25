@@ -113,31 +113,21 @@ function seededShuffle<T>(arr: T[], seed: string): T[] {
 // Category keys used throughout the daily challenge system (AAUS categories)
 export const CHALLENGE_CATEGORIES = [
   "Abdominal",
+  "OB/Gyn",
   "Small Parts",
-  "Pelvic/Gyn",
-  "OB 1st Trimester",
-  "OB 2nd/3rd Trimester",
-  "Fetal Echo",
-  "Breast",
   "Vascular",
   "MSK",
   "POCUS",
-  "Physics",
 ] as const;
 export type ChallengeCategory = typeof CHALLENGE_CATEGORIES[number];
 // Map category label -> JSON key used in questionIds object
 const CAT_KEY: Record<ChallengeCategory, string> = {
   "Abdominal": "abdominal",
+  "OB/Gyn": "obgyn",
   "Small Parts": "smallParts",
-  "Pelvic/Gyn": "pelvicGyn",
-  "OB 1st Trimester": "ob1st",
-  "OB 2nd/3rd Trimester": "ob2nd3rd",
-  "Fetal Echo": "fetalEcho",
-  "Breast": "breast",
   "Vascular": "vascular",
   "MSK": "msk",
   "POCUS": "pocus",
-  "Physics": "physics",
 };
 
 // IHE-specific challenge categories (echocardiography)
@@ -180,13 +170,13 @@ function getBrandCategoryConfig(brand: string): {
       defaultEnabledSet: new Set(["adultEcho", "pediatricEcho", "acs", "fetalEcho", "ecg", "pocus", "physics"]),
     };
   }
-  const defaultMap: Record<string, number | null> = { abdominal: null, smallParts: null, pelvicGyn: null, ob1st: null, ob2nd3rd: null, fetalEcho: null, breast: null, vascular: null, msk: null, pocus: null, physics: null };
+  const defaultMap: Record<string, number | null> = { abdominal: null, obgyn: null, smallParts: null, vascular: null, msk: null, pocus: null };
   return {
     categories: CHALLENGE_CATEGORIES,
     catKey: CAT_KEY,
     defaultMap,
-    defaultOrder: ["abdominal", "smallParts", "pelvicGyn", "ob1st", "ob2nd3rd", "fetalEcho", "breast", "vascular", "msk", "pocus", "physics"],
-    defaultEnabledSet: new Set(["abdominal", "smallParts", "pelvicGyn", "ob1st", "ob2nd3rd", "fetalEcho", "breast", "vascular", "msk", "pocus", "physics"]),
+    defaultOrder: ["abdominal", "obgyn", "smallParts", "vascular", "msk", "pocus"],
+    defaultEnabledSet: new Set(["abdominal", "obgyn", "smallParts", "vascular", "msk", "pocus"]),
   };
 }
 
@@ -327,19 +317,29 @@ async function ensureTodaySet(db: NonNullable<Awaited<ReturnType<typeof getDb>>>
     } catch { /* ignore */ }
   }
 
-  const VASCULAR_CATS = ["Vascular"];
   // Track which categories need a fallback live challenge row created
   const fallbackLiveNeeded: { cat: string; questionId: number }[] = [];
 
   // Brand filter: only pick questions belonging to this brand
   const brandFilter = eq(quickfireQuestions.brand, brand as any);
 
+  // Category → echoCategory pool mapping for merged categories
+  // OB/Gyn pulls from Pelvic/Gyn + OB 1st Trimester + OB 2nd/3rd Trimester + Fetal Echo
+  // Small Parts pulls from Small Parts + Breast
+  // Vascular pulls from Vascular (already merged venous+arterial into Vascular)
+  const CAT_POOL_LABELS: Record<string, string[]> = {
+    "OB/Gyn": ["Pelvic/Gyn", "OB 1st Trimester", "OB 2nd/3rd Trimester", "Fetal Echo", "OB/Gyn"],
+    "Small Parts": ["Small Parts", "Breast"],
+    "Vascular": ["Vascular"],
+  };
+
   for (const cat of categories) {
     const key = catKey[cat];
     if (questionMap[key] !== null) continue;
     const usedIds = Array.from(usedIdsByCategory[cat] ?? new Set<number>());
-    const catFilter = cat === "Vascular"
-      ? sql`${quickfireQuestions.category} IN (${sql.join(VASCULAR_CATS.map(c => sql`${c}`), sql`, `)})` as any
+    const poolLabels = CAT_POOL_LABELS[cat];
+    const catFilter = poolLabels
+      ? sql`${quickfireQuestions.category} IN (${sql.join(poolLabels.map(c => sql`${c}`), sql`, `)})` as any
       : sql`${quickfireQuestions.category} = ${cat}` as any;
 
     // Try scenario questions first (preferred for challenges)
@@ -1773,10 +1773,22 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
       .from(users)
       .where(eq(users.id, ctx.user.id))
       .limit(1);
-     const defaults = { abdominal: true, smallParts: true, pelvicGyn: true, ob1st: true, ob2nd3rd: true, fetalEcho: true, breast: true, vascular: true, msk: true, pocus: true, physics: true };
+     const defaults = { abdominal: true, obgyn: true, smallParts: true, vascular: true, msk: true, pocus: true };
     if (!userRow?.challengeCategoryPrefs) return defaults;
     try {
-      return { ...defaults, ...JSON.parse(userRow.challengeCategoryPrefs) };
+      const stored = JSON.parse(userRow.challengeCategoryPrefs);
+      // Migrate legacy keys: if stored has old keys but not new ones, derive them
+      const migrated: Record<string, boolean> = { ...defaults };
+      if (stored.abdominal !== undefined) migrated.abdominal = stored.abdominal;
+      if (stored.obgyn !== undefined) migrated.obgyn = stored.obgyn;
+      else if (stored.pelvicGyn !== undefined || stored.ob1st !== undefined || stored.ob2nd3rd !== undefined || stored.fetalEcho !== undefined) {
+        migrated.obgyn = [stored.pelvicGyn, stored.ob1st, stored.ob2nd3rd, stored.fetalEcho].some(v => v === true);
+      }
+      if (stored.smallParts !== undefined) migrated.smallParts = stored.smallParts;
+      if (stored.vascular !== undefined) migrated.vascular = stored.vascular;
+      if (stored.msk !== undefined) migrated.msk = stored.msk;
+      if (stored.pocus !== undefined) migrated.pocus = stored.pocus;
+      return migrated;
     } catch {
       return defaults;
     }
@@ -1786,16 +1798,11 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
     .input(
       z.object({
         abdominal: z.boolean().default(true),
+        obgyn: z.boolean().default(true),
         smallParts: z.boolean().default(true),
-        pelvicGyn: z.boolean().default(true),
-        ob1st: z.boolean().default(true),
-        ob2nd3rd: z.boolean().default(true),
-        fetalEcho: z.boolean().default(true),
-        breast: z.boolean().default(true),
         vascular: z.boolean().default(true),
         msk: z.boolean().default(true),
         pocus: z.boolean().default(true),
-        physics: z.boolean().default(true),
       })
     )
     .mutation(async ({ ctx, input }) => {

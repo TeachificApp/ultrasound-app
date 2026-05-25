@@ -24,6 +24,7 @@ import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } fro
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import CarouselBlock from "@/components/CarouselBlock";
 import type { Block } from "@/components/BlockPreview";
+import { CountdownV2Block, ImageLinkWrapper } from "@/components/BlockPreview";
 import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -215,7 +216,7 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
       const imgElCL = d.url ? <img src={d.url} alt={d.alt ?? ""} className={d.showShadow !== false ? "shadow" : ""} style={imgStyleCL} /> : null;
       return (
         <div className="px-8 py-6" style={{ display: "flex", flexDirection: "column", alignItems: imgJustifyCL }}>
-          {imgElCL && (d.linkUrl ? <a href={d.linkUrl} target={d.openInNewTab !== false ? "_blank" : undefined} rel="noopener noreferrer" style={{ display: "inline-block" }}>{imgElCL}</a> : imgElCL)}
+          {imgElCL && <ImageLinkWrapper d={d}>{imgElCL}</ImageLinkWrapper>}
           {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: imgAlignCL as any }}>{d.caption}</p>}
         </div>
       );
@@ -386,6 +387,28 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
           <CountdownTimer mode={d.mode} durationMinutes={d.durationMinutes} targetDate={d.targetDate} textColor={d.textColor ?? "#fff"} />
         </div>
       );
+    case "ticker": {
+      const tickerItems: string[] = d.items ?? ["Welcome!"];
+      const sep = d.separator ?? " ✦ ";
+      const content = [...tickerItems, ...tickerItems].join(sep);
+      const speed = d.speed ?? 30;
+      const dir = d.direction === "right" ? "ticker-right" : "ticker-left";
+      const fontSizeMap: Record<string, string> = { xs: "0.75rem", sm: "0.875rem", base: "1rem", lg: "1.125rem", xl: "1.25rem" };
+      const fontWeightMap: Record<string, string> = { normal: "400", medium: "500", semibold: "600", bold: "700" };
+      const letterSpacingMap: Record<string, string> = { tighter: "-0.05em", normal: "0", wide: "0.025em", wider: "0.05em", widest: "0.1em" };
+      return (
+        <div className={`overflow-hidden ${d.padding ?? "py-2"}`} style={{ backgroundColor: d.bgColor ?? "#0f766e" }}>
+          <style>{`@keyframes ticker-left{from{transform:translateX(0)}to{transform:translateX(-50%)}} @keyframes ticker-right{from{transform:translateX(-50%)}to{transform:translateX(0)}}`}</style>
+          <div style={{ display: "flex", whiteSpace: "nowrap", animation: `${dir} ${speed}s linear infinite`, willChange: "transform", color: d.textColor ?? "#ffffff", fontSize: fontSizeMap[d.fontSize ?? "sm"] ?? "0.875rem", fontWeight: fontWeightMap[d.fontWeight ?? "normal"] ?? "400", letterSpacing: letterSpacingMap[d.letterSpacing ?? "normal"] ?? "0", textTransform: (d.textTransform === "none" ? "none" : d.textTransform) as any }}>
+            <span style={{ paddingRight: "4rem" }}>{content}</span>
+            <span style={{ paddingRight: "4rem" }}>{content}</span>
+          </div>
+        </div>
+      );
+    }
+    case "countdown_v2": {
+      return <CountdownV2Block d={d} />;
+    }
     case "alert": {
       const alertStyles: Record<string, string> = { info: "bg-blue-50 border-blue-300 text-blue-800", success: "bg-green-50 border-green-300 text-green-800", warning: "bg-yellow-50 border-yellow-300 text-yellow-800", error: "bg-red-50 border-red-300 text-red-800" };
       return (

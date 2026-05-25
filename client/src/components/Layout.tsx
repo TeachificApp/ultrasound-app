@@ -20,6 +20,7 @@ import { getLoginUrl, getThinkificFreeUrl } from "@/const";
 import { useBrand } from "@/hooks/useBrand";
 import { getBrandNavConfig } from "@/config/brandNav";
 import { isLearnDomain, isMembersDomain, isAccreditationDomain } from "@/hooks/useSubdomain";
+import GetAppBanner from "@/components/GetAppBanner";
 
 /** Badge showing the count of echo cases pending admin review */
 function CasePendingBadge() {
@@ -631,6 +632,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+      <GetAppBanner />
     </div>
   );
 }

@@ -81,15 +81,16 @@ export const soundBytesRouter = router({
         .groupBy(soundByteViews.soundByteId);
       const viewMap = new Map(viewCounts.map((v) => [v.soundByteId, v.total]));
 
-      // Tag the FIRST item in each category as free-tier (1 free video per category).
-      const seenCategories = new Set<string>();
+      // Tag the FIRST 3 items in each category as free-tier (3 free clips per category).
+      const FREE_PER_CATEGORY = 3;
+      const categoryCountMap = new Map<string, number>();
       return rows.map((r) => {
-        const isFirstInCategory = !seenCategories.has(r.category);
-        seenCategories.add(r.category);
+        const count = categoryCountMap.get(r.category) ?? 0;
+        categoryCountMap.set(r.category, count + 1);
         return {
           ...r,
           phantomViews: getPhantomViews(r.id, viewMap.get(r.id) ?? 0),
-          isFree: isFirstInCategory,
+          isFree: count < FREE_PER_CATEGORY,
         };
       });
     }),
