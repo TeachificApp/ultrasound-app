@@ -35,6 +35,12 @@ export interface Block {
 
 export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block; coursePrice?: number; courseTitle?: string }) {
   const d = block.data ?? {};
+  const bwBP = d.contentWidth;
+  const bwMapBP: Record<string, string> = { xl: "1280px", lg: "1024px", md: "768px", sm: "640px" };
+  const bwMaxBP = bwBP && bwBP !== "full" ? bwMapBP[bwBP] : null;
+
+  const wrapWidth = (inner: React.ReactNode) =>
+    bwMaxBP ? <div style={{ maxWidth: bwMaxBP, marginLeft: "auto", marginRight: "auto", width: "100%" }}>{inner}</div> : <>{inner}</>;
 
   switch (block.type) {
     case "hero": {
@@ -102,12 +108,13 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       const imgAlign = d.align ?? "center";
       const imgJustify = imgAlign === "left" ? "flex-start" : imgAlign === "right" ? "flex-end" : "center";
       const mw = d.maxWidth ?? "auto";
-      const imgStyle: React.CSSProperties = { maxWidth: mw === "auto" ? "100%" : mw, width: mw === "auto" ? undefined : "100%", height: d.height || "auto", objectFit: "cover", borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined };
+      const imgStyle: React.CSSProperties = { maxWidth: mw === "auto" ? "100%" : mw, width: mw === "auto" ? undefined : "100%", height: d.height || "auto", objectFit: "cover", borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.noBorder ? "none" : (d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined) };
+      const imgEl = d.url
+        ? <img src={d.url} alt={d.alt ?? ""} className={d.showShadow !== false ? "shadow" : ""} style={imgStyle} />
+        : <div className="w-full h-40 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400"><Image size={32} /></div>;
       return (
         <div className="px-8 py-6" style={{ display: "flex", flexDirection: "column", alignItems: imgJustify }}>
-          {d.url
-            ? <img src={d.url} alt={d.alt ?? ""} className="shadow" style={imgStyle} />
-            : <div className="w-full h-40 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400"><Image size={32} /></div>}
+          {d.url && d.linkUrl ? <a href={d.linkUrl} target={d.openInNewTab !== false ? "_blank" : undefined} rel="noopener noreferrer" style={{ display: "inline-block" }}>{imgEl}</a> : imgEl}
           {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: imgAlign as any }}>{d.caption}</p>}
         </div>
       );

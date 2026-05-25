@@ -146,6 +146,11 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
   user?: UserParamSource | null;
 }) {
   const d = block.data;
+  // Content width wrapper helper
+  const widthMap: Record<string, string> = { full: "100%", xl: "1280px", lg: "1024px", md: "768px", sm: "640px" };
+  const cw = d.contentWidth && d.contentWidth !== "full" ? widthMap[d.contentWidth] : null;
+  const withWidthWrapper = (inner: React.ReactNode) =>
+    cw ? <div style={{ maxWidth: cw, marginLeft: "auto", marginRight: "auto", width: "100%" }}>{inner}</div> : <>{inner}</>;
 
   switch (block.type) {
     case "hero": {
@@ -186,10 +191,11 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
       const imgAlignF = d.align ?? "center";
       const imgJustifyF = imgAlignF === "left" ? "flex-start" : imgAlignF === "right" ? "flex-end" : "center";
       const mwF = d.maxWidth ?? "auto";
-      const imgStyleF: React.CSSProperties = { maxWidth: mwF === "auto" ? "100%" : mwF, width: mwF === "auto" ? undefined : "100%", height: d.height || "auto", objectFit: "cover", borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined };
+      const imgStyleF: React.CSSProperties = { maxWidth: mwF === "auto" ? "100%" : mwF, width: mwF === "auto" ? undefined : "100%", height: d.height || "auto", objectFit: "cover", borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.noBorder ? "none" : (d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined) };
+      const imgElF = d.url ? <img src={d.url} alt={d.alt ?? ""} className={d.showShadow !== false ? "shadow-md" : ""} style={imgStyleF} /> : null;
       return (
         <div className="px-8 py-8" style={{ display: "flex", flexDirection: "column", alignItems: imgJustifyF }}>
-          {d.url && <img src={d.url} alt={d.alt ?? ""} className="shadow-md" style={imgStyleF} />}
+          {imgElF && (d.linkUrl ? <a href={d.linkUrl} target={d.openInNewTab !== false ? "_blank" : undefined} rel="noopener noreferrer" style={{ display: "inline-block" }}>{imgElF}</a> : imgElF)}
           {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: imgAlignF as any }}>{d.caption}</p>}
         </div>
       );
@@ -1426,18 +1432,22 @@ function FunnelPageContent({ data }: { data: { funnel: any; page: any; nextPage:
   return (
     <div className="min-h-screen bg-white">
       {/* Render all blocks */}
-      {blocks.map((block) => (
-        <div key={block.id} style={{ marginTop: block.data.marginTop ? `${block.data.marginTop}px` : undefined, marginBottom: block.data.marginBottom ? `${block.data.marginBottom}px` : undefined, paddingTop: block.data.paddingTop ? `${block.data.paddingTop}px` : undefined, paddingBottom: block.data.paddingBottom ? `${block.data.paddingBottom}px` : undefined, paddingLeft: block.data.paddingLeft ? `${block.data.paddingLeft}px` : undefined, paddingRight: block.data.paddingRight ? `${block.data.paddingRight}px` : undefined }}>
-          <RenderBlock
-            block={block}
-            funnelId={funnel.id}
-            pageId={page.id}
-            funnelSlug={funnel.slug}
-            nextPage={effectiveNextPage}
-            user={pageUser}
-          />
-        </div>
-      ))}
+      {blocks.map((block) => {
+        const bw = block.data.contentWidth;
+        const bwMap: Record<string, string> = { xl: "1280px", lg: "1024px", md: "768px", sm: "640px" };
+        const bwMax = bw && bw !== "full" ? bwMap[bw] : null;
+        return (
+          <div key={block.id} style={{ marginTop: block.data.marginTop || undefined, marginBottom: block.data.marginBottom || undefined, paddingTop: block.data.paddingTop || undefined, paddingBottom: block.data.paddingBottom || undefined, paddingLeft: block.data.paddingLeft || undefined, paddingRight: block.data.paddingRight || undefined }}>
+            {bwMax ? (
+              <div style={{ maxWidth: bwMax, marginLeft: "auto", marginRight: "auto", width: "100%" }}>
+                <RenderBlock block={block} funnelId={funnel.id} pageId={page.id} funnelSlug={funnel.slug} nextPage={effectiveNextPage} user={pageUser} />
+              </div>
+            ) : (
+              <RenderBlock block={block} funnelId={funnel.id} pageId={page.id} funnelSlug={funnel.slug} nextPage={effectiveNextPage} user={pageUser} />
+            )}
+          </div>
+        );
+      })}
 
       {/* Next page navigation — only shown when showNavigationButton is explicitly ON */}
       {page.showNavigationButton && branchResolved && resolvedNextUrl && (
@@ -1479,7 +1489,7 @@ function FunnelPageContent({ data }: { data: { funnel: any; page: any; nextPage:
 // ─── Instructor Public Block (fetches from saved profile or uses manual data) ──
 function InstructorPublicBlock({ d }: { d: Record<string, any> }) {
   const instructorId = d.instructorId ? Number(d.instructorId) : null;
-  const { data: instructors } = trpc.lms.listInstructors.useQuery();
+  const { data: instructors } = trpc.lms.listInstructors.useQuery(undefined, { staleTime: 5 * 60_000 });
   const instructor = instructorId ? instructors?.find((i: any) => i.id === instructorId) : null;
   const name = instructor?.name ?? d.name ?? "";
   const title = instructor?.title ?? d.title ?? "";

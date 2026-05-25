@@ -434,17 +434,34 @@ export const lmsPublicRouter = router({
       }
 
       // Sections + preview lessons
-      const sections = await db.select().from(lmsSections).where(eq(lmsSections.courseId, course.id)).orderBy(asc(lmsSections.position));
-      const sectionsWithLessons = await Promise.all(sections.map(async (s) => {
-        const lessons = await db.select({
+      // Batch all sub-queries in parallel to avoid sequential round-trips
+      const [sections, allLessonsRaw, cis, landingPageRow, pricingOptions] = await Promise.all([
+        db.select().from(lmsSections).where(eq(lmsSections.courseId, course.id)).orderBy(asc(lmsSections.position)),
+        db.select({
           id: lmsLessons.id, title: lmsLessons.title, type: lmsLessons.type,
-          position: lmsLessons.position, isPreview: lmsLessons.isPreview, previewMode: lmsLessons.previewMode, durationMinutes: lmsLessons.durationMinutes,
-        }).from(lmsLessons).where(eq(lmsLessons.sectionId, s.id)).orderBy(asc(lmsLessons.position));
-        return { ...s, lessons };
-      }));
+          position: lmsLessons.position, isPreview: lmsLessons.isPreview, previewMode: lmsLessons.previewMode,
+          durationMinutes: lmsLessons.durationMinutes, sectionId: lmsLessons.sectionId,
+        }).from(lmsLessons)
+          .innerJoin(lmsSections, eq(lmsLessons.sectionId, lmsSections.id))
+          .where(eq(lmsSections.courseId, course.id))
+          .orderBy(asc(lmsLessons.position)),
+        db.select().from(lmsCourseInstructors).where(eq(lmsCourseInstructors.courseId, course.id)),
+        db.select().from(lmsLandingPages).where(eq(lmsLandingPages.courseId, course.id)).limit(1),
+        db.select().from(lmsPricingOptions)
+          .where(and(eq(lmsPricingOptions.courseId, course.id), eq(lmsPricingOptions.isActive, true)))
+          .orderBy(asc(lmsPricingOptions.sortOrder)),
+      ]);
 
-      // Instructors — batch fetch to avoid N+1
-      const cis = await db.select().from(lmsCourseInstructors).where(eq(lmsCourseInstructors.courseId, course.id));
+      // Group lessons by sectionId
+      const lessonsBySectionId = new Map<number, typeof allLessonsRaw>();
+      for (const lesson of allLessonsRaw) {
+        const arr = lessonsBySectionId.get(lesson.sectionId) ?? [];
+        arr.push(lesson);
+        lessonsBySectionId.set(lesson.sectionId, arr);
+      }
+      const sectionsWithLessons = sections.map(s => ({ ...s, lessons: lessonsBySectionId.get(s.id) ?? [] }));
+
+      // Instructors — batch fetch
       let instructors: any[] = [];
       if (cis.length > 0) {
         const instructorIds = cis.map(ci => ci.instructorId);
@@ -457,15 +474,9 @@ export const lmsPublicRouter = router({
         }).filter(Boolean);
       }
 
-      // Landing page
-      const [landingPage] = await db.select().from(lmsLandingPages).where(eq(lmsLandingPages.courseId, course.id)).limit(1);
+      const landingPage = landingPageRow[0] ?? null;
 
-      // Pricing options (secondary pricing plans)
-      const pricingOptions = await db.select().from(lmsPricingOptions)
-        .where(and(eq(lmsPricingOptions.courseId, course.id), eq(lmsPricingOptions.isActive, true)))
-        .orderBy(asc(lmsPricingOptions.sortOrder));
-
-      return { ...course, sections: sectionsWithLessons, instructors: instructors.filter(Boolean), landingPage: landingPage ?? null, pricingOptions };
+      return { ...course, sections: sectionsWithLessons, instructors: instructors.filter(Boolean), landingPage, pricingOptions };
     }),
 
   /** Get instructor public profile */
@@ -568,11 +579,13 @@ export const lmsLearnerRouter = router({
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     const enrollments = await db.select().from(lmsEnrollments).where(eq(lmsEnrollments.userId, ctx.user.id)).orderBy(desc(lmsEnrollments.enrolledAt));
-    const enriched = await Promise.all(enrollments.map(async (e) => {
-      const [course] = await db.select({ id: lmsCourses.id, slug: lmsCourses.slug, title: lmsCourses.title, coverImageUrl: lmsCourses.coverImageUrl, type: lmsCourses.type }).from(lmsCourses).where(eq(lmsCourses.id, e.courseId)).limit(1);
-      return { ...e, course: course ?? null };
-    }));
-    return enriched;
+    if (enrollments.length === 0) return [];
+    const courseIds = [...new Set(enrollments.map(e => e.courseId))];
+    const coursesRaw = await db.select({ id: lmsCourses.id, slug: lmsCourses.slug, title: lmsCourses.title, coverImageUrl: lmsCourses.coverImageUrl, type: lmsCourses.type })
+      .from(lmsCourses)
+      .where(sql`${lmsCourses.id} IN (${sql.join(courseIds.map(id => sql`${id}`), sql`, `)})`);
+    const courseMap = new Map(coursesRaw.map(c => [c.id, c]));
+    return enrollments.map(e => ({ ...e, course: courseMap.get(e.courseId) ?? null }));
   }),
 
   /** Get full course content for enrolled user (or preview lessons) */

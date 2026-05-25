@@ -190,10 +190,11 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
       const imgAlignCL = d.align ?? "center";
       const imgJustifyCL = imgAlignCL === "left" ? "flex-start" : imgAlignCL === "right" ? "flex-end" : "center";
       const mwCL = d.maxWidth ?? "auto";
-      const imgStyleCL: React.CSSProperties = { maxWidth: mwCL === "auto" ? "100%" : mwCL, width: mwCL === "auto" ? undefined : "100%", height: d.height || "auto", objectFit: "cover", borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined };
+      const imgStyleCL: React.CSSProperties = { maxWidth: mwCL === "auto" ? "100%" : mwCL, width: mwCL === "auto" ? undefined : "100%", height: d.height || "auto", objectFit: "cover", borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.noBorder ? "none" : (d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined) };
+      const imgElCL = d.url ? <img src={d.url} alt={d.alt ?? ""} className={d.showShadow !== false ? "shadow" : ""} style={imgStyleCL} /> : null;
       return (
         <div className="px-8 py-6" style={{ display: "flex", flexDirection: "column", alignItems: imgJustifyCL }}>
-          {d.url && <img src={d.url} alt={d.alt ?? ""} className="shadow" style={imgStyleCL} />}
+          {imgElCL && (d.linkUrl ? <a href={d.linkUrl} target={d.openInNewTab !== false ? "_blank" : undefined} rel="noopener noreferrer" style={{ display: "inline-block" }}>{imgElCL}</a> : imgElCL)}
           {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: imgAlignCL as any }}>{d.caption}</p>}
         </div>
       );
@@ -727,11 +728,22 @@ export default function CourseLanding() {
   if (blocks.length > 0) {
     return (
       <div className="min-h-screen bg-white">
-        {blocks.map(block => (
-          <div key={block.id} style={{ marginTop: block.data?.marginTop ? `${block.data.marginTop}px` : undefined, marginBottom: block.data?.marginBottom ? `${block.data.marginBottom}px` : undefined, paddingTop: block.data?.paddingTop ? `${block.data.paddingTop}px` : undefined, paddingBottom: block.data?.paddingBottom ? `${block.data.paddingBottom}px` : undefined, paddingLeft: block.data?.paddingLeft ? `${block.data.paddingLeft}px` : undefined, paddingRight: block.data?.paddingRight ? `${block.data.paddingRight}px` : undefined }}>
-            <RenderBlock block={block} course={course} onEnroll={handleEnroll} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} />
-          </div>
-        ))}
+        {blocks.map(block => {
+          const bwCL = block.data?.contentWidth;
+          const bwMapCL: Record<string, string> = { xl: "1280px", lg: "1024px", md: "768px", sm: "640px" };
+          const bwMaxCL = bwCL && bwCL !== "full" ? bwMapCL[bwCL] : null;
+          return (
+            <div key={block.id} style={{ marginTop: block.data?.marginTop || undefined, marginBottom: block.data?.marginBottom || undefined, paddingTop: block.data?.paddingTop || undefined, paddingBottom: block.data?.paddingBottom || undefined, paddingLeft: block.data?.paddingLeft || undefined, paddingRight: block.data?.paddingRight || undefined }}>
+              {bwMaxCL ? (
+                <div style={{ maxWidth: bwMaxCL, marginLeft: "auto", marginRight: "auto", width: "100%" }}>
+                  <RenderBlock block={block} course={course} onEnroll={handleEnroll} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} />
+                </div>
+              ) : (
+                <RenderBlock block={block} course={course} onEnroll={handleEnroll} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} />
+              )}
+            </div>
+          );
+        })}
         {/* Before-checkout order bump */}
         {!enrollment && course && (
           <div className="max-w-2xl mx-auto px-4 py-8">
@@ -1000,7 +1012,7 @@ export default function CourseLanding() {
 // ─── Instructor Public Block (fetches from saved profile or uses manual data) ──
 function InstructorPublicBlock({ d }: { d: Record<string, any> }) {
   const instructorId = d.instructorId ? Number(d.instructorId) : null;
-  const { data: instructors } = trpc.lms.listInstructors.useQuery();
+  const { data: instructors } = trpc.lms.listInstructors.useQuery(undefined, { staleTime: 5 * 60_000 });
   const instructor = instructorId ? instructors?.find((i: any) => i.id === instructorId) : null;
   const name = instructor?.name ?? d.name ?? "";
   const title = instructor?.title ?? d.title ?? "";

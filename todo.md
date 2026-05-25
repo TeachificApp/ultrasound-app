@@ -2823,3 +2823,11 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Apply contentWidth wrapper in PublicFunnelPage renderer
 - [ ] Apply contentWidth wrapper in CourseLanding renderer
 - [ ] Apply contentWidth wrapper in DownloadLanding renderer
+
+## Image Block Clickable Link (May 2026)
+- [ ] Add linkUrl + openInNewTab fields to image block defaultData in BLOCK_CATALOG
+- [ ] Add link URL input + open-in-new-tab toggle to image BlockSettings in LandingPageBuilder
+- [ ] Wrap img in <a> tag in BlockPreview when linkUrl is set
+- [ ] Wrap img in <a> tag in PublicFunnelPage when linkUrl is set
+- [ ] Wrap img in <a> tag in CourseLanding when linkUrl is set
+- [ ] Wrap img in <a> tag in DownloadLanding when linkUrl is set
