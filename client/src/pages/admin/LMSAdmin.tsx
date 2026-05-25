@@ -105,7 +105,7 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
   const typeLabel = typeFilter === "quiz" ? "Quiz" : typeFilter === "download" ? "Download" : "Course";
   const typeLabelPlural = typeFilter === "quiz" ? "quizzes" : typeFilter === "download" ? "downloads" : "courses";
 
-  const { data, isLoading, refetch } = trpc.lmsAdmin.listCourses.useQuery({ status: statusFilter as any, type: typeFilter, page, pageSize: 20 });
+  const { data, isLoading, error, refetch } = trpc.lmsAdmin.listCourses.useQuery({ status: statusFilter as any, type: typeFilter, page, pageSize: 20 });
 
   const deleteCourse = trpc.lmsAdmin.deleteCourse.useMutation({
     onSuccess: () => { toast.success("Course deleted"); refetch(); },
@@ -142,6 +142,13 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
 
       {isLoading ? (
         <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-lg" />)}</div>
+      ) : error ? (
+        <div className="text-center py-12 text-red-500">
+          <AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />
+          <p className="font-medium">Failed to load {typeLabelPlural}</p>
+          <p className="text-sm text-gray-400 mt-1">{error.message}</p>
+          <Button size="sm" variant="outline" className="mt-3" onClick={() => refetch()}>Retry</Button>
+        </div>
       ) : (
         <div className="space-y-2">
           {(data?.courses ?? []).map((c: any) => (

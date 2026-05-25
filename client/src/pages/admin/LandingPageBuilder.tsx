@@ -663,14 +663,14 @@ function BSLinkField({ data, onSet, label, field, value, onChange }: {
 function CurriculumCourseSelector({ d, set }: { d: Record<string, any>; set: (key: string, val: any) => void }) {
   const { data: coursesData } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", type: "course", pageSize: 200 });
   const courses = (coursesData?.courses ?? []) as Array<{ id: number; title: string; type: string }>;
-  const selectedId = d.courseId ? String(d.courseId) : "";
+  const selectedId = d.courseId ? String(d.courseId) : "_auto";
   return (
     <div className="border-b pb-3 mb-1">
       <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Course to Display</label>
-      <Select value={selectedId} onValueChange={v => set("courseId", v ? Number(v) : null)}>
+      <Select value={selectedId} onValueChange={v => set("courseId", v === "_auto" ? null : Number(v))}>
         <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Auto (from page context)" /></SelectTrigger>
         <SelectContent>
-          <SelectItem value="">Auto (from page context)</SelectItem>
+          <SelectItem value="_auto">Auto (from page context)</SelectItem>
           {courses.map((c) => (
             <SelectItem key={c.id} value={String(c.id)}>{c.title}</SelectItem>
           ))}

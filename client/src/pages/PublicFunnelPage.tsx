@@ -1433,9 +1433,13 @@ function FunnelPageContent({ data }: { data: { funnel: any; page: any; nextPage:
     <div className="min-h-screen bg-white">
       {/* Render all blocks */}
       {blocks.map((block) => {
+        // Full-bleed block types must never be wrapped in a contentWidth constraint at the outer level.
+        // Their background spans 100% width; contentWidth only constrains inner content (handled inside RenderBlock).
+        const FULL_BLEED_TYPES = ["hero", "pricing_cta", "cta_standalone", "divider", "spacer", "footer", "logo_strip", "urgency_offer", "product_offer_stack", "price_stack", "image_content"];
+        const isFullBleed = FULL_BLEED_TYPES.includes(block.type);
         const bw = block.data.contentWidth;
         const bwMap: Record<string, string> = { xl: "1280px", lg: "1024px", md: "768px", sm: "640px" };
-        const bwMax = bw && bw !== "full" ? bwMap[bw] : null;
+        const bwMax = !isFullBleed && bw && bw !== "full" ? bwMap[bw] : null;
         return (
           <div key={block.id} style={{ marginTop: block.data.marginTop || undefined, marginBottom: block.data.marginBottom || undefined, paddingTop: block.data.paddingTop || undefined, paddingBottom: block.data.paddingBottom || undefined, paddingLeft: block.data.paddingLeft || undefined, paddingRight: block.data.paddingRight || undefined }}>
             {bwMax ? (

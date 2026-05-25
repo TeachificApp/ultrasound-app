@@ -710,9 +710,11 @@ export default function DownloadLanding() {
     return (
       <div className="min-h-screen bg-white">
         {blocks.map(block => {
+          const FULL_BLEED_TYPES_DL = ["hero", "pricing_cta", "cta_standalone", "divider", "spacer", "footer", "logo_strip", "urgency_offer", "product_offer_stack", "price_stack", "image_content"];
+          const isFullBleedDL = FULL_BLEED_TYPES_DL.includes(block.type);
           const bwDL = block.data?.contentWidth;
           const bwMapDL: Record<string, string> = { xl: "1280px", lg: "1024px", md: "768px", sm: "640px" };
-          const bwMaxDL = bwDL && bwDL !== "full" ? bwMapDL[bwDL] : null;
+          const bwMaxDL = !isFullBleedDL && bwDL && bwDL !== "full" ? bwMapDL[bwDL] : null;
           return (
             <div key={block.id} style={{ marginTop: block.data?.marginTop || undefined, marginBottom: block.data?.marginBottom || undefined, paddingTop: block.data?.paddingTop || undefined, paddingBottom: block.data?.paddingBottom || undefined, paddingLeft: block.data?.paddingLeft || undefined, paddingRight: block.data?.paddingRight || undefined }}>
               {bwMaxDL ? (

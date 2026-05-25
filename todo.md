@@ -2831,3 +2831,16 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Wrap img in <a> tag in PublicFunnelPage when linkUrl is set
 - [ ] Wrap img in <a> tag in CourseLanding when linkUrl is set
 - [ ] Wrap img in <a> tag in DownloadLanding when linkUrl is set
+
+## Bug Fixes — May 25 2026
+- [x] Fix SelectItem value="" crash in CurriculumCourseSelector (use "_auto" sentinel)
+- [x] Fix full-bleed blocks (hero, pricing_cta, cta_standalone, image_content, urgency_offer, price_stack, product_offer_stack, etc.) being clipped by outer contentWidth wrapper in PublicFunnelPage, CourseLanding, and DownloadLanding
+
+## CTA Action Dropdown & Free-Preview Enrollment (May 2026)
+- [ ] Add "Free Preview Enroll" and "Group Enrollment" options to all existing CTA behavior dropdowns (hero, pricing_cta, cta_standalone)
+- [ ] Add hero/banner "Make entire banner clickable" toggle with same action dropdown
+- [ ] Upgrade bare-link CTA fields (image block, price_stack, urgency_offer, product_offer_stack) to full action dropdown
+- [ ] Add server procedure for free-preview enrollment via CTA
+- [ ] Track free-preview enrollments in lmsEnrollments with enrollmentType = "free_preview"
+- [ ] Admin analytics: per-course free-preview enrollment counts drill-down
+- [ ] Show "Free Preview" enrollment label in user profiles and My Dashboard

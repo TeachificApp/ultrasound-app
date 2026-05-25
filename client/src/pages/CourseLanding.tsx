@@ -729,9 +729,12 @@ export default function CourseLanding() {
     return (
       <div className="min-h-screen bg-white">
         {blocks.map(block => {
+          // Full-bleed block types must never be wrapped in a contentWidth constraint at the outer level.
+          const FULL_BLEED_TYPES_CL = ["hero", "pricing_cta", "cta_standalone", "divider", "spacer", "footer", "logo_strip", "urgency_offer", "product_offer_stack", "price_stack", "image_content"];
+          const isFullBleedCL = FULL_BLEED_TYPES_CL.includes(block.type);
           const bwCL = block.data?.contentWidth;
           const bwMapCL: Record<string, string> = { xl: "1280px", lg: "1024px", md: "768px", sm: "640px" };
-          const bwMaxCL = bwCL && bwCL !== "full" ? bwMapCL[bwCL] : null;
+          const bwMaxCL = !isFullBleedCL && bwCL && bwCL !== "full" ? bwMapCL[bwCL] : null;
           return (
             <div key={block.id} style={{ marginTop: block.data?.marginTop || undefined, marginBottom: block.data?.marginBottom || undefined, paddingTop: block.data?.paddingTop || undefined, paddingBottom: block.data?.paddingBottom || undefined, paddingLeft: block.data?.paddingLeft || undefined, paddingRight: block.data?.paddingRight || undefined }}>
               {bwMaxCL ? (
