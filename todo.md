@@ -2776,3 +2776,13 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add SortableReviewItem component with GripVertical drag handle in LandingPageBuilder
 - [x] Wrap reviews list in DndContext + SortableContext for vertical reordering
 - [x] Move reviewSensors hook to top of BlockSettings (React rules of hooks compliance)
+## Checklist Content Block (May 2026)
+- [x] Add "checklist" to BlockType union in BlockPreview.tsx
+- [x] Add checklist renderer in BlockPreview.tsx (checkmark badge instead of number)
+- [x] Add checklist catalog entry in LandingPageBuilder.tsx BLOCK_CATALOG (Marketing category)
+- [x] Add checklist BlockSettings case in LandingPageBuilder.tsx (identical to numbered_list editor)
+- [x] Add checklist label case in LessonBlockEditor.tsx
+- [x] Add checklist renderer in CourseLanding.tsx
+- [x] Add checklist renderer in DownloadLanding.tsx
+- [x] Add checklist renderer in PublicFunnelPage.tsx
+- [x] DownloadLandingPageBuilder, ProductLandingPageBuilder, FunnelPageEditor inherit checklist automatically via BLOCK_CATALOG import

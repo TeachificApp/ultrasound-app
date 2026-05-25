@@ -16,7 +16,7 @@ export type BlockType =
   | "pricing_cta" | "divider" | "two_column" | "divided_columns" | "spacer"
   | "faq" | "image_text" | "gallery" | "icon_grid" | "countdown"
   | "instructor" | "logos" | "reviews" | "embed" | "cta_standalone"
-  | "lead_capture" | "cta_optin" | "numbered_list" | "alert" | "flip_cards"
+  | "lead_capture" | "cta_optin" | "numbered_list" | "checklist" | "alert" | "flip_cards"
   | "curriculum_auto" | "pricing_options_auto"
   | "funnel_workflow" | "product_offer_stack" | "order_bump_checkout"
   | "price_stack" | "urgency_offer" | "checkout_form"
@@ -199,6 +199,20 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
               <div key={i} className="flex items-start gap-4">
                 <span className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold" style={{ backgroundColor: d.accentColor ?? "#179ca3" }}>{i + 1}</span>
                 <span className="text-gray-700 pt-1">{item}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    case "checklist":
+      return (
+        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          <div className="space-y-3 max-w-2xl">
+            {(d.items ?? []).map((item: string, i: number) => (
+              <div key={i} className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold mt-0.5" style={{ backgroundColor: d.accentColor ?? "#179ca3" }}>✓</span>
+                <span className="text-gray-700">{item}</span>
               </div>
             ))}
           </div>

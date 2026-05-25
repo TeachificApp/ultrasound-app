@@ -190,6 +190,22 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
           </div>
         </div>
       );
+    case "checklist":
+      return (
+        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          <div className="max-w-2xl mx-auto">
+            {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+            <div className="space-y-3">
+              {(d.items ?? []).map((item: string, i: number) => (
+                <div key={i} className="flex items-start gap-3">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold mt-0.5" style={{ backgroundColor: d.accentColor ?? "#179ca3" }}>✓</span>
+                  <span className="text-gray-700">{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
     case "testimonial":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f0fdfa" }}>

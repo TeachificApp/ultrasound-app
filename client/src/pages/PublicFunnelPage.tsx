@@ -419,6 +419,23 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
           </div>
         </div>
       );
+    case "checklist":
+      return (
+        <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
+          <div className="max-w-3xl mx-auto">
+            {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+            <ul className="space-y-3">
+              {(d.items ?? []).map((item: string, i: number) => (
+                <li key={i} className="flex items-start gap-3">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center font-bold text-white text-xs mt-0.5"
+                    style={{ backgroundColor: d.accentColor ?? "#179ca3" }}>✓</span>
+                  <span className="text-lg text-gray-700">{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      );
     case "logos":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>

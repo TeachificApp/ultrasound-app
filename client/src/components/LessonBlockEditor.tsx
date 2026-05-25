@@ -290,6 +290,10 @@ export default function LessonBlockEditor({
         const items: string[] = d?.items ?? [];
         return truncate(d?.headline || items[0] || "Numbered list");
       }
+      case "checklist": {
+        const items: string[] = d?.items ?? [];
+        return truncate(d?.headline || items[0] || "Checklist");
+      }
       case "icon_grid":
         return truncate(d?.headline || "Icon grid");
       case "testimonial":
