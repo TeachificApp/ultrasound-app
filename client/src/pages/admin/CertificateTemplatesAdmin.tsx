@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Plus, Edit, Trash2, Award, Star, Download, Eye } from "lucide-react";
 
 interface CertTemplate {
@@ -203,7 +203,6 @@ function TemplateEditor({
 }
 
 export default function CertificateTemplatesAdmin() {
-  const { toast } = useToast();
   const utils = trpc.useUtils();
 
   const { data: templates = [], isLoading } = trpc.lmsAdmin.listCertificateTemplates.useQuery();
@@ -217,27 +216,27 @@ export default function CertificateTemplatesAdmin() {
     onSuccess: () => {
       utils.lmsAdmin.listCertificateTemplates.invalidate();
       setShowCreate(false);
-      toast({ title: "Template created" });
+      toast.success("Template created");
     },
-    onError: (e) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e) => toast.error(`Error: ${e.message}`),
   });
 
   const updateMut = trpc.lmsAdmin.updateCertificateTemplate.useMutation({
     onSuccess: () => {
       utils.lmsAdmin.listCertificateTemplates.invalidate();
       setEditTemplate(null);
-      toast({ title: "Template updated" });
+      toast.success("Template updated");
     },
-    onError: (e) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e) => toast.error(`Error: ${e.message}`),
   });
 
   const deleteMut = trpc.lmsAdmin.deleteCertificateTemplate.useMutation({
     onSuccess: () => {
       utils.lmsAdmin.listCertificateTemplates.invalidate();
       setDeleteId(null);
-      toast({ title: "Template deleted" });
+      toast.success("Template deleted");
     },
-    onError: (e) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e) => toast.error(`Error: ${e.message}`),
   });
 
   const setDefaultMut = trpc.lmsAdmin.updateCertificateTemplate.useMutation({
