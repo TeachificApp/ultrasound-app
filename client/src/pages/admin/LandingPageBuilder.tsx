@@ -1441,6 +1441,34 @@ function CheckoutFormBlockSettings({
   );
 }
 
+// ─── Sortable Review Item (used inside BlockSettings reviews case) ────────────
+function SortableReviewItem({
+  id, review, index, onUpdate, onRemove,
+}: {
+  id: string;
+  review: { name: string; rating: number; text: string };
+  index: number;
+  onUpdate: (field: string, value: any) => void;
+  onRemove: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  return (
+    <div ref={setNodeRef} style={style} className="border border-gray-200 rounded p-2 space-y-1 bg-white">
+      <div className="flex justify-between items-center mb-1">
+        <div className="flex items-center gap-1">
+          <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 p-0.5 rounded" title="Drag to reorder"><GripVertical size={12} /></button>
+          <span className="text-xs text-gray-500">Review {index + 1}</span>
+        </div>
+        <button onClick={onRemove} className="text-red-400 hover:text-red-600"><X size={10} /></button>
+      </div>
+      <DebouncedInput value={review.name} onChange={v => onUpdate("name", v)} className="h-7 text-xs" placeholder="Name" />
+      <Input type="number" value={review.rating} onChange={e => onUpdate("rating", Number(e.target.value))} className="h-7 text-xs" min={1} max={5} placeholder="Rating (1-5)" />
+      <DebouncedTextarea value={review.text} onChange={v => onUpdate("text", v)} className="text-xs min-h-[60px]" placeholder="Review text" />
+    </div>
+  );
+}
+
 export function BlockSettings({ block, onChange, lessonId }: { block: Block; onChange: (data: Record<string, any>) => void; lessonId?: number }) {
   const d = block.data ?? {};
   // Use refs to avoid stale closures with debounced inputs
@@ -1458,6 +1486,8 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
   const [uploading, setUploading] = useState<string | null>(null);
   const uploadMedia = trpc.auth.uploadPageMedia.useMutation();
   const { data: productCatalog } = trpc.funnel.listAllProducts.useQuery(undefined, { staleTime: 60_000 });
+  // Sensors for review drag-and-drop (must be at top level, not inside switch)
+  const reviewSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const handleFileUpload = async (file: File, targetField: string, context: string) => {
     if (file.size > 40 * 1024 * 1024) { toast.error("File must be under 40 MB"); return; }
     setUploading(targetField);
@@ -1667,7 +1697,45 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
       return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Quote" field="quote" multiline /><BSTextField data={d} onSet={set} label="Author" field="author" /><BSTextField data={d} onSet={set} label="Avatar URL" field="avatarUrl" /><div><label className="text-xs text-gray-500 block mb-1">Star Rating</label><div className="flex items-center gap-1">{[0,1,2,3,4,5].map(n => (<button key={n} type="button" onClick={() => set("rating", n)} className={`w-8 h-8 rounded text-sm font-medium border ${(d.rating ?? 5) === n ? "bg-yellow-100 border-yellow-400 text-yellow-700" : "border-gray-200 text-gray-500 hover:border-gray-300"}`}>{n === 0 ? "\u2715" : "\u2605".repeat(n)}</button>))}</div><p className="text-[10px] text-gray-400 mt-1">{(d.rating ?? 5) === 0 ? "Stars hidden" : `${d.rating ?? 5} star${(d.rating ?? 5) > 1 ? "s" : ""} shown`}</p></div><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" /></div>);
     case "reviews": {
       const reviews: Array<{ name: string; rating: number; text: string }> = d.reviews ?? [];
-      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Section Headline" field="headline" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div><div className="flex items-center justify-between mb-2"><label className="text-xs text-gray-500 font-medium">Reviews</label><button onClick={() => set("reviews", [...reviews, { name: "Student Name", rating: 5, text: "Great course!" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div><div className="space-y-2">{reviews.map((r, i) => (<div key={i} className="border border-gray-200 rounded p-2 space-y-1"><div className="flex justify-between items-center mb-1"><span className="text-xs text-gray-500">Review {i + 1}</span><button onClick={() => set("reviews", reviews.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div><DebouncedInput value={r.name} onChange={v => { const next = reviews.map((rv, j) => j === i ? { ...rv, name: v } : rv); set("reviews", next); }} className="h-7 text-xs" placeholder="Name" /><Input type="number" value={r.rating} onChange={e => { const next = reviews.map((rv, j) => j === i ? { ...rv, rating: Number(e.target.value) } : rv); set("reviews", next); }} className="h-7 text-xs" min={1} max={5} placeholder="Rating (1-5)" /><DebouncedTextarea value={r.text} onChange={v => { const next = reviews.map((rv, j) => j === i ? { ...rv, text: v } : rv); set("reviews", next); }} className="text-xs min-h-[60px]" placeholder="Review text" /></div>))}</div></div></div>);
+      const reviewIds = reviews.map((_, i) => `review-${i}`);
+      return (
+        <div className="space-y-3">
+          <BSTextField data={d} onSet={set} label="Section Headline" field="headline" />
+          <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs text-gray-500 font-medium">Reviews</label>
+              <button onClick={() => set("reviews", [...reviews, { name: "Student Name", rating: 5, text: "Great course!" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button>
+            </div>
+            <DndContext
+              sensors={reviewSensors}
+              collisionDetection={closestCenter}
+              modifiers={[restrictToVerticalAxis, restrictToFirstScrollableAncestor]}
+              onDragEnd={({ active, over }) => {
+                if (!over || active.id === over.id) return;
+                const oldIdx = reviewIds.indexOf(active.id as string);
+                const newIdx = reviewIds.indexOf(over.id as string);
+                if (oldIdx !== -1 && newIdx !== -1) set("reviews", arrayMove(reviews, oldIdx, newIdx));
+              }}
+            >
+              <SortableContext items={reviewIds} strategy={verticalListSortingStrategy}>
+                <div className="space-y-2">
+                  {reviews.map((r, i) => (
+                    <SortableReviewItem
+                      key={reviewIds[i]}
+                      id={reviewIds[i]}
+                      review={r}
+                      index={i}
+                      onUpdate={(field, value) => { const next = reviews.map((rv, j) => j === i ? { ...rv, [field]: value } : rv); set("reviews", next); }}
+                      onRemove={() => set("reviews", reviews.filter((_, j) => j !== i))}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          </div>
+        </div>
+      );
     }
     case "logos": {
       const logos: Array<{ url: string; alt: string }> = d.logos ?? [];

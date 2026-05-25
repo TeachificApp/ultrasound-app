@@ -2737,6 +2737,7 @@ export const lmsCourses = mysqlTable("lms_courses", {
   // SEO / landing page
   metaTitle: varchar("meta_title", { length: 255 }),
   metaDescription: text("meta_description"),
+  metaKeywords: text("meta_keywords"),
   // Completion certificate
   hasCertificate: boolean("has_certificate").default(false).notNull(),
   // Featured: admin-selectable to show on LMS home page
@@ -3098,6 +3099,7 @@ export const digitalProducts = mysqlTable("digital_products", {
   // SEO
   metaTitle: varchar("meta_title", { length: 255 }),
   metaDescription: text("meta_description"),
+  metaKeywords: text("meta_keywords"),
   // Show in Education Library — admin toggle to include/exclude from the public library
   showInLibrary: boolean("show_in_library").default(true).notNull(),
   // Stats
@@ -3235,6 +3237,7 @@ export const funnels = mysqlTable("funnels", {
   // SEO / Settings
   metaTitle: varchar("meta_title", { length: 255 }),
   metaDescription: text("meta_description"),
+  metaKeywords: text("meta_keywords"),
   thankYouUrl: text("thank_you_url"),
   // Template used to create this funnel
   templateName: varchar("template_name", { length: 100 }),
@@ -3821,6 +3824,7 @@ export const physicalProducts = mysqlTable("physical_products", {
   // SEO
   metaTitle: varchar("meta_title", { length: 255 }),
   metaDescription: text("meta_description"),
+  metaKeywords: text("meta_keywords"),
   // Stats
   orderCount: int("order_count").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),

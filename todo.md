@@ -2772,3 +2772,7 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix: Unified /scorm/* route so relative asset paths in SCORM HTML resolve correctly
 - [x] Fix: URL-decode req.path before path.join (Express does not decode wildcard paths)
 - [x] Fix: Resolve relative asset paths relative to launch file's parent directory (for nested ZIPs)
+## Reviews Block Drag-and-Drop Reordering (May 2026)
+- [x] Add SortableReviewItem component with GripVertical drag handle in LandingPageBuilder
+- [x] Wrap reviews list in DndContext + SortableContext for vertical reordering
+- [x] Move reviewSensors hook to top of BlockSettings (React rules of hooks compliance)
