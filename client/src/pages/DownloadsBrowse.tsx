@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { FileDown, Search, Package } from "lucide-react";
 
 function ProductCard({ product }: { product: any }) {
-  const price = product.isFree ? "Free" : `$${(product.price / 100).toFixed(2)}`;
+  const price = (product.isFree || product.price === 0) ? "Free" : `$${(product.price / 100).toFixed(2)}`;
   return (
     <Link href={`/downloads/${product.slug}`}>
       <div className="group bg-white rounded-xl border border-gray-200 hover:border-teal-400 hover:shadow-lg transition-all duration-200 overflow-hidden cursor-pointer flex flex-col h-full">
