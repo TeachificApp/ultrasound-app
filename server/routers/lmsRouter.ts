@@ -2403,16 +2403,39 @@ export const lmsAdminRouter = router({
       difficulty: z.enum(["beginner", "intermediate", "advanced"]).default("intermediate"),
       questionType: z.enum(["mcq", "truefalse", "mixed"]).default("mcq"),
       courseId: z.number().optional(),
+      lessonIds: z.array(z.number()).optional(), // specific lesson IDs to extract content from
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-      // Optionally inject course content as context
+      // Build course/lesson context for AI
       let courseContext = "";
-      if (input.courseId) {
-        try {
+      try {
+        if (input.lessonIds && input.lessonIds.length > 0) {
+          // Extract content from specific selected lessons
+          const selectedLessons = await db
+            .select({ title: lmsLessons.title, content: lmsLessons.content, contentBlocks: lmsLessons.contentBlocks })
+            .from(lmsLessons)
+            .where(inArray(lmsLessons.id, input.lessonIds));
+          const lessonTexts = selectedLessons.map(l => {
+            let text = `Lesson: ${l.title}`;
+            if (l.content) text += `\nContent: ${l.content.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 1500)}`;
+            if (l.contentBlocks) {
+              try {
+                const blocks = JSON.parse(l.contentBlocks);
+                const blockText = blocks
+                  .filter((b: any) => b.type === "rich_text" || b.type === "text")
+                  .map((b: any) => (b.data?.content ?? b.data?.text ?? "").replace(/<[^>]+>/g, " ").trim())
+                  .join(" ");
+                if (blockText) text += `\nBlock content: ${blockText.slice(0, 1500)}`;
+              } catch { /* ignore */ }
+            }
+            return text;
+          });
+          courseContext = `\n\nLesson content to base questions on:\n${lessonTexts.join("\n---\n")}\n\nGenerate questions that test understanding of the specific content above.`;
+        } else if (input.courseId) {
           const [course] = await db
             .select({ title: lmsCourses.title, description: lmsCourses.description })
             .from(lmsCourses)
@@ -2431,9 +2454,9 @@ export const lmsAdminRouter = router({
               .orderBy(asc(lmsLessons.position));
             courseContext = `\n\nCourse context for question generation:\nCourse: "${course.title}"\nDescription: ${course.description ?? "N/A"}\nModules: ${sections.map(s => s.title).join(", ") || "N/A"}\nLessons: ${lessons.map(l => l.title).join(", ") || "N/A"}\n\nUse this course content to make questions directly relevant to what students are learning.`;
           }
-        } catch {
-          // Ignore context fetch errors — proceed without course context
         }
+      } catch {
+        // Ignore context fetch errors — proceed without course context
       }
 
       const typeInstruction =
@@ -2664,6 +2687,122 @@ Rules:
       }
       return { success: true };
     }),
+  // ── AI Generate Landing Page ──
+  aiGenerateLandingPage: protectedProcedure
+    .input(z.object({ courseId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Gather course data
+      const [course] = await db.select({
+        id: lmsCourses.id,
+        title: lmsCourses.title,
+        subtitle: lmsCourses.subtitle,
+        description: lmsCourses.description,
+        type: lmsCourses.type,
+        price: lmsCourses.price,
+        coverImageUrl: lmsCourses.coverImageUrl,
+        slug: lmsCourses.slug,
+      }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });
+
+      // Get sections and published lessons
+      const sections = await db.select({ id: lmsCourseSections.id, title: lmsCourseSections.title })
+        .from(lmsCourseSections).where(eq(lmsCourseSections.courseId, input.courseId)).orderBy(asc(lmsCourseSections.position));
+      const lessons = await db.select({ title: lmsLessons.title, type: lmsLessons.type, sectionId: lmsLessons.sectionId })
+        .from(lmsLessons)
+        .where(and(eq(lmsLessons.courseId, input.courseId), eq(lmsLessons.lessonStatus, "published")))
+        .orderBy(asc(lmsLessons.position));
+
+      // Get pricing
+      const pricing = await db.select({ name: lmsPricingTiers.name, price: lmsPricingTiers.price, billingInterval: lmsPricingTiers.billingInterval, isDefault: lmsPricingTiers.isDefault })
+        .from(lmsPricingTiers).where(and(eq(lmsPricingTiers.courseId, input.courseId), eq(lmsPricingTiers.isActive, true))).limit(5);
+
+      const typeLabel = course.type === "download" ? "digital download" : course.type === "quiz" ? "quiz" : "course";
+      const curriculumText = sections.length > 0
+        ? sections.map(s => {
+            const sLessons = lessons.filter(l => l.sectionId === s.id);
+            return `Section: ${s.title}\n${sLessons.map(l => `  - ${l.title} (${l.type})`).join("\n")}`;
+          }).join("\n")
+        : lessons.map(l => `- ${l.title} (${l.type})`).join("\n");
+      const pricingText = pricing.length > 0
+        ? pricing.map(p => `${p.name}: $${p.price}${p.billingInterval ? "/" + p.billingInterval : ""}`).join(", ")
+        : course.price ? `$${course.price}` : "Free";
+
+      const systemPrompt = `You are an expert landing page designer for online ${typeLabel}s. Generate a complete, compelling landing page block structure as JSON. The blocks should be professional, conversion-focused, and specific to the content provided.`;
+      const userPrompt = `Generate a landing page for this ${typeLabel}:
+
+Title: ${course.title}
+Subtitle: ${course.subtitle ?? ""}
+Description: ${course.description ?? ""}
+Pricing: ${pricingText}
+Cover Image: ${course.coverImageUrl ?? ""}
+
+Curriculum:
+${curriculumText}
+
+Generate a JSON array of content blocks. Each block must have:
+- id: unique string (e.g. "block_1")
+- type: one of: hero, rich_text, curriculum_auto, pricing_options_auto, testimonials, faq, cta_button, two_column
+- For hero blocks: heroTitle (string), heroSubtitle (string), heroImageUrl (string, use course cover if available), heroBtnText (string), heroBehavior: "checkout", heroCheckoutProductType: "course", heroCheckoutProductId: ${input.courseId}
+- For rich_text blocks: content (HTML string with h2/h3/p/ul tags)
+- For curriculum_auto blocks: no extra fields needed
+- For pricing_options_auto blocks: no extra fields needed  
+- For cta_button blocks: ctaText (string), ctaBehavior: "checkout", checkoutProductType: "course", checkoutProductId: ${input.courseId}
+- For testimonials blocks: testimonials array with {name, role, text, rating} objects (generate 3 realistic ones)
+- For faq blocks: faqs array with {question, answer} objects (generate 4-6 relevant FAQs)
+- For two_column blocks: leftContent (HTML), rightContent (HTML)
+
+Create 6-8 blocks in this order: hero, rich_text (what you'll learn), curriculum_auto, rich_text (about/description), pricing_options_auto, faq, cta_button. Make the content specific and compelling based on the course content above.`;
+
+      const response = await invokeLLM({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "landing_page_blocks",
+            strict: false,
+            schema: {
+              type: "object",
+              properties: {
+                blocks: { type: "array", items: { type: "object", additionalProperties: true } },
+              },
+              required: ["blocks"],
+            },
+          },
+        },
+      });
+
+      let blocks: any[];
+      try {
+        const raw = response.choices[0].message.content as string;
+        const parsed = JSON.parse(raw);
+        blocks = Array.isArray(parsed) ? parsed : parsed.blocks;
+        if (!Array.isArray(blocks)) throw new Error("Not an array");
+        // Ensure each block has a unique id
+        blocks = blocks.map((b, i) => ({ ...b, id: b.id ?? `ai_block_${i}_${Date.now()}` }));
+      } catch {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "AI returned invalid JSON. Please try again." });
+      }
+
+      // Save the generated blocks
+      const blocksJson = JSON.stringify(blocks);
+      const [existing] = await db.select({ id: lmsLandingPages.id })
+        .from(lmsLandingPages).where(eq(lmsLandingPages.courseId, input.courseId)).limit(1);
+      if (existing) {
+        await db.update(lmsLandingPages).set({ blocks: blocksJson, isCustom: true }).where(eq(lmsLandingPages.courseId, input.courseId));
+      } else {
+        await db.insert(lmsLandingPages).values({ courseId: input.courseId, blocks: blocksJson, isCustom: true });
+      }
+
+      return { success: true, blockCount: blocks.length };
+    }),
+
   // ── Page Templates ──
   listPageTemplates: protectedProcedure
     .input(z.object({ templateType: z.enum(["page", "block"]).optional() }))
@@ -3651,6 +3790,19 @@ CRITICAL REQUIREMENTS:
         ))
         .orderBy(asc(lmsLessons.position));
       return lessons;
+    }),
+
+  /** List all lessons for a course (lightweight — id + title + type only) */
+  listCourseLessons: protectedProcedure
+    .input(z.object({ courseId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      return db.select({ id: lmsLessons.id, title: lmsLessons.title, type: lmsLessons.type, sectionId: lmsLessons.sectionId })
+        .from(lmsLessons)
+        .where(eq(lmsLessons.courseId, input.courseId))
+        .orderBy(asc(lmsLessons.position));
     }),
 
   /** Search users by name or email (for enroll dialog) */

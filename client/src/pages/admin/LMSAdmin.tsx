@@ -1179,25 +1179,7 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
 
         {/* Landing Page Tab — lazy-mounted on first visit to avoid parsing the large builder on load */}
         <TabsContent value="landing" className="mt-4">
-          <div className="flex items-center gap-2 mb-4">
-            <Button
-              size="sm" variant="outline"
-              className="h-8 text-xs text-teal-600 border-teal-300 hover:bg-teal-50"
-              onClick={() => navigate(`/admin/lms/${courseId}/landing-builder`)}
-            >
-              <LinkIcon className="w-3 h-3 mr-1" /> Edit Landing Page (Full Builder)
-            </Button>
-            <Button size="sm" variant="ghost" className="h-8 text-xs text-gray-500 hover:text-teal-600"
-              onClick={() => openLearnLink(`/courses/${course.slug}?preview=admin`)}
-            >
-              <Eye className="w-3 h-3 mr-1" /> Preview Landing Page
-            </Button>
-          </div>
-          {visitedTabs.has("landing") ? (
-            <LandingPageEditor courseId={courseId} landingPage={course.landingPage} courseType={course.type} onSave={data => updateLandingPage.mutate({ courseId, ...data })} saving={updateLandingPage.isPending} />
-          ) : (
-            <div className="flex items-center justify-center h-32 text-gray-400 text-sm">Loading Landing Page editor…</div>
-          )}
+          <LandingPageEditor courseId={courseId} courseType={course.type} />
         </TabsContent>
 
         {/* Course Overview Tab — lazy-mounted on first visit */}
@@ -2110,102 +2092,87 @@ function FreePreviewLinkPanel({ courseId }: { courseId: number }) {
 
 // ─── Landing Page Editor ──────────────────────────────────────────────────────
 
-function LandingPageEditor({ courseId, landingPage, courseType, onSave, saving }: { courseId: number; landingPage: any; courseType?: string; onSave: (data: any) => void; saving: boolean }) {
-  const [heroTitle, setHeroTitle] = useState(landingPage?.heroTitle ?? "");
-  const [heroSubtitle, setHeroSubtitle] = useState(landingPage?.heroSubtitle ?? "");
-  const [heroImageUrl, setHeroImageUrl] = useState(landingPage?.heroImageUrl ?? "");
-  const [ctaText, setCtaText] = useState(landingPage?.ctaText ?? "Enroll Now");
-  const [whatYouLearn, setWhatYouLearn] = useState(landingPage?.whatYouLearn ?? "");
-  const [requirements, setRequirements] = useState(landingPage?.requirements ?? "");
-  const [bodyContent, setBodyContent] = useState(landingPage?.bodyContent ?? "");
-   const [uploadingHero, setUploadingHero] = useState(false);
-  const handleHeroFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 10_000_000) { toast.error("Image must be under 10 MB"); return; }
-    e.target.value = "";
-    setUploadingHero(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/upload-course-image", { method: "POST", credentials: "include", body: fd });
-      if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error ?? "Upload failed"); }
-      const { url } = await res.json();
-      setHeroImageUrl(url);
-      toast.success("Hero image uploaded");
-    } catch (err: any) {
-      toast.error(`Upload failed: ${err.message}`);
-    } finally {
-      setUploadingHero(false);
-    }
-  };
+function LandingPageEditor({ courseId, courseType }: { courseId: number; courseType?: string }) {
+  const navigate = useNavigate();
+  const openLearnLink = useOpenLearnLink();
+  const { data: course } = trpc.lmsAdmin.getCourse.useQuery({ courseId });
+  const aiGenerateLandingPage = trpc.lmsAdmin.aiGenerateLandingPage.useMutation({
+    onSuccess: () => {
+      toast.success("Landing page generated! Opening builder...");
+      setTimeout(() => navigate(`/admin/lms/${courseId}/landing-builder`), 600);
+    },
+    onError: e => toast.error(`AI error: ${e.message}`),
+  });
+
+  const typeLabel = courseType === "download" ? "download" : courseType === "quiz" ? "quiz" : "course";
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="space-y-4">
+      {/* Status banner */}
+      <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 flex items-start gap-3">
+        <LayoutTemplate className="w-5 h-5 text-teal-600 flex-shrink-0 mt-0.5" />
         <div>
-          <Label className="text-sm">Hero Title</Label>
-          <Input value={heroTitle} onChange={e => setHeroTitle(e.target.value)} className="mt-1" />
-        </div>
-        <div>
-          <Label className="text-sm">CTA Button Text</Label>
-          <Input value={ctaText} onChange={e => setCtaText(e.target.value)} className="mt-1" />
-        </div>
-      </div>
-      <div>
-        <Label className="text-sm">Hero Subtitle</Label>
-        <Input value={heroSubtitle} onChange={e => setHeroSubtitle(e.target.value)} className="mt-1" />
-      </div>
-      <div>
-        <Label className="text-sm">
-          {courseType === "download" ? "What's Included" : courseType === "quiz" ? "What You'll Practice" : "What You'll Learn"}
-        </Label>
-        <div className="mt-1"><RichTextEditor value={whatYouLearn} onChange={setWhatYouLearn} /></div>
-      </div>
-      <div>
-        <Label className="text-sm">
-          {courseType === "download" ? "About This Download" : courseType === "quiz" ? "About This Quiz" : "Course Description / Body Content"}
-        </Label>
-        <div className="mt-1"><RichTextEditor value={bodyContent} onChange={setBodyContent} /></div>
-      </div>
-      <div>
-        <Label className="text-sm">
-          {courseType === "download" ? "Who This Is For" : courseType === "quiz" ? "Prerequisites" : "Requirements"}
-        </Label>
-        <div className="mt-1"><RichTextEditor value={requirements} onChange={setRequirements} /></div>
-      </div>
-      {/* Hero Image */}
-      <div>
-        <Label className="text-sm">Hero Banner Image</Label>
-        <p className="text-xs text-gray-400 mt-0.5">Displayed at the top of the public landing page. Recommended: 1600×600 px. Stored in the Media Library.</p>
-        <div className="mt-2 flex items-start gap-4">
-          <div className="w-48 h-20 rounded-lg border-2 border-dashed border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center flex-shrink-0">
-            {heroImageUrl ? (
-              <img src={heroImageUrl} alt="Hero" className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-xs text-gray-400 text-center px-2">No banner</span>
-            )}
-          </div>
-          <div className="flex-1 space-y-2">
-            <label className="cursor-pointer">
-              <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={handleHeroFileChange} disabled={uploadingHero} />
-              <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors ${
-                uploadingHero
-                  ? "border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed"
-                  : "border-teal-300 text-teal-600 bg-white hover:bg-teal-50 cursor-pointer"
-              }`}>
-                <Upload className="w-3 h-3" />
-                {uploadingHero ? "Uploading..." : "Upload Banner"}
-              </span>
-            </label>
-            <Input value={heroImageUrl} onChange={e => setHeroImageUrl(e.target.value)} placeholder="Or paste image URL..." className="text-xs h-8" />
-          </div>
+          <p className="text-sm font-medium text-teal-800">Landing Page Builder</p>
+          <p className="text-xs text-teal-600 mt-0.5">
+            Use the full builder to design your {typeLabel} landing page with blocks, images, pricing sections, and more.
+          </p>
         </div>
       </div>
 
-      <Button className="bg-teal-600 hover:bg-teal-700 text-white" disabled={saving} onClick={() => onSave({ heroTitle, heroSubtitle, heroImageUrl, ctaText, whatYouLearn, bodyContent, requirements })}>
-        {saving ? "Saving..." : "Save Landing Page"}
-      </Button>
+      {/* Quick actions */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <button
+          onClick={() => navigate(`/admin/lms/${courseId}/landing-builder`)}
+          className="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-xl hover:border-teal-400 hover:bg-teal-50 transition-colors text-left"
+        >
+          <div className="w-9 h-9 bg-teal-100 rounded-lg flex items-center justify-center flex-shrink-0">
+            <LayoutTemplate className="w-5 h-5 text-teal-600" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-800">Open Full Builder</p>
+            <p className="text-xs text-gray-500">Edit blocks, layout, pricing, CTAs</p>
+          </div>
+        </button>
+        <button
+          onClick={() => openLearnLink(`/courses/${course?.slug}?preview=admin`)}
+          className="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-colors text-left"
+        >
+          <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+            <Eye className="w-5 h-5 text-blue-600" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-800">Preview Landing Page</p>
+            <p className="text-xs text-gray-500">See how it looks to visitors</p>
+          </div>
+        </button>
+      </div>
+
+      {/* AI Generate */}
+      <div className="bg-white border border-purple-200 rounded-xl p-5">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="w-9 h-9 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+            <Sparkles className="w-5 h-5 text-purple-600" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-800">AI Generate Landing Page</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              The AI will read your {typeLabel} title, description, sections, and lesson content to generate a complete block-based landing page — hero, curriculum, pricing, testimonials, and more.
+            </p>
+          </div>
+        </div>
+        <Button
+          className="bg-purple-600 hover:bg-purple-700 text-white gap-2 w-full"
+          disabled={aiGenerateLandingPage.isPending}
+          onClick={() => aiGenerateLandingPage.mutate({ courseId })}
+        >
+          {aiGenerateLandingPage.isPending
+            ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating landing page...</>
+            : <><Sparkles className="w-4 h-4" /> Generate Landing Page with AI</>}
+        </Button>
+        {aiGenerateLandingPage.isPending && (
+          <p className="text-xs text-purple-500 text-center mt-2">This may take 15–30 seconds while the AI builds your page...</p>
+        )}
+      </div>
     </div>
   );
 }
@@ -4128,7 +4095,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
 // ─── Quiz Builder Inline (embedded in LessonEditorPage Quiz tab) ─────────────
 
 function QuizBuilderInline({ lesson, courseId }: { lesson: any; courseId?: number }) {
-  const { data: quiz, refetch } = trpc.lmsAdmin.getQuiz.useQuery({ lessonId: lesson.id });
+  const { data: quiz, isLoading: quizLoading, refetch } = trpc.lmsAdmin.getQuiz.useQuery({ lessonId: lesson.id });
   const [addingQuestion, setAddingQuestion] = useState(false);
   const [newQ, setNewQ] = useState({ question: "", type: "mcq" as "mcq" | "truefalse", options: ["", "", "", ""], correctAnswer: "", explanation: "" });
 
@@ -4139,6 +4106,14 @@ function QuizBuilderInline({ lesson, courseId }: { lesson: any; courseId?: numbe
   const [aiDifficulty, setAIDifficulty] = useState<"beginner" | "intermediate" | "advanced">("intermediate");
   const [aiQType, setAIQType] = useState<"mcq" | "truefalse" | "mixed">("mcq");
   const [aiPreview, setAIPreview] = useState<Array<{ question: string; type: string; options: string[]; correctAnswer: string; explanation: string; selected: boolean }> | null>(null);
+  const [selectedLessonIds, setSelectedLessonIds] = useState<number[]>([]);
+  const [useFromLessons, setUseFromLessons] = useState(false);
+
+  // Fetch course lessons for the lesson selector
+  const { data: courseLessonList } = trpc.lmsAdmin.listCourseLessons.useQuery(
+    { courseId: courseId! },
+    { enabled: !!courseId && showAIPanel }
+  );
 
   const updateQuiz = trpc.lmsAdmin.updateQuiz.useMutation({ onSuccess: () => { toast.success("Quiz settings saved"); refetch(); } });
   const addQuestion = trpc.lmsAdmin.addQuestion.useMutation({
@@ -4161,7 +4136,8 @@ function QuizBuilderInline({ lesson, courseId }: { lesson: any; courseId?: numbe
     onError: e => toast.error(`Error: ${e.message}`),
   });
 
-  if (!quiz) return <div className="text-gray-400 text-sm py-8 text-center">Loading quiz...</div>;
+  if (quizLoading) return <div className="flex items-center justify-center py-12 gap-2 text-gray-400 text-sm"><Loader2 className="w-4 h-4 animate-spin" /> Loading quiz...</div>;
+  if (!quiz) return <div className="text-gray-400 text-sm py-8 text-center">No quiz found. Please try refreshing.</div>;
 
   return (
     <div className="space-y-5">
@@ -4201,8 +4177,31 @@ function QuizBuilderInline({ lesson, courseId }: { lesson: any; courseId?: numbe
               <div>
                 <Label className="text-sm font-medium">Topic *</Label>
                 <Input value={aiTopic} onChange={e => setAITopic(e.target.value)} placeholder="e.g. Doppler physics, DVT diagnosis criteria, Normal fetal echo anatomy" className="mt-1" />
-                <p className="text-xs text-gray-500 mt-1">{courseId ? "The AI will use this course's content as context to generate relevant questions." : "Be specific — the AI will generate clinically accurate questions tailored to your topic."}</p>
+                <p className="text-xs text-gray-500 mt-1">Be specific — the AI will generate clinically accurate questions tailored to your topic.</p>
               </div>
+              {courseId && courseLessonList && courseLessonList.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Switch id="use-lessons" checked={useFromLessons} onCheckedChange={v => { setUseFromLessons(v); if (!v) setSelectedLessonIds([]); }} />
+                    <Label htmlFor="use-lessons" className="text-sm font-medium cursor-pointer">Generate from specific lesson content</Label>
+                  </div>
+                  {useFromLessons && (
+                    <div className="border border-purple-200 rounded-lg p-3 bg-white space-y-1 max-h-48 overflow-y-auto">
+                      <div className="flex gap-2 mb-2">
+                        <Button size="sm" variant="ghost" className="text-xs h-6 px-2" onClick={() => setSelectedLessonIds(courseLessonList.map(l => l.id))}>Select All</Button>
+                        <Button size="sm" variant="ghost" className="text-xs h-6 px-2" onClick={() => setSelectedLessonIds([])}>Clear</Button>
+                        <span className="text-xs text-gray-500 ml-auto self-center">{selectedLessonIds.length} selected</span>
+                      </div>
+                      {courseLessonList.map(l => (
+                        <label key={l.id} className="flex items-center gap-2 cursor-pointer hover:bg-purple-50 rounded px-1 py-0.5">
+                          <input type="checkbox" className="rounded" checked={selectedLessonIds.includes(l.id)} onChange={e => setSelectedLessonIds(prev => e.target.checked ? [...prev, l.id] : prev.filter(id => id !== l.id))} />
+                          <span className="text-sm text-gray-700 truncate">{l.title}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <Label className="text-sm font-medium">Number of Questions</Label>
@@ -4243,8 +4242,8 @@ function QuizBuilderInline({ lesson, courseId }: { lesson: any; courseId?: numbe
                 <Button
                   className="bg-purple-600 hover:bg-purple-700 text-white gap-2"
                   size="sm"
-                  disabled={!aiTopic.trim() || aiGenerate.isPending}
-                  onClick={() => aiGenerate.mutate({ quizId: quiz.id, topic: aiTopic.trim(), count: aiCount, difficulty: aiDifficulty, questionType: aiQType, courseId })}
+                  disabled={!aiTopic.trim() || aiGenerate.isPending || (useFromLessons && selectedLessonIds.length === 0)}
+                  onClick={() => aiGenerate.mutate({ quizId: quiz.id, topic: aiTopic.trim(), count: aiCount, difficulty: aiDifficulty, questionType: aiQType, courseId, lessonIds: useFromLessons && selectedLessonIds.length > 0 ? selectedLessonIds : undefined })}
                 >
                   {aiGenerate.isPending ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</> : <><Sparkles className="w-4 h-4" /> Generate {aiCount} Questions</>}
                 </Button>
