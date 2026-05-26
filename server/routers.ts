@@ -1868,7 +1868,7 @@ export const appRouter = router({
   emailCampaign: emailCampaignRouter,
   menuLinks: menuLinksRouter,
 
-  // ─── LMS Education Library ────────────────────────────────────────────────────
+  // ─── LMS LMS Management ────────────────────────────────────────────────────
   blockTemplates: blockTemplatesRouter,
   lms: lmsPublicRouter,
   lmsLearner: lmsLearnerRouter,

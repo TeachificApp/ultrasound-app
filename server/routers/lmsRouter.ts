@@ -1,6 +1,6 @@
 /**
  * lmsRouter.ts
- * All About Ultrasound™ LMS — Education Library
+ * All About Ultrasound™ LMS — LMS Management
  *
  * Sub-routers:
  *   lmsPublic   — public course catalog, landing pages, instructor profiles
@@ -460,9 +460,10 @@ export const lmsPublicRouter = router({
           id: lmsLessons.id, title: lmsLessons.title, type: lmsLessons.type,
           position: lmsLessons.position, isPreview: lmsLessons.isPreview, previewMode: lmsLessons.previewMode,
           durationMinutes: lmsLessons.durationMinutes, sectionId: lmsLessons.sectionId,
+          lessonStatus: lmsLessons.lessonStatus,
         }).from(lmsLessons)
           .innerJoin(lmsSections, eq(lmsLessons.sectionId, lmsSections.id))
-          .where(eq(lmsSections.courseId, course.id))
+          .where(and(eq(lmsSections.courseId, course.id), eq(lmsLessons.lessonStatus, "published")))
           .orderBy(asc(lmsLessons.position)),
         db.select().from(lmsCourseInstructors).where(eq(lmsCourseInstructors.courseId, course.id)),
         db.select().from(lmsLandingPages).where(eq(lmsLandingPages.courseId, course.id)).limit(1),
@@ -478,7 +479,10 @@ export const lmsPublicRouter = router({
         arr.push(lesson);
         lessonsBySectionId.set(lesson.sectionId, arr);
       }
-      const sectionsWithLessons = sections.map(s => ({ ...s, lessons: lessonsBySectionId.get(s.id) ?? [] }));
+      // Filter out sections that have no published lessons
+      const sectionsWithLessons = sections
+        .map(s => ({ ...s, lessons: lessonsBySectionId.get(s.id) ?? [] }))
+        .filter(s => s.lessons.length > 0);
 
       // Instructors — batch fetch
       let instructors: any[] = [];
@@ -2314,8 +2318,20 @@ export const lmsAdminRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const [quiz] = await db.select().from(lmsQuizzes).where(eq(lmsQuizzes.lessonId, input.lessonId)).limit(1);
-      if (!quiz) return null;
+      let [quiz] = await db.select().from(lmsQuizzes).where(eq(lmsQuizzes.lessonId, input.lessonId)).limit(1);
+      // Auto-create a quiz record if none exists for this lesson
+      if (!quiz) {
+        const [lesson] = await db.select({ title: lmsLessons.title }).from(lmsLessons).where(eq(lmsLessons.id, input.lessonId)).limit(1);
+        const [result] = await db.insert(lmsQuizzes).values({
+          lessonId: input.lessonId,
+          title: lesson?.title ?? "Quiz",
+          passingScore: 70,
+          allowRetakes: true,
+          showCorrectAnswers: true,
+        }).$returningId();
+        [quiz] = await db.select().from(lmsQuizzes).where(eq(lmsQuizzes.id, result.id)).limit(1);
+      }
+      if (!quiz) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create quiz" });
       const questions = await db.select().from(lmsQuizQuestions).where(eq(lmsQuizQuestions.quizId, quiz.id)).orderBy(asc(lmsQuizQuestions.position));
       return { ...quiz, questions };
     }),
@@ -4209,12 +4225,12 @@ CRITICAL REQUIREMENTS:
       page: z.number().min(1).default(1),
       pageSize: z.number().min(1).max(100).default(50),
       search: z.string().optional(),
-    }).optional())
+    }))
     .query(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const p = input ?? {};
+      const p = input;
       const page = p.page ?? 1;
       const pageSize = p.pageSize ?? 50;
       const offset = (page - 1) * pageSize;

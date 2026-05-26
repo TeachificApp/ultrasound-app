@@ -41,7 +41,7 @@ const Profile = lazy(() => import("./pages/Profile"));
 const UpgradeSuccess = lazy(() => import("./pages/UpgradeSuccess"));
 const Premium = lazy(() => import("./pages/Premium"));
 
-// ── LMS — Education Library ─────────────────────────────────────────────────
+// ── LMS — LMS Management ─────────────────────────────────────────────────
 const EducationLibrary = lazy(() => import("./pages/EducationLibrary"));
 const LMSHome = lazy(() => import("./pages/LMSHome"));
 const CollectionDetail = lazy(() => import("./pages/CollectionDetail"));
@@ -388,7 +388,7 @@ function Router() {
         <Route path="/case-library/:id" component={CaseDetail} />
         <Route path="/soundbytes" component={SoundBytes} />
 
-        {/* ── LMS — Education Library ─────────────────────────────────────────────── */}
+        {/* ── LMS — LMS Management ─────────────────────────────────────────────── */}
         <Route path="/education-library">{() => { window.location.replace(`${LEARN_APP_URL}/education-library`); return null; }}</Route>
         {/* collections → learn subdomain (authenticated access) */}
         <Route path="/collections/:id">{(params: { id: string }) => <SsoRedirect path={`/collections/${params.id}`} />}</Route>

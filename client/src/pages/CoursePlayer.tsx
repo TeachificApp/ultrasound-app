@@ -478,14 +478,15 @@ function InlineLiveSession({ data }: { data: Record<string, any> }) {
 }
 
 // ─── Lesson icon helper ───────────────────────────────────────────────────────
-function LessonIcon({ type, done, locked }: { type: string; done: boolean; locked?: boolean }) {
+function LessonIcon({ type, done, locked, color }: { type: string; done: boolean; locked?: boolean; color?: string }) {
+  const iconStyle = color ? { color } : undefined;
   if (locked) return <Lock className="w-4 h-4 text-gray-500" />;
-  if (done) return <CheckCircle className="w-4 h-4 text-teal-500" />;
-  if (type === "quiz") return <HelpCircle className="w-4 h-4 text-gray-400" />;
-  if (type === "download") return <Download className="w-4 h-4 text-gray-400" />;
-  if (type === "embed") return <Monitor className="w-4 h-4 text-gray-400" />;
-  if (type === "text") return <FileText className="w-4 h-4 text-gray-400" />;
-  return <PlayCircle className="w-4 h-4 text-gray-400" />;
+  if (done) return <CheckCircle className="w-4 h-4" style={iconStyle ?? { color: "#0d9488" }} />;
+  if (type === "quiz") return <HelpCircle className="w-4 h-4" style={iconStyle ?? { color: "#6b7280" }} />;
+  if (type === "download") return <Download className="w-4 h-4" style={iconStyle ?? { color: "#6b7280" }} />;
+  if (type === "embed") return <Monitor className="w-4 h-4" style={iconStyle ?? { color: "#6b7280" }} />;
+  if (type === "text") return <FileText className="w-4 h-4" style={iconStyle ?? { color: "#6b7280" }} />;
+  return <PlayCircle className="w-4 h-4" style={iconStyle ?? { color: "#6b7280" }} />;
 }
 
 // ─── Lesson Note Editor ───────────────────────────────────────────────────────
@@ -584,9 +585,9 @@ function MobileSidebarContent({
   const enrollment = data?.enrollment;
   const enrolledAt = enrollment?.enrolledAt ? new Date(enrollment.enrolledAt) : new Date();
   const daysSinceEnroll = Math.floor((Date.now() - enrolledAt.getTime()) / 86400000);
-  const dripBypassed = !course.isDrip;
+    const dripBypassed = !course.isDrip;
+  const primaryColor = course.primaryColor ?? "#0d9488";
   const allLessons = [...topLevelLessons, ...sections.flatMap((s: any) => s.lessons)];
-
   return (
     <>
       <div className="flex-1 overflow-y-auto py-1">
@@ -662,7 +663,7 @@ function MobileSidebarContent({
                           <button key={lesson.id} onClick={() => { if (!lessonLocked) setSelectedLessonId(lesson.id); }} disabled={lessonLocked}
                             className={cn("w-full text-left px-2 py-1.5 flex items-center gap-2 text-[11px] transition-colors rounded",
                               active ? "text-teal-700 bg-teal-50 font-semibold" : lessonLocked ? "text-gray-400 cursor-not-allowed" : done ? "text-gray-400" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50")}>
-                            <LessonIcon type={lesson.type} done={done} locked={lessonLocked} />
+                            <LessonIcon type={lesson.type} done={done} locked={lessonLocked} color={primaryColor} />
                             <div className="flex-1 min-w-0">
                               <span className="truncate block">{lesson.title}</span>
                               {dripLocked && lessonUnlockDate && <span className="text-[10px] text-gray-400">Unlocks {lessonUnlockDate}</span>}
@@ -1572,7 +1573,7 @@ export default function CoursePlayer() {
                             )}
                             style={active ? { color: primaryColor, backgroundColor: `${primaryColor}12` } : undefined}
                           >
-                            <LessonIcon type={lesson.type} done={done} locked={lessonLocked} />
+                            <LessonIcon type={lesson.type} done={done} locked={lessonLocked} color={primaryColor} />
                             <div className="flex-1 min-w-0">
                               <span className="truncate block">{lesson.title}</span>
                               {dripLocked && lessonUnlockDate && <span className="text-[10px] text-gray-400">Unlocks {lessonUnlockDate}</span>}

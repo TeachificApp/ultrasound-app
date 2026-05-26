@@ -173,7 +173,7 @@ export default function EducationLibrary() {
       {/* Hero */}
       <div className="teal-header py-12 px-4">
         <div className="max-w-5xl mx-auto text-center">
-          <h1 className="text-3xl font-bold text-white mb-2">Education Library</h1>
+          <h1 className="text-3xl font-bold text-white mb-2">LMS Management</h1>
           <p className="text-teal-100 text-base max-w-xl mx-auto">
             Courses, quizzes, and downloads from All About Ultrasound™ and iHeartEcho™ — designed for sonographers, physicians, and educators.
           </p>

@@ -29,14 +29,15 @@ import { BlockPreview, type Block } from "@/components/BlockPreview";
 const LOGO = import.meta.env.VITE_APP_LOGO as string;
 
 // ─── Lesson type icon ──────────────────────────────────────────────────────────
-function LessonTypeIcon({ type }: { type: string }) {
+function LessonTypeIcon({ type, color }: { type: string; color?: string }) {
   const cls = "w-3.5 h-3.5 shrink-0";
+  const style = color ? { color } : undefined;
   switch (type) {
-    case "video": return <PlayCircle className={cn(cls, "text-teal-500")} />;
-    case "quiz": return <HelpCircle className={cn(cls, "text-purple-500")} />;
-    case "download": return <Download className={cn(cls, "text-blue-500")} />;
-    case "embed": return <Monitor className={cn(cls, "text-orange-500")} />;
-    default: return <FileText className={cn(cls, "text-gray-400")} />;
+    case "video": return <PlayCircle className={cls} style={style ?? { color: "#0d9488" }} />;
+    case "quiz": return <HelpCircle className={cls} style={style ?? { color: "#0d9488" }} />;
+    case "download": return <Download className={cls} style={style ?? { color: "#0d9488" }} />;
+    case "embed": return <Monitor className={cls} style={style ?? { color: "#0d9488" }} />;
+    default: return <FileText className={cls} style={style ?? { color: "#6b7280" }} />;
   }
 }
 
@@ -266,7 +267,7 @@ export default function CourseOverview() {
           ) : showDone ? (
             <CheckCircle className="w-4 h-4" style={primaryText} />
           ) : (
-            <LessonTypeIcon type={lesson.type} />
+            <LessonTypeIcon type={lesson.type} color={primaryColor} />
           )}
         </span>
         <div className="flex-1 min-w-0">

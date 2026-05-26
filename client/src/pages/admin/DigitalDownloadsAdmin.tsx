@@ -295,8 +295,8 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
             <div className="flex items-center gap-3">
               <Switch checked={(form as any).showInLibrary ?? true} onCheckedChange={(v) => setForm({ ...form, showInLibrary: v } as any)} />
               <div>
-                <label className="text-sm font-medium">Show in Education Library</label>
-                <p className="text-xs text-muted-foreground">When enabled, this download will appear in the public Education Library.</p>
+                <label className="text-sm font-medium">Show in LMS Management</label>
+                <p className="text-xs text-muted-foreground">When enabled, this download will appear in the public LMS Management.</p>
               </div>
             </div>
           </div>

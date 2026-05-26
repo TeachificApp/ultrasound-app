@@ -1,6 +1,6 @@
 /**
  * LMSAdmin.tsx
- * Platform Admin — LMS Education Library management panel.
+ * Platform Admin — LMS LMS Management management panel.
  *
  * Tabs:
  *   Courses      — list, create, edit, delete
@@ -1598,7 +1598,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
             </label>
             {/* URL fallback */}
             <Input value={coverImageUrl} onChange={e => setCoverImageUrl(e.target.value)} placeholder="Or paste image URL..." className="text-xs h-8" />
-            <p className="text-xs text-gray-400">Recommended: 800×500 px, JPG or PNG, max 8 MB. Displayed as the card thumbnail in the Education Library.</p>
+            <p className="text-xs text-gray-400">Recommended: 800×500 px, JPG or PNG, max 8 MB. Displayed as the card thumbnail in the LMS Management.</p>
           </div>
         </div>
       </div>
@@ -1767,8 +1767,8 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
       <div className="flex items-start gap-2">
         <Switch checked={showInLibrary} onCheckedChange={setShowInLibrary} id="show-in-library-switch" className="mt-0.5" />
         <div>
-          <Label htmlFor="show-in-library-switch" className="text-sm">Show in Education Library</Label>
-          <p className="text-xs text-gray-400 mt-0.5">When enabled, this item will appear in the public Education Library. Disable to hide it from the library while keeping it accessible by direct URL.</p>
+          <Label htmlFor="show-in-library-switch" className="text-sm">Show in LMS Management</Label>
+          <p className="text-xs text-gray-400 mt-0.5">When enabled, this item will appear in the public LMS Management. Disable to hide it from the library while keeping it accessible by direct URL.</p>
         </div>
       </div>
       <div className="flex items-start gap-2">
@@ -2246,6 +2246,12 @@ function CourseOverviewEditor({
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState(CATALOG_CATEGORIES[0]);
+  const [pickerTab, setPickerTab] = useState<"catalog" | "templates">("catalog");
+  const [tplSearch, setTplSearch] = useState("");
+  const { data: blockTemplates, isLoading: tplLoading } = trpc.blockTemplates.list.useQuery(
+    { search: tplSearch || undefined },
+    { enabled: addMenuOpen && pickerTab === "templates" }
+  );
   const [previewMode, setPreviewMode] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -2277,10 +2283,10 @@ function CourseOverviewEditor({
     }
   };
 
-  const addBlock = (type: BlockType) => {
+  const addBlock = (type: BlockType, initialData?: Record<string, any>) => {
     const catalog = BLOCK_CATALOG.find(c => c.type === type);
     if (!catalog) return;
-    const newBlock: Block = { id: uid(), type, data: { ...catalog.defaultData } };
+    const newBlock: Block = { id: uid(), type, data: { ...catalog.defaultData, ...(initialData ?? {}) } };
     setActiveBlocks(bs => [...bs, newBlock]);
     setSelectedBlockId(newBlock.id);
     setAddMenuOpen(false);
@@ -2608,40 +2614,86 @@ function CourseOverviewEditor({
       </div>
 
       {/* Block Picker Modal */}
-      <Dialog open={addMenuOpen} onOpenChange={open => { setAddMenuOpen(open); }}>
+      <Dialog open={addMenuOpen} onOpenChange={open => { setAddMenuOpen(open); if (!open) { setTplSearch(""); setPickerTab("catalog"); } }}>
         <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
           <DialogHeader className="shrink-0">
             <DialogTitle className="text-teal-700 flex items-center gap-2"><Plus className="w-5 h-5" /> Add Content Block</DialogTitle>
           </DialogHeader>
+          {/* Top-level tabs */}
           <div className="flex gap-1 border-b border-gray-200 shrink-0 overflow-x-auto pb-px">
-            {CATALOG_CATEGORIES.map(cat => (
-              <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                className={cn(
-                  "px-3 py-2 text-xs font-semibold whitespace-nowrap transition-colors",
-                  activeCategory === cat ? "text-teal-700 border-b-2 border-teal-500" : "text-gray-500 hover:text-gray-700"
-                )}
-              >{cat}</button>
-            ))}
+            <button onClick={() => setPickerTab("catalog")} className={cn("px-3 py-2 text-xs font-semibold whitespace-nowrap transition-colors", pickerTab === "catalog" ? "text-teal-700 border-b-2 border-teal-500" : "text-gray-500 hover:text-gray-700")}>Block Catalog</button>
+            <button onClick={() => setPickerTab("templates")} className={cn("px-3 py-2 text-xs font-semibold whitespace-nowrap transition-colors", pickerTab === "templates" ? "text-teal-700 border-b-2 border-teal-500" : "text-gray-500 hover:text-gray-700")}>Saved Templates</button>
           </div>
-          <div className="flex-1 overflow-y-auto">
-            <div className="grid grid-cols-2 gap-2 p-3">
-              {BLOCK_CATALOG.filter(b => b.category === activeCategory).map(item => (
-                <button
-                  key={item.type}
-                  onClick={() => addBlock(item.type)}
-                  className="flex items-start gap-2 p-3 rounded-lg border border-gray-200 hover:border-teal-400 hover:bg-teal-50 text-left transition-colors group"
-                >
-                  <span className="text-lg shrink-0">{item.icon}</span>
-                  <div>
-                    <p className="text-xs font-semibold text-gray-800 group-hover:text-teal-700">{item.label}</p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">{(item as any).description ?? item.label}</p>
-                  </div>
-                </button>
-              ))}
+          {pickerTab === "catalog" && (
+            <>
+              <div className="flex gap-1 border-b border-gray-100 shrink-0 overflow-x-auto bg-gray-50">
+                {CATALOG_CATEGORIES.map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setActiveCategory(cat)}
+                    className={cn(
+                      "px-3 py-2 text-xs font-semibold whitespace-nowrap transition-colors",
+                      activeCategory === cat ? "text-teal-700 border-b-2 border-teal-500 bg-white" : "text-gray-500 hover:text-gray-700"
+                    )}
+                  >{cat}</button>
+                ))}
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                <div className="grid grid-cols-2 gap-2 p-3">
+                  {BLOCK_CATALOG.filter(b => b.category === activeCategory).map(item => (
+                    <button
+                      key={item.type}
+                      onClick={() => { addBlock(item.type); setAddMenuOpen(false); }}
+                      className="flex items-start gap-2 p-3 rounded-lg border border-gray-200 hover:border-teal-400 hover:bg-teal-50 text-left transition-colors group"
+                    >
+                      <span className="text-lg shrink-0">{item.icon}</span>
+                      <div>
+                        <p className="text-xs font-semibold text-gray-800 group-hover:text-teal-700">{item.label}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">{(item as any).description ?? item.label}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+          {pickerTab === "templates" && (
+            <div className="flex-1 overflow-y-auto p-3">
+              <div className="relative mb-3">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                <input value={tplSearch} onChange={e => setTplSearch(e.target.value)} placeholder="Search saved templates…" className="w-full pl-8 pr-3 h-8 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-teal-400" />
+              </div>
+              {tplLoading ? (
+                <p className="text-xs text-gray-400 text-center py-6">Loading…</p>
+              ) : !blockTemplates?.length ? (
+                <div className="flex flex-col items-center justify-center py-10 gap-2 text-gray-400">
+                  <Layers className="w-8 h-8 opacity-30" />
+                  <p className="text-xs">No saved block templates yet. Save blocks as templates from the lesson editor.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {blockTemplates.map((tpl: any) => {
+                    let blockData: Record<string, any> = {};
+                    try { blockData = typeof tpl.blockData === "string" ? JSON.parse(tpl.blockData) : (tpl.blockData ?? {}); } catch { /* ignore */ }
+                    const catalogEntry = BLOCK_CATALOG.find(c => c.type === tpl.blockType);
+                    return (
+                      <div key={tpl.id} className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg border border-gray-100 hover:border-teal-200 hover:bg-teal-50 group transition-colors">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {catalogEntry && <span className="shrink-0 text-teal-500" style={{ fontSize: 14 }}>{catalogEntry.icon}</span>}
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-gray-700 truncate">{tpl.name}</p>
+                            {tpl.description && <p className="text-xs text-gray-400 truncate">{tpl.description}</p>}
+                          </div>
+                        </div>
+                        <button onClick={() => { addBlock(tpl.blockType, blockData); setAddMenuOpen(false); }}
+                          className="shrink-0 px-2.5 py-1 text-xs bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors">Add</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
@@ -2731,7 +2783,7 @@ function CourseInstructorsEditor({ courseId, courseInstructors, onSaved }: { cou
 
       {/* Hint about global profiles */}
       <p className="text-xs text-gray-400">
-        Instructor profiles are saved globally and can be reused across all courses. Manage all profiles from the <span className="font-medium text-teal-600">Instructors</span> tab in the main Education Library view.
+        Instructor profiles are saved globally and can be reused across all courses. Manage all profiles from the <span className="font-medium text-teal-600">Instructors</span> tab in the main LMS Management view.
       </p>
 
       {/* Create Instructor Dialog */}
@@ -5255,12 +5307,12 @@ export default function LMSAdmin() {
               </div>
               <div>
                 <h1 className="text-lg font-bold text-gray-900">LMS Management</h1>
-                <p className="text-xs text-gray-400">Education Library · Courses · Products · Enrollments</p>
+                <p className="text-xs text-gray-400">LMS Management · Courses · Products · Enrollments</p>
               </div>
             </div>
             <Link href="/education-library">
               <Button size="sm" variant="outline" className="h-8 text-xs text-teal-600 border-teal-200 hover:bg-teal-50">
-                <LinkIcon className="w-3 h-3 mr-1.5" /> View Education Library
+                <LinkIcon className="w-3 h-3 mr-1.5" /> View LMS Management
               </Button>
             </Link>
           </div>
@@ -5747,7 +5799,7 @@ function CollectionsTab() {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="font-semibold text-gray-800">Collections</h3>
-          <p className="text-xs text-gray-500 mt-0.5">Group courses by custom labels — shown as filter tabs on the Education Library. Drag to reorder.</p>
+          <p className="text-xs text-gray-500 mt-0.5">Group courses by custom labels — shown as filter tabs on the LMS Management. Drag to reorder.</p>
         </div>
         <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => setCreateOpen(true)}>
           <Plus className="w-3.5 h-3.5 mr-1" /> New Collection
@@ -5870,7 +5922,7 @@ function CollectionFormDialog({
             </div>
             <div className="col-span-2 flex items-center gap-2">
               <Switch checked={isPublished} onCheckedChange={setIsPublished} />
-              <Label className="text-xs">Published (visible on Education Library)</Label>
+              <Label className="text-xs">Published (visible on LMS Management)</Label>
             </div>
           </div>
 

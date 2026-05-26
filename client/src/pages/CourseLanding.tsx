@@ -518,18 +518,23 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
           {d.headline && <h2 className={`text-2xl font-bold mb-6 ${hAlign === "center" ? "text-center" : hAlign === "right" ? "text-right" : "text-left"}`} style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="overflow-hidden max-w-3xl" style={{ border: `1px solid ${d.sectionBorderColor ?? "#e5e7eb"}`, borderRadius: `${cr}px` }}>
             <Accordion type="multiple" defaultValue={["section-0"]}>
-              {course.sections.map((section: any, si: number) => (
+              {course.sections.filter((section: any) => {
+                const published = (section.lessons ?? []).filter((l: any) => l.lessonStatus !== "draft");
+                return published.length > 0;
+              }).map((section: any, si: number) => {
+                const publishedLessons = (section.lessons ?? []).filter((l: any) => l.lessonStatus !== "draft");
+                return (
                 <AccordionItem key={section.id} value={`section-${si}`} style={{ borderBottom: `1px solid ${d.sectionBorderColor ?? "#e5e7eb"}` }}>
                   <AccordionTrigger
                     className="hover:no-underline px-5 font-semibold text-sm"
                     style={{ backgroundColor: d.sectionBgColor ?? "#f9fafb", color: d.sectionTextColor ?? "#1f2937" }}
                   >
                     <span>{section.title}</span>
-                    <span className="text-xs ml-auto mr-2" style={{ color: d.lessonCountColor ?? "#9ca3af" }}>{section.lessons.length} lesson{section.lessons.length !== 1 ? "s" : ""}</span>
+                    <span className="text-xs ml-auto mr-2" style={{ color: d.lessonCountColor ?? "#9ca3af" }}>{publishedLessons.length} lesson{publishedLessons.length !== 1 ? "s" : ""}</span>
                   </AccordionTrigger>
                   <AccordionContent>
                     <ul className="space-y-1 pt-1">
-                      {section.lessons.filter((lesson: any) => {
+                      {publishedLessons.filter((lesson: any) => {
                         if (!enrollment) return true; // not enrolled — show all
                         const pm = lesson.previewMode ?? (lesson.isPreview ? "preview" : "none");
                         return pm !== "preview_hide_after_purchase";
@@ -562,7 +567,8 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
                     </ul>
                   </AccordionContent>
                 </AccordionItem>
-              ))}
+                );
+              })}
             </Accordion>
           </div>
         </div>
