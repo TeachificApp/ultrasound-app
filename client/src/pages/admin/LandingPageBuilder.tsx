@@ -1899,6 +1899,65 @@ function SortableReviewItem({
   );
 }
 
+// ─── ColumnBlockList — top-level to prevent remount-on-render crash ──────────
+function ColumnBlockList({ side, blocks, onUpdate, lessonId }: {
+  side: "left" | "right";
+  blocks: Block[];
+  onUpdate: (newBlocks: Block[]) => void;
+  lessonId?: number;
+}) {
+  const [addOpen, setAddOpen] = useState(false);
+  const [addCat, setAddCat] = useState(CATALOG_CATEGORIES[0]);
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-xs font-medium text-gray-600 capitalize">{side} Column</span>
+        <button onClick={() => setAddOpen(v => !v)} className="text-xs text-teal-600 flex items-center gap-1 hover:text-teal-700"><Plus size={11} /> Add Block</button>
+      </div>
+      {addOpen && (
+        <div className="bg-gray-50 border border-gray-200 rounded p-2 space-y-1 mb-2">
+          <div className="flex gap-1 flex-wrap">
+            {CATALOG_CATEGORIES.map(cat => (
+              <button key={cat} onClick={() => setAddCat(cat)} className={`text-[10px] px-2 py-0.5 rounded-full border ${addCat === cat ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-500"}`}>{cat}</button>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-1 max-h-40 overflow-y-auto">
+            {BLOCK_CATALOG.filter(c => c.category === addCat && c.type !== "column_layout").map(c => (
+              <button key={c.type} onClick={() => {
+                const newBlock: Block = { id: uid(), type: c.type, data: { ...c.defaultData } };
+                onUpdate([...blocks, newBlock]);
+                setAddOpen(false);
+              }} className="text-[10px] text-left px-2 py-1 rounded border border-gray-200 hover:bg-teal-50 hover:border-teal-300 text-gray-600 truncate">{c.label}</button>
+            ))}
+          </div>
+        </div>
+      )}
+      {blocks.length === 0 ? (
+        <div className="border-2 border-dashed border-gray-200 rounded p-3 text-center text-gray-400 text-xs">No blocks yet — click Add Block</div>
+      ) : (
+        <div className="space-y-1">
+          {blocks.map((b, i) => (
+            <div key={b.id} className="border border-gray-200 rounded p-2 bg-white">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] font-medium text-gray-600 truncate flex-1">{BLOCK_CATALOG.find(c => c.type === b.type)?.label ?? b.type}</span>
+                <div className="flex gap-0.5">
+                  <button disabled={i === 0} onClick={() => { const nb = [...blocks]; [nb[i-1], nb[i]] = [nb[i], nb[i-1]]; onUpdate(nb); }} className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-teal-600 disabled:opacity-30"><ChevronUp size={10} /></button>
+                  <button disabled={i === blocks.length - 1} onClick={() => { const nb = [...blocks]; [nb[i], nb[i+1]] = [nb[i+1], nb[i]]; onUpdate(nb); }} className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-teal-600 disabled:opacity-30"><ChevronDown size={10} /></button>
+                  <button onClick={() => onUpdate(blocks.filter((_, j) => j !== i))} className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-red-500"><X size={10} /></button>
+                </div>
+              </div>
+              <BlockSettings block={b} onChange={newData => {
+                const nb = blocks.map((bl, j) => j === i ? { ...bl, data: newData } : bl);
+                onUpdate(nb);
+              }} lessonId={lessonId} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function BlockSettings({ block, onChange, lessonId }: { block: Block; onChange: (data: Record<string, any>) => void; lessonId?: number }) {
   const d = block.data ?? {};
   // Use refs to avoid stale closures with debounced inputs
@@ -2026,6 +2085,20 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
           <div className="border-t pt-3 mt-3">
             <label className="text-xs text-gray-500 block mb-1">Min Height (px)</label>
             <input type="number" min={100} max={1200} step={10} value={d.heroMinHeight ?? 400} onChange={e => set("heroMinHeight", Number(e.target.value))} className="w-full h-7 text-xs rounded border border-gray-200 px-2" />
+          </div>
+          {/* Hero Max Height */}
+          <div className="mt-2">
+            <label className="text-xs text-gray-500 block mb-1">Max Height (px) <span className="text-gray-400 font-normal">— leave blank for no limit</span></label>
+            <input
+              type="number" min={50} max={1200} step={10}
+              value={d.maxHeight ?? ""}
+              placeholder="e.g. 150"
+              onChange={e => {
+                const v = e.target.value;
+                set("maxHeight", v === "" ? undefined : Number(v));
+              }}
+              className="w-full h-7 text-xs rounded border border-gray-200 px-2"
+            />
           </div>
           {/* Clickable Hero Section */}
           <div className="border-t pt-3 mt-3">
@@ -3780,10 +3853,10 @@ function ColumnDropZone({ id, blocks, activeDragId, isTargeted, onMoveOut, onMov
   // isTargeted comes from parent (tracked via pointermove); isOver is from dnd-kit
   const isActive = isTargeted || (isOver && activeDragId != null);
   return (
-    <div ref={setNodeRef} data-col-zone={id} style={{ pointerEvents: "all" }} className={`flex-1 min-h-[120px] rounded-lg transition-all ${isActive ? "ring-2 ring-teal-400 bg-teal-50" : "bg-gray-50/50"}`}>
+    <div ref={setNodeRef} data-col-zone={id} style={{ pointerEvents: "all" }} className={`flex-1 min-h-[120px] rounded-lg transition-all duration-150 ${isActive ? "ring-4 ring-teal-500 ring-offset-2 bg-teal-50 shadow-lg shadow-teal-200" : "bg-gray-50/50"}`}>
       {blocks.length === 0 ? (
-        <div data-col-zone={id} className={`h-full min-h-[120px] flex flex-col items-center justify-center gap-2 text-xs rounded-lg border-2 border-dashed transition-all ${isActive ? "border-teal-400 text-teal-600 bg-teal-50" : "border-gray-200 text-gray-400"}`}>
-          {isActive ? <><span className="text-lg">+</span><span>Drop here</span></> : (
+        <div data-col-zone={id} className={`h-full min-h-[120px] flex flex-col items-center justify-center gap-2 text-xs rounded-lg border-2 border-dashed transition-all duration-150 ${isActive ? "border-teal-500 text-teal-700 bg-teal-100 scale-[1.02]" : "border-gray-200 text-gray-400"}`}>
+          {isActive ? <><span className="text-2xl font-bold text-teal-600">↓</span><span className="font-semibold text-teal-700">Drop here</span></> : (
             <>
               <span>Drag blocks here</span>
               <button onClick={e => { e.stopPropagation(); setPickerOpen(true); }}
@@ -3796,7 +3869,7 @@ function ColumnDropZone({ id, blocks, activeDragId, isTargeted, onMoveOut, onMov
       ) : (
         <>
           <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
-            <div data-col-zone={id} className="space-y-1 p-1">
+            <div data-col-zone={id} className={`space-y-1 p-1 rounded transition-all duration-150 ${isActive ? "bg-teal-50" : ""}`}>
               {blocks.map(b => (
                 <ColumnChildBlock
                   key={b.id}
@@ -3807,15 +3880,22 @@ function ColumnDropZone({ id, blocks, activeDragId, isTargeted, onMoveOut, onMov
                   colZoneId={id}
                 />
               ))}
+              {isActive && (
+                <div data-col-zone={id} className="flex items-center justify-center gap-1 py-3 rounded-lg border-2 border-dashed border-teal-400 bg-teal-100 text-teal-700 text-xs font-semibold">
+                  <span className="text-base">↓</span> Drop here
+                </div>
+              )}
             </div>
           </SortableContext>
           {/* Add block button below existing blocks */}
-          <div className="px-1 pb-1">
-            <button onClick={e => { e.stopPropagation(); setPickerOpen(true); }}
-              className="w-full flex items-center justify-center gap-1 py-1.5 rounded-lg border border-dashed border-gray-200 text-gray-400 text-[10px] hover:border-teal-400 hover:text-teal-600 hover:bg-teal-50 transition-colors">
-              <Plus size={10} /> Add Block
-            </button>
-          </div>
+          {!isActive && (
+            <div className="px-1 pb-1">
+              <button onClick={e => { e.stopPropagation(); setPickerOpen(true); }}
+                className="w-full flex items-center justify-center gap-1 py-1.5 rounded-lg border border-dashed border-gray-200 text-gray-400 text-[10px] hover:border-teal-400 hover:text-teal-600 hover:bg-teal-50 transition-colors">
+                <Plus size={10} /> Add Block
+              </button>
+            </div>
+          )}
         </>
       )}
       <ColumnBlockPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} onAddBlock={onAddBlock} />

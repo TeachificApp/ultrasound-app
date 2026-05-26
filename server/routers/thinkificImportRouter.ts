@@ -685,6 +685,7 @@ export const thinkificImportRouter = router({
                 buttons: [],
                 showButtons: false,
                 hideButtons: true,
+                maxHeight: 150,
               },
             });
 
@@ -1218,6 +1219,7 @@ export const thinkificImportRouter = router({
                   buttons: [],
                   showButtons: false,
                   hideButtons: true,
+                  maxHeight: 150,
                 },
               });
               if (embedUrl) {

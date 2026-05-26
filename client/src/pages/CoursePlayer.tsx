@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import {
   Award, BookOpen, Bookmark, BookmarkCheck, CheckCircle, ChevronLeft, ChevronRight,
   Download, Eye, FileText, HelpCircle, Lock, Menu, Maximize2, Minimize2, Monitor, PlayCircle, StickyNote, X,
-  User, ListChecks, ChevronDown,
+  User, ListChecks, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import LessonEffectPlayer, { fireLessonCompleteEffect } from "@/components/LessonEffectPlayer";
@@ -567,6 +567,7 @@ function MobileSidebarContent({
   completedIds: Set<number>; notesData: any; bookmarksData: any;
   slug: string; course: any; prereqLockedIds: Set<number>; lbl: Record<string, string>;
 }) {
+  const [collapsedSections, setCollapsedSections] = useState<Set<number>>(new Set());
   const topLevelLessons = (data?.topLevelLessons ?? []).filter((l: any) => {
     if (!data?.enrollment) return true;
     const pm = l.previewMode ?? (l.isPreview ? "preview" : "none");
@@ -620,10 +621,20 @@ function MobileSidebarContent({
               const sectionNum = topLevelLessons.length + sIdx + 1;
               const allSectionDone = section.lessons.every((l: any) => completedIds.has(l.id)) && section.lessons.length > 0;
               const isSectionActive = section.lessons.some((l: any) => l.id === selectedLessonId);
+              const isExpanded = isSectionActive || !collapsedSections.has(section.id);
+              const toggleSection = () => {
+                if (sectionLocked) return;
+                setCollapsedSections(prev => {
+                  const next = new Set(prev);
+                  if (next.has(section.id)) next.delete(section.id);
+                  else next.add(section.id);
+                  return next;
+                });
+              };
               return (
                 <div key={section.id}>
-                  <button onClick={() => { if (!sectionLocked && section.lessons[0]) setSelectedLessonId(section.lessons[0].id); }} disabled={sectionLocked}
-                    className={cn("w-full text-left px-3 py-2.5 flex items-center gap-3 text-xs transition-all border-l-4",
+                  <div onClick={toggleSection}
+                    className={cn("w-full text-left px-3 py-2.5 flex items-center gap-3 text-xs transition-all border-l-4 cursor-pointer select-none",
                       isSectionActive ? "bg-teal-50 text-teal-900 border-teal-500" : allSectionDone ? "text-gray-500 hover:bg-gray-50 border-transparent" : sectionLocked ? "text-gray-400 cursor-not-allowed border-transparent" : "text-gray-700 hover:bg-gray-50 border-transparent")}>
                     <span className={cn("w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-extrabold shrink-0",
                       isSectionActive ? "bg-teal-500 text-white" : allSectionDone ? "bg-teal-100 text-teal-700" : sectionLocked ? "bg-gray-100 text-gray-400" : "bg-gray-100 text-gray-500")}>
@@ -633,9 +644,12 @@ function MobileSidebarContent({
                       <span className="leading-snug font-semibold uppercase tracking-wide truncate block">{section.title}</span>
                       {sectionLocked && unlockDate && <span className="text-[10px] text-gray-500 font-normal normal-case">Unlocks {unlockDate}</span>}
                     </div>
-                    {isSectionActive && !sectionLocked && <ChevronDown className="w-3 h-3 text-teal-500 shrink-0" />}
-                  </button>
-                  {isSectionActive && !sectionLocked && (
+                    {!sectionLocked && (isExpanded
+                      ? <ChevronUp className="w-3 h-3 text-teal-500 shrink-0" />
+                      : <ChevronDown className="w-3 h-3 text-gray-400 shrink-0" />
+                    )}
+                  </div>
+                  {isExpanded && !sectionLocked && (
                     <div className="ml-10 border-l border-gray-200 pl-3 py-1">
                       {section.lessons.map((lesson: any) => {
                         const done = completedIds.has(lesson.id);
@@ -721,6 +735,9 @@ export default function CoursePlayer() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<"lessons" | "notes" | "bookmarks">("lessons");
+  // collapsedSections: Set of section IDs that are manually collapsed
+  // null = not yet initialized (auto-expand active section on first load)
+  const [collapsedSections, setCollapsedSections] = useState<Set<number>>(new Set());
   const [rightPanelTab, setRightPanelTab] = useState<"info" | "notes">("info");
   const [videoWatched, setVideoWatched] = useState(false);
   const [showCertDialog, setShowCertDialog] = useState(false);
@@ -1085,7 +1102,11 @@ export default function CoursePlayer() {
   const isBookmarked = selectedLessonId ? bookmarkedIds.has(selectedLessonId) : false;
   const currentNote = selectedLessonId ? notesByLesson.get(selectedLessonId) : null;
   const requireVideoCompletion = lessonData?.requireVideoCompletion === 1;
-  const requireManualComplete = lessonData?.requireManualComplete === 1;
+  // Resolve effective Mark Complete: lesson override (0/1) → course default → fallback ON
+  const courseDefaultMarkComplete = data?.course?.defaultMarkComplete !== 0; // true unless explicitly 0
+  const requireManualComplete = lessonData?.requireManualComplete === null || lessonData?.requireManualComplete === undefined
+    ? courseDefaultMarkComplete  // inherit from course
+    : lessonData.requireManualComplete === 1; // explicit lesson override
   const canMarkComplete = !requireVideoCompletion || videoWatched;
 
   // Parse content blocks and learning objectives from lesson data
@@ -1101,8 +1122,11 @@ export default function CoursePlayer() {
     } catch { return []; }
   })();
 
+  const playerTheme = data?.course?.playerTheme ?? "light";
+  const isDarkTheme = playerTheme === "dark";
+
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-gray-50">
+    <div className={cn("flex flex-col h-screen overflow-hidden", isDarkTheme ? "bg-gray-900 text-gray-100" : "bg-gray-50 text-gray-900")}>
       {/* Upgrade Prompt Dialog for preview lesson users */}
       <Dialog open={showUpgradePrompt} onOpenChange={setShowUpgradePrompt}>
         <DialogContent className="max-w-md">
@@ -1195,7 +1219,7 @@ export default function CoursePlayer() {
       )}
 
       {/* Top Header Bar */}
-      <div className="flex items-center justify-between px-5 py-2.5 bg-white border-b border-gray-200 shrink-0 shadow-sm">
+      <div className={cn("flex items-center justify-between px-5 py-2.5 border-b shrink-0 shadow-sm", isDarkTheme ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200")}>
         <div className="flex items-center gap-3">
           {/* Mobile hamburger */}
           <button
@@ -1326,7 +1350,8 @@ export default function CoursePlayer() {
 
         {/* Desktop inline sidebar */}
         <aside className={cn(
-          "flex-col bg-white border-r border-gray-200 transition-all duration-300 shrink-0",
+          "flex-col border-r transition-all duration-300 shrink-0",
+          isDarkTheme ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200",
           "hidden lg:flex",
           sidebarOpen ? "lg:w-[17rem]" : "lg:w-0 lg:overflow-hidden"
         )}>
@@ -1402,6 +1427,28 @@ export default function CoursePlayer() {
 
           {/* Module List — only shown when lessons tab is active */}
           {sidebarTab === "lessons" && <div className="flex-1 overflow-y-auto py-1">
+            {/* Collapse All / Expand All toggle — only shown when there are sections */}
+            {sections.length > 0 && (
+              <div className="flex justify-end px-3 pb-1">
+                <button
+                  onClick={() => {
+                    const allCollapsed = sections.every((s: any) => collapsedSections.has(s.id));
+                    if (allCollapsed) {
+                      setCollapsedSections(new Set());
+                    } else {
+                      setCollapsedSections(new Set(sections.map((s: any) => s.id)));
+                    }
+                  }}
+                  className="text-[10px] text-teal-600 hover:text-teal-800 font-medium transition-colors flex items-center gap-1"
+                >
+                  {sections.every((s: any) => collapsedSections.has(s.id)) ? (
+                    <><ChevronDown className="w-3 h-3" /> Expand All</>
+                  ) : (
+                    <><ChevronUp className="w-3 h-3" /> Collapse All</>
+                  )}
+                </button>
+              </div>
+            )}
             {/* Top-level lessons */}
             {topLevelLessons.map((lesson: any, idx: number) => {
               const done = completedIds.has(lesson.id);
@@ -1452,15 +1499,26 @@ export default function CoursePlayer() {
               const sectionNum = topLevelLessons.length + sIdx + 1;
               const allSectionDone = section.lessons.every((l: any) => completedIds.has(l.id)) && section.lessons.length > 0;
               const isSectionActive = section.lessons.some((l: any) => l.id === selectedLessonId);
+              // A section is expanded if: it's active (always show active) OR it's not in collapsedSections
+              const isExpanded = isSectionActive || !collapsedSections.has(section.id);
+
+              const toggleSection = (e: React.MouseEvent) => {
+                e.stopPropagation();
+                if (sectionLocked) return;
+                setCollapsedSections(prev => {
+                  const next = new Set(prev);
+                  if (next.has(section.id)) next.delete(section.id);
+                  else next.add(section.id);
+                  return next;
+                });
+              };
 
               return (
                 <div key={section.id}>
                   {/* Section header */}
-                  <button
-                    onClick={() => { if (!sectionLocked && section.lessons[0]) handleLessonSelect(section.lessons[0].id); }}
-                    disabled={sectionLocked}
+                  <div
                     className={cn(
-                      "w-full text-left px-3 py-2.5 flex items-center gap-3 text-xs transition-all border-l-4",
+                      "w-full text-left px-3 py-2.5 flex items-center gap-3 text-xs transition-all border-l-4 cursor-pointer select-none",
                       isSectionActive
                         ? "text-gray-900"
                         : allSectionDone
@@ -1470,6 +1528,7 @@ export default function CoursePlayer() {
                             : "text-gray-700 hover:bg-gray-50 border-transparent",
                     )}
                     style={isSectionActive ? { backgroundColor: `${primaryColor}12`, borderColor: primaryColor } : undefined}
+                    onClick={toggleSection}
                   >
                     <span className={cn(
                       "w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-extrabold shrink-0",
@@ -1484,13 +1543,15 @@ export default function CoursePlayer() {
                         <span className="text-[10px] text-gray-500 font-normal normal-case">Unlocks {unlockDate}</span>
                       )}
                     </div>
-                    {isSectionActive && !sectionLocked && (
-                      <ChevronDown className="w-3 h-3 shrink-0" style={primaryText} />
+                    {!sectionLocked && (
+                      isExpanded
+                        ? <ChevronUp className="w-3 h-3 shrink-0 opacity-60" style={isSectionActive ? primaryText : undefined} />
+                        : <ChevronDown className="w-3 h-3 shrink-0 opacity-60" />
                     )}
-                  </button>
+                  </div>
 
-                  {/* Expanded lessons within active section */}
-                  {isSectionActive && !sectionLocked && (
+                  {/* Expanded lessons within section */}
+                  {isExpanded && !sectionLocked && (
                     <div className="ml-10 border-l border-gray-200 pl-3 py-1">
                       {section.lessons.map((lesson: any) => {
                         const done = completedIds.has(lesson.id);
@@ -1550,9 +1611,9 @@ export default function CoursePlayer() {
         </aside>
 
         {/* ── Main Content Area ── */}
-        <div className={cn("flex-1 flex flex-col overflow-hidden", contentFullscreen && "fixed inset-0 z-50 bg-white")}>
+        <div className={cn("flex-1 flex flex-col overflow-hidden", contentFullscreen && (isDarkTheme ? "fixed inset-0 z-50 bg-gray-900" : "fixed inset-0 z-50 bg-white"))}>
           {/* Content Header */}
-          <div className="bg-white border-b border-gray-200 px-5 py-2.5 flex items-center gap-3 shrink-0">
+          <div className={cn("border-b px-5 py-2.5 flex items-center gap-3 shrink-0", isDarkTheme ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200")}>
             {!contentFullscreen && (
               <button onClick={() => setSidebarOpen(o => !o)} className="text-gray-400 hover:text-gray-700 transition-colors shrink-0">
                 {sidebarOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
@@ -1771,7 +1832,7 @@ export default function CoursePlayer() {
                 </div>
 
                 {/* ── Right Panel — "In This Lesson" / Notes ── */}
-                {!contentFullscreen && <div className="w-64 shrink-0 border-l border-gray-200 bg-gray-50 hidden lg:flex flex-col">
+                {!contentFullscreen && <div className={cn("w-64 shrink-0 border-l hidden lg:flex flex-col", isDarkTheme ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50")}>
                   {/* Right panel tab switcher */}
                   <div className="flex border-b border-gray-200 shrink-0">
                     <button

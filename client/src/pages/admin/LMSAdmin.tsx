@@ -710,6 +710,7 @@ function SortableSectionRow({ section, children, onAddLesson, onDrip, onDelete, 
   onMoveUp?: () => void;
   onMoveDown?: () => void;
   onRenameSection?: (newTitle: string) => void;
+  onSaveAsTemplate?: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: section.id });
   const style: React.CSSProperties = {
@@ -773,6 +774,11 @@ function SortableSectionRow({ section, children, onAddLesson, onDrip, onDelete, 
         {onCopyModule && (
           <Button size="sm" variant="ghost" className="h-7 text-xs text-blue-500 hover:bg-blue-50" title="Copy module to another course" onClick={onCopyModule}>
             <Copy className="w-3 h-3 mr-1" /> Copy
+          </Button>
+        )}
+        {onSaveAsTemplate && (
+          <Button size="sm" variant="ghost" className="h-7 text-xs text-purple-500 hover:bg-purple-50" title="Save section as reusable template" onClick={onSaveAsTemplate}>
+            <Save className="w-3 h-3 mr-1" /> Template
           </Button>
         )}
         <Button size="sm" variant="ghost" className="h-7 text-red-400 hover:bg-red-50" onClick={onDelete}>
@@ -840,6 +846,7 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
   const [activeDragId, setActiveDragId] = useState<number | null>(null);
   const [copyLessonTarget, setCopyLessonTarget] = useState<any | null>(null);
   const [copyModuleTarget, setCopyModuleTarget] = useState<any | null>(null);
+  const [saveAsTemplateSection, setSaveAsTemplateSection] = useState<any | null>(null);
 
   useEffect(() => {
     if (course) {
@@ -1067,6 +1074,7 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
                       onAddLesson={() => setAddLessonSection(section.id)}
                       onDrip={() => setEditSectionDrip({ id: section.id, title: section.title, dripDays: section.dripDays ?? 0 })}
                       onCopyModule={() => setCopyModuleTarget(section)}
+                      onSaveAsTemplate={() => setSaveAsTemplateSection(section)}
                       onDelete={() => { if (confirm(`Delete section "${section.title}" and all its lessons?`)) deleteSection.mutate({ id: section.id }); }}
                       onMoveUp={si > 0 ? () => setLocalSections(prev => { const r = arrayMove(prev, si, si - 1); reorderSections.mutate({ sections: r.map((s: any, i: number) => ({ id: s.id, position: i })) }); return r; }) : undefined}
                       onMoveDown={si < localSections.length - 1 ? () => setLocalSections(prev => { const r = arrayMove(prev, si, si + 1); reorderSections.mutate({ sections: r.map((s: any, i: number) => ({ id: s.id, position: i })) }); return r; }) : undefined}
@@ -1250,6 +1258,12 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
           }}
         />
       )}
+      {saveAsTemplateSection && (
+        <SaveSectionTemplateDialog
+          section={saveAsTemplateSection}
+          onClose={() => setSaveAsTemplateSection(null)}
+        />
+      )}
     </div>
   );
 }
@@ -1323,6 +1337,8 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
   const [showInstructor, setShowInstructor] = useState(course.showInstructor ?? false);
   const [showInLibrary, setShowInLibrary] = useState(course.showInLibrary ?? true);
   const [sendEnrollmentEmail, setSendEnrollmentEmail] = useState(course.sendEnrollmentEmail ?? true);
+  const [defaultMarkComplete, setDefaultMarkComplete] = useState<boolean>(course.defaultMarkComplete !== 0);
+  const [playerTheme, setPlayerTheme] = useState<"light" | "dark">(course.playerTheme ?? "light");
   // Custom labels — parse from JSON string stored in DB
   const initLabels = (() => { try { return course.customLabels ? JSON.parse(course.customLabels) : {}; } catch { return {}; } })();
   const [labelLesson, setLabelLesson] = useState<string>(initLabels.lesson ?? "");
@@ -1412,6 +1428,8 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
             gradientTo: useGradient ? (gradientEnd || null) : null,
             gradientDirection: gradientDirection || null,
             sendEnrollmentEmail,
+            defaultMarkComplete,
+            playerTheme,
             customLabels: buildCustomLabels(),
           })}
         >
@@ -1779,6 +1797,37 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
             <p className="text-xs text-gray-400 mt-0.5">Send a welcome email to students when they enroll in this course. Platform-level setting must also be enabled.</p>
           </div>
           <Switch checked={sendEnrollmentEmail} onCheckedChange={setSendEnrollmentEmail} />
+        </div>
+      </div>
+      {/* Player Experience */}
+      <div className="border border-gray-200 rounded-lg p-4 space-y-4 bg-gray-50">
+        <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+          <span className="text-base">🎨</span> Player Experience
+        </h3>
+        {/* Mark Lessons Complete */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-700">Show “Mark Complete” button</p>
+            <p className="text-xs text-gray-400 mt-0.5">Show the Mark Complete button on all lessons by default. Can be overridden per lesson.</p>
+          </div>
+          <Switch checked={defaultMarkComplete} onCheckedChange={setDefaultMarkComplete} />
+        </div>
+        {/* Player Theme */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-700">Player Theme</p>
+            <p className="text-xs text-gray-400 mt-0.5">Choose the color theme for the course player interface.</p>
+          </div>
+          <div className="flex gap-1 border rounded-lg p-1 bg-white">
+            {(["light", "dark"] as const).map(t => (
+              <button key={t} onClick={() => setPlayerTheme(t)}
+                className={`px-3 py-1 text-xs rounded-md font-medium transition-colors capitalize ${
+                  playerTheme === t ? "bg-teal-600 text-white shadow" : "text-gray-500 hover:text-gray-700"
+                }`}>
+                {t === "light" ? "☀️ Light" : "🌙 Dark"}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
       {/* Custom Labels */}
@@ -2745,22 +2794,192 @@ function SectionDripDialog({ section, onClose, onSave }: { section: any; onClose
     </Dialog>
   );
 }
+// ─── Save Section Template Dialog ───────────────────────────────────────────────
+function SaveSectionTemplateDialog({ section, onClose }: { section: { id: number; title: string }; onClose: () => void }) {
+  const [name, setName] = useState(section.title);
+  const [description, setDescription] = useState("");
+  const save = trpc.lmsAdmin.saveSectionTemplate.useMutation({
+    onSuccess: () => { toast.success("Section saved as template"); onClose(); },
+    onError: e => toast.error(`Error: ${e.message}`),
+  });
+  return (
+    <Dialog open onOpenChange={v => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader><DialogTitle>Save as Template</DialogTitle></DialogHeader>
+        <p className="text-xs text-gray-500 mb-3">Save “{section.title}” as a reusable section template. All lessons will be included.</p>
+        <div className="space-y-3">
+          <div>
+            <Label className="text-xs text-gray-600 mb-1 block">Template Name <span className="text-red-400">*</span></Label>
+            <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Standard Module" autoFocus />
+          </div>
+          <div>
+            <Label className="text-xs text-gray-600 mb-1 block">Description <span className="text-gray-400">(optional)</span></Label>
+            <Input value={description} onChange={e => setDescription(e.target.value)} placeholder="Brief description of this template" />
+          </div>
+        </div>
+        <DialogFooter className="mt-4">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button className="bg-purple-600 hover:bg-purple-700 text-white" disabled={!name.trim() || save.isPending}
+            onClick={() => save.mutate({ sectionId: section.id, name: name.trim(), description: description.trim() || undefined })}>
+            {save.isPending ? "Saving…" : "Save Template"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Add Section Dialog ───────────────────────────────────────────────────────
 function AddSectionDialog({ open, courseId, onClose, onCreated }: { open: boolean; courseId: number; onClose: () => void; onCreated: (section: { id: number; title: string }) => void }) {
+  const [mode, setMode] = useState<"blank" | "template" | "course">("blank");
   const [title, setTitle] = useState("");
+  // Template mode
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
+  const [templateTitle, setTemplateTitle] = useState("");
+  // Course copy mode
+  const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
+  const [selectedSectionId, setSelectedSectionId] = useState<number | null>(null);
+  const [copyTitle, setCopyTitle] = useState("");
+
+  const { data: templates, isLoading: templatesLoading } = trpc.lmsAdmin.listSectionTemplates.useQuery(undefined, { enabled: open && mode === "template" });
+  const { data: coursesWithSections, isLoading: coursesLoading } = trpc.lmsAdmin.listCoursesWithSections.useQuery(undefined, { enabled: open && mode === "course" });
+
+  const selectedCourse = coursesWithSections?.find(c => c.id === selectedCourseId);
+  const selectedSection = selectedCourse?.sections.find(s => s.id === selectedSectionId);
+
   const create = trpc.lmsAdmin.createSection.useMutation({
     onSuccess: (data) => { toast.success("Section added"); const t = title.trim(); setTitle(""); onCreated({ id: data.id, title: t }); },
     onError: e => toast.error(`Error: ${e.message}`),
   });
+  const importTemplate = trpc.lmsAdmin.importSectionTemplate.useMutation({
+    onSuccess: (data) => { toast.success(`Section "${data.title}" imported with ${data.lessonCount} lesson(s)`); setTemplateTitle(""); setSelectedTemplateId(null); onCreated({ id: data.sectionId, title: data.title }); },
+    onError: e => toast.error(`Error: ${e.message}`),
+  });
+  const copySection = trpc.lmsAdmin.copySectionFromCourse.useMutation({
+    onSuccess: (data) => { toast.success(`Section "${data.title}" copied with ${data.lessonCount} lesson(s)`); setCopyTitle(""); setSelectedSectionId(null); setSelectedCourseId(null); onCreated({ id: data.sectionId, title: data.title }); },
+    onError: e => toast.error(`Error: ${e.message}`),
+  });
+
+  const isPending = create.isPending || importTemplate.isPending || copySection.isPending;
+
+  function handleSubmit() {
+    if (mode === "blank") {
+      if (!title.trim()) return;
+      create.mutate({ courseId, title: title.trim() });
+    } else if (mode === "template") {
+      if (!selectedTemplateId) return;
+      importTemplate.mutate({ courseId, templateId: selectedTemplateId, sectionTitle: templateTitle.trim() || undefined });
+    } else {
+      if (!selectedSectionId) return;
+      copySection.mutate({ targetCourseId: courseId, sourceSectionId: selectedSectionId, sectionTitle: copyTitle.trim() || undefined });
+    }
+  }
+
+  const canSubmit = mode === "blank" ? !!title.trim() : mode === "template" ? !!selectedTemplateId : !!selectedSectionId;
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-sm">
+    <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-lg">
         <DialogHeader><DialogTitle>Add Section</DialogTitle></DialogHeader>
-        <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Section title" className="mt-2" />
-        <DialogFooter className="mt-3">
+
+        {/* Mode selector */}
+        <div className="flex gap-1 border rounded-lg p-1 bg-gray-50 mb-4">
+          {(["blank", "template", "course"] as const).map(m => (
+            <button key={m} onClick={() => setMode(m)}
+              className={`flex-1 text-xs py-1.5 rounded-md font-medium transition-colors ${
+                mode === m ? "bg-white shadow text-teal-700 border border-gray-200" : "text-gray-500 hover:text-gray-700"
+              }`}>
+              {m === "blank" ? "Blank Section" : m === "template" ? "From Template" : "Copy from Course"}
+            </button>
+          ))}
+        </div>
+
+        {/* Blank */}
+        {mode === "blank" && (
+          <div>
+            <Label className="text-xs text-gray-600 mb-1 block">Section Title</Label>
+            <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Module 1: Introduction" autoFocus />
+          </div>
+        )}
+
+        {/* From Template */}
+        {mode === "template" && (
+          <div className="space-y-3">
+            {templatesLoading ? <p className="text-sm text-gray-400">Loading templates…</p> : !templates?.length ? (
+              <p className="text-sm text-gray-500 py-4 text-center">No saved templates yet. Save a section as a template from the course builder.</p>
+            ) : (
+              <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                {templates.map(t => (
+                  <button key={t.id} onClick={() => { setSelectedTemplateId(t.id); setTemplateTitle(t.sectionTitle); }}
+                    className={`w-full text-left p-2.5 rounded-lg border text-sm transition-colors ${
+                      selectedTemplateId === t.id ? "border-teal-500 bg-teal-50" : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                    }`}>
+                    <div className="font-medium text-gray-800">{t.name}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{t.sectionTitle} · {t.lessonCount} lesson{t.lessonCount !== 1 ? "s" : ""}</div>
+                    {t.description && <div className="text-xs text-gray-400 mt-0.5 truncate">{t.description}</div>}
+                  </button>
+                ))}
+              </div>
+            )}
+            {selectedTemplateId && (
+              <div>
+                <Label className="text-xs text-gray-600 mb-1 block">Section Title <span className="text-gray-400">(optional override)</span></Label>
+                <Input value={templateTitle} onChange={e => setTemplateTitle(e.target.value)} placeholder="Leave blank to use template default" className="h-8 text-sm" />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Copy from Course */}
+        {mode === "course" && (
+          <div className="space-y-3">
+            {coursesLoading ? <p className="text-sm text-gray-400">Loading courses…</p> : (
+              <>
+                <div>
+                  <Label className="text-xs text-gray-600 mb-1 block">Source Course</Label>
+                  <Select value={selectedCourseId?.toString() ?? ""} onValueChange={v => { setSelectedCourseId(Number(v)); setSelectedSectionId(null); setCopyTitle(""); }}>
+                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Choose a course…" /></SelectTrigger>
+                    <SelectContent>
+                      {coursesWithSections?.filter(c => c.id !== courseId).map(c => (
+                        <SelectItem key={c.id} value={c.id.toString()}>{c.title}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {selectedCourse && (
+                  <div>
+                    <Label className="text-xs text-gray-600 mb-1 block">Section to Copy</Label>
+                    {!selectedCourse.sections.length ? (
+                      <p className="text-xs text-gray-400">This course has no sections.</p>
+                    ) : (
+                      <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
+                        {selectedCourse.sections.map(s => (
+                          <button key={s.id} onClick={() => { setSelectedSectionId(s.id); setCopyTitle(s.title); }}
+                            className={`w-full text-left px-3 py-2 rounded-lg border text-sm transition-colors ${
+                              selectedSectionId === s.id ? "border-teal-500 bg-teal-50" : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                            }`}>
+                            {s.title}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {selectedSection && (
+                  <div>
+                    <Label className="text-xs text-gray-600 mb-1 block">Section Title in This Course <span className="text-gray-400">(optional override)</span></Label>
+                    <Input value={copyTitle} onChange={e => setCopyTitle(e.target.value)} placeholder={selectedSection.title} className="h-8 text-sm" />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        <DialogFooter className="mt-4">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button className="bg-teal-600 hover:bg-teal-700 text-white" disabled={!title.trim() || create.isPending} onClick={() => create.mutate({ courseId, title: title.trim() })}>
-            {create.isPending ? "Adding..." : "Add Section"}
+          <Button className="bg-teal-600 hover:bg-teal-700 text-white" disabled={!canSubmit || isPending} onClick={handleSubmit}>
+            {isPending ? "Adding…" : "Add Section"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -2849,7 +3068,8 @@ function AddLessonDialog({ courseId, sectionId, onClose, onCreated }: {
   const [embedUrl, setEmbedUrl] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("");
   const [requireVideoCompletion, setRequireVideoCompletion] = useState(false);
-  const [requireManualComplete, setRequireManualComplete] = useState(false);
+  // null = inherit from course default, true = always show, false = always hide
+  const [requireManualComplete, setRequireManualComplete] = useState<boolean | null>(null);
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<{ id: number; title: string; s3Url: string; mediaType: string } | null>(null);
 
@@ -2860,7 +3080,7 @@ function AddLessonDialog({ courseId, sectionId, onClose, onCreated }: {
         id: data.id, title, type, content, videoContent, embedUrl,
         isPreview, durationMinutes: durationMinutes ? parseInt(durationMinutes) : null,
         requireVideoCompletion: requireVideoCompletion ? 1 : 0,
-        requireManualComplete: requireManualComplete ? 1 : 0,
+        requireManualComplete: requireManualComplete === null ? null : (requireManualComplete ? 1 : 0),
         contentBlocks: null, mediaAssetId: selectedAsset?.id ?? null,
       });
     },
@@ -3002,9 +3222,20 @@ function AddLessonDialog({ courseId, sectionId, onClose, onCreated }: {
               <Label htmlFor="add-req-video" className="text-sm">Require video completion before marking complete</Label>
             </div>
           )}
-          <div className="flex items-center gap-2">
-            <Switch checked={requireManualComplete} onCheckedChange={setRequireManualComplete} id="add-req-manual" />
-            <Label htmlFor="add-req-manual" className="text-sm">Show "Mark Complete" button (manual completion)</Label>
+          {/* Mark Complete override — 3-state: inherit / show / hide */}
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-gray-700">"Mark Complete" button</p>
+            <div className="flex gap-1 border rounded-lg p-1 bg-gray-50 w-fit">
+              {([null, true, false] as const).map(v => (
+                <button key={String(v)} onClick={() => setRequireManualComplete(v)}
+                  className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${
+                    requireManualComplete === v ? "bg-white shadow text-teal-700 border border-gray-200" : "text-gray-500 hover:text-gray-700"
+                  }`}>
+                  {v === null ? "Inherit from course" : v ? "Always show" : "Always hide"}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400">"Inherit from course" uses the course-level default setting.</p>
           </div>
         </div>
         <DialogFooter>
@@ -3170,7 +3401,10 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
   );
   const [durationMinutes, setDurationMinutes] = useState(String(lesson.durationMinutes ?? ""));
     const [requireVideoCompletion, setRequireVideoCompletion] = useState(lesson.requireVideoCompletion === 1);
-  const [requireManualComplete, setRequireManualComplete] = useState(lesson.requireManualComplete === 1);
+  // null = inherit from course default, true = always show, false = always hide
+  const [requireManualComplete, setRequireManualComplete] = useState<boolean | null>(
+    lesson.requireManualComplete === null || lesson.requireManualComplete === undefined ? null : lesson.requireManualComplete === 1
+  );
   const [dripDays, setDripDays] = useState(String(lesson.dripDays ?? ""));
   const [showInstructor, setShowInstructor] = useState<"inherit" | "show" | "hide">(lesson.showInstructor ?? "inherit");
   const [isPrerequisite, setIsPrerequisite] = useState<boolean>(!!lesson.isPrerequisite);
@@ -3188,7 +3422,9 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
     setPreviewMode((lessonShallow as any).previewMode ?? (lessonShallow.isPreview ? "preview" : "none"));
     setDurationMinutes(String(lessonShallow.durationMinutes ?? ""));
     setRequireVideoCompletion(lessonShallow.requireVideoCompletion === 1);
-    setRequireManualComplete(lessonShallow.requireManualComplete === 1);
+    setRequireManualComplete(
+      lessonShallow.requireManualComplete === null || lessonShallow.requireManualComplete === undefined ? null : lessonShallow.requireManualComplete === 1
+    );
     setDripDays(String(lessonShallow.dripDays ?? ""));
     setShowInstructor(lessonShallow.showInstructor ?? "inherit");
     setIsPrerequisite(!!lessonShallow.isPrerequisite);
@@ -3446,9 +3682,20 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
               <Label htmlFor="edit-req-video" className="text-sm">Require video completion before marking complete</Label>
             </div>
           )}
-                    <div className="flex items-center gap-2">
-            <Switch checked={requireManualComplete} onCheckedChange={setRequireManualComplete} id="edit-req-manual" />
-            <Label htmlFor="edit-req-manual" className="text-sm">Show "Mark Complete" button (manual completion)</Label>
+                    {/* Mark Complete override — 3-state: inherit / show / hide */}
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-gray-700">"Mark Complete" button</p>
+            <div className="flex gap-1 border rounded-lg p-1 bg-gray-50 w-fit">
+              {([null, true, false] as const).map(v => (
+                <button key={String(v)} onClick={() => setRequireManualComplete(v)}
+                  className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${
+                    requireManualComplete === v ? "bg-white shadow text-teal-700 border border-gray-200" : "text-gray-500 hover:text-gray-700"
+                  }`}>
+                  {v === null ? "Inherit from course" : v ? "Always show" : "Always hide"}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400">"Inherit from course" uses the course-level default setting.</p>
           </div>
 
           {/* Comments toggle */}

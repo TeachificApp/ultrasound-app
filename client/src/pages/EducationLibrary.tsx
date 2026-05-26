@@ -25,7 +25,11 @@ const BRAND_LABELS: Record<string, string> = {
 };
 
 function CourseCard({ course, enrolledCourseIds, purchasedProductSlugs }: { course: any; enrolledCourseIds: Set<number>; purchasedProductSlugs: Set<string> }) {
-  const price = course.isFree ? "Free" : `$${(course.price / 100).toFixed(2)}`;
+  const subscriptionSuffix = course.pricingType === "subscription"
+    ? (course.subscriptionInterval === "annual" ? "/yr" : course.subscriptionInterval === "quarterly" ? "/qtr" : "/mo")
+    : course.pricingType === "payment_plan" ? " (plan)"
+    : "";
+  const price = course.isFree ? "Free" : `$${(course.price / 100).toFixed(2)}${subscriptionSuffix}`;
   const isOwned = course._source === "digital_product"
     ? purchasedProductSlugs.has(course.slug)
     : enrolledCourseIds.has(course.id);

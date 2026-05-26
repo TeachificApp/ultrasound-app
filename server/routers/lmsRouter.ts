@@ -57,6 +57,7 @@ import {
   lmsCertificateTemplates,
   orderBumps,
   freePreviewEnrollments,
+  lmsSectionTemplates,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
@@ -1510,12 +1511,17 @@ export const lmsAdminRouter = router({
       sendEnrollmentEmail: z.boolean().optional(),
       // Custom text labels — JSON string of { lesson, section, markComplete, nextLesson, prevLesson, submitQuiz, courseModules, completed }
       customLabels: z.string().nullable().optional(),
+      // Course-level default for Mark Complete button: true = show (default), false = hide
+      defaultMarkComplete: z.boolean().optional(),
+      // Course player theme: 'light' or 'dark'
+      playerTheme: z.enum(["light", "dark"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const { id, pricingType, ...updates } = input;
+      const { id, pricingType, defaultMarkComplete: dmc, ...updates } = input;
+      if (dmc !== undefined) (updates as any).defaultMarkComplete = dmc ? 1 : 0;
       // Sync isFree with pricingType
       const extra: Record<string, any> = {};
       if (pricingType !== undefined) {
@@ -1795,6 +1801,182 @@ export const lmsAdminRouter = router({
       return { success: true };
     }),
 
+  // ── Section Templates ──
+
+  /** Save a section (with all its lessons) as a reusable template */
+  saveSectionTemplate: protectedProcedure
+    .input(z.object({
+      sectionId: z.number(),
+      name: z.string().min(1).max(255),
+      description: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [section] = await db.select().from(lmsSections).where(eq(lmsSections.id, input.sectionId)).limit(1);
+      if (!section) throw new TRPCError({ code: "NOT_FOUND", message: "Section not found" });
+      const lessons = await db.select({
+        title: lmsLessons.title,
+        type: lmsLessons.type,
+        content: lmsLessons.content,
+        videoContent: lmsLessons.videoContent,
+        embedUrl: lmsLessons.embedUrl,
+        dripDays: lmsLessons.dripDays,
+        durationMinutes: lmsLessons.durationMinutes,
+        requireVideoCompletion: lmsLessons.requireVideoCompletion,
+        requireManualComplete: lmsLessons.requireManualComplete,
+        contentBlocks: lmsLessons.contentBlocks,
+        learningObjectives: lmsLessons.learningObjectives,
+        position: lmsLessons.position,
+      }).from(lmsLessons)
+        .where(eq(lmsLessons.sectionId, input.sectionId))
+        .orderBy(asc(lmsLessons.position));
+      const [result] = await db.insert(lmsSectionTemplates).values({
+        name: input.name,
+        description: input.description ?? null,
+        sectionTitle: section.title,
+        lessonsJson: JSON.stringify(lessons),
+        lessonCount: lessons.length,
+        createdByUserId: ctx.user.id,
+      }).$returningId();
+      return { id: result.id };
+    }),
+
+  /** List all saved section templates */
+  listSectionTemplates: protectedProcedure
+    .query(async ({ ctx }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const templates = await db.select({
+        id: lmsSectionTemplates.id,
+        name: lmsSectionTemplates.name,
+        description: lmsSectionTemplates.description,
+        sectionTitle: lmsSectionTemplates.sectionTitle,
+        lessonCount: lmsSectionTemplates.lessonCount,
+        createdAt: lmsSectionTemplates.createdAt,
+      }).from(lmsSectionTemplates).orderBy(desc(lmsSectionTemplates.createdAt));
+      return templates;
+    }),
+
+  /** Delete a section template */
+  deleteSectionTemplate: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(lmsSectionTemplates).where(eq(lmsSectionTemplates.id, input.id));
+      return { success: true };
+    }),
+
+  /** Import a section template into a course (creates section + lessons) */
+  importSectionTemplate: protectedProcedure
+    .input(z.object({
+      courseId: z.number(),
+      templateId: z.number(),
+      sectionTitle: z.string().optional(), // override the template's default section title
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [template] = await db.select().from(lmsSectionTemplates).where(eq(lmsSectionTemplates.id, input.templateId)).limit(1);
+      if (!template) throw new TRPCError({ code: "NOT_FOUND", message: "Template not found" });
+      // Get next section position
+      const posResult = await db.select({ maxPos: max(lmsSections.position) }).from(lmsSections).where(eq(lmsSections.courseId, input.courseId));
+      const nextPosition = (posResult[0]?.maxPos ?? -1) + 1;
+      const title = input.sectionTitle?.trim() || template.sectionTitle;
+      const [sectionResult] = await db.insert(lmsSections).values({ courseId: input.courseId, title, position: nextPosition }).$returningId();
+      const sectionId = sectionResult.id;
+      // Insert lessons from template snapshot
+      let lessons: any[] = [];
+      try { lessons = JSON.parse(template.lessonsJson); } catch { lessons = []; }
+      for (let i = 0; i < lessons.length; i++) {
+        const l = lessons[i];
+        await db.insert(lmsLessons).values({
+          courseId: input.courseId,
+          sectionId,
+          title: l.title,
+          type: l.type ?? "text",
+          position: i,
+          content: l.content ?? null,
+          videoContent: l.videoContent ?? null,
+          embedUrl: l.embedUrl ?? null,
+          dripDays: l.dripDays ?? 0,
+          durationMinutes: l.durationMinutes ?? null,
+          requireVideoCompletion: l.requireVideoCompletion ?? 0,
+          requireManualComplete: l.requireManualComplete ?? null,
+          contentBlocks: l.contentBlocks ?? null,
+          learningObjectives: l.learningObjectives ?? null,
+        });
+      }
+      return { sectionId, title, lessonCount: lessons.length };
+    }),
+
+  /** Copy a section from another course into this course */
+  copySectionFromCourse: protectedProcedure
+    .input(z.object({
+      targetCourseId: z.number(),
+      sourceSectionId: z.number(),
+      sectionTitle: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [sourceSection] = await db.select().from(lmsSections).where(eq(lmsSections.id, input.sourceSectionId)).limit(1);
+      if (!sourceSection) throw new TRPCError({ code: "NOT_FOUND", message: "Source section not found" });
+      const sourceLessons = await db.select().from(lmsLessons)
+        .where(eq(lmsLessons.sectionId, input.sourceSectionId))
+        .orderBy(asc(lmsLessons.position));
+      // Get next section position in target course
+      const posResult = await db.select({ maxPos: max(lmsSections.position) }).from(lmsSections).where(eq(lmsSections.courseId, input.targetCourseId));
+      const nextPosition = (posResult[0]?.maxPos ?? -1) + 1;
+      const title = input.sectionTitle?.trim() || sourceSection.title;
+      const [sectionResult] = await db.insert(lmsSections).values({ courseId: input.targetCourseId, title, position: nextPosition }).$returningId();
+      const sectionId = sectionResult.id;
+      for (let i = 0; i < sourceLessons.length; i++) {
+        const l = sourceLessons[i];
+        await db.insert(lmsLessons).values({
+          courseId: input.targetCourseId,
+          sectionId,
+          title: l.title,
+          type: l.type,
+          position: i,
+          content: l.content ?? null,
+          videoContent: l.videoContent ?? null,
+          embedUrl: l.embedUrl ?? null,
+          dripDays: l.dripDays ?? 0,
+          durationMinutes: l.durationMinutes ?? null,
+          requireVideoCompletion: l.requireVideoCompletion ?? 0,
+          requireManualComplete: l.requireManualComplete ?? null,
+          contentBlocks: l.contentBlocks ?? null,
+          learningObjectives: l.learningObjectives ?? null,
+        });
+      }
+      return { sectionId, title, lessonCount: sourceLessons.length };
+    }),
+
+  /** List all courses with their sections (for copy-from-course picker) */
+  listCoursesWithSections: protectedProcedure
+    .query(async ({ ctx }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const courses = await db.select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug })
+        .from(lmsCourses).orderBy(asc(lmsCourses.title));
+      const sections = await db.select({ id: lmsSections.id, courseId: lmsSections.courseId, title: lmsSections.title, position: lmsSections.position })
+        .from(lmsSections).orderBy(asc(lmsSections.courseId), asc(lmsSections.position));
+      const sectionsByCourse = new Map<number, typeof sections>();
+      for (const s of sections) {
+        if (!sectionsByCourse.has(s.courseId)) sectionsByCourse.set(s.courseId, []);
+        sectionsByCourse.get(s.courseId)!.push(s);
+      }
+      return courses.map(c => ({ ...c, sections: sectionsByCourse.get(c.id) ?? [] }));
+    }),
+
   // ── Lessons ──
   createLesson: protectedProcedure
     .input(z.object({
@@ -1843,6 +2025,7 @@ export const lmsAdminRouter = router({
           bgColor: "#149096",
           textColor: "#ffffff",
           align: "left",
+          maxHeight: 150,
         },
       }]);
       const [result] = await db.insert(lmsLessons).values({
@@ -1884,7 +2067,8 @@ export const lmsAdminRouter = router({
       dripDays: z.number().int().nullable().optional(),
       durationMinutes: z.number().int().nullable().optional(),
       requireVideoCompletion: z.boolean().optional(),
-      requireManualComplete: z.boolean().optional(),
+      // null = inherit from course default, true = always show, false = always hide
+      requireManualComplete: z.boolean().nullable().optional(),
       contentBlocks: z.string().nullable().optional(), // JSON array of Block objects
       learningObjectives: z.string().nullable().optional(), // JSON array of strings
       showInstructor: z.enum(["inherit", "show", "hide"]).optional(),
@@ -1901,7 +2085,8 @@ export const lmsAdminRouter = router({
         Object.entries(rest).filter(([, v]) => v !== undefined)
       );
       if (requireVideoCompletion !== undefined) updates.requireVideoCompletion = requireVideoCompletion ? 1 : 0;
-      if (requireManualComplete !== undefined) updates.requireManualComplete = requireManualComplete ? 1 : 0;
+      // null = inherit from course default, true = show (1), false = hide (0)
+      if (requireManualComplete !== undefined) updates.requireManualComplete = requireManualComplete === null ? null : (requireManualComplete ? 1 : 0);
       if (isPrerequisite !== undefined) updates.isPrerequisite = isPrerequisite;
       if (commentsEnabled !== undefined) updates.commentsEnabled = commentsEnabled ? 1 : 0;
       // Convert null dripDays to 0 (no drip)

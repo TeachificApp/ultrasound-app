@@ -2775,6 +2775,11 @@ export const lmsCourses = mysqlTable("lms_courses", {
   // Custom text labels — JSON object overriding default terminology per-course
   // e.g. { lesson: "Lecture", section: "Unit", markComplete: "Mark Complete", nextLesson: "Next Lesson", ... }
   customLabels: longtext("custom_labels"),
+  // Course-level default: show Mark Complete button on all lessons (can be overridden per lesson)
+  // 1 = show (default), 0 = hide
+  defaultMarkComplete: int("default_mark_complete").default(1).notNull(),
+  // Course player UI theme: 'light' (default) or 'dark'
+  playerTheme: mysqlEnum("player_theme", ["light", "dark"]).default("light").notNull(),
   // Group purchase: allow bulk seat purchases for teams/organizations
   allowGroupPurchase: boolean("allow_group_purchase").default(true).notNull(),
   createdByUserId: int("created_by_user_id").notNull(),
@@ -2815,7 +2820,8 @@ export const lmsLessons = mysqlTable("lms_lessons", {
   dripDays: int("drip_days").default(0).notNull(), // days after enrollment to unlock
   durationMinutes: int("duration_minutes"),
   requireVideoCompletion: int("require_video_completion").default(0).notNull(), // 1 = must watch video before marking complete
-  requireManualComplete: int("require_manual_complete").default(1).notNull(), // 1 = show Mark Complete button (default ON)
+  // null = inherit from course default, 0 = hide, 1 = show
+  requireManualComplete: int("require_manual_complete"), // null = inherit from course (default)
   // Lesson Effects
   effectEnabled: boolean("effect_enabled").default(false),
   effectTrigger: varchar("effect_trigger", { length: 20 }).default("lesson_start"),
@@ -2847,6 +2853,23 @@ export const lmsLessons = mysqlTable("lms_lessons", {
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
 export type LmsLesson = typeof lmsLessons.$inferSelect;
+
+// ── Section Templates ─────────────────────────────────────────────────────────
+// A section template stores a section title + all its lessons (as a JSON snapshot)
+// so admins can reuse common module structures across courses.
+export const lmsSectionTemplates = mysqlTable("lms_section_templates", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(), // template display name
+  description: text("description"), // optional description
+  sectionTitle: varchar("section_title", { length: 255 }).notNull(), // default section title when imported
+  // JSON snapshot of lessons: array of { title, type, content, embedUrl, dripDays, requireVideoCompletion, requireManualComplete, durationMinutes, contentBlocks, learningObjectives }
+  lessonsJson: longtext("lessons_json").notNull(),
+  lessonCount: int("lesson_count").default(0).notNull(),
+  createdByUserId: int("created_by_user_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type LmsSectionTemplate = typeof lmsSectionTemplates.$inferSelect;
 
 export const lmsQuizzes = mysqlTable("lms_quizzes", {
   id: int("id").autoincrement().primaryKey(),

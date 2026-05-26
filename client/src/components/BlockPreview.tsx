@@ -117,10 +117,11 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
         ? { borderBottom: `${d.heroBottomBorderWidth ?? 4}px solid ${d.heroBottomBorderColor ?? "#179ca3"}` }
         : {};
       const heroMinHeight = d.heroMinHeight ?? 400;
+      const heroMaxHeight = d.maxHeight ? `${d.maxHeight}px` : undefined;
       return (
         <div
           className="relative px-8 py-16 overflow-hidden"
-          style={{ ...heroBg, ...heroBottomBorderStyle, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left"), cursor: heroClickHandler ? "pointer" : undefined, minHeight: `${heroMinHeight}px` }}
+          style={{ ...heroBg, ...heroBottomBorderStyle, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left"), cursor: heroClickHandler ? "pointer" : undefined, minHeight: `${heroMinHeight}px`, ...(heroMaxHeight ? { maxHeight: heroMaxHeight, overflow: "hidden" } : {}) }}
           onClick={heroClickHandler}
         >
           {bgType === "video" && d.videoUrl && (
@@ -268,12 +269,15 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
           </div>
         </div>
       );
-    case "bullets":
+    case "bullets": {
+      const bulletItems: string[] = (d.items ?? []).map((item: string | { text?: string; crossed?: boolean }) =>
+        typeof item === "string" ? item : (item?.text ?? "")
+      );
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
           {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-3xl">
-            {(d.items ?? []).map((item: string, i: number) => (
+            {bulletItems.map((item: string, i: number) => (
               <div key={i} className="flex items-start gap-3">
                 <span className="mt-0.5 flex-shrink-0 text-lg" style={{ color: d.iconColor ?? "#179ca3" }}>✓</span>
                 <span className="text-gray-700">{item}</span>
@@ -282,14 +286,18 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
           </div>
         </div>
       );
-    case "numbered_list":
+    }
+    case "numbered_list": {
+      const numItems: string[] = (d.items ?? []).map((item: string | { text?: string; crossed?: boolean }) =>
+        typeof item === "string" ? item : (item?.text ?? "")
+      );
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           {d.headline && <h2 className="text-2xl font-bold mb-2 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subHeading && <p className="text-gray-500 mb-6 text-base leading-relaxed" dangerouslySetInnerHTML={{ __html: d.subHeading }} />}
           {!d.subHeading && d.headline && <div className="mb-6" />}
           <div className="space-y-4 max-w-2xl">
-            {(d.items ?? []).map((item: string, i: number) => (
+            {numItems.map((item: string, i: number) => (
               <div key={i} className="flex items-start gap-4">
                 <span className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold" style={{ backgroundColor: d.accentColor ?? "#179ca3" }}>{i + 1}</span>
                 <span className="text-gray-700 pt-1">{item}</span>
@@ -298,6 +306,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
           </div>
         </div>
       );
+    }
     case "checklist": {
       // Items can be plain strings or { text: string; crossed?: boolean } objects (backward-compatible)
       const clItems: Array<{ text: string; crossed: boolean }> = (d.items ?? []).map(

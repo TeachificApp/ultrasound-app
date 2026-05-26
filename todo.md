@@ -2998,3 +2998,19 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Move free-preview-enrollment useEffect from render section (after early returns) to hooks section (before early returns)
 - [x] Fix isPreviewMode to recognize preview=admin (was only checking preview=student)
 - [x] Add useMemo to React imports in CoursePlayer.tsx
+
+## Batch May 26 2026
+- [x] React error #31 fix: normalize bullets/numbered_list items (handle {text,crossed} objects)
+- [x] Column block drag-and-drop: improved drop-zone visibility (ring-4, arrow indicator, scale effect)
+- [x] Column block edit crash: extract ColumnBlockList as top-level component (fix nested component definition)
+- [x] Course player sidebar: collapsible sections with Collapse All / Expand All toggle (desktop + mobile)
+- [x] Course card pricing: show subscription interval suffix (/mo, /yr, /qtr) for subscription pricing type
+- [x] Course settings: defaultMarkComplete toggle + playerTheme (dark/light) selector
+- [x] Lesson settings: 3-state Mark Complete override (Inherit from course / Always show / Always hide)
+- [x] CoursePlayer: resolve effective showMarkComplete (lesson override → course default → fallback ON)
+- [x] CoursePlayer: apply playerTheme dark/light to all structural areas
+- [x] Lesson hero banner: default maxHeight 150px for auto-generated hero blocks (editable)
+- [x] Hero block settings: add maxHeight field to LandingPageBuilder settings panel
+- [x] Section templates: save section as template, import from template or copy from another course
+- [x] Add Section dialog: three options (blank / from template / from course)
+- [x] DB migration: defaultMarkComplete on lms_courses, nullable requireManualComplete on lms_lessons, lms_section_templates table, playerTheme on lms_courses
