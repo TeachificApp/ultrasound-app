@@ -383,9 +383,16 @@ export default function CourseOverview() {
 
           {/* Sections */}
           {sections?.map((section: any) => {
+            // If every lesson in the section is hidden after purchase, hide the whole section too
+            const visibleLessons = section.lessons.filter((l: any) => {
+              const pm = l.previewMode ?? (l.isPreview ? "preview" : "none");
+              return pm !== "preview_hide_after_purchase";
+            });
+            if (section.lessons.length > 0 && visibleLessons.length === 0) return null;
+
             const expanded = expandedSections.has(section.id);
             const sectionDone = section.lessons.filter((l: any) => completedIds.has(l.id)).length;
-            const sectionTotal = section.lessons.length;
+            const sectionTotal = visibleLessons.length;
             const sectionDripLocked = !dripBypassed && course.isDrip && (section.dripDays ?? 0) > 0 && daysSinceEnroll < (section.dripDays ?? 0);
             const sectionUnlockDate = sectionDripLocked
               ? new Date(enrolledAt.getTime() + (section.dripDays ?? 0) * 24 * 60 * 60 * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" })
