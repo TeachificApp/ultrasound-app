@@ -3265,67 +3265,9 @@ function AddLessonDialog({ courseId, sectionId, onClose, onCreated }: {
             </div>
           </div>
 
-          {/* Content fields by type */}
-          {type === "text" && (
-            <div>
-              <Label className="text-sm">Lesson Description</Label>
-              <div className="mt-1"><RichTextEditor value={content} onChange={setContent} /></div>
-            </div>
-          )}
-          {(type === "video" || type === "download") && (
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <Label className="text-sm">{type === "video" ? "Video URL" : "Download URL"}</Label>
-                <Button size="sm" variant="outline" className="h-6 text-xs text-teal-600 border-teal-300 hover:bg-teal-50" onClick={() => setMediaPickerOpen(true)}>
-                  Pick from Media Repository
-                </Button>
-              </div>
-              {selectedAsset && (
-                <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-teal-50 border border-teal-200 rounded-lg text-xs text-teal-700">
-                  <span className="font-mono bg-teal-100 px-1 rounded uppercase">{selectedAsset.mediaType}</span>
-                  <span className="flex-1 truncate">{selectedAsset.title}</span>
-                  <button className="text-teal-400 hover:text-teal-600" onClick={() => { setSelectedAsset(null); setContent(""); }}>×</button>
-                </div>
-              )}
-              <Input value={content} onChange={e => setContent(e.target.value)} placeholder="https://..." className="mt-1" />
-              <p className="text-xs text-gray-400 mt-1">Upload video to Media Repository first, then pick it above — or paste a direct URL (Vimeo, YouTube, Wistia, etc.)</p>
-            </div>
-          )}
-          {type === "video_text" && (
-            <div className="space-y-3">
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <Label className="text-sm">Video URL</Label>
-                  <Button size="sm" variant="outline" className="h-6 text-xs text-teal-600 border-teal-300 hover:bg-teal-50" onClick={() => setMediaPickerOpen(true)}>
-                    Pick from Media Repository
-                  </Button>
-                </div>
-                {selectedAsset && (
-                  <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-teal-50 border border-teal-200 rounded-lg text-xs text-teal-700">
-                    <span className="font-mono bg-teal-100 px-1 rounded uppercase">{selectedAsset.mediaType}</span>
-                    <span className="flex-1 truncate">{selectedAsset.title}</span>
-                    <button className="text-teal-400 hover:text-teal-600" onClick={() => { setSelectedAsset(null); setContent(""); }}>×</button>
-                  </div>
-                )}
-                <Input value={content} onChange={e => setContent(e.target.value)} placeholder="https://..." className="mt-1" />
-              </div>
-                <p className="text-xs text-gray-400 mt-1">Upload video to Media Repository first, then pick it above — or paste a direct URL (Vimeo, YouTube, Wistia, etc.)</p>
-              <div>
-                <Label className="text-sm">Lesson Description</Label>
-                <div className="mt-1"><RichTextEditor value={videoContent} onChange={setVideoContent} /></div>
-              </div>
-            </div>
-          )}
-          {type === "embed" && (
-            <div>
-              <Label className="text-sm">Embed URL (iframe src)</Label>
-              <Input value={embedUrl} onChange={e => setEmbedUrl(e.target.value)} placeholder="https://..." className="mt-1" />
-              <p className="text-xs text-gray-400 mt-1">Paste the full URL to embed (e.g., YouTube, Vimeo, SCORM, H5P, etc.)</p>
-            </div>
-          )}
           {type === "quiz" && (
             <div className="px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg text-xs text-purple-700">
-              A quiz will be automatically created. Use the Quiz Builder to add questions after saving.
+              A quiz will be automatically created. Use the Quiz Builder tab to add questions after saving.
             </div>
           )}
 
@@ -3773,67 +3715,9 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
             </div>
           </div>
 
-          {/* Content fields by type */}
-          {lessonType === "text" && (
-            <div>
-              <Label className="text-sm">Lesson Description</Label>
-              <div className="mt-1"><RichTextEditor value={content} onChange={setContent} /></div>
-            </div>
-          )}
-          {(lessonType === "video" || lessonType === "download") && (
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <Label className="text-sm">{lessonType === "video" ? "Video URL" : "Download URL"}</Label>
-                <Button size="sm" variant="outline" className="h-6 text-xs text-teal-600 border-teal-300 hover:bg-teal-50" onClick={() => setMediaPickerOpen(true)}>
-                  Pick from Media Repository
-                </Button>
-              </div>
-              {selectedAsset && (
-                <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-teal-50 border border-teal-200 rounded-lg text-xs text-teal-700">
-                  <span className="font-mono bg-teal-100 px-1 rounded uppercase">{selectedAsset.mediaType}</span>
-                  <span className="flex-1 truncate">{selectedAsset.title}</span>
-                  <button className="text-teal-400 hover:text-teal-600" onClick={() => { setSelectedAsset(null); setContent(lesson.content ?? ""); }}>×</button>
-                </div>
-              )}
-              <Input value={content} onChange={e => setContent(e.target.value)} placeholder="https://..." className="mt-1" />
-              <p className="text-xs text-gray-400 mt-1">Upload video to Media Repository first, then pick it above — or paste a direct URL (Vimeo, YouTube, Wistia, etc.)</p>
-            </div>
-          )}
-          {lessonType === "video_text" && (
-            <div className="space-y-3">
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <Label className="text-sm">Video URL</Label>
-                  <Button size="sm" variant="outline" className="h-6 text-xs text-teal-600 border-teal-300 hover:bg-teal-50" onClick={() => setMediaPickerOpen(true)}>
-                    Pick from Media Repository
-                  </Button>
-                </div>
-                {selectedAsset && (
-                  <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-teal-50 border border-teal-200 rounded-lg text-xs text-teal-700">
-                    <span className="font-mono bg-teal-100 px-1 rounded uppercase">{selectedAsset.mediaType}</span>
-                    <span className="flex-1 truncate">{selectedAsset.title}</span>
-                    <button className="text-teal-400 hover:text-teal-600" onClick={() => { setSelectedAsset(null); setContent(lesson.content ?? ""); }}>×</button>
-                  </div>
-                )}
-                <Input value={content} onChange={e => setContent(e.target.value)} placeholder="https://..." className="mt-1" />
-                <p className="text-xs text-gray-400 mt-1">Upload video to Media Repository first, then pick it above — or paste a direct URL (Vimeo, YouTube, Wistia, etc.)</p>
-              </div>
-              <div>
-                <Label className="text-sm">Lesson Description</Label>
-                <div className="mt-1"><RichTextEditor value={videoContent} onChange={setVideoContent} /></div>
-              </div>
-            </div>
-          )}
-          {lessonType === "embed" && (
-            <div>
-              <Label className="text-sm">Embed URL (iframe src)</Label>
-              <Input value={embedUrl} onChange={e => setEmbedUrl(e.target.value)} placeholder="https://..." className="mt-1" />
-              <p className="text-xs text-gray-400 mt-1">Paste the full URL to embed (YouTube, Vimeo, SCORM, H5P, etc.)</p>
-            </div>
-          )}
           {lessonType === "quiz" && (
             <div className="px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg text-xs text-purple-700">
-              Use the Quiz Builder button to manage questions for this quiz lesson.
+              Use the Quiz Builder tab to manage questions for this quiz lesson.
             </div>
           )}
 
