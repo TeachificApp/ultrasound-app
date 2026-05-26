@@ -262,15 +262,21 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
           bgColor={d.bgColor ?? "#f8fffe"}
         />
       );
-    case "embed":
+    case "embed": {
+      const embedAlign = d.align ?? "center";
+      const embedJustify = embedAlign === "left" ? "flex-start" : embedAlign === "right" ? "flex-end" : "center";
+      const embedMaxWidth = d.maxWidth ?? "100%";
       return (
-        <div className="px-8 py-6">
-          {d.embedCode ? (
-            <div dangerouslySetInnerHTML={{ __html: d.embedCode }} style={{ height: d.height ?? 400 }} />
-          ) : <div className="w-full bg-gray-100 rounded-lg flex items-center justify-center text-gray-400" style={{ height: d.height ?? 400 }}><Globe size={32} /></div>}
-          {d.caption && <p className="text-sm text-gray-500 mt-2 text-center">{d.caption}</p>}
+        <div className="px-8 py-6" style={{ display: "flex", flexDirection: "column", alignItems: embedJustify }}>
+          <div style={{ width: embedMaxWidth, maxWidth: "100%" }}>
+            {d.embedCode ? (
+              <div dangerouslySetInnerHTML={{ __html: d.embedCode }} style={{ height: d.height ?? 400 }} />
+            ) : <div className="w-full bg-gray-100 rounded-lg flex items-center justify-center text-gray-400" style={{ height: d.height ?? 400 }}><Globe size={32} /></div>}
+            {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: embedAlign as any }}>{d.caption}</p>}
+          </div>
         </div>
       );
+    }
     case "gallery":
       return (
         <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
@@ -998,28 +1004,33 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       const title = d.mediaAssetTitle ?? "Interactive Content";
       const height = d.height ?? 600;
       const embedUrl = slug ? `/api/media/${slug}/embed` : "";
+      const scormAlign = d.align ?? "center";
+      const scormJustify = scormAlign === "left" ? "flex-start" : scormAlign === "right" ? "flex-end" : "center";
+      const scormMaxWidth = d.maxWidth ?? "100%";
       return (
-        <div className="px-8 py-6" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          {d.title && <h3 className="text-lg font-semibold text-gray-800 mb-3">{d.title}</h3>}
-          {embedUrl ? (
-            <iframe
-              src={embedUrl}
-              style={{ width: "100%", height: `${height}px`, border: "none", borderRadius: "8px" }}
-              title={title}
-              allow="autoplay; fullscreen"
-              allowFullScreen
-            />
-          ) : (
-            <div
-              className="w-full bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-3 text-gray-400"
-              style={{ height: `${height}px` }}
-            >
-              <Package size={36} className="text-gray-300" />
-              <p className="text-sm font-medium">No file selected</p>
-              <p className="text-xs text-gray-400">Pick an HTML, SCORM, or ZIP file from the media repository</p>
-            </div>
-          )}
-          {d.caption && <p className="text-sm text-gray-500 mt-2 text-center">{d.caption}</p>}
+        <div className="px-8 py-6" style={{ backgroundColor: d.bgColor ?? "#fff", display: "flex", flexDirection: "column", alignItems: scormJustify }}>
+          <div style={{ width: scormMaxWidth, maxWidth: "100%" }}>
+            {d.title && <h3 className="text-lg font-semibold text-gray-800 mb-3">{d.title}</h3>}
+            {embedUrl ? (
+              <iframe
+                src={embedUrl}
+                style={{ width: "100%", height: `${height}px`, border: "none", borderRadius: "8px" }}
+                title={title}
+                allow="autoplay; fullscreen"
+                allowFullScreen
+              />
+            ) : (
+              <div
+                className="w-full bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-3 text-gray-400"
+                style={{ height: `${height}px` }}
+              >
+                <Package size={36} className="text-gray-300" />
+                <p className="text-sm font-medium">No file selected</p>
+                <p className="text-xs text-gray-400">Pick an HTML, SCORM, or ZIP file from the media repository</p>
+              </div>
+            )}
+            {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: scormAlign as any }}>{d.caption}</p>}
+          </div>
         </div>
       );
     }
@@ -1027,29 +1038,34 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       const height = d.height ?? 600;
       const embedTitle = d.title ?? "Embedded Content";
       const url = urlEmbedSrc || d.url || "";
+      const urlAlign = d.align ?? "center";
+      const urlJustify = urlAlign === "left" ? "flex-start" : urlAlign === "right" ? "flex-end" : "center";
+      const urlMaxWidth = d.maxWidth ?? "100%";
       return (
-        <div className="px-8 py-6" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          {d.title && <h3 className="text-lg font-semibold text-gray-800 mb-3">{d.title}</h3>}
-          {url ? (
-            <iframe
-              src={url}
-              style={{ width: "100%", height: `${height}px`, border: "none", borderRadius: "8px" }}
-              title={embedTitle}
-              allow="autoplay; fullscreen; clipboard-write; encrypted-media; picture-in-picture"
-              allowFullScreen
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation allow-top-navigation-by-user-activation"
-            />
-          ) : (
-            <div
-              className="w-full bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-3 text-gray-400"
-              style={{ height: `${height}px` }}
-            >
-              <Globe size={36} className="text-gray-300" />
-              <p className="text-sm font-medium">No URL entered</p>
-              <p className="text-xs text-gray-400">Enter a URL to embed any webpage or interactive content</p>
-            </div>
-          )}
-          {d.caption && <p className="text-sm text-gray-500 mt-2 text-center">{d.caption}</p>}
+        <div className="px-8 py-6" style={{ backgroundColor: d.bgColor ?? "#fff", display: "flex", flexDirection: "column", alignItems: urlJustify }}>
+          <div style={{ width: urlMaxWidth, maxWidth: "100%" }}>
+            {d.title && <h3 className="text-lg font-semibold text-gray-800 mb-3">{d.title}</h3>}
+            {url ? (
+              <iframe
+                src={url}
+                style={{ width: "100%", height: `${height}px`, border: "none", borderRadius: "8px" }}
+                title={embedTitle}
+                allow="autoplay; fullscreen; clipboard-write; encrypted-media; picture-in-picture"
+                allowFullScreen
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation allow-top-navigation-by-user-activation"
+              />
+            ) : (
+              <div
+                className="w-full bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-3 text-gray-400"
+                style={{ height: `${height}px` }}
+              >
+                <Globe size={36} className="text-gray-300" />
+                <p className="text-sm font-medium">No URL entered</p>
+                <p className="text-xs text-gray-400">Enter a URL to embed any webpage or interactive content</p>
+              </div>
+            )}
+            {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: urlAlign as any }}>{d.caption}</p>}
+          </div>
         </div>
       );
     }

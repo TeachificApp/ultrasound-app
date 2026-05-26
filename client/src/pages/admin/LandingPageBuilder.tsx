@@ -2444,7 +2444,31 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
         />
       );
     case "embed":
-      return (<div className="space-y-3"><UserParamTagsHelper context="html" /><div><label className="text-xs text-gray-500 block mb-1">Embed Code (iframe or HTML)</label><DebouncedTextarea value={d.embedCode ?? ""} onChange={v => set("embedCode", v)} className="text-sm min-h-[100px] font-mono text-xs" placeholder='<iframe src="..." />' /></div><div><label className="text-xs text-gray-500 block mb-1">Height (px)</label><Input type="number" value={d.height ?? 400} onChange={e => set("height", Number(e.target.value))} className="h-8 text-sm" /></div><BSTextField data={d} onSet={set} label="Caption" field="caption" /></div>);
+      return (
+        <div className="space-y-3">
+          <UserParamTagsHelper context="html" />
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Embed Code (iframe or HTML)</label>
+            <DebouncedTextarea value={d.embedCode ?? ""} onChange={v => set("embedCode", v)} className="text-sm min-h-[100px] font-mono text-xs" placeholder='<iframe src="..." />' />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Height (px)</label>
+            <Input type="number" value={d.height ?? 400} onChange={e => set("height", Number(e.target.value))} className="h-8 text-sm" />
+          </div>
+          {/* Alignment */}
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Alignment</label>
+            <div className="flex gap-1">{(["left","center","right"] as const).map(a => <button key={a} onClick={() => set("align", a)} className={`flex-1 py-1 text-xs rounded border capitalize ${(d.align ?? "center") === a ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>{a}</button>)}</div>
+          </div>
+          {/* Width */}
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Width</label>
+            <div className="flex flex-wrap gap-1 mb-1">{(["100%","75%","50%","33%","25%"] as const).map(w => <button key={w} onClick={() => set("maxWidth", w)} className={`px-2 py-0.5 text-xs rounded border ${(d.maxWidth ?? "100%") === w ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>{w}</button>)}</div>
+            <DebouncedInput value={d.maxWidth ?? "100%"} onChange={v => set("maxWidth", v)} className="h-8 text-sm" placeholder="100%, 600px, etc." />
+          </div>
+          <BSTextField data={d} onSet={set} label="Caption" field="caption" />
+        </div>
+      );
     case "gallery": {
       const images: Array<{ url: string; caption: string }> = d.images ?? [];
       return (<div className="space-y-3"><div><label className="text-xs text-gray-500 block mb-1">Columns</label><Input type="number" value={d.columns ?? 3} onChange={e => set("columns", Number(e.target.value))} className="h-8 text-sm" min={1} max={6} /></div><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div><div className="flex items-center justify-between mb-2"><label className="text-xs text-gray-500 font-medium">Images</label><button onClick={() => set("images", [...images, { url: "", caption: "" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div><div className="space-y-2">{images.map((img, i) => (<div key={i} className="border border-gray-200 rounded p-2 space-y-1"><div className="flex justify-between items-center mb-1"><span className="text-xs text-gray-500">Image {i + 1}</span><button onClick={() => set("images", images.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div><DebouncedInput value={img.url} onChange={v => { const next = images.map((im, j) => j === i ? { ...im, url: v } : im); set("images", next); }} className="h-7 text-xs" placeholder="Image URL" /><DebouncedInput value={img.caption} onChange={v => { const next = images.map((im, j) => j === i ? { ...im, caption: v } : im); set("images", next); }} className="h-7 text-xs" placeholder="Caption (optional)" /></div>))}</div></div></div>);
@@ -3750,6 +3774,17 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
               <input type="color" value={d.bgColor ?? "#ffffff"} onChange={e => set("bgColor", e.target.value)} className="w-8 h-8 rounded cursor-pointer border border-gray-200" />
               <DebouncedInput value={d.bgColor ?? "#ffffff"} onChange={v => set("bgColor", v)} className="h-8 text-xs flex-1" placeholder="#ffffff" />
             </div>
+          </div>
+          {/* Alignment */}
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">Alignment</label>
+            <div className="flex gap-1">{(["left","center","right"] as const).map(a => <button key={a} onClick={() => set("align", a)} className={`flex-1 py-1 text-xs rounded border capitalize ${(d.align ?? "center") === a ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>{a}</button>)}</div>
+          </div>
+          {/* Width */}
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">Width</label>
+            <div className="flex flex-wrap gap-1 mb-1">{(["100%","75%","50%","33%","25%"] as const).map(w => <button key={w} onClick={() => set("maxWidth", w)} className={`px-2 py-0.5 text-xs rounded border ${(d.maxWidth ?? "100%") === w ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>{w}</button>)}</div>
+            <DebouncedInput value={d.maxWidth ?? "100%"} onChange={v => set("maxWidth", v)} className="h-8 text-xs" placeholder="100%, 600px, etc." />
           </div>
           {/* Pass-through credentials */}
           <div className="border-t border-gray-100 pt-3">
@@ -5716,6 +5751,18 @@ function ScormEmbedBlockSettings({ d, set, dataRef, onChangeRef }: {
           <input type="color" value={d.bgColor ?? "#ffffff"} onChange={e => set("bgColor", e.target.value)} className="w-8 h-7 rounded cursor-pointer border border-gray-200" />
           <DebouncedInput value={d.bgColor ?? "#ffffff"} onChange={v => set("bgColor", v)} className="h-7 text-xs flex-1" placeholder="#ffffff" />
         </div>
+      </div>
+
+      {/* Alignment */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Alignment</label>
+        <div className="flex gap-1">{(["left","center","right"] as const).map(a => <button key={a} onClick={() => set("align", a)} className={`flex-1 py-1 text-xs rounded border capitalize ${(d.align ?? "center") === a ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>{a}</button>)}</div>
+      </div>
+      {/* Width */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Width</label>
+        <div className="flex flex-wrap gap-1 mb-1">{(["100%","75%","50%","33%","25%"] as const).map(w => <button key={w} onClick={() => set("maxWidth", w)} className={`px-2 py-0.5 text-xs rounded border ${(d.maxWidth ?? "100%") === w ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>{w}</button>)}</div>
+        <DebouncedInput value={d.maxWidth ?? "100%"} onChange={v => set("maxWidth", v)} className="h-7 text-xs" placeholder="100%, 600px, etc." />
       </div>
 
       {/* Embed URL preview */}
