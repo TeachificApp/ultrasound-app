@@ -1,253 +1,13 @@
 /**
  * pageScraper.test.ts — Unit tests for the pageScraperRouter htmlToBlocks logic.
- * Tests are written against replicated helper functions that mirror the router.
+ * Tests are written against the exported htmlToBlocks function.
  */
 import { describe, it, expect } from "vitest";
-import * as cheerio from "cheerio";
-
-// ─── Replicate helpers from pageScraperRouter (keep in sync) ─────────────────
-
-function uid() { return Math.random().toString(36).slice(2, 10); }
-
-function cleanText(text: string): string {
-  return text.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
-}
-function cleanTextFlat(text: string): string {
-  return text.replace(/\s+/g, " ").trim();
-}
-function resolveUrl(src: string, baseUrl: string): string {
-  if (!src) return "";
-  try { return new URL(src, baseUrl).href; } catch { return src; }
-}
-
-const CHECKMARK_CHARS = /[✓✔✅☑✗☒✘]/u;
-const CHECKMARK_LINE_START = /^[\s]*[✓✔✅☑✗☒✘]/u;
-const CHECKMARK_ENTITY_START = /^[\s]*(?:&#10003;|&#10004;|&#9989;|&#9745;|&check;)/i;
-const DASH_BULLET_LINE = /^[\s]*[-–—]\s+\S/;
-
-function stripCheckmark(text: string): string {
-  return text.replace(/^[\s]*[✓✔✅☑✗☒✘]\s*/u, "").trim();
-}
-function stripDashBullet(text: string): string {
-  return text.replace(/^[\s]*[-–—]\s+/, "").trim();
-}
-
-function isNoise(text: string): boolean {
-  const noisePatterns = [
-    /^100%\s*secure/i,
-    /privacy\s*guaranteed/i,
-    /^copyright/i,
-    /^all rights reserved/i,
-    /^terms of/i,
-    /^privacy policy/i,
-    /^cookie/i,
-    /^powered by/i,
-    /^\d+:\d+:\d+$/,
-    /^(hours?|minutes?|seconds?)$/i,
-  ];
-  return text.length < 6 || noisePatterns.some(p => p.test(text));
-}
-
-function tryExtractInlineList(text: string): { type: "checklist" | "bullets"; items: string[] } | null {
-  const lines = text.split(/\n/).map(l => l.trim()).filter(Boolean);
-  if (lines.length < 2) return null;
-  const checkLines = lines.filter(l => CHECKMARK_LINE_START.test(l) || CHECKMARK_ENTITY_START.test(l));
-  if (checkLines.length > lines.length / 2) {
-    return { type: "checklist", items: lines.map(l => stripCheckmark(l) || l).filter(Boolean) };
-  }
-  const dashLines = lines.filter(l => DASH_BULLET_LINE.test(l));
-  if (dashLines.length > lines.length / 2) {
-    return { type: "bullets", items: lines.map(l => stripDashBullet(l) || l).filter(Boolean) };
-  }
-  return null;
-}
-
-function isChecklistUl($: cheerio.CheerioAPI, $ul: cheerio.Cheerio<any>): boolean {
-  const items = $ul.children("li").toArray();
-  if (items.length === 0) return false;
-  let checkCount = 0;
-  for (const li of items) {
-    const $li = $(li);
-    const rawText = $li.text().trim();
-    if (CHECKMARK_LINE_START.test(rawText) || CHECKMARK_ENTITY_START.test(rawText)) { checkCount++; continue; }
-    const hasCheckIcon = $li.find("[class*='check'], [class*='tick'], [aria-label*='check'], [aria-label*='Check']").length > 0;
-    if (hasCheckIcon) { checkCount++; continue; }
-    if (CHECKMARK_CHARS.test($.html($li) || "")) checkCount++;
-  }
-  return checkCount > items.length / 2;
-}
-
-function extractListItems($: cheerio.CheerioAPI, $ul: cheerio.Cheerio<any>): string[] {
-  return $ul.children("li")
-    .map((_j: number, li: any) => { const raw = cleanTextFlat($(li).text()); return stripCheckmark(raw) || raw; })
-    .get().filter(Boolean);
-}
-
-interface ScrapedBlock { id: string; type: string; data: Record<string, any>; }
-
-function isCTALink($: cheerio.CheerioAPI, $a: cheerio.Cheerio<any>): boolean {
-  const cls = ($a.attr("class") || "").toLowerCase();
-  const role = $a.attr("role") || "";
-  const btnPatterns = /btn|button|cta|submit|action|primary|secondary|enroll|register|get.started|sign.up|learn.more|secure.your/i;
-  if (btnPatterns.test(cls) || role === "button") return true;
-  const parentCls = ($a.parent().attr("class") || "").toLowerCase();
-  if (btnPatterns.test(parentCls)) return true;
-  const text = cleanTextFlat($a.text());
-  if (text.length > 0 && text.length < 60 && /^(get|start|enroll|register|sign|learn|secure|join|buy|order|claim|yes|i want)/i.test(text)) return true;
-  return false;
-}
-
-function htmlToBlocks(html: string, baseUrl: string): ScrapedBlock[] {
-  const $ = cheerio.load(html);
-  $("script, style, noscript, nav, footer, header, aside, [role='navigation'], [role='banner'], [role='complementary'], .cookie-banner, #cookie, .popup, .modal, .overlay, .ad, .advertisement, .sidebar, .widget, .menu, .nav, .navbar, .header, .footer, form, input, select, textarea, label, .elCountdownTimer, .countdown, [class*='countdown'], [class*='timer']").remove();
-
-  const blocks: ScrapedBlock[] = [];
-  const ogTitle = $("meta[property='og:title']").attr("content") || "";
-  const ogDesc = $("meta[property='og:description']").attr("content") || $("meta[name='description']").attr("content") || "";
-  const ogImage = $("meta[property='og:image']").attr("content") || "";
-  const h1Text = cleanTextFlat($("h1").first().text());
-  const heroHeadline = h1Text || ogTitle || "";
-  if (heroHeadline) {
-    blocks.push({ id: uid(), type: "hero", data: { headline: heroHeadline, subheadline: ogDesc || "", bgType: "color", bgColor: "#179ca3", textColor: "#ffffff", align: "center", imageUrl: ogImage ? resolveUrl(ogImage, baseUrl) : "", buttons: [] } });
-    $("h1").first().remove();
-  }
-
-  const processed = new WeakSet<any>();
-
-  function walk(el: any) {
-    if (!el || processed.has(el)) return;
-    const tag = el.tagName?.toLowerCase();
-    if (!tag) return;
-    const $el = $(el);
-
-    if (tag === "img") {
-      processed.add(el);
-      const src = resolveUrl($el.attr("src") || $el.attr("data-src") || "", baseUrl);
-      const alt = $el.attr("alt") || "";
-      if (!src || src.includes("data:") || src.includes("pixel") || src.includes("tracking") || src.includes("spacer")) return;
-      const w = parseInt($el.attr("width") || "0");
-      const h = parseInt($el.attr("height") || "0");
-      if ((w > 0 && w < 10) || (h > 0 && h < 10)) return;
-      blocks.push({ id: uid(), type: "image", data: { url: src, alt, caption: "", align: "center", maxWidth: "auto", showShadow: true } });
-      return;
-    }
-
-    if (tag === "h2" || tag === "h3" || tag === "h4") {
-      processed.add(el);
-      const text = cleanTextFlat($el.text());
-      if (!text || isNoise(text)) return;
-      const level = tag === "h2" ? "h2" : "h3";
-      blocks.push({ id: uid(), type: "text", data: { html: `<${level}>${text}</${level}>`, align: "center", bgColor: "#ffffff", textColor: "#1a1a1a" } });
-      return;
-    }
-
-    if (tag === "p") {
-      processed.add(el);
-      $el.find("br").replaceWith("\n");
-      const rawText = cleanText($el.text());
-      if (!rawText || rawText.length < 8 || isNoise(rawText)) return;
-      const inlineList = tryExtractInlineList(rawText);
-      if (inlineList) {
-        if (inlineList.type === "checklist") blocks.push({ id: uid(), type: "checklist", data: { headline: "", items: inlineList.items, accentColor: "#179ca3", bgColor: "#f8fffe" } });
-        else blocks.push({ id: uid(), type: "bullets", data: { headline: "", items: inlineList.items, iconColor: "#179ca3", bgColor: "#f8fffe" } });
-        return;
-      }
-      const paragraphs = rawText.split(/\n\n+/).map(p => p.trim()).filter(p => p.length >= 8 && !isNoise(p));
-      for (const para of paragraphs) {
-        const subList = tryExtractInlineList(para);
-        if (subList) {
-          if (subList.type === "checklist") blocks.push({ id: uid(), type: "checklist", data: { headline: "", items: subList.items, accentColor: "#179ca3", bgColor: "#f8fffe" } });
-          else blocks.push({ id: uid(), type: "bullets", data: { headline: "", items: subList.items, iconColor: "#179ca3", bgColor: "#f8fffe" } });
-        } else {
-          const htmlContent = para.split("\n").map(l => l.trim()).filter(Boolean).join("<br>");
-          blocks.push({ id: uid(), type: "text", data: { html: `<p>${htmlContent}</p>`, align: "left", bgColor: "#ffffff", textColor: "#1a1a1a" } });
-        }
-      }
-      return;
-    }
-
-    if (tag === "ul") {
-      processed.add(el);
-      const items = extractListItems($, $el);
-      if (items.length === 0) return;
-      if (isChecklistUl($, $el)) blocks.push({ id: uid(), type: "checklist", data: { headline: "", items, accentColor: "#179ca3", bgColor: "#f8fffe" } });
-      else blocks.push({ id: uid(), type: "bullets", data: { headline: "", items, iconColor: "#179ca3", bgColor: "#f8fffe" } });
-      return;
-    }
-
-    if (tag === "ol") {
-      processed.add(el);
-      const items = $el.children("li").map((_j: number, li: any) => cleanTextFlat($(li).text())).get().filter(Boolean);
-      if (items.length === 0) return;
-      blocks.push({ id: uid(), type: "numbered_list", data: { headline: "", items, accentColor: "#179ca3", bgColor: "#ffffff" } });
-      return;
-    }
-
-    if (tag === "a") {
-      processed.add(el);
-      const text = cleanTextFlat($el.text());
-      const href = $el.attr("href") || "";
-      if (!text || text.length < 3 || isNoise(text)) return;
-      if (isCTALink($, $el)) {
-        blocks.push({ id: uid(), type: "cta", data: { headline: "", subheadline: "", buttonText: text, buttonUrl: href.startsWith("#") ? "" : resolveUrl(href, baseUrl), buttonColor: "#179ca3", buttonTextColor: "#ffffff", align: "center", bgColor: "#ffffff" } });
-      }
-      return;
-    }
-
-    if (["div", "section", "article", "main", "figure", "figcaption", "span", "strong", "em", "b", "i"].includes(tag)) {
-      const hasBlockChildren = $el.children("p, h1, h2, h3, h4, h5, h6, ul, ol, div, section, article, img, figure, a").length > 0;
-      if (!hasBlockChildren) {
-        processed.add(el);
-        $el.find("br").replaceWith("\n");
-        const rawText = cleanText($el.text());
-        if (!rawText || rawText.length < 8 || isNoise(rawText)) return;
-        const inlineList = tryExtractInlineList(rawText);
-        if (inlineList) {
-          if (inlineList.type === "checklist") blocks.push({ id: uid(), type: "checklist", data: { headline: "", items: inlineList.items, accentColor: "#179ca3", bgColor: "#f8fffe" } });
-          else blocks.push({ id: uid(), type: "bullets", data: { headline: "", items: inlineList.items, iconColor: "#179ca3", bgColor: "#f8fffe" } });
-          return;
-        }
-        const paragraphs = rawText.split(/\n\n+/).map(p => p.trim()).filter(p => p.length >= 8 && !isNoise(p));
-        for (const para of paragraphs) {
-          const subList = tryExtractInlineList(para);
-          if (subList) {
-            if (subList.type === "checklist") blocks.push({ id: uid(), type: "checklist", data: { headline: "", items: subList.items, accentColor: "#179ca3", bgColor: "#f8fffe" } });
-            else blocks.push({ id: uid(), type: "bullets", data: { headline: "", items: subList.items, iconColor: "#179ca3", bgColor: "#f8fffe" } });
-          } else {
-            const htmlContent = para.split("\n").map(l => l.trim()).filter(Boolean).join("<br>");
-            blocks.push({ id: uid(), type: "text", data: { html: `<p>${htmlContent}</p>`, align: "left", bgColor: "#ffffff", textColor: "#1a1a1a" } });
-          }
-        }
-        return;
-      }
-      $el.children().each((_i, child) => { if (!processed.has(child)) walk(child); });
-      return;
-    }
-
-    if (!processed.has(el)) {
-      processed.add(el);
-      const text = cleanTextFlat($el.text());
-      if (text.length >= 20 && !isNoise(text)) blocks.push({ id: uid(), type: "text", data: { html: `<p>${text}</p>`, align: "left", bgColor: "#ffffff", textColor: "#1a1a1a" } });
-    }
-  }
-
-  const mainEl = $("main, [role='main'], article, .content, .main-content, #content, #main").first();
-  const root = mainEl.length ? mainEl : $("body");
-  root.children().each((_i, el) => { if (!processed.has(el)) walk(el); });
-
-  const deduped: ScrapedBlock[] = [];
-  for (const block of blocks) {
-    const last = deduped[deduped.length - 1];
-    if (last && last.type === block.type && last.type === "text" && last.data.html === block.data.html) continue;
-    if (last && last.type === block.type && (last.type === "checklist" || last.type === "bullets") && JSON.stringify(last.data.items) === JSON.stringify(block.data.items)) continue;
-    deduped.push(block);
-  }
-  return deduped;
-}
-
-// ─── Tests ────────────────────────────────────────────────────────────────────
+import { htmlToBlocks } from "./routers/pageScraperRouter";
 
 const BASE_URL = "https://example.com";
+
+// ─── Hero block ───────────────────────────────────────────────────────────────
 
 describe("htmlToBlocks — hero block", () => {
   it("extracts H1 as a hero block", () => {
@@ -277,6 +37,8 @@ describe("htmlToBlocks — hero block", () => {
     expect(textBlocks.every(b => !b.data.html?.includes("Main Title"))).toBe(true);
   });
 });
+
+// ─── Text blocks ──────────────────────────────────────────────────────────────
 
 describe("htmlToBlocks — text blocks", () => {
   it("extracts H2 as a text block with h2 HTML", () => {
@@ -309,6 +71,8 @@ describe("htmlToBlocks — text blocks", () => {
   });
 });
 
+// ─── Image blocks ─────────────────────────────────────────────────────────────
+
 describe("htmlToBlocks — image blocks", () => {
   it("extracts IMG as an image block with resolved URL", () => {
     const html = `<html><body><img src="/images/scan.jpg" alt="Ultrasound scan" /></body></html>`;
@@ -329,6 +93,8 @@ describe("htmlToBlocks — image blocks", () => {
   });
 });
 
+// ─── List blocks ──────────────────────────────────────────────────────────────
+
 describe("htmlToBlocks — list blocks", () => {
   it("extracts plain UL as bullets block", () => {
     const html = `<html><body><ul><li>Item one</li><li>Item two</li><li>Item three</li></ul></body></html>`;
@@ -343,6 +109,8 @@ describe("htmlToBlocks — list blocks", () => {
     expect(blocks.find(b => b.type === "numbered_list")!.data.items).toEqual(["First step", "Second step"]);
   });
 });
+
+// ─── Checklist detection from UL ─────────────────────────────────────────────
 
 describe("htmlToBlocks — checklist detection from UL", () => {
   it("detects ✓ checkmark UL as checklist block", () => {
@@ -387,7 +155,9 @@ describe("htmlToBlocks — checklist detection from UL", () => {
   });
 });
 
-describe("htmlToBlocks — inline list splitting from paragraphs/divs", () => {
+// ─── Inline list splitting from paragraphs (newline-based) ───────────────────
+
+describe("htmlToBlocks — inline list splitting (newline-based)", () => {
   it("splits ✔ multi-line paragraph into checklist block", () => {
     const html = `<html><body><p>✔ Built for general sonographers\n✔ Live, structured, and focused\n✔ Learn vascular foundations</p></body></html>`;
     const blocks = htmlToBlocks(html, BASE_URL);
@@ -423,6 +193,64 @@ describe("htmlToBlocks — inline list splitting from paragraphs/divs", () => {
   });
 });
 
+// ─── ClickFunnels-style inline checkmarks (no newlines) ──────────────────────
+
+describe("htmlToBlocks — ClickFunnels inline checkmarks (no newlines, zero-width spaces)", () => {
+  it("splits concatenated ✔ items from a paragraph with <br> tags", () => {
+    // ClickFunnels uses <br> between checkmark lines — cheerio replaces them with \n
+    const html = `<html><body><p>✔ Built for general sonographers<br>✔ Live, structured, and clinically focused<br>✔ Learn vascular foundations, Doppler, and pathology</p></body></html>`;
+    const blocks = htmlToBlocks(html, BASE_URL);
+    const checklist = blocks.find(b => b.type === "checklist");
+    expect(checklist).toBeDefined();
+    expect(checklist!.data.items.length).toBe(3);
+    expect(checklist!.data.items[0]).toBe("Built for general sonographers");
+    expect(checklist!.data.items[1]).toBe("Live, structured, and clinically focused");
+  });
+
+  it("strips zero-width spaces (U+200B) before checkmarks and splits correctly", () => {
+    // Simulate ClickFunnels zero-width space injection: ​✔
+    const zwsp = "\u200B";
+    const html = `<html><body><p>✔ Built for general sonographers<br>${zwsp}✔ Live, structured<br>${zwsp}✔ Learn vascular</p></body></html>`;
+    const blocks = htmlToBlocks(html, BASE_URL);
+    const checklist = blocks.find(b => b.type === "checklist");
+    expect(checklist).toBeDefined();
+    expect(checklist!.data.items.length).toBe(3);
+    // Items should NOT contain zero-width spaces
+    for (const item of checklist!.data.items) {
+      expect(item).not.toContain(zwsp);
+    }
+  });
+
+  it("splits concatenated inline checkmarks with no separator", () => {
+    // Worst case: all checkmarks concatenated with no whitespace
+    const html = `<html><body><p>✔ Built for general sonographers✔ Live, structured and focused✔ Learn vascular foundations</p></body></html>`;
+    const blocks = htmlToBlocks(html, BASE_URL);
+    const checklist = blocks.find(b => b.type === "checklist");
+    expect(checklist).toBeDefined();
+    expect(checklist!.data.items.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("handles zero-width space before first checkmark in a paragraph", () => {
+    const zwsp = "\u200B";
+    const html = `<html><body><p>${zwsp}✔ First item<br>${zwsp}✔ Second item<br>${zwsp}✔ Third item</p></body></html>`;
+    const blocks = htmlToBlocks(html, BASE_URL);
+    const checklist = blocks.find(b => b.type === "checklist");
+    expect(checklist).toBeDefined();
+    expect(checklist!.data.items[0]).toBe("First item");
+  });
+
+  it("handles mixed zero-width spaces and regular newlines", () => {
+    const zwsp = "\u200B";
+    const html = `<html><body><p>✔ First benefit\n${zwsp}✔ Second benefit\n${zwsp}✔ Third benefit</p></body></html>`;
+    const blocks = htmlToBlocks(html, BASE_URL);
+    const checklist = blocks.find(b => b.type === "checklist");
+    expect(checklist).toBeDefined();
+    expect(checklist!.data.items.length).toBe(3);
+  });
+});
+
+// ─── Noise filtering ──────────────────────────────────────────────────────────
+
 describe("htmlToBlocks — noise filtering", () => {
   it("filters '100% Secure - Privacy Guaranteed' text", () => {
     const html = `<html><body><p>100% Secure - Privacy Guaranteed</p><h2>Real Section Title Here</h2></body></html>`;
@@ -444,6 +272,8 @@ describe("htmlToBlocks — noise filtering", () => {
     expect(blocks.find(b => JSON.stringify(b.data).includes("Footer text"))).toBeUndefined();
   });
 });
+
+// ─── CTA detection ────────────────────────────────────────────────────────────
 
 describe("htmlToBlocks — CTA detection", () => {
   it("detects anchor with btn class as CTA block", () => {
@@ -474,11 +304,12 @@ describe("htmlToBlocks — CTA detection", () => {
   });
 });
 
+// ─── Document order preservation ─────────────────────────────────────────────
+
 describe("htmlToBlocks — document order preservation", () => {
   it("preserves image before text when image appears first in HTML", () => {
     const html = `<html><body><img src="/scan.jpg" alt="scan" /><p>This is a paragraph about the scan above.</p></body></html>`;
     const blocks = htmlToBlocks(html, BASE_URL);
-    // Hero is first (no H1 here), then image, then text
     const imgIdx = blocks.findIndex(b => b.type === "image");
     const textIdx = blocks.findIndex(b => b.type === "text");
     expect(imgIdx).toBeLessThan(textIdx);
@@ -491,63 +322,4 @@ describe("htmlToBlocks — document order preservation", () => {
     const imgIdx = blocks.findIndex(b => b.type === "image");
     expect(textIdx).toBeLessThan(imgIdx);
   });
-});
-
-describe("tryExtractInlineList", () => {
-  it("detects ✔ checkmark lines", () => {
-    const result = tryExtractInlineList("✔ Built for sonographers\n✔ Live and structured\n✔ Learn the right way");
-    expect(result!.type).toBe("checklist");
-    expect(result!.items).toHaveLength(3);
-    expect(result!.items[0]).toBe("Built for sonographers");
-  });
-
-  it("detects ✅ emoji lines", () => {
-    const result = tryExtractInlineList("✅ Feature one\n✅ Feature two\n✅ Feature three");
-    expect(result!.type).toBe("checklist");
-  });
-
-  it("detects dash-prefixed lines", () => {
-    const result = tryExtractInlineList("- First item\n- Second item\n- Third item");
-    expect(result!.type).toBe("bullets");
-    expect(result!.items[0]).toBe("First item");
-  });
-
-  it("returns null for single-line text", () => {
-    expect(tryExtractInlineList("This is just a single paragraph.")).toBeNull();
-  });
-
-  it("returns null for multi-line non-list text", () => {
-    expect(tryExtractInlineList("First line of text\nSecond line of text\nThird line of text")).toBeNull();
-  });
-
-  it("strips checkmark from items", () => {
-    const result = tryExtractInlineList("✔ Item one\n✔ Item two\n✔ Item three");
-    expect(result!.items[0]).not.toMatch(/^[✓✔✅☑]/);
-  });
-
-  it("strips dash from bullet items", () => {
-    const result = tryExtractInlineList("- First item\n- Second item\n- Third item");
-    expect(result!.items[0]).toBe("First item");
-  });
-});
-
-describe("isNoise", () => {
-  it("filters '100% Secure - Privacy Guaranteed'", () => { expect(isNoise("100% Secure - Privacy Guaranteed")).toBe(true); });
-  it("filters 'Privacy Guaranteed'", () => { expect(isNoise("Privacy Guaranteed")).toBe(true); });
-  it("filters countdown timer '12:11:17'", () => { expect(isNoise("12:11:17")).toBe(true); });
-  it("filters 'Hours'", () => { expect(isNoise("Hours")).toBe(true); });
-  it("filters 'Copyright 2024'", () => { expect(isNoise("Copyright 2024 All About Ultrasound")).toBe(true); });
-  it("does NOT filter legitimate content", () => {
-    expect(isNoise("Step Into Vascular Ultrasound with Confidence!")).toBe(false);
-    expect(isNoise("Classes start June 1st! Register now.")).toBe(false);
-  });
-});
-
-describe("stripCheckmark", () => {
-  it("strips ✔ from start", () => { expect(stripCheckmark("✔ Item text")).toBe("Item text"); });
-  it("strips ✓ from start", () => { expect(stripCheckmark("✓ Item text")).toBe("Item text"); });
-  it("strips ✅ from start", () => { expect(stripCheckmark("✅ Item text")).toBe("Item text"); });
-  it("strips ☑ from start", () => { expect(stripCheckmark("☑ Item text")).toBe("Item text"); });
-  it("handles leading whitespace", () => { expect(stripCheckmark("  ✔ Item text")).toBe("Item text"); });
-  it("does not strip from middle", () => { expect(stripCheckmark("Item ✔ text")).toBe("Item ✔ text"); });
 });
