@@ -3268,18 +3268,20 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
           <button
             onClick={() => prevLesson && onNavigateLesson?.(prevLesson)}
             disabled={!prevLesson}
-            title={prevLesson ? `Previous: ${prevLesson.title}` : "No previous lesson"}
-            className="p-1.5 rounded-md text-gray-400 hover:text-teal-600 hover:bg-teal-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            title={prevLesson ? `← ${prevLesson.title}` : "No previous lesson"}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-gray-500 hover:text-teal-700 hover:bg-teal-50 border border-gray-200 hover:border-teal-300 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
           >
-            <ChevronLeft className="w-4 h-4" />
+            <ChevronLeft className="w-3.5 h-3.5 shrink-0" />
+            <span className="hidden md:inline max-w-[110px] truncate">{prevLesson ? prevLesson.title : "Prev"}</span>
           </button>
           <button
             onClick={() => nextLesson && onNavigateLesson?.(nextLesson)}
             disabled={!nextLesson}
-            title={nextLesson ? `Next: ${nextLesson.title}` : "No next lesson"}
-            className="p-1.5 rounded-md text-gray-400 hover:text-teal-600 hover:bg-teal-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            title={nextLesson ? `${nextLesson.title} →` : "No next lesson"}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-gray-500 hover:text-teal-700 hover:bg-teal-50 border border-gray-200 hover:border-teal-300 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
           >
-            <ChevronRight className="w-4 h-4" />
+            <span className="hidden md:inline max-w-[110px] truncate">{nextLesson ? nextLesson.title : "Next"}</span>
+            <ChevronRight className="w-3.5 h-3.5 shrink-0" />
           </button>
         </div>
         <div className="flex gap-1">

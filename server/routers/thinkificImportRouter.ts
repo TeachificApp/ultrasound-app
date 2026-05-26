@@ -681,7 +681,7 @@ export const thinkificImportRouter = router({
                 bgColor: "#149096",
                 bgImage: "",
                 textColor: "#ffffff",
-                align: "center",
+                align: "left",
                 buttons: [],
                 showButtons: false,
                 hideButtons: true,
@@ -744,19 +744,35 @@ export const thinkificImportRouter = router({
             }
 
             // 3. EMBED block — for iframe/multimedia content types that have a take_url
-            //    but no video ID (e.g., external tool embeds, H5P, etc.)
-            if (
-              lessonType === "embed" &&
-              !embedUrl &&
-              content.take_url
-            ) {
+            //    Always add an embed block for Iframe/embed content types, even when no video ID
+            //    is available (e.g., external tool embeds, H5P, Wistia via iframe, etc.)
+            if (content.take_url && !embedUrl && (lessonType === "embed" || content.contentable_type === "Iframe")) {
               blocks.push({
                 id: `embed-${uid()}`,
                 type: "embed",
                 data: {
                   url: content.take_url,
-                  caption: "",
+                  caption: content.name || "",
                   bgColor: "#f9fafb",
+                },
+              });
+            }
+
+            // 3b. HtmlItem placeholder — when no HTML body was available from the API,
+            //     add a minimal text block so the lesson isn't completely empty.
+            if (
+              content.contentable_type === "HtmlItem" &&
+              !htmlDesc &&
+              !plainDesc
+            ) {
+              blocks.push({
+                id: `text-${uid()}`,
+                type: "text",
+                data: {
+                  html: `<p>This lesson contains rich text content hosted on Thinkific. Visit the course player to view the full content.</p>`,
+                  align: "left",
+                  bgColor: "#ffffff",
+                  textColor: "#1a1a1a",
                 },
               });
             }
@@ -1184,9 +1200,8 @@ export const thinkificImportRouter = router({
                 embedUrl = `https://player.vimeo.com/video/${detail.vimeo_video_id}`;
               }
 
-              // Build content blocks (same logic as import)
+                            // Build content blocks (same logic as import)
               const blocks: object[] = [];
-
               // 0. HERO block — lesson name only, no subheadline, no CTA buttons
               blocks.push({
                 id: `hero-${uid()}`,
@@ -1199,13 +1214,12 @@ export const thinkificImportRouter = router({
                   bgColor: "#149096",
                   bgImage: "",
                   textColor: "#ffffff",
-                  align: "center",
+                  align: "left",
                   buttons: [],
                   showButtons: false,
                   hideButtons: true,
                 },
               });
-
               if (embedUrl) {
                 let videoProvider = "url";
                 if (detail?.wistia_hashed_id) videoProvider = "wistia";
@@ -1217,7 +1231,6 @@ export const thinkificImportRouter = router({
                   data: { url: embedUrl, provider: videoProvider, caption: "", bgColor: "#000000", autoplay: false },
                 });
               }
-
               const htmlDesc = detail?.html_description || (detail as any)?.body || content.html_description || null;
               const plainDesc = (detail as any)?.description || (content as any).description || null;
               if (htmlDesc && htmlDesc.trim().length > 0) {
@@ -1225,10 +1238,14 @@ export const thinkificImportRouter = router({
               } else if (plainDesc && plainDesc.trim().length > 0) {
                 blocks.push({ id: `text-${uid()}`, type: "text", data: { html: `<p>${plainDesc}</p>`, align: "left", bgColor: "#ffffff", textColor: "#1a1a1a" } });
               }
-
               const lessonType = mapContentType(content.contentable_type, content.take_url);
-              if (lessonType === "embed" && !embedUrl && content.take_url) {
-                blocks.push({ id: `embed-${uid()}`, type: "embed", data: { url: content.take_url, caption: "", bgColor: "#f9fafb" } });
+              // Embed block: always add for Iframe/embed types with a take_url
+              if (content.take_url && !embedUrl && (lessonType === "embed" || content.contentable_type === "Iframe")) {
+                blocks.push({ id: `embed-${uid()}`, type: "embed", data: { url: content.take_url, caption: content.name || "", bgColor: "#f9fafb" } });
+              }
+              // HtmlItem placeholder when no body available
+              if (content.contentable_type === "HtmlItem" && !htmlDesc && !plainDesc) {
+                blocks.push({ id: `text-${uid()}`, type: "text", data: { html: `<p>This lesson contains rich text content hosted on Thinkific. Visit the course player to view the full content.</p>`, align: "left", bgColor: "#ffffff", textColor: "#1a1a1a" } });
               }
 
               if (detail?.download_url) {
