@@ -2855,6 +2855,8 @@ export const lmsLessons = mysqlTable("lms_lessons", {
   liveEndAt: bigint("live_end_at", { mode: "number" }),
   // Comments: when true, enrolled students can post comments on this lesson
   commentsEnabled: boolean("comments_enabled").default(false).notNull(),
+  // Per-lesson publish status: 'published' = visible to enrolled learners (default), 'draft' = hidden from learners even if course is published
+  lessonStatus: mysqlEnum("lesson_status", ["published", "draft"]).default("published").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });

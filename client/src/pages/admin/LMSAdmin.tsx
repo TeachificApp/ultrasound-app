@@ -677,6 +677,7 @@ function SortableLessonRow({ lesson, onEdit, onQuiz, onDelete, onCopy, onMoveUp,
       <span className="text-gray-400">{TYPE_ICONS[lesson.type] ?? <FileText className="w-4 h-4" />}</span>
       <span className="text-sm text-gray-700 flex-1">{lesson.title}</span>
       <span className="text-xs text-gray-400">{LESSON_TYPE_LABELS[lesson.type] ?? lesson.type}</span>
+      {(lesson.lessonStatus === "draft") && <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 bg-amber-50">Draft</Badge>}
       {lesson.isPreview && <Badge variant="outline" className="text-xs text-teal-600 border-teal-300">Preview</Badge>}
       {lesson.requireVideoCompletion === 1 && <Badge variant="outline" className="text-xs text-orange-600 border-orange-300">Video req.</Badge>}
       {lesson.requireManualComplete === 1 && <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">Manual</Badge>}
@@ -826,6 +827,24 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
     onSuccess: () => { toast.success("Saved"); refetch(); },
     onError: e => toast.error(`Error: ${e.message}`),
   });
+
+  // Publish dialog state — shown when admin changes status to 'public' and there are draft lessons
+  const [publishDialog, setPublishDialog] = useState<{ pendingData: any } | null>(null);
+  const bulkSetLessonStatus = trpc.lmsAdmin.bulkSetLessonStatus.useMutation();
+
+  const handleSaveCourseSettings = (data: any) => {
+    const allLessonsFlat = [
+      ...(course?.topLevelLessons ?? []),
+      ...(course?.sections ?? []).flatMap((s: any) => s.lessons ?? []),
+    ];
+    const draftCount = allLessonsFlat.filter((l: any) => l.lessonStatus === "draft").length;
+    // If publishing (status → public) and there are draft lessons, show dialog
+    if (data.status === "public" && course?.status !== "public" && draftCount > 0) {
+      setPublishDialog({ pendingData: data });
+    } else {
+      updateCourse.mutate({ id: courseId, ...data });
+    }
+  };
 
   const deleteSection = trpc.lmsAdmin.deleteSection.useMutation({
     onSuccess: () => refetch(),
@@ -1029,7 +1048,7 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
 
         {/* Settings Tab */}
         <TabsContent value="settings" className="mt-4">
-          <CourseSettingsForm course={course} onSave={data => updateCourse.mutate({ id: courseId, ...data })} saving={updateCourse.isPending} />
+          <CourseSettingsForm course={course} onSave={handleSaveCourseSettings} saving={updateCourse.isPending} />
         </TabsContent>
 
         {/* Curriculum Tab */}
@@ -1275,6 +1294,56 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
           onClose={() => setSaveAsTemplateSection(null)}
         />
       )}
+
+      {/* Publish Dialog — shown when publishing a course that has draft lessons */}
+      {publishDialog && (() => {
+        const allLessonsFlat = [
+          ...(course?.topLevelLessons ?? []),
+          ...(course?.sections ?? []).flatMap((s: any) => s.lessons ?? []),
+        ];
+        const draftCount = allLessonsFlat.filter((l: any) => l.lessonStatus === "draft").length;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 space-y-4">
+              <h2 className="text-lg font-bold text-gray-900">Publish Course</h2>
+              <p className="text-sm text-gray-600">
+                This course has <strong>{draftCount} draft {draftCount === 1 ? "lesson" : "lessons"}</strong> that won’t be visible to enrolled learners. How would you like to proceed?
+              </p>
+              <div className="space-y-3">
+                <button
+                  className="w-full text-left border border-teal-300 rounded-lg px-4 py-3 hover:bg-teal-50 transition-colors group"
+                  onClick={async () => {
+                    await bulkSetLessonStatus.mutateAsync({ courseId, lessonStatus: "published", onlyDrafts: true });
+                    updateCourse.mutate({ id: courseId, ...publishDialog.pendingData });
+                    setPublishDialog(null);
+                  }}
+                >
+                  <p className="text-sm font-semibold text-teal-700 group-hover:text-teal-800">Publish all lessons</p>
+                  <p className="text-xs text-gray-500 mt-0.5">All {draftCount} draft {draftCount === 1 ? "lesson" : "lessons"} will be published and visible to enrolled learners.</p>
+                </button>
+                <button
+                  className="w-full text-left border border-gray-200 rounded-lg px-4 py-3 hover:bg-gray-50 transition-colors group"
+                  onClick={() => {
+                    updateCourse.mutate({ id: courseId, ...publishDialog.pendingData });
+                    setPublishDialog(null);
+                  }}
+                >
+                  <p className="text-sm font-semibold text-gray-700 group-hover:text-gray-900">Keep draft lessons hidden</p>
+                  <p className="text-xs text-gray-500 mt-0.5">The course will be published, but the {draftCount} draft {draftCount === 1 ? "lesson" : "lessons"} will remain hidden from learners.</p>
+                </button>
+              </div>
+              <div className="flex justify-end pt-1">
+                <button
+                  className="text-sm text-gray-400 hover:text-gray-600 underline"
+                  onClick={() => setPublishDialog(null)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -3425,6 +3494,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
   const [liveEndAt, setLiveEndAt] = useState<string>((lesson as any).liveEndAt ? new Date((lesson as any).liveEndAt).toISOString().slice(0, 16) : "");
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<{ id: number; title: string; s3Url: string; mediaType: string } | null>(null);
+  const [lessonStatus, setLessonStatus] = useState<"published" | "draft">((lesson as any).lessonStatus ?? "published");
 
   // Reset all lesson state when navigating to a different lesson
   useEffect(() => {
@@ -3446,6 +3516,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
     setMeetingLink((lessonShallow as any).meetingLink ?? "");
     setLiveStartAt((lessonShallow as any).liveStartAt ? new Date((lessonShallow as any).liveStartAt).toISOString().slice(0, 16) : "");
     setLiveEndAt((lessonShallow as any).liveEndAt ? new Date((lessonShallow as any).liveEndAt).toISOString().slice(0, 16) : "");
+    setLessonStatus((lessonShallow as any).lessonStatus ?? "published");
   }, [lessonShallow.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync state when full lesson data arrives (content/videoContent/embedUrl may be empty until then)
@@ -3495,6 +3566,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
       meetingLink: meetingLink.trim() || null,
       liveStartAt: liveStartAt ? new Date(liveStartAt).getTime() : null,
       liveEndAt: liveEndAt ? new Date(liveEndAt).getTime() : null,
+      lessonStatus,
       content: (lessonType === "text" || lessonType === "video" || lessonType === "download" || lessonType === "video_text") ? (content || null) : undefined,
       videoContent: lessonType === "video_text" ? (videoContent || null) : undefined,
       embedUrl: lessonType === "embed" ? (embedUrl || null) : undefined,
@@ -3579,6 +3651,40 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
           <div>
             <Label className="text-sm">Title</Label>
             <Input value={title} onChange={e => setTitle(e.target.value)} className="mt-1" />
+          </div>
+
+          {/* Lesson Status — Published / Draft */}
+          <div className="flex items-center justify-between border rounded-lg px-4 py-3 bg-gray-50">
+            <div>
+              <p className="text-sm font-medium text-gray-700">Lesson Status</p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {lessonStatus === "published"
+                  ? "Visible to enrolled learners."
+                  : "Hidden from learners — only admins can see this lesson."}
+              </p>
+            </div>
+            <div className="flex gap-1 ml-4 shrink-0">
+              <button
+                onClick={() => setLessonStatus("published")}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md border transition-colors ${
+                  lessonStatus === "published"
+                    ? "bg-teal-600 text-white border-teal-600"
+                    : "border-gray-200 text-gray-500 hover:border-teal-300 hover:text-teal-600"
+                }`}
+              >
+                Published
+              </button>
+              <button
+                onClick={() => setLessonStatus("draft")}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md border transition-colors ${
+                  lessonStatus === "draft"
+                    ? "bg-amber-500 text-white border-amber-500"
+                    : "border-gray-200 text-gray-500 hover:border-amber-300 hover:text-amber-600"
+                }`}
+              >
+                Draft
+              </button>
+            </div>
           </div>
 
           {/* Lesson Type Selector */}

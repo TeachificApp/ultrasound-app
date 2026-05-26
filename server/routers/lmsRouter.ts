@@ -749,9 +749,15 @@ export const lmsLearnerRouter = router({
           effectConfettiColors: lmsLessons.effectConfettiColors,
           effectConfettiMode: lmsLessons.effectConfettiMode,
           effectBannerDuration: lmsLessons.effectBannerDuration,
+          lessonStatus: lmsLessons.lessonStatus,
           createdAt: lmsLessons.createdAt,
           updatedAt: lmsLessons.updatedAt,
-        }).from(lmsLessons).where(eq(lmsLessons.courseId, course.id)).orderBy(asc(lmsLessons.position)),
+        }).from(lmsLessons).where(
+          // Admins (in preview mode) see all lessons; enrolled learners only see published lessons
+          isAdminPreview
+            ? eq(lmsLessons.courseId, course.id)
+            : and(eq(lmsLessons.courseId, course.id), eq(lmsLessons.lessonStatus, "published"))
+        ).orderBy(asc(lmsLessons.position)),
       ]);
       // Group lessons by sectionId in JS — no extra round-trips
       const lessonsBySectionId = new Map<number, typeof allCourseLessons>();
@@ -813,6 +819,10 @@ export const lmsLearnerRouter = router({
       }
             if (!resolvedCourseId) throw new TRPCError({ code: "NOT_FOUND" });
       const isAdmin = ctx.user.role === "admin";
+      // Block draft lessons from non-admin learners
+      if (!isAdmin && lesson.lessonStatus === "draft") {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Lesson not found" });
+      }
       const pm = lesson.previewMode ?? (lesson.isPreview ? "preview" : "none");
       if (pm !== "preview" && !isAdmin) {
         // Check enrollment
@@ -1357,7 +1367,12 @@ export const lmsLearnerRouter = router({
       // Fetch sections + lessons
       const [sections, allLessons] = await Promise.all([
         db.select().from(lmsSections).where(eq(lmsSections.courseId, course.id)).orderBy(asc(lmsSections.position)),
-        db.select().from(lmsLessons).where(eq(lmsLessons.courseId, course.id)).orderBy(asc(lmsLessons.position)),
+        db.select().from(lmsLessons).where(
+          // Admins in preview mode see all lessons; enrolled learners only see published lessons
+          isAdminPreview
+            ? eq(lmsLessons.courseId, course.id)
+            : and(eq(lmsLessons.courseId, course.id), eq(lmsLessons.lessonStatus, "published"))
+        ).orderBy(asc(lmsLessons.position)),
       ]);
       const lessonsBySectionId = new Map<number, typeof allLessons>();
       const topLevelLessons: typeof allLessons = [];
@@ -2078,6 +2093,7 @@ export const lmsAdminRouter = router({
       meetingLink: z.string().max(1024).nullable().optional(),
       liveStartAt: z.number().int().nullable().optional(),
       liveEndAt: z.number().int().nullable().optional(),
+      lessonStatus: z.enum(["published", "draft"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -2122,6 +2138,25 @@ export const lmsAdminRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       await Promise.all(input.lessons.map(l => db.update(lmsLessons).set({ position: l.position }).where(eq(lmsLessons.id, l.id))));
+      return { success: true };
+    }),
+
+  /** Bulk-set lessonStatus for all lessons in a course (used by publish-course dialog) */
+  bulkSetLessonStatus: protectedProcedure
+    .input(z.object({
+      courseId: z.number(),
+      lessonStatus: z.enum(["published", "draft"]),
+      /** When true, only update lessons that are currently 'draft' → 'published'. When false, set ALL lessons. */
+      onlyDrafts: z.boolean().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const condition = input.onlyDrafts
+        ? and(eq(lmsLessons.courseId, input.courseId), eq(lmsLessons.lessonStatus, "draft"))
+        : eq(lmsLessons.courseId, input.courseId);
+      await db.update(lmsLessons).set({ lessonStatus: input.lessonStatus }).where(condition);
       return { success: true };
     }),
 

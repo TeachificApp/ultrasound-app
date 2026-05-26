@@ -3057,3 +3057,14 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Rich text editor: image selection shows resize handles (drag corners to resize)
 - [ ] Rich text editor: image wrapping options (float left, float right, inline, block/full-width)
 - [ ] Rich text editor: image alignment toolbar (left, center, right) when image is selected
+
+## Per-Lesson Draft Status (May 2026)
+- [x] Add lessonStatus ENUM('published','draft') column to lms_lessons table (default: published)
+- [x] Add lessonStatus to updateLesson procedure input schema
+- [x] Add bulkSetLessonStatus procedure (used by publish dialog)
+- [x] Add Published/Draft toggle to LessonEditorPage settings tab
+- [x] Show Draft badge on SortableLessonRow in curriculum list
+- [x] Filter draft lessons from getCoursePlayer learner query (admins in preview see all)
+- [x] Filter draft lessons from getCourseOverview learner query
+- [x] Block draft lesson access in getLesson for non-admin users
+- [x] Add publish-course dialog: "Publish all lessons" vs "Keep draft lessons hidden"
