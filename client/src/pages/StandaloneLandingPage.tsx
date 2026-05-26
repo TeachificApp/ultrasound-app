@@ -144,7 +144,7 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
           }
         : undefined;
       return (
-        <div className="relative px-8 py-16 md:py-24 overflow-hidden" style={{ ...bgStyle, ...heroBottomBorderStyleSL, color: d.textColor || "#ffffff", minHeight: `${d.heroMinHeight ?? 400}px`, cursor: heroClickHandlerSL ? "pointer" : undefined }} onClick={heroClickHandlerSL}>
+        <div className="relative px-8 py-16 md:py-24 overflow-hidden" style={{ ...bgStyle, ...heroBottomBorderStyleSL, color: d.textColor || "#ffffff", minHeight: `${d.heroMinHeight ?? 150}px`, cursor: heroClickHandlerSL ? "pointer" : undefined }} onClick={heroClickHandlerSL}>
           {d.bgType === "video" && d.videoUrl && (
             <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
           )}
