@@ -21,7 +21,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import {
   Award, BookOpen, CheckCircle, ChevronDown, ChevronRight, Clock, Edit3,
   Lock, PlayCircle, User, FileText, HelpCircle, Download, Monitor,
-  ArrowRight, ListChecks, ExternalLink,
+  ArrowRight, ListChecks, ExternalLink, Video,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
@@ -287,8 +287,19 @@ export default function CourseOverview() {
             <p className="text-[10px] text-gray-400 mt-0.5">{lesson.durationMinutes} min</p>
           )}
         </div>
-        {!locked && (
+        {!locked && !lesson.meetingLink && (
           <ChevronRight className="w-4 h-4 text-gray-300 shrink-0 mt-0.5" />
+        )}
+        {!locked && lesson.meetingLink && (
+          <a
+            href={lesson.meetingLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={e => e.stopPropagation()}
+            className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-500 text-white hover:bg-teal-600 transition-colors"
+          >
+            <Video className="w-3 h-3" /> Join Live
+          </a>
         )}
       </button>
     );

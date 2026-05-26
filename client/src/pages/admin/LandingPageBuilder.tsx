@@ -4050,7 +4050,7 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
 // ─── Sortable Block Card ──────────────────────────────────────────────────────
 
 // ─── Column Drop Zone ─────────────────────────────────────────────────────────
-function ColumnDropZone({ id, blocks, activeDragId, isTargeted, onMoveOut, onMoveToOther, onDeleteChild, onAddBlock }: {
+function ColumnDropZone({ id, blocks, activeDragId, isTargeted, onMoveOut, onMoveToOther, onDeleteChild, onAddBlock, onReorderChild }: {
   id: string; blocks: Block[]; activeDragId: UniqueIdentifier | null;
   isTargeted?: boolean;
   onMoveOut: (childBlockId: string) => void;

@@ -2847,6 +2847,8 @@ export const lmsLessons = mysqlTable("lms_lessons", {
   isPrerequisite: boolean("is_prerequisite").default(false).notNull(),
   // Legacy: kept for DB compatibility but no longer used in logic
   prerequisiteLessonId: int("prerequisite_lesson_id"),
+  // Live meeting link (Zoom/Teams) — shown as "Join Live" button on enrolled course overview only
+  meetingLink: varchar("meeting_link", { length: 1024 }),
   // Comments: when true, enrolled students can post comments on this lesson
   commentsEnabled: boolean("comments_enabled").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),

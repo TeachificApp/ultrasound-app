@@ -3418,6 +3418,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
   const [showInstructor, setShowInstructor] = useState<"inherit" | "show" | "hide">(lesson.showInstructor ?? "inherit");
   const [isPrerequisite, setIsPrerequisite] = useState<boolean>(!!lesson.isPrerequisite);
   const [commentsEnabled, setCommentsEnabled] = useState<boolean>(!!(lesson as any).commentsEnabled);
+  const [meetingLink, setMeetingLink] = useState<string>((lesson as any).meetingLink ?? "");
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<{ id: number; title: string; s3Url: string; mediaType: string } | null>(null);
 
@@ -3438,6 +3439,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
     setShowInstructor(lessonShallow.showInstructor ?? "inherit");
     setIsPrerequisite(!!lessonShallow.isPrerequisite);
     setCommentsEnabled(!!(lessonShallow as any).commentsEnabled);
+    setMeetingLink((lessonShallow as any).meetingLink ?? "");
   }, [lessonShallow.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync state when full lesson data arrives (content/videoContent/embedUrl may be empty until then)
@@ -3484,6 +3486,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
       showInstructor,
       isPrerequisite,
       commentsEnabled,
+      meetingLink: meetingLink.trim() || null,
       content: (lessonType === "text" || lessonType === "video" || lessonType === "download" || lessonType === "video_text") ? (content || null) : undefined,
       videoContent: lessonType === "video_text" ? (videoContent || null) : undefined,
       embedUrl: lessonType === "embed" ? (embedUrl || null) : undefined,
@@ -3711,6 +3714,23 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
           <div className="flex items-center gap-2">
             <Switch checked={commentsEnabled} onCheckedChange={setCommentsEnabled} id="edit-comments-enabled" />
             <Label htmlFor="edit-comments-enabled" className="text-sm">Enable student discussion / comments on this lesson</Label>
+          </div>
+          {/* Live meeting link */}
+          <div className="border border-teal-100 rounded-lg p-4 space-y-2 bg-teal-50/40">
+            <p className="text-sm font-semibold text-gray-700 flex items-center gap-1.5"><Video className="w-4 h-4 text-teal-600" /> Live Meeting Link (Zoom / Teams)</p>
+            <p className="text-xs text-gray-500">Paste a Zoom or Teams meeting URL here. A "Join Live" button will appear next to this lesson on the enrolled course overview page only.</p>
+            <Input
+              type="url"
+              value={meetingLink}
+              onChange={e => setMeetingLink(e.target.value)}
+              placeholder="https://zoom.us/j/... or https://teams.microsoft.com/..."
+              className="text-sm"
+            />
+            {meetingLink && (
+              <p className="text-xs text-teal-700 flex items-center gap-1">
+                <CheckCircle className="w-3 h-3" /> Join Live button will be shown on the course overview
+              </p>
+            )}
           </div>
 
           {/* Drip scheduling */}
