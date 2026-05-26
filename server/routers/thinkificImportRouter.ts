@@ -32,6 +32,7 @@ import {
   getContentsForChapter,
   getContentDetail,
   getContentDetailWithSession,
+  scrapeLessonFromTakeUrl,
   getEnrollmentsForCourse,
   getThinkificInstructor,
   type ThinkificChapter,
@@ -582,8 +583,10 @@ export const thinkificImportRouter = router({
             const isFreePreview = content.free ?? content.free_preview ?? false;
 
             // Fetch full content detail (html_description, video_url, quiz questions, etc.)
-            // The public API v1 /contents/{id} does NOT return lesson body content.
-            // Use the admin session-based course player API first; fall back to public API.
+            // Strategy (in order):
+            //   1. Course player JSON API (getContentDetailWithSession) — fastest, most structured
+            //   2. Public API v1 /contents/{id} — metadata only, no body content
+            //   3. take_url HTML scrape (scrapeLessonFromTakeUrl) — last resort when API returns no rich content
             let detail: ThinkificContentDetail | ThinkificLessonContent | null = null;
             try {
               detail = await getContentDetailWithSession(content.id, courseSlug);
@@ -592,6 +595,19 @@ export const thinkificImportRouter = router({
             }
             if (!detail) {
               detail = await getContentDetail(content.id);
+            }
+            // If we still have no rich content and the lesson has a take_url, scrape the page directly
+            const hasRichContent = !!(detail as any)?.html_description || !!(detail as any)?.wistia_hashed_id || !!(detail as any)?.youtube_video_id || !!(detail as any)?.vimeo_video_id || !!(detail as any)?.download_url || !!(detail as any)?.questions?.length;
+            if (!hasRichContent && content.take_url) {
+              try {
+                const scraped = await scrapeLessonFromTakeUrl(content.take_url);
+                if (scraped) {
+                  detail = scraped;
+                  log.push(`  take_url scrape OK for "${content.name}"`);
+                }
+              } catch (scrapeErr) {
+                log.push(`  take_url scrape failed for "${content.name}": ${scrapeErr instanceof Error ? scrapeErr.message : String(scrapeErr)}`);
+              }
             }
             if (detail) {
               const hasContent = !!(detail as any).html_description || !!(detail as any).wistia_hashed_id || !!(detail as any).youtube_video_id;
@@ -1097,8 +1113,7 @@ export const thinkificImportRouter = router({
             const contents = await getContentsForChapter(chapter.id);
             for (const content of contents) {
               // Fetch full detail for this lesson
-              // The public API v1 does NOT return lesson body content.
-              // Use admin session-based course player API first; fall back to public API.
+              // Strategy: player API → public API → take_url HTML scrape
               let detail: ThinkificContentDetail | ThinkificLessonContent | null = null;
               try {
                 detail = await getContentDetailWithSession(content.id, courseSlug);
@@ -1107,6 +1122,17 @@ export const thinkificImportRouter = router({
               }
               if (!detail) {
                 detail = await getContentDetail(content.id);
+              }
+              // Last resort: scrape the take_url HTML page if still no rich content
+              const resyncHasRich = !!(detail as any)?.html_description || !!(detail as any)?.wistia_hashed_id || !!(detail as any)?.youtube_video_id || !!(detail as any)?.vimeo_video_id || !!(detail as any)?.download_url || !!(detail as any)?.questions?.length;
+              if (!resyncHasRich && content.take_url) {
+                try {
+                  const scraped = await scrapeLessonFromTakeUrl(content.take_url);
+                  if (scraped) {
+                    detail = scraped;
+                    log.push(`  take_url scrape OK for "${content.name}"`);
+                  }
+                } catch { /* ignore scrape errors in resync */ }
               }
 
               // Resolve embed URL
@@ -1316,5 +1342,74 @@ export const thinkificImportRouter = router({
         log.push(`ERROR: ${errorMessage}`);
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Resync failed: ${errorMessage}` });
       }
+    }),
+
+  /**
+   * Debug: fetch raw content detail from the course player API and return it.
+   * Useful for diagnosing why lesson content is not being imported.
+   */
+  testContentFetch: protectedProcedure
+    .input(z.object({
+      contentId: z.number(),
+      courseSlug: z.string(),
+      takeUrl: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      adminOnly(ctx.user.role);
+      const log: string[] = [];
+
+      // 1. Course player JSON API
+      let playerResult: unknown = null;
+      try {
+        const { ENV } = await import("../_core/env");
+        const memberDomain = "member.allaboutultrasound.com";
+        const subdomain = ENV.thinkificSubdomain;
+        const { getThinkificAdminSession } = await import("../thinkific");
+        const sessionCookie = await getThinkificAdminSession();
+        const endpoints = [
+          `https://${memberDomain}/api/course_player/v2/contents/${input.contentId}`,
+          `https://${subdomain}.thinkific.com/api/course_player/v2/contents/${input.contentId}`,
+        ];
+        for (const endpoint of endpoints) {
+          const res = await fetch(endpoint, {
+            headers: {
+              "Cookie": sessionCookie,
+              "Accept": "application/json",
+              "X-Requested-With": "XMLHttpRequest",
+              "Referer": `https://${memberDomain}/courses/${input.courseSlug}/take`,
+            },
+          });
+          log.push(`${endpoint} → HTTP ${res.status}`);
+          if (res.ok) {
+            playerResult = await res.json();
+            log.push(`Response keys: ${Object.keys(playerResult as object).join(", ")}`);
+            break;
+          }
+        }
+      } catch (err) {
+        log.push(`Player API error: ${err instanceof Error ? err.message : String(err)}`);
+      }
+
+      // 2. take_url HTML scrape (if provided)
+      let scrapeResult: unknown = null;
+      if (input.takeUrl) {
+        try {
+          scrapeResult = await scrapeLessonFromTakeUrl(input.takeUrl);
+          log.push(`take_url scrape: ${scrapeResult ? "OK" : "no content found"}`);
+          if (scrapeResult) {
+            log.push(`Scraped keys: ${Object.keys(scrapeResult as object).join(", ")}`);
+          }
+        } catch (err) {
+          log.push(`take_url scrape error: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+
+      return {
+        log,
+        playerResult,
+        scrapeResult,
+        playerResultJson: playerResult ? JSON.stringify(playerResult, null, 2).substring(0, 5000) : null,
+        scrapeResultJson: scrapeResult ? JSON.stringify(scrapeResult, null, 2).substring(0, 5000) : null,
+      };
     }),
 });

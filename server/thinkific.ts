@@ -708,6 +708,23 @@ export interface ThinkificLessonContent {
  *
  * NOTE: Requires THINKIFIC_ADMIN_EMAIL and THINKIFIC_ADMIN_PASSWORD secrets.
  */
+/**
+ * Unwrap a Thinkific course player API response.
+ * The API sometimes wraps the content in { content: {...} } or { data: {...} }.
+ * This helper normalises both wrapped and bare responses.
+ */
+function unwrapPlayerResponse(raw: unknown): ThinkificLessonContent | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  // Bare object with an `id` field → already unwrapped
+  if (typeof r.id === "number" || typeof r.id === "string") return r as unknown as ThinkificLessonContent;
+  // Wrapped: { content: { id, ... } }
+  if (r.content && typeof r.content === "object") return r.content as ThinkificLessonContent;
+  // Wrapped: { data: { id, ... } }
+  if (r.data && typeof r.data === "object") return r.data as ThinkificLessonContent;
+  return null;
+}
+
 export async function getContentDetailWithSession(
   contentId: number,
   courseSlug: string
@@ -715,49 +732,172 @@ export async function getContentDetailWithSession(
   const subdomain = ENV.thinkificSubdomain;
   const memberDomain = "member.allaboutultrasound.com";
 
+  // Endpoints to try in order (member domain first, then subdomain)
+  const endpoints = [
+    `https://${memberDomain}/api/course_player/v2/contents/${contentId}`,
+    `https://${subdomain}.thinkific.com/api/course_player/v2/contents/${contentId}`,
+  ];
+
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const sessionCookie = await getThinkificAdminSession();
 
-      // Try the internal course player API first
-      const playerRes = await fetch(
-        `https://${memberDomain}/api/course_player/v2/contents/${contentId}`,
-        {
+      for (const endpoint of endpoints) {
+        const res = await fetch(endpoint, {
           headers: {
             "Cookie": sessionCookie,
             "Accept": "application/json",
             "X-Requested-With": "XMLHttpRequest",
+            "Referer": `https://${memberDomain}/courses/${courseSlug}/take`,
           },
+        });
+
+        if (res.status === 401) {
+          invalidateThinkificAdminSession();
+          break; // break inner loop, retry outer
         }
-      );
-
-      if (playerRes.status === 401) {
-        invalidateThinkificAdminSession();
-        continue; // retry with fresh session
-      }
-
-      if (!playerRes.ok) {
-        // Try the subdomain portal as fallback
-        const fallbackRes = await fetch(
-          `https://${subdomain}.thinkific.com/api/course_player/v2/contents/${contentId}`,
-          {
-            headers: {
-              "Cookie": sessionCookie,
-              "Accept": "application/json",
-              "X-Requested-With": "XMLHttpRequest",
-            },
-          }
-        );
-        if (!fallbackRes.ok) {
-          console.warn(`[Thinkific] getContentDetailWithSession: ${contentId} returned ${playerRes.status}/${fallbackRes.status}`);
-          return null;
+        if (!res.ok) {
+          console.warn(`[Thinkific] player API ${endpoint} → ${res.status}`);
+          continue; // try next endpoint
         }
-        return fallbackRes.json() as Promise<ThinkificLessonContent>;
-      }
 
-      return playerRes.json() as Promise<ThinkificLessonContent>;
+        const raw = await res.json();
+        const content = unwrapPlayerResponse(raw);
+        if (content) {
+          const hasRichContent = !!(content.html_description || (content as any).body || content.wistia_hashed_id || content.youtube_video_id || content.vimeo_video_id || content.download_url || content.questions?.length);
+          console.log(`[Thinkific] player API OK for ${contentId} (${content.contentable_type ?? "?"})${hasRichContent ? " ✓ has content" : " (metadata only)"}`);
+          return content;
+        }
+        console.warn(`[Thinkific] player API ${endpoint} returned unexpected shape:`, JSON.stringify(raw).substring(0, 200));
+      }
     } catch (err) {
       console.error(`[Thinkific] getContentDetailWithSession error for ${contentId}:`, err);
+      if (attempt === 0) {
+        invalidateThinkificAdminSession();
+        continue;
+      }
+      return null;
+    }
+  }
+  return null;
+}
+
+/**
+ * Scrape a Thinkific lesson page by fetching the take_url HTML with the admin session.
+ *
+ * Thinkific embeds the full lesson state as JSON inside a <script> tag:
+ *   window.__INITIAL_STATE__ = { ... }
+ * or as a data attribute on the root element.
+ *
+ * This is the LAST-RESORT fallback when the course player JSON API returns no rich content.
+ * It handles text, video (Wistia/YouTube/Vimeo), download, and embed lesson types.
+ *
+ * @param takeUrl  Relative path, e.g. "/courses/slug/take/123/456"
+ * @returns        ThinkificLessonContent-shaped object, or null on failure
+ */
+export async function scrapeLessonFromTakeUrl(takeUrl: string): Promise<ThinkificLessonContent | null> {
+  const memberDomain = "member.allaboutultrasound.com";
+  const fullUrl = takeUrl.startsWith("http") ? takeUrl : `https://${memberDomain}${takeUrl}`;
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const sessionCookie = await getThinkificAdminSession();
+      const res = await fetch(fullUrl, {
+        headers: {
+          "Cookie": sessionCookie,
+          "Accept": "text/html,application/xhtml+xml",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Referer": `https://${memberDomain}/`,
+        },
+        redirect: "follow",
+      });
+
+      if (res.status === 401 || res.status === 403) {
+        invalidateThinkificAdminSession();
+        if (attempt === 0) continue;
+        return null;
+      }
+      if (!res.ok) {
+        console.warn(`[Thinkific] scrapeLessonFromTakeUrl: ${fullUrl} → ${res.status}`);
+        return null;
+      }
+
+      const html = await res.text();
+
+      // ── 1. Try to extract window.__INITIAL_STATE__ JSON ──────────────────────
+      // Thinkific embeds the full lesson state as JSON in a <script> tag.
+      // Pattern: window.__INITIAL_STATE__={"content":{"id":...}}
+      const stateMatch = html.match(/window\.__INITIAL_STATE__\s*=\s*(\{[\s\S]*?\})(?:\s*;|\s*<\/script>)/);
+      if (stateMatch) {
+        try {
+          const state = JSON.parse(stateMatch[1]);
+          // The content is usually at state.content or state.coursePlayer.content
+          const raw = state?.content ?? state?.coursePlayer?.content ?? state?.lesson ?? null;
+          const content = unwrapPlayerResponse(raw);
+          if (content) {
+            console.log(`[Thinkific] scrapeLessonFromTakeUrl: extracted __INITIAL_STATE__ for ${fullUrl}`);
+            return content;
+          }
+        } catch {
+          // JSON parse failed — fall through to HTML parsing
+        }
+      }
+
+      // ── 2. Try data-react-props or data-props JSON ────────────────────────────
+      const propsMatch = html.match(/data-(?:react-)?props="([^"]+)"/);
+      if (propsMatch) {
+        try {
+          const props = JSON.parse(propsMatch[1].replace(/&quot;/g, '"').replace(/&#39;/g, "'"));
+          const raw = props?.content ?? props?.lesson ?? null;
+          const content = unwrapPlayerResponse(raw);
+          if (content) {
+            console.log(`[Thinkific] scrapeLessonFromTakeUrl: extracted data-props for ${fullUrl}`);
+            return content;
+          }
+        } catch {
+          // fall through
+        }
+      }
+
+      // ── 3. HTML parsing fallback ──────────────────────────────────────────────
+      // Extract lesson title
+      const titleMatch = html.match(/<h1[^>]*class="[^"]*(?:lesson|content)[^"]*"[^>]*>([\s\S]*?)<\/h1>/i)
+        || html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+      const name = titleMatch ? titleMatch[1].replace(/<[^>]*>/g, "").trim() : "";
+
+      // Extract rich HTML content
+      const htmlContentMatch = html.match(/<div[^>]*class="[^"]*(?:html-content|lesson-content|content-body|text-content)[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+      const html_description = htmlContentMatch ? htmlContentMatch[1].trim() : null;
+
+      // Extract Wistia embed
+      const wistiaMatch = html.match(/wistia_async_([a-z0-9]+)/i) || html.match(/wistia\.com\/medias\/([a-z0-9]+)/i);
+      const wistia_hashed_id = wistiaMatch ? wistiaMatch[1] : null;
+
+      // Extract YouTube embed
+      const youtubeMatch = html.match(/(?:youtube\.com\/embed\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+      const youtube_video_id = youtubeMatch ? youtubeMatch[1] : null;
+
+      // Extract Vimeo embed
+      const vimeoMatch = html.match(/player\.vimeo\.com\/video\/(\d+)/);
+      const vimeo_video_id = vimeoMatch ? vimeoMatch[1] : null;
+
+      if (html_description || wistia_hashed_id || youtube_video_id || vimeo_video_id) {
+        console.log(`[Thinkific] scrapeLessonFromTakeUrl: HTML-parsed content for ${fullUrl}`);
+        return {
+          id: 0,
+          name,
+          contentable_type: wistia_hashed_id || youtube_video_id || vimeo_video_id ? "Video" : "HtmlItem",
+          html_description,
+          wistia_hashed_id,
+          youtube_video_id,
+          vimeo_video_id,
+        };
+      }
+
+      console.warn(`[Thinkific] scrapeLessonFromTakeUrl: no content found in HTML for ${fullUrl}`);
+      return null;
+    } catch (err) {
+      console.error(`[Thinkific] scrapeLessonFromTakeUrl error for ${fullUrl}:`, err);
       if (attempt === 0) {
         invalidateThinkificAdminSession();
         continue;

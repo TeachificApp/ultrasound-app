@@ -858,6 +858,27 @@ export default function FunnelPageEditor() {
                         }));
                         setSelectedId(newBlock.id);
                       }}
+                      onMoveChildToOtherColumn={(colBlockId, fromSide, childBlockId) => {
+                        setBlocks(prev => prev.map(b => {
+                          if (b.id !== colBlockId) return b;
+                          const fromKey = fromSide === "left" ? "leftBlocks" : "rightBlocks";
+                          const toKey = fromSide === "left" ? "rightBlocks" : "leftBlocks";
+                          const fromCol: Block[] = b.data[fromKey] ?? [];
+                          const toCol: Block[] = b.data[toKey] ?? [];
+                          const child = fromCol.find((cb: Block) => cb.id === childBlockId);
+                          if (!child) return b;
+                          return { ...b, data: { ...b.data, [fromKey]: fromCol.filter((cb: Block) => cb.id !== childBlockId), [toKey]: [...toCol, child] } };
+                        }));
+                      }}
+                      onDeleteChildFromColumn={(colBlockId, side, childBlockId) => {
+                        setBlocks(prev => prev.map(b => {
+                          if (b.id !== colBlockId) return b;
+                          const colKey = side === "left" ? "leftBlocks" : "rightBlocks";
+                          const col: Block[] = b.data[colKey] ?? [];
+                          return { ...b, data: { ...b.data, [colKey]: col.filter((cb: Block) => cb.id !== childBlockId) } };
+                        }));
+                        if (selectedId === childBlockId) setSelectedId(null);
+                      }}
                     />
                   ))}
                 </SortableContext>

@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import {
   ArrowRight, BookOpen, CheckCircle, AlertCircle, Loader2, Users,
-  FileText, ChevronDown, ChevronRight, ExternalLink, Search, RefreshCw,
+  FileText, ChevronDown, ChevronRight, ExternalLink, Search, RefreshCw, Wrench,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -87,6 +87,13 @@ export default function ThinkificImporter() {
   } | null>(null);
   const [resyncResultOpen, setResyncResultOpen] = useState(false);
 
+  // Debug: test content fetch
+  const [debugContentId, setDebugContentId] = useState("");
+  const [debugCourseSlug, setDebugCourseSlug] = useState("");
+  const [debugTakeUrl, setDebugTakeUrl] = useState("");
+  const [debugResult, setDebugResult] = useState<{ log: string[]; playerResultJson: string | null; scrapeResultJson: string | null } | null>(null);
+  const [debugOpen, setDebugOpen] = useState(false);
+
   // Queries
   const { data: courses, isLoading: loadingCourses, error: coursesError } = trpc.thinkificImport.listCourses.useQuery();
   const { data: preview, isLoading: loadingPreview } = trpc.thinkificImport.previewImport.useQuery(
@@ -131,6 +138,16 @@ export default function ThinkificImporter() {
     },
     onError: (err) => {
       toast.error(`Re-sync failed: ${err.message}`);
+    },
+  });
+
+  const testContentFetch = trpc.thinkificImport.testContentFetch.useMutation({
+    onSuccess: (data) => {
+      setDebugResult(data);
+      toast.success("Content fetch test complete — see results below");
+    },
+    onError: (err) => {
+      toast.error(`Test failed: ${err.message}`);
     },
   });
 
@@ -698,6 +715,85 @@ export default function ThinkificImporter() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* ── Debug: Test Content Fetch ─────────────────────────────────── */}
+      <Card className="mt-6 border-dashed border-amber-300 bg-amber-50">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2 text-amber-800">
+            <Wrench className="w-4 h-4" />
+            Diagnostics: Test Content Fetch
+          </CardTitle>
+          <CardDescription className="text-xs text-amber-700">
+            Test whether the course player API and take_url scraper can retrieve lesson content. Use this to diagnose why lessons import without content.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Content ID</label>
+              <Input
+                placeholder="e.g. 12345678"
+                value={debugContentId}
+                onChange={e => setDebugContentId(e.target.value)}
+                className="h-8 text-xs"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Course Slug</label>
+              <Input
+                placeholder="e.g. vascular-ultrasound"
+                value={debugCourseSlug}
+                onChange={e => setDebugCourseSlug(e.target.value)}
+                className="h-8 text-xs"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">take_url (optional)</label>
+              <Input
+                placeholder="/courses/slug/take/123/456"
+                value={debugTakeUrl}
+                onChange={e => setDebugTakeUrl(e.target.value)}
+                className="h-8 text-xs"
+              />
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-amber-400 text-amber-800 hover:bg-amber-100"
+            disabled={!debugContentId || !debugCourseSlug || testContentFetch.isPending}
+            onClick={() => testContentFetch.mutate({
+              contentId: parseInt(debugContentId, 10),
+              courseSlug: debugCourseSlug,
+              takeUrl: debugTakeUrl || undefined,
+            })}
+          >
+            {testContentFetch.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Wrench className="w-3 h-3 mr-1" />}
+            Run Test
+          </Button>
+          {debugResult && (
+            <div className="space-y-2">
+              <div className="p-2 rounded bg-white border text-xs font-mono space-y-0.5">
+                {debugResult.log.map((line, i) => (
+                  <p key={i} className={line.includes("error") || line.includes("Error") ? "text-red-600" : line.includes("OK") || line.includes("✓") ? "text-green-700" : "text-gray-700"}>{line}</p>
+                ))}
+              </div>
+              {debugResult.playerResultJson && (
+                <details className="text-xs">
+                  <summary className="cursor-pointer font-medium text-gray-600">Player API Response</summary>
+                  <pre className="mt-1 p-2 rounded bg-white border text-gray-700 max-h-48 overflow-auto whitespace-pre-wrap">{debugResult.playerResultJson}</pre>
+                </details>
+              )}
+              {debugResult.scrapeResultJson && (
+                <details className="text-xs">
+                  <summary className="cursor-pointer font-medium text-gray-600">take_url Scrape Result</summary>
+                  <pre className="mt-1 p-2 rounded bg-white border text-gray-700 max-h-48 overflow-auto whitespace-pre-wrap">{debugResult.scrapeResultJson}</pre>
+                </details>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

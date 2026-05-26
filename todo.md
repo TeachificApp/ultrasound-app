@@ -2958,3 +2958,16 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 ## Bug Fixes (May 2026 — Session Continuation)
 - [x] getProductsByIds fallback: when type="course" is requested but ID not found in lms_courses, check digital_products and return as type="download" — fixes "COURSE" badge showing for eBook on Related Products blocks with legacy block data
 - [x] Fix TypeScript errors in thinkificImportRouter.ts (file_size and description properties on ThinkificLessonContent type at lines 719 and 760) — added file_size and description to ThinkificLessonContent interface in thinkific.ts
+
+## Column Layout Improvements (May 26, 2026 — Session 2)
+- [x] Add "Remove from column" (trash) button on child blocks in all three editors (LandingPageBuilder, FunnelPageEditor, LessonBlockEditor)
+- [x] Add "Move to other column" (⇄) button on child blocks in all three editors
+- [x] Wire onMoveChildToOtherColumn and onDeleteChildFromColumn in FunnelPageEditor
+- [x] Wire onMoveChildToOtherColumn and onDeleteChildFromColumn in LessonBlockEditor
+
+## Thinkific Import Fix (May 26, 2026 — Session 2)
+- [x] Fix getContentDetailWithSession: add unwrapPlayerResponse() to handle { content: {...} } or { data: {...} } JSON wrappers
+- [x] Add scrapeLessonFromTakeUrl() as third fallback when player API returns no rich content (parses window.__INITIAL_STATE__, data-props, and raw HTML)
+- [x] Wire take_url scraping fallback in both import and resync procedures
+- [x] Add Diagnostics panel in ThinkificImporter for testing content fetch per lesson (player API + take_url scrape)
+- [x] Add testContentFetch tRPC procedure to thinkificImportRouter
