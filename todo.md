@@ -2947,3 +2947,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix column_layout block in LandingPageBuilder — updateBlock now also updates child blocks inside column_layout
 - [x] Fix selectedBlock derivation in all three editors to also search column_layout children
 - [x] Add CTA Button toolbar button to RichTextEditor with dialog (text, URL, bg color, text color, size, full-width)
+
+## React Error #185 & Lesson Hero CTA Fixes (May 26, 2026)
+- [x] Fix React error #185 in LandingPageBuilder (setState-during-render → useEffect)
+- [x] Fix React error #185 in DownloadLandingPageBuilder (same pattern)
+- [x] Fix React error #185 in ProductLandingPageBuilder (same pattern)
+- [x] Fix React error #185 in MediaRepository (same pattern)
+- [x] Thinkific lesson import hero blocks: add hideButtons:true so CTA button doesn't show on lesson pages

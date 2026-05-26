@@ -711,15 +711,19 @@ function AssetDetailDialog({ assetId, onClose, onRefresh }: AssetDetailDialogPro
     { id: assetId! },
     { enabled: !!assetId }
   );
-  // Initialize slug state when data loads
-  if (data && !slugInitialized) {
-    setEditSlug(data.asset.slug);
-    setSlugInitialized(true);
-  }
+  // Initialize slug state when data loads — must be in useEffect to avoid setState-during-render (React error #185)
+  useEffect(() => {
+    if (data && !slugInitialized) {
+      setEditSlug(data.asset.slug);
+      setSlugInitialized(true);
+    }
+  }, [data, slugInitialized]);
   // Reset when dialog closes/opens for different asset
-  if (!assetId && slugInitialized) {
-    setSlugInitialized(false);
-  }
+  useEffect(() => {
+    if (!assetId && slugInitialized) {
+      setSlugInitialized(false);
+    }
+  }, [assetId, slugInitialized]);
   const { data: foldersData } = trpc.mediaRepo.listFoldersFull.useQuery();
   const updateSlugMutation = trpc.mediaRepo.updateAsset.useMutation({
     onSuccess: () => { toast.success("Slug updated"); refetch(); onRefresh(); },

@@ -631,6 +631,7 @@ export const thinkificImportRouter = router({
                 align: "center",
                 buttons: [],
                 showButtons: false,
+                hideButtons: true,
               },
             });
 
@@ -1138,6 +1139,7 @@ export const thinkificImportRouter = router({
                   align: "center",
                   buttons: [],
                   showButtons: false,
+                  hideButtons: true,
                 },
               });
 

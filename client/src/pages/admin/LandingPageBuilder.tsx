@@ -4156,7 +4156,9 @@ export default function LandingPageBuilder() {
     { enabled: !isNaN(numericCourseId) }
   );
 
-  if (lpData && !hasLoaded) {
+  // Initialize blocks from server data — must be in useEffect to avoid setState-during-render (React error #185)
+  useEffect(() => {
+    if (!lpData || hasLoaded) return;
     setHasLoaded(true);
     setCourseInfo({ title: lpData.courseTitle, slug: lpData.courseSlug, price: lpData.coursePrice });
     if (lpData.blocks && lpData.blocks.length > 0) {
@@ -4168,7 +4170,8 @@ export default function LandingPageBuilder() {
         { id: uid(), type: "pricing_cta", data: { headline: "Ready to Get Started?", subtext: "Join thousands of sonographers improving their skills.", ctaText: lpData.ctaText || "Enroll Now", ctaColor: "#179ca3", ctaTextColor: "#ffffff", bgColor: "#ffffff", showPrice: true } },
       ]);
     }
-  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lpData]);
 
   const saveBlocks = trpc.lmsAdmin.saveLandingPageBlocks.useMutation({
     onSuccess: () => toast.success("Landing page saved!"),

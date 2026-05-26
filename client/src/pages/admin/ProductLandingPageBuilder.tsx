@@ -94,7 +94,9 @@ export default function ProductLandingPageBuilder() {
     { enabled: !isNaN(numericProductId) }
   );
 
-  if (lpData && !hasLoaded) {
+  // Load blocks from page data — must be in useEffect to avoid setState-during-render (React error #185)
+  useEffect(() => {
+    if (!lpData || hasLoaded) return;
     setHasLoaded(true);
     setProductInfo({ title: lpData.productTitle, slug: lpData.productSlug });
     if (lpData.blocks && lpData.blocks.length > 0) {
@@ -102,7 +104,8 @@ export default function ProductLandingPageBuilder() {
     } else {
       setBlocks(getDefaultBlocks(lpData.productTitle));
     }
-  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lpData]);
 
   const saveBlocks = trpc.productsAdmin.saveLandingBlocks.useMutation({
     onSuccess: () => toast.success("Sales page saved!"),
