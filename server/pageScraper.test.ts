@@ -323,3 +323,89 @@ describe("htmlToBlocks — document order preservation", () => {
     expect(textIdx).toBeLessThan(imgIdx);
   });
 });
+
+// ─── Two-column layout (Bootstrap col-md-6) ───────────────────────────────────
+
+describe("htmlToBlocks — two_column block detection", () => {
+  it("detects Bootstrap col-md-6 two-column layout", () => {
+    const html = `<html><body>
+      <div class="row id-abc">
+        <div class="col-md-6 innerContent col_left id-left">
+          <p>Left column content with enough text to be meaningful here.</p>
+        </div>
+        <div class="col-md-6 innerContent col_right id-right">
+          <p>Right column content with enough text to be meaningful here.</p>
+        </div>
+      </div>
+    </body></html>`;
+    const result = htmlToBlocks(html, BASE_URL);
+    const twoCol = result.find(b => b.type === "two_column");
+    expect(twoCol).toBeDefined();
+    expect(twoCol!.data.leftHtml).toContain("Left column");
+    expect(twoCol!.data.rightHtml).toContain("Right column");
+  });
+
+  it("sets leftRatio to 50 for equal col-md-6 columns", () => {
+    const html = `<html><body>
+      <div class="row">
+        <div class="col-md-6 innerContent col_left">
+          <p>Left content that is long enough to not be filtered as noise.</p>
+        </div>
+        <div class="col-md-6 innerContent col_right">
+          <p>Right content that is long enough to not be filtered as noise.</p>
+        </div>
+      </div>
+    </body></html>`;
+    const result = htmlToBlocks(html, BASE_URL);
+    const twoCol = result.find(b => b.type === "two_column");
+    expect(twoCol!.data.leftRatio).toBe(50);
+  });
+
+  it("detects image+content as column_layout when one column is an image", () => {
+    const html = `<html><body>
+      <div class="row">
+        <div class="col-md-6 innerContent col_left">
+          <img src="https://example.com/course.jpg" alt="Course" />
+        </div>
+        <div class="col-md-6 innerContent col_right">
+          <h2>Course Title</h2>
+          <ul><li>✔ Feature one</li><li>✔ Feature two</li></ul>
+        </div>
+      </div>
+    </body></html>`;
+    const result = htmlToBlocks(html, BASE_URL);
+    const colLayout = result.find(b => b.type === "column_layout");
+    expect(colLayout).toBeDefined();
+    const leftBlocks = colLayout!.data.leftBlocks as any[];
+    expect(leftBlocks.some((b: any) => b.type === "image")).toBe(true);
+  });
+});
+
+// ─── Three-column layout (Bootstrap col-md-4) ────────────────────────────────
+
+describe("htmlToBlocks — three_column block detection", () => {
+  it("detects Bootstrap col-md-4 three-column layout", () => {
+    const html = `<html><body>
+      <div class="row id-G86EmV-332">
+        <div class="col-md-4 innerContent col_left id-G86EmV-333">
+          <h2>WHAT</h2>
+          <p>Exclusive 12-Week Vascular Ultrasound Course for advancing vascular insights.</p>
+        </div>
+        <div class="col-md-4 innerContent col_right id-G86EmV-334">
+          <h2>WHEN</h2>
+          <p>Classes start June 1st! Register now, spaces are limited for enrollment.</p>
+        </div>
+        <div class="col-md-4 innerContent col_right id-G86EmV-335">
+          <h2>WHY</h2>
+          <p>So you can finally learn Vascular Ultrasound and hemodynamics effectively.</p>
+        </div>
+      </div>
+    </body></html>`;
+    const result = htmlToBlocks(html, BASE_URL);
+    const threeCol = result.find(b => b.type === "three_column");
+    expect(threeCol).toBeDefined();
+    expect(threeCol!.data.col1Html).toContain("WHAT");
+    expect(threeCol!.data.col2Html).toContain("WHEN");
+    expect(threeCol!.data.col3Html).toContain("WHY");
+  });
+});
