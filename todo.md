@@ -2976,3 +2976,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Rewrite scrapeThinkificSalesPage to parse all Thinkific page sections: banner→hero, checklist→bullets, rich-text→text blocks, curriculum_auto, FAQ
 - [x] Add testScrapeCourseSalesPage debug procedure (server) to test scraper end-to-end
 - [x] Add "Test Sales Page Scraper" diagnostics card in ThinkificImporter UI (blue card)
+
+## Video Block Upload & Lesson Nav (May 2026)
+- [x] Video block settings: add URL/Embed, Upload (50 MB), and Media Library source modes
+- [x] Video upload stores to S3 via uploadPageMedia
+- [x] Media Library picker filters to video assets only
+- [x] Lesson editor header: add prev/next lesson navigation buttons
+- [x] Lesson editor header: pass prevLesson/nextLesson/onNavigateLesson from LMSAdmin

@@ -24,6 +24,7 @@ import { Block, BlockType, BlockPreview } from "@/components/BlockPreview";
 import { BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, SortableBlock, uid } from "@/pages/admin/LandingPageBuilder";
 import {
   X, Plus, Save, Eye, EyeOff, Copy, BookOpen, Search, ExternalLink, Layers, Globe, Loader2,
+  ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { BlockTemplateLibraryProvider, OpenTemplateLibraryButton, SaveAsTemplateButton } from "@/components/BlockTemplateLibrary";
 import { cn } from "@/lib/utils";
@@ -36,6 +37,9 @@ interface LessonBlockEditorProps {
   onClose: () => void;
   onSaved: () => void;
   onSavedAndClose?: () => void;
+  prevLesson?: { id: number; title: string } | null;
+  nextLesson?: { id: number; title: string } | null;
+  onNavigateLesson?: (lesson: { id: number; title: string }) => void;
 }
 
 // Picker tab type
@@ -49,6 +53,9 @@ export default function LessonBlockEditor({
   onClose,
   onSaved,
   onSavedAndClose,
+  prevLesson,
+  nextLesson,
+  onNavigateLesson,
 }: LessonBlockEditorProps) {
   const [blocks, setBlocks] = useState<Block[]>(initialBlocks);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
@@ -384,7 +391,29 @@ export default function LessonBlockEditor({
         <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-gray-200 shrink-0">
           <div className="flex items-center gap-3">
             <span className="text-teal-700 font-bold text-sm uppercase tracking-wide">Lesson Editor</span>
-            <span className="text-gray-400 text-xs">Blocks appear below the video in the player</span>
+            <span className="text-gray-400 text-xs hidden sm:inline">Blocks appear below the video in the player</span>
+            {(prevLesson || nextLesson) && (
+              <div className="flex items-center gap-1 ml-2">
+                <button
+                  onClick={() => prevLesson && onNavigateLesson?.(prevLesson)}
+                  disabled={!prevLesson}
+                  title={prevLesson ? `← ${prevLesson.title}` : "No previous lesson"}
+                  className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-gray-500 hover:text-teal-700 hover:bg-teal-50 border border-gray-200 hover:border-teal-300 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5 shrink-0" />
+                  <span className="hidden md:inline max-w-[100px] truncate">{prevLesson?.title ?? "Prev"}</span>
+                </button>
+                <button
+                  onClick={() => nextLesson && onNavigateLesson?.(nextLesson)}
+                  disabled={!nextLesson}
+                  title={nextLesson ? `${nextLesson.title} →` : "No next lesson"}
+                  className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-gray-500 hover:text-teal-700 hover:bg-teal-50 border border-gray-200 hover:border-teal-300 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                >
+                  <span className="hidden md:inline max-w-[100px] truncate">{nextLesson?.title ?? "Next"}</span>
+                  <ChevronRight className="w-3.5 h-3.5 shrink-0" />
+                </button>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {!previewMode && (

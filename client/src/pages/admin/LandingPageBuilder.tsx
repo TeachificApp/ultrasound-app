@@ -2229,7 +2229,7 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
           </div>
         );
     case "video":
-      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Embed URL (YouTube, Vimeo, Wistia, or direct .mp4)" field="embedUrl" /><UserParamTagsHelper context="url" /><BSTextField data={d} onSet={set} label="Caption" field="caption" /><div className="border border-gray-100 rounded p-2 space-y-2"><p className="text-xs font-semibold text-gray-600 mb-1">Playback Options</p><div className="flex items-center gap-2"><input type="checkbox" checked={d.autoplay ?? false} onChange={e => set("autoplay", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Autoplay <span className="text-gray-400">(direct video files only — iframes use URL params)</span></label></div><div className="flex items-center gap-2"><input type="checkbox" checked={d.muted ?? true} onChange={e => set("muted", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Muted <span className="text-gray-400">(required for autoplay in most browsers)</span></label></div><div className="flex items-center gap-2"><input type="checkbox" checked={d.loop ?? false} onChange={e => set("loop", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Loop</label></div><div className="flex items-center gap-2"><input type="checkbox" checked={d.controls ?? true} onChange={e => set("controls", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show controls</label></div></div><div><label className="text-xs text-gray-500 block mb-1">Max Width</label><DebouncedInput value={d.maxWidth ?? "100%"} onChange={v => set("maxWidth", v)} className="h-8 text-sm" placeholder="100%, 800px, etc." /></div><div><label className="text-xs text-gray-500 block mb-1">Height</label><DebouncedInput value={d.height ?? ""} onChange={v => set("height", v)} className="h-8 text-sm" placeholder="auto, 450px, etc." /></div><div><label className="text-xs text-gray-500 block mb-1">Border Radius (px)</label><Input type="number" value={d.borderRadius ?? 0} onChange={e => set("borderRadius", Number(e.target.value))} className="h-8 text-sm" min={0} max={999} /></div><div><label className="text-xs text-gray-500 block mb-1">Border Width (px)</label><Input type="number" value={d.borderWidth ?? 0} onChange={e => set("borderWidth", Number(e.target.value))} className="h-8 text-sm" min={0} max={20} /></div><div><label className="text-xs text-gray-500 block mb-1">Border Style</label><div className="flex gap-1">{(["solid", "dashed", "dotted"] as const).map(s => <button key={s} onClick={() => set("borderStyle", s)} className={`flex-1 py-1 text-xs rounded border capitalize ${(d.borderStyle ?? "solid") === s ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>{s}</button>)}</div></div><BSColorField data={d} onSet={set} label="Border Color" field="borderColor" /></div>);
+      return <VideoBlockSettings d={d} set={set} uploading={uploading} setUploading={setUploading} uploadMedia={uploadMedia} />;
     case "audio":
       return (
         <AudioBlockEditor
@@ -5386,6 +5386,222 @@ function LandingBlockTemplatesTab({ onInsert }: { onInsert: (block: Block) => vo
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Video Block Settings ──────────────────────────────────────────────────────
+export function VideoBlockSettings({ d, set, uploading, setUploading, uploadMedia }: {
+  d: Record<string, any>;
+  set: (key: string, val: any) => void;
+  uploading: string | null;
+  setUploading: (v: string | null) => void;
+  uploadMedia: any;
+}) {
+  const [showMediaPicker, setShowMediaPicker] = useState(false);
+  const [mediaSearch, setMediaSearch] = useState("");
+  const [mediaPage, setMediaPage] = useState(1);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+
+  const { data: mediaData } = trpc.mediaRepo.listAssets.useQuery(
+    { search: mediaSearch || undefined, page: mediaPage, pageSize: 12, mediaType: "video" },
+    { enabled: showMediaPicker }
+  );
+
+  const handleVideoUpload = async (file: File) => {
+    if (file.size > 50 * 1024 * 1024) { toast.error("Video must be under 50 MB. For larger videos, upload to the Media Repository first, then use the Media Library tab."); return; }
+    setUploading("video_block_upload");
+    try {
+      const reader = new FileReader();
+      const dataUri = await new Promise<string>((resolve) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+      const result = await uploadMedia.mutateAsync({ dataUri, mimeType: file.type, fileName: file.name, context: "video-block" });
+      set("embedUrl", result.url);
+      set("source", "upload");
+      set("uploadedFileName", file.name);
+      toast.success("Video uploaded successfully");
+    } catch (err: any) {
+      toast.error(err.message || "Upload failed");
+    }
+    setUploading(null);
+  };
+
+  const selectMediaAsset = (asset: any) => {
+    const url = asset.currentVersion?.s3Url ?? "";
+    set("embedUrl", url);
+    set("source", "media_repo");
+    set("mediaAssetId", asset.id);
+    set("mediaAssetTitle", asset.title ?? asset.currentVersion?.fileName ?? "Video");
+    setShowMediaPicker(false);
+    toast.success("Video selected from media repository");
+  };
+
+  const sourceMode = d.source ?? "url";
+
+  return (
+    <div className="space-y-3">
+      {/* Source selector */}
+      <div>
+        <label className="text-xs text-gray-500 block mb-1 font-medium">Video Source</label>
+        <div className="flex gap-1">
+          {(["url", "upload", "media_repo"] as const).map(s => (
+            <button
+              key={s}
+              onClick={() => set("source", s)}
+              className={`flex-1 py-1.5 text-xs rounded border capitalize transition-colors ${sourceMode === s ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600 hover:border-teal-300"}`}
+            >
+              {s === "url" ? "URL / Embed" : s === "upload" ? "Upload" : "Media Library"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* URL / Embed mode */}
+      {sourceMode === "url" && (
+        <>
+          <BSTextField data={d} onSet={set} label="Embed URL (YouTube, Vimeo, Wistia, or direct .mp4)" field="embedUrl" />
+          <UserParamTagsHelper context="url" />
+        </>
+      )}
+
+      {/* Upload mode */}
+      {sourceMode === "upload" && (
+        <div className="space-y-2">
+          <input
+            ref={videoInputRef}
+            type="file"
+            accept="video/*"
+            className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) handleVideoUpload(f); e.target.value = ""; }}
+          />
+          {d.embedUrl && d.source === "upload" ? (
+            <div className="border border-teal-200 rounded p-2 bg-teal-50 space-y-1">
+              <p className="text-xs text-teal-700 font-medium truncate">{d.uploadedFileName ?? "Uploaded video"}</p>
+              <p className="text-xs text-gray-400 truncate">{d.embedUrl}</p>
+              <button onClick={() => videoInputRef.current?.click()} className="text-xs text-teal-600 hover:underline">Replace video</button>
+            </div>
+          ) : (
+            <button
+              onClick={() => videoInputRef.current?.click()}
+              disabled={uploading === "video_block_upload"}
+              className="w-full border-2 border-dashed border-gray-300 rounded-lg p-4 text-center text-xs text-gray-500 hover:border-teal-400 hover:text-teal-600 transition-colors disabled:opacity-50"
+            >
+              {uploading === "video_block_upload" ? (
+                <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Uploading...</span>
+              ) : (
+                <>
+                  <div className="text-2xl mb-1">🎬</div>
+                  <p className="font-medium">Click to upload video</p>
+                  <p className="text-gray-400 mt-0.5">MP4, WebM, MOV — max 50 MB</p>
+                  <p className="text-gray-400 mt-0.5 text-[10px]">For larger files, upload to Media Repository first</p>
+                </>
+              )}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Media Repository picker */}
+      {sourceMode === "media_repo" && (
+        <div className="space-y-2">
+          {d.embedUrl && d.source === "media_repo" ? (
+            <div className="border border-teal-200 rounded p-2 bg-teal-50 space-y-1">
+              <p className="text-xs text-teal-700 font-medium truncate">{d.mediaAssetTitle ?? "Media repository video"}</p>
+              <p className="text-xs text-gray-400 truncate">{d.embedUrl}</p>
+              <button onClick={() => setShowMediaPicker(true)} className="text-xs text-teal-600 hover:underline">Change video</button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowMediaPicker(true)}
+              className="w-full border-2 border-dashed border-gray-300 rounded-lg p-4 text-center text-xs text-gray-500 hover:border-teal-400 hover:text-teal-600 transition-colors"
+            >
+              <div className="text-2xl mb-1">🗂️</div>
+              <p className="font-medium">Pick from Media Library</p>
+              <p className="text-gray-400 mt-0.5">Browse uploaded videos</p>
+            </button>
+          )}
+
+          {showMediaPicker && (
+            <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+                <div className="flex items-center justify-between px-4 py-3 border-b">
+                  <h3 className="font-semibold text-sm">Media Library — Videos</h3>
+                  <button onClick={() => setShowMediaPicker(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+                </div>
+                <div className="px-4 py-2 border-b">
+                  <input
+                    type="text"
+                    placeholder="Search videos..."
+                    value={mediaSearch}
+                    onChange={e => { setMediaSearch(e.target.value); setMediaPage(1); }}
+                    className="w-full h-8 px-3 text-sm border border-gray-200 rounded focus:outline-none focus:border-teal-400"
+                  />
+                </div>
+                <div className="flex-1 overflow-y-auto p-4">
+                  {!mediaData ? (
+                    <div className="text-center py-8 text-gray-400 text-sm">Loading...</div>
+                  ) : mediaData.assets.length === 0 ? (
+                    <div className="text-center py-8 text-gray-400 text-sm">No videos found in media library</div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {mediaData.assets.map((asset: any) => (
+                        <button
+                          key={asset.id}
+                          onClick={() => selectMediaAsset(asset)}
+                          className="border border-gray-200 rounded-lg p-2 text-left hover:border-teal-400 hover:bg-teal-50 transition-colors"
+                        >
+                          <div className="w-full aspect-video bg-gray-100 rounded mb-1.5 flex items-center justify-center text-2xl overflow-hidden">
+                            {asset.currentVersion?.thumbnailUrl
+                              ? <img src={asset.currentVersion.thumbnailUrl} alt="" className="w-full h-full object-cover rounded" />
+                              : "🎬"}
+                          </div>
+                          <p className="text-xs font-medium text-gray-700 truncate">{asset.title ?? asset.currentVersion?.fileName}</p>
+                          {asset.currentVersion?.fileSize && (
+                            <p className="text-xs text-gray-400">
+                              {asset.currentVersion.fileSize > 1024 * 1024
+                                ? `${(asset.currentVersion.fileSize / (1024 * 1024)).toFixed(1)} MB`
+                                : `${Math.round(asset.currentVersion.fileSize / 1024)} KB`}
+                            </p>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {mediaData && mediaData.total > 12 && (
+                  <div className="flex justify-between items-center px-4 py-2 border-t text-xs text-gray-500">
+                    <button onClick={() => setMediaPage(p => Math.max(1, p - 1))} disabled={mediaPage === 1} className="px-2 py-1 border rounded disabled:opacity-40">Prev</button>
+                    <span>Page {mediaPage} of {Math.ceil(mediaData.total / 12)}</span>
+                    <button onClick={() => setMediaPage(p => p + 1)} disabled={mediaPage * 12 >= mediaData.total} className="px-2 py-1 border rounded disabled:opacity-40">Next</button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <BSTextField data={d} onSet={set} label="Caption" field="caption" />
+
+      <div className="border border-gray-100 rounded p-2 space-y-2">
+        <p className="text-xs font-semibold text-gray-600 mb-1">Playback Options</p>
+        <div className="flex items-center gap-2"><input type="checkbox" checked={d.autoplay ?? false} onChange={e => set("autoplay", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Autoplay <span className="text-gray-400">(direct video files only)</span></label></div>
+        <div className="flex items-center gap-2"><input type="checkbox" checked={d.muted ?? true} onChange={e => set("muted", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Muted <span className="text-gray-400">(required for autoplay)</span></label></div>
+        <div className="flex items-center gap-2"><input type="checkbox" checked={d.loop ?? false} onChange={e => set("loop", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Loop</label></div>
+        <div className="flex items-center gap-2"><input type="checkbox" checked={d.controls ?? true} onChange={e => set("controls", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show controls</label></div>
+      </div>
+
+      <div><label className="text-xs text-gray-500 block mb-1">Max Width</label><DebouncedInput value={d.maxWidth ?? "100%"} onChange={v => set("maxWidth", v)} className="h-8 text-sm" placeholder="100%, 800px, etc." /></div>
+      <div><label className="text-xs text-gray-500 block mb-1">Height</label><DebouncedInput value={d.height ?? ""} onChange={v => set("height", v)} className="h-8 text-sm" placeholder="auto, 450px, etc." /></div>
+      <div><label className="text-xs text-gray-500 block mb-1">Border Radius (px)</label><Input type="number" value={d.borderRadius ?? 0} onChange={e => set("borderRadius", Number(e.target.value))} className="h-8 text-sm" min={0} max={999} /></div>
+      <div><label className="text-xs text-gray-500 block mb-1">Border Width (px)</label><Input type="number" value={d.borderWidth ?? 0} onChange={e => set("borderWidth", Number(e.target.value))} className="h-8 text-sm" min={0} max={20} /></div>
+      <div>
+        <label className="text-xs text-gray-500 block mb-1">Border Style</label>
+        <div className="flex gap-1">{(["solid", "dashed", "dotted"] as const).map(s => <button key={s} onClick={() => set("borderStyle", s)} className={`flex-1 py-1 text-xs rounded border capitalize ${(d.borderStyle ?? "solid") === s ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>{s}</button>)}</div>
+      </div>
+      <BSColorField data={d} onSet={set} label="Border Color" field="borderColor" />
     </div>
   );
 }

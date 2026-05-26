@@ -3593,6 +3593,9 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
               onClose={() => setActiveTab("settings")}
               onSaved={() => { onSaved(); }}
               onSavedAndClose={() => { if (onSavedAndClose) onSavedAndClose(); else onSaved(); }}
+              prevLesson={prevLesson}
+              nextLesson={nextLesson}
+              onNavigateLesson={onNavigateLesson}
             />
           )}
         </div>
