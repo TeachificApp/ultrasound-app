@@ -518,7 +518,7 @@ export default function LessonBlockEditor({
         </DialogHeader>
 
         {/* Top-level tabs: Catalog vs From Lessons */}
-        <div className="flex gap-1 border-b border-gray-200 shrink-0 -mx-1 px-1">
+        <div className="flex gap-1 border-b border-gray-200 shrink-0 -mx-1 px-1 overflow-x-auto">
           <button
             onClick={() => setPickerTab("catalog")}
             className={cn(
