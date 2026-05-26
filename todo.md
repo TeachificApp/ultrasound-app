@@ -2990,3 +2990,11 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] BlockPreview video case: teal accent bar at bottom of iframe embeds
 - [x] BlockPreview video case: empty state shows teal play button icon
 - [x] BLOCK_CATALOG video defaultData: include accentColor: "#189aa1"
+
+## React Error #310 CoursePlayer Fix (May 2026)
+- [x] Fix React error #310 in CoursePlayer at ?preview=admin URL
+- [x] Move adminPreviewStudent useState before adminBypass useMemo (dependency order)
+- [x] Convert adminBypass from plain variable (after early returns) to useMemo hook (before early returns)
+- [x] Move free-preview-enrollment useEffect from render section (after early returns) to hooks section (before early returns)
+- [x] Fix isPreviewMode to recognize preview=admin (was only checking preview=student)
+- [x] Add useMemo to React imports in CoursePlayer.tsx

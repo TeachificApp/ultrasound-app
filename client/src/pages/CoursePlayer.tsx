@@ -6,7 +6,7 @@
  *         progress bar, Mark Complete button (bottom-right). Matches the All About Ultrasound mockup.
  * Admin extras: WYSIWYG lesson content block editor + student preview toggle.
  */
-import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from "react";
 import { useParams, useLocation, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -707,10 +707,15 @@ function MobileSidebarContent({
 export default function CoursePlayer() {
   const { slug } = useParams<{ slug: string }>();
   const searchString = useSearch();
-  const isPreviewMode = searchString.includes("preview=student");
+  const isPreviewMode = searchString.includes("preview=student") || searchString.includes("preview=admin");
   const [, navigate] = useLocation();
   const { user, loading: authLoading } = useAuth();
   const isAdmin = user?.role === "admin";
+  // adminPreviewStudent must be declared BEFORE adminBypass (useMemo depends on it)
+  const [adminPreviewStudent, setAdminPreviewStudent] = useState(isPreviewMode);
+  // adminBypass must be defined BEFORE hooks (useEffect references it in a closure)
+  // useMemo ensures it's a hook called in the same order every render
+  const adminBypass = useMemo(() => isAdmin && !adminPreviewStudent, [isAdmin, adminPreviewStudent]);
 
   const [selectedLessonId, setSelectedLessonId] = useState<number | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -720,7 +725,6 @@ export default function CoursePlayer() {
   const [videoWatched, setVideoWatched] = useState(false);
   const [showCertDialog, setShowCertDialog] = useState(false);
   const [showBlockEditor, setShowBlockEditor] = useState(false);
-  const [adminPreviewStudent, setAdminPreviewStudent] = useState(isPreviewMode);
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   const [upgradePromptReason, setUpgradePromptReason] = useState<"entry" | "exit" | "locked_lesson">("entry");
   const [instructorPopup, setInstructorPopup] = useState<any>(null);
@@ -832,6 +836,18 @@ export default function CoursePlayer() {
     prevProgressPct.current = pct;
   }, [data?.enrollment?.progressPct]);
 
+  // 3-minute upgrade prompt for free preview enrollees — must be in hooks section (before early returns)
+  const _isFreePreviewEnrollmentForEffect = data?.enrollment?.enrollmentType === "free_preview";
+  const _isEnrolledForEffect = !!data?.enrollment;
+  useEffect(() => {
+    if (!_isFreePreviewEnrollmentForEffect || !_isEnrolledForEffect) return;
+    const timer = setTimeout(() => {
+      setUpgradePromptReason("entry");
+      setShowUpgradePrompt(true);
+    }, 3 * 60 * 1000); // 3 minutes
+    return () => clearTimeout(timer);
+  }, [_isFreePreviewEnrollmentForEffect, _isEnrolledForEffect]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleMarkComplete = async () => {
     if (!selectedLessonId) return;
     // Optimistically mark as complete immediately so checkmarks appear in both sidebars
@@ -912,8 +928,7 @@ export default function CoursePlayer() {
     );
   }
   if (!user) { navigate("/login"); return null; }
-  // Admins always bypass the enrollment gate — they can preview any course directly
-  const adminBypass = isAdmin && !adminPreviewStudent;
+  // adminBypass is now defined above (before hooks) via useMemo
 
   // Check if course has any preview lessons — unenrolled registered users can access the player in preview mode
   const hasPreviewLessons = data ? [
@@ -1030,16 +1045,6 @@ export default function CoursePlayer() {
   const isEnrolled = !!data.enrollment;
   // Free preview enrollment: enrolled but only has preview access (not full course)
   const isFreePreviewEnrollment = data.enrollment?.enrollmentType === "free_preview";
-
-  // 3-minute upgrade prompt for free preview enrollees
-  useEffect(() => {
-    if (!isFreePreviewEnrollment || !isEnrolled) return;
-    const timer = setTimeout(() => {
-      setUpgradePromptReason("entry");
-      setShowUpgradePrompt(true);
-    }, 3 * 60 * 1000); // 3 minutes
-    return () => clearTimeout(timer);
-  }, [isFreePreviewEnrollment, isEnrolled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isPreviewLesson = selectedLessonId ? (() => {
     const l = allLessons.find((ll: any) => ll.id === selectedLessonId);
