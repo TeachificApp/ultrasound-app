@@ -648,7 +648,7 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
 
 // ─── Lesson Row ──────────────────────────────────────────────────────────────
 
-function SortableLessonRow({ lesson, onEdit, onQuiz, onDelete, onCopy, onMoveUp, onMoveDown }: {
+function SortableLessonRow({ lesson, onEdit, onQuiz, onDelete, onCopy, onMoveUp, onMoveDown, onToggleStatus }: {
   lesson: any;
   onEdit: (lesson: any) => void;
   onQuiz: (lesson: any) => void;
@@ -656,6 +656,7 @@ function SortableLessonRow({ lesson, onEdit, onQuiz, onDelete, onCopy, onMoveUp,
   onCopy?: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
+  onToggleStatus?: (id: number, newStatus: "published" | "draft") => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lesson.id });
   const style: React.CSSProperties = {
@@ -677,7 +678,21 @@ function SortableLessonRow({ lesson, onEdit, onQuiz, onDelete, onCopy, onMoveUp,
       <span className="text-gray-400">{TYPE_ICONS[lesson.type] ?? <FileText className="w-4 h-4" />}</span>
       <span className="text-sm text-gray-700 flex-1">{lesson.title}</span>
       <span className="text-xs text-gray-400">{LESSON_TYPE_LABELS[lesson.type] ?? lesson.type}</span>
-      {(lesson.lessonStatus === "draft") && <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 bg-amber-50">Draft</Badge>}
+      {onToggleStatus ? (
+        <button
+          title={lesson.lessonStatus === "draft" ? "Draft — click to publish" : "Published — click to set as draft"}
+          onClick={() => onToggleStatus(lesson.id, lesson.lessonStatus === "draft" ? "published" : "draft")}
+          className={`text-xs font-semibold px-2 py-0.5 rounded border transition-colors ${
+            lesson.lessonStatus === "draft"
+              ? "text-amber-600 border-amber-300 bg-amber-50 hover:bg-amber-100"
+              : "text-gray-400 border-gray-200 bg-white hover:bg-amber-50 hover:text-amber-600 hover:border-amber-300"
+          }`}
+        >
+          {lesson.lessonStatus === "draft" ? "Draft" : "Published"}
+        </button>
+      ) : (
+        lesson.lessonStatus === "draft" && <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 bg-amber-50">Draft</Badge>
+      )}
       {lesson.isPreview && <Badge variant="outline" className="text-xs text-teal-600 border-teal-300">Preview</Badge>}
       {lesson.requireVideoCompletion === 1 && <Badge variant="outline" className="text-xs text-orange-600 border-orange-300">Video req.</Badge>}
       {lesson.requireManualComplete === 1 && <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">Manual</Badge>}
@@ -831,6 +846,10 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
   // Publish dialog state — shown when admin changes status to 'public' and there are draft lessons
   const [publishDialog, setPublishDialog] = useState<{ pendingData: any } | null>(null);
   const bulkSetLessonStatus = trpc.lmsAdmin.bulkSetLessonStatus.useMutation();
+  const updateLessonStatus = trpc.lmsAdmin.updateLesson.useMutation({
+    onSuccess: () => refetch(),
+    onError: e => toast.error(`Error: ${e.message}`),
+  });
 
   const handleSaveCourseSettings = (data: any) => {
     const allLessonsFlat = [
@@ -1085,6 +1104,7 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
                           onEdit={setEditLesson} onQuiz={setQuizLesson}
                           onCopy={() => setCopyLessonTarget(lesson)}
                           onDelete={id => { if (confirm(`Delete lesson "${lesson.title}"?`)) deleteLesson.mutate({ id }); }}
+                          onToggleStatus={(id, newStatus) => updateLessonStatus.mutate({ id, lessonStatus: newStatus })}
                           onMoveUp={li > 0 ? () => setLocalTopLessons(prev => { const r = arrayMove(prev, li, li - 1); reorderLessons.mutate({ lessons: r.map((l: any, i: number) => ({ id: l.id, position: i })) }); return r; }) : undefined}
                           onMoveDown={li < localTopLessons.length - 1 ? () => setLocalTopLessons(prev => { const r = arrayMove(prev, li, li + 1); reorderLessons.mutate({ lessons: r.map((l: any, i: number) => ({ id: l.id, position: i })) }); return r; }) : undefined}
                         />
@@ -1122,6 +1142,7 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
                               onEdit={setEditLesson} onQuiz={setQuizLesson}
                               onCopy={() => setCopyLessonTarget(lesson)}
                               onDelete={id => { if (confirm(`Delete lesson "${lesson.title}"?`)) deleteLesson.mutate({ id }); }}
+                              onToggleStatus={(id, newStatus) => updateLessonStatus.mutate({ id, lessonStatus: newStatus })}
                               onMoveUp={li > 0 ? () => setLocalSections(prev => { const secs = [...prev]; const lessons = arrayMove(secs[si].lessons, li, li - 1); secs[si] = { ...secs[si], lessons }; reorderLessons.mutate({ lessons: lessons.map((l: any, i: number) => ({ id: l.id, position: i })) }); return secs; }) : undefined}
                               onMoveDown={li < section.lessons.length - 1 ? () => setLocalSections(prev => { const secs = [...prev]; const lessons = arrayMove(secs[si].lessons, li, li + 1); secs[si] = { ...secs[si], lessons }; reorderLessons.mutate({ lessons: lessons.map((l: any, i: number) => ({ id: l.id, position: i })) }); return secs; }) : undefined}
                             />
