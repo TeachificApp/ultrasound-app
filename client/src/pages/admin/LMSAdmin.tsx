@@ -1033,6 +1033,15 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
         {/* Curriculum Tab */}
         <TabsContent value="curriculum" className="mt-4">
           <div className="space-y-4">
+            {/* Quick-add buttons at the top */}
+            <div className="flex gap-2 flex-wrap">
+              <Button size="sm" variant="outline" className="border-dashed border-teal-300 text-teal-600 hover:bg-teal-50" onClick={() => setAddLessonAtCourseLevel(true)}>
+                <Plus className="w-4 h-4 mr-1" /> Add Lesson (No Section)
+              </Button>
+              <Button size="sm" variant="outline" className="border-dashed border-gray-300 text-gray-600 hover:bg-gray-50" onClick={() => setAddSectionOpen(true)}>
+                <Plus className="w-4 h-4 mr-1" /> Add Section
+              </Button>
+            </div>
             {/* Single unified DndContext for all drag operations */}
             <DndContext
               sensors={sensors}
