@@ -4475,7 +4475,7 @@ export default function LandingPageBuilder() {
             <Bookmark size={14} /> Save as Template
           </button>
           {courseInfo?.slug && (
-            <a href={`https://learn.allaboutultrasound.com/courses/${courseInfo.slug}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-teal-700 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors">
+            <a href={`https://learn.allaboutultrasound.com/courses/${courseInfo.slug}?preview=admin`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-teal-700 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors">
               <Eye size={14} /> Preview
             </a>
           )}
