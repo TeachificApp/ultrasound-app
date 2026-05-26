@@ -122,7 +122,7 @@ export function RelatedProductsBlock({ data, currentSlug, currentType }: Props) 
       description: c.subtitle ?? c.description ?? "",
       price: c.price,
       isFree: c.isFree,
-      imageUrl: c.coverImageUrl ?? "",
+      imageUrl: (c as any).coverImageUrl ?? (c as any).thumbnailUrl ?? "",
       type: "course" as const,
       href: `/courses/${c.slug}`,
     }));
