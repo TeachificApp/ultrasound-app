@@ -30,13 +30,92 @@ function resolveUrl(src: string, baseUrl: string): string {
 }
 
 /**
+ * Checkmark detection — returns true if the text/HTML of a list item starts
+ * with a common checkmark character or emoji, OR if the item contains a
+ * checkmark icon element (SVG/img with check-related class/aria-label).
+ *
+ * Detected patterns:
+ *   Unicode: ✓ ✔ ✅ ☑ ✗ (cross — treated as check for design purposes)
+ *   HTML entities: &#10003; &#10004; &#9989; &#9745;
+ *   CSS classes: fa-check, icon-check, check-icon, checkmark, bi-check
+ *   Aria labels: aria-label containing "check"
+ */
+const CHECKMARK_REGEX = /^[\s]*[✓✔✅☑✗☒✘]/u;
+const CHECKMARK_ENTITY_REGEX = /^[\s]*(?:&#10003;|&#10004;|&#9989;|&#9745;|&check;)/i;
+
+function stripCheckmark(text: string): string {
+  // Remove leading checkmark emoji/char and any trailing whitespace after it
+  return text.replace(/^[\s]*[✓✔✅☑✗☒✘]\s*/u, "").trim();
+}
+
+/**
+ * Determine if a <ul> element should be rendered as a checklist block.
+ * Returns true if the majority (>50%) of its <li> items start with a
+ * checkmark character/emoji, or if any <li> contains a checkmark icon element.
+ */
+function isChecklistUl($: cheerio.CheerioAPI, $ul: cheerio.Cheerio<any>): boolean {
+  const items = $ul.children("li").toArray();
+  if (items.length === 0) return false;
+
+  let checkCount = 0;
+
+  for (const li of items) {
+    const $li = $(li);
+    const rawText = $li.text();
+    const trimmed = rawText.trim();
+
+    // Check text starts with a checkmark char
+    if (CHECKMARK_REGEX.test(trimmed) || CHECKMARK_ENTITY_REGEX.test(trimmed)) {
+      checkCount++;
+      continue;
+    }
+
+    // Check for checkmark icon elements inside the <li>
+    // Covers: <i class="fa fa-check">, <span class="checkmark">, SVG with title "check", etc.
+    const hasCheckIcon = $li.find(
+      "[class*='check'], [class*='tick'], [aria-label*='check'], [aria-label*='Check'], [title*='check'], [title*='Check'], svg[class*='check'], img[alt*='check'], img[alt*='Check']"
+    ).length > 0;
+
+    if (hasCheckIcon) {
+      checkCount++;
+      continue;
+    }
+
+    // Check for ✓ anywhere in the HTML of the li (covers icon fonts rendering as text)
+    const liHtml = $.html($li) || "";
+    if (/[✓✔✅☑]/.test(liHtml)) {
+      checkCount++;
+    }
+  }
+
+  // If more than half the items have checkmarks → treat as checklist
+  return checkCount > items.length / 2;
+}
+
+/**
+ * Extract list items from a <ul>, stripping leading checkmark chars from text.
+ */
+function extractListItems($: cheerio.CheerioAPI, $ul: cheerio.Cheerio<any>): string[] {
+  return $ul
+    .children("li")
+    .map((_j: number, li: any) => {
+      const raw = cleanText($(li).text());
+      return stripCheckmark(raw) || raw; // fallback to original if stripping empties it
+    })
+    .get()
+    .filter(Boolean);
+}
+
+/**
  * Convert a scraped URL's HTML into an ordered list of landing-page blocks.
  * Mapping strategy:
  *   - First H1 (or OG title) + meta description → hero block
  *   - H2 / H3 headings with following paragraphs → text block (rich HTML)
  *   - Standalone paragraphs / long text → text block
  *   - Images (with meaningful src) → image block
- *   - UL / OL lists → bullets / numbered_list block
+ *   - UL with checkmark items → checklist block
+ *   - UL without checkmarks → bullets block
+ *   - OL → numbered_list block
  *   - Anchor buttons / CTA-like links → cta_standalone block
  *   - Everything else that has text → text block (rich HTML fallback)
  */
@@ -96,9 +175,9 @@ function htmlToBlocks(html: string, baseUrl: string): ScrapedBlock[] {
         if (nextTag === "p") {
           richHtml += `<p>${cleanText(next.text())}</p>`;
         } else if (nextTag === "ul") {
-          richHtml += `<ul>${next.children("li").map((_j, li) => `<li>${cleanText($(li).text())}</li>`).get().join("")}</ul>`;
+          richHtml += `<ul>${next.children("li").map((_j: number, li: any) => `<li>${cleanText($(li).text())}</li>`).get().join("")}</ul>`;
         } else if (nextTag === "ol") {
-          richHtml += `<ol>${next.children("li").map((_j, li) => `<li>${cleanText($(li).text())}</li>`).get().join("")}</ol>`;
+          richHtml += `<ol>${next.children("li").map((_j: number, li: any) => `<li>${cleanText($(li).text())}</li>`).get().join("")}</ol>`;
         }
         next = next.next();
       }
@@ -113,17 +192,27 @@ function htmlToBlocks(html: string, baseUrl: string): ScrapedBlock[] {
       return;
     }
 
-    // ── Unordered lists → bullets block ──────────────────────────────────
+    // ── Unordered lists → checklist or bullets block ──────────────────────
     if (tag === "ul") {
-      const items = $el.children("li").map((_j, li) => cleanText($(li).text())).get().filter(Boolean);
+      const items = extractListItems($, $el);
       if (items.length === 0) return;
-      blocks.push({ type: "bullets", data: { headline: "", items, iconColor: "#179ca3", bgColor: "#f8fffe" } });
+
+      if (isChecklistUl($, $el)) {
+        // Checkmark list → checklist block
+        blocks.push({
+          type: "checklist",
+          data: { headline: "", items, accentColor: "#179ca3", bgColor: "#f8fffe" },
+        });
+      } else {
+        // Regular list → bullets block
+        blocks.push({ type: "bullets", data: { headline: "", items, iconColor: "#179ca3", bgColor: "#f8fffe" } });
+      }
       return;
     }
 
     // ── Ordered lists → numbered_list block ──────────────────────────────
     if (tag === "ol") {
-      const items = $el.children("li").map((_j, li) => cleanText($(li).text())).get().filter(Boolean);
+      const items = $el.children("li").map((_j: number, li: any) => cleanText($(li).text())).get().filter(Boolean);
       if (items.length === 0) return;
       blocks.push({ type: "numbered_list", data: { headline: "", items, accentColor: "#179ca3", bgColor: "#ffffff" } });
       return;
@@ -165,11 +254,19 @@ function htmlToBlocks(html: string, baseUrl: string): ScrapedBlock[] {
         }
       });
 
-      // Lists inside
+      // Lists inside — detect checklist vs bullets
       $el.find("ul").each((_j, ul) => {
-        const items = $(ul).children("li").map((_k, li) => cleanText($(li).text())).get().filter(Boolean);
+        const $ul = $(ul);
+        const items = extractListItems($, $ul);
         if (items.length > 0) {
-          blocks.push({ type: "bullets", data: { headline: "", items, iconColor: "#179ca3", bgColor: "#f8fffe" } });
+          if (isChecklistUl($, $ul)) {
+            blocks.push({
+              type: "checklist",
+              data: { headline: "", items, accentColor: "#179ca3", bgColor: "#f8fffe" },
+            });
+          } else {
+            blocks.push({ type: "bullets", data: { headline: "", items, iconColor: "#179ca3", bgColor: "#f8fffe" } });
+          }
         }
       });
       return;
