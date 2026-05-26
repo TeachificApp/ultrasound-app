@@ -1,5 +1,5 @@
 /*
-  Platform Admin — All About Ultrasound™
+  Platform Admin — All About Ultrasound - UltrasoundAssist
   Accessible only to users with role === "admin" (owner) or "platform_admin" role.
   Features:
   - Add user by email (search → preview → assign role)
@@ -1464,7 +1464,7 @@ export default function PlatformAdmin() {
                     : "text-gray-500 hover:text-gray-700"
                 }`}
               >
-                All About Ultrasound™
+                All About Ultrasound - UltrasoundAssist
               </button>
               <button
                 onClick={() => setDualBrand("iheartecho")}
@@ -1474,7 +1474,7 @@ export default function PlatformAdmin() {
                     : "text-gray-500 hover:text-gray-700"
                 }`}
               >
-                iHeartEcho™
+                iHeartEcho - EchoAssist
               </button>
             </div>
           </div>
@@ -1483,7 +1483,7 @@ export default function PlatformAdmin() {
               dualBrand === "aaus" ? "bg-teal-50 text-teal-700" : "bg-pink-50 text-pink-700"
             }`}>
               <Globe className="w-3 h-3" />
-              Viewing as: {dualBrand === "aaus" ? "All About Ultrasound™" : "iHeartEcho™"}
+              Viewing as: {dualBrand === "aaus" ? "All About Ultrasound - UltrasoundAssist" : "iHeartEcho - EchoAssist"}
             </span>
           </div>
           <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleDualDragEnd}>
@@ -1678,7 +1678,7 @@ export default function PlatformAdmin() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <div className="flex-1">
                 <p className="text-sm text-gray-600 mb-1">
-                  Create All About Ultrasound™ accounts for all existing Thinkific members who don&apos;t have one yet.
+                  Create All About Ultrasound - UltrasoundAssist accounts for all existing Thinkific members who don&apos;t have one yet.
                   No emails are sent. Future members are handled automatically via webhook.
                 </p>
                 {lastMemberSyncResult ? (
