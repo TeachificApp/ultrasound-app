@@ -1828,6 +1828,34 @@ function SortableListItem({
   );
 }
 
+// ─── Sortable Checklist Item (supports crossed-out toggle) ─────────────────────
+function SortableChecklistItem({
+  id, item, index, onChange, onRemove,
+}: {
+  id: string;
+  item: { text: string; crossed: boolean };
+  index: number;
+  onChange: (v: { text: string; crossed: boolean }) => void;
+  onRemove: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  return (
+    <div ref={setNodeRef} style={style} className="flex gap-1 items-center">
+      <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 p-0.5 rounded flex-shrink-0" title="Drag to reorder"><GripVertical size={12} /></button>
+      <button
+        type="button"
+        onClick={() => onChange({ ...item, crossed: !item.crossed })}
+        className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold transition-colors ${
+          item.crossed ? "bg-red-400 hover:bg-red-500" : "bg-teal-500 hover:bg-teal-600"
+        }`}
+        title={item.crossed ? "Crossed out — click to make normal" : "Normal — click to cross out"}
+      >{item.crossed ? "✗" : "✓"}</button>
+      <DebouncedInput value={item.text} onChange={v => onChange({ ...item, text: v })} className={`h-7 text-xs flex-1 ${item.crossed ? "line-through text-gray-400" : ""}`} />
+      <button onClick={onRemove} className="text-red-400 hover:text-red-600 flex-shrink-0"><X size={12} /></button>
+    </div>
+  );
+}
 // ─── Sortable Review Item (used inside BlockSettings reviews case) ────────────
 function SortableReviewItem({
   id, review, index, onUpdate, onRemove,
@@ -2267,7 +2295,11 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
       );
     }
     case "checklist": {
-      const items: string[] = d.items ?? [];
+      // Normalize items: support plain strings (legacy) and { text, crossed } objects
+      const rawClItems: Array<string | { text: string; crossed?: boolean }> = d.items ?? [];
+      const items: Array<{ text: string; crossed: boolean }> = rawClItems.map(it =>
+        typeof it === "string" ? { text: it, crossed: false } : { text: it.text ?? "", crossed: it.crossed ?? false }
+      );
       const clItemIds = items.map((_, i) => `cl-item-${i}`);
       return (
         <div className="space-y-3">
@@ -2276,7 +2308,8 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs text-gray-500 font-medium">Items</label>
-              <button onClick={() => set("items", [...items, "New item"])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button>
+              <p className="text-[10px] text-gray-400 flex-1 mx-2">Click ✓/✗ to toggle crossed-out</p>
+              <button onClick={() => set("items", [...items, { text: "New item", crossed: false }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button>
             </div>
             <DndContext
               sensors={listSensors}
@@ -2292,12 +2325,11 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
               <SortableContext items={clItemIds} strategy={verticalListSortingStrategy}>
                 <div className="space-y-1">
                   {items.map((item, i) => (
-                    <SortableListItem
+                    <SortableChecklistItem
                       key={clItemIds[i]}
                       id={clItemIds[i]}
-                      value={item}
+                      item={item}
                       index={i}
-                      prefix={<span className="text-teal-500">✓</span>}
                       onChange={v => { const next = items.map((it, j) => j === i ? v : it); set("items", next); }}
                       onRemove={() => set("items", items.filter((_, j) => j !== i))}
                     />

@@ -42,14 +42,21 @@ function resolveUrl(src: string, baseUrl: string): string {
   }
 }
 
-// Checkmark chars and common icon class patterns
-const CHECKMARK_CHARS = /[✓✔✅☑✗☒✘]/u;
-const CHECKMARK_LINE_START = /^[\s]*[✓✔✅☑✗☒✘]/u;
-const CHECKMARK_ENTITY_START = /^[\s]*(?:&#10003;|&#10004;|&#9989;|&#9745;|&check;)/i;
+// Checkmark chars and common icon class patterns (includes ❌ cross marks used in "NOT for you" sections)
+const CHECKMARK_CHARS = /[✓✔✅☑✗☒✘❌❎]/u;
+const CHECKMARK_LINE_START = /^[\s]*[✓✔✅☑✗☒✘❌❎]/u;
+const CHECKMARK_ENTITY_START = /^[\s]*(?:&#10003;|&#10004;|&#9989;|&#9745;|&check;|&#10060;|&#10062;)/i;
 const DASH_BULLET_LINE = /^[\s]*[-–—]\s+\S/;
+// Cross-mark chars only (✗ ☒ ✘ ❌ ❎) — used to tag items as crossed: true
+const CROSS_MARK_LINE_START = /^[\s]*[✗☒✘❌❎]/u;
 
 function stripCheckmark(text: string): string {
-  return text.replace(/^[\s]*[✓✔✅☑✗☒✘]\s*/u, "").trim();
+  return text.replace(/^[\s]*[✓✔✅☑✗☒✘❌❎]\s*/u, "").trim();
+}
+
+/** Return true if a line starts with a cross/negative mark */
+function isCrossLine(text: string): boolean {
+  return CROSS_MARK_LINE_START.test(text);
 }
 
 function stripDashBullet(text: string): string {
@@ -62,7 +69,7 @@ function stripDashBullet(text: string): string {
  *   "✔ Built for general sonographers✔ Live, structured✔ Learn vascular"
  * because <br> tags get stripped and zero-width spaces collapse.
  */
-function splitOnInlineCheckmarks(text: string): string[] | null {
+function splitOnInlineCheckmarks(text: string): Array<{ text: string; crossed: boolean }> | null {
   const checkmarkCount = (text.match(/[✓✔✅☑✗☒✘]/gu) || []).length;
   if (checkmarkCount < 2) return null;
 
@@ -75,7 +82,10 @@ function splitOnInlineCheckmarks(text: string): string[] | null {
   const checkLines = lines.filter(l => CHECKMARK_LINE_START.test(l));
   if (checkLines.length < 2) return null;
 
-  const items = lines.map(l => stripCheckmark(l) || l).filter(Boolean);
+  const items = lines.map(l => ({
+    text: stripCheckmark(l) || l,
+    crossed: isCrossLine(l),
+  })).filter(i => Boolean(i.text));
   return items.length >= 2 ? items : null;
 }
 
@@ -114,29 +124,38 @@ function isChecklistUl($: cheerio.CheerioAPI, $ul: cheerio.Cheerio<any>): boolea
   return checkCount > items.length / 2;
 }
 
-function extractListItems($: cheerio.CheerioAPI, $ul: cheerio.Cheerio<any>): string[] {
+function extractListItems($: cheerio.CheerioAPI, $ul: cheerio.Cheerio<any>): Array<{ text: string; crossed: boolean }> {
   return $ul
     .children("li")
     .map((_j: number, li: any) => {
       const raw = cleanTextFlat($(li).text());
-      return stripCheckmark(raw) || raw;
+      const crossed = isCrossLine(raw);
+      return { text: stripCheckmark(raw) || raw, crossed };
     })
     .get()
-    .filter(Boolean);
+    .filter((i: any) => Boolean(i.text));
 }
 
 /**
  * Try to split a block of text into individual checkmark lines or dash-bullet lines.
  */
-function tryExtractInlineList(text: string): { type: "checklist" | "bullets"; items: string[] } | null {
+type ChecklistItem = { text: string; crossed: boolean };
+type ExtractedList =
+  | { type: "checklist"; items: ChecklistItem[] }
+  | { type: "bullets"; items: string[] };
+
+function tryExtractInlineList(text: string): ExtractedList | null {
   const lines = text.split(/\n/).map(l => l.trim()).filter(Boolean);
 
   if (lines.length >= 2) {
     const checkLines = lines.filter(l => CHECKMARK_LINE_START.test(l) || CHECKMARK_ENTITY_START.test(l));
-    if (checkLines.length > lines.length / 2) {
+    if (checkLines.length >= lines.length / 2 && checkLines.length >= 2) {
       return {
         type: "checklist",
-        items: lines.map(l => stripCheckmark(l) || l).filter(Boolean),
+        items: lines.map(l => ({
+          text: stripCheckmark(l) || l,
+          crossed: isCrossLine(l),
+        })).filter(i => Boolean(i.text)),
       };
     }
 
@@ -184,6 +203,10 @@ function isNoise(text: string): boolean {
     /^powered by/i,
     /^\d+:\d+:\d+$/,
     /^(hours?|minutes?|seconds?)$/i,
+    /^\d+\s*(hours?|minutes?|seconds?):?$/i,
+    /^working\.{0,3}$/i,
+    /^loading\.{0,3}$/i,
+    /^please wait\.{0,3}$/i,
   ];
   return noisePatterns.some(p => p.test(text));
 }
@@ -211,16 +234,15 @@ function textToBlocks(rawText: string): ScrapedBlock[] {
 
   if (!rawText || rawText.length < 8 || isNoise(rawText)) return result;
 
-  const inlineList = tryExtractInlineList(rawText);
+    const inlineList = tryExtractInlineList(rawText);
   if (inlineList) {
     if (inlineList.type === "checklist") {
       result.push({ id: uid(), type: "checklist", data: { headline: "", items: inlineList.items, accentColor: "#179ca3", bgColor: "#f8fffe" } });
     } else {
-      result.push({ id: uid(), type: "bullets", data: { headline: "", items: inlineList.items, iconColor: "#179ca3", bgColor: "#f8fffe" } });
+      result.push({ id: uid(), type: "bullets", data: { headline: "", items: (inlineList.items as string[]), iconColor: "#179ca3", bgColor: "#f8fffe" } });
     }
     return result;
   }
-
   const paragraphs = rawText.split(/\n\n+/).map(p => p.trim()).filter(p => p.length >= 8 && !isNoise(p));
   for (const para of paragraphs) {
     const subList = tryExtractInlineList(para);
@@ -228,7 +250,7 @@ function textToBlocks(rawText: string): ScrapedBlock[] {
       if (subList.type === "checklist") {
         result.push({ id: uid(), type: "checklist", data: { headline: "", items: subList.items, accentColor: "#179ca3", bgColor: "#f8fffe" } });
       } else {
-        result.push({ id: uid(), type: "bullets", data: { headline: "", items: subList.items, iconColor: "#179ca3", bgColor: "#f8fffe" } });
+        result.push({ id: uid(), type: "bullets", data: { headline: "", items: (subList.items as string[]), iconColor: "#179ca3", bgColor: "#f8fffe" } });
       }
     } else {
       const htmlContent = para.split("\n").map(l => l.trim()).filter(Boolean).join("<br>");
@@ -330,8 +352,24 @@ function colToHtml($: cheerio.CheerioAPI, colEl: any, baseUrl: string): string {
       $el.find("br").replaceWith("\n");
       const text = cleanText($el.text());
       if (text && text.length >= 4 && !isNoise(text)) {
-        const htmlContent = text.split("\n").map(l => l.trim()).filter(Boolean).join("<br>");
-        parts.push(`<p>${htmlContent}</p>`);
+        // Check if this paragraph contains br-separated checkmarks → convert to checklist HTML
+        const inlineList = tryExtractInlineList(text);
+        if (inlineList && inlineList.items.length >= 2) {
+          if (inlineList.type === "checklist") {
+            const listHtml = inlineList.items.map(item => {
+              const icon = item.crossed ? "✗" : "✔";
+              const style = item.crossed ? " style=\"text-decoration:line-through;color:#999;\"" : "";
+              return `<li${style}>${icon} ${item.text}</li>`;
+            }).join("");
+            parts.push(`<ul class="checklist">${listHtml}</ul>`);
+          } else {
+            const listHtml = (inlineList.items as string[]).map(item => `<li>${item}</li>`).join("");
+            parts.push(`<ul>${listHtml}</ul>`);
+          }
+        } else {
+          const htmlContent = text.split("\n").map(l => l.trim()).filter(Boolean).join("<br>");
+          parts.push(`<p>${htmlContent}</p>`);
+        }
       }
       return;
     }
@@ -340,8 +378,15 @@ function colToHtml($: cheerio.CheerioAPI, colEl: any, baseUrl: string): string {
       const items = extractListItems($, $el);
       if (items.length > 0) {
         const isCheck = isChecklistUl($, $el);
-        const listHtml = items.map(item => `<li>${isCheck ? "✔ " : ""}${item}</li>`).join("");
-        parts.push(`<ul>${listHtml}</ul>`);
+        const listHtml = items.map(item => {
+          if (isCheck) {
+            const icon = item.crossed ? "✗" : "✔";
+            const style = item.crossed ? " style=\"text-decoration:line-through;color:#999;\"" : "";
+            return `<li${style}>${icon} ${item.text}</li>`;
+          }
+          return `<li>${item.text}</li>`;
+        }).join("");
+        parts.push(`<ul${isCheck ? " class=\"checklist\"" : ""}>${listHtml}</ul>`);
       }
       return;
     }
@@ -414,7 +459,8 @@ export function htmlToBlocks(html: string, baseUrl: string): ScrapedBlock[] {
     ".ad, .advertisement, .sidebar, .widget, " +
     ".menu, .nav, .navbar, .header, .footer, " +
     "form, input, select, textarea, label, " +
-    ".elCountdownTimer, .countdown, [class*='countdown'], [class*='timer']"
+    ".elCountdownTimer, .elCountdown, .countdown, [class*='countdown'], [class*='timer'], " +
+    "[data-state-node-script-id]"
   ).remove();
 
   const blocks: ScrapedBlock[] = [];
@@ -539,7 +585,7 @@ export function htmlToBlocks(html: string, baseUrl: string): ScrapedBlock[] {
               if (isChecklistUl($, $el)) {
                 tempBlocks.push({ id: uid(), type: "checklist", data: { headline: "", items, accentColor: "#179ca3", bgColor: "#f8fffe" } });
               } else {
-                tempBlocks.push({ id: uid(), type: "bullets", data: { headline: "", items, iconColor: "#179ca3", bgColor: "#f8fffe" } });
+                tempBlocks.push({ id: uid(), type: "bullets", data: { headline: "", items: items.map(i => i.text), iconColor: "#179ca3", bgColor: "#f8fffe" } });
               }
             }
             return;
@@ -687,7 +733,7 @@ export function htmlToBlocks(html: string, baseUrl: string): ScrapedBlock[] {
       if (isChecklistUl($, $el)) {
         blocks.push({ id: uid(), type: "checklist", data: { headline: "", items, accentColor: "#179ca3", bgColor: "#f8fffe" } });
       } else {
-        blocks.push({ id: uid(), type: "bullets", data: { headline: "", items, iconColor: "#179ca3", bgColor: "#f8fffe" } });
+        blocks.push({ id: uid(), type: "bullets", data: { headline: "", items: items.map(i => i.text), iconColor: "#179ca3", bgColor: "#f8fffe" } });
       }
       return;
     }

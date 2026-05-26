@@ -117,7 +117,11 @@ describe("htmlToBlocks — checklist detection from UL", () => {
     const html = `<html><body><ul><li>✓ First benefit</li><li>✓ Second benefit</li><li>✓ Third benefit</li></ul></body></html>`;
     const blocks = htmlToBlocks(html, BASE_URL);
     const checklist = blocks.find(b => b.type === "checklist");
-    expect(checklist!.data.items).toEqual(["First benefit", "Second benefit", "Third benefit"]);
+    expect(checklist!.data.items).toEqual([
+      { text: "First benefit", crossed: false },
+      { text: "Second benefit", crossed: false },
+      { text: "Third benefit", crossed: false },
+    ]);
   });
 
   it("detects ✔ checkmark UL as checklist block", () => {
@@ -128,16 +132,17 @@ describe("htmlToBlocks — checklist detection from UL", () => {
   it("detects ✅ emoji UL as checklist block", () => {
     const html = `<html><body><ul><li>✅ Feature one</li><li>✅ Feature two</li><li>✅ Feature three</li></ul></body></html>`;
     const blocks = htmlToBlocks(html, BASE_URL);
-    expect(blocks.find(b => b.type === "checklist")!.data.items).toEqual(["Feature one", "Feature two", "Feature three"]);
+    const clItems = blocks.find(b => b.type === "checklist")!.data.items;
+    expect(clItems.map((i: any) => i.text)).toEqual(["Feature one", "Feature two", "Feature three"]);
   });
 
   it("strips checkmark chars from checklist items", () => {
     const html = `<html><body><ul><li>✓ Clean item text</li><li>✓ Another clean item</li></ul></body></html>`;
     const checklist = htmlToBlocks(html, BASE_URL).find(b => b.type === "checklist")!;
     for (const item of checklist.data.items) {
-      expect(item).not.toMatch(/[✓✔✅☑]/u);
+      expect(item.text).not.toMatch(/[✓✔✅☑]/u);
     }
-    expect(checklist.data.items[0]).toBe("Clean item text");
+    expect(checklist.data.items[0].text).toBe("Clean item text");
   });
 
   it("detects fa-check icon UL as checklist", () => {
@@ -164,7 +169,7 @@ describe("htmlToBlocks — inline list splitting (newline-based)", () => {
     const checklist = blocks.find(b => b.type === "checklist");
     expect(checklist).toBeDefined();
     expect(checklist!.data.items.length).toBe(3);
-    expect(checklist!.data.items[0]).toBe("Built for general sonographers");
+    expect(checklist!.data.items[0].text).toBe("Built for general sonographers");
   });
 
   it("splits dash-prefixed multi-line paragraph into bullets block", () => {
@@ -203,8 +208,8 @@ describe("htmlToBlocks — ClickFunnels inline checkmarks (no newlines, zero-wid
     const checklist = blocks.find(b => b.type === "checklist");
     expect(checklist).toBeDefined();
     expect(checklist!.data.items.length).toBe(3);
-    expect(checklist!.data.items[0]).toBe("Built for general sonographers");
-    expect(checklist!.data.items[1]).toBe("Live, structured, and clinically focused");
+    expect(checklist!.data.items[0].text).toBe("Built for general sonographers");
+    expect(checklist!.data.items[1].text).toBe("Live, structured, and clinically focused");
   });
 
   it("strips zero-width spaces (U+200B) before checkmarks and splits correctly", () => {
@@ -217,7 +222,7 @@ describe("htmlToBlocks — ClickFunnels inline checkmarks (no newlines, zero-wid
     expect(checklist!.data.items.length).toBe(3);
     // Items should NOT contain zero-width spaces
     for (const item of checklist!.data.items) {
-      expect(item).not.toContain(zwsp);
+      expect(item.text).not.toContain(zwsp);
     }
   });
 
@@ -236,7 +241,7 @@ describe("htmlToBlocks — ClickFunnels inline checkmarks (no newlines, zero-wid
     const blocks = htmlToBlocks(html, BASE_URL);
     const checklist = blocks.find(b => b.type === "checklist");
     expect(checklist).toBeDefined();
-    expect(checklist!.data.items[0]).toBe("First item");
+    expect(checklist!.data.items[0].text).toBe("First item");
   });
 
   it("handles mixed zero-width spaces and regular newlines", () => {
@@ -407,5 +412,67 @@ describe("htmlToBlocks — three_column block detection", () => {
     expect(threeCol!.data.col1Html).toContain("WHAT");
     expect(threeCol!.data.col2Html).toContain("WHEN");
     expect(threeCol!.data.col3Html).toContain("WHY");
+  });
+});
+
+// ─── Crossed-out checklist item detection ────────────────────────────────────
+
+describe("htmlToBlocks — crossed-out checklist items", () => {
+  it("tags ❌ items as crossed: true in checklist block", () => {
+    const html = `<html><body><ul>
+      <li>✔ This course IS for you</li>
+      <li>❌ This course is NOT for you</li>
+      <li>✔ Another benefit here</li>
+    </ul></body></html>`;
+    const blocks = htmlToBlocks(html, BASE_URL);
+    const checklist = blocks.find(b => b.type === "checklist");
+    expect(checklist).toBeDefined();
+    const items = checklist!.data.items;
+    expect(items[0].crossed).toBe(false);
+    expect(items[1].crossed).toBe(true);
+    expect(items[2].crossed).toBe(false);
+  });
+
+  it("tags ✗ items as crossed: true in checklist block", () => {
+    const html = `<html><body><ul>
+      <li>✔ Good feature</li>
+      <li>✗ Bad feature</li>
+      <li>✔ Another good feature</li>
+    </ul></body></html>`;
+    const blocks = htmlToBlocks(html, BASE_URL);
+    const checklist = blocks.find(b => b.type === "checklist");
+    expect(checklist).toBeDefined();
+    expect(checklist!.data.items[1].crossed).toBe(true);
+    expect(checklist!.data.items[1].text).toBe("Bad feature");
+  });
+
+  it("tags ❌ items as crossed: true in inline paragraph checklist", () => {
+    const html = `<html><body><p>✔ This course is for you if...<br>❌ This course is NOT for you if...<br>✔ Another benefit</p></body></html>`;
+    const blocks = htmlToBlocks(html, BASE_URL);
+    const checklist = blocks.find(b => b.type === "checklist");
+    expect(checklist).toBeDefined();
+    const items = checklist!.data.items;
+    expect(items[0].crossed).toBe(false);
+    expect(items[1].crossed).toBe(true);
+    expect(items[2].crossed).toBe(false);
+  });
+
+  it("renders crossed items with strikethrough style in two_column HTML", () => {
+    const html = `<html><body>
+      <div class="row">
+        <div class="col-md-6 innerContent col_left">
+          <p>✔ Good item one<br>❌ Not for you<br>✔ Good item two</p>
+        </div>
+        <div class="col-md-6 innerContent col_right">
+          <p>Right column content with enough text to be meaningful here.</p>
+        </div>
+      </div>
+    </body></html>`;
+    const blocks = htmlToBlocks(html, BASE_URL);
+    const twoCol = blocks.find(b => b.type === "two_column");
+    expect(twoCol).toBeDefined();
+    // The left HTML should contain line-through style for the crossed item
+    expect(twoCol!.data.leftHtml).toContain("line-through");
+    expect(twoCol!.data.leftHtml).toContain("✗");
   });
 });

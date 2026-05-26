@@ -286,22 +286,32 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
           </div>
         </div>
       );
-    case "checklist":
+    case "checklist": {
+      // Items can be plain strings or { text: string; crossed?: boolean } objects (backward-compatible)
+      const clItems: Array<{ text: string; crossed: boolean }> = (d.items ?? []).map(
+        (item: string | { text: string; crossed?: boolean }) =>
+          typeof item === "string" ? { text: item, crossed: false } : { text: item.text ?? "", crossed: item.crossed ?? false }
+      );
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           {d.headline && <h2 className="text-2xl font-bold mb-2 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subHeading && <p className="text-gray-500 mb-6 text-base leading-relaxed" dangerouslySetInnerHTML={{ __html: d.subHeading }} />}
           {!d.subHeading && d.headline && <div className="mb-6" />}
           <div className="space-y-3 max-w-2xl">
-            {(d.items ?? []).map((item: string, i: number) => (
+            {clItems.map((item, i) => (
               <div key={i} className="flex items-start gap-3">
-                <span className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold mt-0.5" style={{ backgroundColor: d.accentColor ?? "#179ca3" }}>✓</span>
-                <span className="text-gray-700">{item}</span>
+                {item.crossed ? (
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold mt-0.5" style={{ backgroundColor: "#ef4444" }}>✗</span>
+                ) : (
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold mt-0.5" style={{ backgroundColor: d.accentColor ?? "#179ca3" }}>✓</span>
+                )}
+                <span className={item.crossed ? "text-gray-400 line-through" : "text-gray-700"}>{item.text}</span>
               </div>
             ))}
           </div>
         </div>
       );
+    }
     case "icon_grid":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
