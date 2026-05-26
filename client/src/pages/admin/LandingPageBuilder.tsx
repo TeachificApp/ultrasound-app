@@ -52,6 +52,7 @@ import {
   ChevronDown, ChevronUp, Copy, FolderOpen, BookMarked, Upload, Code,
   ShoppingCart, Package, Link, Mail, Phone, MapPin, Bookmark, BookmarkPlus, Music, UserPlus, Search,
   SlidersHorizontal, Radio, Clock, Loader2, ArrowLeftRight,
+  Table2, LayoutList,
 } from "lucide-react";
 import AudioBlockEditor from "@/components/AudioBlockEditor";
 import CarouselBlock from "@/components/CarouselBlock";
@@ -379,6 +380,67 @@ BLOCK_CATALOG.push(
       accentColor: "#189aa1",
       bgColor: "#f8fafc",
     } },
+);
+
+// ─── Extra catalog entries ────────────────────────────────────────────────────
+BLOCK_CATALOG.push(
+  {
+    type: "comparison_table",
+    label: "Comparison Table",
+    icon: <Table2 size={14} />,
+    category: "Marketing",
+    defaultData: {
+      headline: "How We Compare",
+      subtext: "See why our approach stands out.",
+      columns: [
+        { label: "Competitor", highlight: false },
+        { label: "Us", highlight: true },
+      ],
+      rows: [
+        { feature: "Feature One", values: [false, true] },
+        { feature: "Feature Two", values: ["Limited", "Unlimited"] },
+        { feature: "Feature Three", values: [false, true] },
+      ],
+      accentColor: "#179ca3",
+      bgColor: "#ffffff",
+    },
+  },
+  {
+    type: "pricing_cards",
+    label: "Pricing Cards",
+    icon: <LayoutList size={14} />,
+    category: "Conversion",
+    defaultData: {
+      headline: "Simple, Transparent Pricing",
+      subtext: "Choose the plan that fits your needs.",
+      tiers: [
+        {
+          name: "Starter",
+          price: "$0",
+          interval: "/ month",
+          description: "Perfect for getting started",
+          badge: "",
+          features: ["Feature A", "Feature B"],
+          ctaText: "Start Free",
+          ctaLink: "#",
+          highlighted: false,
+        },
+        {
+          name: "Pro",
+          price: "$49",
+          interval: "/ month",
+          description: "For growing teams",
+          badge: "Most Popular",
+          features: ["Everything in Starter", "Feature C", "Feature D"],
+          ctaText: "Get Started",
+          ctaLink: "#",
+          highlighted: true,
+        },
+      ],
+      accentColor: "#179ca3",
+      bgColor: "#f8fffe",
+    },
+  },
 );
 
 // ─── Block Preview ─────────────────────────────────────────────────────────────
@@ -3797,6 +3859,154 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
             </div>
             <BSColorField data={d} onSet={set} label="Background Color" field="bgColor" />
             <BSColorField data={d} onSet={set} label="Border / Accent Color" field="borderColor" />
+          </div>
+        </div>
+      );
+    }
+    case "comparison_table": {
+      const ctCols: Array<{ label: string; highlight?: boolean }> = d.columns ?? [];
+      const ctRows: Array<{ feature: string; values: Array<string | boolean | null> }> = d.rows ?? [];
+      return (
+        <div className="space-y-3">
+          <BSTextField data={d} onSet={set} label="Headline" field="headline" />
+          <BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline />
+          <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />
+          <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
+          {/* Columns */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs text-gray-500 font-medium">Columns</label>
+              <button onClick={() => set("columns", [...ctCols, { label: "New Column", highlight: false }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button>
+            </div>
+            <div className="space-y-1">
+              {ctCols.map((col, ci) => (
+                <div key={ci} className="flex items-center gap-1">
+                  <DebouncedInput value={col.label} onChange={v => set("columns", ctCols.map((c, j) => j === ci ? { ...c, label: v } : c))} className="h-7 text-xs flex-1" placeholder="Column label" />
+                  <label className="flex items-center gap-1 text-xs text-gray-500 cursor-pointer flex-shrink-0">
+                    <input type="checkbox" checked={col.highlight ?? false} onChange={e => set("columns", ctCols.map((c, j) => j === ci ? { ...c, highlight: e.target.checked } : c))} className="rounded" />
+                    Highlight
+                  </label>
+                  <button onClick={() => set("columns", ctCols.filter((_, j) => j !== ci))} className="text-red-400 hover:text-red-600 flex-shrink-0"><X size={10} /></button>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Rows */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs text-gray-500 font-medium">Rows</label>
+              <button onClick={() => set("rows", [...ctRows, { feature: "New Feature", values: ctCols.map(() => false) }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button>
+            </div>
+            <div className="space-y-2">
+              {ctRows.map((row, ri) => (
+                <div key={ri} className="border border-gray-200 rounded p-2 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500">Row {ri + 1}</span>
+                    <button onClick={() => set("rows", ctRows.filter((_, j) => j !== ri))} className="text-red-400 hover:text-red-600"><X size={10} /></button>
+                  </div>
+                  <DebouncedInput value={row.feature} onChange={v => set("rows", ctRows.map((r, j) => j === ri ? { ...r, feature: v } : r))} className="h-7 text-xs" placeholder="Feature name" />
+                  <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${ctCols.length || 1}, 1fr)` }}>
+                    {ctCols.map((col, ci) => {
+                      const val = row.values?.[ci];
+                      const isBoolean = val === true || val === false;
+                      return (
+                        <div key={ci} className="space-y-0.5">
+                          <p className="text-[10px] text-gray-400 truncate">{col.label || `Col ${ci + 1}`}</p>
+                          <select
+                            value={isBoolean ? (val ? "true" : "false") : "text"}
+                            onChange={e => {
+                              const next = [...(row.values ?? [])];
+                              if (e.target.value === "true") next[ci] = true;
+                              else if (e.target.value === "false") next[ci] = false;
+                              else next[ci] = "";
+                              set("rows", ctRows.map((r, j) => j === ri ? { ...r, values: next } : r));
+                            }}
+                            className="w-full h-6 text-[10px] rounded border border-gray-200 px-1"
+                          >
+                            <option value="true">✓ Yes</option>
+                            <option value="false">— No</option>
+                            <option value="text">Text</option>
+                          </select>
+                          {!isBoolean && (
+                            <DebouncedInput
+                              value={typeof val === "string" ? val : ""}
+                              onChange={v => {
+                                const next = [...(row.values ?? [])];
+                                next[ci] = v;
+                                set("rows", ctRows.map((r, j) => j === ri ? { ...r, values: next } : r));
+                              }}
+                              className="h-6 text-[10px]"
+                              placeholder="Text value"
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+    case "pricing_cards": {
+      const pcTiers: Array<{ name: string; price: string; interval?: string; description?: string; badge?: string; features: string[]; ctaText: string; ctaLink?: string; highlighted?: boolean }> = d.tiers ?? [];
+      return (
+        <div className="space-y-3">
+          <BSTextField data={d} onSet={set} label="Headline" field="headline" />
+          <BSTextField data={d} onSet={set} label="Subtext" field="subtext" multiline />
+          <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />
+          <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs text-gray-500 font-medium">Pricing Tiers</label>
+              <button
+                onClick={() => set("tiers", [...pcTiers, { name: "New Tier", price: "$0", interval: "/ month", description: "", badge: "", features: ["Feature A"], ctaText: "Get Started", ctaLink: "#", highlighted: false }])}
+                className="text-xs text-teal-600 flex items-center gap-1"
+              ><Plus size={12} /> Add Tier</button>
+            </div>
+            <div className="space-y-3">
+              {pcTiers.map((tier, ti) => (
+                <div key={ti} className="border border-gray-200 rounded-lg p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-gray-600">Tier {ti + 1}</span>
+                    <button onClick={() => set("tiers", pcTiers.filter((_, j) => j !== ti))} className="text-red-400 hover:text-red-600"><X size={10} /></button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" checked={tier.highlighted ?? false} onChange={e => set("tiers", pcTiers.map((t, j) => j === ti ? { ...t, highlighted: e.target.checked } : t))} className="rounded" />
+                    <label className="text-xs text-gray-600">Highlight this tier</label>
+                  </div>
+                  <DebouncedInput value={tier.name} onChange={v => set("tiers", pcTiers.map((t, j) => j === ti ? { ...t, name: v } : t))} className="h-7 text-xs" placeholder="Tier name" />
+                  <DebouncedInput value={tier.badge ?? ""} onChange={v => set("tiers", pcTiers.map((t, j) => j === ti ? { ...t, badge: v } : t))} className="h-7 text-xs" placeholder="Badge label (e.g. Most Popular)" />
+                  <DebouncedInput value={tier.description ?? ""} onChange={v => set("tiers", pcTiers.map((t, j) => j === ti ? { ...t, description: v } : t))} className="h-7 text-xs" placeholder="Short description" />
+                  <div className="grid grid-cols-2 gap-1">
+                    <DebouncedInput value={tier.price} onChange={v => set("tiers", pcTiers.map((t, j) => j === ti ? { ...t, price: v } : t))} className="h-7 text-xs" placeholder="$49" />
+                    <DebouncedInput value={tier.interval ?? ""} onChange={v => set("tiers", pcTiers.map((t, j) => j === ti ? { ...t, interval: v } : t))} className="h-7 text-xs" placeholder="/ month" />
+                  </div>
+                  {/* Features */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[10px] text-gray-400">Features</label>
+                      <button onClick={() => set("tiers", pcTiers.map((t, j) => j === ti ? { ...t, features: [...(t.features ?? []), "New feature"] } : t))} className="text-[10px] text-teal-600 flex items-center gap-0.5"><Plus size={10} /> Add</button>
+                    </div>
+                    <div className="space-y-1">
+                      {(tier.features ?? []).map((feat, fi) => (
+                        <div key={fi} className="flex items-center gap-1">
+                          <DebouncedInput value={feat} onChange={v => set("tiers", pcTiers.map((t, j) => j === ti ? { ...t, features: (t.features ?? []).map((f, k) => k === fi ? v : f) } : t))} className="h-6 text-[10px] flex-1" placeholder="Feature" />
+                          <button onClick={() => set("tiers", pcTiers.map((t, j) => j === ti ? { ...t, features: (t.features ?? []).filter((_, k) => k !== fi) } : t))} className="text-red-400 hover:text-red-600 flex-shrink-0"><X size={10} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {/* CTA */}
+                  <div className="grid grid-cols-2 gap-1">
+                    <DebouncedInput value={tier.ctaText} onChange={v => set("tiers", pcTiers.map((t, j) => j === ti ? { ...t, ctaText: v } : t))} className="h-7 text-xs" placeholder="Button text" />
+                    <DebouncedInput value={tier.ctaLink ?? ""} onChange={v => set("tiers", pcTiers.map((t, j) => j === ti ? { ...t, ctaLink: v } : t))} className="h-7 text-xs" placeholder="https://..." />
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       );

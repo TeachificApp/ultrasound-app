@@ -71,7 +71,8 @@ export type BlockType =
   | "lesson_quiz" | "lesson_flashcard"
   | "file_download" | "scorm_embed" | "url_embed"
   | "column_layout" | "carousel" | "ticker" | "countdown_v2"
-  | "live_session";
+  | "live_session"
+  | "comparison_table" | "pricing_cards";
 
 export interface Block {
   id: string;
@@ -1076,6 +1077,88 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       return <CountdownV2BlockPreview d={d} />;
     case "live_session":
       return <LiveSessionBlockPreview d={d} />;
+    case "comparison_table": {
+      const cols: Array<{ label: string; highlight?: boolean }> = d.columns ?? [];
+      const rows: Array<{ feature: string; values: Array<string | boolean | null> }> = d.rows ?? [];
+      const accentCol = d.accentColor ?? "#179ca3";
+      return (
+        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          {d.headline && <h2 className="text-2xl font-bold mb-2 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          {d.subtext && <p className="text-center text-gray-500 mb-8 text-sm" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
+          {!d.subtext && d.headline && <div className="mb-8" />}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium w-1/3"></th>
+                  {cols.map((col, ci) => (
+                    <th key={ci} className="px-4 py-3 text-center font-semibold" style={{ backgroundColor: col.highlight ? accentCol : "#f9fafb", color: col.highlight ? "#fff" : "#374151", borderRadius: ci === 0 ? "8px 8px 0 0" : ci === cols.length - 1 ? "8px 8px 0 0" : undefined }}>
+                      {col.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, ri) => (
+                  <tr key={ri} className={ri % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                    <td className="px-4 py-3 text-gray-700 font-medium border-b border-gray-100">{row.feature}</td>
+                    {cols.map((col, ci) => {
+                      const val = row.values?.[ci];
+                      return (
+                        <td key={ci} className="px-4 py-3 text-center border-b border-gray-100" style={{ backgroundColor: col.highlight ? `${accentCol}08` : undefined }}>
+                          {val === true ? <span className="inline-flex items-center justify-center w-5 h-5 rounded-full text-white text-xs font-bold" style={{ backgroundColor: accentCol }}>✓</span>
+                            : val === false ? <span className="text-gray-300 text-lg">—</span>
+                            : <span className="text-gray-700 text-xs">{val ?? ""}</span>}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+    case "pricing_cards": {
+      const tiers: Array<{ name: string; price: string; interval?: string; description?: string; badge?: string; features: string[]; ctaText: string; ctaLink?: string; highlighted?: boolean }> = d.tiers ?? [];
+      const accentColor = d.accentColor ?? "#179ca3";
+      return (
+        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
+          {d.headline && <h2 className="text-2xl font-bold mb-2 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          {d.subtext && <p className="text-center text-gray-500 mb-8 text-sm" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
+          {!d.subtext && d.headline && <div className="mb-8" />}
+          <div className="grid gap-6" style={{ gridTemplateColumns: `repeat(${tiers.length || 1}, 1fr)`, maxWidth: "900px", margin: "0 auto" }}>
+            {tiers.map((tier, ti) => (
+              <div key={ti} className="rounded-2xl overflow-hidden flex flex-col" style={{ border: tier.highlighted ? `2px solid ${accentColor}` : "1px solid #e5e7eb", boxShadow: tier.highlighted ? `0 8px 32px ${accentColor}22` : "0 1px 4px rgba(0,0,0,0.06)" }}>
+                {tier.badge && (
+                  <div className="text-center text-xs font-bold py-1.5 text-white" style={{ backgroundColor: accentColor }}>{tier.badge}</div>
+                )}
+                <div className="p-6 flex-1 flex flex-col">
+                  <h3 className="font-bold text-gray-900 text-lg mb-1">{tier.name}</h3>
+                  {tier.description && <p className="text-gray-500 text-xs mb-4">{tier.description}</p>}
+                  <div className="mb-4">
+                    <span className="text-3xl font-black" style={{ color: accentColor }}>{tier.price}</span>
+                    {tier.interval && <span className="text-sm text-gray-400 ml-1">{tier.interval}</span>}
+                  </div>
+                  <ul className="space-y-2 mb-6 flex-1">
+                    {(tier.features ?? []).map((feat, fi) => (
+                      <li key={fi} className="flex items-start gap-2 text-sm text-gray-700">
+                        <span className="flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-white text-[10px] font-bold mt-0.5" style={{ backgroundColor: accentColor }}>✓</span>
+                        {feat}
+                      </li>
+                    ))}
+                  </ul>
+                  <a href={tier.ctaLink ?? "#"} className="block text-center py-2.5 rounded-xl font-semibold text-sm" style={{ backgroundColor: tier.highlighted ? accentColor : "transparent", color: tier.highlighted ? "#fff" : accentColor, border: `2px solid ${accentColor}` }}>
+                    {tier.ctaText || "Get Started"}
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
     default:
       return <div className="px-8 py-4 text-gray-400 text-sm text-center">Block preview not available</div>;
   }

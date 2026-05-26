@@ -700,7 +700,7 @@ function SortableLessonRow({ lesson, onEdit, onQuiz, onDelete, onCopy, onMoveUp,
 
 // ─── Sortable Section Row ────────────────────────────────────────────────────
 
-function SortableSectionRow({ section, children, onAddLesson, onDrip, onDelete, onCopyModule, onMoveUp, onMoveDown, onRenameSection }: {
+function SortableSectionRow({ section, children, onAddLesson, onDrip, onDelete, onCopyModule, onMoveUp, onMoveDown, onRenameSection, onSaveAsTemplate }: {
   section: any;
   children: React.ReactNode;
   onAddLesson: () => void;
