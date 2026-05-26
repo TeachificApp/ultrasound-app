@@ -45,6 +45,7 @@ import { blockTemplatesRouter } from "./routers/blockTemplatesRouter";
 import { ssoRouter } from "./routers/ssoRouter";
 import { lessonCommentsRouter } from "./routers/lessonCommentsRouter";
 import { pageScraperRouter } from "./routers/pageScraperRouter";
+import { questionBankRouter } from "./routers/questionBankRouter";
 import {
   getUserById,
   getUsersByIds,
@@ -1874,6 +1875,7 @@ export const appRouter = router({
   lmsLearner: lmsLearnerRouter,
   lmsAdmin: lmsAdminRouter,
   lmsGroup: lmsGroupRouter,
+  questionBank: questionBankRouter,
   thinkificImport: thinkificImportRouter,
   downloads: downloadsPublicRouter,
   downloadsLearner: downloadsLearnerRouter,

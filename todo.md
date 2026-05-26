@@ -3083,3 +3083,25 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Added aiGenerateLandingPage procedure to productsAdminRouter
 - [x] HTML embed blocks: replaced dangerouslySetInnerHTML with srcdoc iframe (allows JavaScript execution) in BlockPreview, CourseLanding, PublicFunnelPage, DownloadLanding
 - [x] Updated embed block settings label to note JavaScript is supported
+
+
+## Session: Quiz Block, Question Bank, Lesson Simplification, Bug Fixes (May 26 2026 Late)
+- [x] Fix deployment build error: useNavigate not exported by wouter v3.7.1 → replaced with useLocation-based navigation
+- [x] Fix LayoutTemplate import: aliased Layout as LayoutTemplate from lucide-react
+- [x] Add useOpenLearnLink function to LMSAdmin
+- [x] Remove lesson type selector from AddLessonDialog (all lessons are "text" type)
+- [x] Remove lesson type selector from LessonEditorPage settings tab
+- [x] Remove Quiz Builder tab from LessonEditorPage header (quiz is now a content block)
+- [x] Fix lesson ordering in AI generator: join sections and order by section position then lesson position
+- [x] Make topic optional in AI generator when lessons are selected
+- [x] Add requirePassingToProgress, randomizeQuestions, randomizeAnswers toggles to quiz settings
+- [x] Add new columns to lms_quizzes table (requirePassingToProgress, randomizeQuestions, randomizeAnswers)
+- [x] Create question_bank, question_bank_tags, question_bank_tag_map tables
+- [x] Create questionBankRouter with full CRUD, tag management, AI generation, import to quiz
+- [x] Add Question Bank tab to LMS admin navigation with QuestionBankAdmin component
+- [x] Add "From Bank" tab to LessonQuizBlockEditor (QuestionBankPicker component)
+- [x] Fix Free Preview link in curriculum list: pass onFreePreviewClick prop to RenderBlock
+- [x] Fix banner/CTA button click: add resolveBtnAction helper to handle all behavior types
+- [x] Fix related products images: sync coverImageUrl and thumbnailUrl in all update paths
+- [x] Add syncAllCourseImages procedure to bulk-sync Thinkific course images
+- [x] Add "Sync Images" button to CoursesTab header

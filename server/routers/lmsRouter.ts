@@ -1548,13 +1548,15 @@ export const lmsAdminRouter = router({
         extra.pricingType = pricingType;
         extra.isFree = pricingType === "free";
       }
-      const filtered = { ...Object.fromEntries(Object.entries(updates).filter(([, v]) => v !== undefined)), ...extra };
+            const filtered = { ...Object.fromEntries(Object.entries(updates).filter(([, v]) => v !== undefined)), ...extra };
+      // Keep coverImageUrl and thumbnailUrl in sync
+      if (filtered.coverImageUrl && !filtered.thumbnailUrl) filtered.thumbnailUrl = filtered.coverImageUrl;
+      if (filtered.thumbnailUrl && !filtered.coverImageUrl) filtered.coverImageUrl = filtered.thumbnailUrl;
       if (Object.keys(filtered).length > 0) {
         await db.update(lmsCourses).set(filtered).where(eq(lmsCourses.id, id));
       }
       return { success: true };
     }),
-
   deleteCourse: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
@@ -1632,11 +1634,10 @@ export const lmsAdminRouter = router({
         uploadedByUserId: ctx.user.id,
       });
 
-      // Update the course coverImageUrl
-      await db.update(lmsCourses).set({ coverImageUrl: url }).where(eq(lmsCourses.id, input.courseId));
+            // Update the course coverImageUrl and thumbnailUrl (keep both in sync)
+      await db.update(lmsCourses).set({ coverImageUrl: url, thumbnailUrl: url }).where(eq(lmsCourses.id, input.courseId));
       return { url, assetId };
     }),
-
   uploadLandingPageHeroImage: protectedProcedure
     .input(z.object({
       courseId: z.number(),
@@ -2338,7 +2339,15 @@ export const lmsAdminRouter = router({
     }),
 
   updateQuiz: protectedProcedure
-    .input(z.object({ lessonId: z.number(), passingScore: z.number().int().min(0).max(100).optional(), allowRetakes: z.boolean().optional(), showCorrectAnswers: z.boolean().optional() }))
+    .input(z.object({
+      lessonId: z.number(),
+      passingScore: z.number().int().min(0).max(100).optional(),
+      allowRetakes: z.boolean().optional(),
+      showCorrectAnswers: z.boolean().optional(),
+      requirePassingToProgress: z.boolean().optional(),
+      randomizeQuestions: z.boolean().optional(),
+      randomizeAnswers: z.boolean().optional(),
+    }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
@@ -2988,7 +2997,7 @@ Create 6-8 blocks in this order: hero, rich_text (what you'll learn), curriculum
         const thinkificCourse = await getThinkificCourse(thinkificCourseId);
          const newImageUrl = thinkificCourse.course_card_image_url || thinkificCourse.banner_image_url;
         if (newImageUrl) {
-          await db.update(lmsCourses).set({ coverImageUrl: newImageUrl }).where(eq(lmsCourses.id, input.courseId));
+          await db.update(lmsCourses).set({ coverImageUrl: newImageUrl, thumbnailUrl: newImageUrl }).where(eq(lmsCourses.id, input.courseId));
           console.log(`[syncThinkific] Updated cover image for course ${input.courseId}: ${newImageUrl}`);
         }
       } catch (e) {
@@ -3072,6 +3081,30 @@ Create 6-8 blocks in this order: hero, rich_text (what you'll learn), curriculum
         skipped,
         total: thinkificEnrollments.length,
       };
+    }),
+
+  /** Bulk-sync cover images from Thinkific for all courses that have a Thinkific import record */
+  syncAllCourseImages: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const imports = await db.select({ courseId: lmsThinkificImports.courseId, thinkificCourseId: lmsThinkificImports.thinkificCourseId }).from(lmsThinkificImports);
+      let updated = 0;
+      let failed = 0;
+      for (const imp of imports) {
+        try {
+          const tc = await getThinkificCourse(imp.thinkificCourseId);
+          const imageUrl = tc.course_card_image_url || tc.banner_image_url;
+          if (imageUrl) {
+            await db.update(lmsCourses).set({ coverImageUrl: imageUrl, thumbnailUrl: imageUrl }).where(eq(lmsCourses.id, imp.courseId));
+            updated++;
+          }
+        } catch {
+          failed++;
+        }
+      }
+      return { updated, failed, total: imports.length };
     }),
 
   // ── Groups ──
@@ -3800,10 +3833,21 @@ CRITICAL REQUIREMENTS:
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      return db.select({ id: lmsLessons.id, title: lmsLessons.title, type: lmsLessons.type, sectionId: lmsLessons.sectionId })
+      // Join sections so we order by section.position first, then lesson.position
+      const rows = await db
+        .select({
+          id: lmsLessons.id,
+          title: lmsLessons.title,
+          type: lmsLessons.type,
+          sectionId: lmsLessons.sectionId,
+          lessonPosition: lmsLessons.position,
+          sectionPosition: lmsSections.position,
+        })
         .from(lmsLessons)
+        .leftJoin(lmsSections, eq(lmsLessons.sectionId, lmsSections.id))
         .where(eq(lmsLessons.courseId, input.courseId))
-        .orderBy(asc(lmsLessons.position));
+        .orderBy(asc(lmsSections.position), asc(lmsLessons.position));
+      return rows.map(r => ({ id: r.id, title: r.title, type: r.type, sectionId: r.sectionId }));
     }),
 
   /** Search users by name or email (for enroll dialog) */

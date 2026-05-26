@@ -2886,6 +2886,9 @@ export const lmsQuizzes = mysqlTable("lms_quizzes", {
   passingScore: int("passing_score").default(70).notNull(), // percentage
   allowRetakes: boolean("allow_retakes").default(true).notNull(),
   showCorrectAnswers: boolean("show_correct_answers").default(true).notNull(),
+  requirePassingToProgress: boolean("require_passing_to_progress").default(false).notNull(),
+  randomizeQuestions: boolean("randomize_questions").default(false).notNull(),
+  randomizeAnswers: boolean("randomize_answers").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 export type LmsQuiz = typeof lmsQuizzes.$inferSelect;
@@ -4516,3 +4519,45 @@ export const lessonTemplates = mysqlTable("lesson_templates", {
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
 export type LessonTemplate = typeof lessonTemplates.$inferSelect;
+
+// ─── Question Bank ─────────────────────────────────────────────────────────────
+// Central repository of reusable quiz questions with tagging support.
+// Questions are auto-saved here when created via the quiz builder or AI generator.
+// Media: questionImageUrl / questionVideoUrl attach to the question stem.
+// Options are stored as JSON array of objects: { text, imageUrl?, videoUrl? }
+// Quiz-level settings (randomizeQuestions, randomizeAnswers) live on lms_quizzes.
+
+export const questionBank = mysqlTable("question_bank", {
+  id: int("id").autoincrement().primaryKey(),
+  question: longtext("question").notNull(),
+  type: mysqlEnum("type", ["mcq", "truefalse"]).default("mcq").notNull(),
+  // JSON array of { text: string, imageUrl?: string, videoUrl?: string }
+  options: longtext("options"),
+  correctAnswer: varchar("correct_answer", { length: 500 }).notNull(),
+  explanation: longtext("explanation"),
+  // Media attached to the question stem
+  questionImageUrl: text("question_image_url"),
+  questionVideoUrl: text("question_video_url"),
+  // Source tracking
+  sourceQuizId: int("source_quiz_id"), // FK → lms_quizzes.id (if created via quiz builder)
+  sourceQuizQuestionId: int("source_quiz_question_id"), // FK → lms_quiz_questions.id
+  createdByAdminId: int("created_by_admin_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type QuestionBankItem = typeof questionBank.$inferSelect;
+
+export const questionBankTags = mysqlTable("question_bank_tags", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 100 }).notNull().unique(),
+  color: varchar("color", { length: 32 }).default("#179ca3").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type QuestionBankTag = typeof questionBankTags.$inferSelect;
+
+export const questionBankTagMap = mysqlTable("question_bank_tag_map", {
+  id: int("id").autoincrement().primaryKey(),
+  questionId: int("question_id").notNull(), // FK → question_bank.id
+  tagId: int("tag_id").notNull(),            // FK → question_bank_tags.id
+});
+export type QuestionBankTagMap = typeof questionBankTagMap.$inferSelect;

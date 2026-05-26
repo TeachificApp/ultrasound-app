@@ -128,10 +128,23 @@ function CountdownTimer({ mode, durationMinutes, targetDate, textColor }: { mode
 
 // ─── Block Renderer ────────────────────────────────────────────────────────────
 
-function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selectedPricingOptionId, onSelectPricingOption, slug, enrollment, user }: {
+/** Resolve a CTA button action to a click handler */
+function resolveBtnAction(behavior: string | undefined, link: string | undefined, emailAddress: string | undefined, scrollAnchor: string | undefined, popupUrl: string | undefined, downloadUrl: string | undefined, onEnroll: () => void): () => void {
+  const b = behavior ?? (link ? "url" : "");
+  if (b === "url" && link) return () => window.open(link, "_blank", "noopener,noreferrer");
+  if (b === "send_email" && emailAddress) return () => { window.location.href = `mailto:${emailAddress}`; };
+  if (b === "scroll_to_section" && scrollAnchor) return () => { const el = document.getElementById(scrollAnchor.replace(/^#/, "")); if (el) el.scrollIntoView({ behavior: "smooth" }); };
+  if (b === "open_popup" && popupUrl) return () => { const w = 800, h = 600; const left = window.screenX + (window.outerWidth - w) / 2; const top = window.screenY + (window.outerHeight - h) / 2; window.open(popupUrl, "_blank", `width=${w},height=${h},left=${left},top=${top},resizable=yes,scrollbars=yes`); };
+  if (b === "download_file" && downloadUrl) return () => window.open(downloadUrl, "_blank", "noopener,noreferrer");
+  // direct_checkout, group_purchase, free_preview, next_funnel_step, or default → onEnroll
+  return onEnroll;
+}
+
+function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selectedPricingOptionId, onSelectPricingOption, slug, enrollment, user, onFreePreviewClick }: {
   block: Block; course: any; onEnroll: () => void; enrolling: boolean; ctaText: string; price: string;
   selectedPricingOptionId?: number; onSelectPricingOption?: (id: number | undefined) => void;
   slug?: string; enrollment?: any; user?: UserParamSource | null;
+  onFreePreviewClick?: (lessonId: number) => void;
 }) {
   const d = block.data;
   switch (block.type) {
@@ -174,7 +187,7 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
               {!d.hideButtons && <div className="flex flex-wrap gap-3 animate-fade-slide-up-delay-2" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
                 {buttons.map((btn, i) => (
                   <div key={i} className="flex flex-col items-center gap-1">
-                    <button onClick={btn.link ? () => window.location.href = btn.link : onEnroll}
+                    <button onClick={resolveBtnAction((btn as any).behavior, btn.link, (btn as any).emailAddress, (btn as any).scrollAnchor, (btn as any).popupUrl, (btn as any).downloadUrl, onEnroll)}
                       className={`px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-opacity hover:opacity-90 ${(btn as any).animation && (btn as any).animation !== "none" ? `animate-${(btn as any).animation}-btn` : ""}`}
                       style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
                       {btn.text}
@@ -492,7 +505,7 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
         <div className="px-8 py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa", textAlign: d.align ?? "center" }}>
           {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
-          <button onClick={d.ctaLink ? () => window.location.href = d.ctaLink : onEnroll} disabled={enrolling}
+          <button onClick={resolveBtnAction(d.ctaBehavior, d.ctaLink, d.emailAddress, d.scrollAnchor, d.popupUrl, d.downloadUrl, onEnroll)} disabled={enrolling}
             className={`inline-block px-8 py-3 rounded-lg font-semibold shadow disabled:opacity-60 transition-opacity hover:opacity-90 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`} style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
             {d.ctaText ?? ctaText}
           </button>
@@ -563,7 +576,7 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
                                 type="button"
                                 className="ml-auto text-xs hover:underline font-semibold flex items-center gap-1 shrink-0 cursor-pointer"
                                 style={{ color: d.lessonPreviewIconColor ?? "#0d9488" }}
-                                onClick={(e) => { e.stopPropagation(); handleFreePreviewClick(lesson.id); }}
+                                onClick={(e) => { e.stopPropagation(); onFreePreviewClick?.(lesson.id); }}
                               >
                                 <PlayCircle className="w-3 h-3" /> Free Preview
                               </button>
@@ -864,10 +877,10 @@ export default function CourseLanding() {
             <div key={block.id} style={{ marginTop: block.data?.marginTop || undefined, marginBottom: block.data?.marginBottom || undefined, paddingTop: block.data?.paddingTop || undefined, paddingBottom: block.data?.paddingBottom || undefined, paddingLeft: block.data?.paddingLeft || undefined, paddingRight: block.data?.paddingRight || undefined }}>
               {bwMaxCL ? (
                 <div style={{ maxWidth: bwMaxCL, marginLeft: "auto", marginRight: "auto", width: "100%" }}>
-                  <RenderBlock block={block} course={course} onEnroll={handleEnroll} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} />
+                  <RenderBlock block={block} course={course} onEnroll={handleEnroll} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} />
                 </div>
               ) : (
-                <RenderBlock block={block} course={course} onEnroll={handleEnroll} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} />
+                <RenderBlock block={block} course={course} onEnroll={handleEnroll} enrolling={enrolling || enrollFree.isPending || createCheckout.isPending} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} />
               )}
             </div>
           );

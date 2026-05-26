@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Pencil, Trash2, Plus } from "lucide-react";
+import { Pencil, Trash2, Plus, Database, Search } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export interface QuizQuestion {
@@ -154,7 +154,7 @@ function QuestionEditor({
 }
 
 export default function LessonQuizBlockEditor({ data, onChange, handleFileUpload, lessonId }: Props) {
-  const [addTab, setAddTab] = useState<"ai" | "manual">("manual");
+  const [addTab, setAddTab] = useState<"ai" | "manual" | "bank">("manual");
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [addingNew, setAddingNew] = useState(false);
   const [aiCount, setAiCount] = useState(5);
@@ -326,11 +326,32 @@ export default function LessonQuizBlockEditor({ data, onChange, handleFileUpload
 
       {/* ── Add / AI tabs ── */}
       {!addingNew && editingIndex === null && (
-        <Tabs value={addTab} onValueChange={(v) => setAddTab(v as "ai" | "manual")}>
+        <Tabs value={addTab} onValueChange={(v) => setAddTab(v as "ai" | "manual" | "bank")}>
           <TabsList className="h-8">
             <TabsTrigger value="manual" className="text-xs h-7">Manual Entry</TabsTrigger>
+            <TabsTrigger value="bank" className="text-xs h-7">From Bank</TabsTrigger>
             <TabsTrigger value="ai" className="text-xs h-7">AI Generate</TabsTrigger>
           </TabsList>
+
+          {/* From Bank */}
+          <TabsContent value="bank" className="mt-2">
+            <QuestionBankPicker onAdd={(bankQ) => {
+              // Convert bank question format to QuizQuestion format
+              const opts = Array.isArray(bankQ.options)
+                ? bankQ.options.map((o: any) => (typeof o === "string" ? o : o.text ?? ""))
+                : ["True", "False"];
+              const correctIdx = opts.findIndex((o: string) => o === bankQ.correctAnswer);
+              const q: QuizQuestion = {
+                question: bankQ.question,
+                options: opts.length > 0 ? opts : ["True", "False"],
+                correctAnswer: correctIdx >= 0 ? correctIdx : 0,
+                explanation: bankQ.explanation ?? "",
+                imageUrl: bankQ.questionImageUrl ?? undefined,
+              };
+              set("questions", [...questions, q]);
+              toast.success("Question added from bank.");
+            }} />
+          </TabsContent>
 
           {/* Manual */}
           <TabsContent value="manual" className="mt-2">
@@ -490,6 +511,82 @@ export default function LessonQuizBlockEditor({ data, onChange, handleFileUpload
           </Badge>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── Question Bank Picker ─────────────────────────────────────────────────────
+
+function QuestionBankPicker({ onAdd }: { onAdd: (q: any) => void }) {
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
+  const [page, setPage] = useState(1);
+
+  React.useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 350);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const { data: tagsData } = trpc.questionBank.listTags.useQuery();
+  const tags = tagsData ?? [];
+
+  const { data, isLoading } = trpc.questionBank.listQuestions.useQuery({
+    search: debouncedSearch || undefined,
+    tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined,
+    page,
+    pageSize: 10,
+  });
+
+  const questions = data?.questions ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.ceil(total / 10);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-1.5">
+        <div className="relative flex-1">
+          <Input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="Search question bank..." className="h-8 text-xs pl-7" />
+          <Search className="absolute left-2 top-2 w-3.5 h-3.5 text-gray-400" />
+        </div>
+      </div>
+      {tags.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {tags.map(tag => (
+            <button key={tag.id} onClick={() => { setSelectedTagIds(prev => prev.includes(tag.id) ? prev.filter(id => id !== tag.id) : [...prev, tag.id]); setPage(1); }}
+              className={`px-2 py-0.5 rounded-full text-xs font-medium border transition-all ${selectedTagIds.includes(tag.id) ? "text-white border-transparent" : "bg-white text-gray-600 border-gray-200"}`}
+              style={selectedTagIds.includes(tag.id) ? { backgroundColor: tag.color, borderColor: tag.color } : {}}>
+              {tag.name}
+            </button>
+          ))}
+        </div>
+      )}
+      {isLoading ? (
+        <p className="text-xs text-gray-400 text-center py-3">Loading...</p>
+      ) : questions.length === 0 ? (
+        <div className="text-center py-4">
+          <Database className="w-6 h-6 mx-auto mb-1 text-gray-300" />
+          <p className="text-xs text-gray-400">{total === 0 ? "No questions in bank yet." : "No questions match your search."}</p>
+        </div>
+      ) : (
+        <div className="space-y-1 max-h-60 overflow-y-auto">
+          {questions.map((q: any) => (
+            <div key={q.id} className="flex items-start gap-2 p-2 bg-gray-50 rounded border border-gray-100 text-xs hover:border-teal-200 hover:bg-teal-50 transition-colors">
+              <p className="flex-1 text-gray-700 font-medium line-clamp-2">{q.question}</p>
+              <button onClick={() => onAdd(q)} className="shrink-0 px-2 py-0.5 bg-teal-600 text-white rounded text-xs hover:bg-teal-700 transition-colors">Add</button>
+            </div>
+          ))}
+        </div>
+      )}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between text-xs text-gray-500">
+          <span>{(page - 1) * 10 + 1}–{Math.min(page * 10, total)} of {total}</span>
+          <div className="flex gap-1">
+            <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-2 py-0.5 border border-gray-200 rounded disabled:opacity-40">‹</button>
+            <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} className="px-2 py-0.5 border border-gray-200 rounded disabled:opacity-40">›</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
