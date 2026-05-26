@@ -23,7 +23,7 @@
 
 import { useEditor, EditorContent, Node, mergeAttributes } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import Image from "@tiptap/extension-image";
+import { ImageResize } from "tiptap-extension-resize-image";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import TextAlign from "@tiptap/extension-text-align";
@@ -71,6 +71,10 @@ import {
   Smile,
   Video,
   MousePointerClick,
+  WrapText,
+  MoveLeft,
+  MoveRight,
+  MoveHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Picker from "@emoji-mart/react";
@@ -270,7 +274,7 @@ export default function RichTextEditor({
       TextStyle,
       Color,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
-      Image.configure({ inline: false, allowBase64: true }),
+      ImageResize.configure({ inline: false, allowBase64: true }),
       VideoNode,
       Link.configure({
         openOnClick: false,
@@ -385,6 +389,38 @@ export default function RichTextEditor({
     editor.chain().focus().insertContent(html).run();
     setCtaDialogOpen(false);
   }, [editor, ctaText, ctaUrl, ctaBgColor, ctaTextColor, ctaSize, ctaFullWidth]);
+
+  // Image alignment/float helper — applies CSS class to the selected/nearby image node
+  const setImageClass = (cls: string) => {
+    if (!editor) return;
+    const { state } = editor;
+    const { from } = state.selection;
+    let found = false;
+    state.doc.nodesBetween(Math.max(0, from - 1), Math.min(state.doc.content.size, from + 1), (node, pos) => {
+      if (found) return false;
+      if (node.type.name === "image" || node.type.name === "imageResize") {
+        found = true;
+        const existingClass = (node.attrs.class ?? "") as string;
+        const newClass = existingClass === cls ? "" : cls;
+        editor.chain().focus().updateAttributes(node.type.name, { class: newClass }).run();
+        return false;
+      }
+    });
+  };
+
+  const getImageClass = (): string => {
+    if (!editor) return "";
+    const { state } = editor;
+    const { from } = state.selection;
+    let cls = "";
+    state.doc.nodesBetween(Math.max(0, from - 1), Math.min(state.doc.content.size, from + 1), (node) => {
+      if (node.type.name === "image" || node.type.name === "imageResize") {
+        cls = (node.attrs.class ?? "") as string;
+        return false;
+      }
+    });
+    return cls;
+  };
 
   if (!editor) return null;
 
@@ -545,6 +581,23 @@ export default function RichTextEditor({
             <ImageIcon className="w-3.5 h-3.5" />
           </ToolbarBtn>
 
+          {/* Image alignment / float — active when image is selected */}
+          <ToolbarBtn title="Image: align left (block)" active={getImageClass() === "align-left"} onClick={() => setImageClass("align-left")}>
+            <AlignLeft className="w-3.5 h-3.5" />
+          </ToolbarBtn>
+          <ToolbarBtn title="Image: center" active={getImageClass() === "align-center"} onClick={() => setImageClass("align-center")}>
+            <AlignCenter className="w-3.5 h-3.5" />
+          </ToolbarBtn>
+          <ToolbarBtn title="Image: align right (block)" active={getImageClass() === "align-right"} onClick={() => setImageClass("align-right")}>
+            <AlignRight className="w-3.5 h-3.5" />
+          </ToolbarBtn>
+          <ToolbarBtn title="Image: float left (text wraps right)" active={getImageClass() === "float-left"} onClick={() => setImageClass("float-left")}>
+            <MoveLeft className="w-3.5 h-3.5" />
+          </ToolbarBtn>
+          <ToolbarBtn title="Image: float right (text wraps left)" active={getImageClass() === "float-right"} onClick={() => setImageClass("float-right")}>
+            <MoveRight className="w-3.5 h-3.5" />
+          </ToolbarBtn>
+
           {/* Video Upload (direct file) */}
           <ToolbarBtn title="Upload video file (saved to Media Repository)" onClick={() => videoFileInputRef.current?.click()}>
             <Video className="w-3.5 h-3.5" />
@@ -626,7 +679,17 @@ export default function RichTextEditor({
         .rte-content .tiptap p { margin: 0.3em 0; }
         .rte-content .tiptap a { color: #149096; text-decoration: underline; cursor: pointer; }
         .rte-content .tiptap code { background: #f3f4f6; border-radius: 3px; padding: 0.1em 0.3em; font-family: monospace; font-size: 0.85em; }
-        .rte-content .tiptap img { max-width: 100%; border-radius: 8px; margin: 0.5em 0; }
+        .rte-content .tiptap img { max-width: 100%; border-radius: 8px; margin: 0.5em 0; display: block; }
+        .rte-content .tiptap img.float-left { float: left; margin: 0.5em 1em 0.5em 0; display: inline; }
+        .rte-content .tiptap img.float-right { float: right; margin: 0.5em 0 0.5em 1em; display: inline; }
+        .rte-content .tiptap img.align-center { margin-left: auto; margin-right: auto; display: block; }
+        .rte-content .tiptap img.align-left { margin-right: auto; display: block; }
+        .rte-content .tiptap img.align-right { margin-left: auto; display: block; }
+        /* Resize handle styles from tiptap-extension-resize-image */
+        .rte-content .tiptap .image-resizer { display: inline-block; position: relative; }
+        .rte-content .tiptap .image-resizer .resize-trigger { position: absolute; right: -5px; bottom: -5px; width: 12px; height: 12px; background: #149096; border-radius: 2px; cursor: se-resize; }
+        /* Clearfix after floated images */
+        .rte-content .tiptap p:has(img.float-left), .rte-content .tiptap p:has(img.float-right) { overflow: hidden; }
         .rte-content .tiptap iframe { max-width: 100%; border-radius: 8px; margin: 0.5em 0; }
         .rte-content .tiptap .youtube-embed { max-width: 100%; }
         .rte-content .tiptap video { max-width: 100%; border-radius: 8px; margin: 0.5em 0; }

@@ -3591,7 +3591,37 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
             <span className="text-gray-400 text-xs shrink-0 ml-1">({LESSON_TYPE_LABELS[lesson.type] ?? lesson.type})</span>
           </div>
         </div>
-        {/* Prev / Next lesson navigation */}
+        {/* Tab switcher — always rendered with fixed width so prev/next never shift */}
+        <div className="flex gap-1 shrink-0">
+          <button
+            onClick={() => setActiveTab("settings")}
+            className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+              activeTab === "settings" ? "bg-teal-600 text-white" : "text-gray-500 hover:text-gray-800"
+            }`}
+          >
+            Settings
+          </button>
+          <button
+            onClick={() => setActiveTab("content")}
+            className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+              activeTab === "content" ? "bg-teal-600 text-white" : "text-gray-500 hover:text-gray-800"
+            }`}
+          >
+            Lesson Editor
+          </button>
+          {/* Quiz Builder tab — always occupies space when lesson is quiz type to prevent layout shift */}
+          <button
+            onClick={() => lessonType === "quiz" && setActiveTab("quiz")}
+            aria-hidden={lessonType !== "quiz"}
+            className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+              lessonType !== "quiz" ? "invisible pointer-events-none" :
+              activeTab === "quiz" ? "bg-teal-600 text-white" : "text-gray-500 hover:text-gray-800"
+            }`}
+          >
+            <HelpCircle className="w-3 h-3" /> Quiz Builder
+          </button>
+        </div>
+        {/* Prev / Next lesson navigation — always at far right, never shifts */}
         <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={() => prevLesson && onNavigateLesson?.(prevLesson)}
@@ -3612,34 +3642,6 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
             <ChevronRight className="w-3.5 h-3.5 shrink-0" />
           </button>
         </div>
-        <div className="flex gap-1">
-          <button
-            onClick={() => setActiveTab("settings")}
-            className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-colors ${
-              activeTab === "settings" ? "bg-teal-600 text-white" : "text-gray-500 hover:text-gray-800"
-            }`}
-          >
-            Settings
-          </button>
-          <button
-            onClick={() => setActiveTab("content")}
-            className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-colors ${
-              activeTab === "content" ? "bg-teal-600 text-white" : "text-gray-500 hover:text-gray-800"
-            }`}
-          >
-            Lesson Editor
-          </button>
-          {lessonType === "quiz" && (
-            <button
-              onClick={() => setActiveTab("quiz")}
-              className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-colors flex items-center gap-1.5 ${
-                activeTab === "quiz" ? "bg-teal-600 text-white" : "text-gray-500 hover:text-gray-800"
-              }`}
-            >
-              <HelpCircle className="w-3 h-3" /> Quiz Builder
-            </button>
-          )}
-        </div>
       </div>
 
       {/* Tab Content */}
@@ -3647,6 +3649,24 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
       {activeTab === "settings" && (
       <div className="flex-1 overflow-y-auto">
       <div className="max-w-2xl mx-auto px-6 py-6">
+        {/* Top Save bar */}
+        <div className="flex justify-end gap-2 pb-4 border-b mb-4">
+          <Button
+            variant="outline"
+            className="border-teal-300 text-teal-700 hover:bg-teal-50 h-8 text-xs"
+            disabled={update.isPending}
+            onClick={() => handleSave(false)}
+          >
+            {update.isPending ? "Saving..." : "Save"}
+          </Button>
+          <Button
+            className="bg-teal-600 hover:bg-teal-700 text-white h-8 text-xs"
+            disabled={update.isPending}
+            onClick={() => handleSave(true)}
+          >
+            {update.isPending ? "Saving..." : "Save & Close"}
+          </Button>
+        </div>
         <div className="space-y-4">
           <div>
             <Label className="text-sm">Title</Label>
