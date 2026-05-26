@@ -19,6 +19,27 @@ function slugify(text: string): string {
     .slice(0, 200);
 }
 
+/**
+ * Returns a slug that is unique within the given funnel's pages.
+ * If `baseSlug` already exists in the funnel, appends -2, -3, -4, ... until unique.
+ * This prevents duplicate URL slugs like two pages both at /landing-page.
+ */
+async function uniquePageSlug(
+  db: Awaited<ReturnType<typeof getDb>>,
+  funnelId: number,
+  baseSlug: string
+): Promise<string> {
+  const existingPages = await db
+    .select({ slug: funnelPages.slug })
+    .from(funnelPages)
+    .where(eq(funnelPages.funnelId, funnelId));
+  const existingSlugs = new Set(existingPages.map(p => p.slug));
+  if (!existingSlugs.has(baseSlug)) return baseSlug;
+  let attempt = 2;
+  while (existingSlugs.has(`${baseSlug}-${attempt}`)) attempt++;
+  return `${baseSlug}-${attempt}`;
+}
+
 // ─── Admin Router ────────────────────────────────────────────────────────────
 
 export const funnelRouter = router({
@@ -331,8 +352,9 @@ export const funnelRouter = router({
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
-      // Auto-generate slug from title if not provided
-      const pageSlug = input.slug || slugify(input.title);
+      // Auto-generate slug from title if not provided, then ensure it is unique within this funnel
+      const basePageSlug = input.slug || slugify(input.title);
+      const pageSlug = await uniquePageSlug(db, input.funnelId, basePageSlug);
       // Get max sort order
       const [maxOrder] = await db
         .select({ max: sql<number>`COALESCE(MAX(sort_order), -1)` })
@@ -395,7 +417,8 @@ export const funnelRouter = router({
       const db = await getDb();
       const [original] = await db.select().from(funnelPages).where(eq(funnelPages.id, input.id));
       if (!original) throw new TRPCError({ code: "NOT_FOUND" });
-      const pageSlug = original.slug + "-copy-" + Date.now().toString(36).slice(-4);
+      // Use uniquePageSlug to avoid collisions — starts from original.slug-2, -3, etc.
+      const pageSlug = await uniquePageSlug(db, original.funnelId, original.slug + "-copy");
       const [maxOrder] = await db
         .select({ max: sql<number>`COALESCE(MAX(sort_order), -1)` })
         .from(funnelPages)
@@ -428,7 +451,8 @@ export const funnelRouter = router({
       if (!original) throw new TRPCError({ code: "NOT_FOUND" });
       const [targetFunnel] = await db.select({ id: funnels.id }).from(funnels).where(eq(funnels.id, input.targetFunnelId));
       if (!targetFunnel) throw new TRPCError({ code: "NOT_FOUND", message: "Target funnel not found" });
-      const pageSlug = original.slug + "-copy-" + Date.now().toString(36).slice(-4);
+      // Ensure slug is unique in the target funnel
+      const pageSlug = await uniquePageSlug(db, input.targetFunnelId, original.slug);
       const [maxOrder] = await db
         .select({ max: sql<number>`COALESCE(MAX(sort_order), -1)` })
         .from(funnelPages)
