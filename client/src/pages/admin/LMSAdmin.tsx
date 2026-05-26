@@ -3578,18 +3578,18 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
       {/* Lesson Editor Tab */}
       {activeTab === "content" && (
         <div className="flex-1 overflow-hidden flex flex-col">
-          {lessonLoading && !fullLesson ? (
+          {!fullLesson ? (
             <div className="flex items-center justify-center flex-1 gap-2 text-gray-400">
               <Loader2 className="w-5 h-5 animate-spin" />
               <span className="text-sm">Loading lesson content...</span>
             </div>
           ) : (
             <LessonBlockEditor
-              key={`blocks-${lesson.id}-${fullLesson ? 'full' : 'shallow'}`}
+              key={`blocks-${lesson.id}`}
               lessonId={lesson.id}
               courseId={lesson.courseId}
               courseSlug={courseData?.slug ?? ""}
-              initialBlocks={lesson.contentBlocks ? (typeof lesson.contentBlocks === "string" ? JSON.parse(lesson.contentBlocks) : lesson.contentBlocks) as Block[] : []}
+              initialBlocks={fullLesson.contentBlocks ? (typeof fullLesson.contentBlocks === "string" ? JSON.parse(fullLesson.contentBlocks) : fullLesson.contentBlocks) as Block[] : []}
               onClose={() => setActiveTab("settings")}
               onSaved={() => { onSaved(); }}
               onSavedAndClose={() => { if (onSavedAndClose) onSavedAndClose(); else onSaved(); }}
