@@ -1,6 +1,6 @@
 /**
  * EducationLibrary.tsx
- * Public-facing course catalog for All About Ultrasound - UltrasoundAssist & iHeartEcho
+ * Public-facing course catalog for All About Ultrasound™ & iHeartEcho™
  */
 import { useState, useMemo } from "react";
 import { Link } from "wouter";
@@ -20,8 +20,8 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
 };
 
 const BRAND_LABELS: Record<string, string> = {
-  aaus: "All About Ultrasound - UltrasoundAssist",
-  iheartecho: "iHeartEcho - EchoAssist",
+  aaus: "All About Ultrasound™",
+  iheartecho: "iHeartEcho™",
 };
 
 function CourseCard({ course, enrolledCourseIds, purchasedProductSlugs }: { course: any; enrolledCourseIds: Set<number>; purchasedProductSlugs: Set<string> }) {
@@ -175,7 +175,7 @@ export default function EducationLibrary() {
         <div className="max-w-5xl mx-auto text-center">
           <h1 className="text-3xl font-bold text-white mb-2">Education Library</h1>
           <p className="text-teal-100 text-base max-w-xl mx-auto">
-            Courses, quizzes, and downloads from All About Ultrasound - UltrasoundAssist and iHeartEcho — designed for sonographers, physicians, and educators.
+            Courses, quizzes, and downloads from All About Ultrasound™ and iHeartEcho™ — designed for sonographers, physicians, and educators.
           </p>
         </div>
       </div>
@@ -230,8 +230,8 @@ export default function EducationLibrary() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Brands</SelectItem>
-              <SelectItem value="aaus">All About Ultrasound - UltrasoundAssist</SelectItem>
-              <SelectItem value="iheartecho">iHeartEcho - EchoAssist</SelectItem>
+              <SelectItem value="aaus">All About Ultrasound™</SelectItem>
+              <SelectItem value="iheartecho">iHeartEcho™</SelectItem>
             </SelectContent>
           </Select>
           <Select value={type} onValueChange={v => { setType(v); setPage(1); }}>
