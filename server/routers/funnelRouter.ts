@@ -93,9 +93,28 @@ export const funnelRouter = router({
           : [],
       ]);
 
+      // Fallback: if a courseId was requested but not found in lms_courses,
+      // check digital_products. This handles legacy block data where a download
+      // was accidentally saved as type="course" in manualItems.
+      const foundCourseIds = new Set((courses as any[]).map((c: any) => c.id));
+      const missingCourseIds = courseIds.filter(id => !foundCourseIds.has(id));
+      let fallbackDownloads: any[] = [];
+      if (missingCourseIds.length > 0) {
+        fallbackDownloads = await db
+          .select({ id: digitalProducts.id, title: digitalProducts.title, slug: digitalProducts.slug, price: digitalProducts.price, isFree: digitalProducts.isFree, description: digitalProducts.subtitle, imageUrl: digitalProducts.thumbnailUrl })
+          .from(digitalProducts)
+          .where(inArray(digitalProducts.id, missingCourseIds));
+      }
+
       // Preserve the order specified by input.items
       const map = new Map<string, object>();
       for (const c of courses as any[]) map.set(`course-${c.id}`, { ...c, type: "course", isFree: c.isFree ?? false, href: `/courses/${c.slug}` });
+      // Register fallback downloads under BOTH keys so the original course-{id} lookup resolves
+      for (const d of fallbackDownloads as any[]) {
+        const entry = { ...d, type: "download", isFree: d.isFree ?? false, href: `/downloads/${d.slug}` };
+        map.set(`course-${d.id}`, entry); // original (wrong) key from block data
+        map.set(`download-${d.id}`, entry); // correct key
+      }
       for (const d of downloads as any[]) map.set(`download-${d.id}`, { ...d, type: "download", isFree: d.isFree ?? false, href: `/downloads/${d.slug}` });
       for (const b of bundles as any[]) map.set(`bundle-${b.id}`, { ...b, type: "bundle", isFree: false, price: b.price ?? 0, href: `/bundles/${b.slug}` });
       for (const p of physicals as any[]) map.set(`physical-${p.id}`, { ...p, type: "physical", isFree: false, href: `/shop/${p.slug}` });

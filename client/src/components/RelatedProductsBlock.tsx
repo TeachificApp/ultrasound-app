@@ -244,7 +244,7 @@ interface CardProps {
 function typeInfo(type: string) {
   switch (type) {
     case "course":   return { Icon: BookOpen,  label: "Course" };
-    case "download": return { Icon: FileDown,  label: "Download" };
+    case "download": return { Icon: FileDown,  label: "Digital Download" };
     case "bundle":   return { Icon: Package,   label: "Bundle" };
     case "physical": return { Icon: Package,   label: "Physical" };
     default:         return { Icon: Package,   label: type };

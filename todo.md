@@ -2954,3 +2954,7 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix React error #185 in ProductLandingPageBuilder (same pattern)
 - [x] Fix React error #185 in MediaRepository (same pattern)
 - [x] Thinkific lesson import hero blocks: add hideButtons:true so CTA button doesn't show on lesson pages
+
+## Bug Fixes (May 2026 — Session Continuation)
+- [x] getProductsByIds fallback: when type="course" is requested but ID not found in lms_courses, check digital_products and return as type="download" — fixes "COURSE" badge showing for eBook on Related Products blocks with legacy block data
+- [x] Fix TypeScript errors in thinkificImportRouter.ts (file_size and description properties on ThinkificLessonContent type at lines 719 and 760) — added file_size and description to ThinkificLessonContent interface in thinkific.ts

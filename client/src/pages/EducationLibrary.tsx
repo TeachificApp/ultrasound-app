@@ -86,7 +86,7 @@ function CourseCard({ course, enrolledCourseIds, purchasedProductSlugs }: { cour
           {/* Tags below price */}
           <div className="flex flex-wrap gap-1.5 mt-2">
             <Badge variant="secondary" className="bg-teal-50 text-teal-700 text-xs font-medium flex items-center gap-1">
-              {TYPE_ICONS[course.type]} {course.type.charAt(0).toUpperCase() + course.type.slice(1)}
+              {TYPE_ICONS[course.type]} {course.type === "download" ? "Digital Download" : course.type.charAt(0).toUpperCase() + course.type.slice(1)}
             </Badge>
             {course.isFree && (
               <Badge className="bg-green-500 text-white text-xs">Free</Badge>

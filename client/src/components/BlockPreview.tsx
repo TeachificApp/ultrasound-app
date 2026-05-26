@@ -815,7 +815,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       const layout = d.layout ?? "grid";
       const mockCards = Array.from({ length: maxItems }, (_, i) => ({
         title: ["Advanced Vascular Ultrasound", "Fetal Echo Essentials", "POCUS Fundamentals"][i] ?? `Product ${i + 1}`,
-        type: i % 2 === 0 ? "Course" : "Download",
+        type: i % 2 === 0 ? "Course" : "Digital Download",
         price: i === 0 ? "$149" : i === 1 ? "$79" : "Free",
         description: "Comprehensive training resource for sonographers and clinicians.",
       }));

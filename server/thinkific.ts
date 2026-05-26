@@ -685,7 +685,10 @@ export interface ThinkificLessonContent {
   // Download / file
   download_url?: string | null;
   file_name?: string | null;
+  file_size?: number | null;       // bytes (may be returned by player API)
   content_type?: string | null;
+  // Description / plain text body (may be returned by player API)
+  description?: string | null;
   // Presentation
   slide_urls?: string[] | null;
   // Quiz / Exam

@@ -879,7 +879,7 @@ export default function CourseLanding() {
           <div className="lg:col-span-2 space-y-4">
             <div className="flex flex-wrap gap-2">
               <Badge variant="secondary" className="bg-teal-600 text-white border-0 flex items-center gap-1">
-                {TYPE_ICONS[course.type]} {course.type.charAt(0).toUpperCase() + course.type.slice(1)}
+                {TYPE_ICONS[course.type]} {course.type === "download" ? "Digital Download" : course.type.charAt(0).toUpperCase() + course.type.slice(1)}
               </Badge>
               <Badge variant="outline" className="border-teal-400 text-teal-200">
                 {course.brand === "aaus" ? "All About Ultrasound™" : "iHeartEcho™"}
