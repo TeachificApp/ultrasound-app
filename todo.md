@@ -2971,3 +2971,8 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Wire take_url scraping fallback in both import and resync procedures
 - [x] Add Diagnostics panel in ThinkificImporter for testing content fetch per lesson (player API + take_url scrape)
 - [x] Add testContentFetch tRPC procedure to thinkificImportRouter
+
+## Sales Page Scraper Fix (May 26, 2026 — Session 3)
+- [x] Rewrite scrapeThinkificSalesPage to parse all Thinkific page sections: banner→hero, checklist→bullets, rich-text→text blocks, curriculum_auto, FAQ
+- [x] Add testScrapeCourseSalesPage debug procedure (server) to test scraper end-to-end
+- [x] Add "Test Sales Page Scraper" diagnostics card in ThinkificImporter UI (blue card)

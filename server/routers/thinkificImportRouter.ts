@@ -178,104 +178,115 @@ async function scrapeThinkificSalesPage(slug: string, customDomain: string): Pro
   if (!html) return { blocks: [], price: 0 };
 
   try {
-
     const bodyIdx = html.indexOf("<body");
     const body = bodyIdx > -1 ? html.slice(bodyIdx) : html;
     const blocks: LandingBlock[] = [];
 
-    // ── 1. Extract course title from page ──
-    // Thinkific pages have the course title in a heading with class containing "course" or in the banner
-    let pageTitle = "";
-    const titleMatch = body.match(/class="[^"]*(?:course-landing|banner)[^"]*__title[^"]*"[^>]*>([\s\S]*?)<\/[^>]*>/i)
-      || body.match(/class="[^"]*course[^"]*title[^"]*"[^>]*>([\s\S]*?)<\/[^>]*>/i);
-    if (titleMatch) {
-      pageTitle = stripHtml(titleMatch[1]);
-    }
-
-    // ── 2. Extract description from card__description or course description divs ──
-    let description = "";
-    const descMatches = [...body.matchAll(/class="[^"]*(?:card__description|course-landing[^"]*description)[^"]*"[^>]*>([\s\S]*?)<\/div>/gi)];
-    for (const m of descMatches) {
-      const text = stripHtml(m[1]);
-      if (text && text.length > 20) {
-        description = text;
-        break;
-      }
-    }
-    // Fallback: look for any description div
-    if (!description) {
-      const anyDesc = body.match(/class="[^"]*description[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
-      if (anyDesc) {
-        const text = stripHtml(anyDesc[1]);
-        if (text.length > 20) description = text;
-      }
-    }
-
-    // ── 3. Extract pricing ──
+    // ── 1. Extract pricing (do this first so we can use it in hero) ──
     const priceMatches = [...body.matchAll(/\$(\d+(?:[.,]\d{2})?)/g)];
     if (priceMatches.length > 0) {
-      // Take the first price found (usually the main course price)
       const priceStr = priceMatches[0][1].replace(",", "");
-      price = Math.round(parseFloat(priceStr) * 100); // convert to cents
+      price = Math.round(parseFloat(priceStr) * 100);
     }
 
-    // ── 4. Extract images (course card image, banner image) ──
+    // ── 2. Extract hero image (first thinkific CDN file upload image) ──
     let heroImage = "";
     const imgMatches = [...body.matchAll(/<img[^>]*src="([^"]+)"[^>]*>/gi)];
     for (const m of imgMatches) {
       const src = m[1];
-      // Skip tiny icons and logos
-      if (src.includes("thinkific") && src.includes("file_uploads") && !src.includes("logo") && !src.includes("icon")) {
+      if ((src.includes("thinkific") || src.includes("cdn")) && src.includes("file_uploads") && !src.includes("logo") && !src.includes("icon")) {
         heroImage = src;
         break;
       }
     }
 
-    // ── 5. Build hero block ──
-    if (pageTitle || description) {
-      blocks.push({
-        id: uid(),
-        type: "hero",
-        data: {
-          headline: pageTitle || "Course",
-          headline2: "",
-          subheadline: description.slice(0, 200),
-          bgType: heroImage ? "image" : "color",
-          bgColor: "#149096",
-          bgImage: heroImage || "",
-          textColor: "#ffffff",
-          align: "center",
-          buttons: [{ text: "Enroll Now", color: "#ffffff", textColor: "#149096", link: "", style: "filled" }],
-          showButtons: true,
-        },
-      });
-    }
-
-    // ── 6. Description text block (if longer than hero subheadline) ──
-    if (description && description.length > 200) {
-      blocks.push({
-        id: uid(),
-        type: "text",
-        data: {
-          html: `<p>${description}</p>`,
-          align: "left",
-          bgColor: "#ffffff",
-          textColor: "#1a1a1a",
-        },
-      });
-    }
-
-    // ── 7. Extract curriculum from the page (chapter names and lesson names) ──
-    const chapterNames: string[] = [];
-    const chapterHeadings = [...body.matchAll(/class="[^"]*chapter[^"]*(?:title|name|heading)[^"]*"[^>]*>([\s\S]*?)<\/[^>]*>/gi)];
-    for (const m of chapterHeadings) {
-      const text = stripHtml(m[1]);
-      if (text && text.length > 2 && text.length < 200) {
-        chapterNames.push(text);
+    // ── 3. Parse the banner section → hero block ──
+    const bannerMatch = body.match(/<section[^>]*class="[^"]*banner[^"]*"[^>]*>([\s\S]*?)<\/section>/i);
+    if (bannerMatch) {
+      const bannerContent = bannerMatch[1];
+      const titleMatch = bannerContent.match(/<h[12][^>]*>([\s\S]*?)<\/h[12]>/i);
+      const subtitleMatch = bannerContent.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
+      const bannerImgMatch = bannerContent.match(/background-image:\s*url\(["']?([^"')]+)["']?\)/i)
+        || bannerContent.match(/<img[^>]*src="([^"]+)"[^>]*>/i);
+      const bannerTitle = titleMatch ? stripHtml(titleMatch[1]) : "";
+      const bannerSubtitle = subtitleMatch ? stripHtml(subtitleMatch[1]) : "";
+      const bannerImg = bannerImgMatch ? bannerImgMatch[1] : heroImage;
+      if (bannerTitle) {
+        blocks.push({
+          id: uid(),
+          type: "hero",
+          data: {
+            headline: bannerTitle,
+            headline2: "",
+            subheadline: bannerSubtitle,
+            bgType: bannerImg ? "image" : "color",
+            bgColor: "#149096",
+            bgImage: bannerImg || "",
+            textColor: "#ffffff",
+            align: "center",
+            buttons: [{ text: "Enroll Now", color: "#ffffff", textColor: "#149096", link: "", style: "filled" }],
+            showButtons: true,
+          },
+        });
       }
     }
 
-    // ── 8. Always append a curriculum_auto block ──
+    // ── 4. Parse checklist section → bullets block ──
+    const checklistMatch = body.match(/<section[^>]*class="[^"]*checklist[^"]*"[^>]*>([\s\S]*?)<\/section>/i);
+    if (checklistMatch) {
+      const checklistContent = checklistMatch[1];
+      const headingMatch = checklistContent.match(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/i);
+      const listItems = [...checklistContent.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)]
+        .map(m => stripHtml(m[1]))
+        .filter(t => t && t.length > 3 && t.length < 300);
+      if (listItems.length > 0) {
+        blocks.push({
+          id: uid(),
+          type: "bullets",
+          data: {
+            headline: headingMatch ? stripHtml(headingMatch[1]) : "What's Included",
+            items: listItems,
+            bgColor: "#f0fdfd",
+            textColor: "#1a1a1a",
+            headlineColor: "#149096",
+            iconColor: "#149096",
+            columns: 2,
+          },
+        });
+      }
+    }
+
+    // ── 5. Parse rich-text sections → text blocks ──
+    const richTextSections = [...body.matchAll(/<section[^>]*class="[^"]*rich-text[^"]*"[^>]*>([\s\S]*?)<\/section>/gi)];
+    for (const sectionMatch of richTextSections) {
+      const sectionContent = sectionMatch[1];
+      // Build HTML from headings + paragraphs + lists inside this section
+      const headings = [...sectionContent.matchAll(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/gi)]
+        .map(m => `<h3>${stripHtml(m[1])}</h3>`)
+        .filter(h => h.length > 9);
+      const paras = [...sectionContent.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)]
+        .map(m => { const t = stripHtml(m[1]); return t.length > 10 ? `<p>${t}</p>` : ""; })
+        .filter(Boolean);
+      const listItems = [...sectionContent.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)]
+        .map(m => stripHtml(m[1]))
+        .filter(t => t && t.length > 3);
+      const listHtml = listItems.length > 0 ? `<ul>${listItems.map(i => `<li>${i}</li>`).join("")}</ul>` : "";
+      const combinedHtml = [...headings, ...paras, listHtml].filter(Boolean).join("\n");
+      if (combinedHtml.length > 20) {
+        blocks.push({
+          id: uid(),
+          type: "text",
+          data: {
+            html: combinedHtml,
+            align: "left",
+            bgColor: "#ffffff",
+            textColor: "#1a1a1a",
+          },
+        });
+      }
+    }
+
+    // ── 6. Curriculum block ──
     blocks.push({
       id: uid(),
       type: "curriculum_auto",
@@ -296,7 +307,7 @@ async function scrapeThinkificSalesPage(slug: string, customDomain: string): Pro
       },
     });
 
-    // ── 9. FAQ section (if found) ──
+    // ── 7. FAQ section (if found) ──
     const faqItems: { q: string; a: string }[] = [];
     const faqMatches = [...body.matchAll(/class="[^"]*(?:faq|accordion)[^"]*"[^>]*>([\s\S]*?)<\/(?:div|section)>/gi)];
     for (const match of faqMatches) {
@@ -321,8 +332,34 @@ async function scrapeThinkificSalesPage(slug: string, customDomain: string): Pro
       });
     }
 
+    // ── 8. Fallback: if no hero was built from banner, build one from page title ──
+    if (!blocks.find(b => b.type === "hero")) {
+      const titleMatch = body.match(/class="[^"]*(?:course-landing|banner)[^"]*__title[^"]*"[^>]*>([\s\S]*?)<\/[^>]*>/i)
+        || body.match(/class="[^"]*course[^"]*title[^"]*"[^>]*>([\s\S]*?)<\/[^>]*>/i);
+      const pageTitle = titleMatch ? stripHtml(titleMatch[1]) : "";
+      if (pageTitle) {
+        blocks.unshift({
+          id: uid(),
+          type: "hero",
+          data: {
+            headline: pageTitle,
+            headline2: "",
+            subheadline: "",
+            bgType: heroImage ? "image" : "color",
+            bgColor: "#149096",
+            bgImage: heroImage || "",
+            textColor: "#ffffff",
+            align: "center",
+            buttons: [{ text: "Enroll Now", color: "#ffffff", textColor: "#149096", link: "", style: "filled" }],
+            showButtons: true,
+          },
+        });
+      }
+    }
+
     return { blocks, price };
-  } catch {
+  } catch (err) {
+    console.error("[scrapeThinkificSalesPage] Error:", err);
     return { blocks: [], price: 0 };
   }
 }
@@ -1410,6 +1447,34 @@ export const thinkificImportRouter = router({
         scrapeResult,
         playerResultJson: playerResult ? JSON.stringify(playerResult, null, 2).substring(0, 5000) : null,
         scrapeResultJson: scrapeResult ? JSON.stringify(scrapeResult, null, 2).substring(0, 5000) : null,
+      };
+    }),
+
+  /** Debug: test the sales page scraper for a given course slug */
+  testScrapeCourseSalesPage: protectedProcedure
+    .input(z.object({
+      courseSlug: z.string(),
+      customDomain: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      adminOnly(ctx.user.role);
+      const log: string[] = [];
+      const { ENV } = await import("../_core/env");
+      const subdomain = ENV.thinkificSubdomain;
+      const urlsToTry: string[] = [];
+      if (subdomain) urlsToTry.push(`https://${subdomain}.thinkific.com/courses/${input.courseSlug}`);
+      if (input.customDomain && !input.customDomain.startsWith("member.")) {
+        urlsToTry.push(`https://${input.customDomain}/courses/${input.courseSlug}`);
+      }
+      log.push(`URLs to try: ${urlsToTry.join(", ")}`);
+      const result = await scrapeThinkificSalesPage(input.courseSlug, input.customDomain || "");
+      log.push(`Scraped ${result.blocks.length} blocks, price: $${(result.price / 100).toFixed(2)}`);
+      log.push(`Block types: ${result.blocks.map(b => b.type).join(", ")}`);
+      return {
+        log,
+        blocks: result.blocks,
+        price: result.price,
+        blocksJson: JSON.stringify(result.blocks, null, 2).substring(0, 8000),
       };
     }),
 });

@@ -93,6 +93,10 @@ export default function ThinkificImporter() {
   const [debugTakeUrl, setDebugTakeUrl] = useState("");
   const [debugResult, setDebugResult] = useState<{ log: string[]; playerResultJson: string | null; scrapeResultJson: string | null } | null>(null);
   const [debugOpen, setDebugOpen] = useState(false);
+  // Debug: test sales page scraper
+  const [salesPageSlug, setSalesPageSlug] = useState("");
+  const [salesPageDomain, setSalesPageDomain] = useState("");
+  const [salesPageResult, setSalesPageResult] = useState<{ log: string[]; blocksJson: string; price: number; blocks: unknown[] } | null>(null);
 
   // Queries
   const { data: courses, isLoading: loadingCourses, error: coursesError } = trpc.thinkificImport.listCourses.useQuery();
@@ -148,6 +152,16 @@ export default function ThinkificImporter() {
     },
     onError: (err) => {
       toast.error(`Test failed: ${err.message}`);
+    },
+  });
+
+  const testScrapeCourseSalesPage = trpc.thinkificImport.testScrapeCourseSalesPage.useMutation({
+    onSuccess: (data) => {
+      setSalesPageResult(data);
+      toast.success(`Sales page scraped: ${data.blocks.length} blocks found`);
+    },
+    onError: (err) => {
+      toast.error(`Scrape test failed: ${err.message}`);
     },
   });
 
@@ -715,6 +729,69 @@ export default function ThinkificImporter() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* ── Debug: Test Sales Page Scraper ─────────────────────────── */}
+      <Card className="mt-6 border-dashed border-blue-300 bg-blue-50">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2 text-blue-800">
+            <Wrench className="w-4 h-4" />
+            Diagnostics: Test Sales Page Scraper
+          </CardTitle>
+          <CardDescription className="text-xs text-blue-700">
+            Test whether the sales page scraper can extract blocks from a Thinkific course page. Enter the course slug (from the Thinkific URL) to see what blocks would be generated.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Course Slug</label>
+              <Input
+                placeholder="e.g. fetal-echo-fundamentals"
+                value={salesPageSlug}
+                onChange={e => setSalesPageSlug(e.target.value)}
+                className="h-8 text-xs"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Custom Domain (optional)</label>
+              <Input
+                placeholder="e.g. allaboutultrasound.com"
+                value={salesPageDomain}
+                onChange={e => setSalesPageDomain(e.target.value)}
+                className="h-8 text-xs"
+              />
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-blue-400 text-blue-800 hover:bg-blue-100"
+            disabled={!salesPageSlug || testScrapeCourseSalesPage.isPending}
+            onClick={() => testScrapeCourseSalesPage.mutate({
+              courseSlug: salesPageSlug,
+              customDomain: salesPageDomain || undefined,
+            })}
+          >
+            {testScrapeCourseSalesPage.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Wrench className="w-3 h-3 mr-1" />}
+            Run Scrape Test
+          </Button>
+          {salesPageResult && (
+            <div className="space-y-2">
+              <div className="p-2 rounded bg-white border text-xs font-mono space-y-0.5">
+                {salesPageResult.log.map((line, i) => (
+                  <p key={i} className={line.includes("error") || line.includes("Error") ? "text-red-600" : line.includes("block") ? "text-green-700" : "text-gray-700"}>{line}</p>
+                ))}
+              </div>
+              {salesPageResult.blocksJson && (
+                <details className="text-xs" open>
+                  <summary className="cursor-pointer font-medium text-gray-600">Scraped Blocks ({salesPageResult.blocks?.length ?? 0} blocks, price: ${(salesPageResult.price / 100).toFixed(2)})</summary>
+                  <pre className="mt-1 p-2 rounded bg-white border text-gray-700 max-h-64 overflow-auto whitespace-pre-wrap">{salesPageResult.blocksJson}</pre>
+                </details>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* ── Debug: Test Content Fetch ─────────────────────────────────── */}
       <Card className="mt-6 border-dashed border-amber-300 bg-amber-50">
