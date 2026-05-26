@@ -2025,7 +2025,7 @@ export const lmsAdminRouter = router({
           bgColor: "#149096",
           textColor: "#ffffff",
           align: "left",
-          maxHeight: 150,
+          minHeight: 150,
         },
       }]);
       const [result] = await db.insert(lmsLessons).values({

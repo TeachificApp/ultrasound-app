@@ -1758,8 +1758,8 @@ export default function CoursePlayer() {
                   )}
 
                   {/* ── Lesson effects ── */}
-                  <LessonEffectPlayer key={`start-${lessonData.id}`} effect={lessonData} trigger="lesson_start" />
-                  <LessonEffectPlayer key={`complete-${lessonData.id}`} effect={lessonData} trigger="lesson_complete" />
+                  <LessonEffectPlayer key={`start-${lessonData.id}`} effect={lessonData} trigger="lesson_start" userName={user?.name ?? undefined} />
+                  <LessonEffectPlayer key={`complete-${lessonData.id}`} effect={lessonData} trigger="lesson_complete" userName={user?.name ?? undefined} />
 
                   {/* ── Quiz ── */}
                   {lessonData.type === "quiz" && (

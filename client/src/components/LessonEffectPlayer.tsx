@@ -183,11 +183,13 @@ export interface LessonEffect {
 interface LessonEffectPlayerProps {
   effect: LessonEffect | null | undefined;
   trigger: "lesson_start" | "lesson_complete";
+  /** Optional learner name — replaces {{name}} merge tag in banner text */
+  userName?: string;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function LessonEffectPlayer({ effect, trigger }: LessonEffectPlayerProps) {
+export default function LessonEffectPlayer({ effect, trigger, userName }: LessonEffectPlayerProps) {
   const [bannerVisible, setBannerVisible] = useState(false);
   const [confettiActive, setConfettiActive] = useState(false);
   // Always render the canvas so canvasRef.current is always available
@@ -293,7 +295,9 @@ export default function LessonEffectPlayer({ effect, trigger }: LessonEffectPlay
             color: effect.effectBannerTextColor ?? "#ffffff",
           }}
         >
-          <p className="text-base font-semibold flex-1 text-center">{effect.effectBannerText}</p>
+          <p className="text-base font-semibold flex-1 text-center">
+            {effect.effectBannerText?.replace(/\{\{name\}\}/gi, userName?.split(" ")[0] ?? "there")}
+          </p>
           <button
             onClick={() => setBannerVisible(false)}
             className="ml-4 opacity-70 hover:opacity-100 transition-opacity"

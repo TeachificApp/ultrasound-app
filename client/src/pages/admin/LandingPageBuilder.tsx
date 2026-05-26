@@ -2420,6 +2420,7 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
             {/* Appearance */}
             <div className="border border-gray-100 rounded p-2 space-y-2">
               <p className="text-xs font-semibold text-gray-600">Appearance</p>
+              <BSColorField data={d} onSet={set} label="Background Color" field="bgColor" />
               <div className="flex items-center gap-2"><input type="checkbox" checked={d.showShadow ?? true} onChange={e => set("showShadow", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Drop shadow</label></div>
               <div className="flex items-center gap-2"><input type="checkbox" checked={d.noBorder ?? false} onChange={e => set("noBorder", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">No border</label></div>
               <div><label className="text-xs text-gray-500 block mb-1">Border Radius (px)</label><Input type="number" value={d.borderRadius ?? 0} onChange={e => set("borderRadius", Number(e.target.value))} className="h-8 text-sm" min={0} max={999} /></div>
@@ -3749,6 +3750,29 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
               <input type="color" value={d.bgColor ?? "#ffffff"} onChange={e => set("bgColor", e.target.value)} className="w-8 h-8 rounded cursor-pointer border border-gray-200" />
               <DebouncedInput value={d.bgColor ?? "#ffffff"} onChange={v => set("bgColor", v)} className="h-8 text-xs flex-1" placeholder="#ffffff" />
             </div>
+          </div>
+          {/* Pass-through credentials */}
+          <div className="border-t border-gray-100 pt-3">
+            <label className="text-xs font-semibold text-gray-700 block mb-2">Pass User Credentials</label>
+            <p className="text-[10px] text-gray-400 mb-2">When enabled, the logged-in user's name/email will be appended to the iframe URL as query parameters.</p>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={d.passName ?? false} onChange={e => set("passName", e.target.checked)} className="rounded" />
+                <span className="text-xs text-gray-600">Pass <code className="bg-gray-100 px-1 rounded">name</code></span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={d.passEmail ?? false} onChange={e => set("passEmail", e.target.checked)} className="rounded" />
+                <span className="text-xs text-gray-600">Pass <code className="bg-gray-100 px-1 rounded">email</code></span>
+              </label>
+            </div>
+            {(d.passName || d.passEmail) && d.url && (
+              <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
+                <p className="text-[10px] text-gray-500 font-medium mb-1">Preview URL (with params):</p>
+                <p className="text-[10px] text-gray-400 break-all font-mono">
+                  {d.url}{d.url.includes('?') ? '&' : '?'}{[d.passName && 'name=%7Buser.name%7D', d.passEmail && 'email=%7Buser.email%7D'].filter(Boolean).join('&')}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       );

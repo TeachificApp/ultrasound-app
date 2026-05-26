@@ -3052,3 +3052,8 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Trash tab: add "Restore" button on each trashed item to recover it back to draft status (courses, quizzes, downloads, products)
 - [ ] Lesson content editor: add undo/redo stack (Ctrl+Z / Ctrl+Y) for block add, delete, reorder, and edit operations
 - [ ] Show undo/redo toolbar buttons in the lesson block editor header
+
+## Rich Text Editor Image Enhancements
+- [ ] Rich text editor: image selection shows resize handles (drag corners to resize)
+- [ ] Rich text editor: image wrapping options (float left, float right, inline, block/full-width)
+- [ ] Rich text editor: image alignment toolbar (left, center, right) when image is selected

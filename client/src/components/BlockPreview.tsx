@@ -3,8 +3,9 @@
  * Shared read-only block renderer used by CoursePlayer, CourseOverview, and LandingPageBuilder.
  * Extracted into its own file to break the circular dependency between CoursePlayer and LandingPageBuilder.
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ChevronDown, Globe, Image, Package, Upload, Video } from "lucide-react";
+import { useAuth } from "@/_core/hooks/useAuth";
 import CarouselBlock from "@/components/CarouselBlock";
 import InlineCheckoutBlock from "@/components/InlineCheckoutBlock";
 import AudioBlockPlayer from "@/components/AudioBlockPlayer";
@@ -82,7 +83,19 @@ export interface Block {
 }
 
 export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block; coursePrice?: number; courseTitle?: string }) {
+  const { user } = useAuth();
   const d = block.data ?? {};
+  // Pre-compute pass-through URL for url_embed blocks (hooks must be at top level, not inside switch)
+  const urlEmbedSrc = useMemo(() => {
+    if (block.type !== "url_embed") return "";
+    const rawUrl = d.url ?? "";
+    if (!rawUrl || !user || (!d.passName && !d.passEmail)) return rawUrl;
+    const sep = rawUrl.includes('?') ? '&' : '?';
+    const params: string[] = [];
+    if (d.passName && (user as any).name) params.push(`name=${encodeURIComponent((user as any).name)}`);
+    if (d.passEmail && (user as any).email) params.push(`email=${encodeURIComponent((user as any).email)}`);
+    return params.length ? `${rawUrl}${sep}${params.join('&')}` : rawUrl;
+  }, [block.type, d.url, d.passName, d.passEmail, user]);
   const bwBP = d.contentWidth;
   const bwMapBP: Record<string, string> = { xl: "1280px", lg: "1024px", md: "768px", sm: "640px" };
   const bwMaxBP = bwBP && bwBP !== "full" ? bwMapBP[bwBP] : null;
@@ -182,7 +195,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
         ? <img src={d.url} alt={d.alt ?? ""} className={d.showShadow !== false ? "shadow" : ""} style={imgStyle} />
         : <div className="w-full h-40 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400"><Image size={32} /></div>;
       return (
-        <div className="px-8 py-6" style={{ display: "flex", flexDirection: "column", alignItems: imgJustify }}>
+        <div className="px-8 py-6" style={{ display: "flex", flexDirection: "column", alignItems: imgJustify, backgroundColor: d.bgColor || undefined }}>
           <ImageLinkWrapper d={d}>{imgEl}</ImageLinkWrapper>
           {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: imgAlign as any }}>{d.caption}</p>}
         </div>
@@ -1011,9 +1024,9 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       );
     }
     case "url_embed": {
-      const url = d.url ?? "";
       const height = d.height ?? 600;
       const embedTitle = d.title ?? "Embedded Content";
+      const url = urlEmbedSrc || d.url || "";
       return (
         <div className="px-8 py-6" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           {d.title && <h3 className="text-lg font-semibold text-gray-800 mb-3">{d.title}</h3>}
