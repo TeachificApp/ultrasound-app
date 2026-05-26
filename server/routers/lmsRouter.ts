@@ -1412,7 +1412,7 @@ export const lmsAdminRouter = router({
       status: z.enum(["draft", "public", "hidden", "private", "archived", "all"]).default("all"),
       type: z.enum(["course", "quiz", "download", "all"]).default("all"),
       page: z.number().int().min(1).default(1),
-      pageSize: z.number().int().min(1).max(100).default(20),
+      pageSize: z.number().int().min(1).max(500).default(20),
     }))
     .query(async ({ ctx, input }) => {
       await assertAdmin(ctx);
