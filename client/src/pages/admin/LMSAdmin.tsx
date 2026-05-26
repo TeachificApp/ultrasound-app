@@ -38,6 +38,7 @@ import {
   Link as LinkIcon, UserCheck, ArrowLeft, Upload, ImageIcon,
   Sparkles, Loader2, Eye, EyeOff, Save, X, FolderOpen, Monitor, Video, FileText, CheckSquare, Settings2,
   User, Lock, ListChecks, Award, PlayCircle, ArrowRight, UserPlus, RefreshCw,
+  Package, Layers, Globe, Radio, Tag, LayoutGrid, ShoppingBag, GraduationCap, TrendingUp,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import LessonEffectEditor from "@/components/LessonEffectEditor";
@@ -5012,6 +5013,67 @@ function AnalyticsTab() {
   );
 }
 
+// ─── LMS Nav Config ───────────────────────────────────────────────────────────
+
+const LMS_NAV_GROUPS = [
+  {
+    label: "Content",
+    color: "teal",
+    items: [
+      { value: "courses",     label: "Courses",     icon: BookOpen },
+      { value: "quizzes",     label: "Quizzes",     icon: HelpCircle },
+      { value: "downloads",   label: "Downloads",   icon: Download },
+      { value: "products",    label: "Products",    icon: ShoppingBag },
+      { value: "webinars",    label: "Webinars",    icon: Radio },
+      { value: "bundles",     label: "Bundles",     icon: Layers },
+      { value: "memberships", label: "Memberships", icon: Award },
+      { value: "communities", label: "Communities", icon: Globe },
+    ],
+  },
+  {
+    label: "Sales",
+    color: "purple",
+    items: [
+      { value: "orderbumps",  label: "Order Bumps", icon: Tag },
+      { value: "collections", label: "Collections", icon: LayoutGrid },
+    ],
+  },
+  {
+    label: "People",
+    color: "blue",
+    items: [
+      { value: "groups",      label: "Groups",      icon: Users },
+      { value: "instructors", label: "Instructors", icon: GraduationCap },
+      { value: "certificates",label: "Certificates",icon: CheckCircle },
+      { value: "enrollments", label: "Enrollments", icon: UserCheck },
+    ],
+  },
+  {
+    label: "Insights",
+    color: "orange",
+    items: [
+      { value: "analytics",   label: "Analytics",   icon: TrendingUp },
+      { value: "affiliates",  label: "Affiliates",  icon: DollarSign },
+    ],
+  },
+  {
+    label: "Tools",
+    color: "gray",
+    items: [
+      { value: "thinkific",   label: "Import",      icon: Upload }, // Upload already imported
+      { value: "trash",       label: "Trash",       icon: Trash2, danger: true },
+    ],
+  },
+] as const;
+
+const GROUP_COLORS: Record<string, { bg: string; text: string; activeBg: string; activeText: string; dot: string }> = {
+  teal:   { bg: "bg-teal-50",   text: "text-teal-700",   activeBg: "bg-teal-600",   activeText: "text-white", dot: "bg-teal-400" },
+  purple: { bg: "bg-purple-50", text: "text-purple-700", activeBg: "bg-purple-600", activeText: "text-white", dot: "bg-purple-400" },
+  blue:   { bg: "bg-blue-50",   text: "text-blue-700",   activeBg: "bg-blue-600",   activeText: "text-white", dot: "bg-blue-400" },
+  orange: { bg: "bg-orange-50", text: "text-orange-700", activeBg: "bg-orange-500", activeText: "text-white", dot: "bg-orange-400" },
+  gray:   { bg: "bg-gray-50",   text: "text-gray-600",   activeBg: "bg-gray-700",   activeText: "text-white", dot: "bg-gray-400" },
+};
+
 // ─── Main LMSAdmin Component ──────────────────────────────────────────────────
 
 export default function LMSAdmin() {
@@ -5023,61 +5085,168 @@ export default function LMSAdmin() {
   const [activeTab, setActiveTab] = useState(urlTab || (urlEditDownload ? "downloads" : urlEditProduct ? "products" : "courses"));
   const [editingCourseId, setEditingCourseId] = useState<number | null>(urlEditCourse ? Number(urlEditCourse) : null);
 
+  // Flatten all tabs to find active group color
+  const allItems = LMS_NAV_GROUPS.flatMap(g => g.items.map(i => ({ ...i, groupColor: g.color })));
+  const activeItem = allItems.find(i => i.value === activeTab);
+  const activeGroupColor = activeItem?.groupColor ?? "teal";
+
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-5">
-      <div className="mb-1">
-        <Link href="/platform-admin" className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700 transition-colors">
-          <ChevronLeft className="w-3 h-3" /> Platform Admin
-        </Link>
-      </div>
-      <div className="flex items-center gap-3">
-        <BookOpen className="w-6 h-6 text-teal-600" />
-        <h1 className="text-xl font-bold text-gray-900">Education Library — Admin</h1>
-        <Link href="/education-library">
-          <Button size="sm" variant="outline" className="ml-auto h-8 text-xs text-teal-600 border-teal-300">
-            <LinkIcon className="w-3 h-3 mr-1" /> View Public Library
-          </Button>
-        </Link>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="max-w-7xl mx-auto">
+          <div className="mb-2">
+            <Link href="/platform-admin" className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors">
+              <ChevronLeft className="w-3 h-3" /> Platform Admin
+            </Link>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-teal-600 flex items-center justify-center shadow-sm">
+                <BookOpen className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h1 className="text-lg font-bold text-gray-900">LMS Management</h1>
+                <p className="text-xs text-gray-400">Education Library · Courses · Products · Enrollments</p>
+              </div>
+            </div>
+            <Link href="/education-library">
+              <Button size="sm" variant="outline" className="h-8 text-xs text-teal-600 border-teal-200 hover:bg-teal-50">
+                <LinkIcon className="w-3 h-3 mr-1.5" /> View Education Library
+              </Button>
+            </Link>
+          </div>
+        </div>
       </div>
 
-      {editingCourseId ? (
-        <CourseEditor courseId={editingCourseId} onBack={() => setEditingCourseId(null)} />
-      ) : (
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="bg-gray-100 flex-wrap h-auto gap-0.5">
-            <TabsTrigger value="courses" className="text-xs">Courses</TabsTrigger>
-            <TabsTrigger value="quizzes" className="text-xs">Quizzes</TabsTrigger>
-            <TabsTrigger value="downloads" className="text-xs">Downloads</TabsTrigger>
-            <TabsTrigger value="products" className="text-xs">Products</TabsTrigger>
-            <TabsTrigger value="enrollments" className="text-xs">Enrollments</TabsTrigger>
-            <TabsTrigger value="groups" className="text-xs">Groups</TabsTrigger>
-            <TabsTrigger value="instructors" className="text-xs">Instructors</TabsTrigger>
-            <TabsTrigger value="affiliates" className="text-xs">Affiliates</TabsTrigger>
-            <TabsTrigger value="analytics" className="text-xs">Analytics</TabsTrigger>
-            <TabsTrigger value="collections" className="text-xs">Collections</TabsTrigger>
-            <TabsTrigger value="orderbumps" className="text-xs">Order Bumps</TabsTrigger>
-            <TabsTrigger value="certificates" className="text-xs">Certificates</TabsTrigger>
-            <TabsTrigger value="thinkific" className="text-xs">Import from Thinkific</TabsTrigger>
-            <TabsTrigger value="free-previews" className="text-xs">Free Previews</TabsTrigger>
-            <TabsTrigger value="trash" className="text-xs text-red-500">🗑 Trash</TabsTrigger>
-          </TabsList>
-          <TabsContent value="courses" className="mt-4"><CoursesTab onEdit={setEditingCourseId} typeFilter="course" /></TabsContent>
-          <TabsContent value="quizzes" className="mt-4"><CoursesTab onEdit={setEditingCourseId} typeFilter="quiz" /></TabsContent>
-          <TabsContent value="downloads" className="mt-4"><DigitalDownloadsAdmin initialEditId={urlEditDownload ? Number(urlEditDownload) : undefined} /></TabsContent>
-          <TabsContent value="products" className="mt-4"><PhysicalProductsAdmin initialEditId={urlEditProduct ? Number(urlEditProduct) : undefined} /></TabsContent>
-          <TabsContent value="enrollments" className="mt-4"><EnrollmentsTab /></TabsContent>
-          <TabsContent value="groups" className="mt-4"><GroupsTab /></TabsContent>
-          <TabsContent value="instructors" className="mt-4"><InstructorsTab /></TabsContent>
-          <TabsContent value="affiliates" className="mt-4"><AffiliatesTab /></TabsContent>
-          <TabsContent value="analytics" className="mt-4"><AnalyticsTab /></TabsContent>
-          <TabsContent value="collections" className="mt-4"><CollectionsTab /></TabsContent>
-          <TabsContent value="orderbumps" className="mt-4"><OrderBumpsAdmin /></TabsContent>
-          <TabsContent value="certificates" className="mt-4"><CertificateTemplatesAdmin /></TabsContent>
-          <TabsContent value="thinkific" className="mt-4"><ThinkificImporter /></TabsContent>
-          <TabsContent value="free-previews" className="mt-4"><FreePreviewEnrollmentsTab /></TabsContent>
-          <TabsContent value="trash" className="mt-4"><TrashTab /></TabsContent>
-        </Tabs>
-      )}
+      <div className="max-w-7xl mx-auto px-6 py-5">
+        {editingCourseId ? (
+          <CourseEditor courseId={editingCourseId} onBack={() => setEditingCourseId(null)} />
+        ) : (
+          <div className="flex gap-5">
+            {/* Sidebar Nav */}
+            <aside className="w-52 flex-shrink-0">
+              <nav className="space-y-4">
+                {LMS_NAV_GROUPS.map((group) => {
+                  const colors = GROUP_COLORS[group.color];
+                  return (
+                    <div key={group.label}>
+                      <div className="flex items-center gap-1.5 px-2 mb-1.5">
+                        <div className={cn("w-1.5 h-1.5 rounded-full", colors.dot)} />
+                        <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">{group.label}</span>
+                      </div>
+                      <div className="space-y-0.5">
+                        {group.items.map((item) => {
+                          const Icon = item.icon;
+                          const isActive = activeTab === item.value;
+                          const isDanger = (item as any).danger;
+                          return (
+                            <button
+                              key={item.value}
+                              onClick={() => setActiveTab(item.value)}
+                              className={cn(
+                                "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all",
+                                isActive
+                                  ? isDanger
+                                    ? "bg-red-600 text-white shadow-sm"
+                                    : cn(colors.activeBg, colors.activeText, "shadow-sm")
+                                  : isDanger
+                                    ? "text-red-500 hover:bg-red-50"
+                                    : "text-gray-600 hover:bg-white hover:text-gray-900 hover:shadow-sm"
+                              )}
+                            >
+                              <Icon className="w-4 h-4 flex-shrink-0" />
+                              <span className="truncate">{item.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </nav>
+            </aside>
+
+            {/* Main Content */}
+            <main className="flex-1 min-w-0">
+              {activeTab === "courses"     && <CoursesTab onEdit={setEditingCourseId} typeFilter="course" />}
+              {activeTab === "quizzes"     && <CoursesTab onEdit={setEditingCourseId} typeFilter="quiz" />}
+              {activeTab === "downloads"   && <DigitalDownloadsAdmin initialEditId={urlEditDownload ? Number(urlEditDownload) : undefined} />}
+              {activeTab === "products"    && <PhysicalProductsAdmin initialEditId={urlEditProduct ? Number(urlEditProduct) : undefined} />}
+              {activeTab === "webinars"    && <LMSComingSoonTab icon={Radio} title="Webinars" description="Host and manage live webinar sessions with registration, reminders, and replay access." color="teal" />}
+              {activeTab === "bundles"     && <LMSComingSoonTab icon={Layers} title="Bundles" description="Package courses, downloads, products, and quizzes together and sell them as a single bundle at a special price." color="purple" />}
+              {activeTab === "memberships" && <LMSComingSoonTab icon={Award} title="Memberships" description="Create membership tiers that unlock course access, community features, and exclusive content on a recurring basis." color="blue" />}
+              {activeTab === "communities" && <LMSComingSoonTab icon={Globe} title="Communities" description="Manage community hubs — discussion boards, member directories, and group spaces tied to courses or memberships." color="orange" />}
+              {activeTab === "orderbumps"  && <OrderBumpsAdmin />}
+              {activeTab === "collections" && <CollectionsTab />}
+              {activeTab === "groups"      && <GroupsTab />}
+              {activeTab === "instructors" && <InstructorsTab />}
+              {activeTab === "certificates"&& <CertificateTemplatesAdmin />}
+              {activeTab === "enrollments" && <EnrollmentsWithPreviewsTab />}
+              {activeTab === "analytics"   && <AnalyticsTab />}
+              {activeTab === "affiliates"  && <AffiliatesTab />}
+              {activeTab === "thinkific"   && <ThinkificImporter />}
+              {activeTab === "trash"       && <TrashTab />}
+            </main>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Coming Soon Placeholder Tab ─────────────────────────────────────────────
+
+function LMSComingSoonTab({ icon: Icon, title, description, color }: { icon: any; title: string; description: string; color: string }) {
+  const colorMap: Record<string, { bg: string; iconBg: string; iconText: string; badge: string }> = {
+    teal:   { bg: "bg-teal-50",   iconBg: "bg-teal-100",   iconText: "text-teal-600",   badge: "bg-teal-100 text-teal-700" },
+    purple: { bg: "bg-purple-50", iconBg: "bg-purple-100", iconText: "text-purple-600", badge: "bg-purple-100 text-purple-700" },
+    blue:   { bg: "bg-blue-50",   iconBg: "bg-blue-100",   iconText: "text-blue-600",   badge: "bg-blue-100 text-blue-700" },
+    orange: { bg: "bg-orange-50", iconBg: "bg-orange-100", iconText: "text-orange-600", badge: "bg-orange-100 text-orange-700" },
+  };
+  const c = colorMap[color] ?? colorMap.teal;
+  return (
+    <div className={cn("rounded-2xl border border-gray-200 p-12 text-center", c.bg)}>
+      <div className={cn("w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center", c.iconBg)}>
+        <Icon className={cn("w-8 h-8", c.iconText)} />
+      </div>
+      <span className={cn("inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold mb-3", c.badge)}>
+        <Sparkles className="w-3 h-3" /> Coming Soon
+      </span>
+      <h2 className="text-xl font-bold text-gray-900 mb-2">{title}</h2>
+      <p className="text-sm text-gray-500 max-w-md mx-auto">{description}</p>
+    </div>
+  );
+}
+
+// ─── Enrollments + Free Previews Combined Tab ─────────────────────────────────
+
+function EnrollmentsWithPreviewsTab() {
+  const [subTab, setSubTab] = useState<"enrollments" | "free-previews">("enrollments");
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 w-fit">
+        <button
+          onClick={() => setSubTab("enrollments")}
+          className={cn(
+            "px-4 py-1.5 rounded-md text-sm font-medium transition-all",
+            subTab === "enrollments" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+          )}
+        >
+          <UserCheck className="w-3.5 h-3.5 inline mr-1.5" />Enrollments
+        </button>
+        <button
+          onClick={() => setSubTab("free-previews")}
+          className={cn(
+            "px-4 py-1.5 rounded-md text-sm font-medium transition-all",
+            subTab === "free-previews" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+          )}
+        >
+          <Eye className="w-3.5 h-3.5 inline mr-1.5" />Free Previews
+        </button>
+      </div>
+      {subTab === "enrollments"   && <EnrollmentsTab />}
+      {subTab === "free-previews" && <FreePreviewEnrollmentsTab />}
     </div>
   );
 }

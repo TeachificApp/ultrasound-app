@@ -24,7 +24,7 @@ import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } fro
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import CarouselBlock from "@/components/CarouselBlock";
 import type { Block } from "@/components/BlockPreview";
-import { CountdownV2Block, ImageLinkWrapper } from "@/components/BlockPreview";
+import { CountdownV2Block, ImageLinkWrapper, FormEmbedBlockPreview } from "@/components/BlockPreview";
 import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -695,6 +695,8 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
     }
     case "carousel":
       return <div className="px-4 py-4"><CarouselBlock data={d} /></div>;
+    case "form_embed":
+      return <FormEmbedBlockPreview d={d} />;
     default:
       return null;
   }

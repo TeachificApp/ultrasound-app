@@ -3029,3 +3029,15 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Section templates: save section as template, import from template or copy from another course in Add Section dialog
 - [x] Hero banner: 150px default maxHeight on auto-generated lesson hero blocks (editable)
 - [x] Course player theme: dark/light toggle in course settings, applied to player UI
+
+## LMS Nav & Form Block (May 26 2026)
+- [x] LMS Admin nav redesigned: grouped sidebar with Teal/Purple/Blue/Orange/Gray color groups
+- [x] Added Webinars, Bundles, Memberships, Communities tabs (placeholder Coming Soon)
+- [x] Reordered tabs: Courses, Quizzes, Downloads, Products, Webinars, Bundles, Memberships, Communities, Order Bumps, Collections, Groups, Instructors, Certificates, Enrollments, Analytics, Affiliates, Import, Trash
+- [x] Free Previews merged into Enrollments tab as sub-tab
+- [x] Admin header renamed to "LMS Management" (customer-facing stays "Education Library")
+- [x] LMS brand labels: "All About Ultrasound™" and "iHeartEcho™" (LMS only, not app)
+- [x] Collection course picker fixed (pageSize limit raised to 500)
+- [x] React #31 crash fixed (CourseLanding checklist/bullets object normalization)
+- [x] React #185 crash fixed (LandingPageBuilder inline ColumnBlockList hooks violation)
+- [x] Form Embed block added to landing page builder (inline, popup-enter, popup-exit, popup-click modes)

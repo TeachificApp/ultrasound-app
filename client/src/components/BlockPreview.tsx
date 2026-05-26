@@ -72,7 +72,8 @@ export type BlockType =
   | "file_download" | "scorm_embed" | "url_embed"
   | "column_layout" | "carousel" | "ticker" | "countdown_v2"
   | "live_session"
-  | "comparison_table" | "pricing_cards";
+  | "comparison_table" | "pricing_cards"
+  | "form_embed";
 
 export interface Block {
   id: string;
@@ -1159,6 +1160,8 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
         </div>
       );
     }
+    case "form_embed":
+      return <FormEmbedBlockPreview d={d} />;
     default:
       return <div className="px-8 py-4 text-gray-400 text-sm text-center">Block preview not available</div>;
   }
@@ -1577,6 +1580,167 @@ function LiveSessionBlockPreview({ d }: { d: Record<string, any> }) {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Form Embed Block Preview ─────────────────────────────────────────────────
+
+export function FormEmbedBlockPreview({ d }: { d: Record<string, any> }) {
+  const formId = d.formId ? Number(d.formId) : null;
+  const displayMode: "inline" | "popup_enter" | "popup_exit" | "popup_click" = d.displayMode ?? "inline";
+  const [open, setOpen] = useState(false);
+  const [exited, setExited] = useState(false);
+
+  const { data: formData, isLoading } = trpc.generalForm.getPublicForm.useQuery(
+    { slug: d.formSlug ?? "" },
+    { enabled: !!d.formSlug }
+  );
+
+  // Exit-intent detection
+  useEffect(() => {
+    if (displayMode !== "popup_exit" || exited) return;
+    const handleMouseLeave = (e: MouseEvent) => {
+      if (e.clientY <= 0) {
+        setOpen(true);
+        setExited(true);
+      }
+    };
+    document.addEventListener("mouseleave", handleMouseLeave);
+    return () => document.removeEventListener("mouseleave", handleMouseLeave);
+  }, [displayMode, exited]);
+
+  // Page-enter popup (fires after delay)
+  useEffect(() => {
+    if (displayMode !== "popup_enter") return;
+    const delay = d.enterDelayMs ?? 2000;
+    const t = setTimeout(() => setOpen(true), delay);
+    return () => clearTimeout(t);
+  }, [displayMode, d.enterDelayMs]);
+
+  const bgColor = d.bgColor ?? "#ffffff";
+  const accentColor = d.accentColor ?? "#179ca3";
+  const formName = formData?.template?.name ?? d.formName ?? "Form";
+
+  const FormBody = () => (
+    <div className="space-y-3">
+      {isLoading && (
+        <div className="flex justify-center py-8">
+          <div className="w-6 h-6 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
+      {!isLoading && !formData && (
+        <div className="text-center py-8 text-gray-400 text-sm">
+          {d.formSlug ? "Form not found or not public" : "No form selected"}
+        </div>
+      )}
+      {formData && (
+        <div className="space-y-4">
+          {formData.template?.name && (
+            <h3 className="text-base font-semibold text-gray-900">{formData.template.name}</h3>
+          )}
+          {formData.template?.description && (
+            <p className="text-sm text-gray-500">{formData.template.description}</p>
+          )}
+          {(formData.sections ?? []).map((section: any) => (
+            <div key={section.id} className="space-y-2">
+              {section.title && <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">{section.title}</p>}
+              {(formData.items ?? []).filter((it: any) => it.sectionId === section.id).map((item: any) => (
+                <div key={item.id} className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">{item.label}{item.required && <span className="text-red-500 ml-0.5">*</span>}</label>
+                  {(item.fieldType === "text" || item.fieldType === "email" || item.fieldType === "number" || item.fieldType === "phone") && (
+                    <input type={item.fieldType === "email" ? "email" : item.fieldType === "number" ? "number" : "text"} placeholder={item.placeholder ?? ""} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2" style={{ "--tw-ring-color": accentColor } as any} />
+                  )}
+                  {item.fieldType === "textarea" && (
+                    <textarea placeholder={item.placeholder ?? ""} rows={3} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none resize-none" />
+                  )}
+                  {item.fieldType === "select" && (
+                    <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none">
+                      <option value="">Select…</option>
+                      {(formData.options ?? []).filter((o: any) => o.itemId === item.id).map((o: any) => (
+                        <option key={o.id} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
+                  )}
+                  {(item.fieldType === "radio" || item.fieldType === "checkbox") && (
+                    <div className="space-y-1">
+                      {(formData.options ?? []).filter((o: any) => o.itemId === item.id).map((o: any) => (
+                        <label key={o.id} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                          <input type={item.fieldType} name={`item-${item.id}`} value={o.value} className="accent-teal-600" />
+                          {o.label}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ))}
+          <button
+            className="w-full py-2.5 rounded-xl text-white text-sm font-semibold transition-opacity hover:opacity-90"
+            style={{ backgroundColor: accentColor }}
+          >
+            {d.submitText ?? "Submit"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
+  if (displayMode === "inline") {
+    return (
+      <div className="px-8 py-10" style={{ backgroundColor: bgColor }}>
+        {d.headline && <h2 className="text-2xl font-bold mb-2 text-center" style={{ color: d.textColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+        {d.subtext && <p className="text-center text-gray-500 mb-6 text-sm" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
+        <div className="max-w-xl mx-auto bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+          <FormBody />
+        </div>
+      </div>
+    );
+  }
+
+  // Popup modes (enter, exit, click)
+  const triggerLabel = displayMode === "popup_click" ? (d.triggerButtonText ?? "Open Form") : null;
+
+  return (
+    <div className="px-8 py-10" style={{ backgroundColor: bgColor }}>
+      {d.headline && <h2 className="text-2xl font-bold mb-2 text-center" style={{ color: d.textColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+      {d.subtext && <p className="text-center text-gray-500 mb-6 text-sm" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
+
+      {/* Trigger button for click mode */}
+      {displayMode === "popup_click" && (
+        <div className="text-center">
+          <button
+            onClick={() => setOpen(true)}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-white font-semibold text-sm shadow-sm transition-opacity hover:opacity-90"
+            style={{ backgroundColor: accentColor }}
+          >
+            {triggerLabel}
+          </button>
+        </div>
+      )}
+
+      {/* Enter/exit mode hint when closed */}
+      {(displayMode === "popup_enter" || displayMode === "popup_exit") && !open && (
+        <div className="text-center text-sm text-gray-400 italic">
+          {displayMode === "popup_enter" ? `Form popup appears after ${Math.round((d.enterDelayMs ?? 2000) / 1000)}s` : "Form popup appears on exit intent"}
+        </div>
+      )}
+
+      {/* Modal overlay */}
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h3 className="font-semibold text-gray-900">{formName}</h3>
+              <button onClick={() => setOpen(false)} className="w-7 h-7 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors">✕</button>
+            </div>
+            <div className="p-6">
+              <FormBody />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

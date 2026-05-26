@@ -52,7 +52,7 @@ import {
   ChevronDown, ChevronUp, Copy, FolderOpen, BookMarked, Upload, Code,
   ShoppingCart, Package, Link, Mail, Phone, MapPin, Bookmark, BookmarkPlus, Music, UserPlus, Search,
   SlidersHorizontal, Radio, Clock, Loader2, ArrowLeftRight,
-  Table2, LayoutList,
+  Table2, LayoutList, FileText,
 } from "lucide-react";
 import AudioBlockEditor from "@/components/AudioBlockEditor";
 import CarouselBlock from "@/components/CarouselBlock";
@@ -328,6 +328,22 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
       accentColor: "#179ca3",
       textColor: "#111827",
       excludeCurrentSlug: true,
+    } },
+  // ── Form Embed
+  { type: "form_embed", label: "Form Embed", icon: <FileText size={14} />, category: "Conversion",
+    defaultData: {
+      formId: null,
+      formSlug: "",
+      formName: "",
+      displayMode: "inline",       // "inline" | "popup_enter" | "popup_exit" | "popup_click"
+      headline: "",
+      subtext: "",
+      submitText: "Submit",
+      triggerButtonText: "Open Form",
+      enterDelayMs: 2000,
+      accentColor: "#179ca3",
+      bgColor: "#ffffff",
+      textColor: "#111827",
     } },
   // ── File Downloads
   { type: "file_download", label: "File Download", icon: <Upload size={14} />, category: "Content",
@@ -2015,6 +2031,43 @@ function ColumnBlockList({ side, blocks, onUpdate, lessonId }: {
             </div>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Form Embed Form Picker ──────────────────────────────────────────────────
+function FormEmbedFormPicker({ d, set }: { d: Record<string, any>; set: (field: string, value: any) => void }) {
+  const { data: formsData } = trpc.generalForm.listForms.useQuery({ pageSize: 100, status: "all" });
+  const forms = formsData?.forms ?? [];
+  const selectedId = d.formId ? Number(d.formId) : null;
+
+  return (
+    <div className="space-y-2">
+      <label className="text-xs text-gray-500 block">Select Form</label>
+      <select
+        value={selectedId ?? ""}
+        onChange={e => {
+          const id = Number(e.target.value) || null;
+          const form = forms.find((f: any) => f.id === id);
+          set("formId", id);
+          set("formSlug", form?.publicSlug ?? "");
+          set("formName", form?.name ?? "");
+        }}
+        className="w-full h-8 text-xs rounded border border-gray-200 px-2"
+      >
+        <option value="">— Choose a form —</option>
+        {forms.map((f: any) => (
+          <option key={f.id} value={f.id}>
+            {f.name}{f.isPublic ? " ✓" : " (not public)"}
+          </option>
+        ))}
+      </select>
+      {selectedId && !d.formSlug && (
+        <p className="text-[10px] text-amber-600">⚠ This form has no public slug. Set one in Form Builder → Settings → Public URL.</p>
+      )}
+      {selectedId && d.formSlug && (
+        <p className="text-[10px] text-teal-600">✓ Public slug: <code>{d.formSlug}</code></p>
       )}
     </div>
   );
@@ -3957,6 +4010,39 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
               ))}
             </div>
           </div>
+        </div>
+      );
+    }
+    case "form_embed": {
+      return (
+        <div className="space-y-3">
+          <p className="text-[10px] text-gray-500 leading-relaxed">Embed a form from the Form Builder. Select a form by slug (the public URL identifier). The form must be set to <strong>Public</strong> in the Form Builder settings.</p>
+          {/* Form picker */}
+          <FormEmbedFormPicker d={d} set={set} />
+          {/* Display mode */}
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Display Mode</label>
+            <select value={d.displayMode ?? "inline"} onChange={e => set("displayMode", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+              <option value="inline">Inline (embedded on page)</option>
+              <option value="popup_enter">Popup — on page enter (after delay)</option>
+              <option value="popup_exit">Popup — on exit intent (mouse leaves)</option>
+              <option value="popup_click">Popup — on button click</option>
+            </select>
+          </div>
+          {d.displayMode === "popup_enter" && (
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Delay before popup (ms)</label>
+              <DebouncedInput value={String(d.enterDelayMs ?? 2000)} onChange={v => set("enterDelayMs", Number(v) || 2000)} className="h-7 text-xs" placeholder="2000" />
+            </div>
+          )}
+          {d.displayMode === "popup_click" && (
+            <BSTextField data={d} onSet={set} label="Trigger Button Text" field="triggerButtonText" />
+          )}
+          <BSTextField data={d} onSet={set} label="Headline (optional)" field="headline" />
+          <BSTextField data={d} onSet={set} label="Subtext (optional)" field="subtext" multiline />
+          <BSTextField data={d} onSet={set} label="Submit Button Text" field="submitText" />
+          <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />
+          <BSColorField data={d} onSet={set} label="Background Color" field="bgColor" />
         </div>
       );
     }
