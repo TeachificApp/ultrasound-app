@@ -729,6 +729,10 @@ function AssetDetailDialog({ assetId, onClose, onRefresh }: AssetDetailDialogPro
     onSuccess: () => { toast.success("Slug updated"); refetch(); onRefresh(); },
     onError: (e) => toast.error(e.message),
   });
+  const updateMediaTypeMutation = trpc.mediaRepo.updateAsset.useMutation({
+    onSuccess: () => { toast.success("Media type updated"); refetch(); onRefresh(); },
+    onError: (e) => toast.error(e.message),
+  });
   const moveToFolderMutation = trpc.mediaRepo.moveAssetToFolder.useMutation({
     onSuccess: () => { toast.success("Folder updated"); refetch(); onRefresh(); },
     onError: (e) => toast.error(e.message),
@@ -778,7 +782,20 @@ function AssetDetailDialog({ assetId, onClose, onRefresh }: AssetDetailDialogPro
                   <Badge variant={isPublic ? "default" : "secondary"} className="gap-1">
                     {isPublic ? <><Globe className="w-3 h-3" />Public</> : <><Lock className="w-3 h-3" />Private</>}
                   </Badge>
-                  <Badge variant="outline">{MEDIA_TYPE_LABELS[asset.mediaType as MediaType]}</Badge>
+                  <Select
+                    value={asset.mediaType}
+                    onValueChange={(v) => updateMediaTypeMutation.mutate({ id: asset.id, mediaType: v as MediaType })}
+                    disabled={updateMediaTypeMutation.isPending}
+                  >
+                    <SelectTrigger className="h-6 text-xs w-auto gap-1 px-2 border-border rounded-full font-normal" style={{ minWidth: 90 }}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.entries(MEDIA_TYPE_LABELS) as [MediaType, string][]).map(([k, v]) => (
+                        <SelectItem key={k} value={k} className="text-xs">{v}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   {asset.mimeType && <Badge variant="outline" className="font-mono text-xs">{asset.mimeType}</Badge>}
                   {currentVersion && <span className="text-xs text-muted-foreground">v{currentVersion.versionNumber} · {formatBytes(currentVersion.fileSize)}</span>}
                 </div>

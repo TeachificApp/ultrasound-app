@@ -635,7 +635,13 @@ const mobileBannerScript = `
   <\/script>`;
 
 function buildEmbedPage(opts: EmbedPageOptions): string {
-  const { slug, asset, fileUrl, mimeType, mediaType, tokenParam } = opts;
+  const { slug, asset, version, fileUrl, mimeType, mediaType, tokenParam } = opts;
+  const fileName = version.fileName ?? "";
+  const isZipFile = mediaType === "scorm" || mediaType === "lms" || mediaType === "zip" ||
+    mimeType === "application/zip" || mimeType === "application/x-zip-compressed" ||
+    mimeType === "application/x-zip" ||
+    fileName.toLowerCase().endsWith(".zip") ||
+    fileUrl.toLowerCase().includes(".zip");
 
   let contentHtml = "";
   let needsMobileBanner = false;
@@ -715,9 +721,7 @@ function buildEmbedPage(opts: EmbedPageOptions): string {
       <iframe src="${escHtml(fileUrl)}" style="width:100%;height:100%;border:none;"
               allow="autoplay; fullscreen"
               title="${escHtml(asset.title)}"></iframe>`;
-  } else if (mediaType === "scorm" || mediaType === "lms" || mediaType === "zip" ||
-             mimeType === "application/zip" || mimeType === "application/x-zip-compressed" ||
-             mimeType === "application/x-zip" || mimeType === "application/octet-stream" && (fileUrl.endsWith(".zip") || fileUrl.includes(".zip?"))) {
+  } else if (isZipFile) {
     needsMobileBanner = true;
     // SCORM/LMS/ZIP content: always render in an iframe via the scorm-launch route.
     // The server extracts the ZIP, parses imsmanifest.xml, and serves the HTML entry point.
