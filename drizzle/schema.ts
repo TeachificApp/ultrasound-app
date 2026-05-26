@@ -4270,3 +4270,247 @@ export const freePreviewEnrollments = mysqlTable("free_preview_enrollments", {
 });
 export type FreePreviewEnrollment = typeof freePreviewEnrollments.$inferSelect;
 export type NewFreePreviewEnrollment = typeof freePreviewEnrollments.$inferInsert;
+
+// ─── Webinars ─────────────────────────────────────────────────────────────────
+
+export const webinars = mysqlTable("webinars", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 255 }).notNull().unique(),
+  brand: mysqlEnum("brand", ["all_about_ultrasound", "iheartecho"]).default("all_about_ultrasound").notNull(),
+  description: longtext("description"),
+  coverImage: text("cover_image"),
+  type: mysqlEnum("type", ["live", "prerecorded"]).default("live").notNull(),
+  status: mysqlEnum("status", ["draft", "published", "ended"]).default("draft").notNull(),
+  scheduledAt: bigint("scheduled_at", { mode: "number" }),
+  durationMinutes: int("duration_minutes").default(60),
+  meetingUrl: text("meeting_url"),
+  replayUrl: text("replay_url"),
+  replayEnabled: boolean("replay_enabled").default(true).notNull(),
+  accessType: mysqlEnum("access_type", ["free", "paid"]).default("free").notNull(),
+  pricingOptions: longtext("pricing_options"),
+  landingPageBlocks: longtext("landing_page_blocks"),
+  hostName: varchar("host_name", { length: 200 }),
+  hostTitle: varchar("host_title", { length: 200 }),
+  hostAvatar: text("host_avatar"),
+  maxAttendees: int("max_attendees"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type Webinar = typeof webinars.$inferSelect;
+export type NewWebinar = typeof webinars.$inferInsert;
+
+export const webinarRegistrations = mysqlTable("webinar_registrations", {
+  id: int("id").autoincrement().primaryKey(),
+  webinarId: int("webinar_id").notNull(),
+  userId: int("user_id").notNull(),
+  pricingOptionId: varchar("pricing_option_id", { length: 64 }),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 128 }),
+  registeredAt: timestamp("registered_at").defaultNow().notNull(),
+  attendedAt: timestamp("attended_at"),
+  watchedReplayAt: timestamp("watched_replay_at"),
+});
+export type WebinarRegistration = typeof webinarRegistrations.$inferSelect;
+
+export const webinarComments = mysqlTable("webinar_comments", {
+  id: int("id").autoincrement().primaryKey(),
+  webinarId: int("webinar_id").notNull(),
+  userId: int("user_id").notNull(),
+  parentId: int("parent_id"),
+  body: longtext("body").notNull(),
+  isLive: boolean("is_live").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type WebinarComment = typeof webinarComments.$inferSelect;
+
+// ─── Bundles ──────────────────────────────────────────────────────────────────
+
+export const bundles = mysqlTable("bundles", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 255 }).notNull().unique(),
+  brand: mysqlEnum("brand", ["all_about_ultrasound", "iheartecho"]).default("all_about_ultrasound").notNull(),
+  description: longtext("description"),
+  coverImage: text("cover_image"),
+  status: mysqlEnum("status", ["draft", "published"]).default("draft").notNull(),
+  accessType: mysqlEnum("access_type", ["free", "paid"]).default("paid").notNull(),
+  pricingOptions: longtext("pricing_options"),
+  landingPageBlocks: longtext("landing_page_blocks"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type Bundle = typeof bundles.$inferSelect;
+export type NewBundle = typeof bundles.$inferInsert;
+
+export const bundleItems = mysqlTable("bundle_items", {
+  id: int("id").autoincrement().primaryKey(),
+  bundleId: int("bundle_id").notNull(),
+  itemType: mysqlEnum("item_type", ["course", "quiz", "download", "product", "webinar"]).notNull(),
+  itemId: int("item_id").notNull(),
+  sortOrder: int("sort_order").default(0).notNull(),
+});
+export type BundleItem = typeof bundleItems.$inferSelect;
+
+export const bundleEnrollments = mysqlTable("bundle_enrollments", {
+  id: int("id").autoincrement().primaryKey(),
+  bundleId: int("bundle_id").notNull(),
+  userId: int("user_id").notNull(),
+  pricingOptionId: varchar("pricing_option_id", { length: 64 }),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 128 }),
+  enrolledAt: timestamp("enrolled_at").defaultNow().notNull(),
+});
+export type BundleEnrollment = typeof bundleEnrollments.$inferSelect;
+
+// ─── Memberships ──────────────────────────────────────────────────────────────
+
+export const membershipPlans = mysqlTable("membership_plans", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 255 }).notNull().unique(),
+  brand: mysqlEnum("brand", ["all_about_ultrasound", "iheartecho"]).default("all_about_ultrasound").notNull(),
+  description: longtext("description"),
+  coverImage: text("cover_image"),
+  status: mysqlEnum("status", ["draft", "published"]).default("draft").notNull(),
+  billingInterval: mysqlEnum("billing_interval", ["monthly", "annual", "lifetime"]).default("monthly").notNull(),
+  price: int("price").default(0).notNull(),
+  currency: varchar("currency", { length: 8 }).default("usd").notNull(),
+  stripeProductId: varchar("stripe_product_id", { length: 128 }),
+  stripePriceId: varchar("stripe_price_id", { length: 128 }),
+  features: longtext("features"),
+  landingPageBlocks: longtext("landing_page_blocks"),
+  trialDays: int("trial_days").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type MembershipPlan = typeof membershipPlans.$inferSelect;
+export type NewMembershipPlan = typeof membershipPlans.$inferInsert;
+
+export const membershipPlanAccess = mysqlTable("membership_plan_access", {
+  id: int("id").autoincrement().primaryKey(),
+  planId: int("plan_id").notNull(),
+  itemType: mysqlEnum("item_type", ["course", "bundle", "community", "webinar", "download"]).notNull(),
+  itemId: int("item_id").notNull(),
+});
+export type MembershipPlanAccess = typeof membershipPlanAccess.$inferSelect;
+
+export const membershipSubscriptions = mysqlTable("membership_subscriptions", {
+  id: int("id").autoincrement().primaryKey(),
+  planId: int("plan_id").notNull(),
+  userId: int("user_id").notNull(),
+  status: mysqlEnum("status", ["active", "cancelled", "expired", "trialing", "past_due"]).default("active").notNull(),
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 128 }),
+  stripeCustomerId: varchar("stripe_customer_id", { length: 128 }),
+  currentPeriodEnd: bigint("current_period_end", { mode: "number" }),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type MembershipSubscription = typeof membershipSubscriptions.$inferSelect;
+
+// ─── Communities ──────────────────────────────────────────────────────────────
+
+export const communities = mysqlTable("communities", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 255 }).notNull().unique(),
+  brand: mysqlEnum("brand", ["all_about_ultrasound", "iheartecho"]).default("all_about_ultrasound").notNull(),
+  description: longtext("description"),
+  coverImage: text("cover_image"),
+  logoImage: text("logo_image"),
+  status: mysqlEnum("status", ["draft", "published"]).default("draft").notNull(),
+  privacy: mysqlEnum("privacy", ["public", "private", "paid"]).default("public").notNull(),
+  accessType: mysqlEnum("access_type", ["free", "paid"]).default("free").notNull(),
+  pricingOptions: longtext("pricing_options"),
+  landingPageBlocks: longtext("landing_page_blocks"),
+  pageBlocks: longtext("page_blocks"),
+  accentColor: varchar("accent_color", { length: 32 }).default("#189aa1"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type Community = typeof communities.$inferSelect;
+export type NewCommunity = typeof communities.$inferInsert;
+
+export const communityMembers = mysqlTable("community_members", {
+  id: int("id").autoincrement().primaryKey(),
+  communityId: int("community_id").notNull(),
+  userId: int("user_id").notNull(),
+  role: mysqlEnum("role", ["admin", "moderator", "member"]).default("member").notNull(),
+  joinedAt: timestamp("joined_at").defaultNow().notNull(),
+  pricingOptionId: varchar("pricing_option_id", { length: 64 }),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 128 }),
+});
+export type CommunityMember = typeof communityMembers.$inferSelect;
+
+export const communityChannels = mysqlTable("community_channels", {
+  id: int("id").autoincrement().primaryKey(),
+  communityId: int("community_id").notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  type: mysqlEnum("type", ["discussion", "announcements", "resources"]).default("discussion").notNull(),
+  sortOrder: int("sort_order").default(0).notNull(),
+  isDefault: boolean("is_default").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type CommunityChannel = typeof communityChannels.$inferSelect;
+
+export const communityPosts = mysqlTable("community_posts", {
+  id: int("id").autoincrement().primaryKey(),
+  channelId: int("channel_id").notNull(),
+  communityId: int("community_id").notNull(),
+  userId: int("user_id").notNull(),
+  title: varchar("title", { length: 255 }),
+  body: longtext("body").notNull(),
+  attachments: longtext("attachments"),
+  isPinned: boolean("is_pinned").default(false).notNull(),
+  commentCount: int("comment_count").default(0).notNull(),
+  reactionCount: int("reaction_count").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type CommunityPost = typeof communityPosts.$inferSelect;
+
+export const communityPostComments = mysqlTable("community_post_comments", {
+  id: int("id").autoincrement().primaryKey(),
+  postId: int("post_id").notNull(),
+  userId: int("user_id").notNull(),
+  parentId: int("parent_id"),
+  body: longtext("body").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type CommunityPostComment = typeof communityPostComments.$inferSelect;
+
+export const communityPostReactions = mysqlTable("community_post_reactions", {
+  id: int("id").autoincrement().primaryKey(),
+  postId: int("post_id").notNull(),
+  userId: int("user_id").notNull(),
+  emoji: varchar("emoji", { length: 16 }).notNull(),
+});
+export type CommunityPostReaction = typeof communityPostReactions.$inferSelect;
+
+export const communityDMs = mysqlTable("community_dms", {
+  id: int("id").autoincrement().primaryKey(),
+  communityId: int("community_id").notNull(),
+  fromUserId: int("from_user_id").notNull(),
+  toUserId: int("to_user_id").notNull(),
+  body: longtext("body").notNull(),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type CommunityDM = typeof communityDMs.$inferSelect;
+
+// ─── Lesson Templates ─────────────────────────────────────────────────────────
+
+export const lessonTemplates = mysqlTable("lesson_templates", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  lessonType: varchar("lesson_type", { length: 64 }).default("video").notNull(),
+  blocks: longtext("blocks"),
+  coverImage: text("cover_image"),
+  tags: text("tags"),
+  createdByAdminId: int("created_by_admin_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type LessonTemplate = typeof lessonTemplates.$inferSelect;

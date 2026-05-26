@@ -20,6 +20,7 @@ import {
 import {
   SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable, arrayMove,
 } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -3560,7 +3561,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
             <button
               onClick={() => setActiveTab("quiz")}
               className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-colors flex items-center gap-1.5 ${
-                activeTab === "quiz" ? "bg-purple-600 text-white" : "text-gray-500 hover:text-gray-800"
+                activeTab === "quiz" ? "bg-teal-600 text-white" : "text-gray-500 hover:text-gray-800"
               }`}
             >
               <HelpCircle className="w-3 h-3" /> Quiz Builder
@@ -5032,7 +5033,7 @@ const LMS_NAV_GROUPS = [
   },
   {
     label: "Sales",
-    color: "purple",
+    color: "teal",
     items: [
       { value: "orderbumps",  label: "Order Bumps", icon: Tag },
       { value: "collections", label: "Collections", icon: LayoutGrid },
@@ -5040,7 +5041,7 @@ const LMS_NAV_GROUPS = [
   },
   {
     label: "People",
-    color: "blue",
+    color: "teal",
     items: [
       { value: "groups",      label: "Groups",      icon: Users },
       { value: "instructors", label: "Instructors", icon: GraduationCap },
@@ -5050,7 +5051,7 @@ const LMS_NAV_GROUPS = [
   },
   {
     label: "Insights",
-    color: "orange",
+    color: "teal",
     items: [
       { value: "analytics",   label: "Analytics",   icon: TrendingUp },
       { value: "affiliates",  label: "Affiliates",  icon: DollarSign },
@@ -5068,9 +5069,9 @@ const LMS_NAV_GROUPS = [
 
 const GROUP_COLORS: Record<string, { bg: string; text: string; activeBg: string; activeText: string; dot: string }> = {
   teal:   { bg: "bg-teal-50",   text: "text-teal-700",   activeBg: "bg-teal-600",   activeText: "text-white", dot: "bg-teal-400" },
-  purple: { bg: "bg-purple-50", text: "text-purple-700", activeBg: "bg-purple-600", activeText: "text-white", dot: "bg-purple-400" },
-  blue:   { bg: "bg-blue-50",   text: "text-blue-700",   activeBg: "bg-blue-600",   activeText: "text-white", dot: "bg-blue-400" },
-  orange: { bg: "bg-orange-50", text: "text-orange-700", activeBg: "bg-orange-500", activeText: "text-white", dot: "bg-orange-400" },
+  purple: { bg: "bg-teal-50",   text: "text-teal-700",   activeBg: "bg-teal-600",   activeText: "text-white", dot: "bg-teal-400" },
+  blue:   { bg: "bg-teal-50",   text: "text-teal-700",   activeBg: "bg-teal-600",   activeText: "text-white", dot: "bg-teal-400" },
+  orange: { bg: "bg-teal-50",   text: "text-teal-700",   activeBg: "bg-teal-600",   activeText: "text-white", dot: "bg-teal-400" },
   gray:   { bg: "bg-gray-50",   text: "text-gray-600",   activeBg: "bg-gray-700",   activeText: "text-white", dot: "bg-gray-400" },
 };
 
@@ -5143,7 +5144,7 @@ export default function LMSAdmin() {
                           return (
                             <button
                               key={item.value}
-                              onClick={() => setActiveTab(item.value)}
+                              onClick={() => { setActiveTab(item.value); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                               className={cn(
                                 "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all",
                                 isActive
@@ -5174,9 +5175,9 @@ export default function LMSAdmin() {
               {activeTab === "downloads"   && <DigitalDownloadsAdmin initialEditId={urlEditDownload ? Number(urlEditDownload) : undefined} />}
               {activeTab === "products"    && <PhysicalProductsAdmin initialEditId={urlEditProduct ? Number(urlEditProduct) : undefined} />}
               {activeTab === "webinars"    && <LMSComingSoonTab icon={Radio} title="Webinars" description="Host and manage live webinar sessions with registration, reminders, and replay access." color="teal" />}
-              {activeTab === "bundles"     && <LMSComingSoonTab icon={Layers} title="Bundles" description="Package courses, downloads, products, and quizzes together and sell them as a single bundle at a special price." color="purple" />}
-              {activeTab === "memberships" && <LMSComingSoonTab icon={Award} title="Memberships" description="Create membership tiers that unlock course access, community features, and exclusive content on a recurring basis." color="blue" />}
-              {activeTab === "communities" && <LMSComingSoonTab icon={Globe} title="Communities" description="Manage community hubs — discussion boards, member directories, and group spaces tied to courses or memberships." color="orange" />}
+              {activeTab === "bundles"     && <LMSComingSoonTab icon={Layers} title="Bundles" description="Package courses, downloads, products, and quizzes together and sell them as a single bundle at a special price." color="teal" />}
+              {activeTab === "memberships" && <LMSComingSoonTab icon={Award} title="Memberships" description="Create membership tiers that unlock course access, community features, and exclusive content on a recurring basis." color="teal" />}
+              {activeTab === "communities" && <LMSComingSoonTab icon={Globe} title="Communities" description="Manage community hubs — discussion boards, member directories, and group spaces tied to courses or memberships." color="teal" />}
               {activeTab === "orderbumps"  && <OrderBumpsAdmin />}
               {activeTab === "collections" && <CollectionsTab />}
               {activeTab === "groups"      && <GroupsTab />}
@@ -5496,6 +5497,40 @@ function TrashTab() {
 }
 
 // ─── Collections Tab ──────────────────────────────────────────────────────────
+// ─── Sortable Collection Row ──────────────────────────────────────────────────
+function SortableCollectionRow({ col, onEdit, onDelete }: { col: any; onEdit: (c: any) => void; onDelete: (c: any) => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: col.id });
+  const style: React.CSSProperties = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
+  return (
+    <div ref={setNodeRef} style={style} className="bg-white border border-gray-200 rounded-xl p-4 flex items-start gap-4">
+      <button {...attributes} {...listeners} className="mt-0.5 text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing flex-shrink-0 p-0.5">
+        <GripVertical className="w-4 h-4" />
+      </button>
+      <div className="w-10 h-10 rounded-lg flex-shrink-0 flex items-center justify-center text-white text-xs font-bold shadow-sm"
+        style={{ backgroundColor: col.color ?? "#189aa1" }}>
+        {col.title.slice(0, 2).toUpperCase()}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-medium text-gray-800 text-sm">{col.title}</span>
+          {col.label && <Badge variant="outline" className="text-xs">{col.label}</Badge>}
+          {!col.isPublished && <Badge variant="outline" className="text-xs text-orange-600 border-orange-300">Draft</Badge>}
+        </div>
+        {col.description && <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{col.description}</p>}
+        <p className="text-xs text-gray-400 mt-1">{col.courseCount} course{col.courseCount !== 1 ? "s" : ""}</p>
+      </div>
+      <div className="flex gap-1 flex-shrink-0">
+        <Button size="sm" variant="ghost" className="h-7 text-xs text-teal-600 hover:bg-teal-50" onClick={() => onEdit(col)}>
+          <Edit2 className="w-3 h-3 mr-1" /> Edit
+        </Button>
+        <Button size="sm" variant="ghost" className="h-7 text-red-400 hover:bg-red-50" onClick={() => onDelete(col)}>
+          <Trash2 className="w-3 h-3" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function CollectionsTab() {
   const utils = trpc.useUtils();
   const { data: collections, isLoading } = trpc.lmsAdmin.listCollections.useQuery();
@@ -5503,9 +5538,31 @@ function CollectionsTab() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editCollection, setEditCollection] = useState<any>(null);
+  const [localOrder, setLocalOrder] = useState<any[]>([]);
 
+  // Sync local order when server data loads
+  const prevCollectionsRef = useRef<any[]>([]);
+  if (collections && collections !== prevCollectionsRef.current) {
+    prevCollectionsRef.current = collections as any[];
+    setLocalOrder(collections as any[]);
+  }
+
+  const collectionSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const [pendingCourseIds, setPendingCourseIds] = useState<number[]>([]);
   const createCollection = trpc.lmsAdmin.createCollection.useMutation({
-    onSuccess: () => { toast.success("Collection created"); utils.lmsAdmin.listCollections.invalidate(); setCreateOpen(false); },
+    onSuccess: (newCol) => {
+      if (pendingCourseIds.length > 0) {
+        setCourses.mutate({ collectionId: newCol.id, courseIds: pendingCourseIds }, {
+          onSettled: () => { toast.success("Collection created"); utils.lmsAdmin.listCollections.invalidate(); setCreateOpen(false); setPendingCourseIds([]); },
+        });
+      } else {
+        toast.success("Collection created"); utils.lmsAdmin.listCollections.invalidate(); setCreateOpen(false);
+      }
+    },
     onError: e => toast.error(e.message),
   });
   const updateCollection = trpc.lmsAdmin.updateCollection.useMutation({
@@ -5520,6 +5577,21 @@ function CollectionsTab() {
     onSuccess: () => { utils.lmsAdmin.listCollections.invalidate(); },
     onError: e => toast.error(e.message),
   });
+  const reorderCollections = trpc.lmsAdmin.reorderCollections.useMutation({
+    onError: e => toast.error(e.message),
+  });
+
+  const handleCollectionDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setLocalOrder(prev => {
+      const oldIndex = prev.findIndex((c: any) => c.id === active.id);
+      const newIndex = prev.findIndex((c: any) => c.id === over.id);
+      const next = arrayMove(prev, oldIndex, newIndex);
+      reorderCollections.mutate({ orderedIds: next.map((c: any) => c.id) });
+      return next;
+    });
+  };
 
   if (isLoading) return <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}</div>;
 
@@ -5528,57 +5600,41 @@ function CollectionsTab() {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="font-semibold text-gray-800">Collections</h3>
-          <p className="text-xs text-gray-500 mt-0.5">Group courses by custom labels — shown as filter tabs on the Education Library.</p>
+          <p className="text-xs text-gray-500 mt-0.5">Group courses by custom labels — shown as filter tabs on the Education Library. Drag to reorder.</p>
         </div>
         <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => setCreateOpen(true)}>
           <Plus className="w-3.5 h-3.5 mr-1" /> New Collection
         </Button>
       </div>
 
-      {(!collections || collections.length === 0) && (
+      {localOrder.length === 0 && (
         <div className="text-center py-12 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">
           <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-40" />
           <p className="text-sm">No collections yet. Create one to group courses by topic or label.</p>
         </div>
       )}
 
-      <div className="space-y-3">
-        {(collections ?? []).map((col: any) => (
-          <div key={col.id} className="bg-white border border-gray-200 rounded-xl p-4 flex items-start gap-4">
-            {/* Color swatch */}
-            <div className="w-10 h-10 rounded-lg flex-shrink-0 flex items-center justify-center text-white text-xs font-bold shadow-sm"
-              style={{ backgroundColor: col.color ?? "#189aa1" }}>
-              {col.title.slice(0, 2).toUpperCase()}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-medium text-gray-800 text-sm">{col.title}</span>
-                {col.label && <Badge variant="outline" className="text-xs">{col.label}</Badge>}
-                {!col.isPublished && <Badge variant="outline" className="text-xs text-orange-600 border-orange-300">Draft</Badge>}
-              </div>
-              {col.description && <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{col.description}</p>}
-              <p className="text-xs text-gray-400 mt-1">{col.courseCount} course{col.courseCount !== 1 ? "s" : ""}</p>
-            </div>
-            <div className="flex gap-1 flex-shrink-0">
-              <Button size="sm" variant="ghost" className="h-7 text-xs text-blue-600 hover:bg-blue-50"
-                onClick={() => setEditCollection(col)}>
-                <Edit2 className="w-3 h-3 mr-1" /> Edit
-              </Button>
-              <Button size="sm" variant="ghost" className="h-7 text-red-400 hover:bg-red-50"
-                onClick={() => { if (confirm(`Delete collection "${col.title}"?`)) deleteCollection.mutate({ id: col.id }); }}>
-                <Trash2 className="w-3 h-3" />
-              </Button>
-            </div>
+      <DndContext sensors={collectionSensors} collisionDetection={closestCenter} onDragEnd={handleCollectionDragEnd}>
+        <SortableContext items={localOrder.map((c: any) => c.id)} strategy={verticalListSortingStrategy}>
+          <div className="space-y-3">
+            {localOrder.map((col: any) => (
+              <SortableCollectionRow
+                key={col.id}
+                col={col}
+                onEdit={setEditCollection}
+                onDelete={(c) => { if (confirm(`Delete collection "${c.title}"?`)) deleteCollection.mutate({ id: c.id }); }}
+              />
+            ))}
           </div>
-        ))}
-      </div>
+        </SortableContext>
+      </DndContext>
 
       {/* Create Dialog */}
       <CollectionFormDialog
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         allCourses={allCourses?.courses ?? []}
-        onSave={(data, courseIds) => createCollection.mutate({ ...data, isPublished: data.isPublished ?? true } as any)}
+        onSave={(data, courseIds) => { setPendingCourseIds(courseIds); createCollection.mutate({ ...data, isPublished: data.isPublished ?? true } as any); }}
         saving={createCollection.isPending}
         title="New Collection"
       />

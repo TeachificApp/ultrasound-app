@@ -3041,3 +3041,14 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] React #31 crash fixed (CourseLanding checklist/bullets object normalization)
 - [x] React #185 crash fixed (LandingPageBuilder inline ColumnBlockList hooks violation)
 - [x] Form Embed block added to landing page builder (inline, popup-enter, popup-exit, popup-click modes)
+
+## URL/Iframe Pass-Through Credentials (May 26 2026)
+- [ ] In the URL/iframe embed block settings panel, add a "Pass User Credentials" section
+- [ ] Show two toggleable params: name and email — when enabled, they are appended to the iframe src as query params (e.g. ?name=John&email=john@example.com)
+- [ ] In BlockPreview and CourseLanding renderer: when rendering the iframe, if passName/passEmail are enabled and user is logged in, append the params to the URL at render time
+- [ ] Show a "Copy URL with params" helper snippet in the settings panel so admins can preview what the final URL will look like
+
+## Trash Restore & Lesson Undo (May 26 2026)
+- [ ] Trash tab: add "Restore" button on each trashed item to recover it back to draft status (courses, quizzes, downloads, products)
+- [ ] Lesson content editor: add undo/redo stack (Ctrl+Z / Ctrl+Y) for block add, delete, reorder, and edit operations
+- [ ] Show undo/redo toolbar buttons in the lesson block editor header

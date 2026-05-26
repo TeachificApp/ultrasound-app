@@ -3477,6 +3477,21 @@ CRITICAL REQUIREMENTS:
       return { success: true };
     }),
 
+  /** Reorder collections by providing an ordered array of IDs */
+  reorderCollections: protectedProcedure
+    .input(z.object({ orderedIds: z.array(z.number()) }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await Promise.all(
+        input.orderedIds.map((id, i) =>
+          db.update(lmsCollections).set({ position: i }).where(eq(lmsCollections.id, id))
+        )
+      );
+      return { success: true };
+    }),
+
   // ─── Duplicate Course ─────────────────────────────────────────────────────
 
   duplicateCourse: protectedProcedure
