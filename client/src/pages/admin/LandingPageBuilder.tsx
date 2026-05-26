@@ -364,6 +364,21 @@ BLOCK_CATALOG.push(
     defaultData: { mediaAssetId: null, mediaAssetSlug: "", mediaAssetTitle: "", title: "", caption: "", height: 600, bgColor: "#ffffff" } },
   { type: "url_embed", label: "URL / iFrame Embed", icon: <Globe size={14} />, category: "Content",
     defaultData: { url: "", title: "", caption: "", height: 600, bgColor: "#ffffff" } },
+  { type: "live_session", label: "Live Session", icon: <Radio size={14} />, category: "Content",
+    defaultData: {
+      title: "Live Session",
+      description: "",
+      platform: "zoom",
+      meetingUrl: "",
+      scheduledAt: null,
+      durationMinutes: 60,
+      isRecurring: false,
+      recurringLabel: "",
+      earlyMinutes: 15,
+      openInline: false,
+      accentColor: "#189aa1",
+      bgColor: "#f8fafc",
+    } },
 );
 
 // ─── Block Preview ─────────────────────────────────────────────────────────────
@@ -3550,6 +3565,9 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
         </div>
       );
     }
+    case "live_session": {
+      return <LiveSessionBlockSettings d={d} set={set} />;
+    }
     case "column_layout": {
       const leftBlocks: Block[] = d.leftBlocks ?? [];
       const rightBlocks: Block[] = d.rightBlocks ?? [];
@@ -5606,6 +5624,178 @@ export function VideoBlockSettings({ d, set, uploading, setUploading, uploadMedi
         <p className="text-xs font-semibold text-gray-600 mb-1">Player Theme</p>
         <BSColorField data={d} onSet={set} label="Accent Color (play button &amp; progress bar)" field="accentColor" />
         <p className="text-[10px] text-gray-400">Applies to the play button overlay and progress bar on direct video files. Defaults to AAUS teal (#189aa1).</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Live Session Block Settings ──────────────────────────────────────────────
+function LiveSessionBlockSettings({ d, set }: { d: Record<string, any>; set: (key: string, value: any) => void }) {
+  const platform = d.platform ?? "zoom";
+  const platformOptions = [
+    { value: "zoom", label: "Zoom" },
+    { value: "teams", label: "Microsoft Teams" },
+    { value: "meet", label: "Google Meet" },
+    { value: "webex", label: "Webex" },
+    { value: "other", label: "Other / Custom" },
+  ];
+
+  // Convert stored ISO string or null to datetime-local input value
+  const toDatetimeLocal = (val: string | null) => {
+    if (!val) return "";
+    try {
+      const d = new Date(val);
+      // format: YYYY-MM-DDTHH:mm
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    } catch { return ""; }
+  };
+
+  const fromDatetimeLocal = (val: string) => {
+    if (!val) return null;
+    return new Date(val).toISOString();
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Session Title */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Session Title</label>
+        <DebouncedInput value={d.title ?? ""} onChange={v => set("title", v)} className="h-8 text-xs" placeholder="e.g. Live Q&A Session" />
+      </div>
+
+      {/* Description */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Description (optional)</label>
+        <DebouncedTextarea value={d.description ?? ""} onChange={v => set("description", v)} className="text-xs min-h-[60px]" placeholder="What will be covered in this session?" />
+      </div>
+
+      {/* Platform */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Platform</label>
+        <Select value={platform} onValueChange={v => set("platform", v)}>
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {platformOptions.map(o => (
+              <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Meeting URL */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Meeting URL</label>
+        <DebouncedInput
+          value={d.meetingUrl ?? ""}
+          onChange={v => set("meetingUrl", v)}
+          className="h-8 text-xs"
+          placeholder="https://zoom.us/j/... or teams.microsoft.com/..."
+        />
+        <p className="text-[10px] text-gray-400 mt-1">Paste the full join link from Zoom, Teams, Meet, or any meeting platform.</p>
+      </div>
+
+      {/* Scheduled Date/Time */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Scheduled Date &amp; Time</label>
+        <input
+          type="datetime-local"
+          value={toDatetimeLocal(d.scheduledAt)}
+          onChange={e => set("scheduledAt", fromDatetimeLocal(e.target.value))}
+          className="h-8 text-xs w-full border border-gray-200 rounded-md px-2 bg-white"
+        />
+        <p className="text-[10px] text-gray-400 mt-1">Uses your local timezone. Students see their local time.</p>
+      </div>
+
+      {/* Duration */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Duration (minutes)</label>
+        <DebouncedInput
+          value={String(d.durationMinutes ?? 60)}
+          onChange={v => set("durationMinutes", Number(v) || 60)}
+          className="h-8 text-xs"
+          placeholder="60"
+        />
+      </div>
+
+      {/* Early access window */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Activate Join Button (minutes before start)</label>
+        <DebouncedInput
+          value={String(d.earlyMinutes ?? 15)}
+          onChange={v => set("earlyMinutes", Number(v) || 15)}
+          className="h-8 text-xs"
+          placeholder="15"
+        />
+        <p className="text-[10px] text-gray-400 mt-1">Join button becomes active this many minutes before the scheduled start time.</p>
+      </div>
+
+      {/* Recurring */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="ls-recurring"
+            checked={!!d.isRecurring}
+            onChange={e => set("isRecurring", e.target.checked)}
+            className="rounded"
+          />
+          <label htmlFor="ls-recurring" className="text-xs font-medium text-gray-600">Recurring session</label>
+        </div>
+        {d.isRecurring && (
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">Recurrence Label</label>
+            <DebouncedInput
+              value={d.recurringLabel ?? ""}
+              onChange={v => set("recurringLabel", v)}
+              className="h-8 text-xs"
+              placeholder="e.g. Every Tuesday at 7pm ET"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Open inline */}
+      <div className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          id="ls-inline"
+          checked={!!d.openInline}
+          onChange={e => set("openInline", e.target.checked)}
+          className="rounded"
+        />
+        <label htmlFor="ls-inline" className="text-xs font-medium text-gray-600">Open meeting inline in course player</label>
+      </div>
+      <p className="text-[10px] text-gray-400 -mt-2">Note: Zoom and Teams may block inline embedding. "Open in browser" is always available as a fallback.</p>
+
+      {/* Accent color */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Accent Color</label>
+        <div className="flex items-center gap-2">
+          <input
+            type="color"
+            value={d.accentColor ?? "#189aa1"}
+            onChange={e => set("accentColor", e.target.value)}
+            className="w-8 h-8 rounded cursor-pointer border border-gray-200"
+          />
+          <DebouncedInput value={d.accentColor ?? "#189aa1"} onChange={v => set("accentColor", v)} className="h-8 text-xs flex-1" placeholder="#189aa1" />
+        </div>
+      </div>
+
+      {/* Background color */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Background Color</label>
+        <div className="flex items-center gap-2">
+          <input
+            type="color"
+            value={d.bgColor ?? "#f8fafc"}
+            onChange={e => set("bgColor", e.target.value)}
+            className="w-8 h-8 rounded cursor-pointer border border-gray-200"
+          />
+          <DebouncedInput value={d.bgColor ?? "#f8fafc"} onChange={v => set("bgColor", v)} className="h-8 text-xs flex-1" placeholder="#f8fafc" />
+        </div>
       </div>
     </div>
   );

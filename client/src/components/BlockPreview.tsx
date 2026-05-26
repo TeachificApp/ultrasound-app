@@ -70,7 +70,8 @@ export type BlockType =
   | "related_products" | "embedded_checkout" | "inline_checkout"
   | "lesson_quiz" | "lesson_flashcard"
   | "file_download" | "scorm_embed" | "url_embed"
-  | "column_layout" | "carousel" | "ticker" | "countdown_v2";
+  | "column_layout" | "carousel" | "ticker" | "countdown_v2"
+  | "live_session";
 
 export interface Block {
   id: string;
@@ -1064,6 +1065,8 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       return <TickerBlockPreview d={d} />;
     case "countdown_v2":
       return <CountdownV2BlockPreview d={d} />;
+    case "live_session":
+      return <LiveSessionBlockPreview d={d} />;
     default:
       return <div className="px-8 py-4 text-gray-400 text-sm text-center">Block preview not available</div>;
   }
@@ -1331,4 +1334,157 @@ export function CountdownV2Block({ data: d }: { data: Record<string, any> }) {
 
 function CountdownV2BlockPreview({ d }: { d: Record<string, any> }) {
   return <CountdownV2Block data={d} />;
+}
+
+// ─── Live Session Block Preview ───────────────────────────────────────────────
+function LiveSessionBlockPreview({ d }: { d: Record<string, any> }) {
+  const [now, setNow] = React.useState(() => Date.now());
+  React.useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const accentColor = d.accentColor ?? "#189aa1";
+  const title = d.title ?? "Live Session";
+  const description = d.description ?? "";
+  const meetingUrl = d.meetingUrl ?? "";
+  const platform = d.platform ?? "zoom"; // zoom | teams | meet | webex | other
+  const scheduledAt = d.scheduledAt ? new Date(d.scheduledAt).getTime() : null;
+  const durationMinutes = d.durationMinutes ?? 60;
+  const openInline = d.openInline ?? false;
+  const earlyMinutes = d.earlyMinutes ?? 15;
+
+  // Determine session state
+  const earlyMs = earlyMinutes * 60 * 1000;
+  const durationMs = durationMinutes * 60 * 1000;
+  const isLive = scheduledAt ? now >= scheduledAt - earlyMs && now <= scheduledAt + durationMs : false;
+  const isEnded = scheduledAt ? now > scheduledAt + durationMs : false;
+  const msUntilEarly = scheduledAt ? (scheduledAt - earlyMs) - now : null;
+  const msUntilStart = scheduledAt ? scheduledAt - now : null;
+
+  const formatCountdown = (ms: number) => {
+    if (ms <= 0) return "00:00:00";
+    const totalSec = Math.floor(ms / 1000);
+    const d = Math.floor(totalSec / 86400);
+    const h = Math.floor((totalSec % 86400) / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    if (d > 0) return `${d}d ${String(h).padStart(2, "0")}h ${String(m).padStart(2, "0")}m`;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  };
+
+  const platformLabel: Record<string, string> = {
+    zoom: "Zoom", teams: "Microsoft Teams", meet: "Google Meet", webex: "Webex", other: "Meeting",
+  };
+  const platformIcon: Record<string, string> = {
+    zoom: "🎥", teams: "💼", meet: "📹", webex: "🔵", other: "🔗",
+  };
+
+  const handleJoin = () => {
+    if (!meetingUrl) return;
+    if (openInline) {
+      // Open inline in an iframe overlay — handled by parent
+      window.open(meetingUrl, "_blank", "noopener,noreferrer");
+    } else {
+      window.open(meetingUrl, "_blank", "noopener,noreferrer");
+    }
+  };
+
+  return (
+    <div
+      className="px-8 py-8"
+      style={{ backgroundColor: d.bgColor ?? "#f8fafc" }}
+    >
+      <div
+        className="rounded-2xl overflow-hidden shadow-md border"
+        style={{ borderColor: `${accentColor}33` }}
+      >
+        {/* Header bar */}
+        <div className="px-6 py-4 flex items-center gap-3" style={{ backgroundColor: accentColor }}>
+          <span className="text-2xl">{platformIcon[platform] ?? "🔗"}</span>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-white font-bold text-lg leading-tight truncate">{title}</h3>
+            <p className="text-white/80 text-sm">{platformLabel[platform] ?? "Live Meeting"}</p>
+          </div>
+          {isLive && (
+            <span className="flex items-center gap-1.5 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full animate-pulse">
+              <span className="w-2 h-2 rounded-full bg-white inline-block" />
+              LIVE
+            </span>
+          )}
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5 bg-white space-y-4">
+          {description && <p className="text-gray-600 text-sm leading-relaxed">{description}</p>}
+
+          {/* Schedule info */}
+          {scheduledAt && (
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <span>🗓</span>
+              <span>{new Date(scheduledAt).toLocaleString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}</span>
+              <span className="text-gray-300">·</span>
+              <span>{durationMinutes} min</span>
+            </div>
+          )}
+
+          {/* State: countdown / live / ended / no schedule */}
+          {!scheduledAt ? (
+            <div className="text-center py-3 text-gray-400 text-sm">No session scheduled yet.</div>
+          ) : isEnded ? (
+            <div className="text-center py-3 text-gray-400 text-sm">This session has ended.</div>
+          ) : isLive ? (
+            <div className="space-y-3">
+              {msUntilStart !== null && msUntilStart > 0 && (
+                <p className="text-center text-sm text-gray-500">Session starts in <strong>{formatCountdown(msUntilStart)}</strong></p>
+              )}
+              <div className="flex gap-3">
+                <button
+                  onClick={handleJoin}
+                  disabled={!meetingUrl}
+                  className="flex-1 py-3 rounded-xl text-white font-semibold text-sm transition-all hover:opacity-90 active:scale-95 disabled:opacity-40"
+                  style={{ backgroundColor: accentColor }}
+                >
+                  Join {platformLabel[platform]} Meeting
+                </button>
+                <button
+                  onClick={() => meetingUrl && window.open(meetingUrl, "_blank", "noopener,noreferrer")}
+                  disabled={!meetingUrl}
+                  className="px-4 py-3 rounded-xl border text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+                  style={{ borderColor: `${accentColor}55` }}
+                  title="Open in browser"
+                >
+                  ↗
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="text-center">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Session starts in</p>
+                <p className="text-3xl font-mono font-bold" style={{ color: accentColor }}>
+                  {msUntilEarly !== null ? formatCountdown(msUntilEarly) : "—"}
+                </p>
+                <p className="text-xs text-gray-400 mt-1">Join button activates {earlyMinutes} min before start</p>
+              </div>
+              <button
+                disabled
+                className="w-full py-3 rounded-xl text-white font-semibold text-sm opacity-40 cursor-not-allowed"
+                style={{ backgroundColor: accentColor }}
+              >
+                Join {platformLabel[platform]} Meeting
+              </button>
+            </div>
+          )}
+
+          {/* Recurring badge */}
+          {d.isRecurring && (
+            <p className="text-xs text-gray-400 text-center">
+              🔁 Recurring — {d.recurringLabel ?? "see schedule for dates"}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
