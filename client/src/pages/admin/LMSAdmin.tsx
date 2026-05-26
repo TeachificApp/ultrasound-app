@@ -41,7 +41,7 @@ import {
   User, Lock, ListChecks, Award, PlayCircle, ArrowRight, UserPlus, RefreshCw,
   Package, Layers, Globe, Radio, Tag, LayoutGrid, ShoppingBag, GraduationCap, TrendingUp,
 } from "lucide-react";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useNavigate } from "wouter";
 import LessonEffectEditor from "@/components/LessonEffectEditor";
 import ThinkificImporter from "@/pages/admin/ThinkificImporter";
 import { LMSSalesTab } from "@/components/LMSSalesTab";
