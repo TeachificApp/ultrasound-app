@@ -1605,7 +1605,7 @@ function AdditionalAccessEditor({
   };
 
   const addMembership = (brand: string) => {
-    const label = brand === "aaus" ? "All About Ultrasound - UltrasoundAssist Membership" : brand === "iheartecho" ? "iHeartEcho - EchoAssist Membership" : "All Memberships";
+    const label = brand === "aaus" ? "All About Ultrasound™ Membership" : brand === "iheartecho" ? "iHeartEcho™ Membership" : "All Memberships";
     onSet("additionalAccess", [...items, { type: "membership", brand, label }]);
   };
 
@@ -1663,7 +1663,7 @@ function AdditionalAccessEditor({
         {(["aaus", "iheartecho", "both"] as const).map(b => (
           <button key={b} onClick={() => addMembership(b)}
             className="text-xs px-2 py-0.5 rounded-full border border-teal-200 text-teal-600 hover:bg-teal-50 transition-colors">
-            {b === "aaus" ? "AAUS - UltrasoundAssist" : b === "iheartecho" ? "iHeartEcho - EchoAssist" : "Both"}
+            {b === "aaus" ? "All About Ultrasound™" : b === "iheartecho" ? "iHeartEcho™" : "Both"}
           </button>
         ))}
       </div>

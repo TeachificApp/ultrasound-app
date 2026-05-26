@@ -20,8 +20,8 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
 };
 
 const BRAND_LABELS: Record<string, string> = {
-  aaus: "All About Ultrasound - UltrasoundAssist",
-  iheartecho: "iHeartEcho - EchoAssist",
+  aaus: "All About Ultrasound™",
+  iheartecho: "iHeartEcho™",
 };
 
 function CourseCard({ course, enrolledCourseIds, purchasedProductSlugs }: { course: any; enrolledCourseIds: Set<number>; purchasedProductSlugs: Set<string> }) {
@@ -230,8 +230,8 @@ export default function EducationLibrary() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Brands</SelectItem>
-              <SelectItem value="aaus">All About Ultrasound - UltrasoundAssist</SelectItem>
-              <SelectItem value="iheartecho">iHeartEcho - EchoAssist</SelectItem>
+              <SelectItem value="aaus">All About Ultrasound™</SelectItem>
+              <SelectItem value="iheartecho">iHeartEcho™</SelectItem>
             </SelectContent>
           </Select>
           <Select value={type} onValueChange={v => { setType(v); setPage(1); }}>

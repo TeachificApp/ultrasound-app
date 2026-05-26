@@ -775,7 +775,7 @@ getUserStats: protectedProcedure.query(async ({ ctx }) => {
     const period = input?.period ?? "all";
     const currentUserId = ctx.user.id;
     const brand = ctx.brand as "aaus" | "iheartecho";
-    const ownerBrandName = brand === "iheartecho" ? "iHeartEcho - EchoAssist" : "All About Ultrasound - UltrasoundAssist";
+    const ownerBrandName = brand === "iheartecho" ? "iHeartEcho™" : "All About Ultrasound™";
 
     // Map category to activityTypes for time-period queries
     const activityTypes: Record<string, string[]> = {

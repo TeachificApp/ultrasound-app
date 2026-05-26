@@ -55,7 +55,7 @@ const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
 // ─── Owner attribution masking ────────────────────────────────────────────────
 // When the app owner (larawilliams0501) submits or creates content, display
 // "All About Ultrasound" instead of their personal username.
-const OWNER_DISPLAY_NAME = "All About Ultrasound - UltrasoundAssist";
+const OWNER_DISPLAY_NAME = "All About Ultrasound™";
 function maskOwnerName(openId: string | null | undefined, rawName: string): string {
   if (openId && ENV.ownerOpenId && openId === ENV.ownerOpenId) return OWNER_DISPLAY_NAME;
   return rawName;
