@@ -1499,8 +1499,9 @@ export default function CoursePlayer() {
               const sectionNum = topLevelLessons.length + sIdx + 1;
               const allSectionDone = section.lessons.every((l: any) => completedIds.has(l.id)) && section.lessons.length > 0;
               const isSectionActive = section.lessons.some((l: any) => l.id === selectedLessonId);
-              // A section is expanded if: it's active (always show active) OR it's not in collapsedSections
-              const isExpanded = isSectionActive || !collapsedSections.has(section.id);
+              // A section is expanded if it has NOT been explicitly collapsed.
+              // Explicit collapse always wins — even the active section can be collapsed.
+              const isExpanded = !collapsedSections.has(section.id);
 
               const toggleSection = (e: React.MouseEvent) => {
                 e.stopPropagation();
