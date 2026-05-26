@@ -3014,3 +3014,18 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Section templates: save section as template, import from template or copy from another course
 - [x] Add Section dialog: three options (blank / from template / from course)
 - [x] DB migration: defaultMarkComplete on lms_courses, nullable requireManualComplete on lms_lessons, lms_section_templates table, playerTheme on lms_courses
+
+## Batch May 26 2026 (Afternoon)
+- [x] CRITICAL FIX: Course landing page "Course not found" for admins — getCourse now allows admins to see draft/archived/private courses without ?preview=admin
+- [x] CRITICAL FIX: Same admin-bypass fix applied to downloadsRouter getBySlug for digital products
+- [x] React error #31 fix: normalize bullets/numbered_list items (handle {text,crossed} objects)
+- [x] Column block: extract ColumnBlockList as top-level component to fix crash on edit
+- [x] Column block: improve drop-zone visual feedback (prominent active state)
+- [x] Column block: add up/down reorder buttons for blocks within a column
+- [x] Column block: propagate data-col-zone to child elements to fix second drag-drop
+- [x] Course player sidebar: collapsible sections with Collapse All / Expand All toggle
+- [x] Course card pricing: show subscription interval (e.g. $99.97/mo) on all course cards
+- [x] Mark Lessons Complete: course-level default toggle + per-lesson 3-state override (Inherit/Show/Hide)
+- [x] Section templates: save section as template, import from template or copy from another course in Add Section dialog
+- [x] Hero banner: 150px default maxHeight on auto-generated lesson hero blocks (editable)
+- [x] Course player theme: dark/light toggle in course settings, applied to player UI

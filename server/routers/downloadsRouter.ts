@@ -61,9 +61,9 @@ export const downloadsPublicRouter = router({
       const [product] = await db.select().from(digitalProducts)
         .where(eq(digitalProducts.slug, input.slug)).limit(1);
       // 'published' and 'hidden' are accessible by direct URL; draft/archived/private are not
-      // Allow preview for admin users
+      // Admins can always see any product regardless of status
       const isAdmin = ctx.user?.role === "admin";
-      if (!product || ((!input.preview || !isAdmin) && (product.status === "draft" || product.status === "archived" || product.status === "private"))) {
+      if (!product || (!isAdmin && (product.status === "draft" || product.status === "archived" || product.status === "private"))) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Product not found" });
       }
       // Get file count (not full URLs — those are only for purchasers)

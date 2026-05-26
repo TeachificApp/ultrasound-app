@@ -560,6 +560,19 @@ export default function LessonBlockEditor({
                           }));
                           if (selectedBlockId === childBlockId) setSelectedBlockId(null);
                         }}
+                        onReorderChildInColumn={(colBlockId, side, childBlockId, direction) => {
+                          setBlocks(prev => prev.map(b => {
+                            if (b.id !== colBlockId) return b;
+                            const colKey = side === "left" ? "leftBlocks" : "rightBlocks";
+                            const arr: Block[] = [...(b.data[colKey] ?? [])];
+                            const idx = arr.findIndex(cb => cb.id === childBlockId);
+                            if (idx === -1) return b;
+                            const newIdx = direction === "up" ? idx - 1 : idx + 1;
+                            if (newIdx < 0 || newIdx >= arr.length) return b;
+                            [arr[idx], arr[newIdx]] = [arr[newIdx], arr[idx]];
+                            return { ...b, data: { ...b.data, [colKey]: arr } };
+                          }));
+                        }}
                       />
                     </div>
                   ))}

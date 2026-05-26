@@ -446,9 +446,9 @@ export const lmsPublicRouter = router({
       const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.slug)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
       // draft, archived, and private are not publicly accessible; hidden is accessible by direct URL
-      // Allow preview for admin users
+      // Admins can always see any course regardless of status or preview flag
       const isAdmin = ctx.user?.role === "admin";
-      if (!input.preview || !isAdmin) {
+      if (!isAdmin) {
         if (course.status === "draft" || course.status === "archived" || course.status === "private") throw new TRPCError({ code: "NOT_FOUND" });
       }
 
