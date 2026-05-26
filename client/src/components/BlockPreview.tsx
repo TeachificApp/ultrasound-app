@@ -186,12 +186,15 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
     }
     case "video": {
       const isDirectVideo = d.embedUrl && /\.(mp4|webm|ogg|mov)([?#]|$)/i.test(d.embedUrl);
+      const videoAccent = d.accentColor ?? "#189aa1";
       const containerStyle: React.CSSProperties = { maxWidth: d.maxWidth ?? "100%", height: d.height || undefined, paddingBottom: d.height ? undefined : (isDirectVideo ? undefined : "56.25%"), borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined };
+      const videoId = `aaus-vid-${block.id ?? 'v'}`;
       return (
         <div className="px-8 py-6">
           {d.embedUrl ? (
             isDirectVideo ? (
               <div className="mx-auto overflow-hidden shadow" style={containerStyle}>
+                <style>{`.${videoId} { accent-color: ${videoAccent}; } .${videoId}::-webkit-media-controls-play-button { filter: none; } .${videoId}::-webkit-media-controls-timeline { accent-color: ${videoAccent}; }`}</style>
                 <video
                   src={d.trimStart && d.trimStart > 0 ? `${d.embedUrl}#t=${d.trimStart ?? 0}${d.trimEnd ? `,${d.trimEnd}` : ""}` : d.embedUrl}
                   autoPlay={d.autoplay ?? false}
@@ -199,8 +202,8 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
                   loop={d.loop ?? false}
                   controls={d.controls ?? true}
                   playsInline
-                  className="w-full h-full object-cover"
-                  style={{ height: d.height || undefined }}
+                  className={`w-full h-full object-cover ${videoId}`}
+                  style={{ height: d.height || undefined, accentColor: videoAccent }}
                 />
               </div>
             ) : (
@@ -212,9 +215,17 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
                   title="Video"
                   allow="autoplay; fullscreen"
                 />
+                {/* Accent color bar at bottom of iframe embeds */}
+                <div className="absolute bottom-0 left-0 right-0 h-1 pointer-events-none" style={{ backgroundColor: videoAccent }} />
               </div>
             )
-          ) : <div className="w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400"><Video size={32} /></div>}
+          ) : (
+            <div className="w-full h-48 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${videoAccent}18` }}>
+              <div className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg" style={{ backgroundColor: videoAccent }}>
+                <svg viewBox="0 0 24 24" fill="white" width="28" height="28" style={{ marginLeft: 4 }}><polygon points="5,3 19,12 5,21" /></svg>
+              </div>
+            </div>
+          )}
           {d.caption && <p className="text-sm text-gray-500 mt-2 text-center">{d.caption}</p>}
         </div>
       );

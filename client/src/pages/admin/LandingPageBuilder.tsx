@@ -102,7 +102,7 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
   { type: "image", label: "Image", icon: <Image size={14} />, category: "Content",
     defaultData: { url: "", alt: "", caption: "", align: "center", maxWidth: "auto", linkUrl: "", openInNewTab: true, showShadow: true, noBorder: false } },
   { type: "video", label: "Video Embed", icon: <Video size={14} />, category: "Content",
-    defaultData: { embedUrl: "", caption: "", autoplay: false, muted: true, loop: false, controls: true, trimStart: 0, trimEnd: 0 } },
+    defaultData: { embedUrl: "", caption: "", autoplay: false, muted: true, loop: false, controls: true, trimStart: 0, trimEnd: 0, accentColor: "#189aa1" } },
   { type: "audio", label: "Audio Player", icon: <Music size={14} />, category: "Content",
     defaultData: { audioUrl: "", title: "", caption: "", autoplay: false, muted: false, loop: false, controls: true, trimStart: 0, trimEnd: 0, bgColor: "#f8fffe" } },
   { type: "embed", label: "Embed / iFrame", icon: <Globe size={14} />, category: "Content",
@@ -5602,6 +5602,11 @@ export function VideoBlockSettings({ d, set, uploading, setUploading, uploadMedi
         <div className="flex gap-1">{(["solid", "dashed", "dotted"] as const).map(s => <button key={s} onClick={() => set("borderStyle", s)} className={`flex-1 py-1 text-xs rounded border capitalize ${(d.borderStyle ?? "solid") === s ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>{s}</button>)}</div>
       </div>
       <BSColorField data={d} onSet={set} label="Border Color" field="borderColor" />
+      <div className="border border-gray-100 rounded p-2 space-y-2">
+        <p className="text-xs font-semibold text-gray-600 mb-1">Player Theme</p>
+        <BSColorField data={d} onSet={set} label="Accent Color (play button &amp; progress bar)" field="accentColor" />
+        <p className="text-[10px] text-gray-400">Applies to the play button overlay and progress bar on direct video files. Defaults to AAUS teal (#189aa1).</p>
+      </div>
     </div>
   );
 }

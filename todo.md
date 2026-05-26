@@ -2983,3 +2983,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Media Library picker filters to video assets only
 - [x] Lesson editor header: add prev/next lesson navigation buttons
 - [x] Lesson editor header: pass prevLesson/nextLesson/onNavigateLesson from LMSAdmin
+
+## Video Block Accent Color (May 2026)
+- [x] Video block settings: add Player Theme section with accentColor picker (default #189aa1)
+- [x] BlockPreview video case: apply accentColor to native video accent-color CSS property
+- [x] BlockPreview video case: teal accent bar at bottom of iframe embeds
+- [x] BlockPreview video case: empty state shows teal play button icon
+- [x] BLOCK_CATALOG video defaultData: include accentColor: "#189aa1"
