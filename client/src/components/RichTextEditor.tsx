@@ -70,6 +70,7 @@ import {
   Upload,
   Smile,
   Video,
+  MousePointerClick,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Picker from "@emoji-mart/react";
@@ -252,6 +253,13 @@ export default function RichTextEditor({
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const [customColor, setCustomColor] = useState("#149096");
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const [ctaDialogOpen, setCtaDialogOpen] = useState(false);
+  const [ctaText, setCtaText] = useState("Click Here");
+  const [ctaUrl, setCtaUrl] = useState("");
+  const [ctaBgColor, setCtaBgColor] = useState("#149096");
+  const [ctaTextColor, setCtaTextColor] = useState("#ffffff");
+  const [ctaSize, setCtaSize] = useState<"sm" | "md" | "lg">("md");
+  const [ctaFullWidth, setCtaFullWidth] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -366,6 +374,17 @@ export default function RichTextEditor({
     }
     setLinkUrl(""); setLinkDialogOpen(false);
   }, [editor, linkUrl]);
+
+  const insertCtaButton = useCallback(() => {
+    if (!editor || !ctaText.trim()) return;
+    const padding = ctaSize === "sm" ? "8px 18px" : ctaSize === "lg" ? "16px 36px" : "12px 28px";
+    const fontSize = ctaSize === "sm" ? "13px" : ctaSize === "lg" ? "18px" : "15px";
+    const display = ctaFullWidth ? "block" : "inline-block";
+    const width = ctaFullWidth ? "100%" : "auto";
+    const html = `<a href="${ctaUrl.trim() || "#"}" style="display:${display};width:${width};text-align:center;padding:${padding};background-color:${ctaBgColor};color:${ctaTextColor};border-radius:8px;font-weight:700;font-size:${fontSize};text-decoration:none;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.12);">${ctaText.trim()}</a>`;
+    editor.chain().focus().insertContent(html).run();
+    setCtaDialogOpen(false);
+  }, [editor, ctaText, ctaUrl, ctaBgColor, ctaTextColor, ctaSize, ctaFullWidth]);
 
   if (!editor) return null;
 
@@ -534,6 +553,11 @@ export default function RichTextEditor({
           {/* YouTube / URL embed */}
           <ToolbarBtn title="Embed YouTube / video URL" onClick={() => setVideoDialogOpen(true)}>
             <YoutubeIcon className="w-3.5 h-3.5" />
+          </ToolbarBtn>
+
+          {/* CTA Button */}
+          <ToolbarBtn title="Insert CTA button" onClick={() => { setCtaText("Click Here"); setCtaUrl(""); setCtaBgColor("#149096"); setCtaTextColor("#ffffff"); setCtaSize("md"); setCtaFullWidth(false); setCtaDialogOpen(true); }}>
+            <MousePointerClick className="w-3.5 h-3.5" />
           </ToolbarBtn>
 
           {/* Raw HTML */}
@@ -754,6 +778,72 @@ export default function RichTextEditor({
             <Button variant="outline" onClick={() => setHtmlDialogOpen(false)}>Cancel</Button>
             <Button onClick={insertHtml} disabled={!rawHtml.trim()} style={{ background: "#149096" }} className="text-white">
               Insert HTML
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* CTA Button Dialog */}
+      <Dialog open={ctaDialogOpen} onOpenChange={setCtaDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MousePointerClick className="w-5 h-5 text-[#149096]" /> Insert CTA Button
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-1.5">Button Text</label>
+              <Input placeholder="Click Here" value={ctaText} onChange={e => setCtaText(e.target.value)} autoFocus />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-1.5">Link URL</label>
+              <Input placeholder="https://example.com" value={ctaUrl} onChange={e => setCtaUrl(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-1.5">Background Color</label>
+                <div className="flex items-center gap-2">
+                  <input type="color" value={ctaBgColor} onChange={e => setCtaBgColor(e.target.value)} className="w-8 h-8 rounded border border-gray-200 cursor-pointer p-0" />
+                  <Input value={ctaBgColor} onChange={e => setCtaBgColor(e.target.value)} className="h-8 text-xs font-mono" />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-1.5">Text Color</label>
+                <div className="flex items-center gap-2">
+                  <input type="color" value={ctaTextColor} onChange={e => setCtaTextColor(e.target.value)} className="w-8 h-8 rounded border border-gray-200 cursor-pointer p-0" />
+                  <Input value={ctaTextColor} onChange={e => setCtaTextColor(e.target.value)} className="h-8 text-xs font-mono" />
+                </div>
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-1.5">Size</label>
+              <div className="flex gap-2">
+                {(["sm", "md", "lg"] as const).map(s => (
+                  <button key={s} type="button"
+                    onClick={() => setCtaSize(s)}
+                    className={`flex-1 h-8 rounded text-xs font-medium border transition-all ${
+                      ctaSize === s ? "border-[#149096] bg-[#149096] text-white" : "border-gray-200 text-gray-600 hover:border-gray-300"
+                    }`}>
+                    {s === "sm" ? "Small" : s === "md" ? "Medium" : "Large"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="cta-full-width" checked={ctaFullWidth} onChange={e => setCtaFullWidth(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-[#149096]" />
+              <label htmlFor="cta-full-width" className="text-sm text-gray-700 cursor-pointer">Full width button</label>
+            </div>
+            <div className="p-3 rounded-lg border border-gray-100 bg-gray-50 flex justify-center">
+              <a href="#" onClick={e => e.preventDefault()} style={{ display: ctaFullWidth ? "block" : "inline-block", textAlign: "center", width: ctaFullWidth ? "100%" : "auto", padding: ctaSize === "sm" ? "8px 18px" : ctaSize === "lg" ? "16px 36px" : "12px 28px", backgroundColor: ctaBgColor, color: ctaTextColor, borderRadius: "8px", fontWeight: 700, fontSize: ctaSize === "sm" ? "13px" : ctaSize === "lg" ? "18px" : "15px", textDecoration: "none", boxShadow: "0 2px 8px rgba(0,0,0,0.12)" }}>
+                {ctaText || "Click Here"}
+              </a>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCtaDialogOpen(false)}>Cancel</Button>
+            <Button onClick={insertCtaButton} disabled={!ctaText.trim()} style={{ background: "#149096" }} className="text-white">
+              Insert Button
             </Button>
           </DialogFooter>
         </DialogContent>

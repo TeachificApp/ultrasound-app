@@ -4343,7 +4343,20 @@ export default function LandingPageBuilder() {
   }, []);
 
   const updateBlock = useCallback((id: string, data: Record<string, any>) => {
-    setBlocks(prev => prev.map(b => b.id === id ? { ...b, data } : b));
+    setBlocks(prev => prev.map(b => {
+      if (b.id === id) return { ...b, data };
+      // Also update child blocks inside column_layout
+      if (b.type === "column_layout") {
+        const leftBlocks: Block[] = b.data?.leftBlocks ?? [];
+        const rightBlocks: Block[] = b.data?.rightBlocks ?? [];
+        const newLeft = leftBlocks.map((cb: Block) => cb.id === id ? { ...cb, data } : cb);
+        const newRight = rightBlocks.map((cb: Block) => cb.id === id ? { ...cb, data } : cb);
+        if (newLeft !== leftBlocks || newRight !== rightBlocks) {
+          return { ...b, data: { ...b.data, leftBlocks: newLeft, rightBlocks: newRight } };
+        }
+      }
+      return b;
+    }));
   }, []);
 
   const deleteBlock = useCallback((id: string) => {
@@ -4378,7 +4391,9 @@ export default function LandingPageBuilder() {
     setSaveTemplateDialogBlock(block);
   }, []);
 
-  const selectedBlock = blocks.find(b => b.id === selectedId);
+  // Also search column_layout children so clicking a child block opens its settings
+  const selectedBlock = blocks.find(b => b.id === selectedId) ??
+    blocks.flatMap(b => b.type === "column_layout" ? [...(b.data?.leftBlocks ?? []), ...(b.data?.rightBlocks ?? [])] : []).find(b => b.id === selectedId);
   const catalogByCat = BLOCK_CATALOG.filter(c => c.category === activeCat);
 
   // Block picker: fetch courses with landing blocks (for "Copy from Other Pages" tab)

@@ -2941,3 +2941,9 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] LessonBlockEditor: same "Import from URL" button and dialog
 - [x] Install cheerio for server-side HTML parsing
 - [x] Write vitest tests for scrapeUrl procedure (23 tests passing)
+## Column Layout Block & Rich Text CTA Button (May 25 2026)
+- [x] Fix column_layout block in FunnelPageEditor — add onAddBlockToColumn and onMoveBlockOutOfColumn handlers
+- [x] Fix column_layout block in LessonBlockEditor — add onAddBlockToColumn and onMoveBlockOutOfColumn handlers
+- [x] Fix column_layout block in LandingPageBuilder — updateBlock now also updates child blocks inside column_layout
+- [x] Fix selectedBlock derivation in all three editors to also search column_layout children
+- [x] Add CTA Button toolbar button to RichTextEditor with dialog (text, URL, bg color, text color, size, full-width)

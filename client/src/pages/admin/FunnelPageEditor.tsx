@@ -136,7 +136,20 @@ export default function FunnelPageEditor() {
   }, []);
 
   const updateBlock = useCallback((id: string, data: Record<string, any>) => {
-    setBlocks(prev => prev.map(b => b.id === id ? { ...b, data } : b));
+    setBlocks(prev => prev.map(b => {
+      if (b.id === id) return { ...b, data };
+      // Also update child blocks inside column_layout
+      if (b.type === "column_layout") {
+        const leftBlocks: Block[] = b.data?.leftBlocks ?? [];
+        const rightBlocks: Block[] = b.data?.rightBlocks ?? [];
+        const newLeft = leftBlocks.map((cb: Block) => cb.id === id ? { ...cb, data } : cb);
+        const newRight = rightBlocks.map((cb: Block) => cb.id === id ? { ...cb, data } : cb);
+        if (newLeft !== leftBlocks || newRight !== rightBlocks) {
+          return { ...b, data: { ...b.data, leftBlocks: newLeft, rightBlocks: newRight } };
+        }
+      }
+      return b;
+    }));
   }, []);
 
   const deleteBlock = useCallback((id: string) => {
@@ -154,7 +167,9 @@ export default function FunnelPageEditor() {
     });
   }, []);
 
-  const selectedBlock = blocks.find(b => b.id === selectedId);
+  // Also search column_layout children so clicking a child block opens its settings
+  const selectedBlock = blocks.find(b => b.id === selectedId) ??
+    blocks.flatMap(b => b.type === "column_layout" ? [...(b.data?.leftBlocks ?? []), ...(b.data?.rightBlocks ?? [])] : []).find(b => b.id === selectedId);
   const catalogByCat = BLOCK_CATALOG.filter(c => c.category === activeCat);
 
   // Block picker: fetch funnels with pages (for "Copy from Other Pages" tab)
@@ -803,7 +818,10 @@ export default function FunnelPageEditor() {
           ) : (
             <div className="bg-white min-h-full shadow-sm mx-auto" style={{ maxWidth: "900px" }}>
               <DndContext sensors={sensors} modifiers={[restrictToFirstScrollableAncestor]} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
+                <SortableContext items={[
+                  ...blocks.map(b => b.id),
+                  ...blocks.flatMap(b => b.type === "column_layout" ? [...(b.data?.leftBlocks ?? []), ...(b.data?.rightBlocks ?? [])].map((cb: any) => cb.id) : []),
+                ]} strategy={verticalListSortingStrategy}>
                   {blocks.map((block, idx) => (
                     <SortableBlock
                       key={block.id}
@@ -815,6 +833,31 @@ export default function FunnelPageEditor() {
                       onSaveAsTemplate={handleSaveBlockAsTemplate}
                       onMoveUp={idx > 0 ? () => setBlocks(prev => arrayMove(prev, idx, idx - 1)) : undefined}
                       onMoveDown={idx < blocks.length - 1 ? () => setBlocks(prev => arrayMove(prev, idx, idx + 1)) : undefined}
+                      onMoveBlockOutOfColumn={(colBlockId, side, childBlockId) => {
+                        setBlocks(prev => {
+                          let movedBlock: Block | null = null;
+                          const next = prev.map(b => {
+                            if (b.id !== colBlockId) return b;
+                            const colKey = side === "left" ? "leftBlocks" : "rightBlocks";
+                            const col: Block[] = b.data[colKey] ?? [];
+                            const child = col.find((cb: Block) => cb.id === childBlockId);
+                            if (child) movedBlock = child;
+                            return { ...b, data: { ...b.data, [colKey]: col.filter((cb: Block) => cb.id !== childBlockId) } };
+                          });
+                          if (!movedBlock) return prev;
+                          const colIdx = next.findIndex(b => b.id === colBlockId);
+                          return [...next.slice(0, colIdx + 1), movedBlock, ...next.slice(colIdx + 1)];
+                        });
+                      }}
+                      onAddBlockToColumn={(colBlockId, side, newBlock) => {
+                        setBlocks(prev => prev.map(b => {
+                          if (b.id !== colBlockId) return b;
+                          const colKey = side === "left" ? "leftBlocks" : "rightBlocks";
+                          const existing: Block[] = b.data[colKey] ?? [];
+                          return { ...b, data: { ...b.data, [colKey]: [...existing, newBlock] } };
+                        }));
+                        setSelectedId(newBlock.id);
+                      }}
                     />
                   ))}
                 </SortableContext>
@@ -1369,3 +1412,4 @@ function getDefaultBlocks(pageType: string, title: string): Block[] {
       ];
   }
 }
+
