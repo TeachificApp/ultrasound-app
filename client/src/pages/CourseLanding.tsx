@@ -239,7 +239,14 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
     case "embed":
       return (
         <div className="px-8 py-6">
-          {d.embedCode ? <div dangerouslySetInnerHTML={{ __html: injectUserParamsIntoHtml(d.embedCode, user) }} style={{ height: d.height ?? 400 }} /> : null}
+          {d.embedCode ? (
+            <iframe
+              srcDoc={injectUserParamsIntoHtml(d.embedCode, user)}
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals"
+              style={{ width: "100%", height: d.height ?? 400, border: "none", display: "block" }}
+              title={d.caption ?? "Embedded content"}
+            />
+          ) : null}
           {d.caption && <p className="text-sm text-gray-500 mt-2 text-center">{d.caption}</p>}
         </div>
       );

@@ -3068,3 +3068,18 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Filter draft lessons from getCourseOverview learner query
 - [x] Block draft lesson access in getLesson for non-admin users
 - [x] Add publish-course dialog: "Publish all lessons" vs "Keep draft lessons hidden"
+
+## Quiz Builder & Landing Page Settings (May 26 2026 Evening)
+- [ ] Quiz-type lesson editor: show dedicated standalone quiz builder (flat question list, AI generation, passing score, retakes) instead of curriculum UI when lesson type is "quiz"
+- [ ] Downloads admin landing page tab: remove legacy landingHeadline/landingBody/landingFeatures fields, keep Open Builder + Preview buttons, add AI Generate Landing Page button
+- [ ] Products admin landing page tab: remove legacy landingHeadline/landingBody/landingFeatures fields, keep Open Builder + Preview buttons, add AI Generate Landing Page button
+- [ ] HTML embed block: allow JavaScript (remove sanitization / use srcdoc with scripts enabled)
+
+## Session: Quiz Builder, Landing Page Settings, Embed JS (May 26)
+- [x] Quiz-type lesson editor: confirmed standalone QuizBuilderInline tab already exists and works correctly
+- [x] Downloads landing page tab: removed legacy Headline/Body/Features fields, kept Open Builder + Preview buttons, added AI Generate Landing Page button
+- [x] Products landing page tab: removed legacy Headline/Body/Features fields, kept Open Builder + Preview buttons, added AI Generate Sales Page button
+- [x] Added aiGenerateLandingPage procedure to downloadsAdminRouter
+- [x] Added aiGenerateLandingPage procedure to productsAdminRouter
+- [x] HTML embed blocks: replaced dangerouslySetInnerHTML with srcdoc iframe (allows JavaScript execution) in BlockPreview, CourseLanding, PublicFunnelPage, DownloadLanding
+- [x] Updated embed block settings label to note JavaScript is supported

@@ -3,7 +3,7 @@
  * Shared read-only block renderer used by CoursePlayer, CourseOverview, and LandingPageBuilder.
  * Extracted into its own file to break the circular dependency between CoursePlayer and LandingPageBuilder.
  */
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { ChevronDown, Globe, Image, Package, Upload, Video } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import CarouselBlock from "@/components/CarouselBlock";
@@ -270,7 +270,12 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
         <div className="px-8 py-6" style={{ display: "flex", flexDirection: "column", alignItems: embedJustify }}>
           <div style={{ width: embedMaxWidth, maxWidth: "100%" }}>
             {d.embedCode ? (
-              <div dangerouslySetInnerHTML={{ __html: d.embedCode }} style={{ height: d.height ?? 400 }} />
+              <iframe
+                srcDoc={d.embedCode}
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals"
+                style={{ width: "100%", height: d.height ?? 400, border: "none", display: "block" }}
+                title={d.caption ?? "Embedded content"}
+              />
             ) : <div className="w-full bg-gray-100 rounded-lg flex items-center justify-center text-gray-400" style={{ height: d.height ?? 400 }}><Globe size={32} /></div>}
             {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: embedAlign as any }}>{d.caption}</p>}
           </div>

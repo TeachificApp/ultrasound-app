@@ -390,37 +390,60 @@ export default function RichTextEditor({
     setCtaDialogOpen(false);
   }, [editor, ctaText, ctaUrl, ctaBgColor, ctaTextColor, ctaSize, ctaFullWidth]);
 
-  // Image alignment/float helper — applies CSS class to the selected/nearby image node
-  const setImageClass = (cls: string) => {
+  // Image alignment using wrapperStyle (supported by tiptap-extension-resize-image)
+  const setImageAlign = (align: string) => {
     if (!editor) return;
     const { state } = editor;
     const { from } = state.selection;
     let found = false;
-    state.doc.nodesBetween(Math.max(0, from - 1), Math.min(state.doc.content.size, from + 1), (node, pos) => {
+    state.doc.nodesBetween(Math.max(0, from - 1), Math.min(state.doc.content.size, from + 1), (node) => {
       if (found) return false;
       if (node.type.name === "image" || node.type.name === "imageResize") {
         found = true;
-        const existingClass = (node.attrs.class ?? "") as string;
-        const newClass = existingClass === cls ? "" : cls;
-        editor.chain().focus().updateAttributes(node.type.name, { class: newClass }).run();
+        const current = (node.attrs.wrapperStyle ?? "") as string;
+        const isActive = current.includes(`data-align:${align}`);
+        let wrapperStyle: string;
+        if (isActive) {
+          // Toggle off — reset to default block display
+          wrapperStyle = "display: block; margin: 0;";
+        } else if (align === "float-left") {
+          wrapperStyle = "display: block; float: left; margin: 0 16px 8px 0; data-align:float-left";
+        } else if (align === "float-right") {
+          wrapperStyle = "display: block; float: right; margin: 0 0 8px 16px; data-align:float-right";
+        } else if (align === "center") {
+          wrapperStyle = "display: flex; justify-content: center; margin: 0 auto; data-align:center";
+        } else if (align === "left") {
+          wrapperStyle = "display: block; margin-right: auto; data-align:left";
+        } else if (align === "right") {
+          wrapperStyle = "display: block; margin-left: auto; data-align:right";
+        } else {
+          wrapperStyle = "display: block; margin: 0;";
+        }
+        editor.chain().focus().updateAttributes(node.type.name, { wrapperStyle }).run();
         return false;
       }
     });
   };
 
-  const getImageClass = (): string => {
+  const getImageAlign = (): string => {
     if (!editor) return "";
     const { state } = editor;
     const { from } = state.selection;
-    let cls = "";
+    let align = "";
     state.doc.nodesBetween(Math.max(0, from - 1), Math.min(state.doc.content.size, from + 1), (node) => {
       if (node.type.name === "image" || node.type.name === "imageResize") {
-        cls = (node.attrs.class ?? "") as string;
+        const ws = (node.attrs.wrapperStyle ?? "") as string;
+        const match = ws.match(/data-align:(\S+)/);
+        if (match) align = match[1];
         return false;
       }
     });
-    return cls;
+    return align;
   };
+
+  // Legacy class-based alignment (kept for backward compat with existing content)
+  const setImageClass = (cls: string) => setImageAlign(cls);
+  const getImageClass = (): string => getImageAlign();
 
   if (!editor) return null;
 

@@ -516,7 +516,12 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
         <div className="px-8 py-8">
           <div className="max-w-4xl mx-auto">
             {d.embedCode ? (
-              <div dangerouslySetInnerHTML={{ __html: injectUserParamsIntoHtml(d.embedCode, user) }} style={{ height: d.height ?? 400 }} />
+              <iframe
+                srcDoc={injectUserParamsIntoHtml(d.embedCode, user)}
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals"
+                style={{ width: "100%", height: d.height ?? 400, border: "none", display: "block" }}
+                title={d.caption ?? "Embedded content"}
+              />
             ) : (
               <div className="h-64 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">Embed placeholder</div>
             )}

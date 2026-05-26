@@ -475,9 +475,10 @@ export const lmsPublicRouter = router({
       // Group lessons by sectionId
       const lessonsBySectionId = new Map<number, typeof allLessonsRaw>();
       for (const lesson of allLessonsRaw) {
-        const arr = lessonsBySectionId.get(lesson.sectionId) ?? [];
+        const sid = lesson.sectionId ?? 0;
+        const arr = lessonsBySectionId.get(sid) ?? [];
         arr.push(lesson);
-        lessonsBySectionId.set(lesson.sectionId, arr);
+        lessonsBySectionId.set(sid, arr);
       }
       // Filter out sections that have no published lessons
       const sectionsWithLessons = sections
@@ -4266,7 +4267,7 @@ CRITICAL REQUIREMENTS:
           previewMode: lmsLessons.previewMode,
           isPreview: lmsLessons.isPreview,
           position: lmsLessons.position,
-          lessonType: lmsLessons.lessonType,
+          lessonType: lmsLessons.type,
         })
         .from(lmsLessons)
         .where(
@@ -4365,9 +4366,9 @@ CRITICAL REQUIREMENTS:
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const now = new Date();
-      const { rowsAffected } = await db.delete(lmsArchive)
+      const result = await db.delete(lmsArchive)
         .where(sql`${lmsArchive.purgeAt} <= ${now}`);
-      return { purged: rowsAffected ?? 0 };
+      return { purged: (result as any).rowsAffected ?? 0 };
     }),
 
   /** List free preview enrollments with filters for admin email campaigns */

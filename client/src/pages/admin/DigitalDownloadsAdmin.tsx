@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Copy, Upload, FileIcon, GripVertical, ArrowLeft, ExternalLink, Eye, EyeOff, Image as ImageIcon, Link as LinkIcon, Users, UserPlus, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Copy, Upload, FileIcon, GripVertical, ArrowLeft, ExternalLink, Eye, EyeOff, Image as ImageIcon, Link as LinkIcon, Users, UserPlus, Loader2, Sparkles, LayoutTemplate } from "lucide-react";
 import RichTextEditor from "@/components/RichTextEditor";
 
 // ─── Product List View ──────────────────────────────────────────────────────
@@ -146,6 +146,13 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
     onSuccess: () => toast.success("URL & SEO settings saved"),
     onError: (e) => toast.error(e.message),
   });
+  const aiGenerateLandingPage = trpc.downloadsAdmin.aiGenerateLandingPage.useMutation({
+    onSuccess: () => {
+      toast.success("Landing page generated! Opening builder...");
+      setTimeout(() => navigate(`/admin/downloads/${productId}/landing-builder`), 600);
+    },
+    onError: (e) => toast.error(`AI error: ${e.message}`),
+  });
 
   if (isLoading) return <div className="text-center py-8 text-muted-foreground">Loading...</div>;
   if (!product) return <div className="text-center py-8 text-muted-foreground">Product not found</div>;
@@ -162,9 +169,6 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
       bundleOnly: (product as any).bundleOnly ?? false,
       status: product.status,
       thumbnailUrl: product.thumbnailUrl ?? "",
-      landingHeadline: product.landingHeadline ?? "",
-      landingBody: product.landingBody ?? "",
-      landingFeatures: product.landingFeatures ?? "",
       showInLibrary: (product as any).showInLibrary ?? true,
     });
     setSlug(product.slug ?? "");
@@ -183,9 +187,6 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
       bundleOnly: form.bundleOnly ?? false,
       status: form.status,
       thumbnailUrl: form.thumbnailUrl || null,
-      landingHeadline: form.landingHeadline || null,
-      landingBody: form.landingBody || null,
-      landingFeatures: form.landingFeatures || null,
       showInLibrary: (form as any).showInLibrary ?? true,
     });
   };
@@ -348,43 +349,68 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
         </CardContent>
       </Card>
 
-      {/* Landing Page Content */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm">Landing Page Content</CardTitle>
-            <Button
-              size="sm" variant="outline"
-              className="text-xs h-7"
-              onClick={() => navigate(`/admin/downloads/${productId}/landing-builder`)}
-            >
-              <LinkIcon className="w-3 h-3 mr-1" /> Open Page Builder
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      {/* Landing Page */}
+      <div className="space-y-3">
+        {/* Info banner */}
+        <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 flex items-start gap-3">
+          <LayoutTemplate className="w-5 h-5 text-teal-600 flex-shrink-0 mt-0.5" />
           <div>
-            <Label>Headline</Label>
-            <Input value={form.landingHeadline ?? ""} onChange={(e) => setForm({ ...form, landingHeadline: e.target.value })} placeholder="Compelling headline for the sales page" />
+            <p className="text-sm font-medium text-teal-800">Landing Page Builder</p>
+            <p className="text-xs text-teal-600 mt-0.5">Design your product landing page with blocks, images, pricing sections, and more.</p>
           </div>
-          <div>
-            <Label>Body (Rich Text)</Label>
-            <RichTextEditor
-              value={form.landingBody ?? ""}
-              onChange={(html) => setForm({ ...form, landingBody: html })}
-              placeholder="Detailed description of what buyers will get..."
-              minHeight={150}
-            />
+        </div>
+        {/* Quick actions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <button
+            onClick={() => navigate(`/admin/downloads/${productId}/landing-builder`)}
+            className="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-xl hover:border-teal-400 hover:bg-teal-50 transition-colors text-left"
+          >
+            <div className="w-9 h-9 bg-teal-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <LayoutTemplate className="w-5 h-5 text-teal-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-800">Open Full Builder</p>
+              <p className="text-xs text-gray-500">Edit blocks, layout, pricing, CTAs</p>
+            </div>
+          </button>
+          {product.slug && (
+            <a href={`/downloads/${product.slug}?preview=admin`} target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-colors text-left">
+              <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Eye className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-800">Preview Landing Page</p>
+                <p className="text-xs text-gray-500">See how it looks to visitors</p>
+              </div>
+            </a>
+          )}
+        </div>
+        {/* AI Generate */}
+        <div className="bg-white border border-purple-200 rounded-xl p-5">
+          <div className="flex items-start gap-3 mb-4">
+            <div className="w-9 h-9 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Sparkles className="w-5 h-5 text-purple-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-800">AI Generate Landing Page</p>
+              <p className="text-xs text-gray-500 mt-0.5">The AI will read your product title, description, and pricing to generate a complete block-based landing page — hero, features, testimonials, FAQ, and CTA.</p>
+            </div>
           </div>
-          <div>
-            <Label>Features (one per line)</Label>
-            <Textarea value={form.landingFeatures ?? ""} onChange={(e) => setForm({ ...form, landingFeatures: e.target.value })} rows={4} placeholder="Feature 1&#10;Feature 2&#10;Feature 3" />
-          </div>
-          <p className="text-xs text-muted-foreground">
-            For a full drag-and-drop landing page, use the <strong>Page Builder</strong> above. The fields here serve as fallback content when no builder blocks are configured.
-          </p>
-        </CardContent>
-      </Card>
+          <Button
+            className="bg-purple-600 hover:bg-purple-700 text-white gap-2 w-full"
+            disabled={aiGenerateLandingPage.isPending}
+            onClick={() => aiGenerateLandingPage.mutate({ productId })}
+          >
+            {aiGenerateLandingPage.isPending
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating landing page...</>
+              : <><Sparkles className="w-4 h-4" /> Generate Landing Page with AI</>}
+          </Button>
+          {aiGenerateLandingPage.isPending && (
+            <p className="text-xs text-purple-500 text-center mt-2">This may take 15–30 seconds while the AI builds your page...</p>
+          )}
+        </div>
+      </div>
 
       {/* Files */}
       <FileManager productId={productId} files={product.files} />

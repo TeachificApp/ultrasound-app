@@ -15,7 +15,7 @@ import {
   Plus, Pencil, Trash2, Copy, Upload, ShoppingBag, ArrowLeft,
   ExternalLink, Eye, Image as ImageIcon, Link as LinkIcon,
   Users, UserPlus, Loader2, Package, BarChart2, Settings,
-  DollarSign, Globe, Tag, Truck,
+  DollarSign, Globe, Tag, Truck, Sparkles, LayoutTemplate,
 } from "lucide-react";
 import RichTextEditor from "@/components/RichTextEditor";
 
@@ -474,6 +474,13 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
     onSuccess: () => { utils.productsAdmin.get.invalidate({ id: productId }); utils.productsAdmin.list.invalidate(); toast.success("Saved"); },
     onError: (e) => toast.error(e.message),
   });
+  const aiGenerateLandingPage = trpc.productsAdmin.aiGenerateLandingPage.useMutation({
+    onSuccess: () => {
+      toast.success("Landing page generated! Opening builder...");
+      setTimeout(() => navigate(`/admin/products/${productId}/landing-builder`), 600);
+    },
+    onError: (e) => toast.error(`AI error: ${e.message}`),
+  });
 
   const [form, setForm] = useState<Record<string, any>>({});
   const initialized = useRef(false);
@@ -503,9 +510,6 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
       requiresShipping: product.requiresShipping,
       status: product.status,
       thumbnailUrl: product.thumbnailUrl ?? "",
-      landingHeadline: product.landingHeadline ?? "",
-      landingBody: product.landingBody ?? "",
-      landingFeatures: product.landingFeatures ?? "",
       slug: product.slug,
       metaTitle: product.metaTitle ?? "",
       metaDescription: product.metaDescription ?? "",
@@ -531,9 +535,6 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
       requiresShipping: form.requiresShipping,
       status: form.status,
       thumbnailUrl: form.thumbnailUrl || null,
-      landingHeadline: form.landingHeadline || null,
-      landingBody: form.landingBody || null,
-      landingFeatures: form.landingFeatures || null,
       slug: form.slug || product.slug,
       metaTitle: form.metaTitle || null,
       metaDescription: form.metaDescription || null,
@@ -811,42 +812,66 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
         </TabsContent>
 
         {/* ── Sales Page Tab ── */}
-        <TabsContent value="landing" className="mt-4 space-y-4">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm">Sales Page Content</CardTitle>
-                <Button size="sm" variant="outline" className="text-xs h-7"
-                  onClick={() => navigate(`/admin/products/${productId}/landing-builder`)}>
-                  <LinkIcon className="w-3 h-3 mr-1" /> Open Page Builder
-                </Button>
+        <TabsContent value="landing" className="mt-4 space-y-3">
+          {/* Info banner */}
+          <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 flex items-start gap-3">
+            <LayoutTemplate className="w-5 h-5 text-teal-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-teal-800">Sales Page Builder</p>
+              <p className="text-xs text-teal-600 mt-0.5">Design your product sales page with blocks, images, pricing sections, and more.</p>
+            </div>
+          </div>
+          {/* Quick actions */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <button
+              onClick={() => navigate(`/admin/products/${productId}/landing-builder`)}
+              className="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-xl hover:border-teal-400 hover:bg-teal-50 transition-colors text-left"
+            >
+              <div className="w-9 h-9 bg-teal-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <LayoutTemplate className="w-5 h-5 text-teal-600" />
               </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
               <div>
-                <Label>Headline</Label>
-                <Input value={form.landingHeadline ?? ""} onChange={(e) => setForm({ ...form, landingHeadline: e.target.value })} placeholder="Compelling headline for the sales page" className="mt-1" />
+                <p className="text-sm font-semibold text-gray-800">Open Full Builder</p>
+                <p className="text-xs text-gray-500">Edit blocks, layout, pricing, CTAs</p>
               </div>
-              <div>
-                <Label>Body (Rich Text)</Label>
-                <div className="mt-1">
-                  <RichTextEditor
-                    value={form.landingBody ?? ""}
-                    onChange={(html) => setForm({ ...form, landingBody: html })}
-                    placeholder="Detailed description of what buyers will get..."
-                    minHeight={150}
-                  />
+            </button>
+            {product.slug && (
+              <a href={`/product/${product.slug}?preview=admin`} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-colors text-left">
+                <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Eye className="w-5 h-5 text-blue-600" />
                 </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Preview Sales Page</p>
+                  <p className="text-xs text-gray-500">See how it looks to visitors</p>
+                </div>
+              </a>
+            )}
+          </div>
+          {/* AI Generate */}
+          <div className="bg-white border border-purple-200 rounded-xl p-5">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-9 h-9 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Sparkles className="w-5 h-5 text-purple-600" />
               </div>
               <div>
-                <Label>Features / Bullet Points (one per line)</Label>
-                <Textarea value={form.landingFeatures ?? ""} onChange={(e) => setForm({ ...form, landingFeatures: e.target.value })} rows={4} placeholder={"Feature 1\nFeature 2\nFeature 3"} className="mt-1" />
+                <p className="text-sm font-semibold text-gray-800">AI Generate Sales Page</p>
+                <p className="text-xs text-gray-500 mt-0.5">The AI will read your product title, description, and pricing to generate a complete block-based sales page — hero, features, testimonials, FAQ, and CTA.</p>
               </div>
-              <p className="text-xs text-muted-foreground">
-                For a full drag-and-drop sales page, use the <strong>Page Builder</strong> above. The fields here serve as fallback content.
-              </p>
-            </CardContent>
-          </Card>
+            </div>
+            <Button
+              className="bg-purple-600 hover:bg-purple-700 text-white gap-2 w-full"
+              disabled={aiGenerateLandingPage.isPending}
+              onClick={() => aiGenerateLandingPage.mutate({ productId })}
+            >
+              {aiGenerateLandingPage.isPending
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating sales page...</>
+                : <><Sparkles className="w-4 h-4" /> Generate Sales Page with AI</>}
+            </Button>
+            {aiGenerateLandingPage.isPending && (
+              <p className="text-xs text-purple-500 text-center mt-2">This may take 15–30 seconds while the AI builds your page...</p>
+            )}
+          </div>
         </TabsContent>
 
         {/* ── Orders Tab ── */}

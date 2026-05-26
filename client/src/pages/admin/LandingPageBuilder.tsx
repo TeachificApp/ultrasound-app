@@ -2448,8 +2448,9 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
         <div className="space-y-3">
           <UserParamTagsHelper context="html" />
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Embed Code (iframe or HTML)</label>
-            <DebouncedTextarea value={d.embedCode ?? ""} onChange={v => set("embedCode", v)} className="text-sm min-h-[100px] font-mono text-xs" placeholder='<iframe src="..." />' />
+            <label className="text-xs text-gray-500 block mb-1">Embed Code (HTML, iframe, or JavaScript)</label>
+            <DebouncedTextarea value={d.embedCode ?? ""} onChange={v => set("embedCode", v)} className="text-sm min-h-[100px] font-mono text-xs" placeholder='<iframe src="..." />&#10;<!-- or any HTML/JS snippet -->' />
+            <p className="text-xs text-gray-400 mt-1">JavaScript in &lt;script&gt; tags is fully supported.</p>
           </div>
           <div>
             <label className="text-xs text-gray-500 block mb-1">Height (px)</label>

@@ -16,6 +16,7 @@ import {
   lmsArchive,
 } from "../../drizzle/schema";
 import { sendEmail } from "../_core/email";
+import { invokeLLM } from "../_core/llm";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import { sendDownloadAccessEmail, sendBundleAccessEmail } from "../lib/enrollmentEmail";
 
@@ -1009,6 +1010,89 @@ export const downloadsAdminRouter = router({
         }
       })();
       return { purchaseId: result.id, alreadyGranted: false, isNewUser };
+    }),
+
+  /** AI-generate landing page blocks for a digital product */
+  aiGenerateLandingPage: protectedProcedure
+    .input(z.object({ productId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const [product] = await db.select({
+        id: digitalProducts.id,
+        title: digitalProducts.title,
+        subtitle: digitalProducts.subtitle,
+        description: digitalProducts.description,
+        price: digitalProducts.price,
+        isFree: digitalProducts.isFree,
+        thumbnailUrl: digitalProducts.thumbnailUrl,
+        slug: digitalProducts.slug,
+      }).from(digitalProducts).where(eq(digitalProducts.id, input.productId)).limit(1);
+      if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Product not found" });
+
+      const priceText = product.isFree ? "Free" : product.price ? `$${(product.price / 100).toFixed(2)}` : "Free";
+
+      const systemPrompt = `You are an expert landing page designer for digital products. Generate a complete, compelling landing page block structure as JSON. The blocks should be professional, conversion-focused, and specific to the content provided.`;
+      const userPrompt = `Generate a landing page for this digital download product:
+
+Title: ${product.title}
+Subtitle: ${product.subtitle ?? ""}
+Description: ${product.description ?? ""}
+Price: ${priceText}
+Cover Image: ${product.thumbnailUrl ?? ""}
+
+Generate a JSON array of content blocks. Each block must have:
+- id: unique string (e.g. "block_1")
+- type: one of: hero, rich_text, testimonials, faq, cta_button, two_column
+- For hero blocks: heroTitle (string), heroSubtitle (string), heroImageUrl (string, use product cover if available), heroBtnText (string), heroBehavior: "checkout", heroCheckoutProductType: "download", heroCheckoutProductId: ${input.productId}
+- For rich_text blocks: content (HTML string with h2/h3/p/ul tags)
+- For cta_button blocks: ctaText (string), ctaBehavior: "checkout", checkoutProductType: "download", checkoutProductId: ${input.productId}
+- For testimonials blocks: testimonials array with {name, role, text, rating} objects (generate 3 realistic ones)
+- For faq blocks: faqs array with {question, answer} objects (generate 4-6 relevant FAQs)
+- For two_column blocks: leftContent (HTML), rightContent (HTML)
+
+Create 5-7 blocks in this order: hero, rich_text (what you get), rich_text (about/description), testimonials, faq, cta_button. Make the content specific and compelling.`;
+
+      const response = await invokeLLM({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "landing_page_blocks",
+            strict: false,
+            schema: {
+              type: "object",
+              properties: {
+                blocks: { type: "array", items: { type: "object", additionalProperties: true } },
+              },
+              required: ["blocks"],
+            },
+          },
+        },
+      });
+
+      let blocks: any[];
+      try {
+        const raw = response.choices[0].message.content as string;
+        const parsed = JSON.parse(raw);
+        blocks = Array.isArray(parsed) ? parsed : parsed.blocks;
+        if (!Array.isArray(blocks)) throw new Error("Not an array");
+        blocks = blocks.map((b, i) => ({ ...b, id: b.id ?? `ai_block_${i}_${Date.now()}` }));
+      } catch {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "AI returned invalid JSON. Please try again." });
+      }
+
+      const blocksJson = JSON.stringify(blocks);
+      await db.update(digitalProducts)
+        .set({ landingBlocks: blocksJson })
+        .where(eq(digitalProducts.id, input.productId));
+
+      return { success: true, blockCount: blocks.length };
     }),
 });
 
