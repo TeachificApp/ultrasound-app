@@ -2934,10 +2934,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Fix image block clickable link not working in all page renderers (CourseLanding, PublicFunnelPage, DownloadLanding, LessonBlockEditor)
 
 ## Page Scraper / Import from URL (May 2026)
-- [ ] Server: add scrapeUrl tRPC procedure (public/admin) — fetch URL, parse HTML with cheerio, extract title, headings, paragraphs, images, lists, CTAs, and map to block types
-- [ ] Server: smart block mapping — hero → hero block, h1/h2 headings → heading block, paragraphs → rich_text block, img → image block, ul/ol → rich_text, CTA buttons → cta block, everything else → rich_text
-- [ ] LandingPageBuilder: "Import from URL" button in toolbar → dialog with URL input → calls scrapeUrl → inserts mapped blocks
-- [ ] FunnelPageEditor / FunnelBuilder: same "Import from URL" button and dialog
-- [ ] LessonBlockEditor: same "Import from URL" button and dialog
-- [ ] Install cheerio for server-side HTML parsing
-- [ ] Write vitest tests for scrapeUrl procedure
+- [x] Server: add scrapeUrl tRPC procedure (public/admin) — fetch URL, parse HTML with cheerio, extract title, headings, paragraphs, images, lists, CTAs, and map to block types
+- [x] Server: smart block mapping — hero → hero block, h1/h2 headings → heading block, paragraphs → rich_text block, img → image block, ul/ol → rich_text, CTA buttons → cta block, everything else → rich_text
+- [x] LandingPageBuilder: "Import from URL" button in toolbar → dialog with URL input → calls scrapeUrl → inserts mapped blocks
+- [x] FunnelPageEditor / FunnelBuilder: same "Import from URL" button and dialog
+- [x] LessonBlockEditor: same "Import from URL" button and dialog
+- [x] Install cheerio for server-side HTML parsing
+- [x] Write vitest tests for scrapeUrl procedure (23 tests passing)

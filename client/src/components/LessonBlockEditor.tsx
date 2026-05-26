@@ -23,7 +23,7 @@ import {
 import { Block, BlockType, BlockPreview } from "@/components/BlockPreview";
 import { BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, SortableBlock, uid } from "@/pages/admin/LandingPageBuilder";
 import {
-  X, Plus, Save, Eye, EyeOff, Copy, BookOpen, Search, ExternalLink, Layers,
+  X, Plus, Save, Eye, EyeOff, Copy, BookOpen, Search, ExternalLink, Layers, Globe, Loader2,
 } from "lucide-react";
 import { BlockTemplateLibraryProvider, OpenTemplateLibraryButton, SaveAsTemplateButton } from "@/components/BlockTemplateLibrary";
 import { cn } from "@/lib/utils";
@@ -39,7 +39,7 @@ interface LessonBlockEditorProps {
 }
 
 // Picker tab type
-type PickerTab = "catalog" | "from_lessons" | "templates";
+type PickerTab = "catalog" | "from_lessons" | "templates" | "import_url";
 
 export default function LessonBlockEditor({
   lessonId,
@@ -68,6 +68,16 @@ export default function LessonBlockEditor({
   const [selectedSourceFunnelId, setSelectedSourceFunnelId] = useState<number | null>(null);
   const [selectedSourceFunnelPageId, setSelectedSourceFunnelPageId] = useState<number | null>(null);
   const [blockSearch, setBlockSearch] = useState("");
+  const [importUrl, setImportUrl] = useState("");
+  const [importPreview, setImportPreview] = useState<{ blocks: any[]; pageTitle: string; blockCount: number } | null>(null);
+  const [importSelectedBlocks, setImportSelectedBlocks] = useState<Set<number>>(new Set());
+  const scrapeUrlMutation = trpc.pageScraper.scrapeUrl.useMutation({
+    onSuccess: (data) => {
+      setImportPreview(data);
+      setImportSelectedBlocks(new Set(data.blocks.map((_: any, i: number) => i)));
+    },
+    onError: (err: any) => toast.error(err.message || "Failed to scrape URL"),
+  });
 
   const updateLesson = trpc.lmsAdmin.updateLesson.useMutation();
 
@@ -542,6 +552,17 @@ export default function LessonBlockEditor({
           >
             <Layers className="w-3.5 h-3.5" /> Block Templates
           </button>
+          <button
+            onClick={() => { setPickerTab("import_url"); setImportPreview(null); }}
+            className={cn(
+              "px-4 py-2 text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5",
+              pickerTab === "import_url"
+                ? "text-teal-700 border-b-2 border-teal-500"
+                : "text-gray-500 hover:text-gray-700"
+            )}
+          >
+            <Globe className="w-3.5 h-3.5" /> Import from URL
+          </button>
         </div>
 
         {/* ── Catalog tab ── */}
@@ -744,6 +765,89 @@ export default function LessonBlockEditor({
               toast.success("Block template inserted!");
             }}
           />
+        )}
+        {/* ── Import from URL tab ── */}
+        {pickerTab === "import_url" && (
+          <div className="flex flex-col flex-1 overflow-hidden gap-3 p-1">
+            <div className="flex gap-2">
+              <input
+                type="url"
+                value={importUrl}
+                onChange={e => setImportUrl(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" && importUrl.trim()) scrapeUrlMutation.mutate({ url: importUrl.trim() }); }}
+                placeholder="https://example.com/page-to-import"
+                className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-400"
+              />
+              <button
+                onClick={() => { if (importUrl.trim()) scrapeUrlMutation.mutate({ url: importUrl.trim() }); }}
+                disabled={!importUrl.trim() || scrapeUrlMutation.isPending}
+                className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+              >
+                {scrapeUrlMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
+                {scrapeUrlMutation.isPending ? "Scraping..." : "Scrape"}
+              </button>
+            </div>
+            {importPreview && (
+              <>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-gray-500">
+                    Found <strong>{importPreview.blockCount}</strong> blocks from <em>{importPreview.pageTitle || importUrl}</em>. Select which to import:
+                  </p>
+                  <div className="flex gap-2">
+                    <button onClick={() => setImportSelectedBlocks(new Set(importPreview.blocks.map((_: any, i: number) => i)))} className="text-xs text-teal-600 hover:underline">All</button>
+                    <button onClick={() => setImportSelectedBlocks(new Set())} className="text-xs text-gray-500 hover:underline">None</button>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto space-y-1 border border-gray-100 rounded-lg p-2">
+                  {importPreview.blocks.map((block: any, i: number) => (
+                    <label key={i} className="flex items-start gap-2 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={importSelectedBlocks.has(i)}
+                        onChange={e => {
+                          const next = new Set(importSelectedBlocks);
+                          if (e.target.checked) next.add(i); else next.delete(i);
+                          setImportSelectedBlocks(next);
+                        }}
+                        className="mt-0.5 accent-teal-600"
+                      />
+                      <div className="min-w-0">
+                        <span className="text-xs font-semibold text-teal-700 uppercase tracking-wide">{block.type}</span>
+                        <p className="text-xs text-gray-500 truncate">
+                          {block.type === "hero" ? block.data?.headline :
+                           block.type === "text" ? (block.data?.html || "").replace(/<[^>]+>/g, "").slice(0, 80) :
+                           block.type === "bullets" || block.type === "numbered_list" ? (block.data?.items?.[0] || "") :
+                           block.type === "image" ? (block.data?.alt || block.data?.url || "Image") :
+                           JSON.stringify(block.data).slice(0, 80)}
+                        </p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+                <button
+                  disabled={importSelectedBlocks.size === 0}
+                  onClick={() => {
+                    const toAdd = importPreview.blocks
+                      .filter((_: any, i: number) => importSelectedBlocks.has(i))
+                      .map((b: any) => ({ ...b, id: uid() }));
+                    setBlocks(prev => [...prev, ...toAdd]);
+                    setAddMenuOpen(false);
+                    toast.success(`Imported ${toAdd.length} block${toAdd.length !== 1 ? "s" : ""} from URL!`);
+                  }}
+                  className="w-full py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
+                >
+                  Import {importSelectedBlocks.size} Selected Block{importSelectedBlocks.size !== 1 ? "s" : ""}
+                </button>
+              </>
+            )}
+            {!importPreview && !scrapeUrlMutation.isPending && (
+              <div className="flex-1 flex flex-col items-center justify-center text-center gap-3 text-gray-400">
+                <Globe className="w-10 h-10 opacity-30" />
+                <p className="text-sm">Enter a URL above and click Scrape to import page content as blocks.</p>
+                <p className="text-xs">Headings, paragraphs, images, and lists will be converted to content blocks automatically.</p>
+              </div>
+            )}
+          </div>
         )}
       </DialogContent>
     </Dialog>
