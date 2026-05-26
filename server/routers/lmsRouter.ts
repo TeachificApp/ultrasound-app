@@ -2076,6 +2076,8 @@ export const lmsAdminRouter = router({
       isPrerequisite: z.boolean().optional(),
       commentsEnabled: z.boolean().optional(),
       meetingLink: z.string().max(1024).nullable().optional(),
+      liveStartAt: z.number().int().nullable().optional(),
+      liveEndAt: z.number().int().nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);

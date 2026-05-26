@@ -2849,6 +2849,10 @@ export const lmsLessons = mysqlTable("lms_lessons", {
   prerequisiteLessonId: int("prerequisite_lesson_id"),
   // Live meeting link (Zoom/Teams) — shown as "Join Live" button on enrolled course overview only
   meetingLink: varchar("meeting_link", { length: 1024 }),
+  // Scheduled start/end times for the live session (UTC ms). Join Live button appears 15 min before
+  // liveStartAt and hides after liveEndAt (or 3 hours after liveStartAt if liveEndAt is not set).
+  liveStartAt: bigint("live_start_at", { mode: "number" }),
+  liveEndAt: bigint("live_end_at", { mode: "number" }),
   // Comments: when true, enrolled students can post comments on this lesson
   commentsEnabled: boolean("comments_enabled").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),

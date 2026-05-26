@@ -3419,6 +3419,8 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
   const [isPrerequisite, setIsPrerequisite] = useState<boolean>(!!lesson.isPrerequisite);
   const [commentsEnabled, setCommentsEnabled] = useState<boolean>(!!(lesson as any).commentsEnabled);
   const [meetingLink, setMeetingLink] = useState<string>((lesson as any).meetingLink ?? "");
+  const [liveStartAt, setLiveStartAt] = useState<string>((lesson as any).liveStartAt ? new Date((lesson as any).liveStartAt).toISOString().slice(0, 16) : "");
+  const [liveEndAt, setLiveEndAt] = useState<string>((lesson as any).liveEndAt ? new Date((lesson as any).liveEndAt).toISOString().slice(0, 16) : "");
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<{ id: number; title: string; s3Url: string; mediaType: string } | null>(null);
 
@@ -3440,6 +3442,8 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
     setIsPrerequisite(!!lessonShallow.isPrerequisite);
     setCommentsEnabled(!!(lessonShallow as any).commentsEnabled);
     setMeetingLink((lessonShallow as any).meetingLink ?? "");
+    setLiveStartAt((lessonShallow as any).liveStartAt ? new Date((lessonShallow as any).liveStartAt).toISOString().slice(0, 16) : "");
+    setLiveEndAt((lessonShallow as any).liveEndAt ? new Date((lessonShallow as any).liveEndAt).toISOString().slice(0, 16) : "");
   }, [lessonShallow.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync state when full lesson data arrives (content/videoContent/embedUrl may be empty until then)
@@ -3487,6 +3491,8 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
       isPrerequisite,
       commentsEnabled,
       meetingLink: meetingLink.trim() || null,
+      liveStartAt: liveStartAt ? new Date(liveStartAt).getTime() : null,
+      liveEndAt: liveEndAt ? new Date(liveEndAt).getTime() : null,
       content: (lessonType === "text" || lessonType === "video" || lessonType === "download" || lessonType === "video_text") ? (content || null) : undefined,
       videoContent: lessonType === "video_text" ? (videoContent || null) : undefined,
       embedUrl: lessonType === "embed" ? (embedUrl || null) : undefined,
@@ -3730,6 +3736,33 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
               <p className="text-xs text-teal-700 flex items-center gap-1">
                 <CheckCircle className="w-3 h-3" /> Join Live button will be shown on the course overview
               </p>
+            )}
+            {/* Scheduled start/end times for time-gated Join Live button */}
+            {meetingLink && (
+              <div className="space-y-2 pt-2 border-t border-teal-100">
+                <p className="text-xs font-medium text-gray-600 flex items-center gap-1"><Clock className="w-3 h-3" /> Schedule (optional — controls when Join Live button is visible)</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-gray-500">Session Start</Label>
+                    <Input
+                      type="datetime-local"
+                      value={liveStartAt}
+                      onChange={e => setLiveStartAt(e.target.value)}
+                      className="text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-gray-500">Session End (optional)</Label>
+                    <Input
+                      type="datetime-local"
+                      value={liveEndAt}
+                      onChange={e => setLiveEndAt(e.target.value)}
+                      className="text-xs"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-gray-400">Button appears 15 min before start. If no end time is set, it hides 3 hours after start. Leave both blank to always show the button.</p>
+              </div>
             )}
           </div>
 
