@@ -3180,6 +3180,8 @@ export const digitalProducts = mysqlTable("digital_products", {
   showInLibrary: boolean("show_in_library").default(true).notNull(),
   // Stats
   downloadCount: int("download_count").default(0).notNull(),
+  // Display order in the public Education Library (0 = unset/default, positive = explicit position)
+  libraryOrder: int("library_order").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });

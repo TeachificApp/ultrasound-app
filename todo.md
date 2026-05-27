@@ -3168,3 +3168,12 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix AI landing page invalid JSON — extractJson utility strips markdown code fences before JSON.parse
 - [x] Fix TypeScript root errors (lmsThinkificImports.lmsCourseId, funnelRouter db null, productsRouter label)
 - [x] Add course/lesson selector to QuizBuilderDialog AI Generate panel
+
+## Session: Drag-to-Reorder Downloads + AI Landing Page Fix (2026-05-27)
+- [x] Fix AI landing page stale data: refreshKey from ?t= param, lpUtils cache invalidation, staleTime:0
+- [x] Remove debug console.log from aiGenerateLandingPage in lmsRouter.ts
+- [x] Add lessonTitle prop to LessonBlockEditor (shows lesson name in header)
+- [x] Add library_order column to digital_products table (DB migrated)
+- [x] Add reorder procedure to downloadsAdminRouter (sorts by libraryOrder ASC, createdAt DESC)
+- [x] Update public downloads list to sort by libraryOrder then createdAt
+- [x] Add SortableProductRow component and drag-to-reorder UI to DigitalDownloadsAdmin ProductList

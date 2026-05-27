@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -12,11 +12,80 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, Copy, Upload, FileIcon, GripVertical, ArrowLeft, ExternalLink, Eye, EyeOff, Image as ImageIcon, Link as LinkIcon, Users, UserPlus, Loader2, Sparkles, LayoutTemplate } from "lucide-react";
 import RichTextEditor from "@/components/RichTextEditor";
+import {
+  DndContext, DragOverlay, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable, arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+
+// ─── Sortable Product Row ────────────────────────────────────────────────────
+function SortableProductRow({ product, onEdit, onDuplicate, onDelete }: { product: any; onEdit: (id: number) => void; onDuplicate: (id: number) => void; onDelete: (id: number) => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: product.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center gap-3 bg-white rounded-lg border border-gray-200 px-4 py-3 hover:border-teal-300 transition-colors">
+      <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 touch-none" title="Drag to reorder">
+        <GripVertical className="w-4 h-4" />
+      </button>
+      {product.thumbnailUrl ? (
+        <img src={product.thumbnailUrl} alt="" className="w-10 h-10 rounded object-cover flex-shrink-0" />
+      ) : (
+        <div className="w-10 h-10 rounded bg-muted flex items-center justify-center flex-shrink-0">
+          <FileIcon className="w-4 h-4 text-muted-foreground" />
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-gray-900 text-sm truncate">{product.title}</p>
+        <p className="text-xs text-gray-400">{product.isFree ? "Free" : `$${(product.price / 100).toFixed(2)}`} · /{product.slug}</p>
+      </div>
+      <Badge variant={product.status === "published" ? "default" : product.status === "archived" ? "secondary" : "outline"} className="text-xs">
+        {product.status}
+      </Badge>
+      <Button size="sm" variant="ghost" className="h-7 text-xs text-teal-600 hover:bg-teal-50" onClick={() => onEdit(product.id)}>
+        <Pencil className="w-3 h-3 mr-1" /> Edit
+      </Button>
+      <Button size="sm" variant="ghost" className="h-7 text-xs text-blue-500 hover:bg-blue-50" title="Duplicate" onClick={() => onDuplicate(product.id)}>
+        <Copy className="w-3 h-3" />
+      </Button>
+      <Button size="sm" variant="ghost" className="h-7 text-red-400 hover:bg-red-50" onClick={() => onDelete(product.id)}>
+        <Trash2 className="w-3 h-3" />
+      </Button>
+    </div>
+  );
+}
 
 // ─── Product List View ──────────────────────────────────────────────────────
 function ProductList({ onEdit }: { onEdit: (id: number) => void }) {
   const { data: products, isLoading } = trpc.downloadsAdmin.list.useQuery();
   const utils = trpc.useUtils();
+  const [localProducts, setLocalProducts] = useState<any[]>([]);
+  const [reorderMode, setReorderMode] = useState(false);
+  const [activeDragId, setActiveDragId] = useState<number | null>(null);
+  const prevDataRef = useRef<any>(null);
+  const [showCreate, setShowCreate] = useState(false);
+
+  useEffect(() => {
+    if (products && products !== prevDataRef.current) {
+      prevDataRef.current = products;
+      const sorted = [...products].sort((a: any, b: any) => {
+        if (a.libraryOrder !== b.libraryOrder) return (a.libraryOrder ?? 0) - (b.libraryOrder ?? 0);
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+      setLocalProducts(sorted);
+    }
+  }, [products]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const reorderMut = trpc.downloadsAdmin.reorder.useMutation({
+    onSuccess: () => toast.success("Library order saved"),
+    onError: e => toast.error(`Failed to save order: ${e.message}`),
+  });
   const deleteMut = trpc.downloadsAdmin.delete.useMutation({
     onSuccess: () => { utils.downloadsAdmin.list.invalidate(); toast.success("Product deleted"); },
   });
@@ -24,7 +93,20 @@ function ProductList({ onEdit }: { onEdit: (id: number) => void }) {
     onSuccess: (data) => { utils.downloadsAdmin.list.invalidate(); toast.success(`Duplicated as "${data.title}"`); },
     onError: e => toast.error(`Error: ${e.message}`),
   });
-  const [showCreate, setShowCreate] = useState(false);
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveDragId(null);
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = localProducts.findIndex((p: any) => p.id === active.id);
+    const newIndex = localProducts.findIndex((p: any) => p.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reordered = arrayMove(localProducts, oldIndex, newIndex);
+    setLocalProducts(reordered);
+    reorderMut.mutate({ products: reordered.map((p: any, i: number) => ({ id: p.id, libraryOrder: i + 1 })) });
+  };
+
+  const activeProduct = activeDragId ? localProducts.find((p: any) => p.id === activeDragId) : null;
 
   if (isLoading) return <div className="text-center py-8 text-muted-foreground">Loading...</div>;
 
@@ -32,12 +114,20 @@ function ProductList({ onEdit }: { onEdit: (id: number) => void }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Digital Products</h3>
-        <Button size="sm" onClick={() => setShowCreate(true)}>
-          <Plus className="w-4 h-4 mr-1" /> New Product
-        </Button>
+        <div className="flex items-center gap-2">
+          {localProducts.length > 1 && (
+            <Button size="sm" variant={reorderMode ? "default" : "outline"} onClick={() => setReorderMode(m => !m)}>
+              <GripVertical className="w-4 h-4 mr-1" />
+              {reorderMode ? "Done" : "Reorder"}
+            </Button>
+          )}
+          <Button size="sm" onClick={() => setShowCreate(true)}>
+            <Plus className="w-4 h-4 mr-1" /> New Product
+          </Button>
+        </div>
       </div>
 
-      {(!products || products.length === 0) ? (
+      {localProducts.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="py-12 text-center">
             <FileIcon className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
@@ -47,9 +137,37 @@ function ProductList({ onEdit }: { onEdit: (id: number) => void }) {
             </Button>
           </CardContent>
         </Card>
+      ) : reorderMode ? (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={e => setActiveDragId(e.active.id as number)}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext items={localProducts.map((p: any) => p.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-2">
+              {localProducts.map((p: any) => (
+                <SortableProductRow key={p.id} product={p} onEdit={onEdit}
+                  onDuplicate={id => duplicateMut.mutate({ id })}
+                  onDelete={id => { if (confirm("Delete this product and all its files?")) deleteMut.mutate({ id }); }}
+                />
+              ))}
+            </div>
+          </SortableContext>
+          <DragOverlay>
+            {activeProduct && (
+              <div className="flex items-center gap-3 bg-white rounded-lg border-2 border-teal-400 shadow-lg px-4 py-3">
+                <GripVertical className="w-4 h-4 text-teal-400" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-gray-900 text-sm truncate">{activeProduct.title}</p>
+                </div>
+              </div>
+            )}
+          </DragOverlay>
+        </DndContext>
       ) : (
         <div className="grid gap-3">
-          {products.map((p) => (
+          {localProducts.map((p: any) => (
             <Card key={p.id} className="hover:border-teal-500/50 transition-colors">
               <CardContent className="p-4 flex items-center gap-4">
                 {p.thumbnailUrl ? (

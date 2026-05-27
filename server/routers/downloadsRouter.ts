@@ -45,7 +45,7 @@ export const downloadsPublicRouter = router({
       const [products, countResult] = await Promise.all([
         db.select().from(digitalProducts)
           .where(and(...conditions))
-          .orderBy(desc(digitalProducts.createdAt))
+          .orderBy(asc(digitalProducts.libraryOrder), desc(digitalProducts.createdAt))
           .limit(limit).offset(offset),
         db.select({ count: sql<number>`count(*)` }).from(digitalProducts)
           .where(and(...conditions)),
@@ -421,8 +421,25 @@ export const downloadsAdminRouter = router({
     if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
     const db = await getDb();
     if (!db) return [];
-    return db.select().from(digitalProducts).orderBy(desc(digitalProducts.createdAt));
+    return db.select().from(digitalProducts).orderBy(asc(digitalProducts.libraryOrder), desc(digitalProducts.createdAt));
   }),
+
+  /** Reorder digital products in the Education Library */
+  reorder: protectedProcedure
+    .input(z.object({
+      products: z.array(z.object({ id: z.number(), libraryOrder: z.number() })),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await Promise.all(
+        input.products.map(({ id, libraryOrder }) =>
+          db.update(digitalProducts).set({ libraryOrder }).where(eq(digitalProducts.id, id))
+        )
+      );
+      return { success: true };
+    }),
 
   /** Get single product with files (admin) */
   get: protectedProcedure
