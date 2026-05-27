@@ -266,6 +266,7 @@ router.post(
   "/api/upload-media-repo/chunk",
   upload.single("chunk"),
   async (req: Request, res: Response) => {
+   try {
     const user = await authenticateAdmin(req);
     if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
 
@@ -413,8 +414,10 @@ router.post(
         }
         const fullBuffer = Buffer.concat(chunkBuffers);
 
-        const { storagePut } = await import("../storage");
-        const { url: s3Url } = await storagePut(session.s3Key, fullBuffer, session.mimeType);
+        const { storagePut, storagePutLarge } = await import("../storage");
+        // Use storagePutLarge for files > 50MB to avoid Forge API size limits
+        const uploadFn = fullBuffer.length > LARGE_FILE_THRESHOLD ? storagePutLarge : storagePut;
+        const { url: s3Url } = await uploadFn(session.s3Key, fullBuffer, session.mimeType);
 
         // Clean up tmp chunks
         try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
@@ -427,6 +430,12 @@ router.post(
         return;
       }
     }
+   } catch (err: any) {
+    console.error("[upload-media-repo/chunk] Unhandled error:", err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Chunk processing failed: " + (err?.message || "unknown error") });
+    }
+   }
   }
 );
 

@@ -224,7 +224,7 @@ function UploadDialog({ open, onClose, onSuccess, existingAssetId, existingTitle
     if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
   }, []);
 
-  const CHUNK_SIZE = 10 * 1024 * 1024; // 10 MB per chunk
+  const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB per chunk (smaller to avoid proxy limits)
 
   const uploadOneFile = async (file: File, fileIndex: number, totalFiles: number): Promise<void> => {
     const title = file.name.replace(/\.[^.]+$/, "");
@@ -269,27 +269,45 @@ function UploadDialog({ open, onClose, onSuccess, existingAssetId, existingTitle
         fd.append("access", access);
         if (folderSlug && folderSlug !== "none") fd.append("folder", folderSlug);
       }
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.upload.onprogress = (ev) => {
-          if (ev.lengthComputable) {
-            const chunkPct = ev.loaded / ev.total;
-            const filePct = Math.round(((i + chunkPct) / totalChunks) * 100);
-            setUploadState({ current: fileIndex + 1, total: totalFiles, fileProgress: filePct });
-          }
-        };
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) resolve();
-          else {
-            try { reject(new Error(JSON.parse(xhr.responseText)?.error ?? "Chunk upload failed")); }
-            catch { reject(new Error("Chunk upload failed")); }
-          }
-        };
-        xhr.onerror = () => reject(new Error("Network error on chunk " + i));
-        xhr.open("POST", "/api/upload-media-repo/chunk");
-        xhr.withCredentials = true;
-        xhr.send(fd);
-      });
+      // Retry up to 3 times for transient failures
+      let lastErr: Error | null = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          await new Promise<void>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.timeout = 120000; // 2 min timeout per chunk
+            xhr.upload.onprogress = (ev) => {
+              if (ev.lengthComputable) {
+                const chunkPct = ev.loaded / ev.total;
+                const filePct = Math.round(((i + chunkPct) / totalChunks) * 100);
+                setUploadState({ current: fileIndex + 1, total: totalFiles, fileProgress: filePct });
+              }
+            };
+            xhr.onload = () => {
+              if (xhr.status >= 200 && xhr.status < 300) resolve();
+              else {
+                try {
+                  const errBody = JSON.parse(xhr.responseText);
+                  reject(new Error(errBody?.error ?? `Chunk upload failed (HTTP ${xhr.status})`));
+                } catch {
+                  reject(new Error(`Chunk upload failed (HTTP ${xhr.status}): ${xhr.responseText?.slice(0, 200) || "no response"}`));
+                }
+              }
+            };
+            xhr.onerror = () => reject(new Error("Network error on chunk " + i));
+            xhr.ontimeout = () => reject(new Error(`Chunk ${i} timed out after 120s`));
+            xhr.open("POST", "/api/upload-media-repo/chunk");
+            xhr.withCredentials = true;
+            xhr.send(fd);
+          });
+          lastErr = null;
+          break; // success
+        } catch (err: any) {
+          lastErr = err;
+          if (attempt < 2) await new Promise(r => setTimeout(r, 1000 * (attempt + 1))); // backoff
+        }
+      }
+      if (lastErr) throw lastErr;
     }
   };
 
