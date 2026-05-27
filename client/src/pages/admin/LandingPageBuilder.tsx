@@ -2165,6 +2165,8 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
   const reviewSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const listSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const carouselSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const faqSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const pricingSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   // Related Products manual picker search — must be at top level (React rules of hooks)
   const [rpSearch, setRpSearch] = useState("");
   const handleFileUpload = async (file: File, targetField: string, context: string) => {
@@ -2694,8 +2696,59 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
     case "instructor":
       return <InstructorBlockSettings d={d} set={set} inlineMediaRef={inlineMediaRef} uploading={uploading} handleFileUpload={handleFileUpload} onChange={onChange} />;
     case "faq": {
-      const items: Array<{ q: string; a: string }> = d.items ?? [];
-      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Section Headline" field="headline" /><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" /><div><div className="flex items-center justify-between mb-2"><label className="text-xs text-gray-500 font-medium">FAQ Items</label><button onClick={() => set("items", [...items, { q: "Question?", a: "Answer." }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div><div className="space-y-2">{items.map((item, i) => (<div key={i} className="border border-gray-200 rounded p-2 space-y-1"><div className="flex justify-between items-center mb-1"><span className="text-xs text-gray-500">Q{i + 1}</span><button onClick={() => set("items", items.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div><DebouncedInput value={item.q} onChange={v => { const next = items.map((it, j) => j === i ? { ...it, q: v } : it); set("items", next); }} className="h-7 text-xs" placeholder="Question" /><DebouncedTextarea value={item.a} onChange={v => { const next = items.map((it, j) => j === i ? { ...it, a: v } : it); set("items", next); }} className="text-xs min-h-[60px]" placeholder="Answer" /></div>))}</div></div></div>);
+      const items: Array<{ id: string; q: string; a: string }> = (d.items ?? []).map((it: any, i: number) => ({ id: it.id ?? `faq-${i}`, q: it.q ?? "", a: it.a ?? "" }));
+      return (
+        <div className="space-y-3">
+          <BSTextField data={d} onSet={set} label="Section Headline" field="headline" />
+          <div className="border-t pt-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Color Scheme</p>
+            <div className="space-y-2">
+              <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
+              <BSColorField data={d} onSet={set} label="Headline Color" field="headlineColor" />
+              <BSColorField data={d} onSet={set} label="Accent / Border Color" field="accentColor" />
+              <BSColorField data={d} onSet={set} label="Question Text Color" field="questionColor" />
+              <BSColorField data={d} onSet={set} label="Answer Text Color" field="answerColor" />
+              <BSColorField data={d} onSet={set} label="Item Background" field="itemBgColor" />
+              <BSColorField data={d} onSet={set} label="Item Hover Background" field="itemHoverColor" />
+              <BSColorField data={d} onSet={set} label="Divider Color" field="dividerColor" />
+            </div>
+          </div>
+          <div className="border-t pt-3">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs text-gray-500 font-medium">FAQ Items <span className="text-gray-400">(drag to reorder)</span></label>
+              <button onClick={() => set("items", [...items, { id: `faq-${Date.now()}`, q: "Question?", a: "Answer." }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button>
+            </div>
+            <DndContext sensors={faqSensors} collisionDetection={closestCenter} onDragEnd={e => { const { active, over } = e; if (over && active.id !== over.id) { const oldIdx = items.findIndex(it => it.id === active.id); const newIdx = items.findIndex(it => it.id === over.id); if (oldIdx !== -1 && newIdx !== -1) set("items", arrayMove(items, oldIdx, newIdx)); } }}>
+              <SortableContext items={items.map(it => it.id)} strategy={verticalListSortingStrategy}>
+                <div className="space-y-2">
+                  {items.map((item, i) => {
+                    const SortableFaqItem = ({ item, i }: { item: typeof items[0]; i: number }) => {
+                      const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
+                      return (
+                        <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }} className="border border-gray-200 rounded p-2 space-y-1 bg-white">
+                          <div className="flex justify-between items-center mb-1">
+                            <div className="flex items-center gap-1">
+                              <button {...attributes} {...listeners} className="text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing"><GripVertical size={12} /></button>
+                              <span className="text-xs text-gray-500">Q{i + 1}</span>
+                            </div>
+                            <button onClick={() => set("items", items.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button>
+                          </div>
+                          <DebouncedInput value={item.q} onChange={v => { const next = items.map((it, j) => j === i ? { ...it, q: v } : it); set("items", next); }} className="h-7 text-xs" placeholder="Question" />
+                          <div className="mt-1">
+                            <label className="text-xs text-gray-400 block mb-1">Answer (rich text)</label>
+                            <RichTextEditor value={item.a} onChange={html => { const next = items.map((it, j) => j === i ? { ...it, a: html } : it); set("items", next); }} minHeight={80} maxHeight={300} placeholder="Answer..." />
+                          </div>
+                        </div>
+                      );
+                    };
+                    return <SortableFaqItem key={item.id} item={item} i={i} />;
+                  })}
+                </div>
+              </SortableContext>
+            </DndContext>
+          </div>
+        </div>
+      );
     }
     case "ticker": {
       const tickerItems: string[] = d.items ?? ["Free Shipping on Orders Over $50", "New Courses Added Weekly", "Join 10,000+ Students"];
@@ -3506,12 +3559,38 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
           </div>
         </div>
       );
-    case "pricing_options_auto":
+    case "pricing_options_auto": {
+      const pricingCards: Array<{ id: string; label?: string; sublabel?: string; ctaLabel?: string; ctaUrl?: string; imageUrl?: string; badge?: string }> = (d.cards ?? []).map((c: any, i: number) => ({ id: c.id ?? `pc-${i}`, ...c }));
+      const setPricingCard = (i: number, key: string, val: any) => { const next = pricingCards.map((c, j) => j === i ? { ...c, [key]: val } : c); set("cards", next); };
+      const handlePricingImageUpload = async (i: number, file: File) => {
+        if (file.size > 10 * 1024 * 1024) { toast.error("Image must be under 10 MB"); return; }
+        setUploading(`pricing-img-${i}`);
+        try {
+          const reader = new FileReader();
+          const dataUri = await new Promise<string>((resolve) => { reader.onload = () => resolve(reader.result as string); reader.readAsDataURL(file); });
+          const result = await uploadMedia.mutateAsync({ dataUri, mimeType: file.type, fileName: file.name, context: "pricing-card" });
+          setPricingCard(i, "imageUrl", result.url);
+          toast.success("Image uploaded");
+        } catch (err: any) { toast.error(err.message || "Upload failed"); }
+        setUploading(null);
+      };
       return (
         <div className="space-y-3">
           <BSTextField data={d} onSet={set} label="Section Headline" field="headline" />
-          <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
-          <BSColorField data={d} onSet={set} label="CTA Button Color" field="ctaColor" />
+          <div className="border-t pt-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Design</p>
+            <div className="space-y-2">
+              <BSColorField data={d} onSet={set} label="Section Background" field="bgColor" />
+              <BSColorField data={d} onSet={set} label="Headline Color" field="headlineColor" />
+              <BSColorField data={d} onSet={set} label="Card Background" field="cardBgColor" />
+              <BSColorField data={d} onSet={set} label="Card Border Color" field="cardBorderColor" />
+              <BSColorField data={d} onSet={set} label="Featured Card Color" field="featuredCardColor" />
+              <BSColorField data={d} onSet={set} label="Card Title Color" field="cardTitleColor" />
+              <BSColorField data={d} onSet={set} label="Price Color" field="priceColor" />
+              <BSColorField data={d} onSet={set} label="CTA Button Color" field="ctaColor" />
+              <BSColorField data={d} onSet={set} label="CTA Text Color" field="ctaTextColor" />
+            </div>
+          </div>
           <div className="border-t pt-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Primary Option Labels</p>
             <div className="space-y-2">
@@ -3520,9 +3599,63 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
               <BSTextField data={d} onSet={set} label="Primary CTA Button Text" field="primaryCtaLabel" placeholder="Enroll Now" />
             </div>
           </div>
-          <p className="text-xs text-gray-500 bg-gray-50 p-2 rounded">Secondary pricing option labels are managed in Course Settings → Pricing Options. Each option's label, sublabel, and CTA text can be set there.</p>
+          <div className="border-t pt-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Per-Card Overrides</p>
+              <button onClick={() => set("cards", [...pricingCards, { id: `pc-${Date.now()}`, label: "", sublabel: "", ctaLabel: "", ctaUrl: "", imageUrl: "", badge: "" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add Card</button>
+            </div>
+            <p className="text-xs text-gray-400 mb-2">Override auto-populated data per card. Leave blank to use course pricing data.</p>
+            <DndContext sensors={pricingSensors} collisionDetection={closestCenter} onDragEnd={e => { const { active, over } = e; if (over && active.id !== over.id) { const oldIdx = pricingCards.findIndex(c => c.id === active.id); const newIdx = pricingCards.findIndex(c => c.id === over.id); if (oldIdx !== -1 && newIdx !== -1) set("cards", arrayMove(pricingCards, oldIdx, newIdx)); } }}>
+              <SortableContext items={pricingCards.map(c => c.id)} strategy={verticalListSortingStrategy}>
+                <div className="space-y-3">
+                  {pricingCards.map((card, i) => {
+                    const SortablePricingCard = ({ card, i }: { card: typeof pricingCards[0]; i: number }) => {
+                      const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
+                      return (
+                        <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }} className="border border-gray-200 rounded p-2 space-y-2 bg-white">
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-1">
+                              <button {...attributes} {...listeners} className="text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing"><GripVertical size={12} /></button>
+                              <span className="text-xs font-medium text-gray-600">Card {i + 1}</span>
+                            </div>
+                            <button onClick={() => set("cards", pricingCards.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button>
+                          </div>
+                          <DebouncedInput value={card.label ?? ""} onChange={v => setPricingCard(i, "label", v)} className="h-7 text-xs" placeholder="Card label (e.g. Full Access)" />
+                          <DebouncedInput value={card.sublabel ?? ""} onChange={v => setPricingCard(i, "sublabel", v)} className="h-7 text-xs" placeholder="Sublabel (e.g. One-time payment)" />
+                          <DebouncedInput value={card.ctaLabel ?? ""} onChange={v => setPricingCard(i, "ctaLabel", v)} className="h-7 text-xs" placeholder="CTA button text" />
+                          <div className="flex items-center gap-1">
+                            <Link size={10} className="text-gray-400 flex-shrink-0" />
+                            <DebouncedInput value={card.ctaUrl ?? ""} onChange={v => setPricingCard(i, "ctaUrl", v)} className="h-7 text-xs flex-1" placeholder="CTA URL (overrides auto)" />
+                          </div>
+                          <DebouncedInput value={card.badge ?? ""} onChange={v => setPricingCard(i, "badge", v)} className="h-7 text-xs" placeholder="Badge label (e.g. Most Popular)" />
+                          <div>
+                            <label className="text-xs text-gray-400 block mb-1">Card Image</label>
+                            {card.imageUrl ? (
+                              <div className="relative">
+                                <img src={card.imageUrl} alt="" className="w-full h-20 object-cover rounded border" />
+                                <button onClick={() => setPricingCard(i, "imageUrl", "")} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5"><X size={10} /></button>
+                              </div>
+                            ) : (
+                              <label className="flex items-center gap-2 cursor-pointer border border-dashed border-gray-300 rounded p-2 hover:border-teal-400">
+                                {uploading === `pricing-img-${i}` ? <Loader2 size={12} className="animate-spin text-teal-600" /> : <Upload size={12} className="text-gray-400" />}
+                                <span className="text-xs text-gray-400">{uploading === `pricing-img-${i}` ? "Uploading..." : "Upload image"}</span>
+                                <input type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handlePricingImageUpload(i, f); }} />
+                              </label>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    };
+                    return <SortablePricingCard key={card.id} card={card} i={i} />;
+                  })}
+                </div>
+              </SortableContext>
+            </DndContext>
+          </div>
+          <p className="text-xs text-gray-500 bg-gray-50 p-2 rounded">Auto-populated pricing data comes from Course Settings → Pricing Options. Per-card overrides above take precedence.</p>
         </div>
       );
+    }
     case "related_products": {
       const selMode = d.selectionMode ?? "auto";
       const manualItems: Array<{ type: string; id: number }> = d.manualItems ?? [];

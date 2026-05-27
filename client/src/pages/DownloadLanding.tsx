@@ -317,12 +317,17 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
           <div className="max-w-3xl mx-auto">
-            {d.headline && <h2 className="text-2xl font-bold mb-6 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+            {d.headline && <h2 className="text-2xl font-bold mb-6" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
             <div className="space-y-2">
               {(d.items ?? []).map((item: any, i: number) => (
-                <details key={i} className="group border border-gray-200 rounded-lg overflow-hidden">
-                  <summary className="px-5 py-4 cursor-pointer font-medium text-gray-800 hover:bg-gray-50">{item.q}</summary>
-                  <div className="px-5 py-4 text-gray-600 border-t border-gray-100">{item.a}</div>
+                <details key={i} className="rounded-lg overflow-hidden" style={{ border: `1px solid ${d.accentColor ?? "#e5e7eb"}`, backgroundColor: d.itemBgColor ?? "transparent" }}>
+                  <summary
+                    className="px-5 py-4 cursor-pointer font-medium"
+                    style={{ color: d.questionColor ?? "#1f2937" }}
+                    onMouseEnter={e => { if (d.itemHoverColor) (e.currentTarget.parentElement as HTMLElement).style.backgroundColor = d.itemHoverColor; }}
+                    onMouseLeave={e => { (e.currentTarget.parentElement as HTMLElement).style.backgroundColor = d.itemBgColor ?? "transparent"; }}
+                  >{item.q}</summary>
+                  <div className="px-5 py-4 prose prose-sm max-w-none" style={{ color: d.answerColor ?? "#4b5563", borderTop: `1px solid ${d.dividerColor ?? "#f3f4f6"}` }} dangerouslySetInnerHTML={{ __html: item.a ?? "" }} />
                 </details>
               ))}
             </div>

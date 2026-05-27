@@ -429,14 +429,19 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
     case "faq":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          {d.headline && <h2 className="text-2xl font-bold mb-8 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          {d.headline && <h2 className="text-2xl font-bold mb-8" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="max-w-3xl space-y-3">
             {(d.items ?? []).map((item: any, i: number) => (
-              <details key={i} className="border border-gray-200 rounded-lg overflow-hidden">
-                <summary className="px-5 py-4 font-semibold text-gray-900 cursor-pointer hover:bg-gray-50 flex items-center justify-between">
+              <details key={i} className="rounded-lg overflow-hidden group" style={{ border: `1px solid ${d.accentColor ?? "#e5e7eb"}`, backgroundColor: d.itemBgColor ?? "transparent" }}>
+                <summary
+                  className="px-5 py-4 font-semibold cursor-pointer flex items-center justify-between transition-colors"
+                  style={{ color: d.questionColor ?? "#111827" }}
+                  onMouseEnter={e => { if (d.itemHoverColor) (e.currentTarget.parentElement as HTMLElement).style.backgroundColor = d.itemHoverColor; }}
+                  onMouseLeave={e => { (e.currentTarget.parentElement as HTMLElement).style.backgroundColor = d.itemBgColor ?? "transparent"; }}
+                >
                   {item.q}
                 </summary>
-                <div className="px-5 py-4 text-gray-600 border-t border-gray-100">{item.a}</div>
+                <div className="px-5 py-4 prose prose-sm max-w-none" style={{ color: d.answerColor ?? "#4b5563", borderTop: `1px solid ${d.dividerColor ?? "#f3f4f6"}` }} dangerouslySetInnerHTML={{ __html: item.a ?? "" }} />
               </details>
             ))}
           </div>
@@ -746,21 +751,41 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       );
     }
     case "pricing_options_auto":
+    {
+      const pCards: Array<any> = d.cards?.length ? d.cards : [{ label: "Basic" }, { label: "Pro", badge: "Most Popular" }, { label: "Enterprise" }];
+      const ctaColor = d.ctaColor ?? "#179ca3";
+      const ctaTextColor = d.ctaTextColor ?? "#ffffff";
+      const cardBg = d.cardBgColor ?? "#ffffff";
+      const cardBorder = d.cardBorderColor ?? "#e5e7eb";
+      const featuredColor = d.featuredCardColor ?? "#179ca3";
+      const titleColor = d.cardTitleColor ?? "#111827";
+      const priceColor = d.priceColor ?? "#179ca3";
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
-          {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          {d.headline && <h2 className="text-2xl font-bold mb-8 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="flex justify-center gap-6 max-w-3xl mx-auto">
-            {["Basic", "Pro", "Enterprise"].map((plan, i) => (
-              <div key={i} className={`flex-1 rounded-xl border-2 p-6 text-center ${i === 1 ? "border-teal-500 shadow-lg" : "border-gray-200"}`}>
-                <h3 className="font-bold text-gray-900 mb-2">{plan}</h3>
-                <p className="text-2xl font-bold text-teal-600 mb-4">$0</p>
-                <button className="w-full py-2 rounded-lg font-semibold text-sm" style={{ backgroundColor: i === 1 ? "#179ca3" : "#f3f4f6", color: i === 1 ? "#fff" : "#374151" }}>Select</button>
-              </div>
-            ))}
+            {pCards.map((card: any, i: number) => {
+              const isFeatured = i === Math.floor(pCards.length / 2);
+              return (
+                <div key={i} className="flex-1 rounded-xl border-2 overflow-hidden text-center shadow-sm" style={{ borderColor: isFeatured ? featuredColor : cardBorder, backgroundColor: cardBg, boxShadow: isFeatured ? `0 4px 20px ${featuredColor}33` : undefined }}>
+                  {card.imageUrl && <img src={card.imageUrl} alt={card.label ?? ""} className="w-full h-28 object-cover" />}
+                  <div className="p-6">
+                    {(card.badge || (isFeatured && !card.badge)) && (
+                      <span className="inline-block text-xs font-bold px-3 py-1 rounded-full mb-3 text-white" style={{ backgroundColor: featuredColor }}>{card.badge || "Most Popular"}</span>
+                    )}
+                    <h3 className="font-bold mb-2" style={{ color: titleColor }}>{card.label || ["Basic", "Pro", "Enterprise"][i] || `Option ${i + 1}`}</h3>
+                    {card.sublabel && <p className="text-xs mb-2" style={{ color: d.answerColor ?? "#6b7280" }}>{card.sublabel}</p>}
+                    <p className="text-2xl font-bold mb-4" style={{ color: priceColor }}>$0</p>
+                    <a href={card.ctaUrl || "#"} className="block w-full py-2 rounded-lg font-semibold text-sm text-center" style={{ backgroundColor: isFeatured ? ctaColor : "#f3f4f6", color: isFeatured ? ctaTextColor : "#374151" }}>{card.ctaLabel || "Select"}</a>
+                  </div>
+                </div>
+              );
+            })}
           </div>
           <p className="text-xs text-gray-400 mt-3 text-center">Auto-populated from course pricing options</p>
         </div>
       );
+    }
     case "divider":
       return (
         <div style={{ padding: `${d.spacing ?? 32}px 32px` }}>

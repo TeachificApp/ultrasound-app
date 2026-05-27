@@ -10,7 +10,7 @@ import { Link, useLocation } from "wouter";
 import {
   LogIn, LogOut, Settings, ChevronDown,
   GraduationCap, FolderOpen, ExternalLink, LayoutDashboard,
-  BookOpen, Menu, X, ShieldCheck, MessageSquare
+  BookOpen, Menu, X, ShieldCheck, MessageSquare, Users
 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -33,6 +33,7 @@ const IHE_SITE_URL = "https://www.iheartecho.com";
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Education Library", href: "/education-library", icon: <BookOpen className="w-4 h-4" /> },
+  { label: "Community", href: "/community", icon: <Users className="w-4 h-4" /> },
 ];
 
 export default function LMSLayout({ children }: { children: React.ReactNode }) {
@@ -44,7 +45,7 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
   // Detect by checking: two path segments, not starting with any known system prefix.
   const SYSTEM_PREFIXES = ["/admin", "/courses", "/downloads", "/product", "/media",
     "/my-", "/auth", "/login", "/register", "/profile", "/platform-admin",
-    "/education-library", "/collections", "/bundles", "/quiz"];
+    "/education-library", "/collections", "/bundles", "/quiz", "/community"];
   const isFunnelPage = (() => {
     const parts = location.replace(/^\//,"").split("/").filter(Boolean);
     if (parts.length !== 2) return false;

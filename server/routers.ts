@@ -46,6 +46,7 @@ import { ssoRouter } from "./routers/ssoRouter";
 import { lessonCommentsRouter } from "./routers/lessonCommentsRouter";
 import { pageScraperRouter } from "./routers/pageScraperRouter";
 import { questionBankRouter } from "./routers/questionBankRouter";
+import { communityRouter } from "./routers/communityRouter";
 import {
   getUserById,
   getUsersByIds,
@@ -162,6 +163,7 @@ import {
 
 export const appRouter = router({
   system: systemRouter,
+  community: communityRouter,
 
   auth: router({
     me: publicProcedure.query(async opts => {

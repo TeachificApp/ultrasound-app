@@ -405,12 +405,17 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
     case "faq":
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
-          {d.headline && <h2 className="text-2xl font-bold mb-8 text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          {d.headline && <h2 className="text-2xl font-bold mb-8" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="max-w-3xl space-y-3">
             {(d.items ?? []).map((item: any, i: number) => (
-              <details key={i} className="border border-gray-200 rounded-lg overflow-hidden">
-                <summary className="px-5 py-4 font-semibold text-gray-900 cursor-pointer hover:bg-gray-50">{item.q}</summary>
-                <div className="px-5 py-4 text-gray-600 border-t border-gray-100">{item.a}</div>
+              <details key={i} className="rounded-lg overflow-hidden" style={{ border: `1px solid ${d.accentColor ?? "#e5e7eb"}`, backgroundColor: d.itemBgColor ?? "transparent" }}>
+                <summary
+                  className="px-5 py-4 font-semibold cursor-pointer"
+                  style={{ color: d.questionColor ?? "#111827" }}
+                  onMouseEnter={e => { if (d.itemHoverColor) (e.currentTarget.parentElement as HTMLElement).style.backgroundColor = d.itemHoverColor; }}
+                  onMouseLeave={e => { (e.currentTarget.parentElement as HTMLElement).style.backgroundColor = d.itemBgColor ?? "transparent"; }}
+                >{item.q}</summary>
+                <div className="px-5 py-4 prose prose-sm max-w-none" style={{ color: d.answerColor ?? "#4b5563", borderTop: `1px solid ${d.dividerColor ?? "#f3f4f6"}` }} dangerouslySetInnerHTML={{ __html: item.a ?? "" }} />
               </details>
             ))}
           </div>
@@ -611,38 +616,50 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
         ...pricingOptions.filter((o: any) => o.isActive).map((o: any) => ({ ...o, isPrimary: false })),
       ];
       const currentSelected = selectedPricingOptionId;
+      const cardBg = d.cardBgColor ?? "#ffffff";
+      const cardBorder = d.cardBorderColor ?? "#e5e7eb";
+      const featuredColor = d.featuredCardColor ?? "#179ca3";
+      const titleColor = d.cardTitleColor ?? "#111827";
+      const priceColor = d.priceColor ?? "#179ca3";
+      const ctaTextColor = d.ctaTextColor ?? "#ffffff";
+      // Merge per-card overrides (d.cards) with auto-populated allOptions
+      const mergedOptions = allOptions.map((opt: any, i: number) => {
+        const override = (d.cards ?? [])[i] ?? {};
+        return { ...opt, ...Object.fromEntries(Object.entries(override).filter(([, v]) => v !== undefined && v !== "")) };
+      });
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f9fafb" }}>
-          {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
-          <div className={`grid gap-4 max-w-4xl mx-auto ${allOptions.length === 1 ? "max-w-sm" : allOptions.length === 2 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-3"}`}>
-            {allOptions.map((opt: any, i: number) => {
+          {d.headline && <h2 className="text-2xl font-bold mb-8 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          <div className={`grid gap-4 max-w-4xl mx-auto ${mergedOptions.length === 1 ? "max-w-sm" : mergedOptions.length === 2 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-3"}`}>
+            {mergedOptions.map((opt: any, i: number) => {
               const isSelected = opt.id === undefined ? currentSelected === undefined : currentSelected === opt.id;
               const optPrice = opt.isPrimary ? price : formatPricingOption(opt);
               const optCta = opt.ctaLabel ?? (opt.isPrimary ? ctaText : `Enroll — ${opt.label}`);
+              const isFeatured = opt.isPrimary;
+              const badgeLabel = opt.badge ?? (isFeatured ? "Most Popular" : null);
+              const handleCardClick = () => { if (opt.ctaUrl) { window.open(opt.ctaUrl, "_blank"); } else { onSelectPricingOption?.(opt.id); } };
               return (
                 <div
                   key={i}
-                  onClick={() => onSelectPricingOption?.(opt.id)}
-                  className={`rounded-xl p-6 text-center cursor-pointer transition-all border-2 ${
-                    isSelected
-                      ? "border-teal-500 bg-white shadow-lg ring-2 ring-teal-200"
-                      : "border-gray-200 bg-white hover:border-teal-300 hover:shadow"
-                  }`}
+                  onClick={handleCardClick}
+                  className="rounded-xl overflow-hidden cursor-pointer transition-all border-2"
+                  style={{ borderColor: isSelected ? featuredColor : cardBorder, backgroundColor: cardBg, boxShadow: isSelected ? `0 4px 20px ${featuredColor}33` : undefined }}
                 >
-                  {opt.isPrimary && <div className="text-xs font-semibold text-teal-600 uppercase tracking-wide mb-2">Most Popular</div>}
-                  <h3 className="font-bold text-gray-900 mb-1">{opt.label}</h3>
-                  {opt.sublabel && <p className="text-xs text-gray-500 mb-3">{opt.sublabel}</p>}
-                  <p className="text-3xl font-bold text-teal-600 mb-4">{optPrice}</p>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onSelectPricingOption?.(opt.id); onEnroll(); }}
-                    disabled={enrolling}
-                    className={`w-full py-3 rounded-lg font-semibold text-white disabled:opacity-60 transition-opacity hover:opacity-90 ${
-                      isSelected ? "" : "opacity-80"
-                    }`}
-                    style={{ backgroundColor: d.ctaColor ?? "#179ca3" }}
-                  >
-                    {enrolling && isSelected ? "Processing\u2026" : optCta}
-                  </button>
+                  {opt.imageUrl && <img src={opt.imageUrl} alt={opt.label ?? ""} className="w-full h-28 object-cover" />}
+                  <div className="p-6 text-center">
+                    {badgeLabel && <div className="text-xs font-semibold uppercase tracking-wide mb-2 px-3 py-1 rounded-full inline-block text-white" style={{ backgroundColor: featuredColor }}>{badgeLabel}</div>}
+                    <h3 className="font-bold mb-1" style={{ color: titleColor }}>{opt.label}</h3>
+                    {opt.sublabel && <p className="text-xs mb-3" style={{ color: d.answerColor ?? "#6b7280" }}>{opt.sublabel}</p>}
+                    <p className="text-3xl font-bold mb-4" style={{ color: priceColor }}>{optPrice}</p>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); if (opt.ctaUrl) { window.open(opt.ctaUrl, "_blank"); } else { onSelectPricingOption?.(opt.id); onEnroll(); } }}
+                      disabled={enrolling && !opt.ctaUrl}
+                      className="w-full py-3 rounded-lg font-semibold disabled:opacity-60 transition-opacity hover:opacity-90"
+                      style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: ctaTextColor }}
+                    >
+                      {enrolling && isSelected && !opt.ctaUrl ? "Processing\u2026" : optCta}
+                    </button>
+                  </div>
                 </div>
               );
             })}

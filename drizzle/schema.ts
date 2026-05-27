@@ -4565,3 +4565,175 @@ export const questionBankTagMap = mysqlTable("question_bank_tag_map", {
   tagId: int("tag_id").notNull(),            // FK → question_bank_tags.id
 });
 export type QuestionBankTagMap = typeof questionBankTagMap.$inferSelect;
+
+// ─── Community Extended Schema ────────────────────────────────────────────────
+
+/** User follows another user */
+export const communityFollows = mysqlTable("community_follows", {
+  id: int("id").autoincrement().primaryKey(),
+  followerId: int("follower_id").notNull(),
+  followingId: int("following_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type CommunityFollow = typeof communityFollows.$inferSelect;
+
+/** User bookmarks a post */
+export const communityBookmarks = mysqlTable("community_bookmarks", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  postId: int("post_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type CommunityBookmark = typeof communityBookmarks.$inferSelect;
+
+/** Reactions on comments */
+export const communityCommentReactions = mysqlTable("community_comment_reactions", {
+  id: int("id").autoincrement().primaryKey(),
+  commentId: int("comment_id").notNull(),
+  userId: int("user_id").notNull(),
+  emoji: varchar("emoji", { length: 16 }).notNull(),
+});
+export type CommunityCommentReaction = typeof communityCommentReactions.$inferSelect;
+
+/** Polls attached to posts */
+export const communityPolls = mysqlTable("community_polls", {
+  id: int("id").autoincrement().primaryKey(),
+  postId: int("post_id").notNull().unique(),
+  question: varchar("question", { length: 500 }).notNull(),
+  options: longtext("options").notNull(), // JSON: string[]
+  endsAt: timestamp("ends_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type CommunityPoll = typeof communityPolls.$inferSelect;
+
+/** Poll votes */
+export const communityPollVotes = mysqlTable("community_poll_votes", {
+  id: int("id").autoincrement().primaryKey(),
+  pollId: int("poll_id").notNull(),
+  userId: int("user_id").notNull(),
+  optionIndex: int("option_index").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type CommunityPollVote = typeof communityPollVotes.$inferSelect;
+
+/** Hashtags */
+export const communityHashtags = mysqlTable("community_hashtags", {
+  id: int("id").autoincrement().primaryKey(),
+  tag: varchar("tag", { length: 100 }).notNull().unique(),
+  postCount: int("post_count").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type CommunityHashtag = typeof communityHashtags.$inferSelect;
+
+/** Post ↔ hashtag junction */
+export const communityPostHashtags = mysqlTable("community_post_hashtags", {
+  id: int("id").autoincrement().primaryKey(),
+  postId: int("post_id").notNull(),
+  hashtagId: int("hashtag_id").notNull(),
+});
+export type CommunityPostHashtag = typeof communityPostHashtags.$inferSelect;
+
+/** XP & gamification per user */
+export const communityUserXP = mysqlTable("community_user_xp", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull().unique(),
+  totalXP: int("total_xp").default(0).notNull(),
+  level: int("level").default(1).notNull(),
+  streakDays: int("streak_days").default(0).notNull(),
+  lastActivityDate: varchar("last_activity_date", { length: 10 }), // YYYY-MM-DD
+  postsCount: int("posts_count").default(0).notNull(),
+  commentsCount: int("comments_count").default(0).notNull(),
+  reactionsGivenCount: int("reactions_given_count").default(0).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type CommunityUserXP = typeof communityUserXP.$inferSelect;
+
+/** XP event log */
+export const communityXPEvents = mysqlTable("community_xp_events", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  eventType: varchar("event_type", { length: 64 }).notNull(), // "post","comment","reaction","login","poll_vote"
+  xpAwarded: int("xp_awarded").notNull(),
+  refId: int("ref_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type CommunityXPEvent = typeof communityXPEvents.$inferSelect;
+
+/** Badges */
+export const communityBadges = mysqlTable("community_badges", {
+  id: int("id").autoincrement().primaryKey(),
+  slug: varchar("slug", { length: 100 }).notNull().unique(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  iconEmoji: varchar("icon_emoji", { length: 8 }).default("🏅").notNull(),
+  iconUrl: text("icon_url"),
+  xpRequired: int("xp_required").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type CommunityBadge = typeof communityBadges.$inferSelect;
+
+/** User badge awards */
+export const communityUserBadges = mysqlTable("community_user_badges", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  badgeId: int("badge_id").notNull(),
+  awardedAt: timestamp("awarded_at").defaultNow().notNull(),
+});
+export type CommunityUserBadge = typeof communityUserBadges.$inferSelect;
+
+/** In-app community notifications */
+export const communityNotifications = mysqlTable("community_notifications", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  type: varchar("type", { length: 64 }).notNull(), // "reply","mention","reaction","follow","announcement"
+  actorId: int("actor_id"),
+  postId: int("post_id"),
+  commentId: int("comment_id"),
+  communityId: int("community_id"),
+  body: text("body"),
+  isRead: boolean("is_read").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type CommunityNotification = typeof communityNotifications.$inferSelect;
+
+/** DM conversations (thread between 2 users) */
+export const communityDMConversations = mysqlTable("community_dm_conversations", {
+  id: int("id").autoincrement().primaryKey(),
+  userAId: int("user_a_id").notNull(),
+  userBId: int("user_b_id").notNull(),
+  lastMessageAt: timestamp("last_message_at").defaultNow().notNull(),
+  userAUnread: int("user_a_unread").default(0).notNull(),
+  userBUnread: int("user_b_unread").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type CommunityDMConversation = typeof communityDMConversations.$inferSelect;
+
+/** DM messages (linked to conversation) */
+export const communityDMMessages = mysqlTable("community_dm_messages", {
+  id: int("id").autoincrement().primaryKey(),
+  conversationId: int("conversation_id").notNull(),
+  senderId: int("sender_id").notNull(),
+  body: longtext("body").notNull(),
+  attachmentUrl: text("attachment_url"),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type CommunityDMMessage = typeof communityDMMessages.$inferSelect;
+
+/** Reported content */
+export const communityReports = mysqlTable("community_reports", {
+  id: int("id").autoincrement().primaryKey(),
+  reporterId: int("reporter_id").notNull(),
+  targetType: mysqlEnum("target_type", ["post", "comment", "user"]).notNull(),
+  targetId: int("target_id").notNull(),
+  reason: varchar("reason", { length: 255 }).notNull(),
+  status: mysqlEnum("status", ["pending", "reviewed", "dismissed"]).default("pending").notNull(),
+  reviewedByAdminId: int("reviewed_by_admin_id"),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type CommunityReport = typeof communityReports.$inferSelect;
+
+/** Extra columns on communityPosts: postType, pollId, viewCount, isLocked, isHidden */
+// NOTE: These are added via ALTER TABLE below — the base table is already in the DB.
+// We extend the TypeScript type via a separate view/helper; actual columns added via SQL migration.
