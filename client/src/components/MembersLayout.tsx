@@ -66,35 +66,33 @@ export default function MembersLayout({ children }: { children: React.ReactNode 
             </div>
           </Link>
 
-          {/* Return-to-app links — desktop */}
+          {/* Nav links — desktop (matches LMS nav order) */}
           <nav className="hidden md:flex items-center gap-1 ml-4">
             <a
-              href={AAUS_APP_URL}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900`}
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              UltrasoundAssist™
-            </a>
-            <a
-              href={IHE_APP_URL}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900`}
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              EchoAssist™
-            </a>
-            <a
               href={LEARN_URL}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900`}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900"
             >
               <GraduationCap className="w-3.5 h-3.5" />
               Learning Platform
             </a>
             <a
               href={`${LEARN_URL}/community`}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900`}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900"
             >
               <Users className="w-3.5 h-3.5" />
               Community
+            </a>
+            <a
+              href={AAUS_APP_URL}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            >
+              UltrasoundAssist™
+            </a>
+            <a
+              href={IHE_APP_URL}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            >
+              EchoAssist™
             </a>
           </nav>
 
@@ -140,19 +138,19 @@ export default function MembersLayout({ children }: { children: React.ReactNode 
                           <LayoutDashboard className="w-3.5 h-3.5 text-teal-600" /> My Dashboard
                         </div>
                       </Link>
-                      {/* App return links — mobile */}
+                      {/* App return links — mobile (matches LMS nav order) */}
                       <div className="md:hidden border-t border-gray-100 mt-1 pt-1">
-                        <a href={AAUS_APP_URL} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2" onClick={() => setAccountOpen(false)}>
-                          <ExternalLink className="w-3.5 h-3.5 text-gray-500" /> UltrasoundAssist™
-                        </a>
-                        <a href={IHE_APP_URL} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2" onClick={() => setAccountOpen(false)}>
-                          <ExternalLink className="w-3.5 h-3.5 text-gray-500" /> EchoAssist™
-                        </a>
                         <a href={LEARN_URL} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2" onClick={() => setAccountOpen(false)}>
                           <GraduationCap className="w-3.5 h-3.5 text-gray-500" /> Learning Platform
                         </a>
                         <a href={`${LEARN_URL}/community`} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2" onClick={() => setAccountOpen(false)}>
                           <Users className="w-3.5 h-3.5 text-gray-500" /> Community
+                        </a>
+                        <a href={AAUS_APP_URL} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2" onClick={() => setAccountOpen(false)}>
+                          <ExternalLink className="w-3.5 h-3.5 text-gray-500" /> UltrasoundAssist™
+                        </a>
+                        <a href={IHE_APP_URL} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2" onClick={() => setAccountOpen(false)}>
+                          <ExternalLink className="w-3.5 h-3.5 text-gray-500" /> EchoAssist™
                         </a>
                       </div>
 

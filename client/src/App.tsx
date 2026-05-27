@@ -565,6 +565,15 @@ function LMSRouter() {
           <Switch>
             {/* LMS Home */}
             <Route path="/" component={LMSHome} />
+            {/* Community — must be before /:slug catch-all */}
+            <Route path="/community" component={CommunityFeed} />
+            <Route path="/community/spaces/:spaceId" component={CommunityFeed} />
+            <Route path="/community/spaces/:spaceId/channels/:channelId" component={CommunityFeed} />
+            <Route path="/community/members/:userId" component={CommunityProfile} />
+            <Route path="/community/dms" component={CommunityDMs} />
+            <Route path="/community/dms/:userId" component={CommunityDMs} />
+            <Route path="/community/leaderboard" component={CommunityLeaderboard} />
+            <Route path="/admin/community">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><CommunityAdmin /></RoleGuard>}</Route>
             <Route path="/education-library" component={EducationLibrary} />
             <Route path="/collections/:id" component={CollectionDetail} />
             <Route path="/courses/:slug/overview" component={CourseOverview} />
@@ -598,16 +607,6 @@ function LMSRouter() {
         {/* /profile redirects to dashboard profile tab */}
         <Route path="/profile">{() => { window.location.replace("/my-dashboard?tab=profile"); return null; }}</Route>
         <Route path="/my-dashboard" component={StudentDashboardPage} />
-        {/* Community */}
-        <Route path="/community" component={CommunityFeed} />
-        <Route path="/community/spaces/:spaceId" component={CommunityFeed} />
-        <Route path="/community/spaces/:spaceId/channels/:channelId" component={CommunityFeed} />
-        <Route path="/community/members/:userId" component={CommunityProfile} />
-        <Route path="/community/dms" component={CommunityDMs} />
-        <Route path="/community/dms/:userId" component={CommunityDMs} />
-        <Route path="/community/leaderboard" component={CommunityLeaderboard} />
-        <Route path="/admin/community">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><CommunityAdmin /></RoleGuard>}</Route>
-
         <Route path="/media/:slug/:action" component={MediaRedirect} />
         <Route path="/media/:slug" component={MediaRedirect} />
             {/* Funnel pages — catch-all MUST be last so all specific routes above match first */}
