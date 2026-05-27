@@ -300,7 +300,7 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
   { type: "footer", label: "Footer", icon: <Columns size={14} />, category: "Layout",
     defaultData: {
       bgColor: "#0e1e2e", textColor: "#ffffff", align: "center",
-      copyrightText: "© 2026 All About Ultrasound. All rights reserved.",
+      copyrightText: `© ${new Date().getFullYear()} All About Ultrasound. All rights reserved.`,
       links: [{ text: "Privacy Policy", url: "https://www.allaboutultrasound.com/privacy-policy.html" }, { text: "Terms of Service", url: "https://www.allaboutultrasound.com/terms-of-service.html" }, { text: "Contact", url: "https://www.allaboutultrasound.com/contact.html" }],
       showSocial: true, socialLinks: { facebook: "", instagram: "", youtube: "", linkedin: "" },
       logoUrl: "", logoMaxWidth: "120px",
@@ -3874,7 +3874,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
           </div>
           <BSTextField data={d} onSet={set} label="Logo Max Width" field="logoMaxWidth" placeholder="120px" />
           {/* Copyright */}
-          <BSTextField data={d} onSet={set} label="Copyright Text" field="copyrightText" placeholder="\u00a9 2026 Company. All rights reserved." />
+          <BSTextField data={d} onSet={set} label="Copyright Text" field="copyrightText" placeholder={`\u00a9 ${new Date().getFullYear()} Company. All rights reserved.`} />
           {/* Links */}
           <div className="border border-gray-200 rounded p-3 space-y-2">
             <div className="flex items-center justify-between"><span className="text-xs font-semibold text-gray-700">Links ({footerLinks.length})</span><button onClick={() => set("links", [...footerLinks, { text: "New Link", url: "/" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div>

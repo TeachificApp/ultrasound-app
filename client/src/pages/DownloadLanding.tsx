@@ -474,7 +474,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
               {socialLinks.linkedin && <a href={socialLinks.linkedin} target="_blank" rel="noopener noreferrer" className="opacity-70 hover:opacity-100">LI</a>}
             </div>
           )}
-          <p className="text-xs text-center opacity-60">{d.copyrightText ?? "\u00a9 2026 All rights reserved."}</p>
+          <p className="text-xs text-center opacity-60">{d.copyrightText ?? `\u00a9 ${new Date().getFullYear()} All rights reserved.`}</p>
         </footer>
       );
     }

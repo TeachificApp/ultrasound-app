@@ -881,7 +881,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
               {socialLinks.linkedin && <Globe size={16} className="opacity-70" />}
             </div>
           )}
-          <p className="text-xs text-center opacity-60">{d.copyrightText ?? "© 2026 All rights reserved."}</p>
+          <p className="text-xs text-center opacity-60">{d.copyrightText ?? `© ${new Date().getFullYear()} All rights reserved.`}</p>
         </div>
       );
     }
