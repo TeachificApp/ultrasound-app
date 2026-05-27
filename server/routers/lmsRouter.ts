@@ -2738,10 +2738,10 @@ Rules:
           }).join("\n")
         : lessons.map(l => `- ${l.title} (${l.type})`).join("\n");
       const pricingText = pricing.length > 0
-        ? pricing.map(p => `${p.name}: $${p.price}${p.billingInterval ? "/" + p.billingInterval : ""}`).join(", ")
-        : course.price ? `$${course.price}` : "Free";
+        ? pricing.map(p => `${p.label ?? "Option"}: $${(p.price ?? 0) / 100}${p.subscriptionInterval ? "/" + p.subscriptionInterval : ""} (${p.pricingType ?? "one_time"})`).join(", ")
+        : course.price ? `$${course.price / 100}` : "Free";
 
-      const systemPrompt = `You are an expert landing page designer for online ${typeLabel}s. Generate a complete, compelling landing page block structure as JSON. The blocks should be professional, conversion-focused, and specific to the content provided.`;
+      const systemPrompt = `You are an expert landing page designer for online ${typeLabel}s. Generate a complete, compelling landing page block structure as JSON. The blocks should be professional, conversion-focused, and specific to the content provided. Return ONLY valid JSON, no markdown.`;
       const userPrompt = `Generate a landing page for this ${typeLabel}:
 
 Title: ${course.title}
@@ -2753,19 +2753,59 @@ Cover Image: ${course.coverImageUrl ?? ""}
 Curriculum:
 ${curriculumText}
 
-Generate a JSON array of content blocks. Each block must have:
-- id: unique string (e.g. "block_1")
-- type: one of: hero, rich_text, curriculum_auto, pricing_options_auto, testimonials, faq, cta_button, two_column
-- For hero blocks: heroTitle (string), heroSubtitle (string), heroImageUrl (string, use course cover if available), heroBtnText (string), heroBehavior: "checkout", heroCheckoutProductType: "course", heroCheckoutProductId: ${input.courseId}
-- For rich_text blocks: content (HTML string with h2/h3/p/ul tags)
-- For curriculum_auto blocks: no extra fields needed
-- For pricing_options_auto blocks: no extra fields needed  
-- For cta_button blocks: ctaText (string), ctaBehavior: "checkout", checkoutProductType: "course", checkoutProductId: ${input.courseId}
-- For testimonials blocks: testimonials array with {name, role, text, rating} objects (generate 3 realistic ones)
-- For faq blocks: faqs array with {question, answer} objects (generate 4-6 relevant FAQs)
-- For two_column blocks: leftContent (HTML), rightContent (HTML)
+Generate a JSON array of 6-8 content blocks. Each block MUST have:
+- id: unique string like "block_1", "block_2", etc.
+- type: MUST be one of these exact strings: hero, text, curriculum_auto, pricing_options_auto, reviews, faq, cta_standalone
+- data: object with the fields described below
 
-Create 6-8 blocks in this order: hero, rich_text (what you'll learn), curriculum_auto, rich_text (about/description), pricing_options_auto, faq, cta_button. Make the content specific and compelling based on the course content above.`;
+Block data schemas:
+
+1. hero block — data fields:
+   headline: string (main title, use course title)
+   subheadline: string (subtitle/hook)
+   bgType: "gradient"
+   gradientFrom: "#179ca3"
+   gradientTo: "#0e4a50"
+   textColor: "#ffffff"
+   align: "center"
+   inlineMediaUrl: "${course.coverImageUrl ?? ""}"
+   inlineMediaType: "image"
+   inlineMediaPlacement: "right"
+   buttons: [{text: "Enroll Now", color: "#ffffff", textColor: "#179ca3", link: "", style: "filled"}]
+
+2. text block — data fields:
+   html: string (HTML with h2, p, ul/li tags — write compelling content about what students will learn, benefits, who it's for)
+   bgColor: "#ffffff"
+
+3. curriculum_auto block — data fields:
+   headline: "What You'll Learn"
+   bgColor: "#f9fafb"
+
+4. pricing_options_auto block — data fields:
+   headline: "Enroll Today"
+   bgColor: "#f0fafa"
+
+5. reviews block — data fields:
+   headline: "What Students Are Saying"
+   bgColor: "#ffffff"
+   reviews: array of 3 objects each with: name (string), text (string — realistic review), rating (number 4 or 5)
+
+6. faq block — data fields:
+   headline: "Frequently Asked Questions"
+   bgColor: "#f9fafb"
+   items: array of 5-6 objects each with: q (string — question), a (string — answer)
+
+7. cta_standalone block — data fields:
+   headline: string (urgent call to action)
+   subtext: string (reassurance text)
+   ctaText: "Enroll Now"
+   ctaColor: "#179ca3"
+   ctaTextColor: "#ffffff"
+   bgColor: "#f0fafa"
+   align: "center"
+
+Create blocks in this order: hero, text (what you'll learn + benefits), curriculum_auto, text (about the instructor/course), pricing_options_auto, reviews, faq, cta_standalone.
+Make ALL content specific and compelling based on the course title, description, and curriculum above. Do NOT use generic placeholder text.`;
 
       const response = await invokeLLM({
         messages: [
@@ -2794,8 +2834,21 @@ Create 6-8 blocks in this order: hero, rich_text (what you'll learn), curriculum
         const parsed = JSON.parse(raw);
         blocks = Array.isArray(parsed) ? parsed : parsed.blocks;
         if (!Array.isArray(blocks)) throw new Error("Not an array");
-        // Ensure each block has a unique id
-        blocks = blocks.map((b, i) => ({ ...b, id: b.id ?? `ai_block_${i}_${Date.now()}` }));
+        // Normalize: ensure each block has { id, type, data } structure
+        // The LLM may return { id, type, data: {...} } or { id, type, ...fields }
+        const validTypes = new Set(["hero","text","image","video","audio","bullets","testimonial","pricing_cta","divider","two_column","divided_columns","spacer","faq","image_text","gallery","icon_grid","countdown","instructor","logos","reviews","embed","cta_standalone","lead_capture","cta_optin","numbered_list","checklist","alert","flip_cards","curriculum_auto","pricing_options_auto","funnel_workflow","product_offer_stack","order_bump_checkout","price_stack","urgency_offer","checkout_form","footer","logo_strip","three_column","related_products","embedded_checkout","inline_checkout","lesson_quiz","lesson_flashcard","file_download","scorm_embed","url_embed","column_layout","carousel","ticker","countdown_v2","live_session","comparison_table","pricing_cards","form_embed"]);
+        blocks = blocks
+          .filter((b: any) => b && typeof b === "object" && b.type && validTypes.has(b.type))
+          .map((b: any, i: number) => {
+            const { id, type, data, ...rest } = b;
+            return {
+              id: id ?? `ai_block_${i}_${Date.now()}`,
+              type,
+              // If block already has a data object, use it; otherwise promote top-level fields into data
+              data: (data && typeof data === "object" && !Array.isArray(data)) ? data : rest,
+            };
+          });
+        if (blocks.length === 0) throw new Error("No valid blocks");
       } catch {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "AI returned invalid JSON. Please try again." });
       }

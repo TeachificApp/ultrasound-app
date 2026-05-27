@@ -2592,7 +2592,7 @@ function CourseOverviewEditor({
               <button onClick={() => setSelectedBlockId(null)} className="text-gray-400 hover:text-gray-700"><X className="w-4 h-4" /></button>
             </div>
             <div className="p-3">
-              <BlockSettings block={selectedBlock} onChange={data => updateBlock(selectedBlock.id, data)} />
+              <BlockSettings block={selectedBlock} onChange={data => updateBlock(selectedBlock.id, data)} courseId={courseId} />
             </div>
           </div>
         )}
@@ -4227,7 +4227,7 @@ function QuizBuilderInline({ lesson, courseId }: { lesson: any; courseId?: numbe
 // ─── Quiz Builder Dialog ──────────────────────────────────────────────────────
 
 function QuizBuilderDialog({ lesson, onClose }: { lesson: any; onClose: () => void }) {
-  
+  const courseId: number | undefined = lesson.courseId ?? undefined;
   const { data: quiz, refetch } = trpc.lmsAdmin.getQuiz.useQuery({ lessonId: lesson.id });
   const [addingQuestion, setAddingQuestion] = useState(false);
   const [newQ, setNewQ] = useState({ question: "", type: "mcq" as "mcq" | "truefalse", options: ["", "", "", ""], correctAnswer: "", explanation: "" });
@@ -4239,6 +4239,14 @@ function QuizBuilderDialog({ lesson, onClose }: { lesson: any; onClose: () => vo
   const [aiDifficulty, setAIDifficulty] = useState<"beginner" | "intermediate" | "advanced">("intermediate");
   const [aiQType, setAIQType] = useState<"mcq" | "truefalse" | "mixed">("mcq");
   const [aiPreview, setAIPreview] = useState<Array<{ question: string; type: string; options: string[]; correctAnswer: string; explanation: string; selected: boolean }> | null>(null);
+  const [useFromLessons, setUseFromLessons] = useState(false);
+  const [selectedLessonIds, setSelectedLessonIds] = useState<number[]>([]);
+
+  // Fetch course lessons for lesson selector
+  const { data: courseLessonList } = trpc.lmsAdmin.listCourseLessons.useQuery(
+    { courseId: courseId! },
+    { enabled: !!courseId && showAIDialog }
+  );
 
   const updateQuiz = trpc.lmsAdmin.updateQuiz.useMutation({ onSuccess: () => { toast.success("Quiz settings saved"); refetch(); } });
   const addQuestion = trpc.lmsAdmin.addQuestion.useMutation({
@@ -4260,6 +4268,8 @@ function QuizBuilderDialog({ lesson, onClose }: { lesson: any; onClose: () => vo
       setShowAIDialog(false);
       setAIPreview(null);
       setAITopic("");
+      setUseFromLessons(false);
+      setSelectedLessonIds([]);
       refetch();
     },
     onError: e => toast.error(`Error: ${e.message}`),
@@ -4393,7 +4403,7 @@ function QuizBuilderDialog({ lesson, onClose }: { lesson: any; onClose: () => vo
 
     {/* AI Generate Dialog */}
     {showAIDialog && quiz && (
-      <Dialog open={true} onOpenChange={() => { setShowAIDialog(false); setAIPreview(null); }}>
+      <Dialog open={true} onOpenChange={() => { setShowAIDialog(false); setAIPreview(null); setUseFromLessons(false); setSelectedLessonIds([]); }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -4404,15 +4414,39 @@ function QuizBuilderDialog({ lesson, onClose }: { lesson: any; onClose: () => vo
           {!aiPreview ? (
             <div className="space-y-4">
               <div>
-                <Label className="text-sm font-medium">Topic *</Label>
+                <Label className="text-sm font-medium">Topic {!(useFromLessons && selectedLessonIds.length > 0) && <span className="text-red-500">*</span>}</Label>
                 <Input
                   value={aiTopic}
                   onChange={e => setAITopic(e.target.value)}
                   placeholder="e.g. Doppler physics in vascular ultrasound, Normal fetal echo anatomy, DVT diagnosis criteria"
                   className="mt-1"
                 />
-                <p className="text-xs text-gray-400 mt-1">Be specific — the AI will generate clinically accurate questions tailored to your topic.</p>
+                <p className="text-xs text-gray-400 mt-1">{useFromLessons && selectedLessonIds.length > 0 ? "Optional when lessons are selected — AI will use lesson content as context." : "Be specific — the AI will generate clinically accurate questions tailored to your topic."}</p>
               </div>
+
+              {courseId && courseLessonList && courseLessonList.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Switch id="dlg-use-lessons" checked={useFromLessons} onCheckedChange={v => { setUseFromLessons(v); if (!v) setSelectedLessonIds([]); }} />
+                    <Label htmlFor="dlg-use-lessons" className="text-sm font-medium cursor-pointer">Generate from specific lesson content</Label>
+                  </div>
+                  {useFromLessons && (
+                    <div className="border border-purple-200 rounded-lg p-3 bg-white space-y-1 max-h-48 overflow-y-auto">
+                      <div className="flex gap-2 mb-2">
+                        <Button size="sm" variant="ghost" className="text-xs h-6 px-2" onClick={() => setSelectedLessonIds(courseLessonList.map(l => l.id))}>Select All</Button>
+                        <Button size="sm" variant="ghost" className="text-xs h-6 px-2" onClick={() => setSelectedLessonIds([])}>Clear</Button>
+                        <span className="text-xs text-gray-500 ml-auto self-center">{selectedLessonIds.length} selected</span>
+                      </div>
+                      {courseLessonList.map(l => (
+                        <label key={l.id} className="flex items-center gap-2 cursor-pointer hover:bg-purple-50 rounded px-1 py-0.5">
+                          <input type="checkbox" className="rounded" checked={selectedLessonIds.includes(l.id)} onChange={e => setSelectedLessonIds(prev => e.target.checked ? [...prev, l.id] : prev.filter(id => id !== l.id))} />
+                          <span className="text-sm text-gray-700 truncate">{l.title}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
@@ -4454,8 +4488,8 @@ function QuizBuilderDialog({ lesson, onClose }: { lesson: any; onClose: () => vo
                 <Button variant="outline" onClick={() => setShowAIDialog(false)}>Cancel</Button>
                 <Button
                   className="bg-teal-600 hover:bg-teal-700 text-white gap-2"
-                  disabled={!aiTopic.trim() || aiGenerate.isPending}
-                  onClick={() => aiGenerate.mutate({ quizId: quiz.id, topic: aiTopic.trim(), count: aiCount, difficulty: aiDifficulty, questionType: aiQType })}
+                  disabled={(!aiTopic.trim() && !(useFromLessons && selectedLessonIds.length > 0)) || aiGenerate.isPending}
+                  onClick={() => aiGenerate.mutate({ quizId: quiz.id, topic: aiTopic.trim() || "based on selected lesson content", count: aiCount, difficulty: aiDifficulty, questionType: aiQType, courseId, lessonIds: useFromLessons && selectedLessonIds.length > 0 ? selectedLessonIds : undefined })}
                 >
                   {aiGenerate.isPending ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</> : <><Sparkles className="w-4 h-4" /> Generate {aiCount} Questions</>}
                 </Button>

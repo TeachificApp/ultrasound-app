@@ -80,7 +80,7 @@ export const funnelRouter = router({
 
       const [courses, downloads, bundles, physicals] = await Promise.all([
         courseIds.length > 0
-          ? db.select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug, price: lmsCourses.price, isFree: lmsCourses.isFree, description: lmsCourses.subtitle, imageUrl: lmsCourses.thumbnailUrl }).from(lmsCourses).where(inArray(lmsCourses.id, courseIds))
+          ? db.select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug, price: lmsCourses.price, isFree: lmsCourses.isFree, description: lmsCourses.subtitle, imageUrl: lmsCourses.coverImageUrl }).from(lmsCourses).where(inArray(lmsCourses.id, courseIds))
           : [],
         downloadIds.length > 0
           ? db.select({ id: digitalProducts.id, title: digitalProducts.title, slug: digitalProducts.slug, price: digitalProducts.price, isFree: digitalProducts.isFree, description: digitalProducts.subtitle, imageUrl: digitalProducts.thumbnailUrl }).from(digitalProducts).where(inArray(digitalProducts.id, downloadIds))

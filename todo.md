@@ -3136,3 +3136,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Enforce quiz gate in CoursePlayer: lock Next Lesson until passing score when requirePassingToProgress is true
 - [ ] Update BlockPreview and CoursePlayer quiz renderer: display question/answer media (images/video), respect shuffleQuestions/shuffleAnswers flags
 - [ ] Auto-save questions to question bank when added manually or AI-generated in LessonQuizBlockEditor
+
+## Session: Quiz AI Generate + Landing Page Fixes (2026-05-27)
+
+- [x] Fix AI landing page generator (lmsRouter, downloadsRouter, productsRouter) — use correct block types and proper data structure with normalization
+- [x] Fix course card images in "You Might Also Like" — use coverImageUrl instead of thumbnailUrl in getProductsByIds
+- [x] Fix quiz AI generate in QuizBuilderDialog — add course/lesson selector so user can generate from specific lessons
+- [x] Pass courseId to BlockSettings in CourseOverviewEditor (LMSAdmin) to enable course/lesson selectors
