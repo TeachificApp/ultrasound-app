@@ -2796,6 +2796,9 @@ Rules:
         heroSubtitle: lmsLandingPages.heroSubtitle,
         heroImageUrl: lmsLandingPages.heroImageUrl,
         ctaText: lmsLandingPages.ctaText,
+        seoTitle: lmsLandingPages.seoTitle,
+        seoDescription: lmsLandingPages.seoDescription,
+        seoImage: lmsLandingPages.seoImage,
       }).from(lmsLandingPages).where(eq(lmsLandingPages.courseId, input.courseId)).limit(1);
       const [course] = await db.select({
         title: lmsCourses.title,
@@ -2815,6 +2818,9 @@ Rules:
         courseTitle: course?.title ?? "",
         courseSlug: course?.slug ?? "",
         coursePrice: course?.price ?? 0,
+        seoTitle: lp?.seoTitle ?? null,
+        seoDescription: lp?.seoDescription ?? null,
+        seoImage: lp?.seoImage ?? null,
       };
     }),
   saveLandingPageBlocks: protectedProcedure
@@ -2869,6 +2875,31 @@ Rules:
       }
       return { success: true };
     }),
+  // ── Save Landing Page SEO / Link Preview ──
+  saveLandingPageSeo: protectedProcedure
+    .input(z.object({
+      courseId: z.number(),
+      seoTitle: z.string().nullable().optional(),
+      seoDescription: z.string().nullable().optional(),
+      seoImage: z.string().nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { courseId, ...seoData } = input;
+      const [existing] = await db.select({ id: lmsLandingPages.id })
+        .from(lmsLandingPages).where(eq(lmsLandingPages.courseId, courseId)).limit(1);
+      if (existing) {
+        await db.update(lmsLandingPages)
+          .set(seoData)
+          .where(eq(lmsLandingPages.courseId, courseId));
+      } else {
+        await db.insert(lmsLandingPages).values({ courseId, ...seoData, isCustom: false });
+      }
+      return { success: true };
+    }),
+
   // ── AI Generate Landing Page ──
   aiGenerateLandingPage: protectedProcedure
     .input(z.object({ courseId: z.number() }))

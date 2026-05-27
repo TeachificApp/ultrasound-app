@@ -3219,3 +3219,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix download block "No file selected" when media repo file attached: use slug-based /api/media/:slug/download URL instead of raw S3 URL
 - [x] BlockPreview: fall back to slug-based URL for existing blocks with mediaAssetSlug but empty/stale mediaAssetUrl
 - [x] LandingPageBuilder selectMediaAsset: store mediaAssetSlug and set mediaAssetUrl to slug-based serve endpoint
+
+## Analytics & Sales Management (2026-05-27)
+- [ ] Fix analytics sales dashboard to show funnel/product purchases in real time
+- [ ] Add Sales/Enrollment tab to: Courses, Downloads, Bundles, Quizzes, Memberships
+- [ ] Sales tab: user list with name/email/date/amount, access toggle, refund button
+- [x] Funnel page SEO/preview settings: title, description, og:image — panel in right sidebar (FunnelPageEditor)
+- [x] Landing page SEO/preview settings: title, description, og:image — panel in right sidebar (LandingPageBuilder)

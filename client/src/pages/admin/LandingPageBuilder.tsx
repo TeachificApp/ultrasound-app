@@ -4799,12 +4799,20 @@ export default function LandingPageBuilder() {
   const [isSaving, setIsSaving] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
 
+  // SEO / Link Preview state
+  const [seoTitle, setSeoTitle] = useState("");
+  const [seoDescription, setSeoDescription] = useState("");
+  const [seoImage, setSeoImage] = useState("");
+  const [seoSaved, setSeoSaved] = useState(false);
+  const seoInitialized = useRef(false);
+
   const lpUtils = trpc.useUtils();
   // Reset hasLoaded when courseId or refreshKey changes (e.g. after AI generate)
   useEffect(() => {
     setHasLoaded(false);
     setBlocks([]);
     setSelectedId(null);
+    seoInitialized.current = false;
     // Invalidate the query so fresh data is fetched (not stale cache)
     lpUtils.lmsAdmin.getLandingPageBlocks.invalidate({ courseId: numericCourseId });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -4877,6 +4885,13 @@ export default function LandingPageBuilder() {
     if (!lpData || hasLoaded) return;
     setHasLoaded(true);
     setCourseInfo({ title: lpData.courseTitle, slug: lpData.courseSlug, price: lpData.coursePrice });
+    // Initialize SEO fields once per page load
+    if (!seoInitialized.current) {
+      seoInitialized.current = true;
+      setSeoTitle(lpData.seoTitle ?? "");
+      setSeoDescription(lpData.seoDescription ?? "");
+      setSeoImage(lpData.seoImage ?? "");
+    }
     if (lpData.blocks && lpData.blocks.length > 0) {
       setBlocks(lpData.blocks as Block[]);
     } else {
@@ -4893,6 +4908,25 @@ export default function LandingPageBuilder() {
     onSuccess: () => toast.success("Landing page saved!"),
     onError: (e: any) => toast.error(`Save failed: ${e.message}`),
   });
+
+  // SEO mutation
+  const saveSeoMutation = trpc.lmsAdmin.saveLandingPageSeo.useMutation({
+    onSuccess: () => {
+      setSeoSaved(true);
+      setTimeout(() => setSeoSaved(false), 2000);
+      lpUtils.lmsAdmin.getLandingPageBlocks.invalidate({ courseId: numericCourseId });
+    },
+    onError: (e: any) => toast.error(`SEO save failed: ${e.message}`),
+  });
+
+  const handleSaveSeo = () => {
+    saveSeoMutation.mutate({
+      courseId: numericCourseId,
+      seoTitle: seoTitle.trim() || null,
+      seoDescription: seoDescription.trim() || null,
+      seoImage: seoImage.trim() || null,
+    });
+  };
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -5400,7 +5434,7 @@ export default function LandingPageBuilder() {
           )}
         </div>
 
-        {/* Right Panel: Block Settings */}
+        {/* Right Panel: Block Settings / Page SEO */}
         <div className="w-72 flex-shrink-0 bg-white border-l border-gray-200 overflow-y-auto">
           {selectedBlock ? (
             <>
@@ -5415,9 +5449,67 @@ export default function LandingPageBuilder() {
               </div>
             </>
           ) : (
-            <div className="flex flex-col items-center justify-center h-full text-gray-400 p-6 text-center">
-              <Palette size={24} className="mb-2 opacity-50" />
-              <p className="text-sm">Click any block on the canvas to edit its settings</p>
+            <div className="flex flex-col h-full">
+              <div className="p-3 border-b border-gray-100">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <Bookmark size={12} /> Link Preview / SEO
+                </p>
+              </div>
+              <div className="p-3 space-y-3 flex-1">
+                <p className="text-[10px] text-gray-400">Override what iMessage, WhatsApp, and social media show when this page link is shared.</p>
+                <div>
+                  <label className="text-[10px] font-medium text-gray-600 block mb-1">Display Name (og:title)</label>
+                  <input
+                    className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    placeholder={courseInfo?.title ?? "Page title"}
+                    value={seoTitle}
+                    onChange={e => setSeoTitle(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-medium text-gray-600 block mb-1">Description (og:description)</label>
+                  <textarea
+                    className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+                    rows={3}
+                    placeholder="Short description shown in link previews…"
+                    value={seoDescription}
+                    onChange={e => setSeoDescription(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-medium text-gray-600 block mb-1">Preview Image URL (og:image)</label>
+                  <input
+                    className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    placeholder="https://…"
+                    value={seoImage}
+                    onChange={e => setSeoImage(e.target.value)}
+                  />
+                  {seoImage && (
+                    <img src={seoImage} alt="Preview" className="mt-1.5 w-full rounded-lg border border-gray-200 object-cover" style={{ maxHeight: 80 }} />
+                  )}
+                </div>
+                {/* Mini link preview card */}
+                {(seoTitle || seoDescription) && (
+                  <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                    {seoImage && <img src={seoImage} alt="" className="w-full object-cover" style={{ maxHeight: 60 }} />}
+                    <div className="px-2 py-1.5">
+                      <p className="text-[10px] font-semibold text-gray-800 truncate">{seoTitle || courseInfo?.title}</p>
+                      {seoDescription && <p className="text-[9px] text-gray-500 line-clamp-2">{seoDescription}</p>}
+                      <p className="text-[9px] text-teal-600 mt-0.5 truncate">{typeof window !== 'undefined' ? window.location.hostname : 'learn.allaboutultrasound.com'}</p>
+                    </div>
+                  </div>
+                )}
+                <button
+                  onClick={handleSaveSeo}
+                  disabled={saveSeoMutation.isPending}
+                  className="w-full text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 rounded-lg py-1.5 transition-colors disabled:opacity-50"
+                >
+                  {seoSaved ? "✓ Saved!" : saveSeoMutation.isPending ? "Saving…" : "Save Preview Settings"}
+                </button>
+                <div className="pt-2 border-t border-gray-100">
+                  <p className="text-[10px] text-gray-400 text-center">Click any block on the canvas to edit its settings</p>
+                </div>
+              </div>
             </div>
           )}
         </div>
