@@ -2,7 +2,7 @@
  * EducationLibrary.tsx
  * Public-facing course catalog for All About Ultrasound™ & iHeartEcho™
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -137,6 +137,12 @@ export default function EducationLibrary() {
   // Fetch ownership data for smart routing (only when logged in)
   const { data: myCoursesData } = trpc.lmsLearner.getMyCourses.useQuery(undefined, { enabled: !!user });
   const { data: myPurchasesData } = trpc.downloads.myPurchases.useQuery(undefined, { enabled: !!user });
+
+  // Set page title for SEO
+  useEffect(() => {
+    document.title = "Education Library | All About Ultrasound™";
+    return () => { document.title = "All About Ultrasound™"; };
+  }, []);
 
   // Build fast lookup sets
   const enrolledCourseIds = useMemo(() => new Set((myCoursesData ?? []).map((e: any) => e.courseId)), [myCoursesData]);

@@ -3177,3 +3177,9 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add reorder procedure to downloadsAdminRouter (sorts by libraryOrder ASC, createdAt DESC)
 - [x] Update public downloads list to sort by libraryOrder then createdAt
 - [x] Add SortableProductRow component and drag-to-reorder UI to DigitalDownloadsAdmin ProductList
+
+## Education Library Improvements (May 27 2026)
+- [x] Education Library page title tag: document.title = "Education Library | All About Ultrasound™"
+- [x] CourseLanding already had breadcrumb + title tag (verified)
+- [x] DownloadLanding: added breadcrumb (Education Library › Product Name) to both blocks-based and fallback layouts, plus document.title
+- [x] Collection hero image upload: added uploadCollectionImage procedure in lmsAdmin router, image upload UI in CollectionFormDialog, hero image display in CollectionDetail (with dark overlay for readability)

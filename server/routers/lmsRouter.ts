@@ -3910,6 +3910,35 @@ CRITICAL REQUIREMENTS:
       return { success: true };
     }),
 
+  // ─── Upload Collection Hero Image ─────────────────────────────────────────
+
+  uploadCollectionImage: protectedProcedure
+    .input(z.object({
+      collectionId: z.number(),
+      dataUri: z.string().min(1).max(10_000_000),
+      mimeType: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const [col] = await db.select({ title: lmsCollections.title }).from(lmsCollections).where(eq(lmsCollections.id, input.collectionId)).limit(1);
+      if (!col) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const b64Marker = ";base64,";
+      const b64Idx = input.dataUri.indexOf(b64Marker);
+      const base64Data = b64Idx >= 0 ? input.dataUri.slice(b64Idx + b64Marker.length) : input.dataUri;
+      const buffer = Buffer.from(base64Data, "base64");
+      const ext = input.mimeType.split("/")[1];
+      const suffix = randomBytes(4).toString("hex");
+      const fileKey = `lms-collection-hero/${input.collectionId}-${suffix}.${ext}`;
+
+      const { url } = await storagePut(fileKey, buffer, input.mimeType);
+      await db.update(lmsCollections).set({ coverImageUrl: url }).where(eq(lmsCollections.id, input.collectionId));
+      return { url };
+    }),
+
   // ─── Duplicate Course ─────────────────────────────────────────────────────
 
   duplicateCourse: protectedProcedure

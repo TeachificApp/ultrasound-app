@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { FileDown, Check, ShoppingCart, Download, ArrowLeft, Users, Globe } from "lucide-react";
+import { FileDown, Check, ShoppingCart, Download, ArrowLeft, Users, Globe, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
 import { getLoginUrl } from "@/const";
 import OrderBumpOffer from "@/components/OrderBumpOffer";
@@ -696,6 +696,12 @@ export default function DownloadLanding() {
     onError: (e) => toast.error(e.message),
   });
 
+  // Set page title for SEO
+  useEffect(() => {
+    if (product?.title) document.title = `${product.title} | Education Library | All About Ultrasound™`;
+    return () => { document.title = "All About Ultrasound™"; };
+  }, [product?.title]);
+
   // Auto-trigger checkout when ?checkout=1 is in the URL (used by BSLinkField product links)
   // MUST be before early returns to comply with React Rules of Hooks
   useEffect(() => {
@@ -755,6 +761,14 @@ export default function DownloadLanding() {
   if (blocks.length > 0) {
     return (
       <div className="min-h-screen bg-white">
+        {/* Breadcrumb */}
+        <div className="bg-white border-b border-gray-100">
+          <div className="max-w-4xl mx-auto px-4 py-2 flex items-center gap-1.5 text-sm text-gray-500">
+            <Link href="/education-library" className="hover:text-teal-600 transition-colors">Education Library</Link>
+            <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="text-gray-800 truncate max-w-xs">{product.title}</span>
+          </div>
+        </div>
         {blocks.map(block => {
           const FULL_BLEED_TYPES_DL = ["hero", "pricing_cta", "cta_standalone", "divider", "spacer", "footer", "logo_strip", "urgency_offer", "product_offer_stack", "price_stack", "image_content"];
           const isFullBleedDL = FULL_BLEED_TYPES_DL.includes(block.type);
@@ -799,12 +813,17 @@ export default function DownloadLanding() {
   // ── Fallback: standard layout ──
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Breadcrumb */}
+      <div className="bg-white border-b border-gray-100">
+        <div className="max-w-4xl mx-auto px-4 py-2 flex items-center gap-1.5 text-sm text-gray-500">
+          <Link href="/education-library" className="hover:text-teal-600 transition-colors">Education Library</Link>
+          <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" />
+          <span className="text-gray-800 truncate max-w-xs">{product.title}</span>
+        </div>
+      </div>
       {/* Hero */}
       <div className="bg-gradient-to-br from-teal-600 to-cyan-700 text-white py-16">
         <div className="max-w-4xl mx-auto px-4">
-          <Link href="/downloads" className="text-teal-200 hover:text-white text-sm inline-flex items-center gap-1 mb-4">
-            <ArrowLeft className="w-3 h-3" /> All Downloads
-          </Link>
           <div className="flex flex-col md:flex-row gap-8 items-start">
             <div className="flex-1">
               <h1 className="text-3xl md:text-4xl font-bold leading-tight">

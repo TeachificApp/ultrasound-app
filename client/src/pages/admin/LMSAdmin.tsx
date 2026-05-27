@@ -5826,6 +5826,25 @@ function CollectionFormDialog({
   const [isPublished, setIsPublished] = useState(initial?.isPublished ?? true);
   const [selectedCourseIds, setSelectedCourseIds] = useState<number[]>(initial?.courseIds ?? []);
   const [search, setSearch] = useState("");
+  const [coverImageUrl, setCoverImageUrl] = useState<string>(initial?.coverImageUrl ?? "");
+  const [imageUploading, setImageUploading] = useState(false);
+  const uploadCollectionImage = trpc.lmsAdmin.uploadCollectionImage.useMutation({
+    onSuccess: (data) => { setCoverImageUrl(data.url); setImageUploading(false); },
+    onError: (e) => { toast.error(e.message); setImageUploading(false); },
+  });
+  const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 8_000_000) { toast.error("Image must be under 8 MB"); return; }
+    if (!initial?.id) { toast.error("Save the collection first, then upload a hero image."); return; }
+    setImageUploading(true);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUri = ev.target?.result as string;
+      uploadCollectionImage.mutate({ collectionId: initial.id, dataUri, mimeType: file.type as any });
+    };
+    reader.readAsDataURL(file);
+  };
 
   const filteredCourses = allCourses.filter(c =>
     c.title.toLowerCase().includes(search.toLowerCase())
@@ -5839,7 +5858,7 @@ function CollectionFormDialog({
 
   const handleSave = () => {
     if (!colTitle.trim()) return;
-    onSave({ title: colTitle.trim(), description: description || undefined, label: label || undefined, color, isPublished }, selectedCourseIds);
+    onSave({ title: colTitle.trim(), description: description || undefined, label: label || undefined, color, isPublished, coverImageUrl: coverImageUrl || undefined }, selectedCourseIds);
   };
 
   return (
@@ -5873,6 +5892,25 @@ function CollectionFormDialog({
             <div className="col-span-2 flex items-center gap-2">
               <Switch checked={isPublished} onCheckedChange={setIsPublished} />
               <Label className="text-xs">Published (visible on Education Library)</Label>
+            </div>
+            <div className="col-span-2">
+              <Label className="text-xs font-medium">Hero Banner Image</Label>
+              <p className="text-xs text-gray-400 mb-2">Displayed as the collection hero background. Recommended: 1400×400px. {!initial?.id && <span className="text-amber-600">Save the collection first to enable image upload.</span>}</p>
+              <div className="flex items-start gap-3">
+                {coverImageUrl && (
+                  <img src={coverImageUrl} alt="Hero preview" className="w-32 h-20 object-cover rounded-lg border border-gray-200 flex-shrink-0" />
+                )}
+                <div className="flex-1">
+                  <label className={`flex items-center gap-2 cursor-pointer px-3 py-2 rounded-lg border border-dashed border-gray-300 hover:border-teal-400 text-sm text-gray-500 hover:text-teal-600 transition-colors ${!initial?.id ? 'opacity-50 pointer-events-none' : ''}`}>
+                    {imageUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
+                    {imageUploading ? "Uploading..." : coverImageUrl ? "Replace image" : "Upload hero image"}
+                    <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleImageFile} disabled={imageUploading || !initial?.id} />
+                  </label>
+                  {coverImageUrl && (
+                    <button onClick={() => setCoverImageUrl("")} className="text-xs text-red-500 hover:text-red-700 mt-1">Remove image</button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 

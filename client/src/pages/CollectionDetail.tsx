@@ -117,8 +117,18 @@ export default function CollectionDetail() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Hero */}
-      <div className="py-12 px-4" style={{ background: `linear-gradient(135deg, ${collection.color ?? "#189aa1"} 0%, #0e4a50 100%)` }}>
-        <div className="max-w-5xl mx-auto">
+      <div
+        className="py-12 px-4 relative"
+        style={collection.coverImageUrl
+          ? { backgroundImage: `url(${collection.coverImageUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
+          : { background: `linear-gradient(135deg, ${collection.color ?? "#189aa1"} 0%, #0e4a50 100%)` }
+        }
+      >
+        {/* Dark overlay for readability when using a photo */}
+        {collection.coverImageUrl && (
+          <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.35) 100%)" }} />
+        )}
+        <div className="max-w-5xl mx-auto relative z-10">
           <Link href="/education-library">
             <button className="flex items-center gap-1.5 text-white/80 hover:text-white text-sm mb-4 transition-colors">
               <ArrowLeft className="w-4 h-4" /> Education Library
