@@ -27,7 +27,7 @@ import http from "http";
 import path from "path";
 import fs from "fs";
 import os from "os";
-import AdmZip from "adm-zip";
+import unzipper from "unzipper";
 import {
   mediaAssets,
   mediaVersions,
@@ -141,17 +141,31 @@ function setCorsHeaders(res: Response) {
 const SCORM_CACHE_DIR = path.join(os.tmpdir(), "scorm-cache");
 
 /**
- * Download a remote URL to a Buffer.
+ * Download a remote URL to a local file (streaming — no memory buffering).
  */
-function downloadToBuffer(url: string): Promise<Buffer> {
+function downloadToFile(url: string, destPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const protocol = url.startsWith("https") ? https : http;
-    protocol.get(url, (res) => {
-      const chunks: Buffer[] = [];
-      res.on("data", (chunk: Buffer) => chunks.push(chunk));
-      res.on("end", () => resolve(Buffer.concat(chunks)));
-      res.on("error", reject);
-    }).on("error", reject);
+    const follow = (targetUrl: string, redirects = 0): void => {
+      if (redirects > 5) { reject(new Error("Too many redirects")); return; }
+      const proto = targetUrl.startsWith("https") ? https : http;
+      proto.get(targetUrl, (res) => {
+        // Follow redirects
+        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          follow(res.headers.location, redirects + 1);
+          return;
+        }
+        if (res.statusCode && res.statusCode >= 400) {
+          reject(new Error(`Download failed: HTTP ${res.statusCode}`));
+          return;
+        }
+        const ws = fs.createWriteStream(destPath);
+        res.pipe(ws);
+        ws.on("finish", () => resolve());
+        ws.on("error", reject);
+        res.on("error", reject);
+      }).on("error", reject);
+    };
+    follow(url);
   });
 }
 
@@ -175,6 +189,7 @@ function findScormLaunchFile(manifestXml: string): string {
 
 /**
  * Extract a SCORM ZIP to the cache directory and return the launch file path.
+ * Uses streaming download to disk + disk-based extraction to avoid OOM on large ZIPs.
  * Returns null if extraction fails.
  */
 async function extractScormZip(
@@ -192,11 +207,24 @@ async function extractScormZip(
     return { launchFile, cacheDir };
   }
 
+  const zipPath = path.join(SCORM_CACHE_DIR, `${slug}-${urlHash}.zip`);
   try {
     fs.mkdirSync(cacheDir, { recursive: true });
-    const zipBuffer = await downloadToBuffer(zipUrl);
-    const zip = new AdmZip(zipBuffer);
-    zip.extractAllTo(cacheDir, true);
+    fs.mkdirSync(SCORM_CACHE_DIR, { recursive: true });
+
+    // Stream download to disk (no memory buffering)
+    await downloadToFile(zipUrl, zipPath);
+
+    // Stream-extract from disk file (unzipper uses streaming — much lower memory than AdmZip)
+    await new Promise<void>((resolve, reject) => {
+      fs.createReadStream(zipPath)
+        .pipe(unzipper.Extract({ path: cacheDir }))
+        .on("close", resolve)
+        .on("error", reject);
+    });
+
+    // Clean up the downloaded ZIP to free /tmp space
+    try { fs.unlinkSync(zipPath); } catch {}
 
     // Find launch file
     const manifestPath = path.join(cacheDir, "imsmanifest.xml");
@@ -206,8 +234,22 @@ async function extractScormZip(
       launchFile = findScormLaunchFile(manifestXml);
     } else {
       // Try to find any index.html in the extracted files
-      const entries = zip.getEntries().map((e) => e.entryName);
-      const indexEntry = entries.find((e) => e.toLowerCase().endsWith("index.html"));
+      const findIndex = (dir: string, depth: number): string | null => {
+        if (depth > 4) return null;
+        try {
+          for (const entry of fs.readdirSync(dir)) {
+            const full = path.join(dir, entry);
+            if (fs.statSync(full).isDirectory()) {
+              const found = findIndex(full, depth + 1);
+              if (found) return found;
+            } else if (entry.toLowerCase() === "index.html") {
+              return path.relative(cacheDir, full);
+            }
+          }
+        } catch {}
+        return null;
+      };
+      const indexEntry = findIndex(cacheDir, 0);
       if (indexEntry) launchFile = indexEntry;
     }
 
@@ -216,10 +258,9 @@ async function extractScormZip(
     return { launchFile, cacheDir };
   } catch (err) {
     console.error(`[SCORM] Failed to extract ZIP for slug=${slug}:`, err);
-    // Clean up partial extraction
-    try {
-      fs.rmSync(cacheDir, { recursive: true, force: true });
-    } catch {}
+    // Clean up partial extraction and downloaded zip
+    try { fs.rmSync(cacheDir, { recursive: true, force: true }); } catch {}
+    try { fs.unlinkSync(zipPath); } catch {}
     return null;
   }
 }

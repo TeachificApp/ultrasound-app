@@ -3280,3 +3280,11 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Updated sidebar nav to point to internal /community route (not external Thinkific)
 - [x] Added CommunityHub import and /community route in App.tsx
 - [x] Added /community/:slug route for CommunityFeed (slug param matching)
+
+## SCORM Embed Display Fix (May 2026)
+- [x] Fix SCORM embed 500 error - replaced in-memory AdmZip with streaming unzipper to avoid OOM on large ZIPs (152MB+)
+- [x] Stream download to disk (downloadToFile) instead of buffering entire ZIP in memory (downloadToBuffer)
+- [x] Use unzipper npm package for streaming extraction (10-20MB RAM vs 400MB+ with AdmZip)
+- [x] Improved frontend chunk upload error messages (show HTTP status + response text)
+- [x] Added retry logic (3 attempts with backoff) to chunk uploads
+- [x] Reduced chunk size from 10MB to 5MB to avoid proxy limits
