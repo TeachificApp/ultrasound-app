@@ -1222,7 +1222,7 @@ export const thinkificImportRouter = router({
                   buttons: [],
                   showButtons: false,
                   hideButtons: true,
-                  minHeight: 150,
+                  heroMinHeight: 150,
                 },
               });
               if (embedUrl) {

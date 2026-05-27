@@ -133,7 +133,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       const heroBottomBorderStyle: React.CSSProperties = d.heroBottomBorder
         ? { borderBottom: `${d.heroBottomBorderWidth ?? 4}px solid ${d.heroBottomBorderColor ?? "#179ca3"}` }
         : {};
-      const heroMinHeight = d.heroMinHeight ?? 150;
+      const heroMinHeight = d.heroMinHeight ?? 400;
       const heroMaxHeight = d.maxHeight ? `${d.maxHeight}px` : undefined;
       return (
         <div
