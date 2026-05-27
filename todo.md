@@ -3295,3 +3295,26 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Added admin endpoint POST /api/upload-media-repo/extract-scorm for manual re-extraction
 - [x] Ran extraction for existing FETAL ECHO quiz (180 files uploaded to R2)
 - [x] URL-encode path segments in redirect to handle spaces in filenames
+
+## Bugs & Redesign (May 27, 2026)
+- [ ] Fix Education Library SPI filter showing non-SPI content (eBook showing when only 2 SPI items exist)
+- [ ] Fix User Analytics Users tab returning "No users found" when searching
+- [ ] Remove standalone Membership Management page (/admin/memberships) — was never requested
+- [ ] Build central Member Management on member domain with 3 tabs: LMS, UltrasoundAssist, EchoAssist
+- [ ] Member Management: show all user analytics, sales, enrollments, purchases per tab
+- [ ] Member Management: drill-down to user profile with subscription/profile management
+- [ ] Member Management: exclude demo/system test users from listings
+
+## Member Management & Activity Logging (May 2026)
+- [x] Fix Education Library SPI filter bug (key collision between digital_product id=1 and lms_course id=1; fixed by using _source prefix in React keys)
+- [x] Fix User Analytics Users tab showing "No users found" (column name was created_at instead of createdAt; now returns all 14,268 users)
+- [x] User activity logging DB schema (user_activity_logs table with event_type, description, path, ip_address, user_agent, metadata JSON)
+- [x] Activity tracking middleware/endpoints (page views, video plays/completes, quiz attempts, downloads, logins all log to unified table with IP)
+- [x] User profile drill-down with full activity log tab (paginated, filterable by event type)
+- [x] CSV export for user activity logs (exports from unified table + historical page views + logins)
+- [x] Added _source field to getCollection and listCourses results for unique identification
+- [x] IP address tracking added to page view events
+- [x] Activity log tab added to UserDetailView in User Analytics (7 tabs total now)
+- [ ] Build Member Management central area with 3 tabs (LMS, UltrasoundAssist, EchoAssist)
+- [ ] Exclude demo/system test users from Member Management
+- [ ] Keep LMS data separate from App data in tabs

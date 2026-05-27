@@ -281,7 +281,7 @@ export default function EducationLibrary() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {courses.map((c: any) => <CourseCard key={c.id} course={c} enrolledCourseIds={enrolledCourseIds} purchasedProductSlugs={purchasedProductSlugs} />)}
+            {courses.map((c: any) => <CourseCard key={`${c._source ?? c.type}-${c.id}`} course={c} enrolledCourseIds={enrolledCourseIds} purchasedProductSlugs={purchasedProductSlugs} />)}
           </div>
         )}
 

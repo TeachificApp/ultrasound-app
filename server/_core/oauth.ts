@@ -58,6 +58,18 @@ export function registerOAuthRoutes(app: Express) {
           ipAddress: ip ? ip.substring(0, 64) : null,
           userAgent: req.headers["user-agent"]?.substring(0, 500) ?? null,
         });
+        // Also log to unified activity table
+        try {
+          const { userActivityLogs } = await import("../../drizzle/schema");
+          await dbConn.insert(userActivityLogs).values({
+            userId: user.id,
+            eventType: 'login',
+            description: `Logged in from ${ip || 'unknown IP'}`,
+            ipAddress: ip ? ip.substring(0, 64) : null,
+            userAgent: req.headers["user-agent"]?.substring(0, 500) ?? null,
+            metadata: { country: null },
+          });
+        } catch (e) { /* non-blocking */ }
 
         // Sync user to Thinkific free membership if not already enrolled
         if (user.email && !user.thinkificEnrolledAt) {

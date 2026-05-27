@@ -10,6 +10,7 @@ import { getDb } from "../db";
 import {
   userLoginEvents,
   userPageViewEvents,
+  userActivityLogs,
   lmsVideoEvents,
   lmsQuizAttempts,
   lmsLessonProgress,
@@ -21,6 +22,49 @@ import {
   digitalPurchases,
   users,
 } from "../../drizzle/schema";
+
+/** Helper to extract client IP from request */
+function getClientIp(ctx: any): string | null {
+  const req = ctx.req;
+  if (!req) return null;
+  return (
+    req.headers?.['x-forwarded-for']?.split(',')[0]?.trim() ||
+    req.headers?.['x-real-ip'] ||
+    req.socket?.remoteAddress ||
+    null
+  );
+}
+
+/** Helper to get user agent from request */
+function getUserAgent(ctx: any): string | null {
+  return ctx.req?.headers?.['user-agent'] ?? null;
+}
+
+/** Log to unified activity table (fire-and-forget) */
+async function logActivity(db: any, params: {
+  userId: number;
+  eventType: string;
+  description: string;
+  path?: string | null;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  metadata?: any;
+}) {
+  try {
+    await db.insert(userActivityLogs).values({
+      userId: params.userId,
+      eventType: params.eventType,
+      description: params.description,
+      path: params.path ?? null,
+      ipAddress: params.ipAddress ?? null,
+      userAgent: params.userAgent ?? null,
+      metadata: params.metadata ?? null,
+    });
+  } catch (e) {
+    // Don't let logging failures break the main flow
+    console.error('[ActivityLog] Failed to log:', e);
+  }
+}
 
 // ─── Public / Protected Tracking Router ────────────────────────────────────
 export const analyticsTrackRouter = router({
@@ -36,13 +80,27 @@ export const analyticsTrackRouter = router({
       const db = await getDb();
       if (!db) return { ok: false };
       const userId = (ctx as any).user?.id ?? null;
+      const ip = getClientIp(ctx);
       await db.insert(userPageViewEvents).values({
         userId,
         sessionId: input.sessionId ?? null,
         path: input.path,
         referrer: input.referrer ?? null,
+        ipAddress: ip,
         durationMs: input.durationMs ?? null,
       });
+      // Log to unified activity table for authenticated users
+      if (userId) {
+        logActivity(db, {
+          userId,
+          eventType: 'page_view',
+          description: `Viewed ${input.path}`,
+          path: input.path,
+          ipAddress: ip,
+          userAgent: getUserAgent(ctx),
+          metadata: { referrer: input.referrer, sessionId: input.sessionId },
+        });
+      }
       return { ok: true };
     }),
 
@@ -68,6 +126,17 @@ export const analyticsTrackRouter = router({
         durationSec: input.durationSec,
         percentWatched: input.percentWatched,
       });
+      // Log to unified activity table
+      if (input.eventType === 'play' || input.eventType === 'complete') {
+        logActivity(db, {
+          userId: ctx.user.id,
+          eventType: input.eventType === 'play' ? 'video_play' : 'video_complete',
+          description: `${input.eventType === 'play' ? 'Started' : 'Completed'} video (lesson ${input.lessonId}, course ${input.courseId})`,
+          ipAddress: getClientIp(ctx),
+          userAgent: getUserAgent(ctx),
+          metadata: { lessonId: input.lessonId, courseId: input.courseId, percentWatched: input.percentWatched, positionSec: input.positionSec },
+        });
+      }
       return { ok: true };
     }),
 
@@ -171,6 +240,15 @@ export const analyticsTrackRouter = router({
         correctAnswers: input.correctAnswers,
         timeTakenSec: input.timeTakenSec ?? null,
         answersJson: input.answersJson ?? null,
+      });
+      // Log to unified activity table
+      logActivity(db, {
+        userId: ctx.user.id,
+        eventType: input.passed ? 'quiz_pass' : 'quiz_fail',
+        description: `Quiz ${input.passed ? 'passed' : 'failed'} (${input.score}%, ${input.correctAnswers}/${input.totalQuestions}) - lesson ${input.lessonId}`,
+        ipAddress: getClientIp(ctx),
+        userAgent: getUserAgent(ctx),
+        metadata: { lessonId: input.lessonId, courseId: input.courseId, score: input.score, passed: input.passed },
       });
       return { ok: true };
     }),
@@ -322,7 +400,7 @@ export const analyticsAdminRouter = router({
           u.name,
           u.email,
           u.role,
-          u.created_at AS joinedAt,
+          u.createdAt AS joinedAt,
           u.lastSignedIn AS lastLogin,
           CASE WHEN u.lastSignedIn IS NOT NULL THEN 1 ELSE 0 END AS loginCount,
           (SELECT COUNT(*) FROM user_page_view_events WHERE user_id = u.id) AS pageViewCount,
@@ -584,5 +662,128 @@ export const analyticsAdminRouter = router({
         quizAttempts: Number(r.quizAttempts ?? 0),
         avgQuizScore: r.avgQuizScore != null ? Number(r.avgQuizScore) : null,
       }));
+    }),
+
+  /** Full unified activity log for a user — paginated, filterable */
+  userActivityLog: protectedProcedure
+    .input(z.object({
+      userId: z.number().int(),
+      page: z.number().int().default(1),
+      pageSize: z.number().int().default(50),
+      eventType: z.string().optional(), // filter by event type
+    }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const offset = (input.page - 1) * input.pageSize;
+      const conditions = [eq(userActivityLogs.userId, input.userId)];
+      if (input.eventType) {
+        conditions.push(eq(userActivityLogs.eventType, input.eventType));
+      }
+
+      const logs = await db.select().from(userActivityLogs)
+        .where(and(...conditions))
+        .orderBy(desc(userActivityLogs.createdAt))
+        .limit(input.pageSize)
+        .offset(offset);
+
+      const [totalRow] = await db.select({ total: count() }).from(userActivityLogs)
+        .where(and(...conditions));
+
+      return {
+        logs: logs.map(l => ({
+          id: l.id,
+          eventType: l.eventType,
+          description: l.description,
+          path: l.path,
+          ipAddress: l.ipAddress,
+          userAgent: l.userAgent,
+          metadata: l.metadata,
+          createdAt: l.createdAt,
+        })),
+        total: Number(totalRow?.total ?? 0),
+      };
+    }),
+
+  /** Export user activity log as CSV data */
+  exportUserActivityCsv: protectedProcedure
+    .input(z.object({
+      userId: z.number().int(),
+      eventType: z.string().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const conditions = [eq(userActivityLogs.userId, input.userId)];
+      if (input.eventType) {
+        conditions.push(eq(userActivityLogs.eventType, input.eventType));
+      }
+
+      const logs = await db.select().from(userActivityLogs)
+        .where(and(...conditions))
+        .orderBy(desc(userActivityLogs.createdAt))
+        .limit(10000); // cap at 10k rows for export
+
+      // Also include historical data from existing event tables
+      const pageViews = await db.execute(sql`
+        SELECT 'page_view' AS event_type, path AS description, ip_address, created_at
+        FROM user_page_view_events
+        WHERE user_id = ${input.userId}
+        ORDER BY created_at DESC
+        LIMIT 5000
+      `);
+
+      const logins = await db.execute(sql`
+        SELECT 'login' AS event_type, CONCAT('Login from ', COALESCE(ip_address, 'unknown')) AS description, ip_address, user_agent, created_at
+        FROM user_login_events
+        WHERE user_id = ${input.userId}
+        ORDER BY created_at DESC
+        LIMIT 1000
+      `);
+
+      // Combine all sources
+      const allRows = [
+        ...logs.map(l => ({
+          timestamp: l.createdAt,
+          eventType: l.eventType,
+          description: l.description,
+          path: l.path ?? '',
+          ipAddress: l.ipAddress ?? '',
+          userAgent: l.userAgent ?? '',
+          metadata: l.metadata ? JSON.stringify(l.metadata) : '',
+        })),
+        ...(pageViews as any[]).map(r => ({
+          timestamp: r.created_at,
+          eventType: 'page_view',
+          description: r.description ?? '',
+          path: r.description ?? '',
+          ipAddress: r.ip_address ?? '',
+          userAgent: '',
+          metadata: '',
+        })),
+        ...(logins as any[]).map(r => ({
+          timestamp: r.created_at,
+          eventType: 'login',
+          description: r.description ?? '',
+          path: '',
+          ipAddress: r.ip_address ?? '',
+          userAgent: r.user_agent ?? '',
+          metadata: '',
+        })),
+      ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+      // Build CSV
+      const header = 'Timestamp,Event Type,Description,Path,IP Address,User Agent,Metadata';
+      const rows = allRows.map(r => {
+        const ts = new Date(r.timestamp).toISOString();
+        const escape = (s: string) => `"${(s || '').replace(/"/g, '""')}"`;
+        return `${ts},${escape(r.eventType)},${escape(r.description)},${escape(r.path)},${escape(r.ipAddress)},${escape(r.userAgent)},${escape(r.metadata)}`;
+      });
+
+      return { csv: [header, ...rows].join('\n'), totalRows: allRows.length };
     }),
 });

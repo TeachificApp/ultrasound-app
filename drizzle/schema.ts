@@ -1,6 +1,7 @@
 import {
   boolean,
   int,
+  json,
   longtext,
   mysqlEnum,
   mysqlTable,
@@ -3483,11 +3484,27 @@ export const userPageViewEvents = mysqlTable("user_page_view_events", {
   sessionId: varchar("session_id", { length: 64 }),
   path: varchar("path", { length: 512 }).notNull(),
   referrer: varchar("referrer", { length: 512 }),
+  ipAddress: varchar("ip_address", { length: 64 }),
   durationMs: int("duration_ms"),   // time on page before next navigation
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 export type UserPageViewEvent = typeof userPageViewEvents.$inferSelect;
 export type InsertUserPageViewEvent = typeof userPageViewEvents.$inferInsert;
+
+/** Unified activity log — captures ALL user actions with IP, user agent, and metadata */
+export const userActivityLogs = mysqlTable("user_activity_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  eventType: varchar("event_type", { length: 64 }).notNull(), // 'login'|'page_view'|'video_play'|'video_complete'|'quiz_attempt'|'quiz_pass'|'quiz_fail'|'course_enroll'|'course_complete'|'download'|'module_complete'
+  description: varchar("description", { length: 512 }).notNull(),
+  path: varchar("path", { length: 512 }),
+  ipAddress: varchar("ip_address", { length: 64 }),
+  userAgent: text("user_agent"),
+  metadata: json("metadata"),  // flexible JSON for event-specific data
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type UserActivityLog = typeof userActivityLogs.$inferSelect;
+export type InsertUserActivityLog = typeof userActivityLogs.$inferInsert;
 
 /** One row per LMS lesson video play / progress milestone */
 export const lmsVideoEvents = mysqlTable("lms_video_events", {

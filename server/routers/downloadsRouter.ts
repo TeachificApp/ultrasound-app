@@ -301,6 +301,19 @@ export const downloadsLearnerRouter = router({
       const ip = typeof fwd === "string" ? fwd.split(",")[0].trim() : ctx.req?.socket?.remoteAddress || "unknown";
       logIpAccess({ userId: ctx.user.id, ipAddress: ip, userAgent: ctx.req?.headers?.["user-agent"] || undefined, contentType: "download", contentId: input.productId }).catch(() => {});
 
+      // Log to unified activity table
+      try {
+        const { userActivityLogs } = await import("../../drizzle/schema");
+        await db.insert(userActivityLogs).values({
+          userId: ctx.user.id,
+          eventType: 'download',
+          description: `Downloaded file (product ${input.productId}, file ${input.fileId})`,
+          ipAddress: ip.substring(0, 64),
+          userAgent: ctx.req?.headers?.["user-agent"]?.substring(0, 500) ?? null,
+          metadata: { productId: input.productId, fileId: input.fileId },
+        });
+      } catch (e) { /* non-blocking */ }
+
       return { success: true };
     }),
 

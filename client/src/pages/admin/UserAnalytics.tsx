@@ -413,7 +413,7 @@ function UserDetailView({ userId, onBack }: { userId: number; onBack: () => void
           <TabsTrigger value="pages" className="text-xs">Pages</TabsTrigger>
           <TabsTrigger value="logins" className="text-xs">Logins</TabsTrigger>
           <TabsTrigger value="downloads" className="text-xs">Downloads</TabsTrigger>
-
+          <TabsTrigger value="activity" className="text-xs">Activity Log</TabsTrigger>
         </TabsList>
 
         {/* Courses */}
@@ -661,6 +661,10 @@ function UserDetailView({ userId, onBack }: { userId: number; onBack: () => void
           </Card>
         </TabsContent>
 
+        {/* Activity Log */}
+        <TabsContent value="activity">
+          <ActivityLogTab userId={userId} userName={user.name || user.email || 'User'} />
+        </TabsContent>
 
       </Tabs>
 
@@ -694,6 +698,185 @@ function UserDetailView({ userId, onBack }: { userId: number; onBack: () => void
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+// ─── Activity Log Tab ─────────────────────────────────────────────────────────
+function ActivityLogTab({ userId, userName }: { userId: number; userName: string }) {
+  const [page, setPage] = useState(1);
+  const [eventFilter, setEventFilter] = useState<string>("all_events");
+  const pageSize = 50;
+
+  const activeFilter = eventFilter === "all_events" ? undefined : eventFilter;
+
+  const { data, isLoading } = trpc.analyticsAdmin.userActivityLog.useQuery({
+    userId,
+    page,
+    pageSize,
+    eventType: activeFilter,
+  });
+
+  const { data: csvData, isFetching: csvLoading, refetch: fetchCsv } = trpc.analyticsAdmin.exportUserActivityCsv.useQuery(
+    { userId, eventType: activeFilter },
+    { enabled: false }
+  );
+
+  const handleExportCsv = async () => {
+    const result = await fetchCsv();
+    if (result.data?.csv) {
+      const blob = new Blob([result.data.csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `activity-log-${userName.replace(/\s+/g, '-').toLowerCase()}-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Exported ${result.data.totalRows} activity records`);
+    }
+  };
+
+  const eventTypes = [
+    { value: "all_events", label: "All Events" },
+    { value: "page_view", label: "Page Views" },
+    { value: "login", label: "Logins" },
+    { value: "video_play", label: "Video Plays" },
+    { value: "video_complete", label: "Video Completes" },
+    { value: "quiz_attempt", label: "Quiz Attempts" },
+    { value: "course_enroll", label: "Course Enrollments" },
+    { value: "course_complete", label: "Course Completions" },
+    { value: "download", label: "Downloads" },
+    { value: "module_complete", label: "Module Completions" },
+  ];
+
+  const eventTypeColors: Record<string, string> = {
+    page_view: "bg-purple-100 text-purple-700",
+    login: "bg-blue-100 text-blue-700",
+    video_play: "bg-orange-100 text-orange-700",
+    video_complete: "bg-green-100 text-green-700",
+    quiz_attempt: "bg-pink-100 text-pink-700",
+    quiz_pass: "bg-emerald-100 text-emerald-700",
+    quiz_fail: "bg-red-100 text-red-700",
+    course_enroll: "bg-teal-100 text-teal-700",
+    course_complete: "bg-green-100 text-green-700",
+    download: "bg-indigo-100 text-indigo-700",
+    module_complete: "bg-cyan-100 text-cyan-700",
+  };
+
+  const totalPages = Math.ceil((data?.total ?? 0) / pageSize);
+
+  return (
+    <Card className="border border-gray-200">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-sm font-semibold text-gray-900">Activity Log</CardTitle>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {data?.total ?? 0} total events{activeFilter ? ` (filtered: ${activeFilter.replace(/_/g, ' ')})` : ''}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Select value={eventFilter} onValueChange={(v) => { setEventFilter(v); setPage(1); }}>
+              <SelectTrigger className="w-40 h-8 text-xs">
+                <SelectValue placeholder="All Events" />
+              </SelectTrigger>
+              <SelectContent>
+                {eventTypes.map(et => (
+                  <SelectItem key={et.value} value={et.value}>{et.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5 text-xs"
+              onClick={handleExportCsv}
+              disabled={csvLoading}
+            >
+              <Download className="w-3.5 h-3.5" />
+              {csvLoading ? 'Exporting...' : 'Export CSV'}
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="p-0">
+        {isLoading ? (
+          <div className="p-8 text-center">
+            <div className="animate-spin h-6 w-6 border-2 border-teal-500 border-t-transparent rounded-full mx-auto" />
+          </div>
+        ) : !data?.logs.length ? (
+          <p className="text-gray-400 text-sm text-center py-8">
+            No activity logged yet. Activity will appear here as the user interacts with the platform.
+          </p>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-600">Timestamp</th>
+                    <th className="text-left px-3 py-2.5 text-xs font-semibold text-gray-600">Event</th>
+                    <th className="text-left px-3 py-2.5 text-xs font-semibold text-gray-600">Description</th>
+                    <th className="text-left px-3 py-2.5 text-xs font-semibold text-gray-600">Path</th>
+                    <th className="text-left px-3 py-2.5 text-xs font-semibold text-gray-600">IP Address</th>
+                    <th className="text-left px-3 py-2.5 text-xs font-semibold text-gray-600">User Agent</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {data.logs.map(log => (
+                    <tr key={log.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-2.5 text-xs text-gray-600 whitespace-nowrap">
+                        {fmtDateTime(log.createdAt)}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <Badge className={`text-xs ${eventTypeColors[log.eventType] || 'bg-gray-100 text-gray-700'}`}>
+                          {log.eventType.replace(/_/g, ' ')}
+                        </Badge>
+                      </td>
+                      <td className="px-3 py-2.5 text-xs text-gray-700 max-w-[200px] truncate" title={log.description}>
+                        {log.description}
+                      </td>
+                      <td className="px-3 py-2.5 text-xs text-gray-500 font-mono max-w-[120px] truncate" title={log.path || ''}>
+                        {log.path || '—'}
+                      </td>
+                      <td className="px-3 py-2.5 text-xs text-gray-500 font-mono whitespace-nowrap">
+                        {log.ipAddress || '—'}
+                      </td>
+                      <td className="px-3 py-2.5 text-xs text-gray-400 max-w-[150px] truncate" title={log.userAgent || ''}>
+                        {log.userAgent ? log.userAgent.substring(0, 40) + (log.userAgent.length > 40 ? '...' : '') : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
+                <p className="text-xs text-gray-500">
+                  Page {page} of {totalPages} ({data.total} total)
+                </p>
+                <div className="flex items-center gap-1">
+                  <Button
+                    size="sm" variant="ghost" className="h-7 w-7 p-0"
+                    disabled={page <= 1}
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    size="sm" variant="ghost" className="h-7 w-7 p-0"
+                    disabled={page >= totalPages}
+                    onClick={() => setPage(p => p + 1)}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

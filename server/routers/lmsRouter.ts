@@ -330,7 +330,7 @@ export const lmsPublicRouter = router({
 
       // Batch-fetch primary instructors for all courses in 2 queries (avoids N+1)
       const courseIds = courses.map(c => c.id);
-      let enriched: any[] = courses.map(c => ({ ...c, instructor: null }));
+      let enriched: any[] = courses.map(c => ({ ...c, instructor: null, _source: "lms_course" as const }));
       if (courseIds.length > 0) {
         const ciRows = await db.select().from(lmsCourseInstructors)
           .where(and(
@@ -345,7 +345,7 @@ export const lmsPublicRouter = router({
           const ciMap = new Map(ciRows.map(ci => [ci.courseId, ci]));
           enriched = courses.map(c => {
             const ci = ciMap.get(c.id);
-            return { ...c, instructor: ci ? (insMap.get(ci.instructorId) ?? null) : null };
+            return { ...c, instructor: ci ? (insMap.get(ci.instructorId) ?? null) : null, _source: "lms_course" as const };
           });
         }
       }
@@ -559,7 +559,7 @@ export const lmsPublicRouter = router({
       const courses = await Promise.all(cc.map(async ({ courseId }) => {
         const [c] = await db.select().from(lmsCourses)
           .where(and(eq(lmsCourses.id, courseId), eq(lmsCourses.status, "public"))).limit(1);
-        return c ?? null;
+        return c ? { ...c, _source: "lms_course" as const } : null;
       }));
       return { ...col, courses: courses.filter(Boolean) };
     }),
