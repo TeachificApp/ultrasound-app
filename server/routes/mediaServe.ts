@@ -321,15 +321,6 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
 
     const { asset, version } = result;
 
-    // Extract SCORM ZIP on first request; subsequent requests use the cache.
-    const extracted = await extractScormZip(asset.slug, version.s3Url);
-    if (!extracted) {
-      res.status(500).send(errorPage("Failed to extract SCORM package."));
-      return;
-    }
-
-    const { launchFile, cacheDir } = extracted;
-
     // Determine which file to serve:
     // - /scorm/  or  /scorm  → serve the launch file
     // - /scorm/path/to/asset → serve that asset relative to the cache root
@@ -337,6 +328,42 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
     // Decode URI components since Express does NOT decode req.path for wildcard routes
     const rawRelative = req.path.replace(prefix, "").replace(/^\//, "");
     const relativePath = decodeURIComponent(rawRelative);
+
+    // ─── Strategy 1: Serve from pre-extracted R2 files (fast, no download needed) ───
+    if (version.scormExtractedPrefix) {
+      const r2PublicUrl = process.env.CF_R2_PUBLIC_URL;
+      if (r2PublicUrl) {
+        const baseUrl = r2PublicUrl.replace(/\/+$/, "");
+        const extractedPrefix = version.scormExtractedPrefix;
+        const targetFile = relativePath === "" ? (version.scormLaunchFile || "index.html") : relativePath;
+        // URL-encode each path segment (handles spaces and special chars in filenames)
+        const encodedPath = targetFile.split("/").map(seg => encodeURIComponent(seg)).join("/");
+        const encodedPrefix = extractedPrefix.split("/").map(seg => encodeURIComponent(seg)).join("/");
+        const fileUrl = `${baseUrl}/${encodedPrefix}/${encodedPath}`;
+        // Redirect to R2 URL — browser will load directly from CDN
+        res.redirect(302, fileUrl);
+        return;
+      }
+    }
+
+    // ─── Strategy 2: On-the-fly extraction (fallback for files not yet extracted) ───
+    // Extract SCORM ZIP on first request; subsequent requests use the cache.
+    const extracted = await extractScormZip(asset.slug, version.s3Url);
+    if (!extracted) {
+      // If extraction fails (likely OOM for large files), show helpful message
+      const isLargeFile = version.fileSize && version.fileSize > 50 * 1024 * 1024;
+      if (isLargeFile) {
+        res.status(503).send(errorPage(
+          "SCORM package is being prepared. This large file is being extracted in the background. " +
+          "Please try again in a few minutes."
+        ));
+      } else {
+        res.status(500).send(errorPage("Failed to extract SCORM package."));
+      }
+      return;
+    }
+
+    const { launchFile, cacheDir } = extracted;
 
     // The launch file may be nested inside a sub-folder (e.g. 'CourseName/index.html').
     // Relative asset paths in the HTML resolve relative to /scorm/ (the iframe src),

@@ -3288,3 +3288,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Improved frontend chunk upload error messages (show HTTP status + response text)
 - [x] Added retry logic (3 attempts with backoff) to chunk uploads
 - [x] Reduced chunk size from 10MB to 5MB to avoid proxy limits
+- [x] Fix SCORM images not displaying - extract at upload time and serve from R2 instead of on-the-fly extraction (152MB too large for Cloud Run cold start)
+- [x] Created scormExtractor.ts - downloads ZIP, extracts, uploads all files to R2, updates DB with prefix/launch path
+- [x] Added scormExtractedPrefix and scormLaunchFile columns to mediaVersions table
+- [x] SCORM serve endpoint now redirects to R2 CDN URLs (302) when pre-extracted
+- [x] Added admin endpoint POST /api/upload-media-repo/extract-scorm for manual re-extraction
+- [x] Ran extraction for existing FETAL ECHO quiz (180 files uploaded to R2)
+- [x] URL-encode path segments in redirect to handle spaces in filenames

@@ -2643,6 +2643,10 @@ export const mediaVersions = mysqlTable("mediaVersions", {
   mimeType: varchar("mimeType", { length: 128 }),
   // Optional admin note about this version
   notes: text("notes"),
+  // SCORM: R2 prefix where extracted files are stored (e.g. "scorm-extracted/my-slug-abc123/")
+  scormExtractedPrefix: text("scormExtractedPrefix"),
+  // SCORM: relative path to the launch HTML file within the extracted package
+  scormLaunchFile: varchar("scormLaunchFile", { length: 512 }),
   uploadedByUserId: int("uploadedByUserId").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });

@@ -20,7 +20,7 @@
 
 import { Router, Request, Response } from "express";
 import multer from "multer";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import path from "path";
 import fs from "fs";
@@ -485,6 +485,21 @@ async function finalizeUpload(
 
       await db.delete(mediaUploadSessions).where(eq(mediaUploadSessions.uploadId, uploadId));
       res.json({ done: true, assetId: existingAssetId, versionNumber: nextVersion, s3Url });
+
+      // Fire-and-forget: extract SCORM package to R2 for fast serving
+      if (mediaType === "scorm") {
+        const { extractAndUploadScorm } = await import("./scormExtractor");
+        const [insertedVersion] = await db
+          .select({ id: mediaVersions.id })
+          .from(mediaVersions)
+          .where(and(eq(mediaVersions.assetId, existingAssetId), eq(mediaVersions.versionNumber, nextVersion)))
+          .limit(1);
+        if (insertedVersion) {
+          extractAndUploadScorm(insertedVersion.id, s3Url, asset.slug).catch((e: any) =>
+            console.error("[ScormExtractor] Background extraction failed:", e.message)
+          );
+        }
+      }
     } else {
       const slugMatch = session.s3Key.match(/^media-repo\/([^/]+)\//);
       const slug = slugMatch ? slugMatch[1] : generateSlug(title || fileName);
@@ -517,6 +532,21 @@ async function finalizeUpload(
 
       await db.delete(mediaUploadSessions).where(eq(mediaUploadSessions.uploadId, uploadId));
       res.json({ done: true, assetId, slug, versionNumber: 1, s3Url });
+
+      // Fire-and-forget: extract SCORM package to R2 for fast serving
+      if (mediaType === "scorm") {
+        const { extractAndUploadScorm } = await import("./scormExtractor");
+        const [insertedVersion] = await db
+          .select({ id: mediaVersions.id })
+          .from(mediaVersions)
+          .where(and(eq(mediaVersions.assetId, assetId), eq(mediaVersions.versionNumber, 1)))
+          .limit(1);
+        if (insertedVersion) {
+          extractAndUploadScorm(insertedVersion.id, s3Url, slug).catch((e: any) =>
+            console.error("[ScormExtractor] Background extraction failed:", e.message)
+          );
+        }
+      }
     }
   } catch (err: any) {
     console.error("[upload-media-repo] DB write failed:", err.message);
@@ -607,6 +637,41 @@ router.post(
     }
   }
 );
+
+// ── Admin endpoint to trigger SCORM extraction for existing assets ───────────
+router.post("/api/upload-media-repo/extract-scorm", async (req: Request, res: Response) => {
+  const user = await authenticateAdmin(req);
+  if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const db = await getDb();
+  if (!db) { res.status(503).json({ error: "DB unavailable" }); return; }
+
+  const { slug } = req.body;
+  if (!slug) { res.status(400).json({ error: "slug is required" }); return; }
+
+  const [asset] = await db
+    .select()
+    .from(mediaAssets)
+    .where(and(eq(mediaAssets.slug, slug), isNull(mediaAssets.deletedAt)))
+    .limit(1);
+  if (!asset) { res.status(404).json({ error: "Asset not found" }); return; }
+
+  const [version] = await db
+    .select()
+    .from(mediaVersions)
+    .where(eq(mediaVersions.assetId, asset.id))
+    .orderBy(desc(mediaVersions.versionNumber))
+    .limit(1);
+  if (!version) { res.status(404).json({ error: "No version found" }); return; }
+
+  // Trigger extraction in background
+  const { extractAndUploadScorm } = await import("./scormExtractor");
+  extractAndUploadScorm(version.id, version.s3Url, asset.slug).catch((e: any) =>
+    console.error("[ScormExtractor] Manual extraction failed:", e.message)
+  );
+
+  res.json({ ok: true, message: "SCORM extraction started in background. Check back in a few minutes." });
+});
 
 export function registerUploadMediaRepoRoute(app: import("express").Application) {
   app.use(router);
