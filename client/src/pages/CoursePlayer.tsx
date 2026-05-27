@@ -1852,9 +1852,8 @@ export default function CoursePlayer() {
                       className={cn(
                         "flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[10px] font-semibold transition-colors",
                         rightPanelTab === "notes" ? "border-b-2 bg-white" : "text-gray-500 hover:text-gray-700"
-                      }
-                      style={rightPanelTab === "notes" ? { color: primaryColor, borderColor: primaryColor } : undefined
                       )}
+                      style={rightPanelTab === "notes" ? { color: primaryColor, borderColor: primaryColor } : undefined}
                     >
                       <StickyNote className="w-3.5 h-3.5" /> Notes {currentNote ? "●" : ""}
                     </button>
