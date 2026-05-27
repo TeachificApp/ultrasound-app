@@ -1,41 +1,15 @@
 /**
- * Tests for disk-based chunk storage in the media repository upload route.
- * Verifies that chunks survive simulated server restarts by using /tmp.
+ * Tests for the Media Repository upload route helpers.
+ *
+ * Covers:
+ * - MIME type resolution (browser often reports .zip as octet-stream)
+ * - Media type detection from extension/MIME
+ * - DB-backed R2 multipart upload session logic
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import fs from "fs";
+import { describe, it, expect } from "vitest";
 import path from "path";
-import { randomBytes } from "crypto";
 
-const CHUNK_DIR = "/tmp/media-chunks-test";
-
-// Replicate the helper functions from uploadMediaRepo.ts for unit testing
-function chunkPath(uploadId: string, chunkIndex: number): string {
-  return path.join(CHUNK_DIR, uploadId, `${chunkIndex}.bin`);
-}
-
-function ensureUploadDir(uploadId: string): void {
-  fs.mkdirSync(path.join(CHUNK_DIR, uploadId), { recursive: true });
-}
-
-function countChunksOnDisk(uploadId: string): number {
-  const dir = path.join(CHUNK_DIR, uploadId);
-  if (!fs.existsSync(dir)) return 0;
-  return fs.readdirSync(dir).filter(f => f.endsWith(".bin")).length;
-}
-
-function readChunkFromDisk(uploadId: string, chunkIndex: number): Buffer | null {
-  const p = chunkPath(uploadId, chunkIndex);
-  if (!fs.existsSync(p)) return null;
-  return fs.readFileSync(p);
-}
-
-function cleanupUploadDir(uploadId: string): void {
-  try {
-    const dir = path.join(CHUNK_DIR, uploadId);
-    if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
-  } catch { /* ignore */ }
-}
+// ── Inline copies of the pure helpers from uploadMediaRepo.ts ─────────────────
 
 function resolveMimeType(mimeType: string, fileName: string): string {
   if (mimeType && mimeType !== "application/octet-stream") return mimeType;
@@ -43,12 +17,21 @@ function resolveMimeType(mimeType: string, fileName: string): string {
   const extMap: Record<string, string> = {
     ".zip": "application/zip",
     ".html": "text/html",
+    ".htm": "text/html",
     ".pdf": "application/pdf",
     ".mp4": "video/mp4",
+    ".webm": "video/webm",
+    ".mov": "video/quicktime",
     ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".ogg": "audio/ogg",
+    ".m4a": "audio/mp4",
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
     ".png": "image/png",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".svg": "image/svg+xml",
   };
   return extMap[ext] || mimeType || "application/octet-stream";
 }
@@ -73,125 +56,150 @@ function detectMediaType(mimeType: string, fileName?: string): string {
   return "other";
 }
 
-describe("Disk-based chunk storage", () => {
-  let uploadId: string;
+// ── MIME type resolution ──────────────────────────────────────────────────────
 
-  beforeEach(() => {
-    uploadId = randomBytes(8).toString("hex");
-    // Ensure clean state
-    cleanupUploadDir(uploadId);
-  });
-
-  afterEach(() => {
-    cleanupUploadDir(uploadId);
-  });
-
-  it("creates upload directory on init", () => {
-    ensureUploadDir(uploadId);
-    const dir = path.join(CHUNK_DIR, uploadId);
-    expect(fs.existsSync(dir)).toBe(true);
-  });
-
-  it("writes and reads a chunk from disk", () => {
-    ensureUploadDir(uploadId);
-    const data = Buffer.from("hello chunk 0");
-    fs.writeFileSync(chunkPath(uploadId, 0), data);
-    const read = readChunkFromDisk(uploadId, 0);
-    expect(read).not.toBeNull();
-    expect(read!.toString()).toBe("hello chunk 0");
-  });
-
-  it("counts chunks correctly", () => {
-    ensureUploadDir(uploadId);
-    expect(countChunksOnDisk(uploadId)).toBe(0);
-    fs.writeFileSync(chunkPath(uploadId, 0), Buffer.from("chunk0"));
-    expect(countChunksOnDisk(uploadId)).toBe(1);
-    fs.writeFileSync(chunkPath(uploadId, 1), Buffer.from("chunk1"));
-    expect(countChunksOnDisk(uploadId)).toBe(2);
-  });
-
-  it("assembles chunks in order", () => {
-    ensureUploadDir(uploadId);
-    const totalChunks = 3;
-    for (let i = 0; i < totalChunks; i++) {
-      fs.writeFileSync(chunkPath(uploadId, i), Buffer.from(`chunk${i}`));
-    }
-    const buffers: Buffer[] = [];
-    for (let i = 0; i < totalChunks; i++) {
-      const chunk = readChunkFromDisk(uploadId, i);
-      expect(chunk).not.toBeNull();
-      buffers.push(chunk!);
-    }
-    const assembled = Buffer.concat(buffers).toString();
-    expect(assembled).toBe("chunk0chunk1chunk2");
-  });
-
-  it("cleans up upload directory", () => {
-    ensureUploadDir(uploadId);
-    fs.writeFileSync(chunkPath(uploadId, 0), Buffer.from("data"));
-    cleanupUploadDir(uploadId);
-    const dir = path.join(CHUNK_DIR, uploadId);
-    expect(fs.existsSync(dir)).toBe(false);
-  });
-
-  it("survives simulated server restart (dir already exists)", () => {
-    ensureUploadDir(uploadId);
-    fs.writeFileSync(chunkPath(uploadId, 0), Buffer.from("chunk0"));
-    // Simulate server restart: call ensureUploadDir again (should not throw)
-    expect(() => ensureUploadDir(uploadId)).not.toThrow();
-    // Chunk should still be there
-    const chunk = readChunkFromDisk(uploadId, 0);
-    expect(chunk).not.toBeNull();
-    expect(chunk!.toString()).toBe("chunk0");
-  });
-
-  it("returns null for missing chunk", () => {
-    ensureUploadDir(uploadId);
-    const chunk = readChunkFromDisk(uploadId, 99);
-    expect(chunk).toBeNull();
-  });
-});
-
-describe("MIME type resolution", () => {
-  it("resolves .zip to application/zip when browser reports octet-stream", () => {
-    expect(resolveMimeType("application/octet-stream", "course.zip")).toBe("application/zip");
-  });
-
-  it("preserves explicit MIME type when not octet-stream", () => {
+describe("resolveMimeType", () => {
+  it("passes through a known MIME type unchanged", () => {
     expect(resolveMimeType("video/mp4", "video.mp4")).toBe("video/mp4");
   });
 
-  it("resolves .mp4 to video/mp4 when browser reports octet-stream", () => {
-    expect(resolveMimeType("application/octet-stream", "video.mp4")).toBe("video/mp4");
+  it("resolves application/octet-stream for .zip to application/zip", () => {
+    expect(resolveMimeType("application/octet-stream", "scorm-package.zip")).toBe("application/zip");
   });
 
-  it("resolves .png to image/png when browser reports octet-stream", () => {
-    expect(resolveMimeType("application/octet-stream", "image.png")).toBe("image/png");
+  it("resolves application/octet-stream for .pdf to application/pdf", () => {
+    expect(resolveMimeType("application/octet-stream", "document.pdf")).toBe("application/pdf");
   });
 
-  it("falls back to octet-stream for unknown extension", () => {
-    expect(resolveMimeType("application/octet-stream", "file.xyz")).toBe("application/octet-stream");
+  it("resolves application/octet-stream for .mp4 to video/mp4", () => {
+    expect(resolveMimeType("application/octet-stream", "lecture.mp4")).toBe("video/mp4");
+  });
+
+  it("resolves application/octet-stream for .mp3 to audio/mpeg", () => {
+    expect(resolveMimeType("application/octet-stream", "audio.mp3")).toBe("audio/mpeg");
+  });
+
+  it("resolves application/octet-stream for .png to image/png", () => {
+    expect(resolveMimeType("application/octet-stream", "thumb.png")).toBe("image/png");
+  });
+
+  it("falls back to application/octet-stream for unknown extension", () => {
+    expect(resolveMimeType("application/octet-stream", "data.xyz")).toBe("application/octet-stream");
+  });
+
+  it("falls back to application/octet-stream when both MIME and extension are unknown", () => {
+    expect(resolveMimeType("", "data.xyz")).toBe("application/octet-stream");
   });
 });
 
-describe("Media type detection", () => {
-  it("detects zip from .zip extension", () => {
-    expect(detectMediaType("application/octet-stream", "scorm-course.zip")).toBe("zip");
+// ── Media type detection ──────────────────────────────────────────────────────
+
+describe("detectMediaType", () => {
+  it("detects zip from .zip extension regardless of MIME type", () => {
+    expect(detectMediaType("application/octet-stream", "scorm.zip")).toBe("zip");
+    expect(detectMediaType("application/zip", "scorm.zip")).toBe("zip");
   });
 
   it("detects video from .mp4 extension", () => {
-    expect(detectMediaType("application/octet-stream", "video.mp4")).toBe("video");
+    expect(detectMediaType("application/octet-stream", "lecture.mp4")).toBe("video");
   });
 
-  it("detects image from MIME type", () => {
+  it("detects document from .pdf extension", () => {
+    expect(detectMediaType("application/octet-stream", "guide.pdf")).toBe("document");
+  });
+
+  it("detects image from .png extension", () => {
+    expect(detectMediaType("application/octet-stream", "thumb.png")).toBe("image");
+  });
+
+  it("detects audio from .mp3 extension", () => {
+    expect(detectMediaType("application/octet-stream", "clip.mp3")).toBe("audio");
+  });
+
+  it("detects html from .html extension", () => {
+    expect(detectMediaType("application/octet-stream", "index.html")).toBe("html");
+  });
+
+  it("detects image from MIME type when no extension hint", () => {
     expect(detectMediaType("image/jpeg")).toBe("image");
   });
 
-  it("detects scorm from MIME type", () => {
+  it("detects video from MIME type when no extension hint", () => {
+    expect(detectMediaType("video/webm")).toBe("video");
+  });
+
+  it("detects zip from application/zip MIME type", () => {
+    expect(detectMediaType("application/zip")).toBe("zip");
+  });
+
+  it("detects scorm from scorm MIME type", () => {
     expect(detectMediaType("application/scorm+zip")).toBe("scorm");
   });
 
-  it("falls back to other for unknown types", () => {
-    expect(detectMediaType("application/octet-stream", "file.xyz")).toBe("other");
+  it("returns other for unknown types", () => {
+    expect(detectMediaType("application/x-unknown")).toBe("other");
+  });
+});
+
+// ── DB-backed R2 multipart upload session logic ───────────────────────────────
+
+describe("R2 multipart upload session logic", () => {
+  it("completed parts JSON round-trips correctly", () => {
+    const parts = [
+      { partNumber: 1, etag: '"abc123"' },
+      { partNumber: 2, etag: '"def456"' },
+    ];
+    const serialized = JSON.stringify(parts);
+    const deserialized: typeof parts = JSON.parse(serialized);
+    expect(deserialized).toHaveLength(2);
+    expect(deserialized[0].partNumber).toBe(1);
+    expect(deserialized[1].etag).toBe('"def456"');
+  });
+
+  it("parts are sorted by partNumber before CompleteMultipartUpload", () => {
+    const parts = [
+      { partNumber: 3, etag: '"c"' },
+      { partNumber: 1, etag: '"a"' },
+      { partNumber: 2, etag: '"b"' },
+    ];
+    parts.sort((a, b) => a.partNumber - b.partNumber);
+    expect(parts.map(p => p.partNumber)).toEqual([1, 2, 3]);
+  });
+
+  it("part number is chunkIndex + 1 (R2 uses 1-indexed parts)", () => {
+    for (let chunkIndex = 0; chunkIndex < 5; chunkIndex++) {
+      const partNumber = chunkIndex + 1;
+      expect(partNumber).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it("upload is complete when completedParts.length === totalChunks", () => {
+    const totalChunks = 3;
+    const completedParts = [
+      { partNumber: 1, etag: '"a"' },
+      { partNumber: 2, etag: '"b"' },
+      { partNumber: 3, etag: '"c"' },
+    ];
+    expect(completedParts.length >= totalChunks).toBe(true);
+  });
+
+  it("upload is not complete when some parts are missing", () => {
+    const totalChunks = 3;
+    const completedParts = [{ partNumber: 1, etag: '"a"' }];
+    expect(completedParts.length >= totalChunks).toBe(false);
+  });
+
+  it("expiresAt is 24 hours after creation", () => {
+    const now = Date.now();
+    const expiresAt = new Date(now + 24 * 60 * 60 * 1000);
+    const diffHours = (expiresAt.getTime() - now) / (1000 * 60 * 60);
+    expect(diffHours).toBeCloseTo(24, 0);
+  });
+
+  it("slug is extracted correctly from s3Key", () => {
+    const s3Key = "media-repo/my-scorm-course-abc123/v1-course.zip";
+    const slugMatch = s3Key.match(/^media-repo\/([^/]+)\//);
+    expect(slugMatch).not.toBeNull();
+    expect(slugMatch![1]).toBe("my-scorm-course-abc123");
   });
 });

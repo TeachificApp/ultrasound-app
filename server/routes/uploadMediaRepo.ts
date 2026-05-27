@@ -4,68 +4,62 @@
  * Two endpoints:
  *
  * 1. POST /api/upload-media-repo/init
- *    Initialises an upload session. Returns { uploadId }.
- *    For re-uploads: validates the existing assetId.
+ *    Initialises an R2 multipart upload session. Returns { uploadId }.
+ *    Session state is stored in the DB so it survives server/sandbox restarts.
  *
  * 2. POST /api/upload-media-repo/chunk
  *    Uploads a single chunk (multipart, field "chunk").
- *    Fields: uploadId, chunkIndex, totalChunks, fileName, mimeType, fileSize,
- *            title, description, tags, access, mediaType, notes, assetId (optional), folder
- *    On the final chunk the server assembles the file, pushes to S3, and writes
- *    the mediaVersions row.
+ *    Each chunk is forwarded directly to R2 as a multipart upload part.
+ *    On the final chunk the server completes the R2 upload and writes
+ *    the mediaAssets/mediaVersions rows.
  *
- * Chunks are written to disk under /tmp/media-chunks/{uploadId}/ so they survive
- * server restarts (tsx watch reloads the module but /tmp persists).
+ * Why DB-backed: /tmp is cleared on sandbox reset; in-memory stores are cleared
+ * on any server restart. Only the database survives both.
  *
- * Platform admin only. No file-size limit — chunks are 10 MB each by default.
+ * Platform admin only. No file-size limit.
  */
 
 import { Router, Request, Response } from "express";
 import multer from "multer";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { randomBytes } from "crypto";
-import fs from "fs";
 import path from "path";
-import { storagePut, storagePutLarge } from "../storage";
+import {
+  S3Client,
+  CreateMultipartUploadCommand,
+  UploadPartCommand,
+  CompleteMultipartUploadCommand,
+  AbortMultipartUploadCommand,
+} from "@aws-sdk/client-s3";
 import { sdk } from "../_core/sdk";
 import { getDb } from "../db";
-import { mediaAssets, mediaVersions } from "../../drizzle/schema";
+import { mediaAssets, mediaVersions, mediaUploadSessions } from "../../drizzle/schema";
 import { detectBrandFromHostname } from "../../shared/brands";
 
-// ── Disk-based chunk store ────────────────────────────────────────────────────
-// Chunks are written to /tmp/media-chunks/{uploadId}/{chunkIndex}.bin
-// This survives tsx watch restarts because /tmp is not cleared on module reload.
-const CHUNK_DIR = "/tmp/media-chunks";
+// ── R2 Client ─────────────────────────────────────────────────────────────────
 
-function chunkPath(uploadId: string, chunkIndex: number): string {
-  return path.join(CHUNK_DIR, uploadId, `${chunkIndex}.bin`);
+function getR2Client(): S3Client {
+  const accountId = process.env.CF_R2_ACCOUNT_ID;
+  const accessKeyId = process.env.CF_R2_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.CF_R2_SECRET_ACCESS_KEY;
+  if (!accountId || !accessKeyId || !secretAccessKey) {
+    throw new Error("R2 credentials not configured");
+  }
+  return new S3Client({
+    region: "auto",
+    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+    credentials: { accessKeyId, secretAccessKey },
+  });
 }
 
-function chunkMetaPath(uploadId: string): string {
-  return path.join(CHUNK_DIR, uploadId, "_meta.json");
+function getR2Bucket(): string {
+  return process.env.CF_R2_BUCKET_NAME || "ultrasound-assist";
 }
 
-function ensureUploadDir(uploadId: string): void {
-  fs.mkdirSync(path.join(CHUNK_DIR, uploadId), { recursive: true });
-}
-
-function countChunksOnDisk(uploadId: string): number {
-  const dir = path.join(CHUNK_DIR, uploadId);
-  if (!fs.existsSync(dir)) return 0;
-  return fs.readdirSync(dir).filter(f => f.endsWith(".bin")).length;
-}
-
-function readChunkFromDisk(uploadId: string, chunkIndex: number): Buffer | null {
-  const p = chunkPath(uploadId, chunkIndex);
-  if (!fs.existsSync(p)) return null;
-  return fs.readFileSync(p);
-}
-
-function cleanupUploadDir(uploadId: string): void {
-  try {
-    const dir = path.join(CHUNK_DIR, uploadId);
-    if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
-  } catch { /* ignore */ }
+function getR2PublicUrl(): string {
+  const url = process.env.CF_R2_PUBLIC_URL;
+  if (!url) throw new Error("CF_R2_PUBLIC_URL not configured");
+  return url.replace(/\/+$/, "");
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -90,13 +84,9 @@ function generateSlug(title: string): string {
 }
 
 function detectMediaType(mimeType: string, fileName?: string): string {
-  // Detect SCORM from file extension when MIME is generic
   if (fileName) {
     const ext = path.extname(fileName).toLowerCase();
-    if (ext === ".zip") {
-      // SCORM packages are always .zip — treat as zip (user can reclassify as scorm)
-      return "zip";
-    }
+    if (ext === ".zip") return "zip";
     if (ext === ".html" || ext === ".htm") return "html";
     if (ext === ".pdf") return "document";
     if (ext === ".mp4" || ext === ".webm" || ext === ".mov" || ext === ".avi") return "video";
@@ -107,29 +97,12 @@ function detectMediaType(mimeType: string, fileName?: string): string {
   if (mimeType.startsWith("video/")) return "video";
   if (mimeType.startsWith("audio/")) return "audio";
   if (mimeType === "text/html") return "html";
-  if (
-    mimeType === "application/pdf" ||
-    mimeType.includes("word") ||
-    mimeType.includes("presentation") ||
-    mimeType.includes("spreadsheet")
-  )
-    return "document";
-  if (
-    mimeType === "application/zip" ||
-    mimeType === "application/x-zip-compressed"
-  )
-    return "zip";
-  if (
-    mimeType.includes("scorm") ||
-    mimeType.includes("lms") ||
-    mimeType.includes("aicc")
-  )
-    return "scorm";
+  if (mimeType === "application/pdf" || mimeType.includes("word") || mimeType.includes("presentation") || mimeType.includes("spreadsheet")) return "document";
+  if (mimeType === "application/zip" || mimeType === "application/x-zip-compressed") return "zip";
+  if (mimeType.includes("scorm") || mimeType.includes("lms") || mimeType.includes("aicc")) return "scorm";
   return "other";
 }
 
-// Resolve the best MIME type for a file — browsers often report .zip as
-// "application/octet-stream", so we fall back to extension-based detection.
 function resolveMimeType(mimeType: string, fileName: string): string {
   if (mimeType && mimeType !== "application/octet-stream") return mimeType;
   const ext = path.extname(fileName).toLowerCase();
@@ -165,26 +138,33 @@ async function authenticateAdmin(req: Request): Promise<{ id: number; role: stri
 
 const router = Router();
 
-// Multer with disk storage — write directly to the upload dir to avoid holding
-// large chunks in memory and to survive server restarts.
-const upload = multer({
-  storage: multer.memoryStorage(),
-  // No limits — each chunk is ~10 MB; the frontend enforces chunk size
-});
+// Multer — each chunk is held in memory briefly while we stream it to R2
+const upload = multer({ storage: multer.memoryStorage() });
 
 // ── /api/upload-media-repo/init ──────────────────────────────────────────────
 router.post("/api/upload-media-repo/init", async (req: Request, res: Response) => {
   const user = await authenticateAdmin(req);
   if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-  const uploadId = randomBytes(16).toString("hex");
-  ensureUploadDir(uploadId);
+  const db = await getDb();
+  if (!db) { res.status(503).json({ error: "DB unavailable" }); return; }
 
-  // If this is a re-upload, validate the existing asset exists
   const existingAssetId = req.body.assetId ? parseInt(req.body.assetId, 10) : null;
+  const fileName = (req.body.fileName as string) || "upload";
+  const rawMimeType = (req.body.mimeType as string) || "application/octet-stream";
+  const mimeType = resolveMimeType(rawMimeType, fileName);
+  const totalChunks = parseInt(req.body.totalChunks, 10) || 1;
+  const title = (req.body.title as string)?.trim() || fileName;
+  const description = (req.body.description as string) || null;
+  const tags = (req.body.tags as string) || null;
+  const access = (req.body.access as string) === "public" ? "public" : "private";
+  const notes = (req.body.notes as string) || null;
+  const mediaType = (req.body.mediaType as string) || detectMediaType(mimeType, fileName);
+  const folderSlug = (req.body.folder as string) || null;
+  const brand = getBrandFromRequest(req);
+  const fileSize = parseInt(req.body.fileSize, 10) || 0;
+
   if (existingAssetId) {
-    const db = await getDb();
-    if (!db) { res.status(503).json({ error: "DB unavailable" }); return; }
     const [asset] = await db
       .select({ id: mediaAssets.id })
       .from(mediaAssets)
@@ -192,6 +172,66 @@ router.post("/api/upload-media-repo/init", async (req: Request, res: Response) =
       .limit(1);
     if (!asset) { res.status(404).json({ error: "Asset not found" }); return; }
   }
+
+  // Determine the S3 key upfront (needed for R2 multipart init)
+  let s3Key: string;
+  if (existingAssetId) {
+    const [asset] = await db
+      .select({ slug: mediaAssets.slug })
+      .from(mediaAssets)
+      .where(eq(mediaAssets.id, existingAssetId))
+      .limit(1);
+    const [{ maxVer }] = await db
+      .select({ maxVer: sql<number>`MAX(versionNumber)` })
+      .from(mediaVersions)
+      .where(eq(mediaVersions.assetId, existingAssetId));
+    const nextVersion = (maxVer ?? 0) + 1;
+    s3Key = `media-repo/${asset!.slug}/v${nextVersion}-${fileName}`;
+  } else {
+    const slug = generateSlug(title);
+    s3Key = `media-repo/${slug}/v1-${fileName}`;
+  }
+
+  // Initiate R2 multipart upload
+  let r2UploadId: string;
+  try {
+    const r2 = getR2Client();
+    const result = await r2.send(new CreateMultipartUploadCommand({
+      Bucket: getR2Bucket(),
+      Key: s3Key,
+      ContentType: mimeType,
+    }));
+    r2UploadId = result.UploadId!;
+  } catch (err: any) {
+    console.error("[upload-media-repo/init] R2 init failed:", err);
+    res.status(500).json({ error: "Failed to initialise upload: " + err.message });
+    return;
+  }
+
+  const uploadId = randomBytes(16).toString("hex");
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+
+  await db.insert(mediaUploadSessions).values({
+    uploadId,
+    r2UploadId,
+    s3Key,
+    mimeType,
+    totalChunks,
+    completedParts: "[]",
+    fileName,
+    fileSize,
+    title,
+    description,
+    tags,
+    access,
+    notes,
+    mediaType,
+    folder: folderSlug,
+    brand,
+    existingAssetId,
+    createdByUserId: user.id,
+    expiresAt,
+  });
 
   res.json({ uploadId });
 });
@@ -208,69 +248,95 @@ router.post(
 
     const uploadId = req.body.uploadId as string;
     const chunkIndex = parseInt(req.body.chunkIndex, 10);
-    const totalChunks = parseInt(req.body.totalChunks, 10);
 
-    if (!uploadId || isNaN(chunkIndex) || isNaN(totalChunks)) {
-      res.status(400).json({ error: "Missing uploadId, chunkIndex, or totalChunks" });
+    if (!uploadId || isNaN(chunkIndex)) {
+      res.status(400).json({ error: "Missing uploadId or chunkIndex" });
       return;
     }
 
-    // Ensure upload directory exists (recreate if server restarted mid-upload)
-    const uploadDir = path.join(CHUNK_DIR, uploadId);
-    if (!fs.existsSync(uploadDir)) {
-      // Server was restarted — recreate the directory and accept the chunk
-      // (the client will re-send any missing chunks if they get an error,
-      //  but we can gracefully handle a restart by just recreating the dir)
-      fs.mkdirSync(uploadDir, { recursive: true });
+    const db = await getDb();
+    if (!db) { res.status(503).json({ error: "DB unavailable" }); return; }
+
+    // Load session from DB
+    const [session] = await db
+      .select()
+      .from(mediaUploadSessions)
+      .where(eq(mediaUploadSessions.uploadId, uploadId))
+      .limit(1);
+
+    if (!session) {
+      res.status(404).json({ error: "Upload session not found — please restart the upload" });
+      return;
     }
 
-    // Write chunk to disk
+    // Upload this chunk as an R2 multipart part (part numbers are 1-indexed)
+    const partNumber = chunkIndex + 1;
+    let etag: string;
     try {
-      fs.writeFileSync(chunkPath(uploadId, chunkIndex), req.file.buffer);
+      const r2 = getR2Client();
+      const result = await r2.send(new UploadPartCommand({
+        Bucket: getR2Bucket(),
+        Key: session.s3Key,
+        UploadId: session.r2UploadId,
+        PartNumber: partNumber,
+        Body: req.file.buffer,
+      }));
+      etag = result.ETag!;
     } catch (err: any) {
-      console.error("[upload-media-repo/chunk] Failed to write chunk to disk:", err);
-      res.status(500).json({ error: "Failed to store chunk: " + err.message });
+      console.error(`[upload-media-repo/chunk] R2 part upload failed (part ${partNumber}):`, err);
+      res.status(500).json({ error: "Failed to upload chunk to storage: " + err.message });
       return;
     }
 
-    const receivedChunks = countChunksOnDisk(uploadId);
+    // Record the completed part in the DB
+    const existingParts: { partNumber: number; etag: string }[] = JSON.parse(session.completedParts || "[]");
+    existingParts.push({ partNumber, etag });
+    existingParts.sort((a, b) => a.partNumber - b.partNumber);
 
-    // Not the final chunk yet — acknowledge and wait
-    if (receivedChunks < totalChunks) {
-      res.json({ received: chunkIndex, total: totalChunks, done: false });
+    await db
+      .update(mediaUploadSessions)
+      .set({ completedParts: JSON.stringify(existingParts) })
+      .where(eq(mediaUploadSessions.uploadId, uploadId));
+
+    const receivedCount = existingParts.length;
+
+    // Not the final chunk yet
+    if (receivedCount < session.totalChunks) {
+      res.json({ received: chunkIndex, total: session.totalChunks, done: false });
       return;
     }
 
-    // ── All chunks received — assemble and upload to S3 ──────────────────────
+    // ── All parts uploaded — complete the R2 multipart upload ─────────────────
     try {
-      const buffers: Buffer[] = [];
-      for (let i = 0; i < totalChunks; i++) {
-        const chunk = readChunkFromDisk(uploadId, i);
-        if (!chunk) {
-          res.status(400).json({ error: `Missing chunk ${i} — please retry the upload` });
-          return;
-        }
-        buffers.push(chunk);
-      }
-      const fullBuffer = Buffer.concat(buffers);
-      cleanupUploadDir(uploadId); // Free disk space
+      const r2 = getR2Client();
+      await r2.send(new CompleteMultipartUploadCommand({
+        Bucket: getR2Bucket(),
+        Key: session.s3Key,
+        UploadId: session.r2UploadId,
+        MultipartUpload: {
+          Parts: existingParts.map(p => ({ PartNumber: p.partNumber, ETag: p.etag })),
+        },
+      }));
+    } catch (err: any) {
+      console.error("[upload-media-repo/chunk] R2 complete failed:", err);
+      // Abort the multipart upload to avoid orphaned parts
+      try {
+        const r2 = getR2Client();
+        await r2.send(new AbortMultipartUploadCommand({
+          Bucket: getR2Bucket(),
+          Key: session.s3Key,
+          UploadId: session.r2UploadId,
+        }));
+      } catch {}
+      await db.delete(mediaUploadSessions).where(eq(mediaUploadSessions.uploadId, uploadId));
+      res.status(500).json({ error: "Failed to complete upload: " + err.message });
+      return;
+    }
 
-      const db = await getDb();
-      if (!db) { res.status(503).json({ error: "DB unavailable" }); return; }
+    const s3Url = `${getR2PublicUrl()}/${session.s3Key}`;
+    const { fileName, mimeType, fileSize, title, description, tags, access, notes, mediaType, folder, brand, existingAssetId } = session;
 
-      const originalname = req.body.fileName as string;
-      const rawMimeType = req.body.mimeType as string;
-      const mimetype = resolveMimeType(rawMimeType, originalname);
-      const fileSize = parseInt(req.body.fileSize, 10) || fullBuffer.length;
-      const title = (req.body.title as string)?.trim() || originalname;
-      const description = (req.body.description as string) || null;
-      const tags = (req.body.tags as string) || null;
-      const access = (req.body.access as string) === "public" ? "public" : "private";
-      const notes = (req.body.notes as string) || null;
-      const existingAssetId = req.body.assetId ? parseInt(req.body.assetId, 10) : null;
-      const mediaType = (req.body.mediaType as string) || detectMediaType(mimetype, originalname);
-      const folderSlug = (req.body.folder as string) || null;
-
+    try {
       if (existingAssetId) {
         // Re-upload: new version of existing asset
         const [asset] = await db
@@ -286,45 +352,40 @@ router.post(
           .where(eq(mediaVersions.assetId, existingAssetId));
         const nextVersion = (maxVer ?? 0) + 1;
 
-        const s3Key = `media-repo/${asset.slug}/v${nextVersion}-${originalname}`;
-        const uploadFn = fullBuffer.length > 50 * 1024 * 1024 ? storagePutLarge : storagePut;
-        const { url: s3Url } = await uploadFn(s3Key, fullBuffer, mimetype);
-
         await db.insert(mediaVersions).values({
           assetId: existingAssetId,
           versionNumber: nextVersion,
-          s3Key,
+          s3Key: session.s3Key,
           s3Url,
-          fileName: originalname,
-          fileSize,
-          mimeType: mimetype,
-          notes,
+          fileName,
+          fileSize: fileSize || 0,
+          mimeType,
+          notes: notes || null,
           uploadedByUserId: user.id,
         });
 
         await db
           .update(mediaAssets)
-          .set({ mimeType: mimetype, mediaType: mediaType as any, updatedAt: new Date() })
+          .set({ mimeType, mediaType: mediaType as any, updatedAt: new Date() })
           .where(eq(mediaAssets.id, existingAssetId));
 
+        await db.delete(mediaUploadSessions).where(eq(mediaUploadSessions.uploadId, uploadId));
         res.json({ done: true, assetId: existingAssetId, versionNumber: nextVersion, s3Url });
       } else {
-        // New asset
-        const slug = generateSlug(title);
-        const s3Key = `media-repo/${slug}/v1-${originalname}`;
-        const uploadFn = fullBuffer.length > 50 * 1024 * 1024 ? storagePutLarge : storagePut;
-        const { url: s3Url } = await uploadFn(s3Key, fullBuffer, mimetype);
+        // New asset — extract slug from s3Key
+        const slugMatch = session.s3Key.match(/^media-repo\/([^/]+)\//);
+        const slug = slugMatch ? slugMatch[1] : generateSlug(title || fileName);
 
         const [assetResult] = await db.insert(mediaAssets).values({
           slug,
-          title,
-          description,
+          title: title || fileName,
+          description: description || null,
           mediaType: mediaType as any,
-          mimeType: mimetype,
+          mimeType,
           access: access as any,
-          tags,
-          folder: folderSlug,
-          brand: getBrandFromRequest(req),
+          tags: tags || null,
+          folder: folder || null,
+          brand: brand as any,
           createdByUserId: user.id,
         });
         const assetId = (assetResult as any).insertId as number;
@@ -332,20 +393,20 @@ router.post(
         await db.insert(mediaVersions).values({
           assetId,
           versionNumber: 1,
-          s3Key,
+          s3Key: session.s3Key,
           s3Url,
-          fileName: originalname,
-          fileSize,
-          mimeType: mimetype,
-          notes,
+          fileName,
+          fileSize: fileSize || 0,
+          mimeType,
+          notes: notes || null,
           uploadedByUserId: user.id,
         });
 
+        await db.delete(mediaUploadSessions).where(eq(mediaUploadSessions.uploadId, uploadId));
         res.json({ done: true, assetId, slug, versionNumber: 1, s3Url });
       }
     } catch (err: any) {
-      cleanupUploadDir(uploadId);
-      console.error("[upload-media-repo/chunk]", err);
+      console.error("[upload-media-repo/chunk] DB write failed:", err);
       res.status(500).json({ error: err.message ?? "Upload failed" });
     }
   }
@@ -378,6 +439,10 @@ router.post(
     const folderSlug = (req.body.folder as string) || null;
 
     try {
+      // For small files, use storagePut (forge proxy); for large, use R2 directly
+      const { storagePut, storagePutLarge } = await import("../storage");
+      const uploadFn = buffer.length > 50 * 1024 * 1024 ? storagePutLarge : storagePut;
+
       if (existingAssetId) {
         const [asset] = await db
           .select({ slug: mediaAssets.slug })
@@ -393,7 +458,7 @@ router.post(
         const nextVersion = (maxVer ?? 0) + 1;
 
         const s3Key = `media-repo/${asset.slug}/v${nextVersion}-${originalname}`;
-        const { url: s3Url } = await storagePut(s3Key, buffer, mimetype);
+        const { url: s3Url } = await uploadFn(s3Key, buffer, mimetype);
 
         await db.insert(mediaVersions).values({
           assetId: existingAssetId, versionNumber: nextVersion, s3Key, s3Url,
@@ -409,7 +474,7 @@ router.post(
       } else {
         const slug = generateSlug(title);
         const s3Key = `media-repo/${slug}/v1-${originalname}`;
-        const { url: s3Url } = await storagePut(s3Key, buffer, mimetype);
+        const { url: s3Url } = await uploadFn(s3Key, buffer, mimetype);
 
         const [assetResult] = await db.insert(mediaAssets).values({
           slug, title, description, mediaType: mediaType as any, mimeType: mimetype,

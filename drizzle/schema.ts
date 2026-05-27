@@ -4770,3 +4770,33 @@ export const ipSecurityFlags = mysqlTable("ip_security_flags", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 export type IpSecurityFlag = typeof ipSecurityFlags.$inferSelect;
+
+// ─── Media Upload Sessions (R2 Multipart Upload Tracking) ─────────────────────
+// Tracks in-progress chunked uploads using R2 multipart upload.
+// State is stored in the DB so it survives server/sandbox restarts.
+export const mediaUploadSessions = mysqlTable("media_upload_sessions", {
+  id: int("id").autoincrement().primaryKey(),
+  uploadId: varchar("upload_id", { length: 64 }).notNull().unique(),
+  r2UploadId: varchar("r2_upload_id", { length: 256 }).notNull(),
+  s3Key: varchar("s3_key", { length: 512 }).notNull(),
+  mimeType: varchar("mime_type", { length: 128 }).notNull(),
+  totalChunks: int("total_chunks").notNull(),
+  // JSON array of { partNumber, etag } objects for completed parts
+  completedParts: text("completed_parts").notNull().default("[]"),
+  // Metadata for final asset creation
+  fileName: varchar("file_name", { length: 512 }).notNull(),
+  fileSize: int("file_size").notNull().default(0),
+  title: varchar("title", { length: 512 }),
+  description: text("description"),
+  tags: text("tags"),
+  access: varchar("access", { length: 16 }).notNull().default("private"),
+  notes: text("notes"),
+  mediaType: varchar("media_type", { length: 32 }),
+  folder: varchar("folder", { length: 128 }),
+  brand: varchar("brand", { length: 32 }).notNull().default("aaus"),
+  existingAssetId: int("existing_asset_id"),
+  createdByUserId: int("created_by_user_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+});
+export type MediaUploadSession = typeof mediaUploadSessions.$inferSelect;

@@ -3253,3 +3253,11 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix MIME type resolution: browsers report .zip as application/octet-stream — now resolved from file extension
 - [x] Fix media type detection: .zip extension correctly detected as "zip" type regardless of MIME
 - [x] Add vitest tests for disk-based chunk storage, MIME resolution, and media type detection (17 tests passing)
+
+## Media Upload Permanent Fix (2026-05-27)
+- [x] Replaced disk-based chunk storage with R2 multipart upload + DB-tracked session state
+- [x] /init now calls CreateMultipartUpload on R2 and stores session in media_upload_sessions DB table
+- [x] /chunk now calls UploadPart on R2 directly — no disk/memory storage needed
+- [x] Final chunk calls CompleteMultipartUpload on R2, then writes mediaAssets/mediaVersions rows
+- [x] Session state survives sandbox resets, server restarts, and tsx watch reloads
+- [x] 26 vitest tests passing
