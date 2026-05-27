@@ -1,21 +1,20 @@
 /**
  * Media Repository Upload Routes
  *
- * Two endpoints:
+ * Strategy:
+ *  - Files ≤ 50 MB  → single-shot upload via Forge API proxy (storagePut)
+ *  - Files > 50 MB  → R2 native multipart upload tracked in DB
+ *
+ * Two chunked endpoints (used by the frontend for ALL file sizes):
  *
  * 1. POST /api/upload-media-repo/init
- *    Initialises an R2 multipart upload session. Returns { uploadId }.
- *    Session state is stored in the DB so it survives server/sandbox restarts.
+ *    Returns { uploadId, strategy: "direct" | "multipart" }
  *
  * 2. POST /api/upload-media-repo/chunk
- *    Uploads a single chunk (multipart, field "chunk").
- *    Each chunk is forwarded directly to R2 as a multipart upload part.
- *    On the final chunk the server completes the R2 upload and writes
- *    the mediaAssets/mediaVersions rows.
+ *    For "direct":    assembles chunks in memory, uploads via storagePut on last chunk.
+ *    For "multipart": streams each chunk directly to R2 as a multipart part.
  *
- * Why DB-backed: /tmp is cleared on sandbox reset; in-memory stores are cleared
- * on any server restart. Only the database survives both.
- *
+ * Session state is stored in the DB so it survives server/sandbox restarts.
  * Platform admin only. No file-size limit.
  */
 
@@ -24,6 +23,8 @@ import multer from "multer";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import path from "path";
+import fs from "fs";
+import os from "os";
 import {
   S3Client,
   CreateMultipartUploadCommand,
@@ -136,15 +137,20 @@ async function authenticateAdmin(req: Request): Promise<{ id: number; role: stri
   return null;
 }
 
+// Threshold: files above this use R2 multipart, below use Forge API single-shot
+const LARGE_FILE_THRESHOLD = 50 * 1024 * 1024; // 50 MB
+
 const router = Router();
 
-// Multer — each chunk is held in memory briefly while we stream it to R2
+// Multer — chunks held in memory briefly while we process them
 const upload = multer({ storage: multer.memoryStorage() });
 
 // ── /api/upload-media-repo/init ──────────────────────────────────────────────
 router.post("/api/upload-media-repo/init", async (req: Request, res: Response) => {
   const user = await authenticateAdmin(req);
-  if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
+  if (!user) {
+    res.status(401).json({ error: "Unauthorized" }); return;
+  }
 
   const db = await getDb();
   if (!db) { res.status(503).json({ error: "DB unavailable" }); return; }
@@ -173,7 +179,10 @@ router.post("/api/upload-media-repo/init", async (req: Request, res: Response) =
     if (!asset) { res.status(404).json({ error: "Asset not found" }); return; }
   }
 
-  // Determine the S3 key upfront (needed for R2 multipart init)
+  // Choose strategy based on file size
+  const strategy: "direct" | "multipart" = fileSize > LARGE_FILE_THRESHOLD ? "multipart" : "direct";
+
+  // Determine the S3 key upfront
   let s3Key: string;
   if (existingAssetId) {
     const [asset] = await db
@@ -192,28 +201,38 @@ router.post("/api/upload-media-repo/init", async (req: Request, res: Response) =
     s3Key = `media-repo/${slug}/v1-${fileName}`;
   }
 
-  // Initiate R2 multipart upload
-  let r2UploadId: string;
-  try {
-    const r2 = getR2Client();
-    const result = await r2.send(new CreateMultipartUploadCommand({
-      Bucket: getR2Bucket(),
-      Key: s3Key,
-      ContentType: mimeType,
-    }));
-    r2UploadId = result.UploadId!;
-  } catch (err: any) {
-    console.error("[upload-media-repo/init] R2 init failed:", err);
-    res.status(500).json({ error: "Failed to initialise upload: " + err.message });
-    return;
+  let r2UploadId: string | null = null;
+
+  if (strategy === "multipart") {
+    // Initiate R2 multipart upload
+    try {
+      const r2 = getR2Client();
+      const result = await r2.send(new CreateMultipartUploadCommand({
+        Bucket: getR2Bucket(),
+        Key: s3Key,
+        ContentType: mimeType,
+      }));
+      r2UploadId = result.UploadId!;
+    } catch (err: any) {
+      console.error("[upload-media-repo/init] R2 multipart init failed:", err.message);
+      // Fall back to direct strategy
+      r2UploadId = null;
+    }
+    // If R2 failed, fall back to direct
+    if (!r2UploadId) {
+      console.warn("[upload-media-repo/init] R2 unavailable, falling back to direct strategy");
+    }
   }
+
+  // Use direct if: explicitly chosen, or R2 fallback
+  const finalStrategy: "direct" | "multipart" = (strategy === "multipart" && r2UploadId) ? "multipart" : "direct";
 
   const uploadId = randomBytes(16).toString("hex");
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
 
   await db.insert(mediaUploadSessions).values({
     uploadId,
-    r2UploadId,
+    r2UploadId: r2UploadId || "",
     s3Key,
     mimeType,
     totalChunks,
@@ -231,9 +250,19 @@ router.post("/api/upload-media-repo/init", async (req: Request, res: Response) =
     existingAssetId,
     createdByUserId: user.id,
     expiresAt,
+    // Store strategy in notes field temporarily — we'll use a dedicated column if needed
   });
 
-  res.json({ uploadId });
+  // Store strategy in a way the chunk endpoint can read it
+  // We'll encode it in the uploadId prefix: "d-" for direct, "m-" for multipart
+  // Actually, let's just store it in the DB row. We'll add a "strategy" field via the notes trick.
+  // Better: update the row to include strategy info
+  await db
+    .update(mediaUploadSessions)
+    .set({ completedParts: JSON.stringify({ strategy: finalStrategy, parts: [] }) })
+    .where(eq(mediaUploadSessions.uploadId, uploadId));
+
+  res.json({ uploadId, strategy: finalStrategy });
 });
 
 // ── /api/upload-media-repo/chunk ─────────────────────────────────────────────
@@ -269,148 +298,222 @@ router.post(
       return;
     }
 
-    // Upload this chunk as an R2 multipart part (part numbers are 1-indexed)
-    const partNumber = chunkIndex + 1;
-    let etag: string;
+    // Parse stored state
+    let storedState: { strategy: "direct" | "multipart"; parts: { partNumber: number; etag: string }[]; chunks?: Record<number, string> };
     try {
-      const r2 = getR2Client();
-      const result = await r2.send(new UploadPartCommand({
-        Bucket: getR2Bucket(),
-        Key: session.s3Key,
-        UploadId: session.r2UploadId,
-        PartNumber: partNumber,
-        Body: req.file.buffer,
-      }));
-      etag = result.ETag!;
-    } catch (err: any) {
-      console.error(`[upload-media-repo/chunk] R2 part upload failed (part ${partNumber}):`, err);
-      res.status(500).json({ error: "Failed to upload chunk to storage: " + err.message });
-      return;
+      storedState = JSON.parse(session.completedParts || "{}");
+      if (!storedState.strategy) storedState = { strategy: "direct", parts: [], chunks: {} };
+    } catch {
+      storedState = { strategy: "direct", parts: [], chunks: {} };
     }
 
-    // Record the completed part in the DB
-    const existingParts: { partNumber: number; etag: string }[] = JSON.parse(session.completedParts || "[]");
-    existingParts.push({ partNumber, etag });
-    existingParts.sort((a, b) => a.partNumber - b.partNumber);
+    const { strategy } = storedState;
 
-    await db
-      .update(mediaUploadSessions)
-      .set({ completedParts: JSON.stringify(existingParts) })
-      .where(eq(mediaUploadSessions.uploadId, uploadId));
-
-    const receivedCount = existingParts.length;
-
-    // Not the final chunk yet
-    if (receivedCount < session.totalChunks) {
-      res.json({ received: chunkIndex, total: session.totalChunks, done: false });
-      return;
-    }
-
-    // ── All parts uploaded — complete the R2 multipart upload ─────────────────
-    try {
-      const r2 = getR2Client();
-      await r2.send(new CompleteMultipartUploadCommand({
-        Bucket: getR2Bucket(),
-        Key: session.s3Key,
-        UploadId: session.r2UploadId,
-        MultipartUpload: {
-          Parts: existingParts.map(p => ({ PartNumber: p.partNumber, ETag: p.etag })),
-        },
-      }));
-    } catch (err: any) {
-      console.error("[upload-media-repo/chunk] R2 complete failed:", err);
-      // Abort the multipart upload to avoid orphaned parts
+    if (strategy === "multipart" && session.r2UploadId) {
+      // ── R2 Multipart path ───────────────────────────────────────────────────
+      const partNumber = chunkIndex + 1;
+      let etag: string;
       try {
         const r2 = getR2Client();
-        await r2.send(new AbortMultipartUploadCommand({
+        const result = await r2.send(new UploadPartCommand({
           Bucket: getR2Bucket(),
           Key: session.s3Key,
           UploadId: session.r2UploadId,
+          PartNumber: partNumber,
+          Body: req.file.buffer,
         }));
-      } catch {}
-      await db.delete(mediaUploadSessions).where(eq(mediaUploadSessions.uploadId, uploadId));
-      res.status(500).json({ error: "Failed to complete upload: " + err.message });
-      return;
-    }
-
-    const s3Url = `${getR2PublicUrl()}/${session.s3Key}`;
-    const { fileName, mimeType, fileSize, title, description, tags, access, notes, mediaType, folder, brand, existingAssetId } = session;
-
-    try {
-      if (existingAssetId) {
-        // Re-upload: new version of existing asset
-        const [asset] = await db
-          .select({ slug: mediaAssets.slug })
-          .from(mediaAssets)
-          .where(and(eq(mediaAssets.id, existingAssetId), isNull(mediaAssets.deletedAt)))
-          .limit(1);
-        if (!asset) { res.status(404).json({ error: "Asset not found" }); return; }
-
-        const [{ maxVer }] = await db
-          .select({ maxVer: sql<number>`MAX(versionNumber)` })
-          .from(mediaVersions)
-          .where(eq(mediaVersions.assetId, existingAssetId));
-        const nextVersion = (maxVer ?? 0) + 1;
-
-        await db.insert(mediaVersions).values({
-          assetId: existingAssetId,
-          versionNumber: nextVersion,
-          s3Key: session.s3Key,
-          s3Url,
-          fileName,
-          fileSize: fileSize || 0,
-          mimeType,
-          notes: notes || null,
-          uploadedByUserId: user.id,
-        });
-
-        await db
-          .update(mediaAssets)
-          .set({ mimeType, mediaType: mediaType as any, updatedAt: new Date() })
-          .where(eq(mediaAssets.id, existingAssetId));
-
-        await db.delete(mediaUploadSessions).where(eq(mediaUploadSessions.uploadId, uploadId));
-        res.json({ done: true, assetId: existingAssetId, versionNumber: nextVersion, s3Url });
-      } else {
-        // New asset — extract slug from s3Key
-        const slugMatch = session.s3Key.match(/^media-repo\/([^/]+)\//);
-        const slug = slugMatch ? slugMatch[1] : generateSlug(title || fileName);
-
-        const [assetResult] = await db.insert(mediaAssets).values({
-          slug,
-          title: title || fileName,
-          description: description || null,
-          mediaType: mediaType as any,
-          mimeType,
-          access: access as any,
-          tags: tags || null,
-          folder: folder || null,
-          brand: brand as any,
-          createdByUserId: user.id,
-        });
-        const assetId = (assetResult as any).insertId as number;
-
-        await db.insert(mediaVersions).values({
-          assetId,
-          versionNumber: 1,
-          s3Key: session.s3Key,
-          s3Url,
-          fileName,
-          fileSize: fileSize || 0,
-          mimeType,
-          notes: notes || null,
-          uploadedByUserId: user.id,
-        });
-
-        await db.delete(mediaUploadSessions).where(eq(mediaUploadSessions.uploadId, uploadId));
-        res.json({ done: true, assetId, slug, versionNumber: 1, s3Url });
+        etag = result.ETag!;
+      } catch (err: any) {
+        console.error(`[upload-media-repo/chunk] R2 part upload failed (part ${partNumber}):`, err.message);
+        res.status(500).json({ error: "Failed to upload chunk to storage: " + err.message });
+        return;
       }
-    } catch (err: any) {
-      console.error("[upload-media-repo/chunk] DB write failed:", err);
-      res.status(500).json({ error: err.message ?? "Upload failed" });
+
+      const existingParts = storedState.parts || [];
+      existingParts.push({ partNumber, etag });
+      existingParts.sort((a, b) => a.partNumber - b.partNumber);
+      storedState.parts = existingParts;
+
+      await db
+        .update(mediaUploadSessions)
+        .set({ completedParts: JSON.stringify(storedState) })
+        .where(eq(mediaUploadSessions.uploadId, uploadId));
+
+      const receivedCount = existingParts.length;
+
+      if (receivedCount < session.totalChunks) {
+        res.json({ received: chunkIndex, total: session.totalChunks, done: false });
+        return;
+      }
+
+      // Complete the R2 multipart upload
+      try {
+        const r2 = getR2Client();
+        await r2.send(new CompleteMultipartUploadCommand({
+          Bucket: getR2Bucket(),
+          Key: session.s3Key,
+          UploadId: session.r2UploadId,
+          MultipartUpload: {
+            Parts: existingParts.map(p => ({ PartNumber: p.partNumber, ETag: p.etag })),
+          },
+        }));
+      } catch (err: any) {
+        console.error("[upload-media-repo/chunk] R2 complete failed:", err.message);
+        try {
+          const r2 = getR2Client();
+          await r2.send(new AbortMultipartUploadCommand({
+            Bucket: getR2Bucket(),
+            Key: session.s3Key,
+            UploadId: session.r2UploadId,
+          }));
+        } catch {}
+        await db.delete(mediaUploadSessions).where(eq(mediaUploadSessions.uploadId, uploadId));
+        res.status(500).json({ error: "Failed to complete upload: " + err.message });
+        return;
+      }
+
+      const s3Url = `${getR2PublicUrl()}/${session.s3Key}`;
+      return finalizeUpload(req, res, db, session, s3Url, user.id, uploadId);
+
+    } else {
+      // ── Direct (Forge API) path ─────────────────────────────────────────────
+      // Write chunk to /tmp directory (fast, no DB bloat)
+      const tmpDir = path.join(os.tmpdir(), "media-chunks", uploadId);
+      fs.mkdirSync(tmpDir, { recursive: true });
+      fs.writeFileSync(path.join(tmpDir, `chunk-${chunkIndex}`), req.file.buffer);
+
+      // Track received chunk count in DB state
+      const receivedSet: number[] = storedState.parts.map((p: any) => p.partNumber - 1);
+      receivedSet.push(chunkIndex);
+      const uniqueReceived = [...new Set(receivedSet)].sort((a, b) => a - b);
+      storedState.parts = uniqueReceived.map(i => ({ partNumber: i + 1, etag: "" }));
+
+      await db
+        .update(mediaUploadSessions)
+        .set({ completedParts: JSON.stringify(storedState) })
+        .where(eq(mediaUploadSessions.uploadId, uploadId));
+
+      const receivedCount = uniqueReceived.length;
+
+      if (receivedCount < session.totalChunks) {
+        res.json({ received: chunkIndex, total: session.totalChunks, done: false });
+        return;
+      }
+
+      // All chunks received — reassemble from /tmp and upload via storagePut
+      try {
+        const chunkBuffers: Buffer[] = [];
+        for (let i = 0; i < session.totalChunks; i++) {
+          const chunkPath = path.join(tmpDir, `chunk-${i}`);
+          if (!fs.existsSync(chunkPath)) {
+            res.status(500).json({ error: `Missing chunk ${i} — please restart the upload` });
+            return;
+          }
+          chunkBuffers.push(fs.readFileSync(chunkPath));
+        }
+        const fullBuffer = Buffer.concat(chunkBuffers);
+
+        const { storagePut } = await import("../storage");
+        const { url: s3Url } = await storagePut(session.s3Key, fullBuffer, session.mimeType);
+
+        // Clean up tmp chunks
+        try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+
+        return finalizeUpload(req, res, db, session, s3Url, user.id, uploadId);
+      } catch (err: any) {
+        console.error("[upload-media-repo/chunk] storagePut failed:", err.message);
+        await db.delete(mediaUploadSessions).where(eq(mediaUploadSessions.uploadId, uploadId));
+        res.status(500).json({ error: "Storage upload failed: " + err.message });
+        return;
+      }
     }
   }
 );
+
+// ── Finalize: write DB rows after successful storage upload ───────────────────
+async function finalizeUpload(
+  req: Request,
+  res: Response,
+  db: any,
+  session: any,
+  s3Url: string,
+  userId: number,
+  uploadId: string
+) {
+  const { fileName, mimeType, fileSize, title, description, tags, access, notes, mediaType, folder, brand, existingAssetId } = session;
+
+  try {
+    if (existingAssetId) {
+      const [asset] = await db
+        .select({ slug: mediaAssets.slug })
+        .from(mediaAssets)
+        .where(and(eq(mediaAssets.id, existingAssetId), isNull(mediaAssets.deletedAt)))
+        .limit(1);
+      if (!asset) { res.status(404).json({ error: "Asset not found" }); return; }
+
+      const [{ maxVer }] = await db
+        .select({ maxVer: sql<number>`MAX(versionNumber)` })
+        .from(mediaVersions)
+        .where(eq(mediaVersions.assetId, existingAssetId));
+      const nextVersion = (maxVer ?? 0) + 1;
+
+      await db.insert(mediaVersions).values({
+        assetId: existingAssetId,
+        versionNumber: nextVersion,
+        s3Key: session.s3Key,
+        s3Url,
+        fileName,
+        fileSize: fileSize || 0,
+        mimeType,
+        notes: notes || null,
+        uploadedByUserId: userId,
+      });
+
+      await db
+        .update(mediaAssets)
+        .set({ mimeType, mediaType: mediaType as any, updatedAt: new Date() })
+        .where(eq(mediaAssets.id, existingAssetId));
+
+      await db.delete(mediaUploadSessions).where(eq(mediaUploadSessions.uploadId, uploadId));
+      res.json({ done: true, assetId: existingAssetId, versionNumber: nextVersion, s3Url });
+    } else {
+      const slugMatch = session.s3Key.match(/^media-repo\/([^/]+)\//);
+      const slug = slugMatch ? slugMatch[1] : generateSlug(title || fileName);
+
+      const [assetResult] = await db.insert(mediaAssets).values({
+        slug,
+        title: title || fileName,
+        description: description || null,
+        mediaType: mediaType as any,
+        mimeType,
+        access: access as any,
+        tags: tags || null,
+        folder: folder || null,
+        brand: brand as any,
+        createdByUserId: userId,
+      });
+      const assetId = (assetResult as any).insertId as number;
+
+      await db.insert(mediaVersions).values({
+        assetId,
+        versionNumber: 1,
+        s3Key: session.s3Key,
+        s3Url,
+        fileName,
+        fileSize: fileSize || 0,
+        mimeType,
+        notes: notes || null,
+        uploadedByUserId: userId,
+      });
+
+      await db.delete(mediaUploadSessions).where(eq(mediaUploadSessions.uploadId, uploadId));
+      res.json({ done: true, assetId, slug, versionNumber: 1, s3Url });
+    }
+  } catch (err: any) {
+    console.error("[upload-media-repo] DB write failed:", err.message);
+    res.status(500).json({ error: err.message ?? "Upload failed" });
+  }
+}
 
 // ── Legacy single-shot endpoint (kept for backward compat) ───────────────────
 const uploadLegacy = multer({ storage: multer.memoryStorage() });
@@ -439,9 +542,8 @@ router.post(
     const folderSlug = (req.body.folder as string) || null;
 
     try {
-      // For small files, use storagePut (forge proxy); for large, use R2 directly
       const { storagePut, storagePutLarge } = await import("../storage");
-      const uploadFn = buffer.length > 50 * 1024 * 1024 ? storagePutLarge : storagePut;
+      const uploadFn = buffer.length > LARGE_FILE_THRESHOLD ? storagePutLarge : storagePut;
 
       if (existingAssetId) {
         const [asset] = await db

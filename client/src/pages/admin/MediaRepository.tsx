@@ -247,7 +247,7 @@ function UploadDialog({ open, onClose, onSuccess, existingAssetId, existingTitle
     });
     if (!initRes.ok) {
       const e = await initRes.json().catch(() => ({}));
-      throw new Error(e.error ?? "Failed to initialise upload");
+      throw new Error(`Init failed (HTTP ${initRes.status}): ${e.error ?? e.message ?? JSON.stringify(e)}`);
     }
     const { uploadId } = await initRes.json();
     for (let i = 0; i < totalChunks; i++) {

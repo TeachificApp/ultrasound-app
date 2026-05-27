@@ -1914,6 +1914,83 @@ function CheckoutFormBlockSettings({
   );
 }
 
+// ─── Sortable FAQ Item (used inside BlockSettings faq case) ────────────────────
+function SortableFaqItem({
+  item, index, onUpdateQ, onUpdateA, onRemove,
+}: {
+  item: { id: string; q: string; a: string };
+  index: number;
+  onUpdateQ: (v: string) => void;
+  onUpdateA: (html: string) => void;
+  onRemove: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
+  return (
+    <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }} className="border border-gray-200 rounded p-2 space-y-1 bg-white">
+      <div className="flex justify-between items-center mb-1">
+        <div className="flex items-center gap-1">
+          <button {...attributes} {...listeners} className="text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing"><GripVertical size={12} /></button>
+          <span className="text-xs text-gray-500">Q{index + 1}</span>
+        </div>
+        <button onClick={onRemove} className="text-red-400 hover:text-red-600"><X size={10} /></button>
+      </div>
+      <DebouncedInput value={item.q} onChange={onUpdateQ} className="h-7 text-xs" placeholder="Question" />
+      <div className="mt-1">
+        <label className="text-xs text-gray-400 block mb-1">Answer (rich text)</label>
+        <RichTextEditor value={item.a} onChange={onUpdateA} minHeight={80} maxHeight={300} placeholder="Answer..." />
+      </div>
+    </div>
+  );
+}
+
+// ─── Sortable Pricing Card (used inside BlockSettings pricing case) ───────────
+function SortablePricingCard({
+  card, index, uploading, onSet, onRemove, onImageUpload,
+}: {
+  card: { id: string; label?: string; sublabel?: string; ctaLabel?: string; ctaUrl?: string; badge?: string; imageUrl?: string; [key: string]: any };
+  index: number;
+  uploading: string | null;
+  onSet: (key: string, val: any) => void;
+  onRemove: () => void;
+  onImageUpload: (file: File) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
+  return (
+    <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }} className="border border-gray-200 rounded p-2 space-y-2 bg-white">
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-1">
+          <button {...attributes} {...listeners} className="text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing"><GripVertical size={12} /></button>
+          <span className="text-xs font-medium text-gray-600">Card {index + 1}</span>
+        </div>
+        <button onClick={onRemove} className="text-red-400 hover:text-red-600"><X size={10} /></button>
+      </div>
+      <DebouncedInput value={card.label ?? ""} onChange={v => onSet("label", v)} className="h-7 text-xs" placeholder="Card label (e.g. Full Access)" />
+      <DebouncedInput value={card.sublabel ?? ""} onChange={v => onSet("sublabel", v)} className="h-7 text-xs" placeholder="Sublabel (e.g. One-time payment)" />
+      <DebouncedInput value={card.ctaLabel ?? ""} onChange={v => onSet("ctaLabel", v)} className="h-7 text-xs" placeholder="CTA button text" />
+      <div className="flex items-center gap-1">
+        <Link size={10} className="text-gray-400 flex-shrink-0" />
+        <DebouncedInput value={card.ctaUrl ?? ""} onChange={v => onSet("ctaUrl", v)} className="h-7 text-xs flex-1" placeholder="CTA URL (overrides auto)" />
+      </div>
+      <DebouncedInput value={card.badge ?? ""} onChange={v => onSet("badge", v)} className="h-7 text-xs" placeholder="Badge label (e.g. Most Popular)" />
+      <div>
+        <label className="text-xs text-gray-400 block mb-1">Card Image</label>
+        {card.imageUrl ? (
+          <div className="relative">
+            <img src={card.imageUrl} alt="" className="w-full h-20 object-cover rounded border" />
+            <button onClick={() => onSet("imageUrl", "")} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5"><X size={10} /></button>
+          </div>
+        ) : (
+          <label className="flex items-center gap-2 cursor-pointer border border-dashed border-gray-300 rounded p-2 hover:border-teal-400">
+            {uploading === `pricing-img-${card.id}` ? <Loader2 size={12} className="animate-spin text-teal-600" /> : <Upload size={12} className="text-gray-400" />}
+            <span className="text-xs text-gray-400">{uploading === `pricing-img-${card.id}` ? "Uploading..." : "Upload image"}</span>
+            <input type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) onImageUpload(f); }} />
+          </label>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Sortable Carousel Item (used inside BlockSettings carousel case) ────────────
 function SortableCarouselItem({
   id, item, index, uploading, onUpdate, onRemove, onUpload,
@@ -2721,28 +2798,16 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
             <DndContext sensors={faqSensors} collisionDetection={closestCenter} onDragEnd={e => { const { active, over } = e; if (over && active.id !== over.id) { const oldIdx = items.findIndex(it => it.id === active.id); const newIdx = items.findIndex(it => it.id === over.id); if (oldIdx !== -1 && newIdx !== -1) set("items", arrayMove(items, oldIdx, newIdx)); } }}>
               <SortableContext items={items.map(it => it.id)} strategy={verticalListSortingStrategy}>
                 <div className="space-y-2">
-                  {items.map((item, i) => {
-                    const SortableFaqItem = ({ item, i }: { item: typeof items[0]; i: number }) => {
-                      const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
-                      return (
-                        <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }} className="border border-gray-200 rounded p-2 space-y-1 bg-white">
-                          <div className="flex justify-between items-center mb-1">
-                            <div className="flex items-center gap-1">
-                              <button {...attributes} {...listeners} className="text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing"><GripVertical size={12} /></button>
-                              <span className="text-xs text-gray-500">Q{i + 1}</span>
-                            </div>
-                            <button onClick={() => set("items", items.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button>
-                          </div>
-                          <DebouncedInput value={item.q} onChange={v => { const next = items.map((it, j) => j === i ? { ...it, q: v } : it); set("items", next); }} className="h-7 text-xs" placeholder="Question" />
-                          <div className="mt-1">
-                            <label className="text-xs text-gray-400 block mb-1">Answer (rich text)</label>
-                            <RichTextEditor value={item.a} onChange={html => { const next = items.map((it, j) => j === i ? { ...it, a: html } : it); set("items", next); }} minHeight={80} maxHeight={300} placeholder="Answer..." />
-                          </div>
-                        </div>
-                      );
-                    };
-                    return <SortableFaqItem key={item.id} item={item} i={i} />;
-                  })}
+                  {items.map((item, i) => (
+                    <SortableFaqItem
+                      key={item.id}
+                      item={item}
+                      index={i}
+                      onUpdateQ={v => { const next = items.map((it, j) => j === i ? { ...it, q: v } : it); set("items", next); }}
+                      onUpdateA={html => { const next = items.map((it, j) => j === i ? { ...it, a: html } : it); set("items", next); }}
+                      onRemove={() => set("items", items.filter((_, j) => j !== i))}
+                    />
+                  ))}
                 </div>
               </SortableContext>
             </DndContext>
@@ -3608,46 +3673,17 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
             <DndContext sensors={pricingSensors} collisionDetection={closestCenter} onDragEnd={e => { const { active, over } = e; if (over && active.id !== over.id) { const oldIdx = pricingCards.findIndex(c => c.id === active.id); const newIdx = pricingCards.findIndex(c => c.id === over.id); if (oldIdx !== -1 && newIdx !== -1) set("cards", arrayMove(pricingCards, oldIdx, newIdx)); } }}>
               <SortableContext items={pricingCards.map(c => c.id)} strategy={verticalListSortingStrategy}>
                 <div className="space-y-3">
-                  {pricingCards.map((card, i) => {
-                    const SortablePricingCard = ({ card, i }: { card: typeof pricingCards[0]; i: number }) => {
-                      const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
-                      return (
-                        <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }} className="border border-gray-200 rounded p-2 space-y-2 bg-white">
-                          <div className="flex justify-between items-center">
-                            <div className="flex items-center gap-1">
-                              <button {...attributes} {...listeners} className="text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing"><GripVertical size={12} /></button>
-                              <span className="text-xs font-medium text-gray-600">Card {i + 1}</span>
-                            </div>
-                            <button onClick={() => set("cards", pricingCards.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button>
-                          </div>
-                          <DebouncedInput value={card.label ?? ""} onChange={v => setPricingCard(i, "label", v)} className="h-7 text-xs" placeholder="Card label (e.g. Full Access)" />
-                          <DebouncedInput value={card.sublabel ?? ""} onChange={v => setPricingCard(i, "sublabel", v)} className="h-7 text-xs" placeholder="Sublabel (e.g. One-time payment)" />
-                          <DebouncedInput value={card.ctaLabel ?? ""} onChange={v => setPricingCard(i, "ctaLabel", v)} className="h-7 text-xs" placeholder="CTA button text" />
-                          <div className="flex items-center gap-1">
-                            <Link size={10} className="text-gray-400 flex-shrink-0" />
-                            <DebouncedInput value={card.ctaUrl ?? ""} onChange={v => setPricingCard(i, "ctaUrl", v)} className="h-7 text-xs flex-1" placeholder="CTA URL (overrides auto)" />
-                          </div>
-                          <DebouncedInput value={card.badge ?? ""} onChange={v => setPricingCard(i, "badge", v)} className="h-7 text-xs" placeholder="Badge label (e.g. Most Popular)" />
-                          <div>
-                            <label className="text-xs text-gray-400 block mb-1">Card Image</label>
-                            {card.imageUrl ? (
-                              <div className="relative">
-                                <img src={card.imageUrl} alt="" className="w-full h-20 object-cover rounded border" />
-                                <button onClick={() => setPricingCard(i, "imageUrl", "")} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5"><X size={10} /></button>
-                              </div>
-                            ) : (
-                              <label className="flex items-center gap-2 cursor-pointer border border-dashed border-gray-300 rounded p-2 hover:border-teal-400">
-                                {uploading === `pricing-img-${i}` ? <Loader2 size={12} className="animate-spin text-teal-600" /> : <Upload size={12} className="text-gray-400" />}
-                                <span className="text-xs text-gray-400">{uploading === `pricing-img-${i}` ? "Uploading..." : "Upload image"}</span>
-                                <input type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handlePricingImageUpload(i, f); }} />
-                              </label>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    };
-                    return <SortablePricingCard key={card.id} card={card} i={i} />;
-                  })}
+                  {pricingCards.map((card, i) => (
+                    <SortablePricingCard
+                      key={card.id}
+                      card={card}
+                      index={i}
+                      uploading={uploading}
+                      onSet={(key, val) => setPricingCard(i, key, val)}
+                      onRemove={() => set("cards", pricingCards.filter((_, j) => j !== i))}
+                      onImageUpload={file => handlePricingImageUpload(i, file)}
+                    />
+                  ))}
                 </div>
               </SortableContext>
             </DndContext>
