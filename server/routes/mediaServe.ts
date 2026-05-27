@@ -181,7 +181,9 @@ async function extractScormZip(
   slug: string,
   zipUrl: string
 ): Promise<{ launchFile: string; cacheDir: string } | null> {
-  const cacheDir = path.join(SCORM_CACHE_DIR, slug);
+  // Use a hash of the URL as part of the cache key so re-uploads always get fresh extraction
+  const urlHash = require("crypto").createHash("md5").update(zipUrl).digest("hex").slice(0, 8);
+  const cacheDir = path.join(SCORM_CACHE_DIR, `${slug}-${urlHash}`);
   const launchMarker = path.join(cacheDir, ".launch");
 
   // Already extracted — return cached launch file
@@ -312,15 +314,47 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
       const directPath = path.join(cacheDir, relativePath);
       // Then try relative to the launch file's directory
       const launchRelPath = path.join(cacheDir, launchDir, relativePath);
+      // Also try with 'data/' prefix relative to launchDir (iSpring quirk: player.js requests
+      // 'images/foo.png' but file lives at 'data/images/foo.png' relative to launch dir)
+      const launchDataRelPath = path.join(cacheDir, launchDir, "data", relativePath);
+      const fileName = path.basename(relativePath);
+
       if (fs.existsSync(directPath)) {
         targetFile = relativePath;
         fullPath = directPath;
       } else if (launchDir !== "." && fs.existsSync(launchRelPath)) {
         targetFile = path.join(launchDir, relativePath);
         fullPath = launchRelPath;
+      } else if (launchDir !== "." && fs.existsSync(launchDataRelPath)) {
+        // iSpring fallback: file lives under data/ subdirectory
+        targetFile = path.join(launchDir, "data", relativePath);
+        fullPath = launchDataRelPath;
       } else {
-        targetFile = relativePath;
-        fullPath = directPath; // will 404 below
+        // Last resort: recursive search for the filename within the launch directory
+        const searchRoot = launchDir !== "." ? path.join(cacheDir, launchDir) : cacheDir;
+        let found: string | null = null;
+        const search = (dir: string, depth: number): void => {
+          if (found || depth > 5) return;
+          try {
+            for (const entry of fs.readdirSync(dir)) {
+              const full = path.join(dir, entry);
+              if (fs.statSync(full).isDirectory()) {
+                search(full, depth + 1);
+              } else if (entry === fileName) {
+                found = full;
+                return;
+              }
+            }
+          } catch {}
+        };
+        search(searchRoot, 0);
+        if (found && found.startsWith(cacheDir)) {
+          targetFile = path.relative(cacheDir, found);
+          fullPath = found;
+        } else {
+          targetFile = relativePath;
+          fullPath = directPath; // will 404 below
+        }
       }
     }
 

@@ -74,6 +74,7 @@ import {
   ChevronsUpDown,
   ChevronUp,
   ChevronDown,
+  Pencil,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -706,6 +707,8 @@ function AssetDetailDialog({ assetId, onClose, onRefresh }: AssetDetailDialogPro
   const [selectedToken, setSelectedToken] = useState<string | undefined>(undefined);
   const [editSlug, setEditSlug] = useState("");
   const [slugInitialized, setSlugInitialized] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
 
   const { data, refetch } = trpc.mediaRepo.getAsset.useQuery(
     { id: assetId! },
@@ -727,6 +730,10 @@ function AssetDetailDialog({ assetId, onClose, onRefresh }: AssetDetailDialogPro
   const { data: foldersData } = trpc.mediaRepo.listFoldersFull.useQuery();
   const updateSlugMutation = trpc.mediaRepo.updateAsset.useMutation({
     onSuccess: () => { toast.success("Slug updated"); refetch(); onRefresh(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const updateTitleMutation = trpc.mediaRepo.updateAsset.useMutation({
+    onSuccess: () => { toast.success("Title updated"); setEditingTitle(false); refetch(); onRefresh(); },
     onError: (e) => toast.error(e.message),
   });
   const updateMediaTypeMutation = trpc.mediaRepo.updateAsset.useMutation({
@@ -777,7 +784,35 @@ function AssetDetailDialog({ assetId, onClose, onRefresh }: AssetDetailDialogPro
           <div className="shrink-0 px-5 pt-5 pb-4 border-b border-border">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
-                <DialogTitle className="text-xl font-bold break-words leading-snug">{asset.title}</DialogTitle>
+                {editingTitle ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      autoFocus
+                      value={editTitle}
+                      onChange={e => setEditTitle(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === "Enter" && editTitle.trim()) updateTitleMutation.mutate({ id: asset.id, title: editTitle.trim() });
+                        if (e.key === "Escape") setEditingTitle(false);
+                      }}
+                      className="flex-1 text-xl font-bold border border-teal-400 rounded px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-teal-500 bg-background"
+                    />
+                    <button
+                      className="text-xs px-2 py-1 rounded border border-teal-300 text-teal-600 hover:bg-teal-50 disabled:opacity-50"
+                      disabled={updateTitleMutation.isPending || !editTitle.trim()}
+                      onClick={() => editTitle.trim() && updateTitleMutation.mutate({ id: asset.id, title: editTitle.trim() })}
+                    >{updateTitleMutation.isPending ? "Saving…" : "Save"}</button>
+                    <button className="text-xs px-2 py-1 rounded border border-border text-muted-foreground hover:bg-muted" onClick={() => setEditingTitle(false)}>Cancel</button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 group">
+                    <DialogTitle className="text-xl font-bold break-words leading-snug">{asset.title}</DialogTitle>
+                    <button
+                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-muted"
+                      title="Rename"
+                      onClick={() => { setEditTitle(asset.title); setEditingTitle(true); }}
+                    ><Pencil className="w-3.5 h-3.5 text-muted-foreground" /></button>
+                  </div>
+                )}
                 <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                   <Badge variant={isPublic ? "default" : "secondary"} className="gap-1">
                     {isPublic ? <><Globe className="w-3 h-3" />Public</> : <><Lock className="w-3 h-3" />Private</>}

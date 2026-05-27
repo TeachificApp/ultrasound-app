@@ -256,7 +256,7 @@ export default function LessonQuizBlockEditor({ data, onChange, handleFileUpload
   );
   const courseLessons = courseLessonsData ?? [];
 
-  const generateMutation = trpc.lmsAdmin.generateQuizFromLesson.useMutation({
+  const generateMutation = trpc.lmsGroup.generateQuizFromLesson.useMutation({
     onSuccess: (res) => {
       setAiPreview(res.questions);
       toast.success(`Generated ${res.questions.length} questions — review, edit, then apply below.`);

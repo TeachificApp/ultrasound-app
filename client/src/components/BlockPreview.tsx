@@ -3,7 +3,7 @@
  * Shared read-only block renderer used by CoursePlayer, CourseOverview, and LandingPageBuilder.
  * Extracted into its own file to break the circular dependency between CoursePlayer and LandingPageBuilder.
  */
-import { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { ChevronDown, Globe, Image, Package, Upload, Video } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import CarouselBlock from "@/components/CarouselBlock";

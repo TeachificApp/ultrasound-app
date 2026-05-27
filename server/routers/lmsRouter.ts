@@ -22,6 +22,7 @@ import { generateCertificatePdf } from "../lib/certificateGenerator";
 import { sendCertificateEmail } from "../lib/certificateEmail";
 import { sendEnrollmentEmail } from "../lib/enrollmentEmail";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
+import { extractJson } from "../lib/extractJson";
 import {
   lmsCourses,
   lmsSections,
@@ -2540,7 +2541,7 @@ Rules:
       let questions: Array<{ question: string; type: string; options: string[]; correctAnswer: string; explanation: string }>;
       try {
         const raw = response.choices[0].message.content as string;
-        const parsed = JSON.parse(raw);
+        const parsed = extractJson(raw);
         questions = Array.isArray(parsed) ? parsed : parsed.questions;
         if (!Array.isArray(questions)) throw new Error("Not an array");
       } catch {
@@ -2831,7 +2832,7 @@ Make ALL content specific and compelling based on the course title, description,
       let blocks: any[];
       try {
         const raw = response.choices[0].message.content as string;
-        const parsed = JSON.parse(raw);
+        const parsed = extractJson(raw);
         blocks = Array.isArray(parsed) ? parsed : parsed.blocks;
         if (!Array.isArray(blocks)) throw new Error("Not an array");
         // Normalize: ensure each block has { id, type, data } structure
@@ -3142,7 +3143,7 @@ Make ALL content specific and compelling based on the course title, description,
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const imports = await db.select({ courseId: lmsThinkificImports.courseId, thinkificCourseId: lmsThinkificImports.thinkificCourseId }).from(lmsThinkificImports);
+      const imports = await db.select({ courseId: lmsThinkificImports.lmsCourseId, thinkificCourseId: lmsThinkificImports.thinkificCourseId }).from(lmsThinkificImports);
       let updated = 0;
       let failed = 0;
       for (const imp of imports) {
@@ -3481,7 +3482,7 @@ CRITICAL REQUIREMENTS:
       const raw = String(response?.choices?.[0]?.message?.content ?? "{}");
       let parsed: any;
       try {
-        parsed = JSON.parse(raw);
+        parsed = extractJson(raw);
       } catch {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "AI returned invalid JSON. Please try again." });
       }

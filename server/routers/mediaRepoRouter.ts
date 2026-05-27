@@ -26,6 +26,7 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { storagePut, storageDelete } from "../storage";
 import { sendEmail } from "../_core/email";
+import AdmZip from "adm-zip";
 import {
   mediaAssets,
   mediaVersions,
@@ -74,6 +75,23 @@ function detectMediaType(mimeType: string): string {
   return "other";
 }
 
+/**
+ * Inspect a ZIP buffer to determine if it is a SCORM package.
+ * SCORM packages contain imsmanifest.xml at the root or one level deep.
+ */
+function detectIfScorm(buffer: Buffer): boolean {
+  try {
+    const zip = new AdmZip(buffer);
+    const entries = zip.getEntries().map(e => e.entryName.toLowerCase());
+    return entries.some(name =>
+      name === "imsmanifest.xml" ||
+      /^[^/]+\/imsmanifest\.xml$/.test(name)
+    );
+  } catch {
+    return false;
+  }
+}
+
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
 const MEDIA_TYPES = ["image", "video", "audio", "document", "html", "scorm", "zip", "lms", "other"] as const;
@@ -107,10 +125,15 @@ export const mediaRepoRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
       const slug = generateSlug(input.title);
-      const mediaType = (input.mediaType ?? detectMediaType(input.mimeType)) as typeof MEDIA_TYPES[number];
-
       // Upload to S3
       const buffer = Buffer.from(input.fileData, "base64");
+      // Auto-detect SCORM: if no explicit mediaType provided and the file is a ZIP,
+      // inspect its contents for imsmanifest.xml
+      let detectedType = input.mediaType ?? detectMediaType(input.mimeType);
+      if (!input.mediaType && detectedType === "zip" && detectIfScorm(buffer)) {
+        detectedType = "scorm";
+      }
+      const mediaType = detectedType as typeof MEDIA_TYPES[number];
       const s3Key = `media-repo/${slug}/v1-${input.fileName}`;
       const { url: s3Url } = await storagePut(s3Key, buffer, input.mimeType);
 
@@ -484,11 +507,37 @@ export const mediaRepoRouter = router({
         uploadedByUserId: ctx.user.id,
       });
 
+      // Detect SCORM for ZIP files (inspect manifest)
+      let detectedType = detectMediaType(input.mimeType);
+      if (detectedType === "zip") {
+        try {
+          const admZip = new AdmZip(buffer);
+          const hasManifest = admZip.getEntries().some(e => e.entryName.toLowerCase().endsWith("imsmanifest.xml"));
+          if (hasManifest) detectedType = "scorm";
+        } catch {}
+      }
+
       // Update asset mimeType to reflect new version
       await db
         .update(mediaAssets)
-        .set({ mimeType: input.mimeType, mediaType: detectMediaType(input.mimeType) as any })
+        .set({ mimeType: input.mimeType, mediaType: detectedType as any })
         .where(eq(mediaAssets.id, input.assetId));
+
+      // Invalidate SCORM cache so the new ZIP is extracted on next request
+      if (detectedType === "scorm" || detectedType === "zip") {
+        try {
+          const os = await import("os");
+          const pathMod = await import("path");
+          const fsMod = await import("fs");
+          const cacheDir = pathMod.join(os.tmpdir(), "scorm-cache", asset.slug);
+          if (fsMod.existsSync(cacheDir)) {
+            fsMod.rmSync(cacheDir, { recursive: true, force: true });
+            console.log(`[SCORM] Cache invalidated for slug=${asset.slug}`);
+          }
+        } catch (e) {
+          console.warn(`[SCORM] Failed to invalidate cache for slug=${asset.slug}:`, e);
+        }
+      }
 
       return { versionNumber: nextVersion, s3Url };
     }),

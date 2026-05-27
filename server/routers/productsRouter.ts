@@ -5,6 +5,7 @@ import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
 import { getDb } from "../db";
 import { invokeLLM } from "../_core/llm";
+import { extractJson } from "../lib/extractJson";
 import {
   physicalProducts,
   physicalProductPricingOptions,
@@ -670,13 +671,13 @@ export const productsAdminRouter = router({
 
       // Get pricing options
       const pricingOptions = await db.select({
-        name: physicalProductPricingOptions.name,
+        label: physicalProductPricingOptions.label,
         price: physicalProductPricingOptions.price,
       }).from(physicalProductPricingOptions)
         .where(eq(physicalProductPricingOptions.productId, input.productId))
         .limit(5);
       const priceText = pricingOptions.length > 0
-        ? pricingOptions.map(p => `${p.name}: $${(p.price / 100).toFixed(2)}`).join(", ")
+        ? pricingOptions.map(p => `${p.label}: $${(p.price / 100).toFixed(2)}`).join(", ")
         : "Contact for pricing";
 
       const systemPrompt = `You are an expert landing page designer for physical products. Generate a complete, compelling landing page block structure as JSON. The blocks should be professional, conversion-focused, and specific to the content provided. Return ONLY valid JSON, no markdown.`;
@@ -758,7 +759,7 @@ Make ALL content specific and compelling based on the product title and descript
       let blocks: any[];
       try {
         const raw = response.choices[0].message.content as string;
-        const parsed = JSON.parse(raw);
+        const parsed = extractJson(raw);
         blocks = Array.isArray(parsed) ? parsed : parsed.blocks;
         if (!Array.isArray(blocks)) throw new Error("Not an array");
         const validTypes = new Set(["hero","text","image","video","audio","bullets","testimonial","pricing_cta","divider","two_column","divided_columns","spacer","faq","image_text","gallery","icon_grid","countdown","instructor","logos","reviews","embed","cta_standalone","lead_capture","cta_optin","numbered_list","checklist","alert","flip_cards","curriculum_auto","pricing_options_auto","funnel_workflow","product_offer_stack","order_bump_checkout","price_stack","urgency_offer","checkout_form","footer","logo_strip","three_column","related_products","embedded_checkout","inline_checkout","lesson_quiz","lesson_flashcard","file_download","scorm_embed","url_embed","column_layout","carousel","ticker","countdown_v2","live_session","comparison_table","pricing_cards","form_embed"]);

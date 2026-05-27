@@ -1603,6 +1603,7 @@ export const funnelPublicRouter = router({
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const rules = await db
         .select()
         .from(funnelBranchRules)

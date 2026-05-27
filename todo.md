@@ -3143,3 +3143,28 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix course card images in "You Might Also Like" — use coverImageUrl instead of thumbnailUrl in getProductsByIds
 - [x] Fix quiz AI generate in QuizBuilderDialog — add course/lesson selector so user can generate from specific lessons
 - [x] Pass courseId to BlockSettings in CourseOverviewEditor (LMSAdmin) to enable course/lesson selectors
+
+## SCORM Fix (2026-05-27)
+
+- [ ] Fix SCORM embed player — extract ZIP from S3, serve index.html, inject SCORM 1.2/2004 API shim
+- [ ] Ensure SCORM packages render correctly in /media/:slug/embed route
+- [ ] Handle SCORM progress tracking (LMSSetValue/GetValue) and save completion to DB
+
+## Session: AI Landing Page + SCORM Type Fix (2026-05-27)
+
+- [ ] Fix AI landing page returning "AI returned invalid JSON" error
+- [ ] Fix SCORM files being detected as generic ZIP instead of SCORM media type
+- [ ] Fix TypeScript errors in funnelRouter.ts and lmsRouter.ts
+
+- [ ] Add SCORM question import to question bank (parse iSpring/Articulate SCORM quiz XML and import questions)
+- [ ] Allow renaming/editing title of media repository files
+
+## Session: SCORM Cache + Image Path Fix (2026-05-27)
+
+- [x] Fix SCORM cache not invalidating on re-upload — use URL-hash-based cache key so new uploads always extract fresh
+- [x] Fix SCORM image path resolution — add iSpring data/ prefix fallback + recursive filename search
+- [x] Fix SCORM media type auto-detection on upload and re-upload (inspect ZIP for imsmanifest.xml)
+- [x] Add media file rename/title editing in Media Repository (inline title editor in asset detail dialog)
+- [x] Fix AI landing page invalid JSON — extractJson utility strips markdown code fences before JSON.parse
+- [x] Fix TypeScript root errors (lmsThinkificImports.lmsCourseId, funnelRouter db null, productsRouter label)
+- [x] Add course/lesson selector to QuizBuilderDialog AI Generate panel

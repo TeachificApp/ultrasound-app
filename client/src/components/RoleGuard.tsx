@@ -23,7 +23,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { PremiumPearlGate } from "@/components/PremiumPearlGate";
 
-type AppRole = "user" | "premium_user" | "diy_admin" | "diy_user" | "platform_admin" | "accreditation_manager";
+type AppRole = "user" | "premium_user" | "diy_admin" | "diy_user" | "platform_admin" | "accreditation_manager" | "education_manager" | "education_admin" | "education_student";
 
 interface RoleGuardProps {
   /** At least one of these roles must be present for access */
@@ -42,6 +42,9 @@ const ROLE_LABELS: Record<AppRole, string> = {
   diy_user: "DIY Accreditation User",
   platform_admin: "Platform Administrator",
   accreditation_manager: "Accreditation Manager",
+  education_manager: "Education Manager",
+  education_admin: "Education Admin",
+  education_student: "Education Student",
 };
 
 const ROLE_DESCRIPTIONS: Record<string, string> = {
