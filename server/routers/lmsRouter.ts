@@ -2727,8 +2727,8 @@ Rules:
         .orderBy(asc(lmsLessons.position));
 
       // Get pricing
-      const pricing = await db.select({ name: lmsPricingTiers.name, price: lmsPricingTiers.price, billingInterval: lmsPricingTiers.billingInterval, isDefault: lmsPricingTiers.isDefault })
-        .from(lmsPricingTiers).where(and(eq(lmsPricingTiers.courseId, input.courseId), eq(lmsPricingTiers.isActive, true))).limit(5);
+      const pricing = await db.select({ label: lmsPricingOptions.label, price: lmsPricingOptions.price, pricingType: lmsPricingOptions.pricingType, subscriptionInterval: lmsPricingOptions.subscriptionInterval })
+        .from(lmsPricingOptions).where(and(eq(lmsPricingOptions.courseId, input.courseId), eq(lmsPricingOptions.isActive, true))).limit(5);
 
       const typeLabel = course.type === "download" ? "digital download" : course.type === "quiz" ? "quiz" : "course";
       const curriculumText = sections.length > 0

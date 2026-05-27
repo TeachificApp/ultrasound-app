@@ -3129,3 +3129,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix related products course card images (sync thumbnailUrl with coverImageUrl)
 - [x] Add syncAllCourseImages procedure + Sync Images button in Courses tab
 - [x] Write vitest tests for question bank and quiz block logic (7 tests passing)
+
+## Session: Continued Fixes (2026-05-27 cont.)
+- [x] Pass courseId from LessonBlockEditor → BlockSettings (fixes "Entire Course" / "Pick Lessons" disabled in quiz AI generate from lesson editor)
+- [x] Fix lmsPricingTiers → lmsPricingOptions (correct table + field names) in aiGenerateLandingPage procedure
+- [ ] Enforce quiz gate in CoursePlayer: lock Next Lesson until passing score when requirePassingToProgress is true
+- [ ] Update BlockPreview and CoursePlayer quiz renderer: display question/answer media (images/video), respect shuffleQuestions/shuffleAnswers flags
+- [ ] Auto-save questions to question bank when added manually or AI-generated in LessonQuizBlockEditor

@@ -607,6 +607,7 @@ export default function LessonBlockEditor({
                   block={selectedBlock}
                   onChange={data => updateBlock(selectedBlock.id, data)}
                   lessonId={lessonId}
+                  courseId={courseId}
                 />
               </div>
             </div>
