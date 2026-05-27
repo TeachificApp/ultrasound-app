@@ -4777,7 +4777,7 @@ export type IpSecurityFlag = typeof ipSecurityFlags.$inferSelect;
 export const mediaUploadSessions = mysqlTable("media_upload_sessions", {
   id: int("id").autoincrement().primaryKey(),
   uploadId: varchar("upload_id", { length: 64 }).notNull().unique(),
-  r2UploadId: varchar("r2_upload_id", { length: 256 }).notNull(),
+  r2UploadId: text("r2_upload_id").notNull(),
   s3Key: varchar("s3_key", { length: 512 }).notNull(),
   mimeType: varchar("mime_type", { length: 128 }).notNull(),
   totalChunks: int("total_chunks").notNull(),

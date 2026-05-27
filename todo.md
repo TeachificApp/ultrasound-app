@@ -3269,3 +3269,14 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fixed /chunk handler to read strategy from `session.strategy` DB column instead of parsing completedParts JSON
 - [x] completedParts now stores plain JSON array (not wrapped object) for direct path; multipart path stores {parts:[]} object
 - [x] All 26 vitest tests passing
+- [x] Fix media upload HTTP 500 - r2_upload_id varchar(256) too short for R2 multipart upload IDs (changed to TEXT)
+
+## Community Hub Completion (2026-05-27)
+- [x] Built full CommunitiesTab in LMS Admin (replacing Coming Soon placeholder)
+- [x] CommunitiesTab sub-tabs: Communities, Channels, Moderation, Announcements, Badges
+- [x] Added listChannels admin procedure to communityAdminRouter
+- [x] Added listBadges, createBadge, grantBadge admin procedures to communityAdminRouter
+- [x] Extracted CommunityFormInline and ChannelFormInline as top-level components (React hooks rules fix)
+- [x] Updated sidebar nav to point to internal /community route (not external Thinkific)
+- [x] Added CommunityHub import and /community route in App.tsx
+- [x] Added /community/:slug route for CommunityFeed (slug param matching)

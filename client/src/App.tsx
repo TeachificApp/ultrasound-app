@@ -257,6 +257,7 @@ const AdminDiscountCodesPage = lazy(() => import("./pages/admin/AdminDiscountCod
 const MembershipAdmin = lazy(() => import("./pages/admin/MembershipAdmin"));
 
 // ── Community ─────────────────────────────────────────────────────────────────
+const CommunityHub = lazy(() => import("./pages/Community"));
 const CommunityFeed = lazy(() => import("./pages/CommunityFeed"));
 const CommunityProfile = lazy(() => import("./pages/CommunityProfile"));
 const CommunityDMs = lazy(() => import("./pages/CommunityDMs"));
@@ -572,7 +573,8 @@ function LMSRouter() {
             {/* LMS Home */}
             <Route path="/" component={LMSHome} />
             {/* Community — must be before /:slug catch-all */}
-            <Route path="/community" component={CommunityFeed} />
+            <Route path="/community" component={CommunityHub} />
+            <Route path="/community/:slug" component={CommunityFeed} />
             <Route path="/community/spaces/:spaceId" component={CommunityFeed} />
             <Route path="/community/spaces/:spaceId/channels/:channelId" component={CommunityFeed} />
             <Route path="/community/members/:userId" component={CommunityProfile} />

@@ -40,6 +40,7 @@ import {
   User, Lock, ListChecks, Award, PlayCircle, ArrowRight, UserPlus, RefreshCw,
   Package, Layers, Globe, Radio, Tag, LayoutGrid, ShoppingBag, GraduationCap, TrendingUp,
   Layout as LayoutTemplate, Database,
+  Hash, Shield, Flag, Pin, Megaphone, Bell, MessageSquare, Star, Zap, XCircle,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import LessonEffectEditor from "@/components/LessonEffectEditor";
@@ -5384,7 +5385,7 @@ export default function LMSAdmin() {
               {activeTab === "webinars"    && <LMSComingSoonTab icon={Radio} title="Webinars" description="Host and manage live webinar sessions with registration, reminders, and replay access." color="teal" />}
               {activeTab === "bundles"     && <LMSComingSoonTab icon={Layers} title="Bundles" description="Package courses, downloads, products, and quizzes together and sell them as a single bundle at a special price." color="teal" />}
               {activeTab === "memberships" && <LMSComingSoonTab icon={Award} title="Memberships" description="Create membership tiers that unlock course access, community features, and exclusive content on a recurring basis." color="teal" />}
-              {activeTab === "communities" && <LMSComingSoonTab icon={Globe} title="Communities" description="Manage community hubs — discussion boards, member directories, and group spaces tied to courses or memberships." color="teal" />}
+              {activeTab === "communities" && <CommunitiesTab />}
               {activeTab === "orderbumps"  && <OrderBumpsAdmin />}
               {activeTab === "collections" && <CollectionsTab />}
               {activeTab === "groups"      && <GroupsTab />}
@@ -5404,6 +5405,553 @@ export default function LMSAdmin() {
   );
 }
 
+// ─── Communities Tab helpers (top-level to satisfy React rules of hooks) ─────
+
+function CommunityFormInline({
+  community, onClose, onCreate, onUpdate, isCreating, isUpdating,
+}: {
+  community?: any; onClose: () => void;
+  onCreate: (data: any) => void; onUpdate: (data: any) => void;
+  isCreating: boolean; isUpdating: boolean;
+}) {
+  const [form, setForm] = useState({
+    title: community?.title ?? "",
+    slug: community?.slug ?? "",
+    description: community?.description ?? "",
+    privacy: community?.privacy ?? "public",
+    accessType: community?.accessType ?? "free",
+    brand: community?.brand ?? "all_about_ultrasound",
+    accentColor: community?.accentColor ?? "#189aa1",
+    status: community?.status ?? "published",
+  });
+  function handleSubmit() {
+    if (!form.title.trim() || !form.slug.trim()) { toast("Title and slug are required"); return; }
+    if (community) onUpdate({ id: community.id, ...form });
+    else onCreate(form);
+  }
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label className="text-xs font-medium text-gray-600 mb-1 block">Title *</Label>
+          <Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Community title" />
+        </div>
+        <div>
+          <Label className="text-xs font-medium text-gray-600 mb-1 block">Slug *</Label>
+          <Input value={form.slug} onChange={e => setForm(f => ({ ...f, slug: e.target.value.toLowerCase().replace(/\s+/g, "-") }))} placeholder="url-slug" />
+        </div>
+      </div>
+      <div>
+        <Label className="text-xs font-medium text-gray-600 mb-1 block">Description</Label>
+        <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="What is this community about?" />
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <Label className="text-xs font-medium text-gray-600 mb-1 block">Privacy</Label>
+          <Select value={form.privacy} onValueChange={v => setForm(f => ({ ...f, privacy: v }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="public">Public</SelectItem>
+              <SelectItem value="private">Private</SelectItem>
+              <SelectItem value="paid">Paid</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="text-xs font-medium text-gray-600 mb-1 block">Access</Label>
+          <Select value={form.accessType} onValueChange={v => setForm(f => ({ ...f, accessType: v }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="free">Free</SelectItem>
+              <SelectItem value="paid">Paid</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="text-xs font-medium text-gray-600 mb-1 block">Brand</Label>
+          <Select value={form.brand} onValueChange={v => setForm(f => ({ ...f, brand: v }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all_about_ultrasound">All About Ultrasound™</SelectItem>
+              <SelectItem value="iheartecho">iHeartEcho™</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label className="text-xs font-medium text-gray-600 mb-1 block">Status</Label>
+          <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="published">Published</SelectItem>
+              <SelectItem value="draft">Draft</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="text-xs font-medium text-gray-600 mb-1 block">Accent Color</Label>
+          <div className="flex items-center gap-2">
+            <input type="color" value={form.accentColor} onChange={e => setForm(f => ({ ...f, accentColor: e.target.value }))} className="w-9 h-9 rounded cursor-pointer border" />
+            <Input value={form.accentColor} onChange={e => setForm(f => ({ ...f, accentColor: e.target.value }))} className="w-28" />
+          </div>
+        </div>
+      </div>
+      <div className="flex justify-end gap-2 pt-2">
+        <Button variant="outline" onClick={onClose}>Cancel</Button>
+        <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={handleSubmit} disabled={isCreating || isUpdating}>
+          {community ? "Save Changes" : "Create Community"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ChannelFormInline({
+  communityId, onClose, onAdd, isAdding,
+}: {
+  communityId: number; onClose: () => void;
+  onAdd: (data: any) => void; isAdding: boolean;
+}) {
+  const [form, setForm] = useState({ name: "", description: "", type: "discussion" as string });
+  function handleSubmit() {
+    if (!form.name.trim()) { toast("Channel name is required"); return; }
+    onAdd({ communityId, name: form.name, description: form.description || undefined, type: form.type });
+  }
+  return (
+    <div className="space-y-4">
+      <div>
+        <Label className="text-xs font-medium text-gray-600 mb-1 block">Channel Name *</Label>
+        <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="general" />
+      </div>
+      <div>
+        <Label className="text-xs font-medium text-gray-600 mb-1 block">Description</Label>
+        <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="What is this channel for?" />
+      </div>
+      <div>
+        <Label className="text-xs font-medium text-gray-600 mb-1 block">Type</Label>
+        <Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v }))}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="discussion">Discussion</SelectItem>
+            <SelectItem value="announcements">Announcements</SelectItem>
+            <SelectItem value="resources">Resources</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="flex justify-end gap-2 pt-2">
+        <Button variant="outline" onClick={onClose}>Cancel</Button>
+        <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={handleSubmit} disabled={isAdding}>
+          Add Channel
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Communities Tab ────────────────────────────────────────────────────────
+
+function CommunitiesTab() {
+  const { user } = trpc.auth.me.useQuery(undefined, { select: d => d }).data as any ?? {};
+  const isAdmin = (user as any)?.role === "admin";
+  const utils = trpc.useUtils();
+
+  // Community list
+  const { data: communities, isLoading: commLoading } = trpc.community.admin.listAllCommunities.useQuery(undefined, { enabled: isAdmin });
+  const [activeCommunityId, setActiveCommunityId] = useState<number | null>(null);
+
+  // Tabs within the communities panel
+  const [activeSubTab, setActiveSubTab] = useState<"communities" | "channels" | "moderation" | "announcements" | "badges">("communities");
+
+  // Community form state
+  const [showCommunityForm, setShowCommunityForm] = useState(false);
+  const [editCommunity, setEditCommunity] = useState<any>(null);
+
+  // Channel form state
+  const [showChannelForm, setShowChannelForm] = useState(false);
+
+  // Announcement form state
+  const [announcementTitle, setAnnouncementTitle] = useState("");
+  const [announcementBody, setAnnouncementBody] = useState("");
+
+  // Badge award state
+  const [awardUserId, setAwardUserId] = useState("");
+
+  // Reports
+  const { data: reports } = trpc.community.admin.listReports.useQuery(
+    { status: "pending" },
+    { enabled: isAdmin }
+  );
+
+    // Channels for the active community
+  const { data: channelList, isLoading: channelsLoading } = trpc.community.admin.listChannels.useQuery(
+    { communityId: activeCommunityId! },
+    { enabled: isAdmin && activeCommunityId !== null }
+  );
+  // Mutations
+  const createCommunity = trpc.community.admin.createCommunity.useMutation({
+    onSuccess: () => { toast.success("Community created!"); utils.community.admin.listAllCommunities.invalidate(); setShowCommunityForm(false); },
+    onError: e => toast.error(e.message),
+  });
+  const updateCommunity = trpc.community.admin.updateCommunity.useMutation({
+    onSuccess: () => { toast.success("Community updated!"); utils.community.admin.listAllCommunities.invalidate(); setShowCommunityForm(false); setEditCommunity(null); },
+    onError: e => toast.error(e.message),
+  });
+  const addChannel = trpc.community.admin.addChannel.useMutation({
+    onSuccess: () => { toast.success("Channel added!"); utils.community.admin.listChannels.invalidate(); setShowChannelForm(false); },
+    onError: e => toast.error(e.message),
+  });
+  const deleteChannel = trpc.community.admin.deleteChannel.useMutation({
+    onSuccess: () => { toast.success("Channel deleted"); utils.community.admin.listChannels.invalidate(); },
+    onError: e => toast.error(e.message),
+  });
+  const resolveReport = trpc.community.admin.resolveReport.useMutation({
+    onSuccess: () => { toast.success("Report resolved"); utils.community.admin.listReports.invalidate(); },
+    onError: e => toast.error(e.message),
+  });
+    const postAnnouncement = trpc.community.admin.postAnnouncement.useMutation({
+    onSuccess: () => { toast.success("Announcement posted!"); setAnnouncementTitle(""); setAnnouncementBody(""); },
+    onError: e => toast.error(e.message),
+  });
+  // Badges
+  const { data: badges } = trpc.community.admin.listBadges.useQuery(undefined, { enabled: isAdmin });
+  const [showBadgeForm, setShowBadgeForm] = useState(false);
+  const [badgeName, setBadgeName] = useState("");
+  const [badgeSlug, setBadgeSlug] = useState("");
+  const [badgeEmoji, setBadgeEmoji] = useState("🏅");
+  const [badgeXP, setBadgeXP] = useState(0);
+  const [badgeDesc, setBadgeDesc] = useState("");
+  const createBadge = trpc.community.admin.createBadge.useMutation({
+    onSuccess: () => { toast.success("Badge created!"); utils.community.admin.listBadges.invalidate(); setShowBadgeForm(false); setBadgeName(""); setBadgeSlug(""); setBadgeEmoji("🏅"); setBadgeXP(0); setBadgeDesc(""); },
+    onError: e => toast.error(e.message),
+  });
+  // Auto-select first community
+  useEffect(() => {
+    if (communities?.length && !activeCommunityId) setActiveCommunityId(communities[0].id);
+  }, [communities]);
+
+    if (!isAdmin) {
+    return (
+      <div className="flex items-center justify-center h-64 text-gray-500">
+        <Shield className="w-8 h-8 mr-2" /> Admin access required
+      </div>
+    );
+  }
+
+  const pendingReports = reports?.filter((r: any) => r.status === "pending") ?? [];
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">Community Management</h2>
+          <p className="text-sm text-gray-500 mt-0.5">Manage communities, channels, moderation, and announcements</p>
+        </div>
+        <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => { setEditCommunity(null); setShowCommunityForm(true); }}>
+          <Plus className="w-4 h-4 mr-2" /> New Community
+        </Button>
+      </div>
+
+      {/* Sub-tabs */}
+      <div className="flex gap-1 border-b border-gray-200">
+        {([
+          { key: "communities", label: "Communities", icon: Users },
+          { key: "channels", label: "Channels", icon: Hash },
+          { key: "moderation", label: "Moderation", icon: Flag, badge: pendingReports.length },
+          { key: "announcements", label: "Announcements", icon: Megaphone },
+          { key: "badges", label: "Badges", icon: Award },
+        ] as const).map(({ key, label, icon: Icon, badge }) => (
+          <button
+            key={key}
+            onClick={() => setActiveSubTab(key)}
+            className={cn(
+              "flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors",
+              activeSubTab === key
+                ? "border-teal-500 text-teal-700"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+            )}
+          >
+            <Icon className="w-4 h-4" />
+            {label}
+            {badge != null && badge > 0 && (
+              <span className="ml-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 leading-none">{badge}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Communities sub-tab */}
+      {activeSubTab === "communities" && (
+        <div className="space-y-3">
+          {showCommunityForm && (
+            <div className="border border-teal-200 rounded-xl bg-teal-50/40 p-5">
+              <h3 className="font-semibold text-gray-900 mb-4">{editCommunity ? "Edit Community" : "Create Community"}</h3>
+              <CommunityFormInline
+                community={editCommunity}
+                onClose={() => { setShowCommunityForm(false); setEditCommunity(null); }}
+                onCreate={data => createCommunity.mutate(data as any)}
+                onUpdate={data => updateCommunity.mutate(data as any)}
+                isCreating={createCommunity.isPending}
+                isUpdating={updateCommunity.isPending}
+              />
+            </div>
+          )}
+          {commLoading ? (
+            <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-20 rounded-xl" />)}</div>
+          ) : !communities?.length ? (
+            <div className="text-center py-16 text-gray-400">
+              <Globe className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p className="font-medium">No communities yet</p>
+              <p className="text-sm mt-1">Create your first community to get started.</p>
+            </div>
+          ) : (
+            communities.map((c: any) => (
+              <div key={c.id} className={cn(
+                "flex items-center gap-4 bg-white rounded-xl border px-4 py-3 transition-all",
+                activeCommunityId === c.id ? "ring-2 ring-teal-400 border-teal-200" : "border-gray-200 hover:border-teal-200"
+              )}>
+                <div className="w-11 h-11 rounded-xl flex-shrink-0 flex items-center justify-center text-white font-bold text-lg"
+                  style={{ backgroundColor: c.accentColor || "#189aa1" }}>
+                  {c.title.charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-gray-900">{c.title}</span>
+                    <Badge variant="outline" className="text-xs capitalize">{c.status}</Badge>
+                    <Badge variant="secondary" className="text-xs capitalize">{c.privacy}</Badge>
+                    <Badge variant="secondary" className="text-xs capitalize">{c.accessType}</Badge>
+                  </div>
+                  <p className="text-sm text-gray-500 truncate mt-0.5">{c.description || "No description"}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">/{c.slug} · {(c.memberCount ?? 0).toLocaleString()} members</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => { setActiveCommunityId(c.id); setActiveSubTab("channels"); }}>
+                    <Hash className="w-3.5 h-3.5 mr-1" /> Channels
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => { setEditCommunity(c); setShowCommunityForm(true); }}>
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Channels sub-tab */}
+      {activeSubTab === "channels" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <Select value={activeCommunityId?.toString() ?? ""} onValueChange={v => setActiveCommunityId(parseInt(v))}>
+              <SelectTrigger className="w-56"><SelectValue placeholder="Select community" /></SelectTrigger>
+              <SelectContent>
+                {communities?.map((c: any) => (
+                  <SelectItem key={c.id} value={c.id.toString()}>{c.title}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button className="bg-teal-600 hover:bg-teal-700 text-white" disabled={!activeCommunityId}
+              onClick={() => setShowChannelForm(true)}>
+              <Plus className="w-4 h-4 mr-2" /> Add Channel
+            </Button>
+          </div>
+          {showChannelForm && activeCommunityId && (
+            <div className="border border-teal-200 rounded-xl bg-teal-50/40 p-5">
+              <h3 className="font-semibold text-gray-900 mb-4">Add Channel</h3>
+              <ChannelFormInline
+                communityId={activeCommunityId}
+                onClose={() => setShowChannelForm(false)}
+                onAdd={data => addChannel.mutate(data as any)}
+                isAdding={addChannel.isPending}
+              />
+            </div>
+          )}
+          {!activeCommunityId ? (
+            <div className="text-center py-12 text-gray-400">Select a community to manage its channels.</div>
+          ) : channelsLoading ? (
+            <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-14 rounded-lg" />)}</div>
+          ) : !channelList?.length ? (
+            <div className="text-center py-12 text-gray-400">
+              <Hash className="w-10 h-10 mx-auto mb-2 opacity-30" />
+              <p>No channels yet. Add one to get started.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {channelList.map((ch: any) => (
+                <div key={ch.id} className="flex items-center gap-3 bg-white rounded-lg border border-gray-200 px-4 py-3">
+                  <Hash className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-gray-900">{ch.name}</span>
+                      {ch.isDefault && <Badge className="text-xs bg-teal-100 text-teal-700 border-teal-200">Default</Badge>}
+                      <Badge variant="secondary" className="text-xs capitalize">{ch.type?.replace("_", " ")}</Badge>
+                    </div>
+                    {ch.description && <p className="text-sm text-gray-500">{ch.description}</p>}
+                  </div>
+                  <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700"
+                    onClick={() => { if (confirm(`Delete #${ch.name}?`)) deleteChannel.mutate({ channelId: ch.id }); }}>
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Moderation sub-tab */}
+      {activeSubTab === "moderation" && (
+        <div className="space-y-3">
+          {pendingReports.length === 0 ? (
+            <div className="text-center py-16 text-gray-400">
+              <CheckCircle className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p className="font-medium">No pending reports</p>
+              <p className="text-sm mt-1">Community is clean!</p>
+            </div>
+          ) : (
+            pendingReports.map((r: any) => (
+              <div key={r.id} className="bg-white rounded-xl border border-gray-200 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge variant="destructive" className="text-xs">Pending</Badge>
+                      <span className="text-xs text-gray-500 capitalize">{r.targetType} report</span>
+                    </div>
+                    <p className="text-sm text-gray-700"><strong>Reason:</strong> {r.reason}</p>
+                    {r.details && <p className="text-sm text-gray-500 mt-1">{r.details}</p>}
+                    <p className="text-xs text-gray-400 mt-1">Reported by user #{r.reporterId} · Target ID: {r.targetId}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" className="text-green-600 border-green-200 hover:bg-green-50"
+                      onClick={() => resolveReport.mutate({ reportId: r.id, status: "dismissed" })}>
+                      <CheckCircle className="w-3.5 h-3.5 mr-1" /> Dismiss
+                    </Button>
+                    <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50"
+                      onClick={() => resolveReport.mutate({ reportId: r.id, status: "reviewed" })}>
+                      <XCircle className="w-3.5 h-3.5 mr-1" /> Mark Reviewed
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Announcements sub-tab */}
+      {activeSubTab === "announcements" && (
+        <div className="space-y-4">
+          <div className="border border-teal-200 rounded-xl bg-teal-50/40 p-5">
+            <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <Megaphone className="w-4 h-4 text-teal-600" /> Post Announcement
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs font-medium text-gray-600 mb-1 block">Community</Label>
+                <Select value={activeCommunityId?.toString() ?? ""} onValueChange={v => setActiveCommunityId(parseInt(v))}>
+                  <SelectTrigger className="w-full"><SelectValue placeholder="Select community" /></SelectTrigger>
+                  <SelectContent>
+                    {communities?.map((c: any) => (
+                      <SelectItem key={c.id} value={c.id.toString()}>{c.title}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs font-medium text-gray-600 mb-1 block">Title *</Label>
+                <Input value={announcementTitle} onChange={e => setAnnouncementTitle(e.target.value)} placeholder="Announcement title" />
+              </div>
+              <div>
+                <Label className="text-xs font-medium text-gray-600 mb-1 block">Body *</Label>
+                <RichTextEditor
+                  value={announcementBody}
+                  onChange={setAnnouncementBody}
+                  placeholder="Write your announcement here..."
+                  minHeight={120}
+                />
+              </div>
+              <div className="flex justify-end">
+                <Button className="bg-teal-600 hover:bg-teal-700 text-white"
+                  disabled={!activeCommunityId || !announcementTitle.trim() || !announcementBody.trim() || postAnnouncement.isPending}
+                  onClick={() => postAnnouncement.mutate({ communityId: activeCommunityId!, title: announcementTitle, body: announcementBody })}>
+                  <Megaphone className="w-4 h-4 mr-2" /> Post Announcement
+                </Button>
+              </div>
+            </div>
+          </div>
+                    <p className="text-xs text-gray-400">Announcements are pinned posts in the Announcements channel and notify all community members.</p>
+        </div>
+      )}
+      {/* Badges sub-tab */}
+      {activeSubTab === "badges" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-gray-900 flex items-center gap-2"><Award className="w-4 h-4 text-teal-600" /> Badge Management</h3>
+            <Button className="bg-teal-600 hover:bg-teal-700 text-white" size="sm" onClick={() => setShowBadgeForm(v => !v)}>
+              <Plus className="w-4 h-4 mr-1" /> New Badge
+            </Button>
+          </div>
+          {showBadgeForm && (
+            <div className="border border-teal-200 rounded-xl bg-teal-50/40 p-5 space-y-3">
+              <h4 className="font-medium text-gray-900">Create Badge</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs font-medium text-gray-600 mb-1 block">Name *</Label>
+                  <Input value={badgeName} onChange={e => setBadgeName(e.target.value)} placeholder="e.g. First Post" />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-gray-600 mb-1 block">Slug *</Label>
+                  <Input value={badgeSlug} onChange={e => setBadgeSlug(e.target.value)} placeholder="e.g. first_post" />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-gray-600 mb-1 block">Emoji</Label>
+                  <Input value={badgeEmoji} onChange={e => setBadgeEmoji(e.target.value)} placeholder="🏅" className="w-20" />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-gray-600 mb-1 block">XP Required</Label>
+                  <Input type="number" value={badgeXP} onChange={e => setBadgeXP(parseInt(e.target.value) || 0)} placeholder="0" />
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs font-medium text-gray-600 mb-1 block">Description</Label>
+                <Input value={badgeDesc} onChange={e => setBadgeDesc(e.target.value)} placeholder="Badge description" />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => setShowBadgeForm(false)}>Cancel</Button>
+                <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white"
+                  disabled={!badgeName.trim() || !badgeSlug.trim() || createBadge.isPending}
+                  onClick={() => createBadge.mutate({ name: badgeName, slug: badgeSlug, iconEmoji: badgeEmoji, xpRequired: badgeXP, description: badgeDesc || undefined })}>
+                  Create Badge
+                </Button>
+              </div>
+            </div>
+          )}
+          {!badges?.length ? (
+            <div className="text-center py-12 text-gray-400">
+              <Award className="w-10 h-10 mx-auto mb-2 opacity-30" />
+              <p>No badges yet. Create one to reward community members.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {badges.map((b: any) => (
+                <div key={b.id} className="flex items-center gap-3 bg-white rounded-xl border border-gray-200 px-4 py-3">
+                  <div className="text-2xl flex-shrink-0">{b.iconEmoji || "🏅"}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-gray-900 text-sm truncate">{b.name}</div>
+                    {b.description && <div className="text-xs text-gray-500 truncate">{b.description}</div>}
+                    {b.xpRequired > 0 && <div className="text-xs text-teal-600">{b.xpRequired} XP required</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-xs text-gray-400">Badges are automatically awarded when members reach the required XP threshold or specific milestones.</p>
+        </div>
+      )}
+    </div>
+  );
+}
 // ─── Coming Soon Placeholder Tab ─────────────────────────────────────────────
 
 function LMSComingSoonTab({ icon: Icon, title, description, color }: { icon: any; title: string; description: string; color: string }) {

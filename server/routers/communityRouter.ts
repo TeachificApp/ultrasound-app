@@ -788,6 +788,15 @@ const communityAdminRouter = router({
     return withCounts;
   }),
 
+  /** List channels for a community (admin) */
+  listChannels: protectedProcedure.input(z.object({ communityId: z.number() })).query(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) return [];
+    return db.select().from(communityChannels)
+      .where(eq(communityChannels.communityId, input.communityId))
+      .orderBy(asc(communityChannels.sortOrder));
+  }),
   /** Add a channel */
   addChannel: protectedProcedure.input(z.object({
     communityId: z.number(),
@@ -924,6 +933,40 @@ const communityAdminRouter = router({
     return { id: result.id };
   }),
 
+  /** List all badges */
+  listBadges: protectedProcedure.query(async ({ ctx }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) return [];
+    return db.select().from(communityBadges).orderBy(asc(communityBadges.id));
+  }),
+  /** Create a badge */
+  createBadge: protectedProcedure.input(z.object({
+    name: z.string().min(1).max(100),
+    slug: z.string().min(1).max(100),
+    description: z.string().optional(),
+    iconEmoji: z.string().max(10).default("🏅"),
+    xpRequired: z.number().min(0).default(0),
+    color: z.string().default("#189aa1"),
+  })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const [result] = await db.insert(communityBadges).values(input).$returningId();
+    return { id: result.id };
+  }),
+  /** Grant a badge to a user */
+  grantBadge: protectedProcedure.input(z.object({
+    userId: z.number(),
+    badgeId: z.number(),
+  })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    await db.insert(communityUserBadges).values({ userId: input.userId, badgeId: input.badgeId })
+      .onDuplicateKeyUpdate({ set: { badgeId: input.badgeId } });
+    return { success: true };
+  }),
   /** AI: summarize recent posts in a channel */
   aiSummarizeChannel: protectedProcedure.input(z.object({ channelId: z.number(), limit: z.number().default(20) })).mutation(async ({ ctx, input }) => {
     await assertAdmin(ctx);
