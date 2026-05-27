@@ -1195,6 +1195,7 @@ export default function PlatformAdmin() {
     { id: "user-analytics", href: "/admin/user-analytics", icon: BarChart2, label: "User Analytics", description: "Logins, access, course progress, and detailed user profiles", color: "#7c3aed" },
     { id: "sales-dashboard", href: "/admin/sales-dashboard", icon: TrendingUp, label: "Sales Dashboard", description: "Revenue analytics, per-product breakdown, transaction management, refunds, and resend access emails", color: "#16a34a" },
     { id: "discount-codes", href: "/admin/discount-codes", icon: Tag, label: "Discount Codes", description: "Create and manage Stripe coupons and promo codes for all products", color: "#f59e0b" },
+    { id: "memberships", href: "/admin/memberships", icon: Crown, label: "Memberships", description: "Manage premium memberships for AAUS and iHeartEcho — grant, revoke, and view all active members", color: "#0d9488" },
   ];
 
   // Per-Brand tool cards (auto-scoped to current brand)

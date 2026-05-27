@@ -12,7 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Package, ArrowLeft, Check, Link as LinkIcon, UserPlus, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, ArrowLeft, Check, Link as LinkIcon, UserPlus, Loader2, Users } from "lucide-react";
+import { BundleSalesTab } from "@/components/ProductSalesTab";
 
 function BundleList({ onEdit }: { onEdit: (id: number) => void }) {
   const { data: bundles, isLoading } = trpc.downloadsAdmin.listBundles.useQuery();
@@ -195,6 +196,14 @@ function BundleEditor({ bundleId, onBack }: { bundleId: number; onBack: () => vo
         </Button>
       </div>
       <GrantBundleAccessDialog open={showGrantDialog} bundleId={bundleId} onClose={() => setShowGrantDialog(false)} />
+
+      {/* Sales & Access */}
+      <Card>
+        <CardHeader><CardTitle className="text-sm flex items-center gap-2"><Users className="h-4 w-4 text-teal-600" /> Sales &amp; Access</CardTitle></CardHeader>
+        <CardContent>
+          <BundleSalesTab bundleId={bundleId} />
+        </CardContent>
+      </Card>
 
       {/* Basic Info */}
       <Card>

@@ -21,6 +21,10 @@ import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
 import { sendDownloadAccessEmail, sendBundleAccessEmail } from "../lib/enrollmentEmail";
 
+function assertAdmin(ctx: any) {
+  if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+}
+
 // ─── Public Router ──────────────────────────────────────────────────────────
 export const downloadsPublicRouter = router({
   /** List published digital products */
@@ -1132,6 +1136,98 @@ Make ALL content specific and compelling based on the product title and descript
         .where(eq(digitalProducts.id, input.productId));
 
       return { success: true, blockCount: blocks.length };
+    }),
+
+  /** List all buyers/access holders for a digital product */
+  getSalesData: protectedProcedure
+    .input(z.object({
+      productId: z.number(),
+      page: z.number().min(1).default(1),
+      pageSize: z.number().min(1).max(100).default(25),
+    }))
+    .query(async ({ ctx, input }) => {
+      assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) return { purchases: [], total: 0, totalRevenue: 0 };
+
+      const offset = (input.page - 1) * input.pageSize;
+
+      const [purchases, countResult] = await Promise.all([
+        db.select({
+          id: digitalPurchases.id,
+          userId: digitalPurchases.userId,
+          productId: digitalPurchases.productId,
+          amount: digitalPurchases.amount,
+          currency: digitalPurchases.currency,
+          status: digitalPurchases.status,
+          stripePaymentIntentId: digitalPurchases.stripePaymentIntentId,
+          createdAt: digitalPurchases.createdAt,
+          userName: users.name,
+          userEmail: users.email,
+        })
+          .from(digitalPurchases)
+          .leftJoin(users, eq(users.id, digitalPurchases.userId))
+          .where(eq(digitalPurchases.productId, input.productId))
+          .orderBy(desc(digitalPurchases.createdAt))
+          .limit(input.pageSize)
+          .offset(offset),
+        db.select({ count: sql<number>`count(*)`, revenue: sql<number>`COALESCE(SUM(CASE WHEN status='paid' THEN amount ELSE 0 END), 0)` })
+          .from(digitalPurchases)
+          .where(eq(digitalPurchases.productId, input.productId)),
+      ]);
+
+      return {
+        purchases,
+        total: Number(countResult[0]?.count ?? 0),
+        totalRevenue: Number(countResult[0]?.revenue ?? 0),
+      };
+    }),
+
+  /** Revoke a user's access to a digital product */
+  revokeAccess: protectedProcedure
+    .input(z.object({
+      purchaseId: z.number(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new Error("DB unavailable");
+
+      await db.update(digitalPurchases)
+        .set({ status: "revoked" })
+        .where(eq(digitalPurchases.id, input.purchaseId));
+
+      return { success: true };
+    }),
+
+  /** Refund a digital purchase via Stripe */
+  refundPurchase: protectedProcedure
+    .input(z.object({
+      purchaseId: z.number(),
+      reason: z.string().default("requested_by_customer"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new Error("DB unavailable");
+
+      const [purchase] = await db.select().from(digitalPurchases).where(eq(digitalPurchases.id, input.purchaseId)).limit(1);
+      if (!purchase) throw new Error("Purchase not found");
+      if (!purchase.stripePaymentIntentId) throw new Error("No Stripe payment intent on this purchase");
+
+      const { default: Stripe } = await import("stripe");
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-12-18.acacia" });
+
+      const refund = await stripe.refunds.create({
+        payment_intent: purchase.stripePaymentIntentId,
+        reason: input.reason as any,
+      });
+
+      await db.update(digitalPurchases)
+        .set({ status: "refunded" })
+        .where(eq(digitalPurchases.id, input.purchaseId));
+
+      return { refundId: refund.id, status: refund.status };
     }),
 });
 

@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, Copy, Upload, FileIcon, GripVertical, ArrowLeft, ExternalLink, Eye, EyeOff, Image as ImageIcon, Link as LinkIcon, Users, UserPlus, Loader2, Sparkles, LayoutTemplate } from "lucide-react";
 import RichTextEditor from "@/components/RichTextEditor";
+import { DownloadSalesTab } from "@/components/ProductSalesTab";
 import {
   DndContext, DragOverlay, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent,
 } from "@dnd-kit/core";
@@ -574,6 +575,14 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
         </div>
       </div>
       <GrantDownloadAccessDialog open={showGrantDialog} productId={productId} onClose={() => setShowGrantDialog(false)} />
+
+      {/* Sales & Access Tab */}
+      <Card>
+        <CardHeader><CardTitle className="text-sm flex items-center gap-2"><Users className="h-4 w-4 text-teal-600" /> Sales &amp; Access</CardTitle></CardHeader>
+        <CardContent>
+          <DownloadSalesTab productId={productId} />
+        </CardContent>
+      </Card>
     </div>
   );
 }

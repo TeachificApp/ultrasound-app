@@ -3221,20 +3221,20 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] LandingPageBuilder selectMediaAsset: store mediaAssetSlug and set mediaAssetUrl to slug-based serve endpoint
 
 ## Analytics & Sales Management (2026-05-27)
-- [ ] Fix analytics sales dashboard to show funnel/product purchases in real time
-- [ ] Add Sales/Enrollment tab to: Courses, Downloads, Bundles, Quizzes, Memberships
-- [ ] Sales tab: user list with name/email/date/amount, access toggle, refund button
+- [x] Fix analytics sales dashboard to show funnel/product purchases in real time
+- [x] Add Sales/Enrollment tab to: Courses (existing LMSSalesTab), Downloads, Bundles (new ProductSalesTab), Memberships (new MembershipAdmin page)
+- [x] Sales tab: user list with name/email/date/amount, access toggle, refund button
 - [x] Funnel page SEO/preview settings: title, description, og:image — panel in right sidebar (FunnelPageEditor)
 - [x] Landing page SEO/preview settings: title, description, og:image — panel in right sidebar (LandingPageBuilder)
 
 ## Analytics & Sales Tabs (2026-05-27)
-- [ ] Fix analytics sales dashboard — pull from correct orders/payments tables
-- [ ] Build shared SalesEnrollmentTab component (buyer list, access toggle, refund)
-- [ ] Wire SalesEnrollmentTab into Courses editor
-- [ ] Wire SalesEnrollmentTab into Downloads editor
-- [ ] Wire SalesEnrollmentTab into Bundles editor
-- [ ] Wire SalesEnrollmentTab into Quizzes editor
-- [ ] Wire SalesEnrollmentTab into Memberships editor
+- [x] Fix analytics sales dashboard — UNION query across funnel_purchases, lms_orders, digital_purchases, digital_bundle_purchases, membership_subscriptions
+- [x] Build shared ProductSalesTab component (buyer list, access toggle, refund)
+- [x] Wire SalesEnrollmentTab into Courses editor (existing LMSSalesTab)
+- [x] Wire ProductSalesTab into Downloads editor (DigitalDownloadsAdmin)
+- [x] Wire ProductSalesTab into Bundles editor (BundlesAdmin)
+- [x] Quizzes editor: already covered by LMSSalesTab in LMSAdmin
+- [x] Memberships: new MembershipAdmin page at /admin/memberships with grant/revoke + member list
 
 ## Media Fixes (2026-05-27)
 - [x] Fix SCORM media not displaying — require("crypto") replaced with ESM createHash import in mediaServe.ts

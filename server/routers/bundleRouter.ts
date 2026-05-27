@@ -9,7 +9,7 @@ import { storagePut } from "../storage";
 import { getDb } from "../db";
 import {
   bundles, bundleItems, bundleEnrollments, users,
-  lmsCourses, lmsEnrollments, lmsQuizzes,
+  lmsCourses, lmsEnrollments, lmsQuizzes, digitalBundlePurchases,
 } from "../../drizzle/schema";
 
 function slugify(t: string) { return t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80); }
@@ -193,5 +193,62 @@ export const bundleAdminRouter = router({
         db.select({ count: sql<number>`count(*)` }).from(bundleEnrollments).where(eq(bundleEnrollments.bundleId, input.bundleId)),
       ]);
       return { enrollments: rows, total: cnt[0]?.count ?? 0 };
+    }),
+
+  getSalesData: protectedProcedure
+    .input(z.object({ bundleId: z.number(), page: z.number().min(1).default(1), pageSize: z.number().min(1).max(100).default(25) }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) return { purchases: [], total: 0, totalRevenue: 0 };
+      const offset = (input.page - 1) * input.pageSize;
+      const [purchases, countResult] = await Promise.all([
+        db.select({
+          id: digitalBundlePurchases.id,
+          userId: digitalBundlePurchases.userId,
+          bundleId: digitalBundlePurchases.bundleId,
+          amount: digitalBundlePurchases.amount,
+          currency: digitalBundlePurchases.currency,
+          status: digitalBundlePurchases.status,
+          stripePaymentIntentId: digitalBundlePurchases.stripePaymentIntentId,
+          createdAt: digitalBundlePurchases.createdAt,
+          userName: users.name,
+          userEmail: users.email,
+        })
+          .from(digitalBundlePurchases)
+          .leftJoin(users, eq(users.id, digitalBundlePurchases.userId))
+          .where(eq(digitalBundlePurchases.bundleId, input.bundleId))
+          .orderBy(desc(digitalBundlePurchases.createdAt))
+          .limit(input.pageSize).offset(offset),
+        db.select({ count: sql<number>`count(*)`, revenue: sql<number>`COALESCE(SUM(CASE WHEN status='paid' THEN amount ELSE 0 END), 0)` })
+          .from(digitalBundlePurchases).where(eq(digitalBundlePurchases.bundleId, input.bundleId)),
+      ]);
+      return { purchases, total: Number(countResult[0]?.count ?? 0), totalRevenue: Number(countResult[0]?.revenue ?? 0) };
+    }),
+
+  refundPurchase: protectedProcedure
+    .input(z.object({ purchaseId: z.number(), reason: z.string().default("requested_by_customer") }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [purchase] = await db.select().from(digitalBundlePurchases).where(eq(digitalBundlePurchases.id, input.purchaseId)).limit(1);
+      if (!purchase) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!purchase.stripePaymentIntentId) throw new TRPCError({ code: "BAD_REQUEST", message: "No Stripe payment intent" });
+      const { default: Stripe } = await import("stripe");
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-12-18.acacia" });
+      const refund = await stripe.refunds.create({ payment_intent: purchase.stripePaymentIntentId, reason: input.reason as any });
+      await db.update(digitalBundlePurchases).set({ status: "refunded" }).where(eq(digitalBundlePurchases.id, input.purchaseId));
+      return { refundId: refund.id, status: refund.status };
+    }),
+
+  revokeAccess: protectedProcedure
+    .input(z.object({ enrollmentId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(bundleEnrollments).where(eq(bundleEnrollments.id, input.enrollmentId));
+      return { success: true };
     }),
 });

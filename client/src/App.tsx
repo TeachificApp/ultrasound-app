@@ -254,6 +254,7 @@ const AdminUserDetailPage = lazy(() => import("./pages/admin/AdminUserDetailPage
 const AdminSalesPage = lazy(() => import("./pages/admin/AdminSalesPage"));
 const AdminSalesDashboard = lazy(() => import("./pages/admin/AdminSalesDashboard"));
 const AdminDiscountCodesPage = lazy(() => import("./pages/admin/AdminDiscountCodesPage"));
+const MembershipAdmin = lazy(() => import("./pages/admin/MembershipAdmin"));
 
 // ── Community ─────────────────────────────────────────────────────────────────
 const CommunityFeed = lazy(() => import("./pages/CommunityFeed"));
@@ -450,6 +451,7 @@ function Router() {
         <Route path="/admin/sales">{() => { window.location.replace("/admin/sales-dashboard"); return null; }}</Route>
         <Route path="/admin/sales-dashboard">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminSalesDashboard /></RoleGuard>}</Route>
         <Route path="/admin/discount-codes">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminDiscountCodesPage /></RoleGuard>}</Route>
+        <Route path="/admin/memberships">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><MembershipAdmin /></Suspense></RoleGuard>}</Route>
         <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
         <Route path="/admin/diy-accreditation">{() => <RoleGuard roles={["diy_admin", "platform_admin", "accreditation_manager"]} allowAdmin={true}><DIYAccreditationAdmin /></RoleGuard>}</Route>
         <Route path="/educator-assist">{() => <EducatorAssist />}</Route>

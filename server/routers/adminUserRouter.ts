@@ -28,6 +28,11 @@ import {
   digitalProducts,
   physicalProductOrders,
   physicalProducts,
+  lmsOrders,
+  digitalBundlePurchases,
+  digitalBundles,
+  membershipSubscriptions,
+  membershipPlans,
 } from "../../drizzle/schema";
 import { and, eq, desc, sql } from "drizzle-orm";
 import { storagePut } from "../storage";
@@ -489,14 +494,14 @@ export const adminUserRouter = router({
       return { success: sent };
     }),
 
-  /** List all sales across funnel purchases and LMS orders for the admin sales page */
+  /** List all sales across ALL purchase tables (funnel, courses, downloads, bundles, memberships) */
   listAllSales: protectedProcedure
     .input(z.object({
       page: z.number().int().min(1).default(1),
       pageSize: z.number().int().min(1).max(100).default(50),
       status: z.enum(["all", "paid", "pending", "refunded", "failed"]).default("all"),
       search: z.string().optional(),
-      dateFrom: z.string().optional(), // ISO date string
+      dateFrom: z.string().optional(),
       dateTo: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
@@ -505,66 +510,168 @@ export const adminUserRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
       const offset = (input.page - 1) * input.pageSize;
+      const dateFrom = input.dateFrom ? new Date(input.dateFrom) : null;
+      const dateTo = input.dateTo ? (() => { const d = new Date(input.dateTo!); d.setHours(23,59,59,999); return d; })() : null;
+      const search = input.search?.toLowerCase();
+      const statusFilter = input.status !== "all" ? input.status : null;
 
-      // Build WHERE conditions
-      const conditions: any[] = [];
-      if (input.status !== "all") {
-        conditions.push(eq(funnelPurchases.status, input.status as any));
-      }
-      if (input.dateFrom) {
-        conditions.push(gte(funnelPurchases.purchasedAt, new Date(input.dateFrom)));
-      }
-      if (input.dateTo) {
-        const toDate = new Date(input.dateTo);
-        toDate.setHours(23, 59, 59, 999);
-        conditions.push(lte(funnelPurchases.purchasedAt, toDate));
-      }
+      // Build a UNION across all purchase tables using raw SQL for flexibility
+      const rows = await db.execute(sql`
+        SELECT * FROM (
+          -- 1. Funnel purchases (already has all fields)
+          SELECT
+            CONCAT('fp-', fp.id) AS uid,
+            fp.id AS sourceId,
+            'funnel' AS sourceTable,
+            fp.user_id AS userId,
+            COALESCE(fp.email, u.email, '') AS email,
+            COALESCE(fp.name, u.name, '') AS name,
+            fp.product_name AS productName,
+            fp.product_type AS productType,
+            fp.amount_paid AS amountPaid,
+            fp.currency,
+            fp.status,
+            fp.stripe_payment_intent_id AS stripePaymentIntentId,
+            fp.purchased_at AS purchasedAt
+          FROM funnel_purchases fp
+          LEFT JOIN users u ON fp.user_id = u.id
 
-      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+          UNION ALL
 
-      const rows = await db
-        .select({
-          id: funnelPurchases.id,
-          email: funnelPurchases.email,
-          name: funnelPurchases.name,
-          userId: funnelPurchases.userId,
-          productName: funnelPurchases.productName,
-          productType: funnelPurchases.productType,
-          amountPaid: funnelPurchases.amountPaid,
-          currency: funnelPurchases.currency,
-          status: funnelPurchases.status,
-          stripePaymentIntentId: funnelPurchases.stripePaymentIntentId,
-          sourceType: funnelPurchases.sourceType,
-          orderBumps: funnelPurchases.orderBumps,
-          purchasedAt: funnelPurchases.purchasedAt,
-        })
-        .from(funnelPurchases)
-        .where(whereClause)
-        .orderBy(desc(funnelPurchases.purchasedAt))
-        .limit(input.pageSize)
-        .offset(offset);
+          -- 2. LMS course orders
+          SELECT
+            CONCAT('lo-', lo.id) AS uid,
+            lo.id AS sourceId,
+            'course' AS sourceTable,
+            lo.user_id AS userId,
+            COALESCE(u.email, '') AS email,
+            COALESCE(u.name, '') AS name,
+            COALESCE(c.title, 'Course') AS productName,
+            'course' AS productType,
+            lo.amount AS amountPaid,
+            lo.currency,
+            lo.status,
+            lo.stripe_payment_intent_id AS stripePaymentIntentId,
+            lo.created_at AS purchasedAt
+          FROM lms_orders lo
+          LEFT JOIN users u ON lo.user_id = u.id
+          LEFT JOIN lms_courses c ON lo.course_id = c.id
 
-      // Apply search filter in JS (for email + name + productName)
-      const filtered = input.search
-        ? rows.filter(r =>
-            r.email?.toLowerCase().includes(input.search!.toLowerCase()) ||
-            r.name?.toLowerCase().includes(input.search!.toLowerCase()) ||
-            r.productName?.toLowerCase().includes(input.search!.toLowerCase())
-          )
-        : rows;
+          UNION ALL
 
-      // Get total count
-      const [{ total }] = await db
-        .select({ total: sql<number>`count(*)` })
-        .from(funnelPurchases)
-        .where(whereClause);
+          -- 3. Digital product (download) purchases
+          SELECT
+            CONCAT('dp-', dp.id) AS uid,
+            dp.id AS sourceId,
+            'download' AS sourceTable,
+            dp.user_id AS userId,
+            COALESCE(u.email, '') AS email,
+            COALESCE(u.name, '') AS name,
+            COALESCE(prod.title, 'Download') AS productName,
+            'download' AS productType,
+            COALESCE(prod.price, 0) AS amountPaid,
+            COALESCE(prod.currency, 'usd') AS currency,
+            'paid' AS status,
+            dp.stripe_payment_intent_id AS stripePaymentIntentId,
+            dp.purchased_at AS purchasedAt
+          FROM digital_purchases dp
+          LEFT JOIN users u ON dp.user_id = u.id
+          LEFT JOIN digital_products prod ON dp.product_id = prod.id
+
+          UNION ALL
+
+          -- 4. Bundle purchases
+          SELECT
+            CONCAT('bp-', dbp.id) AS uid,
+            dbp.id AS sourceId,
+            'bundle' AS sourceTable,
+            dbp.user_id AS userId,
+            COALESCE(u.email, '') AS email,
+            COALESCE(u.name, '') AS name,
+            COALESCE(b.title, 'Bundle') AS productName,
+            'bundle' AS productType,
+            COALESCE(b.discount_price, b.original_price, 0) AS amountPaid,
+            COALESCE(b.currency, 'usd') AS currency,
+            'paid' AS status,
+            NULL AS stripePaymentIntentId,
+            dbp.purchased_at AS purchasedAt
+          FROM digital_bundle_purchases dbp
+          LEFT JOIN users u ON dbp.user_id = u.id
+          LEFT JOIN digital_bundles b ON dbp.bundle_id = b.id
+
+          UNION ALL
+
+          -- 5. Membership subscriptions
+          SELECT
+            CONCAT('ms-', ms.id) AS uid,
+            ms.id AS sourceId,
+            'membership' AS sourceTable,
+            ms.user_id AS userId,
+            COALESCE(u.email, '') AS email,
+            COALESCE(u.name, '') AS name,
+            COALESCE(mp.title, 'Membership') AS productName,
+            'membership' AS productType,
+            COALESCE(mp.price, 0) AS amountPaid,
+            COALESCE(mp.currency, 'usd') AS currency,
+            CASE ms.status WHEN 'active' THEN 'paid' WHEN 'cancelled' THEN 'refunded' ELSE ms.status END AS status,
+            ms.stripe_subscription_id AS stripePaymentIntentId,
+            ms.created_at AS purchasedAt
+          FROM membership_subscriptions ms
+          LEFT JOIN users u ON ms.user_id = u.id
+          LEFT JOIN membership_plans mp ON ms.plan_id = mp.id
+        ) AS all_sales
+        WHERE 1=1
+          ${statusFilter ? sql`AND status = ${statusFilter}` : sql``}
+          ${dateFrom ? sql`AND purchasedAt >= ${dateFrom}` : sql``}
+          ${dateTo ? sql`AND purchasedAt <= ${dateTo}` : sql``}
+          ${search ? sql`AND (LOWER(email) LIKE ${`%${search}%`} OR LOWER(name) LIKE ${`%${search}%`} OR LOWER(productName) LIKE ${`%${search}%`})` : sql``}
+        ORDER BY purchasedAt DESC
+        LIMIT ${input.pageSize} OFFSET ${offset}
+      `) as any;
+
+      const countResult = await db.execute(sql`
+        SELECT COUNT(*) AS total FROM (
+          SELECT id FROM funnel_purchases
+          ${statusFilter ? sql`WHERE status = ${statusFilter}` : sql``}
+          ${dateFrom ? sql`AND purchased_at >= ${dateFrom}` : sql``}
+          ${dateTo ? sql`AND purchased_at <= ${dateTo}` : sql``}
+          UNION ALL
+          SELECT id FROM lms_orders
+          ${statusFilter && statusFilter !== 'paid' ? sql`WHERE status = ${statusFilter}` : sql``}
+          UNION ALL
+          SELECT id FROM digital_purchases
+          UNION ALL
+          SELECT id FROM digital_bundle_purchases
+          UNION ALL
+          SELECT id FROM membership_subscriptions
+        ) AS t
+      `) as any;
+
+      const rowsArr = Array.isArray(rows) ? rows : (rows as any)[0] ?? [];
+      const total = Number((Array.isArray(countResult) ? countResult[0] : (countResult as any)[0]?.[0])?.total ?? 0);
 
       return {
-        sales: filtered,
-        total: Number(total),
+        sales: rowsArr.map((r: any) => ({
+          id: r.sourceId,
+          uid: r.uid,
+          sourceTable: r.sourceTable,
+          email: r.email ?? '',
+          name: r.name ?? '',
+          userId: r.userId,
+          productName: r.productName ?? '',
+          productType: r.productType ?? 'other',
+          amountPaid: Number(r.amountPaid ?? 0),
+          currency: r.currency ?? 'usd',
+          status: r.status ?? 'paid',
+          stripePaymentIntentId: r.stripePaymentIntentId ?? null,
+          sourceType: r.sourceTable,
+          orderBumps: null,
+          purchasedAt: r.purchasedAt ? new Date(r.purchasedAt) : new Date(),
+        })),
+        total,
         page: input.page,
         pageSize: input.pageSize,
-        totalPages: Math.ceil(Number(total) / input.pageSize),
+        totalPages: Math.ceil(total / input.pageSize),
       };
     }),
 
@@ -654,7 +761,7 @@ export const adminUserRouter = router({
       return { success: true };
     }),
 
-  // ── Sales Analytics ──────────────────────────────────────────────────────────
+  // ── Sales Analytics (UNION across all purchase tables) ───────────────────────
   getSalesAnalytics: protectedProcedure
     .input(z.object({
       dateFrom: z.string().optional(),
@@ -664,77 +771,66 @@ export const adminUserRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const conditions: any[] = [eq(funnelPurchases.status, "paid")];
-      if (input.dateFrom) conditions.push(gte(funnelPurchases.purchasedAt, new Date(input.dateFrom)));
-      if (input.dateTo) {
-        const toDate = new Date(input.dateTo);
-        toDate.setHours(23, 59, 59, 999);
-        conditions.push(lte(funnelPurchases.purchasedAt, toDate));
-      }
-      const whereClause = and(...conditions);
-      const [summary] = await db
-        .select({
-          totalRevenue: sql<number>`COALESCE(SUM(amount_paid), 0)`,
-          totalSales: sql<number>`COUNT(*)`,
-          avgOrderValue: sql<number>`COALESCE(AVG(amount_paid), 0)`,
-        })
-        .from(funnelPurchases)
-        .where(whereClause);
-      const byProduct = await db
-        .select({
-          productName: funnelPurchases.productName,
-          productType: funnelPurchases.productType,
-          revenue: sql<number>`COALESCE(SUM(amount_paid), 0)`,
-          sales: sql<number>`COUNT(*)`,
-          avgPrice: sql<number>`COALESCE(AVG(amount_paid), 0)`,
-        })
-        .from(funnelPurchases)
-        .where(whereClause)
-        .groupBy(funnelPurchases.productName, funnelPurchases.productType)
-        .orderBy(sql`SUM(amount_paid) DESC`)
-        .limit(100);
-      const byType = await db
-        .select({
-          productType: funnelPurchases.productType,
-          revenue: sql<number>`COALESCE(SUM(amount_paid), 0)`,
-          sales: sql<number>`COUNT(*)`,
-        })
-        .from(funnelPurchases)
-        .where(whereClause)
-        .groupBy(funnelPurchases.productType)
-        .orderBy(sql`SUM(amount_paid) DESC`);
-      const dailySeries = await db
-        .select({
-          date: sql<string>`DATE(purchased_at)`,
-          revenue: sql<number>`COALESCE(SUM(amount_paid), 0)`,
-          sales: sql<number>`COUNT(*)`,
-        })
-        .from(funnelPurchases)
-        .where(whereClause)
-        .groupBy(sql`DATE(purchased_at)`)
-        .orderBy(sql`DATE(purchased_at) ASC`);
+
+      const dateFrom = input.dateFrom ? new Date(input.dateFrom) : null;
+      const dateTo = input.dateTo ? (() => { const d = new Date(input.dateTo!); d.setHours(23,59,59,999); return d; })() : null;
+
+      // All paid sales across all tables
+      const allSalesQuery = sql`
+        SELECT productName, productType, amountPaid, purchasedAt FROM (
+          SELECT fp.product_name AS productName, fp.product_type AS productType, fp.amount_paid AS amountPaid, fp.purchased_at AS purchasedAt
+          FROM funnel_purchases fp WHERE fp.status = 'paid'
+          UNION ALL
+          SELECT COALESCE(c.title,'Course'), 'course', lo.amount, lo.created_at
+          FROM lms_orders lo LEFT JOIN lms_courses c ON lo.course_id = c.id WHERE lo.status = 'paid'
+          UNION ALL
+          SELECT COALESCE(prod.title,'Download'), 'download', COALESCE(prod.price,0), dp.purchased_at
+          FROM digital_purchases dp LEFT JOIN digital_products prod ON dp.product_id = prod.id
+          UNION ALL
+          SELECT COALESCE(b.title,'Bundle'), 'bundle', COALESCE(b.discount_price, b.original_price, 0), dbp.purchased_at
+          FROM digital_bundle_purchases dbp LEFT JOIN digital_bundles b ON dbp.bundle_id = b.id
+          UNION ALL
+          SELECT COALESCE(mp.title,'Membership'), 'membership', COALESCE(mp.price,0), ms.created_at
+          FROM membership_subscriptions ms LEFT JOIN membership_plans mp ON ms.plan_id = mp.id WHERE ms.status IN ('active','trialing')
+        ) AS all_sales
+        WHERE 1=1
+          ${dateFrom ? sql`AND purchasedAt >= ${dateFrom}` : sql``}
+          ${dateTo ? sql`AND purchasedAt <= ${dateTo}` : sql``}
+      `;
+
+      const [summaryResult, byProductResult, byTypeResult, dailyResult] = await Promise.all([
+        db.execute(sql`SELECT COALESCE(SUM(amountPaid),0) AS totalRevenue, COUNT(*) AS totalSales, COALESCE(AVG(amountPaid),0) AS avgOrderValue FROM (${allSalesQuery}) AS s`) as Promise<any>,
+        db.execute(sql`SELECT productName, productType, COALESCE(SUM(amountPaid),0) AS revenue, COUNT(*) AS sales, COALESCE(AVG(amountPaid),0) AS avgPrice FROM (${allSalesQuery}) AS s GROUP BY productName, productType ORDER BY SUM(amountPaid) DESC LIMIT 100`) as Promise<any>,
+        db.execute(sql`SELECT productType, COALESCE(SUM(amountPaid),0) AS revenue, COUNT(*) AS sales FROM (${allSalesQuery}) AS s GROUP BY productType ORDER BY SUM(amountPaid) DESC`) as Promise<any>,
+        db.execute(sql`SELECT DATE(purchasedAt) AS date, COALESCE(SUM(amountPaid),0) AS revenue, COUNT(*) AS sales FROM (${allSalesQuery}) AS s GROUP BY DATE(purchasedAt) ORDER BY DATE(purchasedAt) ASC`) as Promise<any>,
+      ]);
+
+      const toArr = (r: any) => Array.isArray(r) ? r : (r?.[0] ?? []);
+      const summaryArr = toArr(summaryResult);
+      const summary = summaryArr[0] ?? {};
+
       return {
         summary: {
-          totalRevenue: Number(summary?.totalRevenue ?? 0),
-          totalSales: Number(summary?.totalSales ?? 0),
-          avgOrderValue: Number(summary?.avgOrderValue ?? 0),
+          totalRevenue: Number(summary.totalRevenue ?? 0),
+          totalSales: Number(summary.totalSales ?? 0),
+          avgOrderValue: Number(summary.avgOrderValue ?? 0),
         },
-        byProduct: byProduct.map(r => ({
-          productName: r.productName,
-          productType: r.productType,
-          revenue: Number(r.revenue),
-          sales: Number(r.sales),
-          avgPrice: Number(r.avgPrice),
+        byProduct: toArr(byProductResult).map((r: any) => ({
+          productName: r.productName ?? '',
+          productType: r.productType ?? 'other',
+          revenue: Number(r.revenue ?? 0),
+          sales: Number(r.sales ?? 0),
+          avgPrice: Number(r.avgPrice ?? 0),
         })),
-        byType: byType.map(r => ({
-          productType: r.productType,
-          revenue: Number(r.revenue),
-          sales: Number(r.sales),
+        byType: toArr(byTypeResult).map((r: any) => ({
+          productType: r.productType ?? 'other',
+          revenue: Number(r.revenue ?? 0),
+          sales: Number(r.sales ?? 0),
         })),
-        dailySeries: dailySeries.map(r => ({
+        dailySeries: toArr(dailyResult).map((r: any) => ({
           date: r.date,
-          revenue: Number(r.revenue),
-          sales: Number(r.sales),
+          revenue: Number(r.revenue ?? 0),
+          sales: Number(r.sales ?? 0),
         })),
       };
     }),
