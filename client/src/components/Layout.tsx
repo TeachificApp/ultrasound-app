@@ -95,7 +95,7 @@ const BASE_NAV_GROUPS = [
   {
     label: "Community",
     items: [
-      { path: "https://member.allaboutultrasound.com/products/communities/allaboutultrasound-community", label: "Community Hub", icon: MessageCircle, external: true },
+      { path: "https://learn.allaboutultrasound.com/community", label: "Community", icon: Users, external: true },
     ],
   },
   {

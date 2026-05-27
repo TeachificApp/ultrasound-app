@@ -254,6 +254,13 @@ const AdminSalesPage = lazy(() => import("./pages/admin/AdminSalesPage"));
 const AdminSalesDashboard = lazy(() => import("./pages/admin/AdminSalesDashboard"));
 const AdminDiscountCodesPage = lazy(() => import("./pages/admin/AdminDiscountCodesPage"));
 
+// ── Community ─────────────────────────────────────────────────────────────────
+const CommunityFeed = lazy(() => import("./pages/CommunityFeed"));
+const CommunityProfile = lazy(() => import("./pages/CommunityProfile"));
+const CommunityDMs = lazy(() => import("./pages/CommunityDMs"));
+const CommunityLeaderboard = lazy(() => import("./pages/CommunityLeaderboard"));
+const CommunityAdmin = lazy(() => import("./pages/admin/CommunityAdmin"));
+
 function Router() {
   usePageViewTracker();
   useCrossDomainSso(); // Silently sign user into all other domains as free member
@@ -591,6 +598,15 @@ function LMSRouter() {
         {/* /profile redirects to dashboard profile tab */}
         <Route path="/profile">{() => { window.location.replace("/my-dashboard?tab=profile"); return null; }}</Route>
         <Route path="/my-dashboard" component={StudentDashboardPage} />
+        {/* Community */}
+        <Route path="/community" component={CommunityFeed} />
+        <Route path="/community/spaces/:spaceId" component={CommunityFeed} />
+        <Route path="/community/spaces/:spaceId/channels/:channelId" component={CommunityFeed} />
+        <Route path="/community/members/:userId" component={CommunityProfile} />
+        <Route path="/community/dms" component={CommunityDMs} />
+        <Route path="/community/dms/:userId" component={CommunityDMs} />
+        <Route path="/community/leaderboard" component={CommunityLeaderboard} />
+        <Route path="/admin/community">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><CommunityAdmin /></RoleGuard>}</Route>
 
         <Route path="/media/:slug/:action" component={MediaRedirect} />
         <Route path="/media/:slug" component={MediaRedirect} />

@@ -185,6 +185,11 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
                               <MessageSquare className="w-3.5 h-3.5 text-gray-500" /> Lesson Comments
                             </div>
                           </Link>
+                          <Link href="/admin/community" onClick={() => setAccountOpen(false)}>
+                            <div className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer flex items-center gap-2">
+                              <Users className="w-3.5 h-3.5 text-gray-500" /> Community Admin
+                            </div>
+                          </Link>
                         </>
                       )}
 

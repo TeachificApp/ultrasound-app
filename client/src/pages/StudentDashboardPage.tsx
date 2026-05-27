@@ -177,6 +177,8 @@ function ProfileTab() {
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
   const [specialty, setSpecialty] = useState("");
+  const [credentials, setCredentials] = useState("");
+  const [yearsExperience, setYearsExperience] = useState<string>("");
   const [locationVal, setLocationVal] = useState("");
   const [website, setWebsite] = useState("");
   const [initialized, setInitialized] = useState(false);
@@ -192,6 +194,8 @@ function ProfileTab() {
     setDisplayName(profile.displayName ?? profile.name ?? "");
     setBio(profile.bio ?? "");
     setSpecialty(profile.specialty ?? "");
+    setCredentials(profile.credentials ?? "");
+    setYearsExperience(profile.yearsExperience != null ? String(profile.yearsExperience) : "");
     setLocationVal(profile.location ?? "");
     setWebsite(profile.website ?? "");
     setInitialized(true);
@@ -254,6 +258,14 @@ function ProfileTab() {
             <Input id="specialty" value={specialty} onChange={e => setSpecialty(e.target.value)} placeholder="e.g. Vascular Sonographer" />
           </div>
           <div className="space-y-1.5">
+            <Label htmlFor="credentials">Credentials</Label>
+            <Input id="credentials" value={credentials} onChange={e => setCredentials(e.target.value)} placeholder="e.g. RDMS, RVT, RDCS" />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="yearsExperience">Years of Experience</Label>
+            <Input id="yearsExperience" type="number" min={0} max={60} value={yearsExperience} onChange={e => setYearsExperience(e.target.value)} placeholder="e.g. 5" />
+          </div>
+          <div className="space-y-1.5">
             <Label htmlFor="location">Location</Label>
             <Input id="location" value={locationVal} onChange={e => setLocationVal(e.target.value)} placeholder="City, State" />
           </div>
@@ -267,7 +279,7 @@ function ProfileTab() {
           <Textarea id="bio" value={bio} onChange={e => setBio(e.target.value)} placeholder="Tell us about yourself..." rows={3} />
         </div>
         <Button
-          onClick={() => updateProfile.mutate({ displayName, bio, specialty, location: locationVal, website: website || undefined })}
+          onClick={() => updateProfile.mutate({ displayName, bio, specialty, credentials: credentials || undefined, yearsExperience: yearsExperience ? parseInt(yearsExperience, 10) : null, location: locationVal, website: website || undefined })}
           disabled={updateProfile.isPending}
           className="bg-[#189aa1] hover:bg-[#157f85] text-white"
         >
@@ -606,6 +618,102 @@ function ProfileTab() {
           )}
         </div>
       </div>
+      {/* Community Profile */}
+      <CommunityProfileSection userId={profile.id} />
+    </div>
+  );
+}
+
+// ─── Community Profile Section ───────────────────────────────────────────────
+
+const LEARN_URL = "https://learn.allaboutultrasound.com";
+
+function CommunityProfileSection({ userId }: { userId: number }) {
+  const { data: xpData, isLoading } = trpc.community.myXP.useQuery();
+
+  function getLevel(xp: number) {
+    if (xp >= 5000) return { level: 5, title: "Expert", color: "#f59e0b", next: null };
+    if (xp >= 2000) return { level: 4, title: "Advanced", color: "#8b5cf6", next: 5000 };
+    if (xp >= 750)  return { level: 3, title: "Intermediate", color: "#3b82f6", next: 2000 };
+    if (xp >= 200)  return { level: 2, title: "Member", color: "#189aa1", next: 750 };
+    return { level: 1, title: "Newcomer", color: "#6b7280", next: 200 };
+  }
+
+  const totalXP = xpData?.xp?.totalXp ?? 0;
+  const levelInfo = getLevel(totalXP);
+  const progressPct = levelInfo.next ? Math.min(100, Math.round((totalXP / levelInfo.next) * 100)) : 100;
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Community Profile</h3>
+        <a
+          href={`${LEARN_URL}/community/members/${userId}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 text-xs font-medium text-[#189aa1] hover:text-[#157f85] transition-colors"
+        >
+          <ExternalLink className="w-3.5 h-3.5" />
+          View Public Profile
+        </a>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center gap-2 text-sm text-gray-400">
+          <RefreshCw className="w-4 h-4 animate-spin" /> Loading community stats...
+        </div>
+      ) : (
+        <>
+          {/* XP + Level */}
+          <div className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-[#189aa1]/5 to-[#4ad9e0]/5 border border-[#189aa1]/10">
+            <div className="w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold flex-shrink-0"
+              style={{ background: `linear-gradient(135deg, ${levelInfo.color}, ${levelInfo.color}99)` }}>
+              {levelInfo.level}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-sm font-bold text-gray-800">{levelInfo.title}</span>
+                <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: `${levelInfo.color}15`, color: levelInfo.color }}>
+                  {totalXP.toLocaleString()} XP
+                </span>
+              </div>
+              {levelInfo.next && (
+                <>
+                  <div className="w-full bg-gray-100 rounded-full h-1.5">
+                    <div className="h-1.5 rounded-full transition-all" style={{ width: `${progressPct}%`, background: levelInfo.color }} />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5">{totalXP.toLocaleString()} / {levelInfo.next.toLocaleString()} XP to next level</p>
+                </>
+              )}
+              {!levelInfo.next && <p className="text-xs text-gray-400">Maximum level reached!</p>}
+            </div>
+          </div>
+
+          {/* Badges */}
+          {(xpData?.badges?.length ?? 0) > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Badges Earned</p>
+              <div className="flex flex-wrap gap-2">
+                {xpData!.badges.map((b: any) => (
+                  <div key={b.badge.id} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border bg-gray-50"
+                    title={b.badge.description ?? b.badge.name}>
+                    <span>{b.badge.icon ?? "🏅"}</span>
+                    <span className="text-gray-700">{b.badge.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {(xpData?.badges?.length ?? 0) === 0 && (
+            <p className="text-xs text-gray-400 italic">No badges earned yet. Start participating in the community to earn your first badge!</p>
+          )}
+
+          <p className="text-xs text-gray-400">
+            Your profile details (name, bio, specialty, credentials) are shared with the Community. Update them above and they will reflect on your public community profile.
+          </p>
+        </>
+      )}
     </div>
   );
 }

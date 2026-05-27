@@ -3183,3 +3183,11 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] CourseLanding already had breadcrumb + title tag (verified)
 - [x] DownloadLanding: added breadcrumb (Education Library › Product Name) to both blocks-based and fallback layouts, plus document.title
 - [x] Collection hero image upload: added uploadCollectionImage procedure in lmsAdmin router, image upload UI in CollectionFormDialog, hero image display in CollectionDetail (with dark overlay for readability)
+
+## Community Feature Launch (May 2026)
+- [x] Register Community routes in App.tsx (CommunityPage, CommunityChannelPage, MemberProfilePage, etc.)
+- [x] Add Community Admin link to LMSLayout admin dropdown
+- [x] Update Layout.tsx Community sidebar link to point to learn.allaboutultrasound.com/community
+- [x] Add Community nav link to MembersLayout top nav (desktop + mobile)
+- [x] Add Community Profile section to Member Hub Profile tab (XP, level, badges, link to public profile)
+- [x] Add credentials and yearsExperience fields to Member Hub Profile form

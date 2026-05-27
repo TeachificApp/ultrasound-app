@@ -12,7 +12,7 @@ import { Link, useLocation } from "wouter";
 import {
   LogIn, LogOut, Settings, ChevronDown,
   FolderOpen, ExternalLink, LayoutDashboard,
-  GraduationCap, ShieldCheck, ArrowLeft, MessageSquare
+  GraduationCap, ShieldCheck, ArrowLeft, MessageSquare, Users
 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -89,6 +89,13 @@ export default function MembersLayout({ children }: { children: React.ReactNode 
               <GraduationCap className="w-3.5 h-3.5" />
               Learning Platform
             </a>
+            <a
+              href={`${LEARN_URL}/community`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900`}
+            >
+              <Users className="w-3.5 h-3.5" />
+              Community
+            </a>
           </nav>
 
           {/* Spacer */}
@@ -143,6 +150,9 @@ export default function MembersLayout({ children }: { children: React.ReactNode 
                         </a>
                         <a href={LEARN_URL} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2" onClick={() => setAccountOpen(false)}>
                           <GraduationCap className="w-3.5 h-3.5 text-gray-500" /> Learning Platform
+                        </a>
+                        <a href={`${LEARN_URL}/community`} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2" onClick={() => setAccountOpen(false)}>
+                          <Users className="w-3.5 h-3.5 text-gray-500" /> Community
                         </a>
                       </div>
 
