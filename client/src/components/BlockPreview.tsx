@@ -76,7 +76,8 @@ export type BlockType =
   | "comparison_table" | "pricing_cards"
   | "form_embed"
   | "cohort_class"
-  | "lesson_assignment";
+  | "lesson_assignment"
+  | "upgrade_prompt";
 
 export interface Block {
   id: string;
@@ -1202,6 +1203,8 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
     }
     case "form_embed":
       return <FormEmbedBlockPreview d={d} />;
+    case "upgrade_prompt":
+      return <UpgradePromptBlockPreview d={d} />;
     default:
       return <div className="px-8 py-4 text-gray-400 text-sm text-center">Block preview not available</div>;
   }
@@ -1932,6 +1935,230 @@ export function FormEmbedBlockPreview({ d }: { d: Record<string, any> }) {
             <div className="p-6">
               <FormBody />
             </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Upgrade Prompt Block ─────────────────────────────────────────────────────
+/**
+ * UpgradePromptBlockPreview
+ * Renders a customizable upgrade/upsell prompt that can appear:
+ *   - inline (always visible in the page)
+ *   - as a time-delayed modal popup
+ *   - as a scroll-triggered modal
+ *   - as an exit-intent modal
+ *   - as a slide-in banner
+ *
+ * Supports discount pricing (% or fixed) that flows through to Stripe checkout.
+ */
+function UpgradePromptBlockPreview({ d }: { d: Record<string, any> }) {
+  const { user } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+  const triggered = useRef(false);
+
+  const displayMode: string = d.displayMode ?? "inline"; // inline | modal_time | modal_scroll | modal_exit | banner_slide
+  const triggerDelayMs: number = (d.triggerDelaySeconds ?? 5) * 1000;
+  const triggerScrollPct: number = d.triggerScrollPercent ?? 50;
+  const accentColor: string = d.accentColor ?? "#179ca3";
+  const bgColor: string = d.bgColor ?? "#f0fdfa";
+  const productType: string = d.productType ?? "course"; // course | download | product
+  const productSlug: string = d.productSlug ?? "";
+  const productId: number | null = d.productId ? Number(d.productId) : null;
+  const discountType: string = d.discountType ?? "none"; // none | percent | fixed | promo_code
+  const discountValue: number = d.discountValue ?? 0;
+  const promoCode: string = d.promoCode ?? "";
+  const urgencyLabel: string = d.urgencyLabel ?? "";
+  const badgeText: string = d.badgeText ?? "";
+  const imageUrl: string = d.imageUrl ?? "";
+  const headline: string = d.headline ?? "Ready to take the next step?";
+  const subheadline: string = d.subheadline ?? "Unlock the full course and advance your skills.";
+  const ctaText: string = d.ctaText ?? "Upgrade Now";
+  const dismissText: string = d.dismissText ?? "No thanks";
+  const showDismiss: boolean = d.showDismiss !== false && displayMode !== "inline";
+  const originalPrice: number = d.originalPriceCents ?? 0;
+  const discountedPrice: number = discountType === "percent" && originalPrice > 0
+    ? Math.round(originalPrice * (1 - discountValue / 100))
+    : discountType === "fixed" && originalPrice > 0
+    ? Math.max(0, originalPrice - discountValue * 100)
+    : originalPrice;
+
+  const createCheckout = trpc.lms.upgradePromptCheckout.useMutation();
+
+  async function handleCTA() {
+    if (!user) {
+      window.location.href = `/login?return=${encodeURIComponent(window.location.pathname)}`;
+      return;
+    }
+    if (!productSlug && !productId) return;
+    setCheckoutLoading(true);
+    try {
+      const result = await createCheckout.mutateAsync({
+        productType,
+        productSlug: productSlug || undefined,
+        productId: productId || undefined,
+        promoCode: promoCode || undefined,
+        origin: window.location.origin,
+      });
+      if (result.checkoutUrl) {
+        window.open(result.checkoutUrl, "_blank");
+      } else if (result.alreadyEnrolled) {
+        alert("You already have access to this product.");
+      }
+    } catch (err: any) {
+      alert(err?.message ?? "Checkout failed. Please try again.");
+    } finally {
+      setCheckoutLoading(false);
+    }
+  }
+
+  // Time-delay trigger
+  useEffect(() => {
+    if (displayMode !== "modal_time" || triggered.current) return;
+    const t = setTimeout(() => {
+      if (!triggered.current) { triggered.current = true; setOpen(true); }
+    }, triggerDelayMs);
+    return () => clearTimeout(t);
+  }, [displayMode, triggerDelayMs]);
+
+  // Scroll trigger
+  useEffect(() => {
+    if (displayMode !== "modal_scroll" || triggered.current) return;
+    const onScroll = () => {
+      const scrolled = (window.scrollY / (document.body.scrollHeight - window.innerHeight)) * 100;
+      if (scrolled >= triggerScrollPct && !triggered.current) {
+        triggered.current = true;
+        setOpen(true);
+        window.removeEventListener("scroll", onScroll);
+      }
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [displayMode, triggerScrollPct]);
+
+  // Exit-intent trigger
+  useEffect(() => {
+    if (displayMode !== "modal_exit" || triggered.current) return;
+    const onMouseLeave = (e: MouseEvent) => {
+      if (e.clientY <= 0 && !triggered.current) {
+        triggered.current = true;
+        setOpen(true);
+      }
+    };
+    document.addEventListener("mouseleave", onMouseLeave);
+    return () => document.removeEventListener("mouseleave", onMouseLeave);
+  }, [displayMode]);
+
+  if (dismissed) return null;
+
+  const CardContent = () => (
+    <div className="relative flex flex-col gap-4">
+      {badgeText && (
+        <div className="absolute -top-3 left-6">
+          <span className="inline-block px-3 py-1 rounded-full text-xs font-bold text-white shadow-sm" style={{ backgroundColor: accentColor }}>{badgeText}</span>
+        </div>
+      )}
+      {urgencyLabel && (
+        <div className="flex items-center gap-2 text-xs font-semibold" style={{ color: accentColor }}>
+          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" /></svg>
+          {urgencyLabel}
+        </div>
+      )}
+      <div className="flex gap-4 items-start">
+        {imageUrl && (
+          <img src={imageUrl} alt="" className="w-20 h-20 rounded-xl object-cover flex-shrink-0 shadow-sm" />
+        )}
+        <div className="flex-1 min-w-0">
+          <h3 className="font-bold text-gray-900 text-lg leading-tight mb-1" dangerouslySetInnerHTML={{ __html: headline }} />
+          <p className="text-gray-500 text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: subheadline }} />
+        </div>
+      </div>
+      {originalPrice > 0 && discountType !== "none" && (
+        <div className="flex items-center gap-3">
+          <span className="text-2xl font-black" style={{ color: accentColor }}>
+            ${(discountedPrice / 100).toFixed(discountedPrice % 100 === 0 ? 0 : 2)}
+          </span>
+          {discountedPrice < originalPrice && (
+            <span className="text-base text-gray-400 line-through">${(originalPrice / 100).toFixed(originalPrice % 100 === 0 ? 0 : 2)}</span>
+          )}
+          {discountType === "percent" && discountValue > 0 && (
+            <span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ backgroundColor: "#ef4444" }}>{discountValue}% OFF</span>
+          )}
+          {discountType === "promo_code" && promoCode && (
+            <span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700">Code: {promoCode}</span>
+          )}
+        </div>
+      )}
+      <div className="flex items-center gap-3 flex-wrap">
+        <button
+          onClick={handleCTA}
+          disabled={checkoutLoading}
+          className="flex-1 min-w-[140px] py-3 px-6 rounded-xl text-white font-semibold text-sm shadow-sm transition-opacity hover:opacity-90 disabled:opacity-60"
+          style={{ backgroundColor: accentColor }}
+        >
+          {checkoutLoading ? "Loading…" : ctaText}
+        </button>
+        {showDismiss && (
+          <button onClick={() => { setOpen(false); setDismissed(true); }} className="text-xs text-gray-400 hover:text-gray-600 underline">
+            {dismissText}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
+  // Inline display
+  if (displayMode === "inline") {
+    return (
+      <div className="px-8 py-6" style={{ backgroundColor: bgColor }}>
+        <div className="max-w-2xl mx-auto rounded-2xl p-6 shadow-sm" style={{ border: `1.5px solid ${accentColor}33`, backgroundColor: "#fff" }}>
+          <CardContent />
+        </div>
+      </div>
+    );
+  }
+
+  // Banner slide-in (bottom-right)
+  if (displayMode === "banner_slide") {
+    return (
+      <div className="px-8 py-4" style={{ backgroundColor: bgColor }}>
+        <div className="text-center text-sm text-gray-400 italic mb-2">Slide-in banner — appears bottom-right on page</div>
+        <div className="max-w-sm ml-auto rounded-2xl p-5 shadow-lg" style={{ border: `1.5px solid ${accentColor}33`, backgroundColor: "#fff" }}>
+          <CardContent />
+        </div>
+        {/* Live banner */}
+        {open && !dismissed && (
+          <div className="fixed bottom-6 right-6 z-50 w-80 rounded-2xl shadow-2xl p-5 animate-slide-in-right" style={{ backgroundColor: "#fff", border: `2px solid ${accentColor}` }}>
+            <button onClick={() => { setOpen(false); setDismissed(true); }} className="absolute top-3 right-3 w-6 h-6 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 text-xs">✕</button>
+            <CardContent />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Modal modes (time, scroll, exit)
+  return (
+    <div className="px-8 py-4" style={{ backgroundColor: bgColor }}>
+      <div className="text-center text-sm text-gray-400 italic mb-2">
+        {displayMode === "modal_time" && `Popup appears after ${d.triggerDelaySeconds ?? 5}s`}
+        {displayMode === "modal_scroll" && `Popup appears after ${triggerScrollPct}% scroll`}
+        {displayMode === "modal_exit" && "Popup appears on exit intent"}
+      </div>
+      {/* Preview card */}
+      <div className="max-w-md mx-auto rounded-2xl p-5 shadow-sm opacity-60" style={{ border: `1.5px solid ${accentColor}33`, backgroundColor: "#fff" }}>
+        <CardContent />
+      </div>
+      {/* Live modal */}
+      {open && !dismissed && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) { setOpen(false); setDismissed(true); } }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 relative">
+            <button onClick={() => { setOpen(false); setDismissed(true); }} className="absolute top-4 right-4 w-7 h-7 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors text-sm">✕</button>
+            <CardContent />
           </div>
         </div>
       )}

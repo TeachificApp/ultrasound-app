@@ -24,7 +24,7 @@ import { Block, BlockType, BlockPreview } from "@/components/BlockPreview";
 import { BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, SortableBlock, uid } from "@/pages/admin/LandingPageBuilder";
 import {
   X, Plus, Save, Eye, EyeOff, Copy, BookOpen, Search, ExternalLink, Layers, Globe, Loader2,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Bookmark,
 } from "lucide-react";
 import { BlockTemplateLibraryProvider, OpenTemplateLibraryButton, SaveAsTemplateButton } from "@/components/BlockTemplateLibrary";
 import { cn } from "@/lib/utils";
@@ -111,6 +111,20 @@ export default function LessonBlockEditor({
     setSaveTemplateDesc("");
     setSaveTemplateDialogBlock(block);
   }, []);
+
+  // Save entire lesson as template
+  const [saveLessonTemplateOpen, setSaveLessonTemplateOpen] = useState(false);
+  const [lessonTemplateName, setLessonTemplateName] = useState("");
+  const [lessonTemplateTags, setLessonTemplateTags] = useState("");
+  const saveLessonTemplateMutation = trpc.lmsAdmin.saveLessonTemplate.useMutation({
+    onSuccess: () => {
+      toast.success("Lesson saved as template!");
+      setSaveLessonTemplateOpen(false);
+      setLessonTemplateName("");
+      setLessonTemplateTags("");
+    },
+    onError: (e: any) => toast.error(`Save failed: ${e.message}`),
+  });
 
   // Fetch all courses for the course picker
   const { data: coursesData } = trpc.lmsAdmin.listCourses.useQuery(
@@ -473,6 +487,13 @@ export default function LessonBlockEditor({
             >
               {saving ? "Saving..." : "Save & Close"}
             </Button>
+            <button
+              title="Save lesson as template"
+              onClick={() => { setLessonTemplateName(""); setLessonTemplateTags(""); setSaveLessonTemplateOpen(true); }}
+              className="text-gray-400 hover:text-teal-600 ml-1 p-1 rounded transition-colors"
+            >
+              <Bookmark className="w-4 h-4" />
+            </button>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-700 ml-1">
               <X className="w-5 h-5" />
             </button>
@@ -996,6 +1017,56 @@ export default function LessonBlockEditor({
             className="text-sm bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saveBlockTemplateMutation.isPending ? "Saving..." : "Save Template"}
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+
+    {/* Save Lesson as Template Dialog */}
+    <Dialog open={saveLessonTemplateOpen} onOpenChange={setSaveLessonTemplateOpen}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="text-base font-semibold text-gray-800">Save Lesson as Template</DialogTitle>
+        </DialogHeader>
+        <p className="text-xs text-gray-500 mb-3">Saves all {blocks.length} block{blocks.length !== 1 ? 's' : ''} in this lesson as a reusable template you can apply to other lessons.</p>
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-medium text-gray-700 block mb-1">Template name</label>
+            <input
+              type="text"
+              value={lessonTemplateName}
+              onChange={e => setLessonTemplateName(e.target.value)}
+              placeholder="e.g. Video Lesson with Quiz"
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-400"
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-700 block mb-1">Tags (optional, comma-separated)</label>
+            <input
+              type="text"
+              value={lessonTemplateTags}
+              onChange={e => setLessonTemplateTags(e.target.value)}
+              placeholder="e.g. video, quiz, echo"
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-400"
+            />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 mt-4">
+          <button onClick={() => setSaveLessonTemplateOpen(false)} className="text-sm text-gray-600 hover:text-gray-800 px-4 py-2 rounded-lg border border-gray-200 transition-colors">Cancel</button>
+          <button
+            disabled={!lessonTemplateName.trim() || saveLessonTemplateMutation.isPending}
+            onClick={() => {
+              if (!lessonTemplateName.trim() || !lessonId) return;
+              saveLessonTemplateMutation.mutate({
+                lessonId,
+                title: lessonTemplateName.trim(),
+                tags: lessonTemplateTags.trim() || undefined,
+              });
+            }}
+            className="text-sm bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saveLessonTemplateMutation.isPending ? "Saving..." : "Save Template"}
           </button>
         </div>
       </DialogContent>

@@ -460,6 +460,33 @@ BLOCK_CATALOG.push(
     },
   },
   {
+    type: "upgrade_prompt",
+    label: "Upgrade Prompt",
+    icon: <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>,
+    category: "Conversion",
+    defaultData: {
+      displayMode: "inline",
+      productType: "course",
+      productSlug: "",
+      headline: "Ready to take the next step?",
+      subheadline: "Unlock the full course and advance your skills.",
+      ctaText: "Upgrade Now",
+      dismissText: "No thanks",
+      showDismiss: true,
+      accentColor: "#179ca3",
+      bgColor: "#f0fdfa",
+      badgeText: "Special Offer",
+      urgencyLabel: "",
+      imageUrl: "",
+      discountType: "none",
+      discountValue: 0,
+      promoCode: "",
+      originalPriceCents: 0,
+      triggerDelaySeconds: 5,
+      triggerScrollPercent: 50,
+    },
+  },
+  {
     type: "pricing_cards",
     label: "Pricing Cards",
     icon: <LayoutList size={14} />,
@@ -3830,22 +3857,61 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
           {/* Pass-through credentials */}
           <div className="border-t border-gray-100 pt-3">
             <label className="text-xs font-semibold text-gray-700 block mb-2">Pass User Credentials</label>
-            <p className="text-[10px] text-gray-400 mb-2">When enabled, the logged-in user's name/email will be appended to the iframe URL as query parameters.</p>
+            <p className="text-[10px] text-gray-400 mb-2">Append user data to the iframe URL as query parameters. Copy the parameter string and paste it into your form's field-mapping URL.</p>
             <div className="space-y-2">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={d.passName ?? false} onChange={e => set("passName", e.target.checked)} className="rounded" />
-                <span className="text-xs text-gray-600">Pass <code className="bg-gray-100 px-1 rounded">name</code></span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={d.passEmail ?? false} onChange={e => set("passEmail", e.target.checked)} className="rounded" />
-                <span className="text-xs text-gray-600">Pass <code className="bg-gray-100 px-1 rounded">email</code></span>
-              </label>
+              {([
+                { key: "passFirstName", label: "First Name", param: "first_name", value: "{user.firstName}" },
+                { key: "passLastName",  label: "Last Name",  param: "last_name",  value: "{user.lastName}" },
+                { key: "passEmail",     label: "Email",      param: "email",      value: "{user.email}" },
+                { key: "passName",      label: "Full Name",  param: "name",       value: "{user.name}" },
+              ] as const).map(({ key, label, param, value }) => (
+                <div key={key} className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
+                    <input type="checkbox" checked={d[key] ?? false} onChange={e => set(key, e.target.checked)} className="rounded flex-shrink-0" />
+                    <span className="text-xs text-gray-600 truncate">Pass <code className="bg-gray-100 px-1 rounded">{label}</code></span>
+                  </label>
+                  <button
+                    type="button"
+                    title={`Copy ?${param}=${value}`}
+                    onClick={() => { navigator.clipboard.writeText(`${param}=${encodeURIComponent(value)}`); }}
+                    className="flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded text-[10px] bg-gray-100 hover:bg-teal-50 hover:text-teal-700 text-gray-500 border border-gray-200 transition-colors font-mono"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                    {param}=…
+                  </button>
+                </div>
+              ))}
             </div>
-            {(d.passName || d.passEmail) && d.url && (
+            {(d.passFirstName || d.passLastName || d.passEmail || d.passName) && d.url && (
               <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
-                <p className="text-[10px] text-gray-500 font-medium mb-1">Preview URL (with params):</p>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-[10px] text-gray-500 font-medium">Preview URL (with params):</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const params = [
+                        d.passFirstName && `first_name=${encodeURIComponent("{user.firstName}")}`,
+                        d.passLastName  && `last_name=${encodeURIComponent("{user.lastName}")}`,
+                        d.passEmail     && `email=${encodeURIComponent("{user.email}")}`,
+                        d.passName      && `name=${encodeURIComponent("{user.name}")}`,
+                      ].filter(Boolean).join("&");
+                      const full = `${d.url}${d.url.includes("?") ? "&" : "?"}${params}`;
+                      navigator.clipboard.writeText(full);
+                    }}
+                    className="text-[10px] text-teal-600 hover:text-teal-800 flex items-center gap-1"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                    Copy full URL
+                  </button>
+                </div>
                 <p className="text-[10px] text-gray-400 break-all font-mono">
-                  {d.url}{d.url.includes('?') ? '&' : '?'}{[d.passName && 'name=%7Buser.name%7D', d.passEmail && 'email=%7Buser.email%7D'].filter(Boolean).join('&')}
+                  {d.url}{d.url.includes('?') ? '&' : '?'}
+                  {[
+                    d.passFirstName && `first_name=%7Buser.firstName%7D`,
+                    d.passLastName  && `last_name=%7Buser.lastName%7D`,
+                    d.passEmail     && `email=%7Buser.email%7D`,
+                    d.passName      && `name=%7Buser.name%7D`,
+                  ].filter(Boolean).join('&')}
                 </p>
               </div>
             )}
@@ -3861,6 +3927,9 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
     }
     case "lesson_assignment": {
       return <LessonAssignmentBlockSettings d={d} set={set} />;
+    }
+    case "upgrade_prompt": {
+      return <UpgradePromptBlockSettings d={d} set={set} />;
     }
     case "column_layout": {
       const leftBlocks: Block[] = d.leftBlocks ?? [];
@@ -6602,6 +6671,150 @@ function LessonAssignmentBlockSettings({ d, set }: { d: Record<string, any>; set
           <input type="color" value={d.bgColor ?? "#ffffff"} onChange={e => set("bgColor", e.target.value)} className="w-8 h-8 rounded cursor-pointer border border-gray-200" />
           <DebouncedInput value={d.bgColor ?? "#ffffff"} onChange={v => set("bgColor", v)} className="h-8 text-xs flex-1" placeholder="#ffffff" />
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Upgrade Prompt Block Settings ────────────────────────────────────────────
+function UpgradePromptBlockSettings({ d, set }: { d: Record<string, any>; set: (key: string, value: any) => void }) {
+  const { data: coursesData } = trpc.lms.listCourses.useQuery({ pageSize: 100 });
+  const { data: downloadsData } = trpc.downloads.list.useQuery({});
+  const { data: productsData } = trpc.products.list.useQuery({});
+
+  const productType: string = d.productType ?? "course";
+  const discountType: string = d.discountType ?? "none";
+
+  const courseOptions = (coursesData?.courses ?? []).map((c: any) => ({ value: c.slug, label: c.title }));
+  const downloadOptions = (downloadsData?.products ?? []).map((p: any) => ({ value: p.slug, label: p.title }));
+  const productOptions = (productsData?.products ?? []).map((p: any) => ({ value: p.slug, label: p.title }));
+
+  return (
+    <div className="space-y-3">
+      {/* Display Mode */}
+      <div>
+        <label className="text-xs font-semibold text-gray-700 block mb-1">Display Mode</label>
+        <select value={d.displayMode ?? "inline"} onChange={e => set("displayMode", e.target.value)} className="w-full h-8 text-xs border border-gray-200 rounded px-2">
+          <option value="inline">Inline (always visible)</option>
+          <option value="modal_time">Modal — time delay</option>
+          <option value="modal_scroll">Modal — scroll %</option>
+          <option value="modal_exit">Modal — exit intent</option>
+          <option value="banner_slide">Slide-in banner</option>
+        </select>
+      </div>
+
+      {/* Trigger settings */}
+      {d.displayMode === "modal_time" && (
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Delay (seconds)</label>
+          <input type="number" min={1} max={120} value={d.triggerDelaySeconds ?? 5} onChange={e => set("triggerDelaySeconds", Number(e.target.value))} className="w-full h-8 text-xs border border-gray-200 rounded px-2" />
+        </div>
+      )}
+      {d.displayMode === "modal_scroll" && (
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Trigger at scroll % (0–100)</label>
+          <input type="number" min={10} max={100} value={d.triggerScrollPercent ?? 50} onChange={e => set("triggerScrollPercent", Number(e.target.value))} className="w-full h-8 text-xs border border-gray-200 rounded px-2" />
+        </div>
+      )}
+
+      {/* Product targeting */}
+      <div className="border-t border-gray-100 pt-3">
+        <label className="text-xs font-semibold text-gray-700 block mb-1">Target Product</label>
+        <select value={productType} onChange={e => { set("productType", e.target.value); set("productSlug", ""); }} className="w-full h-8 text-xs border border-gray-200 rounded px-2 mb-2">
+          <option value="course">Course</option>
+          <option value="download">Download / Digital Product</option>
+          <option value="product">Physical Product</option>
+        </select>
+        {productType === "course" && (
+          <select value={d.productSlug ?? ""} onChange={e => set("productSlug", e.target.value)} className="w-full h-8 text-xs border border-gray-200 rounded px-2">
+            <option value="">— Select course —</option>
+            {courseOptions.map((o: any) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        )}
+        {productType === "download" && (
+          <select value={d.productSlug ?? ""} onChange={e => set("productSlug", e.target.value)} className="w-full h-8 text-xs border border-gray-200 rounded px-2">
+            <option value="">— Select download —</option>
+            {downloadOptions.map((o: any) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        )}
+        {productType === "product" && (
+          <select value={d.productSlug ?? ""} onChange={e => set("productSlug", e.target.value)} className="w-full h-8 text-xs border border-gray-200 rounded px-2">
+            <option value="">— Select product —</option>
+            {productOptions.map((o: any) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        )}
+      </div>
+
+      {/* Discount */}
+      <div className="border-t border-gray-100 pt-3">
+        <label className="text-xs font-semibold text-gray-700 block mb-1">Discount</label>
+        <select value={discountType} onChange={e => set("discountType", e.target.value)} className="w-full h-8 text-xs border border-gray-200 rounded px-2 mb-2">
+          <option value="none">No discount</option>
+          <option value="percent">Percentage off</option>
+          <option value="fixed">Fixed amount off</option>
+          <option value="promo_code">Promo code</option>
+        </select>
+        {(discountType === "percent" || discountType === "fixed") && (
+          <div className="flex gap-2 items-center">
+            <input type="number" min={0} max={discountType === "percent" ? 100 : 9999} value={d.discountValue ?? 0} onChange={e => set("discountValue", Number(e.target.value))} className="flex-1 h-8 text-xs border border-gray-200 rounded px-2" />
+            <span className="text-xs text-gray-500">{discountType === "percent" ? "%" : "$ off"}</span>
+          </div>
+        )}
+        {discountType === "promo_code" && (
+          <input type="text" placeholder="PROMO20" value={d.promoCode ?? ""} onChange={e => set("promoCode", e.target.value.toUpperCase())} className="w-full h-8 text-xs border border-gray-200 rounded px-2" />
+        )}
+        {discountType !== "none" && (
+          <div className="mt-2">
+            <label className="text-xs text-gray-500 block mb-1">Original price (cents, e.g. 29900 = $299)</label>
+            <input type="number" min={0} value={d.originalPriceCents ?? 0} onChange={e => set("originalPriceCents", Number(e.target.value))} className="w-full h-8 text-xs border border-gray-200 rounded px-2" />
+          </div>
+        )}
+      </div>
+
+      {/* Content */}
+      <div className="border-t border-gray-100 pt-3 space-y-2">
+        <label className="text-xs font-semibold text-gray-700 block">Content</label>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Badge text (optional)</label>
+          <input type="text" placeholder="Special Offer" value={d.badgeText ?? ""} onChange={e => set("badgeText", e.target.value)} className="w-full h-8 text-xs border border-gray-200 rounded px-2" />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Urgency label (optional)</label>
+          <input type="text" placeholder="Limited time offer — ends soon" value={d.urgencyLabel ?? ""} onChange={e => set("urgencyLabel", e.target.value)} className="w-full h-8 text-xs border border-gray-200 rounded px-2" />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Headline</label>
+          <input type="text" value={d.headline ?? ""} onChange={e => set("headline", e.target.value)} className="w-full h-8 text-xs border border-gray-200 rounded px-2" />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Subheadline</label>
+          <textarea rows={2} value={d.subheadline ?? ""} onChange={e => set("subheadline", e.target.value)} className="w-full text-xs border border-gray-200 rounded px-2 py-1 resize-none" />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Image URL (optional)</label>
+          <input type="text" placeholder="https://…" value={d.imageUrl ?? ""} onChange={e => set("imageUrl", e.target.value)} className="w-full h-8 text-xs border border-gray-200 rounded px-2" />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">CTA button text</label>
+          <input type="text" value={d.ctaText ?? "Upgrade Now"} onChange={e => set("ctaText", e.target.value)} className="w-full h-8 text-xs border border-gray-200 rounded px-2" />
+        </div>
+        <div className="flex items-center gap-2">
+          <input type="checkbox" checked={d.showDismiss !== false} onChange={e => set("showDismiss", e.target.checked)} className="rounded" id="upShowDismiss" />
+          <label htmlFor="upShowDismiss" className="text-xs text-gray-600 cursor-pointer">Show dismiss link</label>
+        </div>
+        {d.showDismiss !== false && (
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Dismiss text</label>
+            <input type="text" value={d.dismissText ?? "No thanks"} onChange={e => set("dismissText", e.target.value)} className="w-full h-8 text-xs border border-gray-200 rounded px-2" />
+          </div>
+        )}
+      </div>
+
+      {/* Colors */}
+      <div className="border-t border-gray-100 pt-3 space-y-2">
+        <label className="text-xs font-semibold text-gray-700 block">Colors</label>
+        <BSColorField data={d} onSet={set} label="Accent color" field="accentColor" />
+        <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
       </div>
     </div>
   );

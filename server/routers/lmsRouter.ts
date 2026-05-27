@@ -59,6 +59,7 @@ import {
   orderBumps,
   freePreviewEnrollments,
   lmsSectionTemplates,
+  lessonTemplates,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
@@ -1174,6 +1175,108 @@ export const lmsLearnerRouter = router({
       await db.update(lmsOrders).set({ stripeSessionId: session.id }).where(eq(lmsOrders.id, orderResult.id));
       return { checkoutUrl: session.url };
     }),
+
+  /** Upgrade-prompt checkout — supports course / download / physical product with optional promo code */
+  upgradePromptCheckout: protectedProcedure
+    .input(z.object({
+      productType: z.enum(["course", "download", "product"]),
+      productSlug: z.string().optional(),
+      productId: z.number().optional(),
+      promoCode: z.string().optional(),
+      origin: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+      const origin = input.origin || ctx.req.headers.origin || `https://${ctx.req.headers.host}`;
+
+      // Resolve promo code → Stripe promotion_code ID
+      let discounts: Array<{ promotion_code: string }> | undefined;
+      if (input.promoCode) {
+        try {
+          const codes = await stripe.promotionCodes.list({ code: input.promoCode.toUpperCase(), active: true, limit: 1 });
+          if (codes.data[0]) discounts = [{ promotion_code: codes.data[0].id }];
+        } catch { /* ignore */ }
+      }
+
+      if (input.productType === "course") {
+        const slug = input.productSlug;
+        if (!slug) throw new TRPCError({ code: "BAD_REQUEST", message: "productSlug required for course" });
+        const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, slug)).limit(1);
+        if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+        const [existing] = await db.select().from(lmsEnrollments)
+          .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, course.id))).limit(1);
+        if (existing) return { checkoutUrl: null, alreadyEnrolled: true };
+        if (course.isFree || !course.price) {
+          await db.insert(lmsEnrollments).values({ userId: ctx.user.id, courseId: course.id });
+          return { checkoutUrl: null, alreadyEnrolled: false, free: true };
+        }
+        const session = await stripe.checkout.sessions.create({
+          mode: "payment",
+          customer_email: ctx.user.email ?? undefined,
+          client_reference_id: ctx.user.id.toString(),
+          ...(discounts ? { discounts } : { allow_promotion_codes: true }),
+          line_items: [{ price_data: { currency: course.currency ?? "usd", product_data: { name: course.title, images: course.coverImageUrl ? [course.coverImageUrl] : undefined }, unit_amount: course.price }, quantity: 1 }],
+          metadata: { type: "lms_course", course_id: course.id.toString(), user_id: ctx.user.id.toString(), customer_email: ctx.user.email ?? "", source: "upgrade_prompt" },
+          success_url: `${origin}/courses/${course.slug}?success=1`,
+          cancel_url: `${origin}/courses/${course.slug}`,
+        });
+        return { checkoutUrl: session.url, alreadyEnrolled: false };
+      }
+
+      if (input.productType === "download") {
+        const id = input.productId;
+        const slug = input.productSlug;
+        if (!id && !slug) throw new TRPCError({ code: "BAD_REQUEST", message: "productId or productSlug required" });
+        const [product] = await db.select().from(digitalProducts)
+          .where(id ? eq(digitalProducts.id, id) : eq(digitalProducts.slug, slug!)).limit(1);
+        if (!product) throw new TRPCError({ code: "NOT_FOUND" });
+        if (product.isFree || !product.price) {
+          const { digitalPurchases } = await import("../../drizzle/schema");
+          await db.insert(digitalPurchases).values({ userId: ctx.user.id, productId: product.id });
+          return { checkoutUrl: null, alreadyEnrolled: false, free: true };
+        }
+        const session = await stripe.checkout.sessions.create({
+          mode: "payment",
+          customer_email: ctx.user.email ?? undefined,
+          client_reference_id: ctx.user.id.toString(),
+          ...(discounts ? { discounts } : { allow_promotion_codes: true }),
+          line_items: [{ price_data: { currency: product.currency, product_data: { name: product.title, images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined }, unit_amount: product.price }, quantity: 1 }],
+          metadata: { type: "digital_download", product_id: product.id.toString(), user_id: ctx.user.id.toString(), customer_email: ctx.user.email ?? "", source: "upgrade_prompt" },
+          success_url: `${origin}/downloads/${product.slug}/files?success=1`,
+          cancel_url: `${origin}/downloads/${product.slug}`,
+        });
+        return { checkoutUrl: session.url, alreadyEnrolled: false };
+      }
+
+      if (input.productType === "product") {
+        const id = input.productId;
+        const slug = input.productSlug;
+        if (!id && !slug) throw new TRPCError({ code: "BAD_REQUEST", message: "productId or productSlug required" });
+        const [product] = await db.select().from(physicalProducts)
+          .where(id ? eq(physicalProducts.id, id) : eq(physicalProducts.slug, slug!)).limit(1);
+        if (!product) throw new TRPCError({ code: "NOT_FOUND" });
+        if (product.isFree || !product.price) return { checkoutUrl: null, alreadyEnrolled: false, free: true };
+        const allowedCountries = product.shippingCountries ? (JSON.parse(product.shippingCountries) as string[]) : ["US", "CA", "GB", "AU", "NZ"];
+        const session = await stripe.checkout.sessions.create({
+          mode: "payment",
+          customer_email: ctx.user.email ?? undefined,
+          client_reference_id: ctx.user.id.toString(),
+          ...(discounts ? { discounts } : { allow_promotion_codes: true }),
+          shipping_address_collection: { allowed_countries: allowedCountries as any },
+          line_items: [{ price_data: { currency: product.currency, product_data: { name: product.title, images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined }, unit_amount: product.price }, quantity: 1 }],
+          metadata: { type: "physical_product", product_id: product.id.toString(), user_id: ctx.user.id.toString(), customer_email: ctx.user.email ?? "", source: "upgrade_prompt" },
+          success_url: `${origin}/product/${product.slug}?success=1`,
+          cancel_url: `${origin}/product/${product.slug}`,
+        });
+        return { checkoutUrl: session.url, alreadyEnrolled: false };
+      }
+
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Unknown productType" });
+    }),
+
   /** Accept group seat invite */
   acceptGroupInvite: protectedProcedure
     .input(z.object({ token: z.string() }))
@@ -1935,6 +2038,59 @@ export const lmsAdminRouter = router({
         });
       }
       return { sectionId, title, lessonCount: lessons.length };
+    }),
+
+  // ── Lesson Templates ──
+  /** Save a single lesson (with all its content blocks) as a reusable template */
+  saveLessonTemplate: protectedProcedure
+    .input(z.object({
+      lessonId: z.number(),
+      title: z.string().min(1).max(255),
+      tags: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [lesson] = await db.select().from(lmsLessons).where(eq(lmsLessons.id, input.lessonId)).limit(1);
+      if (!lesson) throw new TRPCError({ code: "NOT_FOUND", message: "Lesson not found" });
+      const [result] = await db.insert(lessonTemplates).values({
+        title: input.title,
+        lessonType: lesson.type ?? "video",
+        blocks: lesson.contentBlocks ?? "[]",
+        coverImage: lesson.coverImageUrl ?? null,
+        tags: input.tags ?? null,
+        createdByAdminId: ctx.user.id,
+      }).$returningId();
+      return { id: result.id, success: true };
+    }),
+  listLessonTemplates: protectedProcedure
+    .query(async ({ ctx }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) return [];
+      return db.select().from(lessonTemplates).orderBy(desc(lessonTemplates.createdAt));
+    }),
+  deleteLessonTemplate: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(lessonTemplates).where(eq(lessonTemplates.id, input.id));
+      return { success: true };
+    }),
+  /** Apply a lesson template to an existing lesson (replaces its content blocks) */
+  applyLessonTemplate: protectedProcedure
+    .input(z.object({ lessonId: z.number(), templateId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [template] = await db.select().from(lessonTemplates).where(eq(lessonTemplates.id, input.templateId)).limit(1);
+      if (!template) throw new TRPCError({ code: "NOT_FOUND", message: "Template not found" });
+      await db.update(lmsLessons).set({ contentBlocks: template.blocks }).where(eq(lmsLessons.id, input.lessonId));
+      return { success: true };
     }),
 
   /** Copy a section from another course into this course */
