@@ -3524,6 +3524,16 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
 
   const [activeTab, setActiveTab] = useState<"settings" | "content">("settings");
   const [headerSaving, setHeaderSaving] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+  const [showDiscardDialog, setShowDiscardDialog] = useState(false);
+
+  const handleCloseWithConfirm = () => {
+    if (isDirty) {
+      setShowDiscardDialog(true);
+    } else {
+      onClose();
+    }
+  };
 
   const handleHeaderSave = async (andClose = false) => {
     setHeaderSaving(true);
@@ -3535,6 +3545,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
         // Save lesson settings from the settings tab
         handleSave(andClose);
       }
+      setIsDirty(false);
     } finally {
       setHeaderSaving(false);
     }
@@ -3665,7 +3676,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
             size="sm"
             variant="outline"
             className="border-gray-200 text-gray-500 hover:text-gray-800 hover:bg-gray-50 h-7 text-xs"
-            onClick={onClose}
+            onClick={handleCloseWithConfirm}
             title="Close without saving"
           >
             <X className="w-3 h-3 mr-1" /> Close
@@ -3737,28 +3748,11 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
       {activeTab === "settings" && (
       <div className="flex-1 overflow-y-auto">
       <div className="max-w-2xl mx-auto px-6 py-6">
-        {/* Top Save bar */}
-        <div className="flex justify-end gap-2 pb-4 border-b mb-4">
-          <Button
-            variant="outline"
-            className="border-teal-300 text-teal-700 hover:bg-teal-50 h-8 text-xs"
-            disabled={update.isPending}
-            onClick={() => handleSave(false)}
-          >
-            {update.isPending ? "Saving..." : "Save"}
-          </Button>
-          <Button
-            className="bg-teal-600 hover:bg-teal-700 text-white h-8 text-xs"
-            disabled={update.isPending}
-            onClick={() => handleSave(true)}
-          >
-            {update.isPending ? "Saving..." : "Save & Close"}
-          </Button>
-        </div>
+
         <div className="space-y-4">
           <div>
             <Label className="text-sm">Title</Label>
-            <Input value={title} onChange={e => setTitle(e.target.value)} className="mt-1" />
+            <Input value={title} onChange={e => { setTitle(e.target.value); setIsDirty(true); }} className="mt-1" />
           </div>
 
           {/* Lesson Status — Published / Draft */}
@@ -3773,7 +3767,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
             </div>
             <div className="flex gap-1 ml-4 shrink-0">
               <button
-                onClick={() => setLessonStatus("published")}
+                onClick={() => { setLessonStatus("published"); setIsDirty(true); }}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-md border transition-colors ${
                   lessonStatus === "published"
                     ? "bg-teal-600 text-white border-teal-600"
@@ -3783,7 +3777,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
                 Published
               </button>
               <button
-                onClick={() => setLessonStatus("draft")}
+                onClick={() => { setLessonStatus("draft"); setIsDirty(true); }}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-md border transition-colors ${
                   lessonStatus === "draft"
                     ? "bg-amber-500 text-white border-amber-500"
@@ -3797,7 +3791,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
 
           <div>
             <Label className="text-sm">Duration (min)</Label>
-            <Input value={durationMinutes} onChange={e => setDurationMinutes(e.target.value)} type="number" min="0" className="mt-1" />
+            <Input value={durationMinutes} onChange={e => { setDurationMinutes(e.target.value); setIsDirty(true); }} type="number" min="0" className="mt-1" />
           </div>
 
           {/* Preview mode selector */}
@@ -3984,24 +3978,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
             />
           </div>
         </div>
-        <div className="flex justify-end gap-2 pt-2 border-t">
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button
-            variant="outline"
-            className="border-teal-300 text-teal-700 hover:bg-teal-50"
-            disabled={update.isPending}
-            onClick={() => handleSave(false)}
-          >
-            {update.isPending ? "Saving..." : "Save"}
-          </Button>
-          <Button
-            className="bg-teal-600 hover:bg-teal-700 text-white"
-            disabled={update.isPending}
-            onClick={() => handleSave(true)}
-          >
-            {update.isPending ? "Saving..." : "Save & Close"}
-          </Button>
-        </div>
+
       </div>
       </div>
       )}
@@ -4009,6 +3986,24 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
       {/* Lesson Editor Tab */}
       {activeTab === "content" && (
         <div className="flex-1 overflow-hidden flex flex-col">
+          {/* Sub-toolbar: canvas actions */}
+          <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 border-b border-gray-200 shrink-0">
+            <Button
+              size="sm"
+              className="bg-teal-600 hover:bg-teal-700 text-white h-7 text-xs font-semibold"
+              onClick={() => blockEditorRef.current?.openAddBlock()}
+            >
+              <Plus className="w-3 h-3 mr-1" /> Add Block
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-teal-300 text-teal-700 hover:bg-teal-50 h-7 text-xs font-semibold"
+              onClick={() => blockEditorRef.current?.openSaveLessonTemplate()}
+            >
+              <LayoutTemplate className="w-3 h-3 mr-1" /> Save as Template
+            </Button>
+          </div>
           {!fullLesson ? (
             <div className="flex items-center justify-center flex-1 gap-2 text-gray-400">
               <Loader2 className="w-5 h-5 animate-spin" />
@@ -4024,8 +4019,8 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
               lessonTitle={lesson.title}
               initialBlocks={fullLesson.contentBlocks ? (typeof fullLesson.contentBlocks === "string" ? JSON.parse(fullLesson.contentBlocks) : fullLesson.contentBlocks) as Block[] : []}
               onClose={() => setActiveTab("settings")}
-              onSaved={() => { onSaved(); }}
-              onSavedAndClose={() => { if (onSavedAndClose) onSavedAndClose(); else onSaved(); }}
+              onSaved={() => { onSaved(); setIsDirty(false); }}
+              onSavedAndClose={() => { setIsDirty(false); if (onSavedAndClose) onSavedAndClose(); else onSaved(); }}
               prevLesson={prevLesson}
               nextLesson={nextLesson}
               onNavigateLesson={onNavigateLesson}
@@ -4038,6 +4033,23 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
 
       </>
       <MediaPickerDialog open={mediaPickerOpen} onClose={() => setMediaPickerOpen(false)} onSelect={asset => { setSelectedAsset(asset); setContent(asset.s3Url); }} />
+
+      {/* Discard changes confirmation dialog */}
+      <Dialog open={showDiscardDialog} onOpenChange={setShowDiscardDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-500" /> Discard unsaved changes?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600 py-2">You have unsaved changes to this lesson. If you close now, your changes will be lost.</p>
+          <div className="flex gap-2 justify-end pt-2">
+            <Button variant="outline" size="sm" onClick={() => setShowDiscardDialog(false)}>Keep Editing</Button>
+            <Button size="sm" variant="outline" className="border-red-300 text-red-600 hover:bg-red-50" onClick={() => { setShowDiscardDialog(false); setIsDirty(false); onClose(); }}>Discard &amp; Close</Button>
+            <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => { setShowDiscardDialog(false); handleHeaderSave(true); }}>Save &amp; Close</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

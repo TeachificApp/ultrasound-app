@@ -7,7 +7,7 @@
  */
 import { useState, useCallback, useMemo, useRef } from "react";
 import {
-  DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent,
+  DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent, DragStartEvent, UniqueIdentifier,
 } from "@dnd-kit/core";
 import {
   SortableContext, verticalListSortingStrategy, arrayMove,
@@ -32,6 +32,8 @@ import { cn } from "@/lib/utils";
 
 export interface LessonBlockEditorHandle {
   save: (andClose?: boolean) => Promise<void>;
+  openAddBlock: () => void;
+  openSaveLessonTemplate: () => void;
 }
 
 interface LessonBlockEditorProps {
@@ -191,15 +193,166 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
+  // Column drag state — mirrors LandingPageBuilder pattern
+  const [activeDragId, setActiveDragId] = useState<UniqueIdentifier | null>(null);
+  const [activeColumnTarget, setActiveColumnTarget] = useState<{ blockId: string; side: "left" | "right" } | null>(null);
+  const activeColumnTargetRef = useRef<{ blockId: string; side: "left" | "right" } | null>(null);
+  const pointerMoveHandlerRef = useRef<((e: PointerEvent) => void) | null>(null);
+  const blocksRef = useRef<Block[]>([]);
+  blocksRef.current = blocks;
+
+  const parseColId = (id: UniqueIdentifier): { blockId: string; side: "left" | "right" } | null => {
+    const s = String(id);
+    if (!s.startsWith("col:")) return null;
+    const parts = s.split(":");
+    if (parts.length < 3) return null;
+    return { blockId: parts[1], side: parts[2] as "left" | "right" };
+  };
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveDragId(event.active.id);
+    setActiveColumnTarget(null);
+    activeColumnTargetRef.current = null;
+    const handler = (e: PointerEvent) => {
+      const els = document.elementsFromPoint(e.clientX, e.clientY);
+      let found: { blockId: string; side: "left" | "right" } | null = null;
+      for (const el of els) {
+        const zoneId = (el as HTMLElement).dataset?.colZone;
+        if (zoneId && zoneId.startsWith("col:")) {
+          const parsed = parseColId(zoneId);
+          if (parsed) { found = parsed; break; }
+        }
+      }
+      if (JSON.stringify(found) !== JSON.stringify(activeColumnTargetRef.current)) {
+        activeColumnTargetRef.current = found;
+        setActiveColumnTarget(found);
+      }
+    };
+    pointerMoveHandlerRef.current = handler;
+    document.addEventListener("pointermove", handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleDragEnd = useCallback((event: DragEndEvent) => {
-    const { active, over } = event;
-    if (over && active.id !== over.id) {
-      setBlocks(bs => {
-        const oldIdx = bs.findIndex(b => b.id === active.id);
-        const newIdx = bs.findIndex(b => b.id === over.id);
-        return arrayMove(bs, oldIdx, newIdx);
-      });
+    if (pointerMoveHandlerRef.current) {
+      document.removeEventListener("pointermove", pointerMoveHandlerRef.current);
+      pointerMoveHandlerRef.current = null;
     }
+    const currentTarget = activeColumnTargetRef.current;
+    setActiveDragId(null);
+    setActiveColumnTarget(null);
+    activeColumnTargetRef.current = null;
+
+    const { active, over } = event;
+    const activeIdStr = String(active.id);
+    const currentBlocks = blocksRef.current;
+
+    // Case 1: Dropping onto a column zone
+    if (currentTarget) {
+      let draggedBlock = currentBlocks.find(b => b.id === activeIdStr);
+      let sourceColBlockId: string | null = null;
+      let sourceSide: "left" | "right" | null = null;
+      if (!draggedBlock) {
+        for (const colBlock of currentBlocks) {
+          if (colBlock.type !== "column_layout") continue;
+          for (const side of ["leftBlocks", "rightBlocks"] as const) {
+            const col: Block[] = colBlock.data[side] ?? [];
+            const found = col.find(cb => cb.id === activeIdStr);
+            if (found) { draggedBlock = found; sourceColBlockId = colBlock.id; sourceSide = side === "leftBlocks" ? "left" : "right"; break; }
+          }
+          if (draggedBlock) break;
+        }
+      }
+      if (!draggedBlock || draggedBlock.type === "column_layout") return;
+      if (sourceColBlockId === currentTarget.blockId && sourceSide === currentTarget.side) return;
+      setBlocks(prev => {
+        let next = prev;
+        if (sourceColBlockId) {
+          next = next.map(b => {
+            if (b.id !== sourceColBlockId) return b;
+            const srcKey = sourceSide === "left" ? "leftBlocks" : "rightBlocks";
+            return { ...b, data: { ...b.data, [srcKey]: (b.data[srcKey] ?? []).filter((cb: Block) => cb.id !== activeIdStr) } };
+          });
+        } else {
+          next = next.filter(b => b.id !== activeIdStr);
+        }
+        return next.map(b => {
+          if (b.id !== currentTarget.blockId) return b;
+          const colKey = currentTarget.side === "left" ? "leftBlocks" : "rightBlocks";
+          const existing: Block[] = b.data[colKey] ?? [];
+          return { ...b, data: { ...b.data, [colKey]: [...existing, draggedBlock!] } };
+        });
+      });
+      return;
+    }
+
+    if (!over) return;
+    const overIdStr = String(over.id);
+    if (activeIdStr === overIdStr) return;
+
+    // Case 4: Drag column child out to main canvas
+    {
+      let sourceColBlockId: string | null = null;
+      let sourceSide: "left" | "right" | null = null;
+      let draggedChildBlock: Block | null = null;
+      for (const colBlock of currentBlocks) {
+        if (colBlock.type !== "column_layout") continue;
+        for (const side of ["leftBlocks", "rightBlocks"] as const) {
+          const col: Block[] = colBlock.data[side] ?? [];
+          const found = col.find(cb => cb.id === activeIdStr);
+          if (found) { draggedChildBlock = found; sourceColBlockId = colBlock.id; sourceSide = side === "leftBlocks" ? "left" : "right"; break; }
+        }
+        if (draggedChildBlock) break;
+      }
+      if (draggedChildBlock && sourceColBlockId && sourceSide) {
+        const overIsMainBlock = currentBlocks.some(b => b.id === overIdStr);
+        if (overIsMainBlock) {
+          setBlocks(prev => {
+            let movedBlock: Block | null = null;
+            let next = prev.map(b => {
+              if (b.id !== sourceColBlockId) return b;
+              const colKey = sourceSide === "left" ? "leftBlocks" : "rightBlocks";
+              const col: Block[] = b.data[colKey] ?? [];
+              const child = col.find(cb => cb.id === activeIdStr);
+              if (child) movedBlock = child;
+              return { ...b, data: { ...b.data, [colKey]: col.filter(cb => cb.id !== activeIdStr) } };
+            });
+            if (!movedBlock) return prev;
+            const overIdx = next.findIndex(b => b.id === overIdStr);
+            if (overIdx === -1) return [...next, movedBlock];
+            return [...next.slice(0, overIdx), movedBlock, ...next.slice(overIdx)];
+          });
+          return;
+        }
+      }
+    }
+
+    // Case 2: Reorder within same column
+    for (const colBlock of currentBlocks) {
+      if (colBlock.type !== "column_layout") continue;
+      for (const side of ["leftBlocks", "rightBlocks"] as const) {
+        const col: Block[] = colBlock.data[side] ?? [];
+        const activeIdx = col.findIndex(cb => cb.id === activeIdStr);
+        const overIdx = col.findIndex(cb => cb.id === overIdStr);
+        if (activeIdx !== -1 && overIdx !== -1) {
+          setBlocks(prev => prev.map(b => {
+            if (b.id !== colBlock.id) return b;
+            const c: Block[] = b.data[side] ?? [];
+            return { ...b, data: { ...b.data, [side]: arrayMove(c, activeIdx, overIdx) } };
+          }));
+          return;
+        }
+      }
+    }
+
+    // Case 3: Reorder main canvas
+    setBlocks(bs => {
+      const oldIdx = bs.findIndex(b => b.id === activeIdStr);
+      const newIdx = bs.findIndex(b => b.id === overIdStr);
+      if (oldIdx === -1 || newIdx === -1) return bs;
+      return arrayMove(bs, oldIdx, newIdx);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /** Scroll the canvas to a specific block id after a short delay (for React to render it first) */
@@ -277,6 +430,8 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
 
   useImperativeHandle(ref, () => ({
     save: (andClose = false) => handleSaveRef.current?.(andClose) ?? Promise.resolve(),
+    openAddBlock: () => setAddMenuOpen(true),
+    openSaveLessonTemplate: () => { setLessonTemplateName(""); setLessonTemplateTags(""); setSaveLessonTemplateOpen(true); },
   }));
 
   const handleSave = async (andClose = false) => {
@@ -535,7 +690,7 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
                 )}
               </div>
             ) : (
-              <DndContext sensors={sensors} modifiers={[restrictToFirstScrollableAncestor]} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <DndContext sensors={sensors} modifiers={[restrictToFirstScrollableAncestor]} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
                 <SortableContext items={[
                   ...blocks.map(b => b.id),
                   ...blocks.flatMap(b => b.type === "column_layout" ? [...(b.data?.leftBlocks ?? []), ...(b.data?.rightBlocks ?? [])].map((cb: any) => cb.id) : []),
@@ -557,6 +712,8 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
                         onMoveUp={idx > 0 ? () => moveBlock(block.id, -1) : undefined}
                         onMoveDown={idx < blocks.length - 1 ? () => moveBlock(block.id, 1) : undefined}
                         onSaveAsTemplate={handleSaveBlockAsTemplate}
+                        activeDragId={activeDragId}
+                        activeColumnTarget={activeColumnTarget}
                         onMoveBlockOutOfColumn={(colBlockId, side, childBlockId) => {
                           setBlocks(prev => {
                             let movedBlock: Block | null = null;

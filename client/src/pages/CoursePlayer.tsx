@@ -636,9 +636,11 @@ function MobileSidebarContent({
                 <div key={section.id}>
                   <div onClick={toggleSection}
                     className={cn("w-full text-left px-3 py-2.5 flex items-center gap-3 text-xs transition-all border-l-4 cursor-pointer select-none",
-                      isSectionActive ? "bg-teal-50 text-teal-900 border-teal-500" : allSectionDone ? "text-gray-500 hover:bg-gray-50 border-transparent" : sectionLocked ? "text-gray-400 cursor-not-allowed border-transparent" : "text-gray-700 hover:bg-gray-50 border-transparent")}>
+                      isSectionActive ? "text-gray-900" : allSectionDone ? "text-gray-500 hover:bg-gray-50 border-transparent" : sectionLocked ? "text-gray-400 cursor-not-allowed border-transparent" : "text-gray-700 hover:bg-gray-50 border-transparent")}
+                    style={isSectionActive ? { backgroundColor: `${primaryColor}12`, borderColor: primaryColor } : undefined}>
                     <span className={cn("w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-extrabold shrink-0",
-                      isSectionActive ? "bg-teal-500 text-white" : allSectionDone ? "bg-teal-100 text-teal-700" : sectionLocked ? "bg-gray-100 text-gray-400" : "bg-gray-100 text-gray-500")}>
+                      sectionLocked ? "bg-gray-100 text-gray-400" : "")}
+                      style={isSectionActive ? { backgroundColor: primaryColor, color: "#fff" } : allSectionDone ? { backgroundColor: `${primaryColor}22`, color: primaryColor } : !sectionLocked ? { backgroundColor: "#f3f4f6", color: "#6b7280" } : undefined}>
                       {sectionLocked ? <Lock className="w-3 h-3" /> : allSectionDone ? "✓" : String(sectionNum).padStart(2, "0")}
                     </span>
                     <div className="flex-1 min-w-0">
@@ -646,7 +648,7 @@ function MobileSidebarContent({
                       {sectionLocked && unlockDate && <span className="text-[10px] text-gray-500 font-normal normal-case">Unlocks {unlockDate}</span>}
                     </div>
                     {!sectionLocked && (isExpanded
-                      ? <ChevronUp className="w-3 h-3 text-teal-500 shrink-0" />
+                      ? <ChevronUp className="w-3 h-3 shrink-0" style={{ color: primaryColor }} />
                       : <ChevronDown className="w-3 h-3 text-gray-400 shrink-0" />
                     )}
                   </div>
@@ -662,7 +664,8 @@ function MobileSidebarContent({
                         return (
                           <button key={lesson.id} onClick={() => { if (!lessonLocked) setSelectedLessonId(lesson.id); }} disabled={lessonLocked}
                             className={cn("w-full text-left px-2 py-1.5 flex items-center gap-2 text-[11px] transition-colors rounded",
-                              active ? "text-teal-700 bg-teal-50 font-semibold" : lessonLocked ? "text-gray-400 cursor-not-allowed" : done ? "text-gray-400" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50")}>
+                              active ? "font-semibold" : lessonLocked ? "text-gray-400 cursor-not-allowed" : done ? "text-gray-400" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50")}
+                            style={active ? { color: primaryColor, backgroundColor: `${primaryColor}12` } : undefined}>
                             <LessonIcon type={lesson.type} done={done} locked={lessonLocked} color={primaryColor} />
                             <div className="flex-1 min-w-0">
                               <span className="truncate block">{lesson.title}</span>
@@ -698,7 +701,9 @@ function MobileSidebarContent({
               <p className="text-xs text-gray-400 text-center py-6">No saved lessons yet.</p>
             ) : (bookmarksData ?? []).map((b: any) => (
               <button key={b.id} onClick={() => setSelectedLessonId(b.lessonId)}
-                className="w-full text-left bg-white border border-gray-200 rounded-lg p-3 hover:border-teal-400 transition-colors">
+                className="w-full text-left bg-white border border-gray-200 rounded-lg p-3 transition-colors"
+                onMouseEnter={e => (e.currentTarget.style.borderColor = primaryColor)}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = "")}>
                 <p className="text-xs font-medium text-gray-800 truncate">{b.lessonTitle}</p>
                 <p className="text-[10px] text-gray-400 mt-0.5">{new Date(b.createdAt).toLocaleDateString()}</p>
               </button>
@@ -710,7 +715,8 @@ function MobileSidebarContent({
         {([{ key: "lessons", icon: BookOpen, label: lbl.courseModules }, { key: "notes", icon: StickyNote, label: "Notes" }, { key: "bookmarks", icon: Bookmark, label: "Saved" }]).map(({ key, icon: Icon, label }) => (
           <button key={key} onClick={() => setSidebarTab(key)}
             className={cn("flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[10px] transition-colors",
-              sidebarTab === key ? "text-teal-600 border-t-2 border-teal-500 bg-teal-50" : "text-gray-500 hover:text-gray-700")}>
+              sidebarTab === key ? "border-t-2" : "text-gray-500 hover:text-gray-700")}
+            style={sidebarTab === key ? { color: primaryColor, borderColor: primaryColor, backgroundColor: `${primaryColor}10` } : undefined}>
             <Icon className="w-3.5 h-3.5" />{label}
           </button>
         ))}
@@ -960,9 +966,9 @@ export default function CoursePlayer() {
   if (!data?.enrollment && !isPreviewMode && !adminPreviewStudent && !adminBypass && !hasPreviewLessons) {
     return (
       <div className="text-center py-20 bg-gray-50 min-h-screen">
-        <Lock className="w-12 h-12 mx-auto mb-3 text-teal-500" />
+        <Lock className="w-12 h-12 mx-auto mb-3" style={{ color: "#0d9488" }} />
         <p className="text-lg font-medium text-gray-800">You are not enrolled in this course</p>
-        <Button className="mt-4 bg-teal-600 hover:bg-teal-700 text-white" onClick={() => navigate(`/courses/${slug}`)}>View Course</Button>
+        <Button className="mt-4 text-white" style={{ backgroundColor: "#0d9488" }} onClick={() => navigate(`/courses/${slug}`)}>View Course</Button>
       </div>
     );
   }
@@ -1134,11 +1140,11 @@ export default function CoursePlayer() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {upgradePromptReason === "locked_lesson" ? (
-                <><Lock className="w-5 h-5 text-teal-600" /> Full Access Required</>
+                <><Lock className="w-5 h-5" style={{ color: primaryColor }} /> Full Access Required</>
               ) : upgradePromptReason === "exit" ? (
-                <><Award className="w-5 h-5 text-teal-600" /> Enjoying the Preview?</>
+                <><Award className="w-5 h-5" style={{ color: primaryColor }} /> Enjoying the Preview?</>
               ) : (
-                <><PlayCircle className="w-5 h-5 text-teal-600" /> You're in Preview Mode</>
+                <><PlayCircle className="w-5 h-5" style={{ color: primaryColor }} /> You're in Preview Mode</>
               )}
             </DialogTitle>
           </DialogHeader>
@@ -1152,7 +1158,8 @@ export default function CoursePlayer() {
             )}
             <div className="flex gap-3">
               <Button
-                className="flex-1 bg-teal-600 hover:bg-teal-700 text-white"
+                className="flex-1 text-white"
+                style={{ backgroundColor: primaryColor }}
                 onClick={() => { setShowUpgradePrompt(false); navigate(`/courses/${slug}`); }}
               >
                 View Course &amp; Enroll
@@ -1167,12 +1174,13 @@ export default function CoursePlayer() {
 
       {/* Free Preview Banner for unenrolled users */}
       {!isEnrolled && !adminBypass && hasPreviewLessons && (
-        <div className="bg-teal-600 text-white text-center py-2 px-4 text-sm font-medium flex items-center justify-center gap-2 shrink-0 z-50">
+        <div className="text-white text-center py-2 px-4 text-sm font-medium flex items-center justify-center gap-2 shrink-0 z-50" style={{ backgroundColor: primaryColor }}>
           <PlayCircle className="w-4 h-4" />
           <span>You're viewing a free preview — <button className="underline font-semibold" onClick={() => navigate(`/courses/${slug}`)}>enroll for full access</button></span>
           <button
             onClick={() => { setUpgradePromptReason("exit"); setShowUpgradePrompt(true); }}
-            className="ml-4 px-2 py-0.5 bg-teal-700 hover:bg-teal-800 rounded text-xs"
+            className="ml-4 px-2 py-0.5 rounded text-xs opacity-80 hover:opacity-100"
+            style={{ backgroundColor: `${primaryColor}cc` }}
           >
             Upgrade
           </button>
@@ -1224,7 +1232,9 @@ export default function CoursePlayer() {
         <div className="flex items-center gap-3">
           {/* Mobile hamburger */}
           <button
-            className="lg:hidden text-gray-500 hover:text-teal-600 transition-colors mr-1"
+            className="lg:hidden text-gray-500 transition-colors mr-1"
+            onMouseEnter={e => (e.currentTarget.style.color = primaryColor)}
+            onMouseLeave={e => (e.currentTarget.style.color = "")}
             onClick={() => setMobileSidebarOpen(o => !o)}
             aria-label="Toggle course outline"
           >
@@ -1232,7 +1242,7 @@ export default function CoursePlayer() {
           </button>
           {LOGO
             ? <img src={LOGO} alt="Logo" className="h-8 w-auto" />
-            : <span className="text-teal-800 font-bold text-base">All About Ultrasound</span>
+            : <span className="font-bold text-base" style={{ color: primaryColor }}>All About Ultrasound</span>
           }
         </div>
         <div className="flex items-center gap-5">
@@ -1252,8 +1262,8 @@ export default function CoursePlayer() {
 
           {/* Welcome */}
           <div className="flex items-center gap-2 text-gray-600">
-            <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center">
-              <User className="w-3.5 h-3.5 text-teal-600" />
+            <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ backgroundColor: `${primaryColor}18` }}>
+              <User className="w-3.5 h-3.5" style={{ color: primaryColor }} />
             </div>
             <span className="text-xs">Welcome, <span className="font-medium text-gray-900">{user?.name?.split(" ")[0] || "Student"}</span></span>
           </div>
@@ -1276,15 +1286,15 @@ export default function CoursePlayer() {
                 <DialogHeader>
                   <DialogTitle className="flex items-center gap-3">
                     {instructorPopup.avatarUrl ? (
-                      <img src={instructorPopup.avatarUrl} alt={instructorPopup.name} className="w-12 h-12 rounded-full object-cover border-2 border-teal-200 shrink-0" />
+                      <img src={instructorPopup.avatarUrl} alt={instructorPopup.name} className="w-12 h-12 rounded-full object-cover border-2 shrink-0" style={{ borderColor: `${primaryColor}55` }} />
                     ) : (
-                      <div className="w-12 h-12 rounded-full bg-teal-100 border-2 border-teal-200 flex items-center justify-center shrink-0">
-                        <User className="w-6 h-6 text-teal-600" />
+                      <div className="w-12 h-12 rounded-full border-2 flex items-center justify-center shrink-0" style={{ backgroundColor: `${primaryColor}18`, borderColor: `${primaryColor}55` }}>
+                        <User className="w-6 h-6" style={{ color: primaryColor }} />
                       </div>
                     )}
                     <div>
                       <p className="font-bold text-gray-900 text-base">{instructorPopup.name}</p>
-                      {instructorPopup.title && <p className="text-sm text-teal-600 font-normal">{instructorPopup.title}</p>}
+                      {instructorPopup.title && <p className="text-sm font-normal" style={{ color: primaryColor }}>{instructorPopup.title}</p>}
                     </div>
                   </DialogTitle>
                 </DialogHeader>
@@ -1294,7 +1304,7 @@ export default function CoursePlayer() {
                     : <p className="text-gray-400 italic">No biography provided.</p>}
                 </div>
                 {instructorPopup.website && (
-                  <a href={instructorPopup.website} target="_blank" rel="noopener noreferrer" className="text-sm text-teal-600 hover:underline mt-1 inline-block">
+                      <a href={instructorPopup.website} target="_blank" rel="noopener noreferrer" className="text-sm hover:underline mt-1 inline-block" style={{ color: primaryColor }}>
                     {instructorPopup.website.replace(/^https?:\/\//, "")}
                   </a>
                 )}
@@ -1320,13 +1330,15 @@ export default function CoursePlayer() {
           {/* Sidebar Header links */}
           <div className="px-4 py-2 border-b border-gray-200 shrink-0">
             <button
-              className="text-teal-600 text-[10px] font-medium flex items-center gap-1 mb-1 hover:text-teal-800 transition-colors"
+              className="text-[10px] font-medium flex items-center gap-1 mb-1 transition-colors"
+              style={{ color: primaryColor }}
               onClick={() => { setMobileSidebarOpen(false); navigate("/education-library"); }}
             >
               <ChevronLeft className="w-3 h-3" /> Back to Library
             </button>
             <button
-              className="text-teal-500 text-[10px] font-medium flex items-center gap-1 hover:text-teal-700 transition-colors"
+              className="text-[10px] font-medium flex items-center gap-1 transition-colors opacity-80 hover:opacity-100"
+              style={{ color: primaryColor }}
               onClick={() => { setMobileSidebarOpen(false); navigate(`/courses/${slug}/overview`); }}
             >
               <BookOpen className="w-3 h-3" /> Course Overview
@@ -1359,7 +1371,8 @@ export default function CoursePlayer() {
           {/* Sidebar Header */}
           <div className="px-4 py-3 border-b border-gray-200 shrink-0">
             <button
-              className="text-teal-600 text-[10px] font-medium flex items-center gap-1 mb-1 hover:text-teal-800 transition-colors"
+              className="text-[10px] font-medium flex items-center gap-1 mb-1 transition-colors"
+              style={{ color: primaryColor }}
               onClick={() => navigate("/education-library")}
             >
               <ChevronLeft className="w-3 h-3" /> Back to Library
@@ -1367,12 +1380,13 @@ export default function CoursePlayer() {
             {sidebarTab === "lessons" && (
               <>
                 <button
-                  className="text-teal-500 text-[10px] font-medium flex items-center gap-1 mb-2 hover:text-teal-700 transition-colors"
+                  className="text-[10px] font-medium flex items-center gap-1 mb-2 transition-colors opacity-80 hover:opacity-100"
+                  style={{ color: primaryColor }}
                   onClick={() => navigate(`/courses/${slug}/overview`)}
                 >
                   <BookOpen className="w-3 h-3" /> Course Overview
                 </button>
-                <h3 className="text-teal-700 text-[11px] font-extrabold uppercase tracking-widest">{lbl.courseModules}</h3>
+                <h3 className="text-[11px] font-extrabold uppercase tracking-widest" style={{ color: primaryColor }}>{lbl.courseModules}</h3>
               </>
             )}
             {sidebarTab === "notes" && <h3 className="text-[11px] font-extrabold uppercase tracking-widest flex items-center gap-1.5 mt-1" style={primaryText}><StickyNote className="w-3.5 h-3.5" /> My Notes</h3>}
@@ -1394,7 +1408,8 @@ export default function CoursePlayer() {
                     <p className="text-[10px] font-semibold truncate flex-1" style={{ color: primaryColor }}>{n.lessonTitle}</p>
                     <button
                       onClick={() => handleLessonSelect(n.lessonId)}
-                      className="text-[9px] text-teal-600 hover:text-teal-800 ml-2 shrink-0"
+                      className="text-[9px] ml-2 shrink-0 hover:opacity-70"
+                      style={{ color: primaryColor }}
                     >Go to lesson</button>
                   </div>
                   <p className="text-xs text-gray-700 whitespace-pre-wrap line-clamp-5">{n.note}</p>
@@ -1417,7 +1432,9 @@ export default function CoursePlayer() {
                 <button
                   key={b.id}
                   onClick={() => handleLessonSelect(b.lessonId)}
-                  className="w-full text-left bg-white border border-gray-200 rounded-lg p-3 hover:border-teal-400 transition-colors"
+                  className="w-full text-left bg-white border border-gray-200 rounded-lg p-3 transition-colors"
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = primaryColor)}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = "")}
                 >
                   <p className="text-xs font-medium text-gray-800 truncate">{b.lessonTitle}</p>
                   <p className="text-[10px] text-gray-400 mt-0.5">{new Date(b.createdAt).toLocaleDateString()}</p>
@@ -1440,7 +1457,8 @@ export default function CoursePlayer() {
                       setCollapsedSections(new Set(sections.map((s: any) => s.id)));
                     }
                   }}
-                  className="text-[10px] text-teal-600 hover:text-teal-800 font-medium transition-colors flex items-center gap-1"
+                  className="text-[10px] font-medium transition-colors flex items-center gap-1 hover:opacity-70"
+                  style={{ color: primaryColor }}
                 >
                   {sections.every((s: any) => collapsedSections.has(s.id)) ? (
                     <><ChevronDown className="w-3 h-3" /> Expand All</>
@@ -1477,9 +1495,9 @@ export default function CoursePlayer() {
                 >
                   <span className={cn(
                     "w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-extrabold shrink-0",
-                    active ? "text-white" : lessonLocked ? "bg-gray-100 text-gray-400" : done ? "text-teal-700" : "bg-gray-100 text-gray-500"
+                    active ? "text-white" : lessonLocked ? "bg-gray-100 text-gray-400" : done ? "" : "bg-gray-100 text-gray-500"
                   )}
-                  style={active ? primaryBg : done ? { backgroundColor: `${primaryColor}25` } : undefined}>
+                  style={active ? primaryBg : done ? { backgroundColor: `${primaryColor}25`, color: primaryColor } : undefined}>
                     {lessonLocked ? <Lock className="w-3 h-3" /> : done ? "✓" : String(idx + 1).padStart(2, "0")}
                   </span>
                   <div className="flex-1 min-w-0">
@@ -1534,9 +1552,9 @@ export default function CoursePlayer() {
                   >
                     <span className={cn(
                       "w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-extrabold shrink-0",
-                      isSectionActive ? "text-white" : allSectionDone ? "text-teal-700" : sectionLocked ? "bg-gray-100 text-gray-400" : "bg-gray-100 text-gray-500"
+                      isSectionActive ? "text-white" : allSectionDone ? "" : sectionLocked ? "bg-gray-100 text-gray-400" : "bg-gray-100 text-gray-500"
                     )}
-                    style={isSectionActive ? primaryBg : allSectionDone ? { backgroundColor: `${primaryColor}25` } : undefined}>
+                    style={isSectionActive ? primaryBg : allSectionDone ? { backgroundColor: `${primaryColor}25`, color: primaryColor } : undefined}>
                       {sectionLocked ? <Lock className="w-3 h-3" /> : allSectionDone ? "✓" : String(sectionNum).padStart(2, "0")}
                     </span>
                     <div className="flex-1 min-w-0">
@@ -1635,7 +1653,8 @@ export default function CoursePlayer() {
                 <button
                   onClick={() => toggleBookmark.mutate({ lessonId: selectedLessonId, courseSlug: slug! })}
                   title={isBookmarked ? "Remove bookmark" : "Bookmark this lesson"}
-                  className={cn("p-1.5 rounded-lg transition-colors", isBookmarked ? "text-teal-600 bg-teal-100" : "text-gray-400 hover:text-teal-600 hover:bg-teal-50")}
+                  className={cn("p-1.5 rounded-lg transition-colors", isBookmarked ? "" : "text-gray-400")}
+                  style={isBookmarked ? { color: primaryColor, backgroundColor: `${primaryColor}18` } : undefined}
                 >
                   {isBookmarked ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
                 </button>
@@ -1654,7 +1673,9 @@ export default function CoursePlayer() {
               <button
                 onClick={() => setContentFullscreen(f => !f)}
                 title={contentFullscreen ? "Exit fullscreen" : "Fullscreen content"}
-                className="p-1.5 rounded-lg text-gray-400 hover:text-teal-600 hover:bg-teal-50 transition-colors"
+                className="p-1.5 rounded-lg text-gray-400 transition-colors hover:opacity-80"
+                onMouseEnter={e => { e.currentTarget.style.color = primaryColor; e.currentTarget.style.backgroundColor = `${primaryColor}10`; }}
+                onMouseLeave={e => { e.currentTarget.style.color = ""; e.currentTarget.style.backgroundColor = ""; }}
               >
                 {contentFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
               </button>
@@ -1662,7 +1683,8 @@ export default function CoursePlayer() {
               {lessonData && lessonData.type !== "quiz" && !isCompleted && requireManualComplete && (
                 <Button
                   size="sm"
-                  className="h-7 text-xs bg-teal-500 hover:bg-teal-400 text-white font-semibold px-3 rounded-full gap-1 shadow-sm"
+                  className="h-7 text-xs text-white font-semibold px-3 rounded-full gap-1 shadow-sm"
+                  style={{ backgroundColor: primaryColor }}
                   onClick={handleMarkComplete}
                   disabled={markComplete.isPending || !canMarkComplete}
                   title={!canMarkComplete ? "Watch the full video first" : undefined}
@@ -1672,17 +1694,17 @@ export default function CoursePlayer() {
                 </Button>
               )}
               {lessonData && lessonData.type !== "quiz" && isCompleted && (
-                <div className="flex items-center gap-1 text-teal-700 text-xs font-semibold bg-teal-100 px-3 py-1 rounded-full h-7">
+                <div className="flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full h-7" style={{ color: primaryColor, backgroundColor: `${primaryColor}18` }}>
                   <CheckCircle className="w-3 h-3" /> {lbl.completed}
                 </div>
               )}
               {prevLesson && (
-                <Button size="sm" variant="outline" onClick={() => handleLessonSelect(prevLesson.id)} className="text-xs h-7 border-teal-400 text-teal-700 hover:bg-teal-50">
+                <Button size="sm" variant="outline" onClick={() => handleLessonSelect(prevLesson.id)} className="text-xs h-7" style={{ borderColor: primaryColor, color: primaryColor }}>
                   <ChevronLeft className="w-3 h-3 mr-1" /> {lbl.prevLesson}
                 </Button>
               )}
               {nextLesson && (
-                <Button size="sm" variant="outline" onClick={() => handleLessonSelect(nextLesson.id)} className="text-xs h-7 border-teal-400 text-teal-700 hover:bg-teal-50">
+                <Button size="sm" variant="outline" onClick={() => handleLessonSelect(nextLesson.id)} className="text-xs h-7" style={{ borderColor: primaryColor, color: primaryColor }}>
                   {lbl.nextLesson} <ChevronRight className="w-3 h-3 ml-1" />
                 </Button>
               )}
@@ -1751,10 +1773,10 @@ export default function CoursePlayer() {
                   {/* ── Download lesson — only show if no content blocks override ── */}
                   {lessonData.type === "download" && lessonData.content && contentBlocks.length === 0 && (
                     <div className="bg-gray-50 rounded-xl border border-gray-200 p-5 mb-5 flex items-center gap-4">
-                      <Download className="w-8 h-8 text-teal-600" />
+                      <Download className="w-8 h-8" style={{ color: primaryColor }} />
                       <div>
                         <p className="font-medium text-gray-900">{lessonData.title}</p>
-                        <a href={lessonData.content} target="_blank" rel="noreferrer" className="text-teal-600 text-sm underline hover:text-teal-800">Download file</a>
+                        <a href={lessonData.content} target="_blank" rel="noreferrer" className="text-sm underline" style={{ color: primaryColor }}>Download file</a>
                       </div>
                     </div>
                   )}
@@ -1803,17 +1825,18 @@ export default function CoursePlayer() {
                   {lessonData.type !== "quiz" && (
                     <div className="mt-auto pt-5 pb-4 flex items-center justify-end gap-3 flex-wrap">
                       {nextLesson && (
-                        <Button variant="outline" onClick={() => handleLessonSelect(nextLesson.id)} className="border-teal-400 text-teal-700 hover:bg-teal-50 text-sm">
+                        <Button variant="outline" onClick={() => handleLessonSelect(nextLesson.id)} className="text-sm" style={{ borderColor: primaryColor, color: primaryColor }}>
                           {lbl.nextLesson} <ChevronRight className="w-4 h-4 ml-1" />
                         </Button>
                       )}
                       {isCompleted ? (
-                        <div className="flex items-center gap-2 text-teal-700 text-sm font-semibold bg-teal-100 px-4 py-2 rounded-full">
+                        <div className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-full" style={{ color: primaryColor, backgroundColor: `${primaryColor}18` }}>
                           <CheckCircle className="w-4 h-4" /> {lbl.completed}
                         </div>
                       ) : requireManualComplete ? (
                         <Button
-                          className="bg-teal-500 hover:bg-teal-400 text-white font-bold px-6 py-2.5 rounded-full shadow-lg shadow-teal-500/20 uppercase tracking-wide text-sm"
+                          className="text-white font-bold px-6 py-2.5 rounded-full uppercase tracking-wide text-sm"
+                          style={{ backgroundColor: primaryColor }}
                           onClick={handleMarkComplete}
                           disabled={markComplete.isPending || !canMarkComplete}
                           title={!canMarkComplete ? "Watch the full video first" : undefined}
@@ -1842,8 +1865,9 @@ export default function CoursePlayer() {
                       onClick={() => setRightPanelTab("info")}
                       className={cn(
                         "flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[10px] font-semibold transition-colors",
-                        rightPanelTab === "info" ? "text-teal-600 border-b-2 border-teal-500 bg-white" : "text-gray-500 hover:text-gray-700"
+                        rightPanelTab === "info" ? "border-b-2 bg-white" : "text-gray-500 hover:text-gray-700"
                       )}
+                      style={rightPanelTab === "info" ? { color: primaryColor, borderColor: primaryColor } : undefined}
                     >
                       <ListChecks className="w-3.5 h-3.5" /> {lbl.lesson} Info
                     </button>
@@ -1875,13 +1899,13 @@ export default function CoursePlayer() {
                   )}
                   {rightPanelTab === "info" && learningObjectives.length > 0 && (
                     <div>
-                      <h3 className="text-xs font-bold text-teal-700 uppercase tracking-widest mb-3 flex items-center gap-2">
+                      <h3 className="text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-2" style={{ color: primaryColor }}>
                         <ListChecks className="w-3.5 h-3.5" /> In This {lbl.lesson}:
                       </h3>
                       <div className="space-y-2">
                         {learningObjectives.map((obj: string, i: number) => (
                           <div key={i} className="flex items-start gap-2">
-                            <CheckCircle className="w-3.5 h-3.5 text-teal-500 shrink-0 mt-0.5" />
+                            <CheckCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: primaryColor }} />
                             <span className="text-gray-600 text-xs leading-snug">{obj}</span>
                           </div>
                         ))}
@@ -1892,7 +1916,7 @@ export default function CoursePlayer() {
                   {/* Section lessons checklist */}
                   {rightPanelTab === "info" && currentSection && currentSection.lessons.length > 1 && (
                     <div className="border-t border-gray-200 pt-4">
-                      <h3 className="text-xs font-bold text-teal-700 uppercase tracking-widest mb-3">In This {lbl.section}:</h3>
+                      <h3 className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: primaryColor }}>In This {lbl.section}:</h3>
                       <div className="space-y-1.5">
                         {currentSection.lessons.map((lesson: any) => {
                           const done = completedIds.has(lesson.id);
@@ -1903,11 +1927,12 @@ export default function CoursePlayer() {
                               onClick={() => handleLessonSelect(lesson.id)}
                               className={cn(
                                 "w-full text-left flex items-start gap-2 py-1 text-[11px] transition-colors",
-                                active ? "text-teal-700 font-semibold" : done ? "text-gray-400 line-through" : "text-gray-600 hover:text-gray-900"
+                                active ? "font-semibold" : done ? "text-gray-400 line-through" : "text-gray-600 hover:text-gray-900"
                               )}
+                              style={active ? { color: primaryColor } : undefined}
                             >
                               <span className="mt-0.5 shrink-0">
-                                {done ? <CheckCircle className="w-3.5 h-3.5 text-teal-500" /> : active ? <PlayCircle className="w-3.5 h-3.5 text-teal-500" /> : <span className="w-3.5 h-3.5 rounded-full border border-gray-300 block" />}
+                                {done ? <CheckCircle className="w-3.5 h-3.5" style={{ color: primaryColor }} /> : active ? <PlayCircle className="w-3.5 h-3.5" style={{ color: primaryColor }} /> : <span className="w-3.5 h-3.5 rounded-full border border-gray-300 block" />}
                               </span>
                               <span className="leading-snug">{lesson.title}</span>
                             </button>
@@ -1921,7 +1946,7 @@ export default function CoursePlayer() {
                   {rightPanelTab === "info" && lessonData.durationMinutes && (
                     <div className="border-t border-gray-200 pt-3">
                       <p className="text-[10px] text-gray-500 uppercase tracking-wide">Estimated duration</p>
-                      <p className="text-sm text-teal-700 font-semibold mt-0.5">{lessonData.durationMinutes} min</p>
+                      <p className="text-sm font-semibold mt-0.5" style={{ color: primaryColor }}>{lessonData.durationMinutes} min</p>
                     </div>
                   )}
 
@@ -1930,7 +1955,8 @@ export default function CoursePlayer() {
                     <div className="border-t border-gray-200 pt-3">
                       <button
                         onClick={() => setShowCertDialog(true)}
-                        className="text-xs text-teal-600 font-medium flex items-center gap-1 hover:text-teal-800"
+                        className="text-xs font-medium flex items-center gap-1 hover:opacity-70"
+                        style={{ color: primaryColor }}
                       >
                         <Award className="w-3.5 h-3.5" /> View Certificate
                       </button>
@@ -1948,7 +1974,7 @@ export default function CoursePlayer() {
                     if (!shouldShow || instructors.length === 0) return null;
                     return (
                       <div className="border-t border-gray-200 pt-4 space-y-3">
-                        <h3 className="text-xs font-bold text-teal-700 uppercase tracking-widest">
+                        <h3 className="text-xs font-bold uppercase tracking-widest" style={{ color: primaryColor }}>
                           Your Instructor{instructors.length > 1 ? "s" : ""}
                         </h3>
                         {instructors.map((inst: any) => {
@@ -1960,15 +1986,15 @@ export default function CoursePlayer() {
                             <div key={inst.id} className="flex flex-col gap-2">
                               <div className="flex items-center gap-2">
                                 {inst.avatarUrl ? (
-                                  <img src={inst.avatarUrl} alt={inst.name} className="w-10 h-10 rounded-full object-cover border-2 border-teal-200 shrink-0" />
+                                  <img src={inst.avatarUrl} alt={inst.name} className="w-10 h-10 rounded-full object-cover border-2 shrink-0" style={{ borderColor: `${primaryColor}55` }} />
                                 ) : (
-                                  <div className="w-10 h-10 rounded-full bg-teal-100 border-2 border-teal-200 flex items-center justify-center shrink-0">
-                                    <User className="w-5 h-5 text-teal-600" />
+                                  <div className="w-10 h-10 rounded-full border-2 flex items-center justify-center shrink-0" style={{ backgroundColor: `${primaryColor}18`, borderColor: `${primaryColor}55` }}>
+                                    <User className="w-5 h-5" style={{ color: primaryColor }} />
                                   </div>
                                 )}
                                 <div className="min-w-0">
                                   <p className="text-xs font-semibold text-gray-900 truncate">{inst.name}</p>
-                                  {inst.title && <p className="text-[10px] text-teal-600 truncate">{inst.title}</p>}
+                                  {inst.title && <p className="text-[10px] truncate" style={{ color: primaryColor }}>{inst.title}</p>}
                                 </div>
                               </div>
                               {plainBio && (
@@ -1976,7 +2002,8 @@ export default function CoursePlayer() {
                                   {truncated ? plainBio.slice(0, BIO_LIMIT).trimEnd() + "…" : plainBio}
                                   {truncated && (
                                     <button
-                                      className="ml-1 text-teal-600 font-medium hover:underline text-[10px]"
+                                      className="ml-1 font-medium hover:underline text-[10px]"
+                                      style={{ color: primaryColor }}
                                       onClick={() => setInstructorPopup(inst)}
                                     >More</button>
                                   )}

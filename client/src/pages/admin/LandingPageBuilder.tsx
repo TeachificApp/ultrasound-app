@@ -5026,6 +5026,54 @@ export default function LandingPageBuilder() {
     const overIdStr = String(over.id);
     if (activeIdStr === overIdStr) return;
 
+    // Case 4: Dragging a column child block out to the main canvas
+    // active is a child block inside a column, over is a main canvas block
+    {
+      let sourceColBlockId: string | null = null;
+      let sourceSide: "left" | "right" | null = null;
+      let draggedChildBlock: Block | null = null;
+
+      for (const colBlock of currentBlocks) {
+        if (colBlock.type !== "column_layout") continue;
+        for (const side of ["leftBlocks", "rightBlocks"] as const) {
+          const col: Block[] = colBlock.data[side] ?? [];
+          const found = col.find(cb => cb.id === activeIdStr);
+          if (found) {
+            draggedChildBlock = found;
+            sourceColBlockId = colBlock.id;
+            sourceSide = side === "leftBlocks" ? "left" : "right";
+            break;
+          }
+        }
+        if (draggedChildBlock) break;
+      }
+
+      if (draggedChildBlock && sourceColBlockId && sourceSide) {
+        // Check if over is a main canvas block (not a column zone)
+        const overIsMainBlock = currentBlocks.some(b => b.id === overIdStr);
+        if (overIsMainBlock) {
+          setBlocks(prev => {
+            // Remove from source column
+            let movedBlock: Block | null = null;
+            let next = prev.map(b => {
+              if (b.id !== sourceColBlockId) return b;
+              const colKey = sourceSide === "left" ? "leftBlocks" : "rightBlocks";
+              const col: Block[] = b.data[colKey] ?? [];
+              const child = col.find(cb => cb.id === activeIdStr);
+              if (child) movedBlock = child;
+              return { ...b, data: { ...b.data, [colKey]: col.filter(cb => cb.id !== activeIdStr) } };
+            });
+            if (!movedBlock) return prev;
+            // Insert at the position of the over block on the main canvas
+            const overIdx = next.findIndex(b => b.id === overIdStr);
+            if (overIdx === -1) return [...next, movedBlock];
+            return [...next.slice(0, overIdx), movedBlock, ...next.slice(overIdx)];
+          });
+          return;
+        }
+      }
+    }
+
     // Case 2: Reordering within a column (both active and over are inside the same column)
     for (const colBlock of currentBlocks) {
       if (colBlock.type !== "column_layout") continue;
