@@ -5,7 +5,7 @@ import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
 import { getDb } from "../db";
 import { invokeLLM } from "../_core/llm";
-import { extractJson } from "../lib/extractJson";
+import { extractJson, parseLandingBlocks } from "../lib/extractJson";
 import {
   physicalProducts,
   physicalProductPricingOptions,
@@ -759,25 +759,11 @@ Make ALL content specific and compelling based on the product title and descript
       let blocks: any[];
       try {
         const raw = response.choices[0].message.content as string;
-        const parsed = extractJson(raw);
-        blocks = Array.isArray(parsed) ? parsed : parsed.blocks;
-        if (!Array.isArray(blocks)) throw new Error("Not an array");
-        const validTypes = new Set(["hero","text","image","video","audio","bullets","testimonial","pricing_cta","divider","two_column","divided_columns","spacer","faq","image_text","gallery","icon_grid","countdown","instructor","logos","reviews","embed","cta_standalone","lead_capture","cta_optin","numbered_list","checklist","alert","flip_cards","curriculum_auto","pricing_options_auto","funnel_workflow","product_offer_stack","order_bump_checkout","price_stack","urgency_offer","checkout_form","footer","logo_strip","three_column","related_products","embedded_checkout","inline_checkout","lesson_quiz","lesson_flashcard","file_download","scorm_embed","url_embed","column_layout","carousel","ticker","countdown_v2","live_session","comparison_table","pricing_cards","form_embed"]);
-        blocks = blocks
-          .filter((b: any) => b && typeof b === "object" && b.type && validTypes.has(b.type))
-          .map((b: any, i: number) => {
-            const { id, type, data, ...rest } = b;
-            return {
-              id: id ?? `ai_block_${i}_${Date.now()}`,
-              type,
-              data: (data && typeof data === "object" && !Array.isArray(data)) ? data : rest,
-            };
-          });
-        if (blocks.length === 0) throw new Error("No valid blocks");
-      } catch {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "AI returned invalid JSON. Please try again." });
+        blocks = parseLandingBlocks(raw);
+      } catch (err: any) {
+        console.error("[aiGenerateLandingPage products] parse error:", err?.message, "raw:", (response.choices[0]?.message?.content as string)?.slice(0, 400));
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `AI returned invalid JSON: ${err?.message ?? "unknown error"}. Please try again.` });
       }
-
       const blocksJson = JSON.stringify(blocks);
       await db.update(physicalProducts)
         .set({ landingBlocks: blocksJson })

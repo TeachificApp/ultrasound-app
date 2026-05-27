@@ -19,15 +19,31 @@ function thinkificHeaders() {
   };
 }
 
-async function thinkificFetch<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    headers: thinkificHeaders(),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Thinkific API error ${res.status}: ${body}`);
+async function thinkificFetch<T>(path: string, retries = 5): Promise<T> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const res = await fetch(`${BASE_URL}${path}`, {
+      headers: thinkificHeaders(),
+    });
+    if (res.status === 429) {
+      // Rate limited — wait with exponential backoff then retry
+      const retryAfterHeader = res.headers.get("Retry-After");
+      const waitMs = retryAfterHeader
+        ? parseInt(retryAfterHeader, 10) * 1000
+        : Math.min(3000 * Math.pow(2, attempt), 60000); // 3s, 6s, 12s, 24s, 48s, max 60s
+      if (attempt < retries) {
+        console.warn(`[Thinkific] 429 rate limit on ${path} — waiting ${waitMs}ms before retry ${attempt + 1}/${retries}`);
+        await new Promise(r => setTimeout(r, waitMs));
+        continue;
+      }
+      throw new Error(`Thinkific API rate limit exceeded after ${retries} retries for ${path}. Please wait a minute and try again.`);
+    }
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Thinkific API error ${res.status}: ${body}`);
+    }
+    return res.json() as Promise<T>;
   }
-  return res.json() as Promise<T>;
+  throw new Error(`Thinkific API rate limit exceeded after ${retries} retries for ${path}. Please wait a minute and try again.`);
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────

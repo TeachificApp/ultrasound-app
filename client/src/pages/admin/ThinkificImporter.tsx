@@ -155,6 +155,11 @@ export default function ThinkificImporter() {
     },
   });
 
+  const syncImages = trpc.lmsAdmin.syncAllCourseImages.useMutation({
+    onSuccess: (r) => toast.success(`Synced ${r.updated} course image${r.updated !== 1 ? 's' : ''} from Thinkific`),
+    onError: (err) => toast.error(`Sync failed: ${err.message}`),
+  });
+
   const testScrapeCourseSalesPage = trpc.thinkificImport.testScrapeCourseSalesPage.useMutation({
     onSuccess: (data) => {
       setSalesPageResult(data);
@@ -220,12 +225,24 @@ export default function ThinkificImporter() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">Import from Thinkific</h2>
-        <p className="text-gray-500 mt-1">
-          Select a course from your Thinkific account to import it as a draft into the LMS builder.
-          Student enrollments are imported directly and visible in the Students tab. No welcome emails are sent.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Import from Thinkific</h2>
+          <p className="text-gray-500 mt-1">
+            Select a course from your Thinkific account to import it as a draft into the LMS builder.
+            Student enrollments are imported directly and visible in the Students tab. No welcome emails are sent.
+          </p>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          className="flex-shrink-0 mt-1"
+          onClick={() => syncImages.mutate()}
+          disabled={syncImages.isPending}
+        >
+          <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${syncImages.isPending ? 'animate-spin' : ''}`} />
+          Sync Course Images
+        </Button>
       </div>
 
       {/* Past imports */}

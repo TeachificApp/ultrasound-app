@@ -124,11 +124,6 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
     onSuccess: (data) => { toast.success(`Duplicated as "${data.title}"`); refetch(); },
     onError: e => toast.error(`Error: ${e.message}`),
   });
-  const syncImages = trpc.lmsAdmin.syncAllCourseImages.useMutation({
-    onSuccess: (r) => { toast.success(`Synced ${r.updated} course image${r.updated !== 1 ? 's' : ''} from Thinkific`); refetch(); },
-    onError: e => toast.error(`Sync failed: ${e.message}`),
-  });
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -149,11 +144,6 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
           {data && <span className="text-sm text-gray-500">{data.total} {data.total !== 1 ? typeLabelPlural : typeLabel.toLowerCase()}</span>}
         </div>
         <div className="flex items-center gap-2">
-          {typeFilter === "course" && (
-            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => syncImages.mutate()} disabled={syncImages.isPending}>
-              <RefreshCw className={`w-3 h-3 mr-1 ${syncImages.isPending ? 'animate-spin' : ''}`} /> Sync Images
-            </Button>
-          )}
           <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white h-8" onClick={() => setCreateOpen(true)}>
             <Plus className="w-4 h-4 mr-1" /> New {typeLabel}
           </Button>
