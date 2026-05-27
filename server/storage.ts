@@ -3,7 +3,14 @@
 // Also supports dual-write to Cloudflare R2 for mirroring
 
 import { ENV } from './_core/env';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  PutObjectCommand,
+  CreateMultipartUploadCommand,
+  UploadPartCommand,
+  CompleteMultipartUploadCommand,
+  AbortMultipartUploadCommand,
+} from '@aws-sdk/client-s3';
 
 type StorageConfig = { baseUrl: string; apiKey: string };
 
@@ -122,6 +129,84 @@ async function mirrorToR2(
     // Don't fail the primary upload if R2 mirror fails
     console.error(`[R2Mirror] Failed to mirror ${relKey}: ${err.message}`);
   }
+}
+
+// ── R2 Multipart Upload for Large Files (> 50 MB) ────────────────────────────
+
+/**
+ * Upload a large file directly to R2 using multipart upload.
+ * Used when the file exceeds the storage proxy limit (~100 MB).
+ * Returns the R2 public URL.
+ */
+export async function storagePutLarge(
+  relKey: string,
+  data: Buffer | Uint8Array,
+  contentType = "application/octet-stream"
+): Promise<{ key: string; url: string }> {
+  const client = getR2Client();
+  const bucket = getR2Bucket();
+  const r2PublicUrl = process.env.CF_R2_PUBLIC_URL;
+
+  if (!client || !r2PublicUrl) {
+    // Fall back to regular storagePut if R2 is not configured
+    console.warn("[StorageLarge] R2 not configured, falling back to storagePut");
+    return storagePut(relKey, data, contentType);
+  }
+
+  const key = normalizeKey(relKey);
+  const body = Buffer.isBuffer(data) ? data : Buffer.from(data);
+  const PART_SIZE = 10 * 1024 * 1024; // 10 MB per part
+
+  // Initiate multipart upload
+  const initResult = await client.send(
+    new CreateMultipartUploadCommand({
+      Bucket: bucket,
+      Key: key,
+      ContentType: contentType,
+    })
+  );
+  const uploadId = initResult.UploadId!;
+
+  const parts: { ETag: string; PartNumber: number }[] = [];
+  try {
+    const totalParts = Math.ceil(body.length / PART_SIZE);
+    for (let i = 0; i < totalParts; i++) {
+      const start = i * PART_SIZE;
+      const end = Math.min(start + PART_SIZE, body.length);
+      const partBuffer = body.slice(start, end);
+      const partResult = await client.send(
+        new UploadPartCommand({
+          Bucket: bucket,
+          Key: key,
+          UploadId: uploadId,
+          PartNumber: i + 1,
+          Body: partBuffer,
+        })
+      );
+      parts.push({ ETag: partResult.ETag!, PartNumber: i + 1 });
+      console.log(`[StorageLarge] Uploaded part ${i + 1}/${totalParts} for ${key}`);
+    }
+
+    // Complete the multipart upload
+    await client.send(
+      new CompleteMultipartUploadCommand({
+        Bucket: bucket,
+        Key: key,
+        UploadId: uploadId,
+        MultipartUpload: { Parts: parts },
+      })
+    );
+  } catch (err) {
+    // Abort the multipart upload on error to avoid orphaned parts
+    await client.send(
+      new AbortMultipartUploadCommand({ Bucket: bucket, Key: key, UploadId: uploadId })
+    ).catch(() => {});
+    throw err;
+  }
+
+  const url = `${r2PublicUrl.replace(/\/+$/, "")}/${key}`;
+  console.log(`[StorageLarge] R2 multipart upload complete: ${url}`);
+  return { key, url };
 }
 
 // ── Primary Storage Operations ─────────────────────────────────────────────────

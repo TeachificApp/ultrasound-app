@@ -22,7 +22,7 @@ import { Router, Request, Response } from "express";
 import multer from "multer";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { randomBytes } from "crypto";
-import { storagePut } from "../storage";
+import { storagePut, storagePutLarge } from "../storage";
 import { sdk } from "../_core/sdk";
 import { getDb } from "../db";
 import { mediaAssets, mediaVersions } from "../../drizzle/schema";
@@ -197,7 +197,8 @@ router.post(
         const nextVersion = (maxVer ?? 0) + 1;
 
         const s3Key = `media-repo/${asset.slug}/v${nextVersion}-${originalname}`;
-        const { url: s3Url } = await storagePut(s3Key, fullBuffer, mimetype);
+        const uploadFn = fullBuffer.length > 50 * 1024 * 1024 ? storagePutLarge : storagePut;
+        const { url: s3Url } = await uploadFn(s3Key, fullBuffer, mimetype);
 
         await db.insert(mediaVersions).values({
           assetId: existingAssetId,
@@ -221,7 +222,8 @@ router.post(
         // New asset
         const slug = generateSlug(title);
         const s3Key = `media-repo/${slug}/v1-${originalname}`;
-        const { url: s3Url } = await storagePut(s3Key, fullBuffer, mimetype);
+        const uploadFn = fullBuffer.length > 50 * 1024 * 1024 ? storagePutLarge : storagePut;
+        const { url: s3Url } = await uploadFn(s3Key, fullBuffer, mimetype);
 
         const [assetResult] = await db.insert(mediaAssets).values({
           slug,

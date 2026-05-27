@@ -3226,3 +3226,16 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Sales tab: user list with name/email/date/amount, access toggle, refund button
 - [x] Funnel page SEO/preview settings: title, description, og:image — panel in right sidebar (FunnelPageEditor)
 - [x] Landing page SEO/preview settings: title, description, og:image — panel in right sidebar (LandingPageBuilder)
+
+## Analytics & Sales Tabs (2026-05-27)
+- [ ] Fix analytics sales dashboard — pull from correct orders/payments tables
+- [ ] Build shared SalesEnrollmentTab component (buyer list, access toggle, refund)
+- [ ] Wire SalesEnrollmentTab into Courses editor
+- [ ] Wire SalesEnrollmentTab into Downloads editor
+- [ ] Wire SalesEnrollmentTab into Bundles editor
+- [ ] Wire SalesEnrollmentTab into Quizzes editor
+- [ ] Wire SalesEnrollmentTab into Memberships editor
+
+## Media Fixes (2026-05-27)
+- [x] Fix SCORM media not displaying — require("crypto") replaced with ESM createHash import in mediaServe.ts
+- [x] Fix large file upload (>50 MB) — added storagePutLarge using R2 multipart upload, bypasses storage proxy limit

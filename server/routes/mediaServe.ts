@@ -182,7 +182,7 @@ async function extractScormZip(
   zipUrl: string
 ): Promise<{ launchFile: string; cacheDir: string } | null> {
   // Use a hash of the URL as part of the cache key so re-uploads always get fresh extraction
-  const urlHash = require("crypto").createHash("md5").update(zipUrl).digest("hex").slice(0, 8);
+  const urlHash = createHash("md5").update(zipUrl).digest("hex").slice(0, 8);
   const cacheDir = path.join(SCORM_CACHE_DIR, `${slug}-${urlHash}`);
   const launchMarker = path.join(cacheDir, ".launch");
 
