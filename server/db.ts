@@ -2110,6 +2110,23 @@ export async function getDiyUsersForLab(labId: number) {
   }));
 }
 
+/**
+ * Get or create a persistent access token for a user.
+ * Used in purchase/access emails. Token never expires and is reusable.
+ * If the user already has one, returns it unchanged.
+ */
+export async function getOrCreateAccessToken(userId: number): Promise<string> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const result = await db.select({ accessToken: users.accessToken }).from(users).where(eq(users.id, userId)).limit(1);
+  const existing = result[0]?.accessToken;
+  if (existing) return existing;
+  const { randomBytes } = await import("crypto");
+  const token = randomBytes(32).toString("hex");
+  await db.update(users).set({ accessToken: token }).where(eq(users.id, userId));
+  return token;
+}
+
 /** Count users who have been pre-registered but have not yet signed in (isPending = true) */
 export async function countPendingUsers(): Promise<number> {
   const db = await getDb();

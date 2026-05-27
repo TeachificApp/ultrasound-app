@@ -3197,3 +3197,20 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Convert all Notes panel amber/orange hardcoded colors to dynamic primaryColor theme
 - [x] Add Save, Save & Close, and Close buttons to LessonEditorPage header (always visible)
 - [x] LessonBlockEditor: expose save() via forwardRef/useImperativeHandle
+
+## Access Token & Email Fixes (2026-05-27)
+- [x] Remove iHeartEcho logo from dual-brand (combined) email headers — keep only AAUS logo
+- [x] Add persistent access_token column to users table (never-expiring, reusable)
+- [x] Add access_token_uses table for IP abuse detection
+- [x] Add ip_security_flags table for flagged accounts
+- [x] Add getOrCreateAccessToken() helper in db.ts
+- [x] Build POST /api/auth/access-verify endpoint with IP abuse detection (>3 IPs/24h revokes token + flags)
+- [x] Create AccessLinkCallback frontend page (/auth/access?token=...)
+- [x] Register /auth/access route in all sub-routers (main, members, LMS, iHeartEcho, accreditation)
+- [x] Update enrollmentEmail.ts: embed access tokens in course, download, bundle, quiz emails
+- [x] Update lmsRouter.ts: pass accessToken to enrollment emails
+- [x] Update downloadsRouter.ts: pass accessToken to download/bundle access emails
+- [x] Update sonoQuizRouter.ts: pass accessToken to quiz invite emails
+- [x] Update stripe.ts: embed access token in welcome email for new accounts created via purchase
+- [x] Apply DB migration: access_token column, access_token_uses table, ip_security_flags table
+- [ ] Generate persistent access token for support@allaboutultrasound.com (DB connection issue — retry after checkpoint)

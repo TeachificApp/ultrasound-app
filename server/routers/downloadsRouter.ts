@@ -3,7 +3,7 @@ import { z } from "zod";
 import { and, desc, eq, sql, asc } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
-import { getDb, getUserById } from "../db";
+import { getDb, getUserById, getOrCreateAccessToken } from "../db";
 import {
   digitalProducts,
   digitalProductFiles,
@@ -955,10 +955,12 @@ export const downloadsAdminRouter = router({
           const [product] = await db.select({ title: digitalProducts.title, slug: digitalProducts.slug })
             .from(digitalProducts).where(eq(digitalProducts.id, input.productId)).limit(1);
           if (!product) return;
+          const accessToken = await getOrCreateAccessToken(userId);
           await sendDownloadAccessEmail({
             to: { name: input.name, email: input.email },
             productTitle: product.title,
             productSlug: product.slug,
+            accessToken,
           });
         } catch (e) {
           console.error("[download-access-email] Failed:", e);
@@ -1018,10 +1020,12 @@ export const downloadsAdminRouter = router({
           const [bundle] = await db.select({ title: digitalBundles.title, slug: digitalBundles.slug })
             .from(digitalBundles).where(eq(digitalBundles.id, input.bundleId)).limit(1);
           if (!bundle) return;
+          const accessToken = await getOrCreateAccessToken(userId);
           await sendBundleAccessEmail({
             to: { name: input.name, email: input.email },
             bundleTitle: bundle.title,
             bundleSlug: bundle.slug,
+            accessToken,
           });
         } catch (e) {
           console.error("[bundle-access-email] Failed:", e);

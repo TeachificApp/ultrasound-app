@@ -22,8 +22,8 @@
 import type { Express, Request, Response } from "express";
 import * as bcrypt from "bcryptjs";
 import { getDb, ensureUserRole } from "../db";
-import { users } from "../../drizzle/schema";
-import { eq } from "drizzle-orm";
+import { users, accessTokenUses, ipSecurityFlags } from "../../drizzle/schema";
+import { eq, and, gte, sql } from "drizzle-orm";
 import { getSessionCookieOptions } from "../_core/cookies";
 import { sdk } from "../_core/sdk";
 import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
@@ -162,6 +162,115 @@ export function registerAuthLoginRoute(app: Express) {
       return res.status(200).json({ success: true });
     } catch (err) {
       console.error("[magic-verify] Error:", err);
+      return res.status(500).json({ error: "An unexpected error occurred." });
+    }
+  });
+
+  /**
+   * POST /api/auth/access-verify
+   * Body: { token: string }
+   * Persistent access token from purchase/access emails.
+   * - Never expires, reusable across sessions.
+   * - IP abuse detection: >3 distinct IPs in 24h revokes token and flags account.
+   */
+  app.post("/api/auth/access-verify", async (req: Request, res: Response) => {
+    try {
+      const { token } = req.body ?? {};
+      if (!token) {
+        return res.status(400).json({ error: "Token is required." });
+      }
+
+      const db = await getDb();
+      if (!db) {
+        return res.status(503).json({ error: "Service temporarily unavailable." });
+      }
+
+      // Look up user by access token
+      const result = await db
+        .select()
+        .from(users)
+        .where(eq(users.accessToken, String(token)))
+        .limit(1);
+
+      const user = result[0];
+      if (!user) {
+        return res.status(401).json({ error: "This access link is invalid. Please contact support." });
+      }
+
+      // Get client IP
+      const ip = (
+        (req.headers["cf-connecting-ip"] as string) ||
+        (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+        req.socket.remoteAddress ||
+        "unknown"
+      );
+      const userAgent = (req.headers["user-agent"] as string) || "";
+
+      // Record this use
+      await db.insert(accessTokenUses).values({
+        userId: user.id,
+        ipAddress: ip,
+        userAgent,
+      });
+
+      // IP abuse check: count distinct IPs in the last 24 hours
+      const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const recentUses = await db
+        .select({ ip: accessTokenUses.ipAddress })
+        .from(accessTokenUses)
+        .where(
+          and(
+            eq(accessTokenUses.userId, user.id),
+            gte(accessTokenUses.usedAt, since24h)
+          )
+        );
+
+      const distinctIps = new Set(recentUses.map(r => r.ip));
+
+      if (distinctIps.size > 3) {
+        // Revoke the access token
+        await db.update(users).set({ accessToken: null }).where(eq(users.id, user.id));
+
+        // Create IP security flag
+        await db.insert(ipSecurityFlags).values({
+          userId: user.id,
+          flagType: "access_token_ip_abuse",
+          details: JSON.stringify({
+            distinctIps: Array.from(distinctIps),
+            windowStart: since24h.toISOString(),
+            windowEnd: new Date().toISOString(),
+            triggerIp: ip,
+          }),
+        });
+
+        console.warn(`[access-verify] IP abuse detected for user ${user.id} (${user.email}) — ${distinctIps.size} distinct IPs in 24h. Token revoked.`);
+
+        return res.status(403).json({
+          error: "This access link has been disabled due to unusual activity. Please sign in directly or contact support.",
+          revoked: true,
+        });
+      }
+
+      // All good — issue session cookie
+      const openId = user.openId ?? emailOpenId(user.email ?? "");
+      if (!user.openId) {
+        await db.update(users).set({ openId, emailVerified: true, isPending: false }).where(eq(users.id, user.id));
+      } else if (user.isPending) {
+        await db.update(users).set({ isPending: false, emailVerified: true }).where(eq(users.id, user.id));
+      }
+
+      await ensureUserRole(user.id);
+
+      const sessionToken = await sdk.createSessionToken(openId, {
+        name: user.name ?? user.email ?? "",
+        expiresInMs: ONE_YEAR_MS,
+      });
+      const cookieOptions = getSessionCookieOptions(req);
+      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+
+      return res.status(200).json({ success: true });
+    } catch (err) {
+      console.error("[access-verify] Error:", err);
       return res.status(500).json({ error: "An unexpected error occurred." });
     }
   });

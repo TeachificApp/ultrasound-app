@@ -89,10 +89,8 @@ const brandDark = "#0e1e2e";
 /** Brand-aware email wrapper. Pass brandMode to customize header/footer. */
 export function emailWrapper(content: string, brandMode?: BrandMode): string {
   const bc = getBrandDisplayConfig(brandMode || "aaus");
-  // For combined mode, show both logos side by side
-  const logoHtml = bc.brandMode === "combined"
-    ? `<img src="${bc.logoUrl}" alt="All About Ultrasound" width="60" height="60" style="border-radius:50%;display:inline-block;margin:0 6px 12px;" /><img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/iheartecho_logo_ring_01cc7ccd.webp" alt="iHeartEcho" width="60" height="60" style="border-radius:50%;display:inline-block;margin:0 6px 12px;" />`
-    : `<img src="${bc.logoUrl}" alt="${bc.displayName}" width="80" height="80" style="border-radius:50%;display:block;margin:0 auto 12px;" />`;
+  // For combined mode, show only the AAUS logo (covers both brands)
+  const logoHtml = `<img src="${bc.logoUrl}" alt="${bc.displayName}" width="80" height="80" style="border-radius:50%;display:block;margin:0 auto 12px;" />`;
 
   return `<!DOCTYPE html>
 <html lang="en">

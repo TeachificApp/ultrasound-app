@@ -15,7 +15,7 @@
  *  5. Logs the event to webhookEvents table
  */
 import type { Express, Request, Response } from "express";
-import { getDb, getUserByEmail, getOrCreateUserByEmail } from "../db";
+import { getDb, getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
 import { diySubscriptions, diyOrganizations, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses } from "../../drizzle/schema";
 import { and, eq } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
@@ -601,6 +601,17 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
           : brandMode === "iheartecho" ? "https://app.iheartecho.net" : "https://app.allaboutultrasound.com";
         const setPasswordUrl = `${baseUrl}/auth/reset-password?token=${resetToken}`;
         const firstName = autoUser.firstName || nameParts[0] || "there";
+        // Generate persistent access token for the new account
+        let accessTokenForEmail: string | null = null;
+        try {
+          accessTokenForEmail = await getOrCreateAccessToken(autoUser.id);
+        } catch (atErr) {
+          console.error(`[Stripe] Failed to generate access token for ${customerEmail}:`, atErr);
+        }
+        // Build access URL — clicking this auto-signs the user in
+        const accessUrl = accessTokenForEmail
+          ? `${baseUrl}/auth/access?token=${accessTokenForEmail}&next=${encodeURIComponent(baseUrl)}`
+          : setPasswordUrl;
         // Send welcome + set-password email
         try {
           const { buildPasswordResetEmail, sendEmail: _sendEmail } = await import("../_core/email");
@@ -610,16 +621,25 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
             brandMode: brandMode as any,
           });
           // Override subject for new accounts
-          const subject = `Your account is ready — set your password to access ${meta.product_name || "your purchase"}`;
+          const subject = `Your account is ready — access your ${meta.product_name || "purchase"}`;
+          // Append access link note to the email body
+          const accessNote = accessTokenForEmail
+            ? `<div style="margin:16px 0;padding:14px 16px;background:#f0fbfc;border-left:3px solid #0d9488;border-radius:0 8px 8px 0;">
+                <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#0e4a50;">Quick access link</p>
+                <p style="margin:0;font-size:13px;color:#475569;">You can also click the link below to access your purchase directly — no password needed:</p>
+                <p style="margin:8px 0 0;"><a href="${accessUrl}" style="color:#0d9488;font-weight:600;">${accessUrl}</a></p>
+              </div>`
+            : "";
+          const enhancedBody = emailContent.htmlBody.replace("</body>", `${accessNote}</body>`);
           await _sendEmail({
             to: { name: customerName || firstName, email: customerEmail },
             subject,
-            htmlBody: emailContent.htmlBody,
-            previewText: `Set your password to access your ${meta.product_name || "purchase"} on ${brandMode === "iheartecho" ? "iHeartEcho" : "All About Ultrasound"}`,
+            htmlBody: enhancedBody,
+            previewText: `Access your ${meta.product_name || "purchase"} on ${brandMode === "iheartecho" ? "iHeartEcho" : "All About Ultrasound"}`,
           });
-          console.log(`[Stripe] Auto-created account for ${customerEmail} (userId=${resolvedUserId}) and sent set-password email`);
+          console.log(`[Stripe] Auto-created account for ${customerEmail} (userId=${resolvedUserId}) and sent welcome email with access token`);
         } catch (emailErr) {
-          console.error(`[Stripe] Failed to send set-password email to ${customerEmail}:`, emailErr);
+          console.error(`[Stripe] Failed to send welcome email to ${customerEmail}:`, emailErr);
         }
       } else {
         console.log(`[Stripe] Resolved existing account for ${customerEmail} (userId=${resolvedUserId})`);

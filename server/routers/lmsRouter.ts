@@ -16,7 +16,7 @@ import { and, desc, eq, isNull, sql, asc, isNotNull, max, inArray, or } from "dr
 import { randomBytes } from "crypto";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
-import { getDb } from "../db";
+import { getDb, getOrCreateAccessToken } from "../db";
 import { invokeLLM } from "../_core/llm";
 import { generateCertificatePdf } from "../lib/certificateGenerator";
 import { sendCertificateEmail } from "../lib/certificateEmail";
@@ -3108,12 +3108,14 @@ Make ALL content specific and compelling based on the course title, description,
           if (!course?.sendEnrollmentEmail) return;
           const [user] = await db.select({ name: users.name, displayName: users.displayName, email: users.email }).from(users).where(eq(users.id, input.userId)).limit(1);
           if (!user?.email) return;
+          const accessToken = await getOrCreateAccessToken(input.userId);
           await sendEnrollmentEmail({
             to: { name: user.displayName || user.name || "Student", email: user.email },
             courseTitle: course.title,
             courseSlug: course.slug,
             customSubject: settings?.enrollmentEmailSubject,
             customIntro: settings?.enrollmentEmailIntro,
+            accessToken,
           });
         } catch (e) {
           console.error("[enrollment-email] Failed to send:", e);
@@ -4241,12 +4243,16 @@ CRITICAL REQUIREMENTS:
           if (!platformEnabled) return;
           const [course] = await db.select({ title: lmsCourses.title, slug: lmsCourses.slug, sendEnrollmentEmail: lmsCourses.sendEnrollmentEmail }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
           if (!course?.sendEnrollmentEmail) return;
+          // Look up userId for the new user to get/create their access token
+          const [newUser] = await db.select({ id: users.id }).from(users).where(eq(users.email, input.email.trim().toLowerCase())).limit(1);
+          const accessToken2 = newUser ? await getOrCreateAccessToken(newUser.id) : null;
           await sendEnrollmentEmail({
             to: { name: input.name, email: input.email },
             courseTitle: course.title,
             courseSlug: course.slug,
             customSubject: settings?.enrollmentEmailSubject,
             customIntro: settings?.enrollmentEmailIntro,
+            accessToken: accessToken2,
           });
         } catch (e) {
           console.error("[enrollment-email] Failed to send:", e);

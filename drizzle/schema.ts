@@ -59,6 +59,9 @@ export const users = mysqlTable("users", {
   // Magic link login (passwordless)
   magicLinkToken: varchar("magicLinkToken", { length: 128 }),
   magicLinkExpiry: timestamp("magicLinkExpiry"),
+  // Persistent access token — embedded in purchase/access emails.
+  // Never expires, reusable (clicking the link always works).
+  accessToken: varchar("accessToken", { length: 128 }),
   // Notification preferences (JSON: { quickfireReminder: boolean, reminderTime: "HH:MM" })
   notificationPrefs: text("notificationPrefs"),
   // IANA timezone string for 9am local-time challenge notifications (e.g. "America/New_York")
@@ -3023,6 +3026,9 @@ export const lmsLandingPages = mysqlTable("lms_landing_pages", {
   requirements: longtext("requirements"), // rich text
   isCustom: boolean("is_custom").default(false).notNull(),
   blocks: longtext("blocks"), // JSON array of page builder blocks
+  seoTitle: varchar("seo_title", { length: 255 }),
+  seoDescription: text("seo_description"),
+  seoImage: varchar("seo_image", { length: 512 }),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
 export type LmsLandingPage = typeof lmsLandingPages.$inferSelect;
@@ -4737,3 +4743,30 @@ export type CommunityReport = typeof communityReports.$inferSelect;
 /** Extra columns on communityPosts: postType, pollId, viewCount, isLocked, isHidden */
 // NOTE: These are added via ALTER TABLE below — the base table is already in the DB.
 // We extend the TypeScript type via a separate view/helper; actual columns added via SQL migration.
+
+// ─── Access Token IP Tracking ─────────────────────────────────────────────────
+// Tracks each use of a persistent access token (from purchase/access emails).
+// Used to detect IP abuse: >3 distinct IPs in 24h revokes the token and flags the account.
+
+export const accessTokenUses = mysqlTable("access_token_uses", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  ipAddress: varchar("ip_address", { length: 64 }).notNull(),
+  userAgent: text("user_agent"),
+  usedAt: timestamp("used_at").defaultNow().notNull(),
+});
+export type AccessTokenUse = typeof accessTokenUses.$inferSelect;
+
+// ─── IP Security Flags ────────────────────────────────────────────────────────
+// Records security events for admin review (e.g. access token IP abuse).
+
+export const ipSecurityFlags = mysqlTable("ip_security_flags", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  flagType: varchar("flag_type", { length: 64 }).notNull(), // e.g. "access_token_ip_abuse"
+  details: text("details"), // JSON with context (IPs, timestamps, etc.)
+  resolvedAt: timestamp("resolved_at"),
+  resolvedByAdminId: int("resolved_by_admin_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type IpSecurityFlag = typeof ipSecurityFlags.$inferSelect;

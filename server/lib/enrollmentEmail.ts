@@ -3,6 +3,9 @@
  * Sends welcome/enrollment confirmation emails when a student is granted access to
  * any content type: course, digital download, bundle, or quiz.
  * Respects both the platform-level master switch and per-item toggles.
+ *
+ * All access links include a persistent auto-login token so users are signed in
+ * automatically when they click the link — no separate login required.
  */
 
 const SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send";
@@ -10,6 +13,17 @@ const brandColor = "#0d9488";
 const brandDark = "#0e4a50";
 
 export type ContentType = "course" | "download" | "bundle" | "quiz";
+
+/**
+ * Build an access URL that auto-signs the user in.
+ * Format: /auth/access?token=<accessToken>&next=<destination>
+ * Falls back to the destination URL if no token is provided.
+ */
+function buildAccessUrl(destination: string, accessToken?: string | null): string {
+  if (!accessToken) return destination;
+  const encoded = encodeURIComponent(destination);
+  return `https://members.allaboutultrasound.com/auth/access?token=${accessToken}&next=${encoded}`;
+}
 
 function emailWrapper(content: string): string {
   return `<!DOCTYPE html>
@@ -98,10 +112,13 @@ export async function sendEnrollmentEmail(opts: {
   courseSlug: string;
   customSubject?: string | null;
   customIntro?: string | null;
+  /** Persistent access token — auto-signs user in when they click the link */
+  accessToken?: string | null;
 }): Promise<boolean> {
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
   const subject = opts.customSubject || `Welcome to "${opts.courseTitle}" 🎉`;
-  const courseUrl = `https://learn.allaboutultrasound.com/courses/${opts.courseSlug}`;
+  const courseDestination = `https://learn.allaboutultrasound.com/courses/${opts.courseSlug}`;
+  const courseUrl = buildAccessUrl(courseDestination, opts.accessToken);
   const introHtml = opts.customIntro
     ? `<div style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.6;">${opts.customIntro}</div>`
     : "";
@@ -117,7 +134,7 @@ export async function sendEnrollmentEmail(opts: {
     <div style="background:#f0fbfc;border-left:3px solid ${brandColor};padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">
       <p style="margin:0;font-size:14px;color:#0e4a50;font-weight:600;">Getting started:</p>
       <ul style="margin:8px 0 0;padding-left:20px;font-size:14px;color:#475569;">
-        <li style="margin:4px 0;">Access your course anytime from your learning dashboard</li>
+        <li style="margin:4px 0;">Click the button below — you'll be signed in automatically</li>
         <li style="margin:4px 0;">Track your progress and complete lessons at your own pace</li>
         <li style="margin:4px 0;">Earn a certificate of completion when you finish</li>
       </ul>
@@ -142,10 +159,13 @@ export async function sendDownloadAccessEmail(opts: {
   productSlug: string;
   customSubject?: string | null;
   customIntro?: string | null;
+  /** Persistent access token — auto-signs user in when they click the link */
+  accessToken?: string | null;
 }): Promise<boolean> {
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
   const subject = opts.customSubject || `Your download is ready: "${opts.productTitle}"`;
-  const filesUrl = `https://app.allaboutultrasound.com/downloads/${opts.productSlug}/files`;
+  const filesDestination = `https://app.allaboutultrasound.com/downloads/${opts.productSlug}/files`;
+  const filesUrl = buildAccessUrl(filesDestination, opts.accessToken);
   const introHtml = opts.customIntro
     ? `<div style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.6;">${opts.customIntro}</div>`
     : "";
@@ -160,7 +180,7 @@ export async function sendDownloadAccessEmail(opts: {
     <div style="background:#f0fbfc;border-left:3px solid ${brandColor};padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">
       <p style="margin:0;font-size:14px;color:#0e4a50;font-weight:600;">Accessing your files:</p>
       <ul style="margin:8px 0 0;padding-left:20px;font-size:14px;color:#475569;">
-        <li style="margin:4px 0;">Click the button below to access your download files</li>
+        <li style="margin:4px 0;">Click the button below — you'll be signed in automatically</li>
         <li style="margin:4px 0;">Files are available anytime from your account</li>
         <li style="margin:4px 0;">Contact support if you experience any issues</li>
       </ul>
@@ -185,10 +205,13 @@ export async function sendBundleAccessEmail(opts: {
   bundleSlug: string;
   customSubject?: string | null;
   customIntro?: string | null;
+  /** Persistent access token — auto-signs user in when they click the link */
+  accessToken?: string | null;
 }): Promise<boolean> {
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
   const subject = opts.customSubject || `You've been granted access to "${opts.bundleTitle}"`;
-  const bundleUrl = `https://app.allaboutultrasound.com/downloads/bundle/${opts.bundleSlug}`;
+  const bundleDestination = `https://app.allaboutultrasound.com/downloads/bundle/${opts.bundleSlug}`;
+  const bundleUrl = buildAccessUrl(bundleDestination, opts.accessToken);
   const introHtml = opts.customIntro
     ? `<div style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.6;">${opts.customIntro}</div>`
     : "";
@@ -203,7 +226,7 @@ export async function sendBundleAccessEmail(opts: {
     <div style="background:#f0fbfc;border-left:3px solid ${brandColor};padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">
       <p style="margin:0;font-size:14px;color:#0e4a50;font-weight:600;">What's included:</p>
       <ul style="margin:8px 0 0;padding-left:20px;font-size:14px;color:#475569;">
-        <li style="margin:4px 0;">Access all products in this bundle from your account</li>
+        <li style="margin:4px 0;">Click the button below — you'll be signed in automatically</li>
         <li style="margin:4px 0;">Download files are available immediately</li>
         <li style="margin:4px 0;">Contact support if you need assistance</li>
       </ul>
@@ -227,10 +250,13 @@ export async function sendQuizAccessEmail(opts: {
   quizTitle: string;
   customSubject?: string | null;
   customIntro?: string | null;
+  /** Persistent access token — auto-signs user in when they click the link */
+  accessToken?: string | null;
 }): Promise<boolean> {
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
   const subject = opts.customSubject || `You've been invited to "${opts.quizTitle}"`;
-  const appUrl = `https://app.allaboutultrasound.com`;
+  const appDestination = `https://app.allaboutultrasound.com`;
+  const appUrl = buildAccessUrl(appDestination, opts.accessToken);
   const introHtml = opts.customIntro
     ? `<div style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.6;">${opts.customIntro}</div>`
     : "";
@@ -245,7 +271,7 @@ export async function sendQuizAccessEmail(opts: {
     <div style="background:#f0fbfc;border-left:3px solid ${brandColor};padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">
       <p style="margin:0;font-size:14px;color:#0e4a50;font-weight:600;">How to join:</p>
       <ul style="margin:8px 0 0;padding-left:20px;font-size:14px;color:#475569;">
-        <li style="margin:4px 0;">Log in to your account when the quiz session starts</li>
+        <li style="margin:4px 0;">Click the button below — you'll be signed in automatically</li>
         <li style="margin:4px 0;">Your instructor will share the session link</li>
         <li style="margin:4px 0;">Compete in real-time with other participants</li>
       </ul>

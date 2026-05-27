@@ -33,6 +33,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import MagicLinkRequest from "./pages/MagicLinkRequest";
 import MagicLinkCallback from "./pages/MagicLinkCallback";
+import AccessLinkCallback from "./pages/AccessLinkCallback";
 import Enrolled from "./pages/Enrolled";
 import Unsubscribe from "./pages/Unsubscribe";
 
@@ -283,6 +284,8 @@ function Router() {
         <Route path="/magic-link/callback" component={MagicLinkCallback} />
         {/* /auth/magic is the URL sent in magic link emails */}
         <Route path="/auth/magic" component={MagicLinkCallback} />
+        {/* /auth/access is used in purchase/access emails — persistent reusable token */}
+        <Route path="/auth/access" component={AccessLinkCallback} />
         <Route path="/enrolled" component={Enrolled} />
         <Route path="/unsubscribe" component={Unsubscribe} />
         <Route path="/upgrade-success" component={UpgradeSuccess} />
@@ -519,6 +522,7 @@ function MembersRouter() {
               <Route path="/login" component={Login} />
               <Route path="/magic-link" component={MagicLinkRequest} />
               <Route path="/auth/magic" component={MagicLinkCallback} />
+              <Route path="/auth/access" component={AccessLinkCallback} />
               <Route path="/register" component={Register} />
               {/* Default: redirect to dashboard */}
               <Route>{() => { window.location.replace("/my-dashboard"); return null; }}</Route>
@@ -603,6 +607,7 @@ function LMSRouter() {
         <Route path="/login" component={Login} />
         <Route path="/magic-link" component={MagicLinkRequest} />
         <Route path="/auth/magic" component={MagicLinkCallback} />
+        <Route path="/auth/access" component={AccessLinkCallback} />
         <Route path="/register" component={Register} />
         {/* /profile redirects to dashboard profile tab */}
         <Route path="/profile">{() => { window.location.replace("/my-dashboard?tab=profile"); return null; }}</Route>
@@ -652,6 +657,7 @@ function IHeartEchoRouter() {
         <Route path="/reset-password" component={ResetPassword} />
         <Route path="/magic-link" component={MagicLinkRequest} />
         <Route path="/auth/magic" component={MagicLinkCallback} />
+        <Route path="/auth/access" component={AccessLinkCallback} />
         <Route path="/enrolled" component={Enrolled} />
         <Route path="/unsubscribe" component={Unsubscribe} />
         <Route path="/upgrade-success" component={UpgradeSuccess} />
@@ -851,6 +857,7 @@ function AccreditationDivisionRouter() {
         <Route path="/reset-password" component={ResetPassword} />
         <Route path="/magic-link" component={MagicLinkRequest} />
         <Route path="/auth/magic" component={MagicLinkCallback} />
+        <Route path="/auth/access" component={AccessLinkCallback} />
         {/* Public landing page — root route, no auth required */}
         <Route path="/" component={DIYAccreditationLanding} />
         {/* DIY Accreditation routes */}
@@ -906,3 +913,4 @@ function App() {
 }
 
 export default App;
+

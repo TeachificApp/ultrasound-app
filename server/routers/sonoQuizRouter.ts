@@ -16,7 +16,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
-import { getDb } from "../db";
+import { getDb, getOrCreateAccessToken } from "../db";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import {
   sonoQuizzes,
@@ -754,9 +754,11 @@ export const sonoQuizRouter = router({
       void (async () => {
         try {
           const { sendQuizAccessEmail } = await import("../lib/enrollmentEmail");
+          const accessToken = await getOrCreateAccessToken(userId);
           await sendQuizAccessEmail({
             to: { name: input.name, email: input.email },
             quizTitle: quiz.title,
+            accessToken,
           });
         } catch (e) {
           console.error("[quiz-invite-email] Failed:", e);

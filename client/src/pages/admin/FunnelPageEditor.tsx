@@ -397,23 +397,43 @@ export default function FunnelPageEditor() {
   const [seoDescription, setSeoDescription] = useState("");
   const [seoImage, setSeoImage] = useState("");
   const [seoSaved, setSeoSaved] = useState(false);
+  // Track whether SEO fields have been initialized so block-save invalidations
+  // don't overwrite user-edited SEO fields.
+  const seoInitialized = useRef(false);
 
-  // Populate SEO fields when page data loads
+  // Populate SEO fields only once when page data first loads (not on every invalidation)
   useEffect(() => {
     if (!pageData) return;
+    if (seoInitialized.current) return; // already initialized — don't overwrite user edits
+    seoInitialized.current = true;
     setSeoTitle(pageData.page.seoTitle ?? "");
     setSeoDescription(pageData.page.seoDescription ?? "");
     setSeoImage(pageData.page.seoImage ?? "");
   }, [pageData]);
 
+  // Reset seoInitialized when navigating to a different page
+  useEffect(() => {
+    seoInitialized.current = false;
+  }, [numericPageId]);
+
+  // Separate mutation for SEO saves so it doesn't conflict with block saves
+  const updateSeoMutation = trpc.funnel.updatePage.useMutation({
+    onSuccess: () => {
+      setSeoSaved(true);
+      setTimeout(() => setSeoSaved(false), 2000);
+      // Refresh page data so the saved values are reflected
+      utils.funnel.getPageById.invalidate({ id: numericPageId });
+      // Keep seoInitialized true so the useEffect doesn't reset fields after invalidation
+    },
+    onError: (e: any) => toast.error(`SEO save failed: ${e.message}`),
+  });
+
   const handleSaveSeo = () => {
-    updatePage.mutate({
+    updateSeoMutation.mutate({
       id: numericPageId,
       seoTitle: seoTitle.trim() || null,
       seoDescription: seoDescription.trim() || null,
       seoImage: seoImage.trim() || null,
-    }, {
-      onSuccess: () => { setSeoSaved(true); setTimeout(() => setSeoSaved(false), 2000); },
     });
   };
 
@@ -746,10 +766,10 @@ export default function FunnelPageEditor() {
                 )}
                 <button
                   onClick={handleSaveSeo}
-                  disabled={updatePage.isPending}
+                  disabled={updateSeoMutation.isPending}
                   className="w-full text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 rounded-lg py-1.5 transition-colors disabled:opacity-50"
                 >
-                  {seoSaved ? "✓ Saved!" : updatePage.isPending ? "Saving…" : "Save Preview Settings"}
+                  {seoSaved ? "✓ Saved!" : updateSeoMutation.isPending ? "Saving…" : "Save Preview Settings"}
                 </button>
               </div>
             )}
