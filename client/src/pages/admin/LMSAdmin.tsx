@@ -105,48 +105,130 @@ function SsoLearnLinkButton({ slug, label }: { slug: string; label?: string }) {
 
 // ─── Course / Quiz / Download List Tab ──────────────────────────────────────
 
+function SortableCourseRow({ course, onEdit, onDuplicate, onDelete }: { course: any; onEdit: (id: number) => void; onDuplicate: (id: number) => void; onDelete: (id: number, title: string) => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: course.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center gap-3 bg-white rounded-lg border border-gray-200 px-4 py-3 hover:border-teal-300 transition-colors">
+      <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 touch-none" title="Drag to reorder">
+        <GripVertical className="w-4 h-4" />
+      </button>
+      <span className="text-gray-400">{TYPE_ICONS[course.type]}</span>
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-gray-900 text-sm truncate">{course.title}</p>
+        <p className="text-xs text-gray-400">{course.brand === "aaus" ? "All About Ultrasound™" : "iHeartEcho™"} · {course.type} · {course.isFree ? "Free" : `$${(course.price / 100).toFixed(0)}`}</p>
+      </div>
+      <Badge className={`text-xs ${STATUS_COLORS[course.status]}`}>{course.status}</Badge>
+      <Button size="sm" variant="ghost" className="h-7 text-xs text-teal-600 hover:bg-teal-50" onClick={() => onEdit(course.id)}>
+        <Edit2 className="w-3 h-3 mr-1" /> Edit
+      </Button>
+      <SsoLearnLinkButton slug={course.slug} />
+      <Button size="sm" variant="ghost" className="h-7 text-xs text-blue-500 hover:bg-blue-50" title="Duplicate" onClick={() => onDuplicate(course.id)}>
+        <Copy className="w-3 h-3" />
+      </Button>
+      <Button size="sm" variant="ghost" className="h-7 text-red-400 hover:bg-red-50" onClick={() => onDelete(course.id, course.title)}>
+        <Trash2 className="w-3 h-3" />
+      </Button>
+    </div>
+  );
+}
+
 function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) => void; typeFilter?: "course" | "quiz" | "download" }) {
-  
   const [createOpen, setCreateOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
+  const [localCourses, setLocalCourses] = useState<any[]>([]);
+  const [reorderMode, setReorderMode] = useState(false);
+  const [activeDragId, setActiveDragId] = useState<number | null>(null);
 
   const typeLabel = typeFilter === "quiz" ? "Quiz" : typeFilter === "download" ? "Download" : "Course";
   const typeLabelPlural = typeFilter === "quiz" ? "quizzes" : typeFilter === "download" ? "downloads" : "courses";
 
-  const { data, isLoading, error, refetch } = trpc.lmsAdmin.listCourses.useQuery({ status: statusFilter as any, type: typeFilter, page, pageSize: 20 });
+  const { data, isLoading, error, refetch } = trpc.lmsAdmin.listCourses.useQuery({ status: statusFilter as any, type: typeFilter, page, pageSize: 200 });
+
+  // Sync local courses from server data
+  const prevDataRef = useRef<any>(null);
+  useEffect(() => {
+    if (data?.courses && data.courses !== prevDataRef.current) {
+      prevDataRef.current = data.courses;
+      // Sort by libraryOrder asc, then createdAt desc (mirrors server)
+      const sorted = [...data.courses].sort((a: any, b: any) => {
+        if (a.libraryOrder !== b.libraryOrder) return (a.libraryOrder ?? 0) - (b.libraryOrder ?? 0);
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+      setLocalCourses(sorted);
+    }
+  }, [data?.courses]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const reorderCourses = trpc.lmsAdmin.reorderCourses.useMutation({
+    onSuccess: () => toast.success("Library order saved"),
+    onError: e => toast.error(`Failed to save order: ${e.message}`),
+  });
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveDragId(null);
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = localCourses.findIndex((c: any) => c.id === active.id);
+    const newIndex = localCourses.findIndex((c: any) => c.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reordered = arrayMove(localCourses, oldIndex, newIndex);
+    setLocalCourses(reordered);
+    // Persist: assign 1-based positions
+    reorderCourses.mutate({
+      courses: reordered.map((c: any, i: number) => ({ id: c.id, libraryOrder: i + 1 })),
+    });
+  };
 
   const deleteCourse = trpc.lmsAdmin.deleteCourse.useMutation({
     onSuccess: () => { toast.success("Course deleted"); refetch(); },
     onError: e => toast.error(`Error: ${e.message}`),
   });
   const duplicateCourse = trpc.lmsAdmin.duplicateCourse.useMutation({
-    onSuccess: (data) => { toast.success(`Duplicated as "${data.title}"`); refetch(); },
+    onSuccess: (d) => { toast.success(`Duplicated as "${d.title}"`); refetch(); },
     onError: e => toast.error(`Error: ${e.message}`),
   });
+
+  const activeCourse = activeDragId ? localCourses.find((c: any) => c.id === activeDragId) : null;
+
+  // Paginate locally when not in reorder mode
+  const pageSize = 20;
+  const displayCourses = reorderMode ? localCourses : localCourses.slice((page - 1) * pageSize, page * pageSize);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Select value={statusFilter} onValueChange={v => { setStatusFilter(v); setPage(1); }}>
-            <SelectTrigger className="w-36 h-8 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="draft">Draft</SelectItem>
-              <SelectItem value="public">Public</SelectItem>
-              <SelectItem value="hidden">Hidden</SelectItem>
-              <SelectItem value="private">Private</SelectItem>
-              <SelectItem value="archived">Archived</SelectItem>
-            </SelectContent>
-          </Select>
+          {!reorderMode && (
+            <Select value={statusFilter} onValueChange={v => { setStatusFilter(v); setPage(1); }}>
+              <SelectTrigger className="w-36 h-8 text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="public">Public</SelectItem>
+                <SelectItem value="hidden">Hidden</SelectItem>
+                <SelectItem value="private">Private</SelectItem>
+                <SelectItem value="archived">Archived</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
           {data && <span className="text-sm text-gray-500">{data.total} {data.total !== 1 ? typeLabelPlural : typeLabel.toLowerCase()}</span>}
+          {reorderMode && <span className="text-xs text-teal-600 font-medium">Drag rows to set library display order</span>}
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white h-8" onClick={() => setCreateOpen(true)}>
-            <Plus className="w-4 h-4 mr-1" /> New {typeLabel}
+          <Button size="sm" variant={reorderMode ? "default" : "outline"} className={reorderMode ? "h-8 bg-teal-600 hover:bg-teal-700 text-white" : "h-8"} onClick={() => setReorderMode(r => !r)}>
+            <GripVertical className="w-3 h-3 mr-1" /> {reorderMode ? "Done Reordering" : "Reorder"}
           </Button>
+          {!reorderMode && (
+            <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white h-8" onClick={() => setCreateOpen(true)}>
+              <Plus className="w-4 h-4 mr-1" /> New {typeLabel}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -159,31 +241,39 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
           <p className="text-sm text-gray-400 mt-1">{error.message}</p>
           <Button size="sm" variant="outline" className="mt-3" onClick={() => refetch()}>Retry</Button>
         </div>
+      ) : reorderMode ? (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={e => setActiveDragId(e.active.id as number)} onDragEnd={handleDragEnd}>
+          <SortableContext items={localCourses.map((c: any) => c.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-2">
+              {localCourses.map((c: any) => (
+                <SortableCourseRow key={c.id} course={c} onEdit={onEdit}
+                  onDuplicate={id => duplicateCourse.mutate({ id })}
+                  onDelete={(id, title) => { if (confirm(`Delete "${title}"?`)) deleteCourse.mutate({ id }); }}
+                />
+              ))}
+            </div>
+          </SortableContext>
+          <DragOverlay>
+            {activeCourse && (
+              <div className="flex items-center gap-3 bg-white rounded-lg border-2 border-teal-400 shadow-lg px-4 py-3">
+                <GripVertical className="w-4 h-4 text-teal-400" />
+                <span className="text-gray-400">{TYPE_ICONS[activeCourse.type]}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-gray-900 text-sm truncate">{activeCourse.title}</p>
+                </div>
+              </div>
+            )}
+          </DragOverlay>
+        </DndContext>
       ) : (
         <div className="space-y-2">
-          {(data?.courses ?? []).map((c: any) => (
-            <div key={c.id} className="flex items-center gap-3 bg-white rounded-lg border border-gray-200 px-4 py-3 hover:border-teal-300 transition-colors">
-              <span className="text-gray-400">{TYPE_ICONS[c.type]}</span>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900 text-sm truncate">{c.title}</p>
-                <p className="text-xs text-gray-400">{c.brand === "aaus" ? "All About Ultrasound™" : "iHeartEcho™"} · {c.type} · {c.isFree ? "Free" : `$${(c.price / 100).toFixed(0)}`}</p>
-              </div>
-              <Badge className={`text-xs ${STATUS_COLORS[c.status]}`}>{c.status}</Badge>
-              <Button size="sm" variant="ghost" className="h-7 text-xs text-teal-600 hover:bg-teal-50" onClick={() => onEdit(c.id)}>
-                <Edit2 className="w-3 h-3 mr-1" /> Edit
-              </Button>
-              <SsoLearnLinkButton slug={c.slug} />
-              <Button size="sm" variant="ghost" className="h-7 text-xs text-blue-500 hover:bg-blue-50" title="Duplicate" onClick={() => duplicateCourse.mutate({ id: c.id })} disabled={duplicateCourse.isPending}>
-                <Copy className="w-3 h-3" />
-              </Button>
-              <Button size="sm" variant="ghost" className="h-7 text-red-400 hover:bg-red-50" onClick={() => {
-                if (confirm(`Delete "${c.title}"?`)) deleteCourse.mutate({ id: c.id });
-              }}>
-                <Trash2 className="w-3 h-3" />
-              </Button>
-            </div>
+          {displayCourses.map((c: any) => (
+            <SortableCourseRow key={c.id} course={c} onEdit={onEdit}
+              onDuplicate={id => duplicateCourse.mutate({ id })}
+              onDelete={(id, title) => { if (confirm(`Delete "${title}"?`)) deleteCourse.mutate({ id }); }}
+            />
           ))}
-          {data?.courses.length === 0 && (
+          {displayCourses.length === 0 && (
             <div className="text-center py-12 text-gray-400">
               <BookOpen className="w-10 h-10 mx-auto mb-2 opacity-30" />
               <p>No {typeLabelPlural} yet. Create your first {typeLabel.toLowerCase()}.</p>
@@ -192,10 +282,10 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
         </div>
       )}
 
-      {(data?.total ?? 0) > 20 && (
+      {!reorderMode && (data?.total ?? 0) > pageSize && (
         <div className="flex justify-center gap-2">
           <Button size="sm" variant="outline" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Previous</Button>
-          <Button size="sm" variant="outline" disabled={page * 20 >= (data?.total ?? 0)} onClick={() => setPage(p => p + 1)}>Next</Button>
+          <Button size="sm" variant="outline" disabled={page * pageSize >= (data?.total ?? 0)} onClick={() => setPage(p => p + 1)}>Next</Button>
         </div>
       )}
 

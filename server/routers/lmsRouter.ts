@@ -324,7 +324,8 @@ export const lmsPublicRouter = router({
       if (input.isFree !== undefined) conditions.push(eq(lmsCourses.isFree, input.isFree));
 
       const offset = (input.page - 1) * input.pageSize;
-      const courses = await db.select().from(lmsCourses).where(and(...conditions)).orderBy(desc(lmsCourses.createdAt)).limit(input.pageSize).offset(offset);
+      // Sort: explicit library order first (asc), then fall back to newest first
+      const courses = await db.select().from(lmsCourses).where(and(...conditions)).orderBy(asc(lmsCourses.libraryOrder), desc(lmsCourses.createdAt)).limit(input.pageSize).offset(offset);
       const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(lmsCourses).where(and(...conditions));
 
       // Batch-fetch primary instructors for all courses in 2 queries (avoids N+1)
@@ -1679,6 +1680,18 @@ export const lmsAdminRouter = router({
         purgeAt,
       });
       await db.delete(lmsCourses).where(eq(lmsCourses.id, input.id));
+      return { success: true };
+    }),
+
+  reorderCourses: protectedProcedure
+    .input(z.object({ courses: z.array(z.object({ id: z.number(), libraryOrder: z.number() })) }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await Promise.all(input.courses.map(c =>
+        db.update(lmsCourses).set({ libraryOrder: c.libraryOrder }).where(eq(lmsCourses.id, c.id))
+      ));
       return { success: true };
     }),
 

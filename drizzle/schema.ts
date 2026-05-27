@@ -2783,6 +2783,8 @@ export const lmsCourses = mysqlTable("lms_courses", {
   // Group purchase: allow bulk seat purchases for teams/organizations
   allowGroupPurchase: boolean("allow_group_purchase").default(true).notNull(),
   createdByUserId: int("created_by_user_id").notNull(),
+  // Display order in the public Education Library (0 = unset/default, positive = explicit position)
+  libraryOrder: int("library_order").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
