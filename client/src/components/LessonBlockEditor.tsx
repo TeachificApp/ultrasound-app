@@ -42,6 +42,8 @@ interface LessonBlockEditorProps {
   onNavigateLesson?: (lesson: { id: number; title: string }) => void;
   /** When true, renders as a flex-fill panel (no fixed overlay). Use when embedded inside another full-screen modal. */
   embedded?: boolean;
+  /** Optional lesson title shown in the header instead of the generic hint text */
+  lessonTitle?: string;
 }
 
 // Picker tab type
@@ -59,6 +61,7 @@ export default function LessonBlockEditor({
   nextLesson,
   onNavigateLesson,
   embedded = false,
+  lessonTitle,
 }: LessonBlockEditorProps) {
   const [blocks, setBlocks] = useState<Block[]>(initialBlocks);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
@@ -408,7 +411,11 @@ export default function LessonBlockEditor({
         {!embedded && <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-gray-200 shrink-0">
           <div className="flex items-center gap-3">
             <span className="text-teal-700 font-bold text-sm uppercase tracking-wide">Lesson Editor</span>
-            <span className="text-gray-400 text-xs hidden sm:inline">Blocks appear below the video in the player</span>
+            {lessonTitle ? (
+              <span className="text-gray-700 text-sm font-medium truncate max-w-xs" title={lessonTitle}>{lessonTitle}</span>
+            ) : (
+              <span className="text-gray-400 text-xs hidden sm:inline">Blocks appear below the video in the player</span>
+            )}
             {(prevLesson || nextLesson) && (
               <div className="flex items-center gap-1 ml-2">
                 <button
