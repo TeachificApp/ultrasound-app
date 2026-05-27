@@ -470,7 +470,8 @@ function Router() {
         <Route path="/media/:slug" component={MediaRedirect} />
         <Route path="/404" component={NotFound} />
         <Route path="/terms" component={() => { window.location.replace("https://www.allaboutultrasound.com/terms-of-service.html"); return null; }} />
-        <Route path="/privacy" component={() => { window.location.replace("https://www.allaboutultrasound.com/terms-of-service.html"); return null; }} />
+        <Route path="/privacy" component={() => { window.location.replace("https://www.allaboutultrasound.com/privacy-policy.html"); return null; }} />
+        <Route path="/contact" component={() => { window.location.replace("https://www.allaboutultrasound.com/contact.html"); return null; }} />
         <Route component={NotFound} />
       </Switch>
     </Suspense>
@@ -601,6 +602,8 @@ function LMSRouter() {
               </Suspense>
             </Route>
             {/* Fallback */}
+            <Route path="/privacy" component={() => { window.location.replace("https://www.allaboutultrasound.com/privacy-policy.html"); return null; }} />
+            <Route path="/contact" component={() => { window.location.replace("https://www.allaboutultrasound.com/contact.html"); return null; }} />
             <Route component={NotFound} />
           </Switch>
           </Suspense>
@@ -761,6 +764,8 @@ function IHeartEchoRouter() {
         <Route path="/physician-review/:token" component={PhysicianOverReadForm} />
 
         <Route path="/404" component={NotFound} />
+        <Route path="/privacy" component={() => { window.location.replace("https://www.allaboutultrasound.com/privacy-policy.html"); return null; }} />
+        <Route path="/contact" component={() => { window.location.replace("https://www.allaboutultrasound.com/contact.html"); return null; }} />
         <Route component={NotFound} />
         <Route path="/media/:slug/:action" component={MediaRedirect} />
         <Route path="/media/:slug" component={MediaRedirect} />

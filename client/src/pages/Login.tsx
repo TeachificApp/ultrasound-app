@@ -247,9 +247,9 @@ export default function Login() {
 
               <p className="mt-6 text-xs text-gray-400 text-center leading-relaxed">
                 By signing in you agree to the{" "}
-                <a href="https://www.allaboutultrasound.com/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600">Terms of Service</a>
+                <a href="https://www.allaboutultrasound.com/terms-of-service.html" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600">Terms of Service</a>
                 {" "}and{" "}
-                <a href="https://www.allaboutultrasound.com/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600">Privacy Policy</a>.
+                <a href="https://www.allaboutultrasound.com/privacy-policy.html" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600">Privacy Policy</a>.
               </p>
             </>
           ) : (
