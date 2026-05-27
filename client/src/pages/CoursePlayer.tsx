@@ -685,8 +685,8 @@ function MobileSidebarContent({
             {(notesData ?? []).length === 0 ? (
               <p className="text-xs text-gray-400 text-center py-6">No notes yet. Open a lesson and use the Notes tab.</p>
             ) : (notesData ?? []).map((n: any) => (
-              <div key={n.id} className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                <p className="text-[10px] font-semibold text-amber-700 mb-1">{n.lessonTitle}</p>
+              <div key={n.id} className="rounded-lg p-3 border" style={{ backgroundColor: `${primaryColor}0d`, borderColor: `${primaryColor}33` }}>
+                <p className="text-[10px] font-semibold mb-1" style={{ color: primaryColor }}>{n.lessonTitle}</p>
                 <p className="text-xs text-gray-700 whitespace-pre-wrap line-clamp-4">{n.note}</p>
               </div>
             ))}
@@ -1389,9 +1389,9 @@ export default function CoursePlayer() {
                   <p className="text-[10px] text-gray-400 mt-1">Open a lesson and use the Notes tab to add notes.</p>
                 </div>
               ) : (notesData ?? []).map((n: any) => (
-                <div key={n.id} className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <div key={n.id} className="rounded-lg p-3 border" style={{ backgroundColor: `${primaryColor}0d`, borderColor: `${primaryColor}33` }}>
                   <div className="flex items-center justify-between mb-1">
-                    <p className="text-[10px] font-semibold text-amber-700 truncate flex-1">{n.lessonTitle}</p>
+                    <p className="text-[10px] font-semibold truncate flex-1" style={{ color: primaryColor }}>{n.lessonTitle}</p>
                     <button
                       onClick={() => handleLessonSelect(n.lessonId)}
                       className="text-[9px] text-teal-600 hover:text-teal-800 ml-2 shrink-0"
@@ -1644,7 +1644,8 @@ export default function CoursePlayer() {
                 <button
                   onClick={() => setRightPanelTab(t => t === "notes" ? "info" : "notes")}
                   title={rightPanelTab === "notes" ? "Hide notes" : "Open notes panel"}
-                  className={cn("p-1.5 rounded-lg transition-colors", rightPanelTab === "notes" ? "text-amber-600 bg-amber-100" : currentNote ? "text-amber-500 bg-amber-50" : "text-gray-400 hover:text-amber-600 hover:bg-amber-50")}
+                  className="p-1.5 rounded-lg transition-colors"
+                  style={rightPanelTab === "notes" ? { color: primaryColor, backgroundColor: `${primaryColor}18` } : currentNote ? { color: primaryColor, backgroundColor: `${primaryColor}10` } : undefined}
                 >
                   <StickyNote className="w-4 h-4" />
                 </button>
@@ -1682,7 +1683,7 @@ export default function CoursePlayer() {
               )}
               {nextLesson && (
                 <Button size="sm" variant="outline" onClick={() => handleLessonSelect(nextLesson.id)} className="text-xs h-7 border-teal-400 text-teal-700 hover:bg-teal-50">
-                  {lbl.lesson} <ChevronRight className="w-3 h-3 ml-1" />
+                  {lbl.nextLesson} <ChevronRight className="w-3 h-3 ml-1" />
                 </Button>
               )}
             </div>
@@ -1713,7 +1714,7 @@ export default function CoursePlayer() {
                         />
                       </div>
                       {requireVideoCompletion && !videoWatched && (
-                        <p className="text-xs text-amber-600 mt-2">Watch the full video to mark this lesson complete.</p>
+                        <p className="text-xs mt-2" style={{ color: primaryColor }}>Watch the full video to mark this lesson complete.</p>
                       )}
                     </div>
                   )}
@@ -1850,7 +1851,9 @@ export default function CoursePlayer() {
                       onClick={() => setRightPanelTab("notes")}
                       className={cn(
                         "flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[10px] font-semibold transition-colors",
-                        rightPanelTab === "notes" ? "text-amber-600 border-b-2 border-amber-500 bg-white" : "text-gray-500 hover:text-gray-700"
+                        rightPanelTab === "notes" ? "border-b-2 bg-white" : "text-gray-500 hover:text-gray-700"
+                      }
+                      style={rightPanelTab === "notes" ? { color: primaryColor, borderColor: primaryColor } : undefined
                       )}
                     >
                       <StickyNote className="w-3.5 h-3.5" /> Notes {currentNote ? "●" : ""}
@@ -1861,10 +1864,10 @@ export default function CoursePlayer() {
                   {rightPanelTab === "notes" && selectedLessonId && (
                     <div className="flex flex-col gap-3">
                       <div className="flex items-center gap-2">
-                        <StickyNote className="w-4 h-4 text-amber-600" />
-                        <p className="text-sm font-semibold text-amber-800">My Notes</p>
+                        <StickyNote className="w-4 h-4" style={{ color: primaryColor }} />
+                        <p className="text-sm font-semibold" style={{ color: primaryColor }}>My Notes</p>
                         {currentNote && (
-                          <span className="ml-auto text-[10px] text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full">Saved</span>
+                          <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full" style={{ color: primaryColor, backgroundColor: `${primaryColor}18` }}>Saved</span>
                         )}
                       </div>
                       <p className="text-[10px] text-gray-400">Notes are saved per lesson and visible only to you.</p>
@@ -2012,10 +2015,10 @@ export default function CoursePlayer() {
             {/* Handle + header */}
             <div className="flex items-center justify-between px-4 pt-3 pb-2 border-b border-gray-200 shrink-0">
               <div className="flex items-center gap-2">
-                <StickyNote className="w-4 h-4 text-amber-600" />
-                <p className="text-sm font-semibold text-amber-800">My Notes</p>
+                <StickyNote className="w-4 h-4" style={{ color: primaryColor }} />
+                <p className="text-sm font-semibold" style={{ color: primaryColor }}>My Notes</p>
                 {currentNote && (
-                  <span className="text-[10px] text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full">Saved</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ color: primaryColor, backgroundColor: `${primaryColor}18` }}>Saved</span>
                 )}
               </div>
               <button

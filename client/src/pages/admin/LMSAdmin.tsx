@@ -11,8 +11,7 @@
  *   Orders       — order history
  *   Analytics    — overview stats
  */
-import { useState, useEffect, useCallback, useRef } from "react";
-import type React from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { cn } from "@/lib/utils";
 import {
   DndContext, DragOverlay, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent,
@@ -3512,6 +3511,7 @@ function CopyModuleDialog({
 }
 
 function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndClose, prevLesson, nextLesson, onNavigateLesson }: { lesson: any; onClose: () => void; onSaved: () => void; onSavedAndClose?: () => void; prevLesson?: any; nextLesson?: any; onNavigateLesson?: (lesson: any) => void }) {
+  const blockEditorRef = React.useRef<import('@/components/LessonBlockEditor').LessonBlockEditorHandle>(null);
   // Fetch the FULL lesson record (including contentBlocks, content, videoContent).
   // The course list view intentionally strips heavy columns for performance, so we
   // must re-fetch the full row here before the editor can render existing blocks.
@@ -3523,6 +3523,22 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
   const lesson = fullLesson ?? lessonShallow;
 
   const [activeTab, setActiveTab] = useState<"settings" | "content">("settings");
+  const [headerSaving, setHeaderSaving] = useState(false);
+
+  const handleHeaderSave = async (andClose = false) => {
+    setHeaderSaving(true);
+    try {
+      if (activeTab === "content" && blockEditorRef.current) {
+        // Save lesson blocks from the content tab
+        await blockEditorRef.current.save(andClose);
+      } else {
+        // Save lesson settings from the settings tab
+        handleSave(andClose);
+      }
+    } finally {
+      setHeaderSaving(false);
+    }
+  };
   const [title, setTitle] = useState(lesson.title);
   const [lessonType, setLessonType] = useState<"video" | "text" | "quiz" | "download" | "embed" | "video_text">(lesson.type ?? "text");
   const [content, setContent] = useState(lesson.content ?? "");
@@ -3642,6 +3658,36 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
             <span className="text-gray-800 font-semibold text-sm truncate" title={lesson.title}>{lesson.title}</span>
             <span className="text-gray-400 text-xs shrink-0 ml-1">({LESSON_TYPE_LABELS[lesson.type] ?? lesson.type})</span>
           </div>
+        </div>
+        {/* Save / Close actions — always visible in header */}
+        <div className="flex items-center gap-1.5 shrink-0 mr-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-gray-200 text-gray-500 hover:text-gray-800 hover:bg-gray-50 h-7 text-xs"
+            onClick={onClose}
+            title="Close without saving"
+          >
+            <X className="w-3 h-3 mr-1" /> Close
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-teal-300 text-teal-700 hover:bg-teal-50 h-7 text-xs font-semibold"
+            disabled={headerSaving || update.isPending}
+            onClick={() => handleHeaderSave(false)}
+          >
+            <Save className="w-3 h-3 mr-1" />
+            {(headerSaving || update.isPending) ? "Saving..." : "Save"}
+          </Button>
+          <Button
+            size="sm"
+            className="bg-teal-600 hover:bg-teal-700 text-white h-7 text-xs font-semibold"
+            disabled={headerSaving || update.isPending}
+            onClick={() => handleHeaderSave(true)}
+          >
+            {(headerSaving || update.isPending) ? "Saving..." : "Save & Close"}
+          </Button>
         </div>
         {/* Tab switcher — always rendered with fixed width so prev/next never shift */}
         <div className="flex gap-1 shrink-0">
@@ -3970,6 +4016,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
             </div>
           ) : (
             <LessonBlockEditor
+              ref={blockEditorRef}
               key={`blocks-${lesson.id}`}
               lessonId={lesson.id}
               courseId={lesson.courseId}

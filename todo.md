@@ -3191,3 +3191,9 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add Community nav link to MembersLayout top nav (desktop + mobile)
 - [x] Add Community Profile section to Member Hub Profile tab (XP, level, badges, link to public profile)
 - [x] Add credentials and yearsExperience fields to Member Hub Profile form
+
+## CoursePlayer Fixes (2026-05-27)
+- [x] Fix Next button showing lbl.lesson instead of lbl.nextLesson (custom text labels)
+- [x] Convert all Notes panel amber/orange hardcoded colors to dynamic primaryColor theme
+- [x] Add Save, Save & Close, and Close buttons to LessonEditorPage header (always visible)
+- [x] LessonBlockEditor: expose save() via forwardRef/useImperativeHandle

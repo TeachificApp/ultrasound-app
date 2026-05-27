@@ -22,12 +22,17 @@ import {
 } from "@/components/ui/dialog";
 import { Block, BlockType, BlockPreview } from "@/components/BlockPreview";
 import { BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, SortableBlock, uid } from "@/pages/admin/LandingPageBuilder";
+import React, { useImperativeHandle } from "react";
 import {
   X, Plus, Save, Eye, EyeOff, Copy, BookOpen, Search, ExternalLink, Layers, Globe, Loader2,
   ChevronLeft, ChevronRight, Bookmark,
 } from "lucide-react";
 import { BlockTemplateLibraryProvider, OpenTemplateLibraryButton, SaveAsTemplateButton } from "@/components/BlockTemplateLibrary";
 import { cn } from "@/lib/utils";
+
+export interface LessonBlockEditorHandle {
+  save: (andClose?: boolean) => Promise<void>;
+}
 
 interface LessonBlockEditorProps {
   lessonId: number;
@@ -49,7 +54,7 @@ interface LessonBlockEditorProps {
 // Picker tab type
 type PickerTab = "catalog" | "from_lessons" | "templates" | "import_url";
 
-export default function LessonBlockEditor({
+const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockEditorProps>(function LessonBlockEditor({
   lessonId,
   courseId,
   courseSlug,
@@ -62,7 +67,7 @@ export default function LessonBlockEditor({
   onNavigateLesson,
   embedded = false,
   lessonTitle,
-}: LessonBlockEditorProps) {
+}: LessonBlockEditorProps, ref: React.Ref<LessonBlockEditorHandle>) {
   const [blocks, setBlocks] = useState<Block[]>(initialBlocks);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
@@ -268,6 +273,12 @@ export default function LessonBlockEditor({
     scrollToBlock(copy.id);
   };
 
+  const handleSaveRef = React.useRef<(andClose?: boolean) => Promise<void>>();
+
+  useImperativeHandle(ref, () => ({
+    save: (andClose = false) => handleSaveRef.current?.(andClose) ?? Promise.resolve(),
+  }));
+
   const handleSave = async (andClose = false) => {
     setSaving(true);
     try {
@@ -287,6 +298,7 @@ export default function LessonBlockEditor({
       setSaving(false);
     }
   };
+  handleSaveRef.current = handleSave;
 
   // Also search column_layout children so clicking a child block opens its settings
   const selectedBlock = blocks.find(b => b.id === selectedBlockId) ??
@@ -1081,7 +1093,9 @@ export default function LessonBlockEditor({
     </>
     </BlockTemplateLibraryProvider>
   );
-}
+});
+
+export default LessonBlockEditor;
 
 function BlockTemplatesTabContent({ onInsert }: { onInsert: (block: Block) => void }) {
   const [search, setSearch] = useState("");
