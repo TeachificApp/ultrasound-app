@@ -740,20 +740,6 @@ Make ALL content specific and compelling based on the product title and descript
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        response_format: {
-          type: "json_schema",
-          json_schema: {
-            name: "landing_page_blocks",
-            strict: false,
-            schema: {
-              type: "object",
-              properties: {
-                blocks: { type: "array", items: { type: "object", additionalProperties: true } },
-              },
-              required: ["blocks"],
-            },
-          },
-        },
       });
 
       let blocks: any[];

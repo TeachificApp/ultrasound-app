@@ -2804,8 +2804,10 @@ Rules:
         subtitle: lmsCourses.subtitle,
         price: lmsCourses.price,
       }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+      const parsedBlocks = lp?.blocks ? (() => { try { return JSON.parse(lp.blocks); } catch(e) { console.error('[getLandingPageBlocks] JSON parse error:', e); return null; } })() : null;
+
       return {
-        blocks: lp?.blocks ? JSON.parse(lp.blocks) : null,
+        blocks: parsedBlocks,
         heroTitle: lp?.heroTitle ?? course?.title ?? "",
         heroSubtitle: lp?.heroSubtitle ?? course?.subtitle ?? "",
         heroImageUrl: lp?.heroImageUrl ?? course?.coverImageUrl ?? "",
@@ -2982,20 +2984,6 @@ Make ALL content specific and compelling based on the course title, description,
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        response_format: {
-          type: "json_schema",
-          json_schema: {
-            name: "landing_page_blocks",
-            strict: false,
-            schema: {
-              type: "object",
-              properties: {
-                blocks: { type: "array", items: { type: "object", additionalProperties: true } },
-              },
-              required: ["blocks"],
-            },
-          },
-        },
       });
 
       let blocks: any[];

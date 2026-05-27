@@ -914,9 +914,23 @@ export default function CourseLanding() {
     ? { backgroundImage: `url(${lp.heroImageUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
     : { backgroundColor: heroColor };
 
+  // Set page title
+  useEffect(() => {
+    if (course?.title) document.title = `${course.title} | Education Library | All About Ultrasound™`;
+    return () => { document.title = "UltrasoundAssist™ | All About Ultrasound™"; };
+  }, [course?.title]);
+
   return (
     <>
     <div className="min-h-screen bg-gray-50">
+      {/* Breadcrumb */}
+      <div className="bg-white border-b border-gray-100">
+        <div className="max-w-6xl mx-auto px-4 py-2 flex items-center gap-1.5 text-sm text-gray-500">
+          <Link href="/education-library" className="hover:text-teal-600 transition-colors">Education Library</Link>
+          <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" />
+          <span className="text-gray-800 truncate max-w-xs">{course.title}</span>
+        </div>
+      </div>
       {/* Hero */}
       <div style={heroBg} className="text-white">
         <div className="max-w-6xl mx-auto px-4 py-12 grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
