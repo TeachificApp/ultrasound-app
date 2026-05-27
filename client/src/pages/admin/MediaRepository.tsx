@@ -228,18 +228,28 @@ function UploadDialog({ open, onClose, onSuccess, existingAssetId, existingTitle
 
   const uploadOneFile = async (file: File, fileIndex: number, totalFiles: number): Promise<void> => {
     const title = file.name.replace(/\.[^.]+$/, "");
+    const totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
     const initRes = await fetch("/api/upload-media-repo/init", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ assetId: isReupload ? existingAssetId : undefined }),
+      body: JSON.stringify({
+        assetId: isReupload ? existingAssetId : undefined,
+        fileName: file.name,
+        mimeType: file.type || "application/octet-stream",
+        totalChunks,
+        fileSize: file.size,
+        title: isReupload ? undefined : title,
+        access: isReupload ? undefined : access,
+        folder: (!isReupload && folderSlug && folderSlug !== "none") ? folderSlug : undefined,
+        notes,
+      }),
     });
     if (!initRes.ok) {
       const e = await initRes.json().catch(() => ({}));
       throw new Error(e.error ?? "Failed to initialise upload");
     }
     const { uploadId } = await initRes.json();
-    const totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
     for (let i = 0; i < totalChunks; i++) {
       const start = i * CHUNK_SIZE;
       const end = Math.min(start + CHUNK_SIZE, file.size);
