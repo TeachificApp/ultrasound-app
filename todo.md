@@ -3239,3 +3239,17 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 ## Media Fixes (2026-05-27)
 - [x] Fix SCORM media not displaying — require("crypto") replaced with ESM createHash import in mediaServe.ts
 - [x] Fix large file upload (>50 MB) — added storagePutLarge using R2 multipart upload, bypasses storage proxy limit
+
+## LMS Communities Management (2026-05-27)
+- [ ] Add Communities tab to LMS Management panel (LMSAdmin)
+- [ ] Wire existing community create/edit/delete/member management into LMS admin
+- [ ] Community list with member count, status, edit/delete actions
+- [ ] Create/edit community dialog with name, description, brand, access settings
+- [ ] Member management per community (add/remove members)
+
+## Media Upload Chunk Fix (2026-05-27)
+- [x] Diagnose media upload failures for large files (SCORM ZIP)
+- [x] Fix chunk upload pipeline: replaced in-memory chunkStore with disk-based /tmp/media-chunks/{uploadId}/ storage — survives tsx watch server restarts
+- [x] Fix MIME type resolution: browsers report .zip as application/octet-stream — now resolved from file extension
+- [x] Fix media type detection: .zip extension correctly detected as "zip" type regardless of MIME
+- [x] Add vitest tests for disk-based chunk storage, MIME resolution, and media type detection (17 tests passing)
