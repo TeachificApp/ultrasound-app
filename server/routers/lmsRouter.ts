@@ -2719,8 +2719,8 @@ Rules:
       if (!course) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });
 
       // Get sections and published lessons
-      const sections = await db.select({ id: lmsCourseSections.id, title: lmsCourseSections.title })
-        .from(lmsCourseSections).where(eq(lmsCourseSections.courseId, input.courseId)).orderBy(asc(lmsCourseSections.position));
+      const sections = await db.select({ id: lmsSections.id, title: lmsSections.title })
+        .from(lmsSections).where(eq(lmsSections.courseId, input.courseId)).orderBy(asc(lmsSections.position));
       const lessons = await db.select({ title: lmsLessons.title, type: lmsLessons.type, sectionId: lmsLessons.sectionId })
         .from(lmsLessons)
         .where(and(eq(lmsLessons.courseId, input.courseId), eq(lmsLessons.lessonStatus, "published")))
@@ -4884,8 +4884,10 @@ export const lmsGroupRouter = router({
   /** AI: Generate quiz questions from lesson content */
   generateQuizFromLesson: protectedProcedure
     .input(z.object({
-      lessonId: z.number().int().positive(),
-      count: z.number().int().min(1).max(20).default(5),
+      lessonId: z.number().int().positive().optional(),
+      courseId: z.number().int().positive().optional(),
+      lessonIds: z.array(z.number().int().positive()).optional(),
+      count: z.number().int().min(1).max(50).default(5),
       questionStyle: z.enum(["understanding", "thinking", "compliance", "thought_provoking", "reflection", "custom"]).default("understanding"),
       customPrompt: z.string().max(500).optional(),
     }))
@@ -4893,32 +4895,55 @@ export const lmsGroupRouter = router({
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const [lesson] = await db.select({
+
+      // Determine which lessons to pull content from
+      let targetLessonIds: number[] = [];
+      if (input.lessonIds && input.lessonIds.length > 0) {
+        targetLessonIds = input.lessonIds;
+      } else if (input.courseId) {
+        // All published lessons in the course
+        const courseLessons = await db.select({ id: lmsLessons.id })
+          .from(lmsLessons)
+          .where(and(eq(lmsLessons.courseId, input.courseId), eq(lmsLessons.lessonStatus, "published")))
+          .orderBy(asc(lmsLessons.position));
+        targetLessonIds = courseLessons.map(l => l.id);
+      } else if (input.lessonId) {
+        targetLessonIds = [input.lessonId];
+      }
+      if (targetLessonIds.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No lessons specified." });
+
+      // Fetch all target lessons
+      const targetLessons = await db.select({
         id: lmsLessons.id,
         title: lmsLessons.title,
         content: lmsLessons.content,
         contentBlocks: lmsLessons.contentBlocks,
-      }).from(lmsLessons).where(eq(lmsLessons.id, input.lessonId)).limit(1);
-      if (!lesson) throw new TRPCError({ code: "NOT_FOUND", message: "Lesson not found" });
-      // Extract text from content blocks
-      let lessonText = lesson.title ?? "";
-      if (lesson.content) lessonText += "\n" + lesson.content;
-      if (lesson.contentBlocks) {
-        try {
-          const blocks = typeof lesson.contentBlocks === "string" ? JSON.parse(lesson.contentBlocks as string) : lesson.contentBlocks;
-          if (Array.isArray(blocks)) {
-            for (const block of blocks) {
-              const d = block.data ?? {};
-              if (d.text) lessonText += "\n" + d.text;
-              if (d.content) lessonText += "\n" + d.content;
-              if (d.title) lessonText += "\n" + d.title;
-              if (d.body) lessonText += "\n" + d.body;
-              if (d.caption) lessonText += "\n" + d.caption;
+      }).from(lmsLessons).where(inArray(lmsLessons.id, targetLessonIds));
+
+      // Extract text from all lessons
+      const extractText = (lesson: typeof targetLessons[0]) => {
+        let text = lesson.title ?? "";
+        if (lesson.content) text += "\n" + lesson.content;
+        if (lesson.contentBlocks) {
+          try {
+            const blocks = typeof lesson.contentBlocks === "string" ? JSON.parse(lesson.contentBlocks as string) : lesson.contentBlocks;
+            if (Array.isArray(blocks)) {
+              for (const block of blocks) {
+                const d = block.data ?? {};
+                if (d.text) text += "\n" + d.text;
+                if (d.content) text += "\n" + d.content;
+                if (d.title) text += "\n" + d.title;
+                if (d.body) text += "\n" + d.body;
+                if (d.caption) text += "\n" + d.caption;
+              }
             }
-          }
-        } catch { /* ignore parse errors */ }
-      }
-      if (lessonText.trim().length < 20) throw new TRPCError({ code: "BAD_REQUEST", message: "Lesson has insufficient text content to generate questions." });
+          } catch { /* ignore */ }
+        }
+        return text;
+      };
+
+      let lessonText = targetLessons.map(l => `=== ${l.title} ===\n${extractText(l)}`).join("\n\n");
+      if (lessonText.trim().length < 20) throw new TRPCError({ code: "BAD_REQUEST", message: "Lessons have insufficient text content to generate questions." });
       const response = await invokeLLM({
         messages: [
           { role: "system", content: `You are a medical ultrasound educator. Generate multiple-choice quiz questions based on the provided lesson content. Each question must have exactly 4 options (A, B, C, D) with one correct answer. Return only valid JSON.\n\nQuestion style guidance:\n${{

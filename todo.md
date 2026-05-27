@@ -3105,3 +3105,27 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix related products images: sync coverImageUrl and thumbnailUrl in all update paths
 - [x] Add syncAllCourseImages procedure to bulk-sync Thinkific course images
 - [x] Add "Sync Images" button to CoursesTab header
+
+## Session: Quiz Block Expansion + Question Bank (2026-05-27)
+- [x] Fix deployment build error (useNavigate → useLocation)
+- [x] Fix lmsCourseSections → lmsSections in AI landing page generation
+- [x] Add DB indexes on all high-traffic LMS columns for performance
+- [x] Remove lesson type selector (all lessons are now text type)
+- [x] Remove Quiz Builder tab from lesson editor header
+- [x] Fix lesson ordering in AI generator (section pos → lesson pos)
+- [x] Make AI generator topic optional when lessons are selected
+- [x] Add requirePassingToProgress, randomizeQuestions, randomizeAnswers to quiz schema + server
+- [x] Add question bank tables (question_bank, question_bank_tags, question_bank_tag_map)
+- [x] Build questionBankRouter with full CRUD + tag management + AI generate
+- [x] Add Question Bank tab to LMS admin
+- [x] Rewrite LessonQuizBlockEditor: Manual / From Bank / AI Generate tabs
+- [x] Add media fields (imageUrl, videoUrl) to questions; per-answer imageUrl
+- [x] Add shuffleAnswers toggle to quiz settings
+- [x] AI Generate tab: source selector (current lesson / entire course / pick specific lessons)
+- [x] Expand generateQuizFromLesson server procedure to accept courseId + lessonIds[]
+- [x] Pass courseId from LandingPageBuilder → BlockSettings → LessonQuizBlockEditor
+- [x] Fix Free Preview link in curriculum list (onFreePreviewClick prop threading)
+- [x] Fix banner/CTA button URL navigation (resolveBtnAction helper)
+- [x] Fix related products course card images (sync thumbnailUrl with coverImageUrl)
+- [x] Add syncAllCourseImages procedure + Sync Images button in Courses tab
+- [x] Write vitest tests for question bank and quiz block logic (7 tests passing)

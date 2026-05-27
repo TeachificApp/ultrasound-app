@@ -1978,11 +1978,12 @@ function SortableReviewItem({
 }
 
 // ─── ColumnBlockList — top-level to prevent remount-on-render crash ──────────
-function ColumnBlockList({ side, blocks, onUpdate, lessonId }: {
+function ColumnBlockList({ side, blocks, onUpdate, lessonId, courseId }: {
   side: "left" | "right";
   blocks: Block[];
   onUpdate: (newBlocks: Block[]) => void;
   lessonId?: number;
+  courseId?: number;
 }) {
   const [addOpen, setAddOpen] = useState(false);
   const [addCat, setAddCat] = useState(CATALOG_CATEGORIES[0]);
@@ -2027,7 +2028,7 @@ function ColumnBlockList({ side, blocks, onUpdate, lessonId }: {
               <BlockSettings block={b} onChange={newData => {
                 const nb = blocks.map((bl, j) => j === i ? { ...bl, data: newData } : bl);
                 onUpdate(nb);
-              }} lessonId={lessonId} />
+              }} lessonId={lessonId} courseId={courseId} />
             </div>
           ))}
         </div>
@@ -2073,7 +2074,7 @@ function FormEmbedFormPicker({ d, set }: { d: Record<string, any>; set: (field: 
   );
 }
 
-export function BlockSettings({ block, onChange, lessonId }: { block: Block; onChange: (data: Record<string, any>) => void; lessonId?: number }) {
+export function BlockSettings({ block, onChange, lessonId, courseId }: { block: Block; onChange: (data: Record<string, any>) => void; lessonId?: number; courseId?: number }) {
   const d = block.data ?? {};
   // Use refs to avoid stale closures with debounced inputs
   const dataRef = useRef(block.data ?? {});
@@ -3711,6 +3712,7 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
           data={d as any}
           onChange={(newData) => onChange(newData as any)}
           lessonId={lessonId}
+          courseId={courseId}
           handleFileUpload={async (file, targetField, context) => {
             if (file.size > 40 * 1024 * 1024) { toast.error("File must be under 40 MB"); return null; }
             setUploading(targetField);
@@ -3823,9 +3825,9 @@ export function BlockSettings({ block, onChange, lessonId }: { block: Block; onC
       // (inline component definitions with useState inside a switch case cause React error #185)
       return (
         <div className="space-y-3">
-          <ColumnBlockList side="left" blocks={leftBlocks} onUpdate={(nb) => set("leftBlocks", nb)} lessonId={lessonId} />
+          <ColumnBlockList side="left" blocks={leftBlocks} onUpdate={(nb) => set("leftBlocks", nb)} lessonId={lessonId} courseId={courseId} />
           <div className="border-t border-gray-100 pt-3">
-            <ColumnBlockList side="right" blocks={rightBlocks} onUpdate={(nb) => set("rightBlocks", nb)} lessonId={lessonId} />
+            <ColumnBlockList side="right" blocks={rightBlocks} onUpdate={(nb) => set("rightBlocks", nb)} lessonId={lessonId} courseId={courseId} />
           </div>
           <div className="border-t border-gray-100 pt-3 space-y-2">
             <div><label className="text-xs text-gray-500 block mb-1">Left Column Width (%)</label><Input type="number" value={d.leftRatio ?? 50} onChange={e => set("leftRatio", Number(e.target.value))} className="h-8 text-sm" min={20} max={80} /></div>
@@ -5101,7 +5103,7 @@ export default function LandingPageBuilder() {
                 <button onClick={() => setSelectedId(null)} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>
               </div>
               <div className="p-3">
-                <BlockSettings block={selectedBlock} onChange={(data) => updateBlock(selectedBlock.id, data)} />
+                <BlockSettings block={selectedBlock} onChange={(data) => updateBlock(selectedBlock.id, data)} courseId={numericCourseId} />
               </div>
             </>
           ) : (
