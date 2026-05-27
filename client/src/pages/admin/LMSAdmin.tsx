@@ -2197,7 +2197,7 @@ function LandingPageEditor({ courseId, courseType }: { courseId: number; courseT
   const aiGenerateLandingPage = trpc.lmsAdmin.aiGenerateLandingPage.useMutation({
     onSuccess: () => {
       toast.success("Landing page generated! Opening builder...");
-      setTimeout(() => navigate(`/admin/lms/${courseId}/landing-builder`), 600);
+      setTimeout(() => navigate(`/admin/lms/${courseId}/landing-builder?t=${Date.now()}`), 600);
     },
     onError: e => toast.error(`AI error: ${e.message}`),
   });

@@ -3006,7 +3006,6 @@ Make ALL content specific and compelling based on the course title, description,
         console.error("[aiGenerateLandingPage] parse error:", err?.message, "raw:", (response.choices[0]?.message?.content as string)?.slice(0, 400));
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `AI returned invalid JSON: ${err?.message ?? "unknown error"}. Please try again.` });
       }
-
       // Save the generated blocks
       const blocksJson = JSON.stringify(blocks);
       const [existing] = await db.select({ id: lmsLandingPages.id })

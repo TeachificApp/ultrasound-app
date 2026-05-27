@@ -4657,11 +4657,25 @@ export default function LandingPageBuilder() {
   const { courseId } = useParams<{ courseId: string }>();
   const [, navigate] = useLocation();
   const numericCourseId = Number(courseId);
+  // ?t=timestamp is appended after AI generate to force a fresh load
+  const searchStr = typeof window !== "undefined" ? window.location.search : "";
+  const refreshKey = new URLSearchParams(searchStr).get("t") ?? "";
 
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
+
+  const lpUtils = trpc.useUtils();
+  // Reset hasLoaded when courseId or refreshKey changes (e.g. after AI generate)
+  useEffect(() => {
+    setHasLoaded(false);
+    setBlocks([]);
+    setSelectedId(null);
+    // Invalidate the query so fresh data is fetched (not stale cache)
+    lpUtils.lmsAdmin.getLandingPageBlocks.invalidate({ courseId: numericCourseId });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [numericCourseId, refreshKey]);
   const [courseInfo, setCourseInfo] = useState<{ title: string; slug: string; price?: number } | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
   const [templatesInitialTab, setTemplatesInitialTab] = useState<"page" | "block">("page");
@@ -4722,7 +4736,7 @@ export default function LandingPageBuilder() {
 
   const { isLoading, data: lpData } = trpc.lmsAdmin.getLandingPageBlocks.useQuery(
     { courseId: numericCourseId },
-    { enabled: !isNaN(numericCourseId) }
+    { enabled: !isNaN(numericCourseId), staleTime: 0 }
   );
 
   // Initialize blocks from server data — must be in useEffect to avoid setState-during-render (React error #185)
