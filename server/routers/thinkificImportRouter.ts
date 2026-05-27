@@ -224,6 +224,7 @@ async function scrapeThinkificSalesPage(slug: string, customDomain: string): Pro
             bgImage: bannerImg || "",
             textColor: "#ffffff",
             align: "center",
+            heroMinHeight: 150,
             buttons: [{ text: "Enroll Now", color: "#ffffff", textColor: "#149096", link: "", style: "filled" }],
             showButtons: true,
           },
@@ -350,6 +351,7 @@ async function scrapeThinkificSalesPage(slug: string, customDomain: string): Pro
             bgImage: heroImage || "",
             textColor: "#ffffff",
             align: "center",
+            heroMinHeight: 150,
             buttons: [{ text: "Enroll Now", color: "#ffffff", textColor: "#149096", link: "", style: "filled" }],
             showButtons: true,
           },
@@ -541,6 +543,7 @@ export const thinkificImportRouter = router({
               bgImage: course.banner_image_url || "",
               textColor: "#ffffff",
               align: "center",
+              heroMinHeight: 150,
               buttons: [{ text: "Enroll Now", color: "#ffffff", textColor: "#149096", link: "", style: "filled" }],
               showButtons: true,
             },
@@ -685,7 +688,7 @@ export const thinkificImportRouter = router({
                 buttons: [],
                 showButtons: false,
                 hideButtons: true,
-                minHeight: 150,
+                heroMinHeight: 150,
               },
             });
 

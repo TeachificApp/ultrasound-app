@@ -176,7 +176,7 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
           }
         : undefined;
       return (
-        <div className="relative px-8 py-16 overflow-hidden" style={{ ...heroBg, ...heroBottomBorderStyle, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left"), minHeight: `${d.heroMinHeight ?? 400}px`, cursor: heroClickHandler ? "pointer" : undefined }} onClick={heroClickHandler}>
+        <div className="relative px-8 py-16 overflow-hidden" style={{ ...heroBg, ...heroBottomBorderStyle, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left"), minHeight: `${d.heroMinHeight ?? 150}px`, cursor: heroClickHandler ? "pointer" : undefined }} onClick={heroClickHandler}>
           {bgType === "video" && d.videoUrl && (
             <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
           )}

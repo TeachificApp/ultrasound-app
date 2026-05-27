@@ -3891,6 +3891,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
               prevLesson={prevLesson}
               nextLesson={nextLesson}
               onNavigateLesson={onNavigateLesson}
+              embedded
             />
           )}
         </div>

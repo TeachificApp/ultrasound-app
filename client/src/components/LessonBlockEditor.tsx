@@ -40,6 +40,8 @@ interface LessonBlockEditorProps {
   prevLesson?: { id: number; title: string } | null;
   nextLesson?: { id: number; title: string } | null;
   onNavigateLesson?: (lesson: { id: number; title: string }) => void;
+  /** When true, renders as a flex-fill panel (no fixed overlay). Use when embedded inside another full-screen modal. */
+  embedded?: boolean;
 }
 
 // Picker tab type
@@ -56,6 +58,7 @@ export default function LessonBlockEditor({
   prevLesson,
   nextLesson,
   onNavigateLesson,
+  embedded = false,
 }: LessonBlockEditorProps) {
   const [blocks, setBlocks] = useState<Block[]>(initialBlocks);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
@@ -384,11 +387,11 @@ export default function LessonBlockEditor({
       scrollToBlock(newBlock.id);
     }}>
     <>
-    <div className="fixed inset-0 z-40 flex bg-black/40">
+    <div className={embedded ? "flex flex-col flex-1 overflow-hidden" : "fixed inset-0 z-40 flex bg-black/40"}>
       {/* Main editor panel */}
-      <div className="flex flex-col w-full max-w-6xl mx-auto bg-white shadow-2xl overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-gray-200 shrink-0">
+      <div className={embedded ? "flex flex-col flex-1 overflow-hidden" : "flex flex-col w-full max-w-6xl mx-auto bg-white shadow-2xl overflow-hidden"}>
+        {/* Header — hidden when embedded inside LessonEditorPage (which has its own header) */}
+        {!embedded && <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-gray-200 shrink-0">
           <div className="flex items-center gap-3">
             <span className="text-teal-700 font-bold text-sm uppercase tracking-wide">Lesson Editor</span>
             <span className="text-gray-400 text-xs hidden sm:inline">Blocks appear below the video in the player</span>

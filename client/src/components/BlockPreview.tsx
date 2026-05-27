@@ -74,7 +74,9 @@ export type BlockType =
   | "column_layout" | "carousel" | "ticker" | "countdown_v2"
   | "live_session"
   | "comparison_table" | "pricing_cards"
-  | "form_embed";
+  | "form_embed"
+  | "cohort_class"
+  | "lesson_assignment";
 
 export interface Block {
   id: string;
@@ -131,7 +133,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       const heroBottomBorderStyle: React.CSSProperties = d.heroBottomBorder
         ? { borderBottom: `${d.heroBottomBorderWidth ?? 4}px solid ${d.heroBottomBorderColor ?? "#179ca3"}` }
         : {};
-      const heroMinHeight = d.heroMinHeight ?? 400;
+      const heroMinHeight = d.heroMinHeight ?? 150;
       const heroMaxHeight = d.maxHeight ? `${d.maxHeight}px` : undefined;
       return (
         <div
@@ -1112,6 +1114,10 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       return <CountdownV2BlockPreview d={d} />;
     case "live_session":
       return <LiveSessionBlockPreview d={d} />;
+    case "cohort_class":
+      return <CohortClassBlockPreview d={d} />;
+    case "lesson_assignment":
+      return <LessonAssignmentBlockPreview d={d} />;
     case "comparison_table": {
       const cols: Array<{ label: string; highlight?: boolean }> = d.columns ?? [];
       const rows: Array<{ feature: string; values: Array<string | boolean | null> }> = d.rows ?? [];
@@ -1613,6 +1619,160 @@ function LiveSessionBlockPreview({ d }: { d: Record<string, any> }) {
             </p>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Cohort Class Block Preview ─────────────────────────────────────────────────
+function CohortClassBlockPreview({ d }: { d: Record<string, any> }) {
+  const accent = d.accentColor ?? "#179ca3";
+  const sessions: Array<{ date: string; time: string; topic: string; meetingUrl?: string }> = d.sessions ?? [];
+  const platformLabel: Record<string, string> = { zoom: "Zoom", teams: "Teams", meet: "Google Meet", webex: "Webex", other: d.platformCustomName ?? "Meeting" };
+  const platform = d.platform ?? "zoom";
+  return (
+    <div className="px-6 py-8" style={{ backgroundColor: d.bgColor ?? "#f8fafc" }}>
+      <div className="max-w-2xl mx-auto">
+        {/* Header */}
+        <div className="flex items-start gap-4 mb-6">
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 text-white" style={{ backgroundColor: accent }}>
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-gray-900">{d.title ?? "Cohort Class"}</h3>
+            {d.description && <p className="text-sm text-gray-500 mt-1">{d.description}</p>}
+          </div>
+        </div>
+        {/* Class details */}
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          {d.startDate && (
+            <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Start Date</p>
+              <p className="text-sm font-semibold text-gray-800">{new Date(d.startDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</p>
+            </div>
+          )}
+          {d.endDate && (
+            <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">End Date</p>
+              <p className="text-sm font-semibold text-gray-800">{new Date(d.endDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</p>
+            </div>
+          )}
+          {d.maxStudents && (
+            <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Class Size</p>
+              <p className="text-sm font-semibold text-gray-800">Max {d.maxStudents} students</p>
+            </div>
+          )}
+          {d.instructorName && (
+            <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Instructor</p>
+              <p className="text-sm font-semibold text-gray-800">{d.instructorName}</p>
+            </div>
+          )}
+        </div>
+        {/* Session schedule */}
+        {sessions.length > 0 && (
+          <div className="mb-6">
+            <h4 className="text-sm font-bold text-gray-700 mb-3">Class Schedule</h4>
+            <div className="space-y-2">
+              {sessions.map((s, i) => (
+                <div key={i} className="flex items-center gap-3 bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ backgroundColor: accent }}>{i + 1}</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-800 truncate">{s.topic || `Session ${i + 1}`}</p>
+                    <p className="text-xs text-gray-400">{s.date} {s.time && `· ${s.time}`}</p>
+                  </div>
+                  {s.meetingUrl && (
+                    <span className="text-xs px-2 py-1 rounded-full text-white" style={{ backgroundColor: accent }}>{platformLabel[platform]}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {/* CTA */}
+        {d.ctaText && (
+          <button className="w-full py-3 rounded-xl text-white font-semibold text-sm" style={{ backgroundColor: accent }}>
+            {d.ctaText}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Lesson Assignment Block Preview ─────────────────────────────────────────────────
+function LessonAssignmentBlockPreview({ d }: { d: Record<string, any> }) {
+  const accent = d.accentColor ?? "#179ca3";
+  const rubricItems: Array<{ criterion: string; points: number; description?: string }> = d.rubricItems ?? [];
+  const totalPoints = rubricItems.reduce((sum, r) => sum + (r.points ?? 0), 0);
+  const submissionTypes: string[] = d.submissionTypes ?? ["text"];
+  const typeLabels: Record<string, string> = { text: "Written response", file: "File upload", url: "URL / link", video: "Video recording", image: "Image upload" };
+  return (
+    <div className="px-6 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+      <div className="max-w-2xl mx-auto">
+        {/* Header */}
+        <div className="flex items-start gap-4 mb-5">
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 text-white" style={{ backgroundColor: accent }}>
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-xl font-bold text-gray-900">{d.title ?? "Assignment"}</h3>
+              {d.dueDate && (
+                <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: `${accent}18`, color: accent }}>
+                  Due {new Date(d.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                </span>
+              )}
+              {totalPoints > 0 && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">{totalPoints} pts</span>
+              )}
+            </div>
+            {d.description && <p className="text-sm text-gray-500 mt-1">{d.description}</p>}
+          </div>
+        </div>
+        {/* Instructions */}
+        {d.instructions && (
+          <div className="bg-gray-50 rounded-xl p-4 mb-5 border border-gray-100">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Instructions</p>
+            <div className="text-sm text-gray-700 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: d.instructions }} />
+          </div>
+        )}
+        {/* Submission types */}
+        {submissionTypes.length > 0 && (
+          <div className="mb-5">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Submission Type</p>
+            <div className="flex flex-wrap gap-2">
+              {submissionTypes.map(t => (
+                <span key={t} className="text-xs px-3 py-1 rounded-full border font-medium" style={{ borderColor: accent, color: accent }}>{typeLabels[t] ?? t}</span>
+              ))}
+            </div>
+          </div>
+        )}
+        {/* Rubric */}
+        {rubricItems.length > 0 && (
+          <div className="mb-5">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Grading Rubric</p>
+            <div className="space-y-2">
+              {rubricItems.map((r, i) => (
+                <div key={i} className="flex items-center gap-3 bg-gray-50 rounded-xl p-3 border border-gray-100">
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-gray-800">{r.criterion}</p>
+                    {r.description && <p className="text-xs text-gray-400 mt-0.5">{r.description}</p>}
+                  </div>
+                  <span className="text-sm font-bold shrink-0" style={{ color: accent }}>{r.points} pts</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {/* Submit button */}
+        <button className="w-full py-3 rounded-xl text-white font-semibold text-sm" style={{ backgroundColor: accent }}>
+          {d.submitButtonText ?? "Submit Assignment"}
+        </button>
+        {d.allowLateSubmissions && (
+          <p className="text-xs text-gray-400 text-center mt-2">Late submissions accepted{d.latePenaltyPct ? ` (${d.latePenaltyPct}% penalty)` : ""}</p>
+        )}
       </div>
     </div>
   );

@@ -103,7 +103,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
           }
         : undefined;
       return (
-        <div style={{ ...bgStyle, ...heroBottomBorderStyleDL, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left"), minHeight: `${d.heroMinHeight ?? 400}px`, cursor: heroClickHandlerDL ? "pointer" : undefined }} className="relative px-8 py-20 overflow-hidden" onClick={heroClickHandlerDL}>
+        <div style={{ ...bgStyle, ...heroBottomBorderStyleDL, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left"), minHeight: `${d.heroMinHeight ?? 150}px`, cursor: heroClickHandlerDL ? "pointer" : undefined }} className="relative px-8 py-20 overflow-hidden" onClick={heroClickHandlerDL}>
           {bgType === "video" && d.videoUrl && (
             <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
           )}

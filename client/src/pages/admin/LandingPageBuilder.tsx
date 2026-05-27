@@ -422,6 +422,44 @@ BLOCK_CATALOG.push(
     },
   },
   {
+    type: "cohort_class",
+    label: "Cohort Class",
+    icon: <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
+    category: "Content",
+    defaultData: {
+      title: "Cohort Class",
+      description: "Join this live cohort class with your instructor and fellow students.",
+      platform: "zoom",
+      startDate: null,
+      endDate: null,
+      maxStudents: null,
+      instructorName: "",
+      sessions: [],
+      ctaText: "Join Class",
+      accentColor: "#189aa1",
+      bgColor: "#f8fafc",
+    },
+  },
+  {
+    type: "lesson_assignment",
+    label: "Lesson Assignment",
+    icon: <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>,
+    category: "Content",
+    defaultData: {
+      title: "Assignment",
+      description: "",
+      instructions: "",
+      dueDate: null,
+      submissionTypes: ["text"],
+      rubricItems: [],
+      submitButtonText: "Submit Assignment",
+      allowLateSubmissions: false,
+      latePenaltyPct: 0,
+      accentColor: "#189aa1",
+      bgColor: "#ffffff",
+    },
+  },
+  {
     type: "pricing_cards",
     label: "Pricing Cards",
     icon: <LayoutList size={14} />,
@@ -2200,7 +2238,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
           {/* Hero Min Height */}
           <div className="border-t pt-3 mt-3">
             <label className="text-xs text-gray-500 block mb-1">Min Height (px)</label>
-            <input type="number" min={100} max={1200} step={10} value={d.heroMinHeight ?? 400} onChange={e => set("heroMinHeight", Number(e.target.value))} className="w-full h-7 text-xs rounded border border-gray-200 px-2" />
+            <input type="number" min={100} max={1200} step={10} value={d.heroMinHeight ?? 150} onChange={e => set("heroMinHeight", Number(e.target.value))} className="w-full h-7 text-xs rounded border border-gray-200 px-2" />
           </div>
           {/* Hero Max Height */}
           <div className="mt-2">
@@ -3817,6 +3855,12 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
     }
     case "live_session": {
       return <LiveSessionBlockSettings d={d} set={set} />;
+    }
+    case "cohort_class": {
+      return <CohortClassBlockSettings d={d} set={set} />;
+    }
+    case "lesson_assignment": {
+      return <LessonAssignmentBlockSettings d={d} set={set} />;
     }
     case "column_layout": {
       const leftBlocks: Block[] = d.leftBlocks ?? [];
@@ -6229,6 +6273,334 @@ function LiveSessionBlockSettings({ d, set }: { d: Record<string, any>; set: (ke
             className="w-8 h-8 rounded cursor-pointer border border-gray-200"
           />
           <DebouncedInput value={d.bgColor ?? "#f8fafc"} onChange={v => set("bgColor", v)} className="h-8 text-xs flex-1" placeholder="#f8fafc" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Cohort Class Block Settings ─────────────────────────────────────────────
+function CohortClassBlockSettings({ d, set }: { d: Record<string, any>; set: (key: string, value: any) => void }) {
+  const sessions: Array<{ date: string; time: string; topic: string; meetingUrl?: string }> = d.sessions ?? [];
+
+  const addSession = () => {
+    set("sessions", [...sessions, { date: "", time: "", topic: "", meetingUrl: "" }]);
+  };
+  const updateSession = (i: number, field: string, val: string) => {
+    const next = sessions.map((s, idx) => idx === i ? { ...s, [field]: val } : s);
+    set("sessions", next);
+  };
+  const removeSession = (i: number) => {
+    set("sessions", sessions.filter((_, idx) => idx !== i));
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Title */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Class Title</label>
+        <DebouncedInput value={d.title ?? ""} onChange={v => set("title", v)} className="h-8 text-xs" placeholder="Cohort Class" />
+      </div>
+      {/* Description */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Description</label>
+        <textarea
+          value={d.description ?? ""}
+          onChange={e => set("description", e.target.value)}
+          className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-400 resize-none"
+          rows={2}
+          placeholder="Brief description of the cohort class"
+        />
+      </div>
+      {/* Dates */}
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">Start Date</label>
+          <input
+            type="date"
+            value={d.startDate ?? ""}
+            onChange={e => set("startDate", e.target.value)}
+            className="w-full h-8 text-xs border border-gray-200 rounded-lg px-2 focus:outline-none focus:ring-2 focus:ring-teal-400"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">End Date</label>
+          <input
+            type="date"
+            value={d.endDate ?? ""}
+            onChange={e => set("endDate", e.target.value)}
+            className="w-full h-8 text-xs border border-gray-200 rounded-lg px-2 focus:outline-none focus:ring-2 focus:ring-teal-400"
+          />
+        </div>
+      </div>
+      {/* Max students & instructor */}
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">Max Students</label>
+          <input
+            type="number"
+            min={1}
+            value={d.maxStudents ?? ""}
+            onChange={e => set("maxStudents", e.target.value ? Number(e.target.value) : null)}
+            className="w-full h-8 text-xs border border-gray-200 rounded-lg px-2 focus:outline-none focus:ring-2 focus:ring-teal-400"
+            placeholder="Unlimited"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">Instructor Name</label>
+          <DebouncedInput value={d.instructorName ?? ""} onChange={v => set("instructorName", v)} className="h-8 text-xs" placeholder="e.g. Dr. Smith" />
+        </div>
+      </div>
+      {/* Platform */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Meeting Platform</label>
+        <select
+          value={d.platform ?? "zoom"}
+          onChange={e => set("platform", e.target.value)}
+          className="w-full h-8 text-xs border border-gray-200 rounded-lg px-2 focus:outline-none focus:ring-2 focus:ring-teal-400"
+        >
+          <option value="zoom">Zoom</option>
+          <option value="teams">Microsoft Teams</option>
+          <option value="meet">Google Meet</option>
+          <option value="webex">Webex</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      {d.platform === "other" && (
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">Platform Name</label>
+          <DebouncedInput value={d.platformCustomName ?? ""} onChange={v => set("platformCustomName", v)} className="h-8 text-xs" placeholder="e.g. Hopin" />
+        </div>
+      )}
+      {/* Sessions */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-xs font-bold text-gray-700">Class Sessions</label>
+          <button
+            onClick={addSession}
+            className="text-xs px-2 py-1 rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 font-medium border border-teal-200"
+          >
+            + Add Session
+          </button>
+        </div>
+        {sessions.length === 0 && (
+          <p className="text-xs text-gray-400 italic">No sessions yet. Add a session to show the schedule.</p>
+        )}
+        <div className="space-y-2">
+          {sessions.map((s, i) => (
+            <div key={i} className="bg-gray-50 rounded-xl p-3 border border-gray-100 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-gray-600">Session {i + 1}</span>
+                <button onClick={() => removeSession(i)} className="text-xs text-red-400 hover:text-red-600">Remove</button>
+              </div>
+              <DebouncedInput value={s.topic} onChange={v => updateSession(i, "topic", v)} className="h-7 text-xs" placeholder="Topic / title" />
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="date"
+                  value={s.date}
+                  onChange={e => updateSession(i, "date", e.target.value)}
+                  className="h-7 text-xs border border-gray-200 rounded-lg px-2 focus:outline-none focus:ring-2 focus:ring-teal-400"
+                />
+                <input
+                  type="time"
+                  value={s.time}
+                  onChange={e => updateSession(i, "time", e.target.value)}
+                  className="h-7 text-xs border border-gray-200 rounded-lg px-2 focus:outline-none focus:ring-2 focus:ring-teal-400"
+                />
+              </div>
+              <DebouncedInput value={s.meetingUrl ?? ""} onChange={v => updateSession(i, "meetingUrl", v)} className="h-7 text-xs" placeholder="Meeting URL (optional)" />
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* CTA */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Button Text</label>
+        <DebouncedInput value={d.ctaText ?? ""} onChange={v => set("ctaText", v)} className="h-8 text-xs" placeholder="Join Class" />
+      </div>
+      {/* Accent color */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Accent Color</label>
+        <div className="flex items-center gap-2">
+          <input type="color" value={d.accentColor ?? "#189aa1"} onChange={e => set("accentColor", e.target.value)} className="w-8 h-8 rounded cursor-pointer border border-gray-200" />
+          <DebouncedInput value={d.accentColor ?? "#189aa1"} onChange={v => set("accentColor", v)} className="h-8 text-xs flex-1" placeholder="#189aa1" />
+        </div>
+      </div>
+      {/* Background color */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Background Color</label>
+        <div className="flex items-center gap-2">
+          <input type="color" value={d.bgColor ?? "#f8fafc"} onChange={e => set("bgColor", e.target.value)} className="w-8 h-8 rounded cursor-pointer border border-gray-200" />
+          <DebouncedInput value={d.bgColor ?? "#f8fafc"} onChange={v => set("bgColor", v)} className="h-8 text-xs flex-1" placeholder="#f8fafc" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Lesson Assignment Block Settings ─────────────────────────────────────────
+function LessonAssignmentBlockSettings({ d, set }: { d: Record<string, any>; set: (key: string, value: any) => void }) {
+  const rubricItems: Array<{ criterion: string; points: number; description?: string }> = d.rubricItems ?? [];
+  const submissionTypes: string[] = d.submissionTypes ?? ["text"];
+
+  const addRubricItem = () => {
+    set("rubricItems", [...rubricItems, { criterion: "", points: 10, description: "" }]);
+  };
+  const updateRubric = (i: number, field: string, val: any) => {
+    set("rubricItems", rubricItems.map((r, idx) => idx === i ? { ...r, [field]: val } : r));
+  };
+  const removeRubric = (i: number) => {
+    set("rubricItems", rubricItems.filter((_, idx) => idx !== i));
+  };
+  const toggleSubmissionType = (type: string) => {
+    if (submissionTypes.includes(type)) {
+      set("submissionTypes", submissionTypes.filter(t => t !== type));
+    } else {
+      set("submissionTypes", [...submissionTypes, type]);
+    }
+  };
+
+  const totalPoints = rubricItems.reduce((sum, r) => sum + (Number(r.points) || 0), 0);
+
+  return (
+    <div className="space-y-3">
+      {/* Title */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Assignment Title</label>
+        <DebouncedInput value={d.title ?? ""} onChange={v => set("title", v)} className="h-8 text-xs" placeholder="Assignment" />
+      </div>
+      {/* Description */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Short Description</label>
+        <DebouncedInput value={d.description ?? ""} onChange={v => set("description", v)} className="h-8 text-xs" placeholder="Brief summary shown in header" />
+      </div>
+      {/* Instructions */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Instructions (HTML)</label>
+        <textarea
+          value={d.instructions ?? ""}
+          onChange={e => set("instructions", e.target.value)}
+          className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-400 resize-none font-mono"
+          rows={4}
+          placeholder="<p>Complete the following...</p>"
+        />
+      </div>
+      {/* Due date */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Due Date</label>
+        <input
+          type="date"
+          value={d.dueDate ?? ""}
+          onChange={e => set("dueDate", e.target.value)}
+          className="w-full h-8 text-xs border border-gray-200 rounded-lg px-2 focus:outline-none focus:ring-2 focus:ring-teal-400"
+        />
+      </div>
+      {/* Submission types */}
+      <div>
+        <label className="text-xs font-bold text-gray-700 block mb-2">Submission Types</label>
+        <div className="flex flex-wrap gap-2">
+          {[
+            { value: "text", label: "Written" },
+            { value: "file", label: "File Upload" },
+            { value: "url", label: "URL / Link" },
+            { value: "video", label: "Video" },
+            { value: "image", label: "Image" },
+          ].map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => toggleSubmissionType(opt.value)}
+              className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${
+                submissionTypes.includes(opt.value)
+                  ? "bg-teal-600 text-white border-teal-600"
+                  : "bg-white text-gray-600 border-gray-200 hover:border-teal-300"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {/* Rubric */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-xs font-bold text-gray-700">
+            Grading Rubric {totalPoints > 0 && <span className="text-teal-600 font-semibold">({totalPoints} pts total)</span>}
+          </label>
+          <button
+            onClick={addRubricItem}
+            className="text-xs px-2 py-1 rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 font-medium border border-teal-200"
+          >
+            + Add Criterion
+          </button>
+        </div>
+        {rubricItems.length === 0 && (
+          <p className="text-xs text-gray-400 italic">No rubric items. Add criteria to show a grading rubric.</p>
+        )}
+        <div className="space-y-2">
+          {rubricItems.map((r, i) => (
+            <div key={i} className="bg-gray-50 rounded-xl p-3 border border-gray-100 space-y-2">
+              <div className="flex items-center gap-2">
+                <DebouncedInput value={r.criterion} onChange={v => updateRubric(i, "criterion", v)} className="h-7 text-xs flex-1" placeholder="Criterion name" />
+                <input
+                  type="number"
+                  min={0}
+                  value={r.points}
+                  onChange={e => updateRubric(i, "points", Number(e.target.value))}
+                  className="w-16 h-7 text-xs border border-gray-200 rounded-lg px-2 focus:outline-none focus:ring-2 focus:ring-teal-400"
+                  placeholder="pts"
+                />
+                <button onClick={() => removeRubric(i)} className="text-xs text-red-400 hover:text-red-600 shrink-0">✕</button>
+              </div>
+              <DebouncedInput value={r.description ?? ""} onChange={v => updateRubric(i, "description", v)} className="h-7 text-xs" placeholder="Description (optional)" />
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* Submit button text */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Submit Button Text</label>
+        <DebouncedInput value={d.submitButtonText ?? ""} onChange={v => set("submitButtonText", v)} className="h-8 text-xs" placeholder="Submit Assignment" />
+      </div>
+      {/* Late submissions */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="la-late"
+            checked={!!d.allowLateSubmissions}
+            onChange={e => set("allowLateSubmissions", e.target.checked)}
+            className="rounded"
+          />
+          <label htmlFor="la-late" className="text-xs font-medium text-gray-600">Allow late submissions</label>
+        </div>
+        {d.allowLateSubmissions && (
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">Late Penalty (%)</label>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={d.latePenaltyPct ?? 0}
+              onChange={e => set("latePenaltyPct", Number(e.target.value))}
+              className="w-24 h-8 text-xs border border-gray-200 rounded-lg px-2 focus:outline-none focus:ring-2 focus:ring-teal-400"
+            />
+          </div>
+        )}
+      </div>
+      {/* Accent color */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Accent Color</label>
+        <div className="flex items-center gap-2">
+          <input type="color" value={d.accentColor ?? "#189aa1"} onChange={e => set("accentColor", e.target.value)} className="w-8 h-8 rounded cursor-pointer border border-gray-200" />
+          <DebouncedInput value={d.accentColor ?? "#189aa1"} onChange={v => set("accentColor", v)} className="h-8 text-xs flex-1" placeholder="#189aa1" />
+        </div>
+      </div>
+      {/* Background color */}
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Background Color</label>
+        <div className="flex items-center gap-2">
+          <input type="color" value={d.bgColor ?? "#ffffff"} onChange={e => set("bgColor", e.target.value)} className="w-8 h-8 rounded cursor-pointer border border-gray-200" />
+          <DebouncedInput value={d.bgColor ?? "#ffffff"} onChange={v => set("bgColor", v)} className="h-8 text-xs flex-1" placeholder="#ffffff" />
         </div>
       </div>
     </div>
