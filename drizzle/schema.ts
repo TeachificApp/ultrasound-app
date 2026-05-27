@@ -4794,6 +4794,7 @@ export const mediaUploadSessions = mysqlTable("media_upload_sessions", {
   mediaType: varchar("media_type", { length: 32 }),
   folder: varchar("folder", { length: 128 }),
   brand: varchar("brand", { length: 32 }).notNull().default("aaus"),
+  strategy: varchar("strategy", { length: 20 }).notNull().default("direct"),
   existingAssetId: int("existing_asset_id"),
   createdByUserId: int("created_by_user_id").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),

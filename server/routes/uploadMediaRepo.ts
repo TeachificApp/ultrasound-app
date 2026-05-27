@@ -248,20 +248,11 @@ router.post("/api/upload-media-repo/init", async (req: Request, res: Response) =
     mediaType,
     folder: folderSlug,
     brand,
+    strategy: finalStrategy,
     existingAssetId,
     createdByUserId: user.id,
     expiresAt,
-    // Store strategy in notes field temporarily — we'll use a dedicated column if needed
   });
-
-  // Store strategy in a way the chunk endpoint can read it
-  // We'll encode it in the uploadId prefix: "d-" for direct, "m-" for multipart
-  // Actually, let's just store it in the DB row. We'll add a "strategy" field via the notes trick.
-  // Better: update the row to include strategy info
-  await db
-    .update(mediaUploadSessions)
-    .set({ completedParts: JSON.stringify({ strategy: finalStrategy, parts: [] }) })
-    .where(eq(mediaUploadSessions.uploadId, uploadId));
 
   res.json({ uploadId, strategy: finalStrategy });
   } catch (err: any) {
@@ -303,16 +294,20 @@ router.post(
       return;
     }
 
-    // Parse stored state
-    let storedState: { strategy: "direct" | "multipart"; parts: { partNumber: number; etag: string }[]; chunks?: Record<number, string> };
+        // Read strategy from dedicated DB column (set at init time)
+    const strategy: "direct" | "multipart" = (session.strategy as any) === "multipart" ? "multipart" : "direct";
+    // Parse completed parts state
+    let storedState: { parts: { partNumber: number; etag: string }[]; chunks?: Record<number, string> };
     try {
-      storedState = JSON.parse(session.completedParts || "{}");
-      if (!storedState.strategy) storedState = { strategy: "direct", parts: [], chunks: {} };
+      const parsed = JSON.parse(session.completedParts || "[]");
+      if (Array.isArray(parsed)) {
+        storedState = { parts: parsed };
+      } else {
+        storedState = { parts: parsed.parts || [], chunks: parsed.chunks || {} };
+      }
     } catch {
-      storedState = { strategy: "direct", parts: [], chunks: {} };
+      storedState = { parts: [], chunks: {} };
     }
-
-    const { strategy } = storedState;
 
     if (strategy === "multipart" && session.r2UploadId) {
       // ── R2 Multipart path ───────────────────────────────────────────────────

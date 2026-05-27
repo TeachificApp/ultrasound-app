@@ -3261,3 +3261,11 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Final chunk calls CompleteMultipartUpload on R2, then writes mediaAssets/mediaVersions rows
 - [x] Session state survives sandbox resets, server restarts, and tsx watch reloads
 - [x] 26 vitest tests passing
+
+## Media Upload HTTP 500 Fix (2026-05-27)
+- [x] Added `strategy` column to `media_upload_sessions` DB table (VARCHAR(20) NOT NULL DEFAULT 'direct')
+- [x] Added `strategy` field to Drizzle schema (mediaUploadSessions table)
+- [x] Fixed /init handler INSERT to include `strategy: finalStrategy` — removed workaround UPDATE
+- [x] Fixed /chunk handler to read strategy from `session.strategy` DB column instead of parsing completedParts JSON
+- [x] completedParts now stores plain JSON array (not wrapped object) for direct path; multipart path stores {parts:[]} object
+- [x] All 26 vitest tests passing
