@@ -477,7 +477,7 @@ export default function LessonBlockEditor({
               <X className="w-5 h-5" />
             </button>
           </div>
-        </div>
+        </div>}
 
         <div className="flex flex-1 overflow-hidden">
           {/* Left: Canvas */}
