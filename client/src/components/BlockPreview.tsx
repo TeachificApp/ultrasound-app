@@ -979,7 +979,11 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       );
     }
     case "file_download": {
-      const fileUrl = d.source === "media_repo" ? (d.mediaAssetUrl || "") : (d.fileUrl || "");
+      // For media_repo: prefer stored mediaAssetUrl, fall back to slug-based serve endpoint
+      // (handles existing blocks saved before slug-URL fix)
+      const fileUrl = d.source === "media_repo"
+        ? (d.mediaAssetUrl || (d.mediaAssetSlug ? `/api/media/${d.mediaAssetSlug}/download` : ""))
+        : (d.fileUrl || "");
       const fileName = d.source === "media_repo" ? (d.mediaAssetTitle || d.fileName || "File") : (d.fileName || "File");
       const displayMode = d.displayMode ?? "card";
       if (displayMode === "inline" && fileUrl) {

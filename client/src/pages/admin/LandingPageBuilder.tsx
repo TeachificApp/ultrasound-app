@@ -5742,7 +5742,9 @@ function FileDownloadBlockSettings({ d, set, uploading, setUploading, uploadMedi
   };
 
   const selectMediaAsset = (asset: any) => {
-    const url = asset.currentVersion?.s3Url ?? "";
+    // Use slug-based serve URL so it never expires and access control is enforced
+    const slug = asset.slug ?? "";
+    const url = slug ? `/api/media/${slug}/download` : (asset.currentVersion?.s3Url ?? "");
     const title = asset.title ?? asset.currentVersion?.fileName ?? "File";
     const size = asset.currentVersion?.fileSize
       ? asset.currentVersion.fileSize > 1024 * 1024
@@ -5751,6 +5753,7 @@ function FileDownloadBlockSettings({ d, set, uploading, setUploading, uploadMedi
       : "";
     set("source", "media_repo");
     set("mediaAssetId", asset.id);
+    set("mediaAssetSlug", slug);
     set("mediaAssetTitle", title);
     set("mediaAssetUrl", url);
     set("fileName", asset.currentVersion?.fileName ?? title);

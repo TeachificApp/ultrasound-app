@@ -3214,3 +3214,8 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Update stripe.ts: embed access token in welcome email for new accounts created via purchase
 - [x] Apply DB migration: access_token column, access_token_uses table, ip_security_flags table
 - [ ] Generate persistent access token for support@allaboutultrasound.com (DB connection issue — retry after checkpoint)
+
+## Download Block Fix (2026-05-27)
+- [x] Fix download block "No file selected" when media repo file attached: use slug-based /api/media/:slug/download URL instead of raw S3 URL
+- [x] BlockPreview: fall back to slug-based URL for existing blocks with mediaAssetSlug but empty/stale mediaAssetUrl
+- [x] LandingPageBuilder selectMediaAsset: store mediaAssetSlug and set mediaAssetUrl to slug-based serve endpoint
