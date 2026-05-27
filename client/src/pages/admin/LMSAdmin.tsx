@@ -1677,7 +1677,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
             </label>
             {/* URL fallback */}
             <Input value={coverImageUrl} onChange={e => setCoverImageUrl(e.target.value)} placeholder="Or paste image URL..." className="text-xs h-8" />
-            <p className="text-xs text-gray-400">Recommended: 800×500 px, JPG or PNG, max 8 MB. Displayed as the card thumbnail in the LMS Management.</p>
+            <p className="text-xs text-gray-400">Recommended: 800×500 px, JPG or PNG, max 8 MB. Displayed as the card thumbnail in the Education Library.</p>
           </div>
         </div>
       </div>
@@ -1846,8 +1846,8 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
       <div className="flex items-start gap-2">
         <Switch checked={showInLibrary} onCheckedChange={setShowInLibrary} id="show-in-library-switch" className="mt-0.5" />
         <div>
-          <Label htmlFor="show-in-library-switch" className="text-sm">Show in LMS Management</Label>
-          <p className="text-xs text-gray-400 mt-0.5">When enabled, this item will appear in the public LMS Management. Disable to hide it from the library while keeping it accessible by direct URL.</p>
+          <Label htmlFor="show-in-library-switch" className="text-sm">Show in Education Library</Label>
+          <p className="text-xs text-gray-400 mt-0.5">When enabled, this item will appear in the public Education Library. Disable to hide it from the library while keeping it accessible by direct URL.</p>
         </div>
       </div>
       <div className="flex items-start gap-2">
@@ -2848,7 +2848,7 @@ function CourseInstructorsEditor({ courseId, courseInstructors, onSaved }: { cou
 
       {/* Hint about global profiles */}
       <p className="text-xs text-gray-400">
-        Instructor profiles are saved globally and can be reused across all courses. Manage all profiles from the <span className="font-medium text-teal-600">Instructors</span> tab in the main LMS Management view.
+        Instructor profiles are saved globally and can be reused across all courses. Manage all profiles from the <span className="font-medium text-teal-600">Instructors</span> tab in the main LMS admin view.
       </p>
 
       {/* Create Instructor Dialog */}
@@ -5256,12 +5256,12 @@ export default function LMSAdmin() {
               </div>
               <div>
                 <h1 className="text-lg font-bold text-gray-900">LMS Management</h1>
-                <p className="text-xs text-gray-400">LMS Management · Courses · Products · Enrollments</p>
+                <p className="text-xs text-gray-400">Education Library · Courses · Products · Enrollments</p>
               </div>
             </div>
             <Link href="/education-library">
               <Button size="sm" variant="outline" className="h-8 text-xs text-teal-600 border-teal-200 hover:bg-teal-50">
-                <LinkIcon className="w-3 h-3 mr-1.5" /> View LMS Management
+                <LinkIcon className="w-3 h-3 mr-1.5" /> View Education Library
               </Button>
             </Link>
           </div>
@@ -5749,7 +5749,7 @@ function CollectionsTab() {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="font-semibold text-gray-800">Collections</h3>
-          <p className="text-xs text-gray-500 mt-0.5">Group courses by custom labels — shown as filter tabs on the LMS Management. Drag to reorder.</p>
+          <p className="text-xs text-gray-500 mt-0.5">Group courses by custom labels — shown as filter tabs on the Education Library. Drag to reorder.</p>
         </div>
         <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => setCreateOpen(true)}>
           <Plus className="w-3.5 h-3.5 mr-1" /> New Collection
@@ -5872,7 +5872,7 @@ function CollectionFormDialog({
             </div>
             <div className="col-span-2 flex items-center gap-2">
               <Switch checked={isPublished} onCheckedChange={setIsPublished} />
-              <Label className="text-xs">Published (visible on LMS Management)</Label>
+              <Label className="text-xs">Published (visible on Education Library)</Label>
             </div>
           </div>
 

@@ -32,7 +32,7 @@ const AAUS_SITE_URL = "https://www.allaboutultrasound.com";
 const IHE_SITE_URL = "https://www.iheartecho.com";
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "LMS Management", href: "/education-library", icon: <BookOpen className="w-4 h-4" /> },
+  { label: "Education Library", href: "/education-library", icon: <BookOpen className="w-4 h-4" /> },
 ];
 
 export default function LMSLayout({ children }: { children: React.ReactNode }) {

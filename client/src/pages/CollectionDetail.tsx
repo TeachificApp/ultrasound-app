@@ -105,7 +105,7 @@ export default function CollectionDetail() {
           <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
           <h2 className="text-lg font-semibold text-gray-700">Collection not found</h2>
           <Link href="/education-library">
-            <Button variant="outline" className="mt-4">Back to LMS Management</Button>
+            <Button variant="outline" className="mt-4">Back to Education Library</Button>
           </Link>
         </div>
       </div>
@@ -121,7 +121,7 @@ export default function CollectionDetail() {
         <div className="max-w-5xl mx-auto">
           <Link href="/education-library">
             <button className="flex items-center gap-1.5 text-white/80 hover:text-white text-sm mb-4 transition-colors">
-              <ArrowLeft className="w-4 h-4" /> LMS Management
+              <ArrowLeft className="w-4 h-4" /> Education Library
             </button>
           </Link>
           <div className="flex items-start gap-4">
