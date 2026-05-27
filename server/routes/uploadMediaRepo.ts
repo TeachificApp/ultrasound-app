@@ -155,6 +155,7 @@ router.post("/api/upload-media-repo/init", async (req: Request, res: Response) =
   const db = await getDb();
   if (!db) { res.status(503).json({ error: "DB unavailable" }); return; }
 
+  try {
   const existingAssetId = req.body.assetId ? parseInt(req.body.assetId, 10) : null;
   const fileName = (req.body.fileName as string) || "upload";
   const rawMimeType = (req.body.mimeType as string) || "application/octet-stream";
@@ -263,6 +264,10 @@ router.post("/api/upload-media-repo/init", async (req: Request, res: Response) =
     .where(eq(mediaUploadSessions.uploadId, uploadId));
 
   res.json({ uploadId, strategy: finalStrategy });
+  } catch (err: any) {
+    console.error("[upload-media-repo/init] Unhandled error:", err);
+    res.status(500).json({ error: err?.message || "Init failed" });
+  }
 });
 
 // ── /api/upload-media-repo/chunk ─────────────────────────────────────────────
