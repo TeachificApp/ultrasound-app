@@ -186,6 +186,14 @@ function EnrollmentDrillDown({ userId, userEmail, onClose }: { userId: number | 
   );
 }
 
+// Source badge config
+const SOURCE_BADGE: Record<string, { label: string; className: string }> = {
+  purchase:         { label: 'Purchase',  className: 'bg-green-50 text-green-700 border-green-200' },
+  group:            { label: 'Group',     className: 'bg-blue-50 text-blue-700 border-blue-200' },
+  thinkific_import: { label: 'Thinkific', className: 'bg-orange-50 text-orange-700 border-orange-200' },
+  admin_grant:      { label: 'Admin',     className: 'bg-gray-100 text-gray-600 border-gray-300' },
+};
+
 // ─── Enrollments Tab ──────────────────────────────────────────────────────────
 type SortKey = 'enrolledAt' | 'userName' | 'courseTitle' | 'progressPct' | 'completedAt';
 
@@ -195,9 +203,13 @@ function EnrollmentsTab() {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<"all" | "active" | "completed">("all");
   const [contentType, setContentType] = useState<"all" | "course" | "quiz" | "download">("all");
+  const [courseId, setCourseId] = useState<number | undefined>(undefined);
   const [sortBy, setSortBy] = useState<SortKey>("enrolledAt");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [drillDown, setDrillDown] = useState<{ userId: number | null; userEmail: string } | null>(null);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkAction, setBulkAction] = useState<'grant' | 'revoke' | null>(null);
+  const [grantCourseId, setGrantCourseId] = useState<number | undefined>(undefined);
   const PAGE_SIZE = 50;
 
   const handleSearch = (v: string) => {

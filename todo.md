@@ -3377,3 +3377,20 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add sort options (date, user name, course name, status, progress) to enrollmentsList procedure
 - [x] Add user drill-down: click a row to see full enrollment detail for that user
 - [x] Rebuild Enrollments tab UI with filter bar, sortable column headers, and drill-down panel
+
+## Enrollments Tab — Phase 2 (May 2026)
+- [ ] Add courseList procedure to return all courses for the filter dropdown
+- [ ] Extend enrollmentsList with courseId filter param
+- [ ] Add enrollment source column (thinkific_import / purchase / admin_grant / manual)
+- [ ] Add bulkGrantEnrollment procedure (admin grants access to selected users for a course)
+- [ ] Add bulkRevokeEnrollment procedure (admin revokes access for selected users)
+- [ ] Update Enrollments tab UI: course dropdown, source badge column, row checkboxes, bulk action toolbar
+
+## MembersHub Data Fixes (May 2026)
+- [x] Fix enrollmentsList: use lms_thinkific_imports as bridge (enrollment.course_id = ti.lms_course_id, not lms_courses.id directly)
+- [x] Fix exportEnrollmentsCsv: same JOIN fix, remove GROUP BY
+- [x] Fix userEnrollmentDetail: same JOIN fix
+- [x] Fix courseListForFilter: count enrollments via thinkific_imports bridge
+- [x] Fix userList: sort by u.lastSignedIn DESC (not alias), use actual login_events count
+- [x] Fix globalActivityLog: UNION with page_view_events and login_events for complete activity picture
+- [x] Fix Activity tab crash: null-safe eventType in UserAnalytics and globalActivityLog server return

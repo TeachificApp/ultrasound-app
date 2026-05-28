@@ -395,6 +395,8 @@ export const analyticsAdminRouter = router({
         : sql`1=1`;
 
       // Aggregate per-user stats in one query
+      // NOTE: users.lastSignedIn is camelCase in the DB (Drizzle uses camelCase by default)
+      // Sort by lastSignedIn DESC NULLS LAST so active users appear first
       const rows = await db.execute(sql`
         SELECT
           u.id,
@@ -403,7 +405,7 @@ export const analyticsAdminRouter = router({
           u.role,
           u.createdAt AS joinedAt,
           u.lastSignedIn AS lastLogin,
-          CASE WHEN u.lastSignedIn IS NOT NULL THEN 1 ELSE 0 END AS loginCount,
+          (SELECT COUNT(*) FROM user_login_events WHERE user_id = u.id) AS loginCount,
           (SELECT COUNT(*) FROM user_page_view_events WHERE user_id = u.id) AS pageViewCount,
           (SELECT COUNT(*) FROM lms_video_events WHERE user_id = u.id AND event_type = 'play') AS videoPlayCount,
           (SELECT COUNT(*) FROM lms_video_events WHERE user_id = u.id AND event_type = 'complete') AS videoCompleteCount,
@@ -415,7 +417,7 @@ export const analyticsAdminRouter = router({
         FROM users u
         WHERE ${searchCond}
         ORDER BY ${
-          input.sortBy === "lastLogin" ? sql`lastLogin DESC` :
+          input.sortBy === "lastLogin" ? sql`u.lastSignedIn DESC` :
           input.sortBy === "logins" ? sql`loginCount DESC` :
           input.sortBy === "pageViews" ? sql`pageViewCount DESC` :
           input.sortBy === "videoPlays" ? sql`videoPlayCount DESC` :
@@ -806,8 +808,10 @@ export const analyticsAdminRouter = router({
       if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
 
       const offset = (input.page - 1) * input.pageSize;
+      // NOTE: lms_enrollments.course_id stores the thinkific_imports.lms_course_id value
+      // (not lms_courses.id directly). We must join via thinkific_imports to get the course.
       const searchCond = input.search
-        ? sql`AND (COALESCE(u.name, '') LIKE ${`%${input.search}%`} OR COALESCE(u.email, e.thinkific_email, '') LIKE ${`%${input.search}%`} OR COALESCE(c.title, ti.thinkific_course_name, '') LIKE ${`%${input.search}%`})`
+        ? sql`AND (COALESCE(u.name, '') LIKE ${`%${input.search}%`} OR COALESCE(u.email, '') LIKE ${`%${input.search}%`} OR COALESCE(c.title, ti.thinkific_course_name, '') LIKE ${`%${input.search}%`})`
         : sql``;
       const courseCond = input.courseId ? sql`AND e.course_id = ${input.courseId}` : sql``;
       const statusCond = input.status === 'completed'
@@ -816,7 +820,7 @@ export const analyticsAdminRouter = router({
         ? sql`AND e.completed_at IS NULL`
         : sql``;
       const contentTypeCond = input.contentType !== 'all'
-        ? sql`AND c.type = ${input.contentType}`
+        ? sql`AND COALESCE(c.type, 'course') = ${input.contentType}`
         : sql``;
 
       // Build ORDER BY clause safely
@@ -830,26 +834,35 @@ export const analyticsAdminRouter = router({
       const sortCol = sortColMap[input.sortBy] ?? 'e.enrolled_at';
       const sortDir = input.sortDir === 'asc' ? 'ASC' : 'DESC';
 
+      // The JOIN chain:
+      // e.course_id -> ti.lms_course_id (thinkific import maps enrollment's course_id to an lms_course)
+      // ti.lms_course_id -> c.id (the actual lms_courses row)
+      // This handles both direct lms enrollments (c.id = e.course_id) and thinkific-imported ones
       const rows = await db.execute(sql`
         SELECT
           e.id AS enrollmentId,
           e.user_id AS userId,
           COALESCE(u.name, u.email, CONCAT('User #', e.user_id)) AS userName,
-          COALESCE(u.email, e.thinkific_email, '') AS userEmail,
-          u.membership_tier AS membershipTier,
+          COALESCE(u.email, '') AS userEmail,
+          u.membershipTier AS membershipTier, -- camelCase column in DB
           e.course_id AS courseId,
           COALESCE(c.title, ti.thinkific_course_name, CONCAT('Course #', e.course_id)) AS courseTitle,
           COALESCE(c.type, 'course') AS courseType,
           e.progress_pct AS progressPct,
           e.enrolled_at AS enrolledAt,
           e.completed_at AS completedAt,
-          e.enrollment_type AS enrollmentType
+          e.enrollment_type AS enrollmentType,
+          CASE
+            WHEN e.order_id IS NOT NULL THEN 'purchase'
+            WHEN e.group_id IS NOT NULL THEN 'group'
+            WHEN ti.id IS NOT NULL THEN 'thinkific_import'
+            ELSE 'admin_grant'
+          END AS enrollmentSource
         FROM lms_enrollments e
         LEFT JOIN users u ON u.id = e.user_id
-        LEFT JOIN lms_courses c ON c.id = e.course_id
         LEFT JOIN lms_thinkific_imports ti ON ti.lms_course_id = e.course_id
+        LEFT JOIN lms_courses c ON c.id = COALESCE(ti.lms_course_id, e.course_id)
         WHERE 1=1 ${searchCond} ${courseCond} ${statusCond} ${contentTypeCond}
-        GROUP BY e.id
         ORDER BY ${sql.raw(sortCol)} ${sql.raw(sortDir)}
         LIMIT ${input.pageSize} OFFSET ${offset}
       `);
@@ -858,8 +871,8 @@ export const analyticsAdminRouter = router({
         SELECT COUNT(*) AS total
         FROM lms_enrollments e
         LEFT JOIN users u ON u.id = e.user_id
-        LEFT JOIN lms_courses c ON c.id = e.course_id
         LEFT JOIN lms_thinkific_imports ti ON ti.lms_course_id = e.course_id
+        LEFT JOIN lms_courses c ON c.id = COALESCE(ti.lms_course_id, e.course_id)
         WHERE 1=1 ${searchCond} ${courseCond} ${statusCond} ${contentTypeCond}
       `);
 
@@ -877,9 +890,83 @@ export const analyticsAdminRouter = router({
           enrolledAt: r.enrolledAt as Date | null,
           completedAt: r.completedAt as Date | null,
           enrollmentType: r.enrollmentType as string | null,
+          enrollmentSource: (r.enrollmentSource as string) ?? 'admin_grant',
         })),
         total: Number((totalRow as any).total ?? 0),
       };
+    }),
+
+  /** List all courses for the enrollment filter dropdown */
+  courseListForFilter: protectedProcedure
+    .query(async ({ ctx }) => {
+      if (ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+      // Enrollments reference courses via thinkific_imports.lms_course_id, not directly by lms_courses.id
+      const rows = await db.execute(sql`
+        SELECT c.id, c.title, c.type,
+          COUNT(DISTINCT e.id) AS enrollmentCount
+        FROM lms_courses c
+        LEFT JOIN lms_thinkific_imports ti ON ti.lms_course_id = c.id
+        LEFT JOIN lms_enrollments e ON e.course_id = ti.lms_course_id
+        WHERE c.status != 'archived'
+        GROUP BY c.id
+        ORDER BY c.title ASC
+      `);
+      return (rows as any[]).map(r => ({
+        id: Number(r.id),
+        title: r.title as string,
+        type: (r.type as string) ?? 'course',
+        enrollmentCount: Number(r.enrollmentCount ?? 0),
+      }));
+    }),
+
+  /** Bulk grant enrollment: add selected users to a course */
+  bulkGrantEnrollment: protectedProcedure
+    .input(z.object({
+      enrollmentIds: z.array(z.number().int()).min(1).max(500),
+      courseId: z.number().int(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+      // Resolve user IDs from enrollment IDs
+      const enrollRows = await db.execute(sql`
+        SELECT DISTINCT user_id FROM lms_enrollments WHERE id IN (${sql.raw(input.enrollmentIds.join(','))})
+        AND user_id IS NOT NULL
+      `);
+      const userIds = (enrollRows as any[]).map(r => Number(r.user_id)).filter(Boolean);
+      if (!userIds.length) return { granted: 0, alreadyEnrolled: 0 };
+      let granted = 0;
+      let alreadyEnrolled = 0;
+      for (const userId of userIds) {
+        const [existing] = await db.execute(sql`
+          SELECT id FROM lms_enrollments WHERE user_id = ${userId} AND course_id = ${input.courseId} LIMIT 1
+        `);
+        if (existing) { alreadyEnrolled++; continue; }
+        await db.execute(sql`
+          INSERT INTO lms_enrollments (user_id, course_id, enrolled_at, progress_pct, enrollment_type, created_at)
+          VALUES (${userId}, ${input.courseId}, NOW(), 0, 'full', NOW())
+        `);
+        granted++;
+      }
+      return { granted, alreadyEnrolled };
+    }),
+
+  /** Bulk revoke enrollment: remove selected enrollments by their IDs */
+  bulkRevokeEnrollment: protectedProcedure
+    .input(z.object({
+      enrollmentIds: z.array(z.number().int()).min(1).max(500),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+      await db.execute(sql`
+        DELETE FROM lms_enrollments WHERE id IN (${sql.raw(input.enrollmentIds.join(','))})
+      `);
+      return { revoked: input.enrollmentIds.length };
     }),
 
   /** Global activity log across all users */
@@ -901,6 +988,8 @@ export const analyticsAdminRouter = router({
         ? sql`AND (u.name LIKE ${`%${input.search}%`} OR u.email LIKE ${`%${input.search}%`})`
         : sql``;
 
+      // Use a UNION of activity_logs + page_view_events + login_events for a complete picture
+      // Fall back to LEFT JOIN so rows without a matching user still appear
       const rows = await db.execute(sql`
         SELECT
           a.id, a.user_id AS userId, u.name AS userName, u.email AS userEmail,
@@ -908,17 +997,45 @@ export const analyticsAdminRouter = router({
           a.ip_address AS ipAddress, a.user_agent AS userAgent,
           a.metadata, a.created_at AS createdAt
         FROM user_activity_logs a
-        JOIN users u ON u.id = a.user_id
+        LEFT JOIN users u ON u.id = a.user_id
         WHERE 1=1 ${typeCond} ${searchCond}
-        ORDER BY a.created_at DESC
+        UNION ALL
+        SELECT
+          p.id, p.user_id AS userId, u2.name AS userName, u2.email AS userEmail,
+          'page_view' AS eventType, p.path AS description, p.path,
+          NULL AS ipAddress, NULL AS userAgent,
+          NULL AS metadata, p.created_at AS createdAt
+        FROM user_page_view_events p
+        LEFT JOIN users u2 ON u2.id = p.user_id
+        WHERE ${input.eventType ? sql`'page_view' = ${input.eventType}` : sql`1=1`}
+          ${input.search ? sql`AND (u2.name LIKE ${`%${input.search}%`} OR u2.email LIKE ${`%${input.search}%`})` : sql``}
+        UNION ALL
+        SELECT
+          l.id, l.user_id AS userId, u3.name AS userName, u3.email AS userEmail,
+          'login' AS eventType, 'User logged in' AS description, NULL AS path,
+          NULL AS ipAddress, NULL AS userAgent,
+          NULL AS metadata, l.created_at AS createdAt
+        FROM user_login_events l
+        LEFT JOIN users u3 ON u3.id = l.user_id
+        WHERE ${input.eventType ? sql`'login' = ${input.eventType}` : sql`1=1`}
+          ${input.search ? sql`AND (u3.name LIKE ${`%${input.search}%`} OR u3.email LIKE ${`%${input.search}%`})` : sql``}
+        ORDER BY createdAt DESC
         LIMIT ${input.pageSize} OFFSET ${offset}
       `);
 
       const [totalRow] = await db.execute(sql`
-        SELECT COUNT(*) AS total
-        FROM user_activity_logs a
-        JOIN users u ON u.id = a.user_id
-        WHERE 1=1 ${typeCond} ${searchCond}
+        SELECT (
+          SELECT COUNT(*) FROM user_activity_logs a LEFT JOIN users u ON u.id = a.user_id
+          WHERE 1=1 ${typeCond} ${searchCond}
+        ) + (
+          SELECT COUNT(*) FROM user_page_view_events p LEFT JOIN users u2 ON u2.id = p.user_id
+          WHERE ${input.eventType ? sql`'page_view' = ${input.eventType}` : sql`1=1`}
+            ${input.search ? sql`AND (u2.name LIKE ${`%${input.search}%`} OR u2.email LIKE ${`%${input.search}%`})` : sql``}
+        ) + (
+          SELECT COUNT(*) FROM user_login_events l LEFT JOIN users u3 ON u3.id = l.user_id
+          WHERE ${input.eventType ? sql`'login' = ${input.eventType}` : sql`1=1`}
+            ${input.search ? sql`AND (u3.name LIKE ${`%${input.search}%`} OR u3.email LIKE ${`%${input.search}%`})` : sql``}
+        ) AS total
       `);
 
       return {
@@ -969,10 +1086,9 @@ export const analyticsAdminRouter = router({
           e.progress_pct, e.enrolled_at, e.completed_at, e.enrollment_type
         FROM lms_enrollments e
         LEFT JOIN users u ON u.id = e.user_id
-        LEFT JOIN lms_courses c ON c.id = e.course_id
         LEFT JOIN lms_thinkific_imports ti ON ti.lms_course_id = e.course_id
+        LEFT JOIN lms_courses c ON c.id = COALESCE(ti.lms_course_id, e.course_id)
         WHERE ${searchCond} ${courseCond} ${statusCond}
-        GROUP BY e.id
         ORDER BY e.enrolled_at DESC
         LIMIT 50000
       `);
@@ -1024,8 +1140,8 @@ export const analyticsAdminRouter = router({
           e.enrollment_type AS enrollmentType
         FROM lms_enrollments e
         LEFT JOIN users u ON u.id = e.user_id
-        LEFT JOIN lms_courses c ON c.id = e.course_id
         LEFT JOIN lms_thinkific_imports ti ON ti.lms_course_id = e.course_id
+        LEFT JOIN lms_courses c ON c.id = COALESCE(ti.lms_course_id, e.course_id)
         WHERE ${userCond}
         ORDER BY e.enrolled_at DESC
       `);
