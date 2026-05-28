@@ -3318,3 +3318,18 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Build Member Management central area with 3 tabs (LMS, UltrasoundAssist, EchoAssist)
 - [ ] Exclude demo/system test users from Member Management
 - [ ] Keep LMS data separate from App data in tabs
+
+## Unified Members Hub (May 2026)
+- [x] Audit all scattered user/enrollment/sales pages (Contacts, User Analytics, Sales Dashboard, Memberships, LMS People sidebar)
+- [x] Build unified /admin/members page with 5 tabs: Members, Enrollments, Sales, Memberships, Activity
+- [x] Members tab: full user list with search/filter, stats (logins, enrollments, purchases), drill-down to profile with Activity Log tab
+- [x] User profile: overview, enrollments, purchases, activity log, membership status — all in one view
+- [x] Enrollments tab: all LMS enrollments across all courses with search/filter/progress + CSV export
+- [x] Sales tab: embeds AdminSalesDashboard (revenue, transactions, refunds)
+- [x] Memberships tab: embeds MembershipAdmin (grant/revoke premium access)
+- [x] Activity tab: unified activity log across all users with event type filter + CSV export
+- [x] Replace Contacts, User Analytics, Sales Dashboard, Memberships cards in admin hub with single Members card
+- [x] Add Members Hub ↗ link to LMS sidebar People section
+- [x] Redirect old routes to Members Hub (/admin/contacts → ?tab=contacts, /admin/user-analytics → ?tab=members, /admin/sales-dashboard → ?tab=sales, /admin/memberships → ?tab=memberships)
+- [x] Update User Search quick-access in Platform Admin to point to Members Hub
+- [x] 16 tests passing for Members Hub backend procedures

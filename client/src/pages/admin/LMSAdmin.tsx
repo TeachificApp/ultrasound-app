@@ -5250,6 +5250,7 @@ const LMS_NAV_GROUPS = [
     label: "People",
     color: "teal",
     items: [
+      { value: "members_hub", label: "Members Hub ↗", icon: Users, href: "/admin/members" },
       { value: "groups",      label: "Groups",      icon: Users },
       { value: "instructors", label: "Instructors", icon: GraduationCap },
       { value: "certificates",label: "Certificates",icon: CheckCircle },
@@ -5352,7 +5353,7 @@ export default function LMSAdmin() {
                           return (
                             <button
                               key={item.value}
-                              onClick={() => { setActiveTab(item.value); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                              onClick={() => { if ((item as any).href) { window.location.href = (item as any).href; return; } setActiveTab(item.value); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                               className={cn(
                                 "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all",
                                 isActive

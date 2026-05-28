@@ -786,4 +786,176 @@ export const analyticsAdminRouter = router({
 
       return { csv: [header, ...rows].join('\n'), totalRows: allRows.length };
     }),
+
+  /** Unified enrollments list across all courses */
+  enrollmentsList: protectedProcedure
+    .input(z.object({
+      search: z.string().optional(),
+      courseId: z.number().int().optional(),
+      page: z.number().int().default(1),
+      pageSize: z.number().int().default(50),
+      status: z.enum(['all', 'active', 'completed']).default('all'),
+    }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+
+      const offset = (input.page - 1) * input.pageSize;
+      const searchCond = input.search
+        ? sql`(u.name LIKE ${`%${input.search}%`} OR u.email LIKE ${`%${input.search}%`} OR c.title LIKE ${`%${input.search}%`})`
+        : sql`1=1`;
+      const courseCond = input.courseId ? sql`AND e.course_id = ${input.courseId}` : sql``;
+      const statusCond = input.status === 'completed'
+        ? sql`AND e.completed_at IS NOT NULL`
+        : input.status === 'active'
+        ? sql`AND e.completed_at IS NULL`
+        : sql``;
+
+      const rows = await db.execute(sql`
+        SELECT
+          e.id AS enrollmentId,
+          e.user_id AS userId,
+          u.name AS userName,
+          u.email AS userEmail,
+          e.course_id AS courseId,
+          c.title AS courseTitle,
+          e.progress_pct AS progressPct,
+          e.enrolled_at AS enrolledAt,
+          e.completed_at AS completedAt,
+          e.enrollment_type AS enrollmentType
+        FROM lms_enrollments e
+        JOIN users u ON u.id = e.user_id
+        JOIN lms_courses c ON c.id = e.course_id
+        WHERE ${searchCond} ${courseCond} ${statusCond}
+        ORDER BY e.enrolled_at DESC
+        LIMIT ${input.pageSize} OFFSET ${offset}
+      `);
+
+      const [totalRow] = await db.execute(sql`
+        SELECT COUNT(*) AS total
+        FROM lms_enrollments e
+        JOIN users u ON u.id = e.user_id
+        JOIN lms_courses c ON c.id = e.course_id
+        WHERE ${searchCond} ${courseCond} ${statusCond}
+      `);
+
+      return {
+        enrollments: (rows as any[]).map(r => ({
+          enrollmentId: Number(r.enrollmentId),
+          userId: Number(r.userId),
+          userName: r.userName as string,
+          userEmail: r.userEmail as string,
+          courseId: Number(r.courseId),
+          courseTitle: r.courseTitle as string,
+          progressPct: Number(r.progressPct ?? 0),
+          enrolledAt: r.enrolledAt as Date | null,
+          completedAt: r.completedAt as Date | null,
+          enrollmentType: r.enrollmentType as string | null,
+        })),
+        total: Number((totalRow as any).total ?? 0),
+      };
+    }),
+
+  /** Global activity log across all users */
+  globalActivityLog: protectedProcedure
+    .input(z.object({
+      page: z.number().int().default(1),
+      pageSize: z.number().int().default(50),
+      eventType: z.string().optional(),
+      search: z.string().optional(), // search by user name/email
+    }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+
+      const offset = (input.page - 1) * input.pageSize;
+      const typeCond = input.eventType ? sql`AND a.event_type = ${input.eventType}` : sql``;
+      const searchCond = input.search
+        ? sql`AND (u.name LIKE ${`%${input.search}%`} OR u.email LIKE ${`%${input.search}%`})`
+        : sql``;
+
+      const rows = await db.execute(sql`
+        SELECT
+          a.id, a.user_id AS userId, u.name AS userName, u.email AS userEmail,
+          a.event_type AS eventType, a.description, a.path,
+          a.ip_address AS ipAddress, a.user_agent AS userAgent,
+          a.metadata, a.created_at AS createdAt
+        FROM user_activity_logs a
+        JOIN users u ON u.id = a.user_id
+        WHERE 1=1 ${typeCond} ${searchCond}
+        ORDER BY a.created_at DESC
+        LIMIT ${input.pageSize} OFFSET ${offset}
+      `);
+
+      const [totalRow] = await db.execute(sql`
+        SELECT COUNT(*) AS total
+        FROM user_activity_logs a
+        JOIN users u ON u.id = a.user_id
+        WHERE 1=1 ${typeCond} ${searchCond}
+      `);
+
+      return {
+        logs: (rows as any[]).map(r => ({
+          id: Number(r.id),
+          userId: Number(r.userId),
+          userName: r.userName as string,
+          userEmail: r.userEmail as string,
+          eventType: r.eventType as string,
+          description: r.description as string,
+          path: r.path as string | null,
+          ipAddress: r.ipAddress as string | null,
+          userAgent: r.userAgent as string | null,
+          metadata: r.metadata,
+          createdAt: r.createdAt as Date,
+        })),
+        total: Number((totalRow as any).total ?? 0),
+      };
+    }),
+
+  /** Export enrollments as CSV */
+  exportEnrollmentsCsv: protectedProcedure
+    .input(z.object({
+      search: z.string().optional(),
+      courseId: z.number().int().optional(),
+      status: z.enum(['all', 'active', 'completed']).default('all'),
+    }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+
+      const searchCond = input.search
+        ? sql`(u.name LIKE ${`%${input.search}%`} OR u.email LIKE ${`%${input.search}%`} OR c.title LIKE ${`%${input.search}%`})`
+        : sql`1=1`;
+      const courseCond = input.courseId ? sql`AND e.course_id = ${input.courseId}` : sql``;
+      const statusCond = input.status === 'completed'
+        ? sql`AND e.completed_at IS NOT NULL`
+        : input.status === 'active'
+        ? sql`AND e.completed_at IS NULL`
+        : sql``;
+
+      const rows = await db.execute(sql`
+        SELECT u.name, u.email, c.title AS course, e.progress_pct, e.enrolled_at, e.completed_at, e.enrollment_type
+        FROM lms_enrollments e
+        JOIN users u ON u.id = e.user_id
+        JOIN lms_courses c ON c.id = e.course_id
+        WHERE ${searchCond} ${courseCond} ${statusCond}
+        ORDER BY e.enrolled_at DESC
+        LIMIT 50000
+      `);
+
+      const escape = (s: string) => `"${(s || '').replace(/"/g, '""')}"`;
+      const header = 'Name,Email,Course,Progress %,Enrolled At,Completed At,Type';
+      const lines = (rows as any[]).map(r =>
+        [escape(r.name), escape(r.email), escape(r.course),
+         r.progress_pct ?? 0,
+         r.enrolled_at ? new Date(r.enrolled_at).toISOString() : '',
+         r.completed_at ? new Date(r.completed_at).toISOString() : '',
+         escape(r.enrollment_type ?? '')].join(',')
+      );
+      return { csv: [header, ...lines].join('\n'), totalRows: lines.length };
+    }),
 });
+

@@ -1191,11 +1191,8 @@ export default function PlatformAdmin() {
     { id: "downloads", href: "/admin/lms?tab=downloads", icon: FileDown, label: "Digital Downloads", description: "Manage downloadable products and files", color: "#b45309" },
     { id: "lms", href: "/admin/lms", icon: Library, label: "LMS Management", description: "Manage courses, videos, and learning content", color: "#1d4ed8" },
     { id: "funnels", href: "/admin/funnels", icon: LayoutTemplate, label: "Funnel Builder", description: "Build and manage marketing funnels", color: "#be185d" },
-    { id: "contacts", href: "/admin/contacts", icon: Users, label: "Contacts", description: "Manage contacts and audience segments", color: "#059669" },
-    { id: "user-analytics", href: "/admin/user-analytics", icon: BarChart2, label: "User Analytics", description: "Logins, access, course progress, and detailed user profiles", color: "#7c3aed" },
-    { id: "sales-dashboard", href: "/admin/sales-dashboard", icon: TrendingUp, label: "Sales Dashboard", description: "Revenue analytics, per-product breakdown, transaction management, refunds, and resend access emails", color: "#16a34a" },
+    { id: "members", href: "/admin/members", icon: Users, label: "Members", description: "Unified hub: users, enrollments, sales, memberships, contacts, and activity logs", color: "#0d9488" },
     { id: "discount-codes", href: "/admin/discount-codes", icon: Tag, label: "Discount Codes", description: "Create and manage Stripe coupons and promo codes for all products", color: "#f59e0b" },
-    { id: "memberships", href: "/admin/memberships", icon: Crown, label: "Memberships", description: "Manage premium memberships for AAUS and iHeartEcho — grant, revoke, and view all active members", color: "#0d9488" },
   ];
 
   // Per-Brand tool cards (auto-scoped to current brand)
@@ -1725,7 +1722,7 @@ export default function PlatformAdmin() {
           </CardContent>
         </Card>
 
-        {/* User Search → User Analytics */}
+        {/* User Search → Members Hub */}
         <Card className="border-0 shadow-sm">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold text-gray-800 flex items-center gap-2">
@@ -1734,14 +1731,14 @@ export default function PlatformAdmin() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <p className="text-sm text-gray-500 mb-3">Search for a user to open their full profile in User Analytics.</p>
+            <p className="text-sm text-gray-500 mb-3">Search for a user to open their full profile in the Members hub.</p>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
                 if (userSearchQuery.trim()) {
-                  window.location.href = `/admin/user-analytics?search=${encodeURIComponent(userSearchQuery.trim())}`;
+                  window.location.href = `/admin/members?tab=members&search=${encodeURIComponent(userSearchQuery.trim())}`;
                 } else {
-                  window.location.href = "/admin/user-analytics";
+                  window.location.href = "/admin/members";
                 }
               }}
               className="flex gap-2"
@@ -1756,15 +1753,27 @@ export default function PlatformAdmin() {
                 />
               </div>
               <Button type="submit" style={{ background: "#189aa1" }} className="text-white h-9 px-4 text-sm gap-1.5">
-                <BarChart2 className="w-4 h-4" />
-                Open in Analytics
+                <Users className="w-4 h-4" />
+                Open in Members
               </Button>
             </form>
-            <div className="mt-3">
-              <Link href="/admin/user-analytics">
+            <div className="mt-3 flex gap-2 flex-wrap">
+              <Link href="/admin/members">
                 <Button variant="outline" size="sm" className="text-xs gap-1.5">
                   <ExternalLink className="w-3.5 h-3.5" />
-                  View All Users in User Analytics
+                  View All Members
+                </Button>
+              </Link>
+              <Link href="/admin/members?tab=enrollments">
+                <Button variant="outline" size="sm" className="text-xs gap-1.5">
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Enrollments
+                </Button>
+              </Link>
+              <Link href="/admin/members?tab=sales">
+                <Button variant="outline" size="sm" className="text-xs gap-1.5">
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Sales
                 </Button>
               </Link>
             </div>
