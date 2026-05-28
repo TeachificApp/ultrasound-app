@@ -66,6 +66,7 @@ import {
   lmsCohortSubmissions,
   mediaUploadFolders,
   mediaUploadResponses,
+  funnelLeads,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
@@ -1199,6 +1200,193 @@ export const lmsLearnerRouter = router({
       if (!session) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create checkout session" });
       await db.update(lmsOrders).set({ stripeSessionId: session.id }).where(eq(lmsOrders.id, orderResult.id));
       return { checkoutUrl: session.url };
+    }),
+
+  /**
+   * Guest checkout — creates/finds account, signs in via session cookie, saves lead, returns Stripe checkout URL.
+   * Used when an unauthenticated user clicks a CTA on a course landing page.
+   */
+  guestCheckoutRegister: publicProcedure
+    .input(z.object({
+      courseSlug: z.string(),
+      name: z.string().min(1).max(200),
+      email: z.string().email(),
+      pricingOptionId: z.number().optional(),
+      orderBumpId: z.number().optional(),
+      promoCode: z.string().optional(),
+      origin: z.string(),
+      referrer: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // 1. Create or find user account
+      const { getOrCreateUserByEmail } = await import('../db');
+      const { user } = await getOrCreateUserByEmail({
+        email: input.email.trim().toLowerCase(),
+        name: input.name.trim(),
+      });
+
+      // 2. Set session cookie — auto sign-in
+      const { sdk } = await import('../_core/sdk');
+      const { COOKIE_NAME, ONE_YEAR_MS } = await import('@shared/const');
+      const { getSessionCookieOptions } = await import('../_core/cookies');
+      const openId = `email:${input.email.trim().toLowerCase()}`;
+      // Persist openId on user row if not set
+      await db.update(users).set({ openId }).where(and(eq(users.id, user.id), isNull(users.openId)));
+      const sessionToken = await sdk.createSessionToken(openId, { name: input.name, expiresInMs: ONE_YEAR_MS });
+      const cookieOptions = getSessionCookieOptions(ctx.req);
+      ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+
+      // 3. Save as lead in funnel_leads
+      try {
+        await db.insert(funnelLeads).values({
+          funnelId: 0,
+          funnelPageId: 0,
+          email: input.email.trim().toLowerCase(),
+          name: input.name.trim(),
+          userId: user.id,
+          source: "course_checkout",
+          sourcePage: `/courses/${input.courseSlug}`,
+          referrer: input.referrer ?? null,
+          ipAddress: (ctx.req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ?? null,
+          userAgent: ctx.req.headers['user-agent'] ?? null,
+        });
+      } catch { /* non-fatal — lead capture failure should not block checkout */ }
+
+      // 4. Create Stripe checkout session (same logic as createCheckout but with user.id)
+      const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      if (course.enrollmentCloseDate && new Date(course.enrollmentCloseDate) < new Date()) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Enrollment is closed for this cohort" });
+      }
+
+      let pricingType: string = course.pricingType ?? (course.isFree ? "free" : "one_time");
+      let effectivePrice = course.price;
+      let effectiveDownPayment = course.downPayment ?? 0;
+      let effectiveInstallmentAmount = course.installmentAmount ?? 0;
+      let effectiveInstallmentCount = course.installmentCount ?? 0;
+      let effectiveInstallmentIntervalDays = course.installmentIntervalDays ?? 30;
+      let effectiveStripePriceId = course.stripePriceId;
+      let effectiveSubscriptionInterval = course.subscriptionInterval ?? "monthly";
+      let pricingOptionLabel: string | null = null;
+
+      if (input.pricingOptionId) {
+        const [opt] = await db.select().from(lmsPricingOptions)
+          .where(and(eq(lmsPricingOptions.id, input.pricingOptionId), eq(lmsPricingOptions.courseId, course.id), eq(lmsPricingOptions.isActive, true)))
+          .limit(1);
+        if (!opt) throw new TRPCError({ code: "NOT_FOUND", message: "Pricing option not found" });
+        pricingType = opt.pricingType;
+        effectivePrice = opt.price;
+        effectiveDownPayment = opt.downPayment ?? 0;
+        effectiveInstallmentAmount = opt.installmentAmount ?? 0;
+        effectiveInstallmentCount = opt.installmentCount ?? 0;
+        effectiveInstallmentIntervalDays = opt.installmentIntervalDays ?? 30;
+        effectiveStripePriceId = opt.stripePriceId ?? null;
+        effectiveSubscriptionInterval = opt.subscriptionInterval ?? "monthly";
+        pricingOptionLabel = opt.label;
+      }
+
+      if (pricingType === "free") {
+        // Free course — just enroll directly
+        const existing = await db.select({ id: lmsEnrollments.id }).from(lmsEnrollments)
+          .where(and(eq(lmsEnrollments.userId, user.id), eq(lmsEnrollments.courseId, course.id))).limit(1);
+        if (!existing[0]) {
+          await db.insert(lmsEnrollments).values({ userId: user.id, courseId: course.id, status: "active", progressPct: 0 });
+          try { await sendEnrollmentEmail({ userId: user.id, courseId: course.id }); } catch {}
+        }
+        return { checkoutUrl: null, enrolled: true };
+      }
+
+      const Stripe = (await import("stripe")).default;
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
+
+      const orderBumpCheckout = await buildOrderBumpCheckoutLine(db, {
+        orderBumpId: input.orderBumpId,
+        triggerType: "course",
+        triggerProductId: course.id,
+        currency: course.currency,
+      });
+      const shippingOptions = orderBumpCheckout?.requiresShipping
+        ? { shipping_address_collection: { allowed_countries: ["US", "CA"] as any } }
+        : {};
+
+      const orderAmount = (pricingType === "payment_plan"
+        ? effectiveDownPayment
+        : effectivePrice * 1) + (orderBumpCheckout?.amount ?? 0);
+      const [orderResult] = await db.insert(lmsOrders).values({
+        userId: user.id, courseId: course.id,
+        amount: orderAmount, affiliateId: null, seats: 1, status: "pending",
+      }).$returningId();
+
+      const commonMeta = {
+        user_id: user.id.toString(),
+        course_id: course.id.toString(),
+        order_id: orderResult.id.toString(),
+        affiliate_code: "",
+        seats: "1",
+        pricing_type: pricingType,
+        trigger_order_type: "course",
+        ...orderBumpCheckout?.metadata,
+      };
+
+      const successUrl = `${input.origin}/courses/${course.slug}/success?session_id={CHECKOUT_SESSION_ID}`;
+      const cancelUrl = `${input.origin}/courses/${course.slug}`;
+
+      let discounts: Array<{ promotion_code: string }> | undefined;
+      if (input.promoCode) {
+        try {
+          const promoCodes = await stripe.promotionCodes.list({ code: input.promoCode.toUpperCase(), active: true, limit: 1 });
+          if (promoCodes.data[0]) discounts = [{ promotion_code: promoCodes.data[0].id }];
+        } catch { /* ignore */ }
+      }
+      const promoOpts = discounts ? { discounts } : { allow_promotion_codes: true };
+      const productName = pricingOptionLabel ? `${course.title} — ${pricingOptionLabel}` : course.title;
+
+      let session: any;
+      if (pricingType === "one_time") {
+        const lineItem = effectiveStripePriceId
+          ? { price: effectiveStripePriceId, quantity: 1 }
+          : { price_data: { currency: course.currency, product_data: { name: productName, description: course.subtitle ?? undefined }, unit_amount: Math.round(Number(effectivePrice) * 100) }, quantity: 1 };
+        session = await stripe.checkout.sessions.create({
+          mode: "payment",
+          customer_email: input.email,
+          ...promoOpts,
+          line_items: [lineItem, ...(orderBumpCheckout ? [orderBumpCheckout.lineItem] : [])],
+          success_url: successUrl, cancel_url: cancelUrl,
+          client_reference_id: user.id.toString(),
+          metadata: { ...commonMeta, pricing_option_id: input.pricingOptionId?.toString() ?? "" },
+          ...shippingOptions,
+        });
+      } else if (pricingType === "subscription") {
+        let stripePriceId = effectiveStripePriceId;
+        if (!stripePriceId) {
+          const intervalMap: Record<string, "month" | "year"> = { monthly: "month", quarterly: "month", annual: "year" };
+          const intervalCountMap: Record<string, number> = { monthly: 1, quarterly: 3, annual: 1 };
+          const stripeProduct = await stripe.products.create({ name: productName, description: course.subtitle ?? undefined, metadata: { course_id: course.id.toString() } });
+          const stripePrice = await stripe.prices.create({ product: stripeProduct.id, unit_amount: Math.round(Number(effectivePrice) * 100), currency: course.currency, recurring: { interval: intervalMap[effectiveSubscriptionInterval], interval_count: intervalCountMap[effectiveSubscriptionInterval] } });
+          stripePriceId = stripePrice.id;
+          if (input.pricingOptionId) await db.update(lmsPricingOptions).set({ stripePriceId }).where(eq(lmsPricingOptions.id, input.pricingOptionId));
+          else await db.update(lmsCourses).set({ stripePriceId }).where(eq(lmsCourses.id, course.id));
+        }
+        session = await stripe.checkout.sessions.create({
+          mode: "subscription",
+          customer_email: input.email,
+          ...promoOpts,
+          line_items: [{ price: stripePriceId, quantity: 1 }, ...(orderBumpCheckout ? [orderBumpCheckout.lineItem] : [])],
+          success_url: successUrl, cancel_url: cancelUrl,
+          client_reference_id: user.id.toString(),
+          metadata: { ...commonMeta, pricing_option_id: input.pricingOptionId?.toString() ?? "" },
+          ...shippingOptions,
+        });
+      } else {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Unsupported pricing type for guest checkout" });
+      }
+
+      if (!session) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create checkout session" });
+      await db.update(lmsOrders).set({ stripeSessionId: session.id }).where(eq(lmsOrders.id, orderResult.id));
+      return { checkoutUrl: session.url, enrolled: false };
     }),
 
   /** Upgrade-prompt checkout — supports course / download / physical product with optional promo code */

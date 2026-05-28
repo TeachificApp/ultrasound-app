@@ -3572,3 +3572,8 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Add user search to enrollments tab in course admin
 - [x] Fix heroClickHandler missing pricing_option and direct_checkout cases in CourseLanding (hero whole-clickable mode)
 - [x] Fix CTA login redirect — add returnTo param so users land at checkout after signing in (magic link + MagicLinkCallback + CourseLanding)
+- [ ] Guest checkout: guestCheckoutRegister procedure (create/find account, sign in, save lead, return checkout URL)
+- [ ] Guest checkout: GuestCheckoutModal in CourseLanding (name+email form, no login redirect)
+- [x] Guest checkout modal: name+email form for unauthenticated CTA clicks (no login redirect)
+- [x] guestCheckoutRegister procedure: create/find account, auto sign-in via session cookie, save lead, return Stripe checkout URL
+- [x] Auth state invalidated after guest checkout so useAuth() reflects new session immediately

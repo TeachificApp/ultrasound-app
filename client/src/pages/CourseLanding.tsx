@@ -937,6 +937,13 @@ export default function CourseLanding() {
   const [promoCode, setPromoCode] = useState<string | null>(null);
   const isPreview = _urlSearchParams.get("preview") === "admin";
   const autoCheckout = _urlSearchParams.get("checkout") === "1";
+  // Guest checkout modal state (for unauthenticated users clicking CTA)
+  const [guestModalOpen, setGuestModalOpen] = useState(false);
+  const [guestPricingOptionId, setGuestPricingOptionId] = useState<number | undefined>();
+  const [guestName, setGuestName] = useState("");
+  const [guestEmail, setGuestEmail] = useState("");
+  const [guestSubmitting, setGuestSubmitting] = useState(false);
+
   // Free Preview modal state
   const [freePreviewOpen, setFreePreviewOpen] = useState(false);
   const [freePreviewLessonId, setFreePreviewLessonId] = useState<number | null>(null);
@@ -958,6 +965,21 @@ export default function CourseLanding() {
     onError: (e) => toast.error(`Checkout failed: ${e.message}`),
   });
   const registerFreePreview = trpc.lms.registerFreePreview.useMutation();
+  const utils = trpc.useUtils();
+  const guestCheckoutRegister = trpc.lmsLearner.guestCheckoutRegister.useMutation({
+    onSuccess: async (data) => {
+      // Invalidate auth state so useAuth() picks up the new session cookie immediately
+      await utils.auth.me.invalidate();
+      setGuestModalOpen(false);
+      if (data.enrolled) {
+        toast.success("Enrolled! You now have access to this course.");
+        navigate(`/courses/${slug}/player`);
+      } else if (data.checkoutUrl) {
+        window.open(data.checkoutUrl, "_blank");
+      }
+    },
+    onError: (e) => toast.error(`Checkout failed: ${e.message}`),
+  });
 
   const handleFreePreviewClick = (lessonId: number) => {
     // If user is logged in, grant access directly via lmsLearner.createFreePreviewEnrollment
@@ -1000,10 +1022,36 @@ export default function CourseLanding() {
     }
   };
 
+  const openGuestCheckoutModal = (pricingOptionId?: number) => {
+    setGuestPricingOptionId(pricingOptionId);
+    setGuestName("");
+    setGuestEmail("");
+    setGuestModalOpen(true);
+  };
+
+  const handleGuestCheckoutSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!slug || !guestName.trim() || !guestEmail.trim()) return;
+    setGuestSubmitting(true);
+    try {
+      await guestCheckoutRegister.mutateAsync({
+        courseSlug: slug,
+        name: guestName.trim(),
+        email: guestEmail.trim(),
+        pricingOptionId: guestPricingOptionId,
+        orderBumpId: selectedOrderBumpId,
+        promoCode: promoCode ?? undefined,
+        origin: window.location.origin,
+        referrer: document.referrer || undefined,
+      });
+    } finally {
+      setGuestSubmitting(false);
+    }
+  };
+
   const handleEnroll = async () => {
     if (!user) {
-      const returnTo = `/courses/${slug}?checkout=1${selectedPricingOptionId ? `&pricingOptionId=${selectedPricingOptionId}` : ''}`;
-      navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`);
+      openGuestCheckoutModal(selectedPricingOptionId);
       return;
     }
     if (enrollment) { navigate(`/courses/${slug}/player`); return; }
@@ -1022,8 +1070,7 @@ export default function CourseLanding() {
   /** Enroll with a specific pricing option ID — avoids React state closure timing issues */
   const handleEnrollWithOption = async (pricingOptionId: number | undefined) => {
     if (!user) {
-      const returnTo = `/courses/${slug}?checkout=1${pricingOptionId ? `&pricingOptionId=${pricingOptionId}` : ''}`;
-      navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`);
+      openGuestCheckoutModal(pricingOptionId);
       return;
     }
     if (enrollment) { navigate(`/courses/${slug}/player`); return; }
@@ -1408,6 +1455,52 @@ export default function CourseLanding() {
         </div>
       </div>
     </div>
+
+    {/* Guest Checkout Modal — shown to unauthenticated users who click a CTA */}
+    <Dialog open={guestModalOpen} onOpenChange={setGuestModalOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-teal-700">Almost there!</DialogTitle>
+          <DialogDescription>
+            Enter your name and email to continue to checkout. We'll create your account automatically.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleGuestCheckoutSubmit} className="space-y-4 mt-2">
+          <div className="space-y-1">
+            <Label htmlFor="gc-name">Full Name <span className="text-red-500">*</span></Label>
+            <Input
+              id="gc-name"
+              value={guestName}
+              onChange={e => setGuestName(e.target.value)}
+              placeholder="Jane Smith"
+              required
+              autoFocus
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="gc-email">Email Address <span className="text-red-500">*</span></Label>
+            <Input
+              id="gc-email"
+              type="email"
+              value={guestEmail}
+              onChange={e => setGuestEmail(e.target.value)}
+              placeholder="jane@example.com"
+              required
+            />
+          </div>
+          <p className="text-xs text-gray-500">
+            Your account will be created automatically. You'll receive a login link by email after purchase.
+          </p>
+          <Button
+            type="submit"
+            className="w-full bg-teal-600 hover:bg-teal-700 text-white"
+            disabled={guestSubmitting}
+          >
+            {guestSubmitting ? "Setting up…" : "Continue to Checkout"}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
 
     {/* Free Preview Registration Modal */}
     <Dialog open={freePreviewOpen} onOpenChange={setFreePreviewOpen}>
