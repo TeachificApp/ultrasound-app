@@ -3894,6 +3894,8 @@ export const lmsPricingOptions = mysqlTable("lms_pricing_options", {
   installmentIntervalDays: int("installment_interval_days").default(30),
   // Custom CTA button text override (null = use default "Enroll Now" / "Buy Now")
   ctaLabel: varchar("cta_label", { length: 100 }),
+  // Optional external URL — if set, the CTA button links here instead of triggering Stripe checkout
+  ctaUrl: varchar("cta_url", { length: 2048 }),
   // Sort order in the pricing options list (lower = shown first)
   sortOrder: int("sort_order").default(0).notNull(),
   // Whether this option is currently shown on the landing page

@@ -5544,6 +5544,7 @@ export const lmsGroupRouter = router({
       installmentAmount: z.number().min(0).optional(),
       installmentIntervalDays: z.number().int().min(1).optional(),
       ctaLabel: z.string().max(100).optional(),
+      ctaUrl: z.string().url().max(2048).optional(),
       sortOrder: z.number().int().min(0).default(0),
       isActive: z.boolean().default(true),
     }))
@@ -5564,6 +5565,7 @@ export const lmsGroupRouter = router({
         installmentAmount: input.installmentAmount ?? 0,
         installmentIntervalDays: input.installmentIntervalDays ?? 30,
         ctaLabel: input.ctaLabel ?? null,
+        ctaUrl: input.ctaUrl ?? null,
         sortOrder: input.sortOrder,
         isActive: input.isActive,
       }).$returningId();
@@ -5585,6 +5587,7 @@ export const lmsGroupRouter = router({
       installmentAmount: z.number().min(0).optional(),
       installmentIntervalDays: z.number().int().min(1).optional(),
       ctaLabel: z.string().max(100).nullable().optional(),
+      ctaUrl: z.string().url().max(2048).nullable().optional(),
       sortOrder: z.number().int().min(0).optional(),
       isActive: z.boolean().optional(),
     }))

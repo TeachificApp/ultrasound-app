@@ -7161,6 +7161,7 @@ type PricingOption = {
   installmentAmount: number | null;
   installmentIntervalDays: number | null;
   ctaLabel: string | null;
+  ctaUrl: string | null;
   sortOrder: number;
   isActive: boolean;
 };
@@ -7187,6 +7188,7 @@ function PricingOptionForm({
   const [installmentAmount, setInstallmentAmount] = useState(String(Number(initial?.installmentAmount ?? 0).toFixed(2)));
   const [installmentIntervalDays, setInstallmentIntervalDays] = useState(String(initial?.installmentIntervalDays ?? 30));
   const [ctaLabel, setCtaLabel] = useState(initial?.ctaLabel ?? "");
+  const [ctaUrl, setCtaUrl] = useState(initial?.ctaUrl ?? "");
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
 
   return (
@@ -7260,6 +7262,13 @@ function PricingOptionForm({
           <Input value={ctaLabel} onChange={e => setCtaLabel(e.target.value)} placeholder="e.g. Start Payment Plan" className="mt-1 h-8 text-sm" />
         </div>
         <div>
+          <Label className="text-xs font-medium">CTA Link URL (optional)</Label>
+          <Input value={ctaUrl} onChange={e => setCtaUrl(e.target.value)} placeholder="https://..." className="mt-1 h-8 text-sm" />
+          <p className="text-xs text-gray-400 mt-0.5">If set, the CTA button links here instead of triggering Stripe checkout.</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
           <Label className="text-xs font-medium">Stripe Price ID (optional)</Label>
           <Input value={stripePriceId} onChange={e => setStripePriceId(e.target.value)} placeholder="price_..." className="mt-1 h-8 text-sm font-mono" />
           <p className="text-xs text-gray-400 mt-0.5">If set, this Stripe Price is used directly at checkout.</p>
@@ -7288,6 +7297,7 @@ function PricingOptionForm({
               installmentAmount: pricingType === "payment_plan" ? parseFloat(installmentAmount || "0") : null,
               installmentIntervalDays: pricingType === "payment_plan" ? parseInt(installmentIntervalDays || "30") : null,
               ctaLabel: ctaLabel.trim() || null,
+              ctaUrl: ctaUrl.trim() || null,
               isActive,
             })}
           >
@@ -7362,7 +7372,7 @@ function CoursePricingOptionsEditor({ courseId }: { courseId: number }) {
               {editingId === opt.id ? (
                 <PricingOptionForm
                   initial={opt}
-                  onSave={(data) => updateOption.mutate({ id: opt.id, label: data.label, sublabel: data.sublabel, pricingType: data.pricingType, price: data.price, stripePriceId: data.stripePriceId, subscriptionInterval: data.subscriptionInterval, downPayment: data.downPayment ?? undefined, installmentCount: data.installmentCount ?? undefined, installmentAmount: data.installmentAmount ?? undefined, installmentIntervalDays: data.installmentIntervalDays ?? undefined, ctaLabel: data.ctaLabel, isActive: data.isActive })}
+                  onSave={(data) => updateOption.mutate({ id: opt.id, label: data.label, sublabel: data.sublabel, pricingType: data.pricingType, price: data.price, stripePriceId: data.stripePriceId, subscriptionInterval: data.subscriptionInterval, downPayment: data.downPayment ?? undefined, installmentCount: data.installmentCount ?? undefined, installmentAmount: data.installmentAmount ?? undefined, installmentIntervalDays: data.installmentIntervalDays ?? undefined, ctaLabel: data.ctaLabel, ctaUrl: data.ctaUrl, isActive: data.isActive })}
                   onCancel={() => setEditingId(null)}
                   saving={updateOption.isPending}
                 />
@@ -7370,7 +7380,7 @@ function CoursePricingOptionsEditor({ courseId }: { courseId: number }) {
                 <div className={`flex items-center gap-3 bg-white rounded-lg border px-3 py-2 ${opt.isActive ? "border-gray-200" : "border-gray-100 opacity-60"}`}>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-800 truncate">{opt.label}</p>
-                    <p className="text-xs text-gray-400">{formatPrice(opt)}{opt.sublabel ? ` · ${opt.sublabel}` : ""}{opt.ctaLabel ? ` · CTA: "${opt.ctaLabel}"` : ""}</p>
+                    <p className="text-xs text-gray-400">{formatPrice(opt)}{opt.sublabel ? ` · ${opt.sublabel}` : ""}{opt.ctaLabel ? ` · CTA: "${opt.ctaLabel}"` : ""}{opt.ctaUrl ? ` · 🔗 ${opt.ctaUrl.length > 40 ? opt.ctaUrl.slice(0, 40) + "…" : opt.ctaUrl}` : ""}</p>
                   </div>
                   <Badge className={`text-xs ${opt.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
                     {opt.isActive ? "Active" : "Hidden"}
@@ -7393,7 +7403,7 @@ function CoursePricingOptionsEditor({ courseId }: { courseId: number }) {
 
       {showAdd && (
         <PricingOptionForm
-          onSave={(data) => createOption.mutate({ courseId, label: data.label, sublabel: data.sublabel ?? undefined, pricingType: data.pricingType, price: data.price, stripePriceId: data.stripePriceId ?? undefined, subscriptionInterval: data.subscriptionInterval ?? undefined, downPayment: data.downPayment ?? undefined, installmentCount: data.installmentCount ?? undefined, installmentAmount: data.installmentAmount ?? undefined, installmentIntervalDays: data.installmentIntervalDays ?? undefined, ctaLabel: data.ctaLabel ?? undefined, isActive: data.isActive, sortOrder: (options as PricingOption[]).length })}
+          onSave={(data) => createOption.mutate({ courseId, label: data.label, sublabel: data.sublabel ?? undefined, pricingType: data.pricingType, price: data.price, stripePriceId: data.stripePriceId ?? undefined, subscriptionInterval: data.subscriptionInterval ?? undefined, downPayment: data.downPayment ?? undefined, installmentCount: data.installmentCount ?? undefined, installmentAmount: data.installmentAmount ?? undefined, installmentIntervalDays: data.installmentIntervalDays ?? undefined, ctaLabel: data.ctaLabel ?? undefined, ctaUrl: data.ctaUrl ?? undefined, isActive: data.isActive, sortOrder: (options as PricingOption[]).length })}
           onCancel={() => setShowAdd(false)}
           saving={createOption.isPending}
         />
@@ -8274,10 +8284,10 @@ function CohortTab({ courseId }: { courseId: number }) {
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-gray-700 mb-1 block">Link to Session (optional)</Label>
-                  <Select value={recordingForm.sessionId?.toString() ?? ""} onValueChange={v => setRecordingForm(p => ({ ...p, sessionId: v ? parseInt(v) : null }))}>
+                  <Select value={recordingForm.sessionId?.toString() ?? "__none__"} onValueChange={v => setRecordingForm(p => ({ ...p, sessionId: v === "__none__" ? null : parseInt(v) }))}>
                     <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value="__none__">None</SelectItem>
                       {(sessions as CohortSession[]).map(s => (
                         <SelectItem key={s.id} value={s.id.toString()}>{s.title}</SelectItem>
                       ))}
@@ -8348,10 +8358,10 @@ function CohortTab({ courseId }: { courseId: number }) {
               </div>
               <div>
                 <Label className="text-sm font-medium text-gray-700 mb-1 block">Recurrence</Label>
-                <Select value={sessionForm.recurrenceRule} onValueChange={v => setSessionForm(p => ({ ...p, recurrenceRule: v as "" | "weekly" | "biweekly" | "monthly" }))}>
+                <Select value={sessionForm.recurrenceRule || "__none__"} onValueChange={v => setSessionForm(p => ({ ...p, recurrenceRule: (v === "__none__" ? "" : v) as "" | "weekly" | "biweekly" | "monthly" }))}>
                   <SelectTrigger><SelectValue placeholder="No recurrence" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No recurrence (one-time)</SelectItem>
+                    <SelectItem value="__none__">No recurrence (one-time)</SelectItem>
                     <SelectItem value="weekly">Weekly</SelectItem>
                     <SelectItem value="biweekly">Bi-weekly (every 2 weeks)</SelectItem>
                     <SelectItem value="monthly">Monthly</SelectItem>
