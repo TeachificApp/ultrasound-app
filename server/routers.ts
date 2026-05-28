@@ -467,6 +467,7 @@ export const appRouter = router({
       .input(z.object({
         email: z.string().email().max(320),
         origin: z.string().url().optional(),
+        returnTo: z.string().max(500).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const { getUserByEmail, setMagicLinkToken } = await import('./db');
@@ -488,7 +489,8 @@ export const appRouter = router({
 
         // Use origin from frontend to build correct redirect URL per domain
         const appUrl = input.origin || process.env.VITE_APP_URL || 'https://app.allaboutultrasound.com';
-        const magicUrl = `${appUrl}/auth/magic?token=${token}`;
+        const returnToParam = input.returnTo ? `&returnTo=${encodeURIComponent(input.returnTo)}` : '';
+        const magicUrl = `${appUrl}/auth/magic?token=${token}${returnToParam}`;
 
         const firstName = (user.displayName || user.name || 'there').split(' ')[0];
         // Detect brand from the origin URL hostname (more reliable than proxy hostname)

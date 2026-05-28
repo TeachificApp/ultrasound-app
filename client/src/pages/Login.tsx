@@ -69,11 +69,14 @@ export default function Login() {
     onSuccess: () => setSent(true),
   });
 
+  // Read returnTo from URL so magic link redirects back after login
+  const returnTo = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("returnTo") ?? undefined : undefined;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = email.trim().toLowerCase();
     if (!trimmed || requestMutation.isPending) return;
-    requestMutation.mutate({ email: trimmed, origin: window.location.origin });
+    requestMutation.mutate({ email: trimmed, origin: window.location.origin, returnTo });
   };
 
   // Show redirect spinner when already authenticated

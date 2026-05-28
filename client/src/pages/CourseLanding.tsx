@@ -1001,7 +1001,11 @@ export default function CourseLanding() {
   };
 
   const handleEnroll = async () => {
-    if (!user) { navigate("/login"); return; }
+    if (!user) {
+      const returnTo = `/courses/${slug}?checkout=1${selectedPricingOptionId ? `&pricingOptionId=${selectedPricingOptionId}` : ''}`;
+      navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`);
+      return;
+    }
     if (enrollment) { navigate(`/courses/${slug}/player`); return; }
     if (isEnrollmentClosed) return; // Enrollment is closed — do nothing
     setEnrolling(true);
@@ -1017,7 +1021,11 @@ export default function CourseLanding() {
 
   /** Enroll with a specific pricing option ID — avoids React state closure timing issues */
   const handleEnrollWithOption = async (pricingOptionId: number | undefined) => {
-    if (!user) { navigate("/login"); return; }
+    if (!user) {
+      const returnTo = `/courses/${slug}?checkout=1${pricingOptionId ? `&pricingOptionId=${pricingOptionId}` : ''}`;
+      navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`);
+      return;
+    }
     if (enrollment) { navigate(`/courses/${slug}/player`); return; }
     if (isEnrollmentClosed) return;
     setEnrolling(true);

@@ -3571,3 +3571,4 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Fix purchase access link resend for students who didn't receive it
 - [ ] Add user search to enrollments tab in course admin
 - [x] Fix heroClickHandler missing pricing_option and direct_checkout cases in CourseLanding (hero whole-clickable mode)
+- [x] Fix CTA login redirect — add returnTo param so users land at checkout after signing in (magic link + MagicLinkCallback + CourseLanding)
