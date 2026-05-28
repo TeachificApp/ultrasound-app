@@ -63,6 +63,7 @@ type OrderBump = {
 const TYPE_ICONS: Record<string, React.ReactNode> = {
   course: <BookOpen size={14} className="text-teal-600" />,
   quiz: <BookOpen size={14} className="text-purple-600" />,
+  cohort: <BookOpen size={14} className="text-orange-500" />,
   download: <Download size={14} className="text-blue-600" />,
   bundle: <Layers size={14} className="text-purple-600" />,
   physical: <Package size={14} className="text-amber-600" />,
@@ -290,6 +291,7 @@ export default function OrderBumpsAdmin() {
   function getProductName(type: string, id: number): string {
     if (type === "course") { const c = (courses as any[])?.find((c: any) => c.id === id && c.type === "course"); return c?.title ?? `Course #${id}`; }
     if (type === "quiz") { const q = (courses as any[])?.find((c: any) => c.id === id && c.type === "quiz"); return q?.title ?? `Quiz #${id}`; }
+    if (type === "cohort") { const co = (courses as any[])?.find((c: any) => c.id === id && c.type === "cohort"); return co?.title ?? `Cohort #${id}`; }
     if (type === "download") { const dl = (downloads as any[])?.find((d: any) => d.id === id); return dl?.title ?? `Download #${id}`; }
     if (type === "bundle") { const b = (bundlesList as any[])?.find((b: any) => b.id === id); return b?.title ?? `Bundle #${id}`; }
     if (type === "physical") { const p = (physicalProducts as any[])?.find((p: any) => p.id === id); return p?.title ?? `Physical Product #${id}`; }
@@ -384,6 +386,7 @@ function OrderBumpEditor({ bump, onClose, onSaved }: {
   const allCourses = coursesResult?.courses ?? [];
   const courses = (allCourses as any[]).filter((c: any) => c.type === "course");
   const quizzes = (allCourses as any[]).filter((c: any) => c.type === "quiz");
+  const cohorts = (allCourses as any[]).filter((c: any) => c.type === "cohort");
   const physicalProducts = physicalProductsData ?? [];
   const bundles = bundlesData ?? [];
   const isLoadingProducts = coursesLoading || downloadsLoading || physLoading || bundlesLoading;
@@ -450,6 +453,7 @@ function OrderBumpEditor({ bump, onClose, onSaved }: {
   function getProductsForType(type: string): any[] {
     if (type === "course") return courses;
     if (type === "quiz") return quizzes;
+    if (type === "cohort") return cohorts;
     if (type === "download") return (downloads as any[]) ?? [];
     if (type === "bundle") return (bundles as any[]);
     if (type === "physical") return (physicalProducts as any[]);

@@ -704,7 +704,21 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
               const optCta = opt.ctaLabel ?? (opt.isPrimary ? ctaText : `Enroll — ${opt.label}`);
               const isFeatured = opt.isPrimary;
               const badgeLabel = opt.badge ?? (isFeatured ? "Most Popular" : null);
-              const handleCardClick = () => { if (opt.ctaUrl) { window.open(opt.ctaUrl, "_blank"); } else { onSelectPricingOption?.(opt.id); } };
+              // Resolve per-card CTA action (supports all CTAActionPicker behaviors)
+              const cardBehavior = opt.ctaBehavior ?? (opt.ctaUrl ? "url" : undefined);
+              const cardCtaAction = resolveBtnAction(
+                cardBehavior,
+                opt.ctaUrl,
+                opt.ctaEmailAddress,
+                opt.ctaScrollAnchor,
+                opt.ctaPopupUrl,
+                opt.ctaDownloadUrl,
+                () => { onSelectPricingOption?.(opt.id); onEnroll(); },
+                onEnrollWithOption,
+                opt.ctaPricingOptionId ? Number(opt.ctaPricingOptionId) : opt.id,
+              );
+              const isExternalAction = cardBehavior && ["url", "send_email", "download_file", "open_popup", "scroll_to_section"].includes(cardBehavior);
+              const handleCardClick = () => { if (isExternalAction) { cardCtaAction(); } else { onSelectPricingOption?.(opt.id); } };
               return (
                 <div
                   key={i}
@@ -719,12 +733,12 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
                     {opt.sublabel && <p className="text-xs mb-3" style={{ color: d.answerColor ?? "#6b7280" }}>{opt.sublabel}</p>}
                     <p className="text-3xl font-bold mb-4" style={{ color: priceColor }}>{optPrice}</p>
                     <button
-                      onClick={(e) => { e.stopPropagation(); if (opt.ctaUrl) { window.open(opt.ctaUrl, "_blank"); } else { onSelectPricingOption?.(opt.id); onEnroll(); } }}
-                      disabled={enrolling && !opt.ctaUrl}
+                      onClick={(e) => { e.stopPropagation(); cardCtaAction(); }}
+                      disabled={enrolling && isSelected && !isExternalAction}
                       className="w-full py-3 rounded-lg font-semibold disabled:opacity-60 transition-opacity hover:opacity-90"
                       style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: ctaTextColor }}
                     >
-                      {enrolling && isSelected && !opt.ctaUrl ? "Processing\u2026" : optCta}
+                      {enrolling && isSelected && !isExternalAction ? "Processing\u2026" : optCta}
                     </button>
                   </div>
                 </div>

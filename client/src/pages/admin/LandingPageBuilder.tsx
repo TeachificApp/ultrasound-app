@@ -311,9 +311,9 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
       sectionBgColor: "#f9fafb", sectionTextColor: "#1f2937", sectionBorderColor: "#e5e7eb",
       lessonTextColor: "#374151", lessonLockedIconColor: "#d1d5db", lessonPreviewIconColor: "#14b8a6",
       lessonCountColor: "#9ca3af", iconStyle: "lock", cornerRadius: 12 } },
-  { type: "pricing_options_auto", label: "Pricing Options (Auto)", icon: <CreditCard size={14} />, category: "Smart",
+  { type: "pricing_options_auto", label: "Pricing Options", icon: <CreditCard size={14} />, category: "Conversion",
     defaultData: { headline: "Choose Your Plan", bgColor: "#f9fafb" } },
-  { type: "cohort_sessions_auto", label: "Live Sessions (Auto)", icon: <Timer size={14} />, category: "Smart",
+  { type: "cohort_sessions_auto", label: "Live Sessions (Auto)", icon: <Timer size={14} />, category: "Content",
     defaultData: { headline: "Upcoming Live Sessions", headlineColor: "#111827", bgColor: "#ffffff", accentColor: "#179ca3", showDescription: true, showDuration: true } },
   { type: "related_products", label: "Related Products", icon: <Package size={14} />, category: "Smart",
     defaultData: {
@@ -2038,7 +2038,7 @@ function SortableFaqItem({
 
 // ─── Sortable Pricing Card (used inside BlockSettings pricing case) ───────────
 function SortablePricingCard({
-  card, index, uploading, onSet, onRemove, onImageUpload,
+  card, index, uploading, onSet, onRemove, onImageUpload, productCatalog, orderBumpsList, funnelList,
 }: {
   card: { id: string; label?: string; sublabel?: string; ctaLabel?: string; ctaUrl?: string; badge?: string; imageUrl?: string; [key: string]: any };
   index: number;
@@ -2046,6 +2046,9 @@ function SortablePricingCard({
   onSet: (key: string, val: any) => void;
   onRemove: () => void;
   onImageUpload: (file: File) => void;
+  productCatalog?: Array<{ id: number; type: string; name: string; price: number }>;
+  orderBumpsList?: Array<{ id: number; headline?: string | null; slug?: string | null; bumpType: string; bumpProductId: number }>;
+  funnelList?: Array<{ id: number; name: string; slug: string; pages?: Array<{ id: number; name: string; slug: string }> }>;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
   return (
@@ -2060,10 +2063,34 @@ function SortablePricingCard({
       <DebouncedInput value={card.label ?? ""} onChange={v => onSet("label", v)} className="h-7 text-xs" placeholder="Card label (e.g. Full Access)" />
       <DebouncedInput value={card.sublabel ?? ""} onChange={v => onSet("sublabel", v)} className="h-7 text-xs" placeholder="Sublabel (e.g. One-time payment)" />
       <DebouncedInput value={card.ctaLabel ?? ""} onChange={v => onSet("ctaLabel", v)} className="h-7 text-xs" placeholder="CTA button text" />
-      <div className="flex items-center gap-1">
-        <Link size={10} className="text-gray-400 flex-shrink-0" />
-        <DebouncedInput value={card.ctaUrl ?? ""} onChange={v => onSet("ctaUrl", v)} className="h-7 text-xs flex-1" placeholder="CTA URL (overrides auto)" />
-      </div>
+      <CTAActionPicker
+        label="CTA Action"
+        behaviorValue={card.ctaBehavior ?? "url"}
+        onBehaviorChange={v => onSet("ctaBehavior", v)}
+        linkValue={card.ctaUrl ?? ""}
+        onLinkChange={v => onSet("ctaUrl", v)}
+        emailValue={card.ctaEmailAddress ?? ""}
+        onEmailChange={v => onSet("ctaEmailAddress", v)}
+        productCatalog={productCatalog}
+        orderBumpsList={orderBumpsList}
+        funnelList={funnelList}
+        orderBumpIdValue={card.ctaOrderBumpId ?? null}
+        onOrderBumpIdChange={v => onSet("ctaOrderBumpId", v)}
+        anchorValue={card.ctaScrollAnchor ?? ""}
+        onAnchorChange={v => onSet("ctaScrollAnchor", v)}
+        popupValue={card.ctaPopupUrl ?? ""}
+        onPopupChange={v => onSet("ctaPopupUrl", v)}
+        downloadValue={card.ctaDownloadUrl ?? ""}
+        onDownloadChange={v => onSet("ctaDownloadUrl", v)}
+        checkoutProductTypeValue={card.checkoutProductType}
+        checkoutProductIdValue={card.checkoutProductId ?? null}
+        onCheckoutProductChange={(type, id) => { onSet("checkoutProductType", type); onSet("checkoutProductId", id); }}
+        groupDiscountTiersValue={card.groupDiscountTiers ?? []}
+        onGroupDiscountTiersChange={v => onSet("groupDiscountTiers", v)}
+        pricingOptionIdValue={card.ctaPricingOptionId ?? null}
+        pricingOptionCourseIdValue={card.ctaPricingOptionCourseId ?? null}
+        onPricingOptionChange={(cid, oid) => { onSet("ctaPricingOptionCourseId", cid); onSet("ctaPricingOptionId", oid); }}
+      />
       <DebouncedInput value={card.badge ?? ""} onChange={v => onSet("badge", v)} className="h-7 text-xs" placeholder="Badge label (e.g. Most Popular)" />
       <div>
         <label className="text-xs text-gray-400 block mb-1">Card Image</label>
@@ -3809,6 +3836,9 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                       onSet={(key, val) => setPricingCard(i, key, val)}
                       onRemove={() => set("cards", pricingCards.filter((_, j) => j !== i))}
                       onImageUpload={file => handlePricingImageUpload(i, file)}
+                      productCatalog={productCatalog}
+                      orderBumpsList={orderBumpsList}
+                      funnelList={funnelList}
                     />
                   ))}
                 </div>
