@@ -3333,3 +3333,16 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Redirect old routes to Members Hub (/admin/contacts → ?tab=contacts, /admin/user-analytics → ?tab=members, /admin/sales-dashboard → ?tab=sales, /admin/memberships → ?tab=memberships)
 - [x] Update User Search quick-access in Platform Admin to point to Members Hub
 - [x] 16 tests passing for Members Hub backend procedures
+
+## Contacts & Conversion Funnel Tracker (May 2026)
+- [ ] Audit contacts/leads schema (funnelContacts table structure, existing fields)
+- [ ] Separate Contacts from Members in admin hub (Contacts = leads, Members = registered users)
+- [ ] Restore Contacts as its own admin section (not merged into Members Hub)
+- [ ] Build conversion matching: match contacts to users by email (contact → registered user)
+- [ ] Build purchaser detection: match users to stripe orders/downloads (user → purchaser)
+- [ ] Conversion funnel dashboard: Lead count → Registered User count → Purchaser count with % rates
+- [ ] Contact list with per-contact conversion status badge (Lead / Registered / Purchaser)
+- [ ] Funnel source breakdown: which funnels generate the most conversions
+- [ ] Time-to-convert metrics: avg days from lead capture to registration, registration to purchase
+- [ ] CSV export of contacts with conversion status
+- [ ] Add conversion tracker link to Platform Admin hub

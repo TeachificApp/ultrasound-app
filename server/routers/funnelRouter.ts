@@ -7,8 +7,8 @@ import { z } from "zod";
 import { router, protectedProcedure, publicProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb, getOrCreateUserByEmail } from "../db";
-import { funnels, funnelPages, funnelLeads, funnelTemplates, lmsCourses, lmsLandingPages, digitalProducts, digitalBundles, funnelBranchRules, funnelBranchConditions, emailCampaigns, funnelPurchases, lmsEnrollments, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProducts } from "../../drizzle/schema";
-import { eq, and, asc, desc, sql, inArray } from "drizzle-orm";
+import { funnels, funnelPages, funnelLeads, funnelTemplates, lmsCourses, lmsLandingPages, digitalProducts, digitalBundles, funnelBranchRules, funnelBranchConditions, emailCampaigns, funnelPurchases, lmsEnrollments, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProducts, lmsOrders, users } from "../../drizzle/schema";
+import { eq, and, asc, desc, sql, inArray, or, like, isNotNull } from "drizzle-orm";
 import { evaluateBranchRules, type VisitorContext } from "../lib/funnelBranchEngine";
 
 function slugify(text: string): string {
@@ -2097,6 +2097,269 @@ export const funnelAdminRouter = router({
       return { csvContent, total: leads.length };
     }),
 
+  /** Global contacts list — all leads across all funnels with conversion status */
+  globalContacts: protectedProcedure
+    .input(z.object({
+      page: z.number().int().min(1).default(1),
+      pageSize: z.number().int().min(1).max(200).default(50),
+      search: z.string().optional(),
+      funnelId: z.number().optional(),
+      conversionStatus: z.enum(["all", "lead", "registered", "purchaser"]).default("all"),
+    }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const offset = (input.page - 1) * input.pageSize;
+
+      // Build base query with funnel name join
+      const conditions: ReturnType<typeof eq>[] = [];
+      if (input.funnelId) conditions.push(eq(funnelLeads.funnelId, input.funnelId));
+
+      let baseQuery = db
+        .select({
+          id: funnelLeads.id,
+          email: funnelLeads.email,
+          name: funnelLeads.name,
+          phone: funnelLeads.phone,
+          funnelId: funnelLeads.funnelId,
+          funnelName: funnels.name,
+          source: funnelLeads.source,
+          tags: funnelLeads.tags,
+          ipAddress: funnelLeads.ipAddress,
+          referrer: funnelLeads.referrer,
+          userId: funnelLeads.userId,
+          createdAt: funnelLeads.createdAt,
+          lastActiveAt: funnelLeads.lastActiveAt,
+        })
+        .from(funnelLeads)
+        .leftJoin(funnels, eq(funnelLeads.funnelId, funnels.id));
+
+      if (conditions.length > 0) {
+        baseQuery = baseQuery.where(and(...conditions)) as typeof baseQuery;
+      }
+
+      // Get all matching leads
+      const allLeads = await baseQuery.orderBy(desc(funnelLeads.createdAt));
+
+      // Apply search filter in JS (for email/name)
+      let filtered = allLeads;
+      if (input.search) {
+        const s = input.search.toLowerCase();
+        filtered = allLeads.filter(l =>
+          l.email.toLowerCase().includes(s) ||
+          (l.name ?? "").toLowerCase().includes(s) ||
+          (l.funnelName ?? "").toLowerCase().includes(s)
+        );
+      }
+
+      // Get all unique emails to check registration and purchase status
+      const emails = [...new Set(filtered.map(l => l.email.toLowerCase()))];
+
+      // Match to users by email
+      const matchedUsers = emails.length > 0
+        ? await db.select({ id: users.id, email: users.email, createdAt: users.createdAt })
+            .from(users)
+            .where(sql`LOWER(${users.email}) IN (${sql.join(emails.map(e => sql`${e}`), sql`, `)})`)
+        : [];
+      const userEmailMap = new Map(matchedUsers.map(u => [u.email.toLowerCase(), u]));
+
+      // Check purchaser status: has any lms_order or digital_purchase
+      const purchaserUserIds = matchedUsers.length > 0
+        ? await db.selectDistinct({ userId: lmsOrders.userId })
+            .from(lmsOrders)
+            .where(inArray(lmsOrders.userId, matchedUsers.map(u => u.id)))
+        : [];
+      const purchaserDpIds = matchedUsers.length > 0
+        ? await db.selectDistinct({ userId: digitalPurchases.userId })
+            .from(digitalPurchases)
+            .where(inArray(digitalPurchases.userId, matchedUsers.map(u => u.id)))
+        : [];
+      const purchaserIds = new Set([
+        ...purchaserUserIds.map(p => p.userId),
+        ...purchaserDpIds.map(p => p.userId),
+      ]);
+
+      // Annotate each lead with conversion status
+      const annotated = filtered.map(l => {
+        const user = userEmailMap.get(l.email.toLowerCase());
+        const isPurchaser = user ? purchaserIds.has(user.id) : false;
+        const isRegistered = !!user;
+        const status: "purchaser" | "registered" | "lead" = isPurchaser ? "purchaser" : isRegistered ? "registered" : "lead";
+        return {
+          ...l,
+          conversionStatus: status,
+          registeredAt: user?.createdAt ?? null,
+          userId: user?.id ?? l.userId,
+        };
+      });
+
+      // Filter by conversion status
+      const statusFiltered = input.conversionStatus === "all"
+        ? annotated
+        : annotated.filter(l => l.conversionStatus === input.conversionStatus);
+
+      const total = statusFiltered.length;
+      const paginated = statusFiltered.slice(offset, offset + input.pageSize);
+
+      return { contacts: paginated, total, page: input.page, pageSize: input.pageSize };
+    }),
+
+  /** Conversion funnel summary — Lead → Registered → Purchaser metrics */
+  conversionFunnel: protectedProcedure
+    .input(z.object({ funnelId: z.number().optional() }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Total leads
+      const [{ totalLeads }] = await db
+        .select({ totalLeads: sql<number>`COUNT(DISTINCT ${funnelLeads.email})` })
+        .from(funnelLeads)
+        .where(input.funnelId ? eq(funnelLeads.funnelId, input.funnelId) : sql`1=1`);
+
+      // Get all lead emails
+      const leadEmailRows = await db
+        .select({ email: funnelLeads.email })
+        .from(funnelLeads)
+        .where(input.funnelId ? eq(funnelLeads.funnelId, input.funnelId) : sql`1=1`);
+      const leadEmails = [...new Set(leadEmailRows.map(r => r.email.toLowerCase()))];
+
+      if (leadEmails.length === 0) {
+        return {
+          totalLeads: 0, registeredUsers: 0, purchasers: 0,
+          leadToRegisteredRate: 0, registeredToPurchaserRate: 0, overallConversionRate: 0,
+          byFunnel: [], recentLeads: [],
+        };
+      }
+
+      // Match to registered users
+      const matchedUsers = await db
+        .select({ id: users.id, email: users.email, createdAt: users.createdAt })
+        .from(users)
+        .where(sql`LOWER(${users.email}) IN (${sql.join(leadEmails.map(e => sql`${e}`), sql`, `)})`);
+      const registeredUsers = matchedUsers.length;
+
+      // Check purchaser status
+      const purchaserLmsIds = matchedUsers.length > 0
+        ? await db.selectDistinct({ userId: lmsOrders.userId })
+            .from(lmsOrders).where(inArray(lmsOrders.userId, matchedUsers.map(u => u.id)))
+        : [];
+      const purchaserDpIds = matchedUsers.length > 0
+        ? await db.selectDistinct({ userId: digitalPurchases.userId })
+            .from(digitalPurchases).where(inArray(digitalPurchases.userId, matchedUsers.map(u => u.id)))
+        : [];
+      const purchaserIds = new Set([...purchaserLmsIds.map(p => p.userId), ...purchaserDpIds.map(p => p.userId)]);
+      const purchasers = purchaserIds.size;
+
+      // Per-funnel breakdown
+      const funnelList = await db
+        .select({ id: funnels.id, name: funnels.name })
+        .from(funnels)
+        .where(input.funnelId ? eq(funnels.id, input.funnelId) : sql`1=1`);
+
+      const byFunnel = await Promise.all(funnelList.map(async (f) => {
+        const [{ count }] = await db
+          .select({ count: sql<number>`COUNT(DISTINCT ${funnelLeads.email})` })
+          .from(funnelLeads).where(eq(funnelLeads.funnelId, f.id));
+        const funnelEmails = await db
+          .select({ email: funnelLeads.email })
+          .from(funnelLeads).where(eq(funnelLeads.funnelId, f.id));
+        const fEmails = [...new Set(funnelEmails.map(r => r.email.toLowerCase()))];
+        const fUsers = fEmails.length > 0
+          ? await db.select({ id: users.id }).from(users)
+              .where(sql`LOWER(${users.email}) IN (${sql.join(fEmails.map(e => sql`${e}`), sql`, `)})`)
+          : [];
+        const fPurchasers = fUsers.filter(u => purchaserIds.has(u.id)).length;
+        return {
+          funnelId: f.id,
+          funnelName: f.name,
+          leads: Number(count),
+          registered: fUsers.length,
+          purchasers: fPurchasers,
+          registrationRate: count > 0 ? Math.round((fUsers.length / Number(count)) * 100) : 0,
+          purchaseRate: fUsers.length > 0 ? Math.round((fPurchasers / fUsers.length) * 100) : 0,
+        };
+      }));
+
+      // Recent leads (last 10)
+      const recentLeads = await db
+        .select({ email: funnelLeads.email, name: funnelLeads.name, funnelName: funnels.name, createdAt: funnelLeads.createdAt })
+        .from(funnelLeads)
+        .leftJoin(funnels, eq(funnelLeads.funnelId, funnels.id))
+        .where(input.funnelId ? eq(funnelLeads.funnelId, input.funnelId) : sql`1=1`)
+        .orderBy(desc(funnelLeads.createdAt))
+        .limit(10);
+
+      return {
+        totalLeads: Number(totalLeads),
+        registeredUsers,
+        purchasers,
+        leadToRegisteredRate: totalLeads > 0 ? Math.round((registeredUsers / Number(totalLeads)) * 100) : 0,
+        registeredToPurchaserRate: registeredUsers > 0 ? Math.round((purchasers / registeredUsers) * 100) : 0,
+        overallConversionRate: totalLeads > 0 ? Math.round((purchasers / Number(totalLeads)) * 100) : 0,
+        byFunnel: byFunnel.filter(f => f.leads > 0),
+        recentLeads,
+      };
+    }),
+
+  /** Export all contacts as CSV with conversion status */
+  exportAllContactsCSV: protectedProcedure
+    .input(z.object({ funnelId: z.number().optional() }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const leads = await db
+        .select({
+          id: funnelLeads.id, email: funnelLeads.email, name: funnelLeads.name,
+          phone: funnelLeads.phone, funnelName: funnels.name, source: funnelLeads.source,
+          tags: funnelLeads.tags, ipAddress: funnelLeads.ipAddress,
+          referrer: funnelLeads.referrer, createdAt: funnelLeads.createdAt,
+        })
+        .from(funnelLeads)
+        .leftJoin(funnels, eq(funnelLeads.funnelId, funnels.id))
+        .where(input.funnelId ? eq(funnelLeads.funnelId, input.funnelId) : sql`1=1`)
+        .orderBy(desc(funnelLeads.createdAt));
+
+      const emails = [...new Set(leads.map(l => l.email.toLowerCase()))];
+      const matchedUsers = emails.length > 0
+        ? await db.select({ id: users.id, email: users.email, createdAt: users.createdAt })
+            .from(users)
+            .where(sql`LOWER(${users.email}) IN (${sql.join(emails.map(e => sql`${e}`), sql`, `)})`)
+        : [];
+      const userEmailMap = new Map(matchedUsers.map(u => [u.email.toLowerCase(), u]));
+      const purchaserLmsIds = matchedUsers.length > 0
+        ? await db.selectDistinct({ userId: lmsOrders.userId }).from(lmsOrders)
+            .where(inArray(lmsOrders.userId, matchedUsers.map(u => u.id)))
+        : [];
+      const purchaserDpIds = matchedUsers.length > 0
+        ? await db.selectDistinct({ userId: digitalPurchases.userId }).from(digitalPurchases)
+            .where(inArray(digitalPurchases.userId, matchedUsers.map(u => u.id)))
+        : [];
+      const purchaserIds = new Set([...purchaserLmsIds.map(p => p.userId), ...purchaserDpIds.map(p => p.userId)]);
+
+      const escape = (s: string | number | null | undefined) => `"${String(s ?? "").replace(/"/g, '""')}"`;
+      const headers = ["ID", "Email", "Name", "Phone", "Funnel", "Source", "Tags", "IP Address", "Referrer", "Conversion Status", "Registered At", "Lead Captured At"];
+      const rows = leads.map(l => {
+        const user = userEmailMap.get(l.email.toLowerCase());
+        const isPurchaser = user ? purchaserIds.has(user.id) : false;
+        const status = isPurchaser ? "Purchaser" : user ? "Registered" : "Lead";
+        return [
+          l.id, l.email, l.name, l.phone, l.funnelName, l.source, l.tags,
+          l.ipAddress, l.referrer, status,
+          user?.createdAt ? new Date(user.createdAt).toISOString() : "",
+          l.createdAt ? new Date(l.createdAt).toISOString() : "",
+        ].map(escape).join(",");
+      });
+
+      const csvContent = [headers.map(escape).join(","), ...rows].join("\n");
+      return { csvContent, total: leads.length };
+    }),
+
   /** Get all funnels with their pages (including blocks) for the block picker "Copy from Other Pages" tab */
   getFunnelsWithPages: protectedProcedure
     .query(async ({ ctx }) => {
@@ -2120,5 +2383,280 @@ export const funnelAdminRouter = router({
         }
       }
       return result;
+    }),
+
+  /** Global contacts/leads across all funnels with conversion status */
+  globalContacts: protectedProcedure
+    .input(z.object({
+      page: z.number().min(1).default(1),
+      pageSize: z.number().min(1).max(200).default(50),
+      search: z.string().optional(),
+      funnelId: z.number().optional(),
+      conversionStatus: z.enum(["all", "lead", "registered", "purchaser"]).default("all"),
+    }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Build WHERE conditions
+      const conditions: ReturnType<typeof eq>[] = [];
+      if (input.funnelId) conditions.push(eq(funnelLeads.funnelId, input.funnelId));
+
+      // Get all leads with funnel name and user match
+      const rows = await db
+        .select({
+          id: funnelLeads.id,
+          email: funnelLeads.email,
+          name: funnelLeads.name,
+          phone: funnelLeads.phone,
+          source: funnelLeads.source,
+          tags: funnelLeads.tags,
+          funnelId: funnelLeads.funnelId,
+          funnelName: funnels.name,
+          userId: funnelLeads.userId,
+          createdAt: funnelLeads.createdAt,
+          userCreatedAt: users.createdAt,
+        })
+        .from(funnelLeads)
+        .leftJoin(funnels, eq(funnelLeads.funnelId, funnels.id))
+        .leftJoin(users, eq(funnelLeads.userId, users.id))
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(funnelLeads.createdAt));
+
+      // Check purchaser status for each lead by email
+      const emails = [...new Set(rows.map(r => r.email).filter(Boolean))];
+      let purchaserEmails = new Set<string>();
+      if (emails.length > 0) {
+        const purchasers = await db
+          .select({ email: users.email })
+          .from(users)
+          .where(and(
+            inArray(users.email, emails),
+            or(
+              isNotNull(
+                db.select({ id: lmsOrders.id }).from(lmsOrders).where(eq(lmsOrders.userId, users.id)).limit(1)
+              ),
+              isNotNull(
+                db.select({ id: digitalPurchases.id }).from(digitalPurchases).where(eq(digitalPurchases.userId, users.id)).limit(1)
+              )
+            )
+          ));
+        purchaserEmails = new Set(purchasers.map(p => p.email).filter(Boolean) as string[]);
+      }
+
+      // Enrich with conversion status
+      const enriched = rows.map(r => {
+        let conversionStatus: "lead" | "registered" | "purchaser" = "lead";
+        if (r.userId) {
+          conversionStatus = purchaserEmails.has(r.email ?? "") ? "purchaser" : "registered";
+        }
+        return {
+          ...r,
+          conversionStatus,
+          registeredAt: r.userCreatedAt ?? null,
+        };
+      });
+
+      // Filter by conversion status
+      const filtered = input.conversionStatus === "all"
+        ? enriched
+        : enriched.filter(r => r.conversionStatus === input.conversionStatus);
+
+      // Apply search filter
+      const searched = input.search
+        ? filtered.filter(r =>
+            r.email?.toLowerCase().includes(input.search!.toLowerCase()) ||
+            r.name?.toLowerCase().includes(input.search!.toLowerCase()) ||
+            r.funnelName?.toLowerCase().includes(input.search!.toLowerCase())
+          )
+        : filtered;
+
+      // Deduplicate by email (keep most recent)
+      const seen = new Map<string, typeof searched[0]>();
+      for (const r of searched) {
+        const key = r.email ?? `id-${r.id}`;
+        if (!seen.has(key) || (r.createdAt && seen.get(key)!.createdAt && r.createdAt > seen.get(key)!.createdAt!)) {
+          seen.set(key, r);
+        }
+      }
+      const deduped = Array.from(seen.values());
+
+      // Paginate
+      const total = deduped.length;
+      const offset = (input.page - 1) * input.pageSize;
+      const contacts = deduped.slice(offset, offset + input.pageSize);
+
+      return { contacts, total };
+    }),
+
+  /** Conversion funnel metrics: Lead → Registered → Purchaser */
+  conversionFunnel: protectedProcedure
+    .input(z.object({ funnelId: z.number().optional() }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Get all leads (optionally filtered by funnel)
+      const leadsQuery = db
+        .select({ email: funnelLeads.email, funnelId: funnelLeads.funnelId, funnelName: funnels.name, userId: funnelLeads.userId, createdAt: funnelLeads.createdAt })
+        .from(funnelLeads)
+        .leftJoin(funnels, eq(funnelLeads.funnelId, funnels.id));
+
+      const allLeads = input.funnelId
+        ? await leadsQuery.where(eq(funnelLeads.funnelId, input.funnelId))
+        : await leadsQuery;
+
+      // Unique emails
+      const uniqueEmails = [...new Set(allLeads.map(l => l.email).filter(Boolean))] as string[];
+      const totalLeads = uniqueEmails.length;
+
+      // Count registered users (have a user account)
+      const registeredRows = await db
+        .select({ email: users.email })
+        .from(users)
+        .where(inArray(users.email, uniqueEmails.length > 0 ? uniqueEmails : [""]))
+      const registeredEmails = new Set(registeredRows.map(r => r.email).filter(Boolean) as string[]);
+      const registeredUsers = registeredEmails.size;
+
+      // Count purchasers (have at least one order)
+      let purchaserCount = 0;
+      if (registeredEmails.size > 0) {
+        const userRows = await db
+          .select({ id: users.id, email: users.email })
+          .from(users)
+          .where(inArray(users.email, [...registeredEmails]));
+        const userIds = userRows.map(u => u.id);
+        if (userIds.length > 0) {
+          const [lmsOrderCount] = await db
+            .select({ count: sql<number>`COUNT(DISTINCT user_id)` })
+            .from(lmsOrders)
+            .where(inArray(lmsOrders.userId, userIds));
+          const [dpCount] = await db
+            .select({ count: sql<number>`COUNT(DISTINCT user_id)` })
+            .from(digitalPurchases)
+            .where(inArray(digitalPurchases.userId, userIds));
+          purchaserCount = Math.min(registeredUsers, (lmsOrderCount?.count ?? 0) + (dpCount?.count ?? 0));
+        }
+      }
+
+      // Per-funnel breakdown
+      const funnelMap = new Map<number, { funnelId: number; funnelName: string; emails: Set<string> }>();
+      for (const lead of allLeads) {
+        if (!lead.funnelId || !lead.email) continue;
+        if (!funnelMap.has(lead.funnelId)) {
+          funnelMap.set(lead.funnelId, { funnelId: lead.funnelId, funnelName: lead.funnelName ?? "Unknown", emails: new Set() });
+        }
+        funnelMap.get(lead.funnelId)!.emails.add(lead.email);
+      }
+
+      const byFunnel = await Promise.all([...funnelMap.values()].map(async f => {
+        const fEmails = [...f.emails];
+        const fRegistered = fEmails.filter(e => registeredEmails.has(e)).length;
+        const fUserRows = await db.select({ id: users.id }).from(users).where(inArray(users.email, fEmails.length > 0 ? fEmails : [""]));
+        const fUserIds = fUserRows.map(u => u.id);
+        let fPurchasers = 0;
+        if (fUserIds.length > 0) {
+          const [c1] = await db.select({ count: sql<number>`COUNT(DISTINCT user_id)` }).from(lmsOrders).where(inArray(lmsOrders.userId, fUserIds));
+          const [c2] = await db.select({ count: sql<number>`COUNT(DISTINCT user_id)` }).from(digitalPurchases).where(inArray(digitalPurchases.userId, fUserIds));
+          fPurchasers = Math.min(fRegistered, (c1?.count ?? 0) + (c2?.count ?? 0));
+        }
+        return {
+          funnelId: f.funnelId,
+          funnelName: f.funnelName,
+          leads: fEmails.length,
+          registered: fRegistered,
+          purchasers: fPurchasers,
+          registrationRate: fEmails.length > 0 ? Math.round((fRegistered / fEmails.length) * 100) : 0,
+          purchaseRate: fRegistered > 0 ? Math.round((fPurchasers / fRegistered) * 100) : 0,
+        };
+      }));
+
+      // Recent leads
+      const recentLeads = allLeads
+        .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0))
+        .slice(0, 10)
+        .map(l => ({ email: l.email, name: null as string | null, funnelName: l.funnelName, createdAt: l.createdAt }));
+
+      return {
+        totalLeads,
+        registeredUsers,
+        purchasers: purchaserCount,
+        leadToRegisteredRate: totalLeads > 0 ? Math.round((registeredUsers / totalLeads) * 100) : 0,
+        registeredToPurchaserRate: registeredUsers > 0 ? Math.round((purchaserCount / registeredUsers) * 100) : 0,
+        overallConversionRate: totalLeads > 0 ? Math.round((purchaserCount / totalLeads) * 100) : 0,
+        byFunnel,
+        recentLeads,
+      };
+    }),
+
+  /** Export all contacts as CSV */
+  exportAllContactsCSV: protectedProcedure
+    .input(z.object({ funnelId: z.number().optional() }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const conditions: ReturnType<typeof eq>[] = [];
+      if (input.funnelId) conditions.push(eq(funnelLeads.funnelId, input.funnelId));
+
+      const rows = await db
+        .select({
+          id: funnelLeads.id,
+          email: funnelLeads.email,
+          name: funnelLeads.name,
+          phone: funnelLeads.phone,
+          source: funnelLeads.source,
+          tags: funnelLeads.tags,
+          funnelName: funnels.name,
+          userId: funnelLeads.userId,
+          createdAt: funnelLeads.createdAt,
+          userCreatedAt: users.createdAt,
+        })
+        .from(funnelLeads)
+        .leftJoin(funnels, eq(funnelLeads.funnelId, funnels.id))
+        .leftJoin(users, eq(funnelLeads.userId, users.id))
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(funnelLeads.createdAt));
+
+      const emails = [...new Set(rows.map(r => r.email).filter(Boolean))] as string[];
+      let purchaserEmails = new Set<string>();
+      if (emails.length > 0) {
+        const purchaserUsers = await db
+          .select({ email: users.email, id: users.id })
+          .from(users)
+          .where(inArray(users.email, emails));
+        const purchaserUserIds = purchaserUsers.map(u => u.id);
+        if (purchaserUserIds.length > 0) {
+          const [c1] = await db.select({ count: sql<number>`COUNT(DISTINCT user_id)` }).from(lmsOrders).where(inArray(lmsOrders.userId, purchaserUserIds));
+          if ((c1?.count ?? 0) > 0) {
+            const pRows = await db.select({ userId: lmsOrders.userId }).from(lmsOrders).where(inArray(lmsOrders.userId, purchaserUserIds));
+            const pUserIds = new Set(pRows.map(r => r.userId));
+            purchaserEmails = new Set(purchaserUsers.filter(u => pUserIds.has(u.id)).map(u => u.email).filter(Boolean) as string[]);
+          }
+        }
+      }
+
+      const header = "ID,Email,Name,Phone,Funnel,Status,Source,Tags,Lead Captured,Registered At";
+      const csvRows = rows.map(r => {
+        const status = r.userId ? (purchaserEmails.has(r.email ?? "") ? "purchaser" : "registered") : "lead";
+        const escape = (v: string | null | undefined) => `"${(v ?? "").replace(/"/g, '""')}"`;
+        return [
+          r.id,
+          escape(r.email),
+          escape(r.name),
+          escape(r.phone),
+          escape(r.funnelName),
+          status,
+          escape(r.source),
+          escape(r.tags),
+          r.createdAt ? new Date(r.createdAt).toISOString() : "",
+          r.userCreatedAt ? new Date(r.userCreatedAt).toISOString() : "",
+        ].join(",");
+      });
+
+      return { csvContent: [header, ...csvRows].join("\n"), total: rows.length };
     }),
 });

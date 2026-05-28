@@ -1190,8 +1190,8 @@ export default function PlatformAdmin() {
     { id: "media-repository", href: "/admin/media-repository", icon: HardDrive, label: "Media Repository", description: "Shared media library with AAUS/IHE brand tags", color: "#0f766e" },
     { id: "downloads", href: "/admin/lms?tab=downloads", icon: FileDown, label: "Digital Downloads", description: "Manage downloadable products and files", color: "#b45309" },
     { id: "lms", href: "/admin/lms", icon: Library, label: "LMS Management", description: "Manage courses, videos, and learning content", color: "#1d4ed8" },
-    { id: "funnels", href: "/admin/funnels", icon: LayoutTemplate, label: "Funnel Builder", description: "Build and manage marketing funnels", color: "#be185d" },
-    { id: "members", href: "/admin/members", icon: Users, label: "Members", description: "Unified hub: users, enrollments, sales, memberships, contacts, and activity logs", color: "#0d9488" },
+    { id: "funnels", href: "/admin/funnels", icon: LayoutTemplate, label: "Funnel Management", description: "Build funnels, manage contacts/leads, and track Lead → User → Purchaser conversions", color: "#be185d" },
+    { id: "members", href: "/admin/members", icon: Users, label: "Members", description: "Registered users, enrollments, sales, memberships, and activity logs", color: "#0d9488" },
     { id: "discount-codes", href: "/admin/discount-codes", icon: Tag, label: "Discount Codes", description: "Create and manage Stripe coupons and promo codes for all products", color: "#f59e0b" },
   ];
 

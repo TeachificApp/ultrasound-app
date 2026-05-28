@@ -1410,6 +1410,292 @@ function getTemplatePages(templateName: string): Array<{ type: PageType; title: 
   ];
 }
 
+// ─── Global Contacts Tab ─────────────────────────────────────────────────────
+
+function GlobalContactsTab({ funnelList }: { funnelList: Funnel[] }) {
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [funnelFilter, setFunnelFilter] = useState<number | undefined>(undefined);
+  const [statusFilter, setStatusFilter] = useState<"all" | "lead" | "registered" | "purchaser">("all");
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const { data, isLoading } = trpc.funnelAdmin.globalContacts.useQuery({
+    page,
+    pageSize: 50,
+    search: debouncedSearch || undefined,
+    funnelId: funnelFilter,
+    conversionStatus: statusFilter,
+  });
+
+  const { refetch: fetchCSV } = trpc.funnelAdmin.exportAllContactsCSV.useQuery(
+    { funnelId: funnelFilter },
+    { enabled: false }
+  );
+
+  const handleExportCSV = async () => {
+    const result = await fetchCSV();
+    if (result.data?.csvContent) {
+      const blob = new Blob([result.data.csvContent], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `contacts-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  const statusBadge = (status: string) => {
+    if (status === "purchaser") return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Purchaser</span>;
+    if (status === "registered") return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Registered</span>;
+    return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Lead</span>;
+  };
+
+  const totalPages = data ? Math.ceil(data.total / 50) : 1;
+
+  return (
+    <div>
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 mb-4">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search by email, name, or funnel..."
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
+            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+          />
+        </div>
+        <select
+          value={funnelFilter ?? ""}
+          onChange={e => { setFunnelFilter(e.target.value ? Number(e.target.value) : undefined); setPage(1); }}
+          className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+        >
+          <option value="">All Funnels</option>
+          {funnelList.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+        </select>
+        <select
+          value={statusFilter}
+          onChange={e => { setStatusFilter(e.target.value as typeof statusFilter); setPage(1); }}
+          className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+        >
+          <option value="all">All Statuses</option>
+          <option value="lead">Lead Only</option>
+          <option value="registered">Registered</option>
+          <option value="purchaser">Purchaser</option>
+        </select>
+        <Button variant="outline" size="sm" onClick={handleExportCSV} className="gap-1.5">
+          <Download size={14} /> Export CSV
+        </Button>
+      </div>
+
+      {/* Count */}
+      {data && (
+        <p className="text-sm text-gray-500 mb-3">{data.total.toLocaleString()} contact{data.total !== 1 ? "s" : ""}</p>
+      )}
+
+      {/* Table */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Contact</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Funnel</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Source</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Tags</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Lead Captured</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Registered</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i}><td colSpan={7} className="px-4 py-3"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
+                ))
+              ) : !data?.contacts.length ? (
+                <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-400">No contacts found</td></tr>
+              ) : (
+                data.contacts.map(c => (
+                  <tr key={c.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-gray-900">{c.name || <span className="text-gray-400 italic">Unknown</span>}</div>
+                      <div className="text-xs text-gray-500">{c.email}</div>
+                      {c.phone && <div className="text-xs text-gray-400">{c.phone}</div>}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 text-xs">{c.funnelName ?? "-"}</td>
+                    <td className="px-4 py-3">{statusBadge(c.conversionStatus)}</td>
+                    <td className="px-4 py-3 text-xs text-gray-500">{c.source ?? "-"}</td>
+                    <td className="px-4 py-3">
+                      {c.tags ? c.tags.split(",").map(t => (
+                        <span key={t} className="inline-block mr-1 px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">{t.trim()}</span>
+                      )) : <span className="text-gray-300">-</span>}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-500">{c.createdAt ? new Date(c.createdAt).toLocaleDateString() : "-"}</td>
+                    <td className="px-4 py-3 text-xs text-gray-500">{c.registeredAt ? new Date(c.registeredAt).toLocaleDateString() : <span className="text-gray-300">-</span>}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4">
+          <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Previous</Button>
+          <span className="text-sm text-gray-500">Page {page} of {totalPages}</span>
+          <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Conversion Tracker Tab ───────────────────────────────────────────────────
+
+function ConversionTrackerTab({ funnelList }: { funnelList: Funnel[] }) {
+  const [funnelFilter, setFunnelFilter] = useState<number | undefined>(undefined);
+
+  const { data, isLoading } = trpc.funnelAdmin.conversionFunnel.useQuery({ funnelId: funnelFilter });
+
+  const metricCard = (label: string, value: number | string, sub?: string, color?: string) => (
+    <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">{label}</div>
+      <div className={`text-3xl font-bold ${color ?? "text-gray-900"}`}>{value}</div>
+      {sub && <div className="text-xs text-gray-400 mt-1">{sub}</div>}
+    </div>
+  );
+
+  return (
+    <div>
+      {/* Funnel filter */}
+      <div className="flex items-center gap-3 mb-6">
+        <Filter size={14} className="text-gray-400" />
+        <select
+          value={funnelFilter ?? ""}
+          onChange={e => setFunnelFilter(e.target.value ? Number(e.target.value) : undefined)}
+          className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+        >
+          <option value="">All Funnels</option>
+          {funnelList.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+        </select>
+      </div>
+
+      {isLoading ? (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+          {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-28 bg-gray-100 rounded-xl animate-pulse" />)}
+        </div>
+      ) : data ? (
+        <>
+          {/* Funnel Metrics */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+            {metricCard("Total Leads", data.totalLeads.toLocaleString(), "unique emails captured")}
+            {metricCard("Registered Users", data.registeredUsers.toLocaleString(), "created an account", "text-blue-600")}
+            {metricCard("Purchasers", data.purchasers.toLocaleString(), "completed a purchase", "text-green-600")}
+            {metricCard("Lead → Registered", `${data.leadToRegisteredRate}%`, "of leads registered", data.leadToRegisteredRate > 20 ? "text-green-600" : "text-orange-500")}
+            {metricCard("Registered → Buyer", `${data.registeredToPurchaserRate}%`, "of users purchased", data.registeredToPurchaserRate > 10 ? "text-green-600" : "text-orange-500")}
+            {metricCard("Overall Conversion", `${data.overallConversionRate}%`, "lead to purchaser", data.overallConversionRate > 5 ? "text-green-600" : "text-red-500")}
+          </div>
+
+          {/* Visual Funnel */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">Conversion Funnel</h3>
+            <div className="flex items-end gap-2 h-32">
+              {[
+                { label: "Leads", value: data.totalLeads, color: "bg-gray-400" },
+                { label: "Registered", value: data.registeredUsers, color: "bg-blue-400" },
+                { label: "Purchasers", value: data.purchasers, color: "bg-green-500" },
+              ].map((step, i) => {
+                const maxVal = data.totalLeads || 1;
+                const height = Math.max(8, Math.round((step.value / maxVal) * 100));
+                return (
+                  <div key={i} className="flex flex-col items-center flex-1">
+                    <div className="text-sm font-bold text-gray-700 mb-1">{step.value.toLocaleString()}</div>
+                    <div
+                      className={`w-full rounded-t-lg ${step.color} transition-all`}
+                      style={{ height: `${height}%` }}
+                    />
+                    <div className="text-xs text-gray-500 mt-2 text-center">{step.label}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Per-Funnel Breakdown */}
+          {data.byFunnel.length > 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
+              <div className="px-5 py-4 border-b border-gray-100">
+                <h3 className="text-sm font-semibold text-gray-700">Per-Funnel Breakdown</h3>
+              </div>
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Funnel</th>
+                    <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Leads</th>
+                    <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Registered</th>
+                    <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Purchasers</th>
+                    <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Reg. Rate</th>
+                    <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Purchase Rate</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {data.byFunnel.map(f => (
+                    <tr key={f.funnelId} className="hover:bg-gray-50">
+                      <td className="px-5 py-3 font-medium text-gray-900">{f.funnelName}</td>
+                      <td className="px-5 py-3 text-right text-gray-600">{f.leads.toLocaleString()}</td>
+                      <td className="px-5 py-3 text-right text-blue-600">{f.registered.toLocaleString()}</td>
+                      <td className="px-5 py-3 text-right text-green-600">{f.purchasers.toLocaleString()}</td>
+                      <td className="px-5 py-3 text-right">
+                        <span className={`font-medium ${f.registrationRate > 20 ? "text-green-600" : "text-orange-500"}`}>{f.registrationRate}%</span>
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        <span className={`font-medium ${f.purchaseRate > 10 ? "text-green-600" : "text-orange-500"}`}>{f.purchaseRate}%</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Recent Leads */}
+          {data.recentLeads.length > 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100">
+                <h3 className="text-sm font-semibold text-gray-700">Recent Leads</h3>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {data.recentLeads.map((l, i) => (
+                  <div key={i} className="flex items-center justify-between px-5 py-3">
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">{l.name || l.email}</div>
+                      {l.name && <div className="text-xs text-gray-500">{l.email}</div>}
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs text-gray-500">{l.funnelName}</div>
+                      <div className="text-xs text-gray-400">{l.createdAt ? new Date(l.createdAt).toLocaleDateString() : ""}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function FunnelBuilder() {
