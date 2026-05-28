@@ -173,6 +173,15 @@ export const embeddedCheckoutRouter = router({
       if (input.sourceFunnelPageId) metadata.funnel_page_id = input.sourceFunnelPageId.toString();
       if (input.sourceLandingPageId) metadata.landing_page_id = input.sourceLandingPageId.toString();
       if (input.sourceLmsLessonId) metadata.lms_lesson_id = input.sourceLmsLessonId.toString();
+      // Block checkout if enrollment close date has passed for cohort courses
+      if (input.lmsCourseId) {
+        const [courseRow] = await db.select({ enrollmentCloseDate: lmsCourses.enrollmentCloseDate })
+          .from(lmsCourses).where(eq(lmsCourses.id, input.lmsCourseId)).limit(1);
+        if (courseRow?.enrollmentCloseDate && new Date(courseRow.enrollmentCloseDate) < new Date()) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Enrollment is closed for this cohort" });
+        }
+      }
+
       // Fulfillment metadata — used by webhook to auto-enroll/grant access
       if (input.lmsCourseId) metadata.fulfillment_course_id = input.lmsCourseId.toString();
       if (input.fulfillmentBrand) metadata.fulfillment_brand = input.fulfillmentBrand;

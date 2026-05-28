@@ -823,6 +823,7 @@ export default function CourseLanding() {
   const handleEnroll = async () => {
     if (!user) { navigate("/login"); return; }
     if (enrollment) { navigate(`/courses/${slug}/player`); return; }
+    if (isEnrollmentClosed) return; // Enrollment is closed — do nothing
     setEnrolling(true);
     try {
       // If a secondary pricing option is selected, use it; otherwise use primary course pricing
@@ -867,7 +868,8 @@ export default function CourseLanding() {
   const lp = course.landingPage;
   const price = formatPrice(course);
   const pricingType = course.pricingType ?? (course.isFree ? "free" : "one_time");
-  const ctaText = enrollment ? "Continue Learning" : (lp?.ctaText ?? "Enroll Now");
+  const isEnrollmentClosed = !enrollment && course.enrollmentCloseDate && new Date(course.enrollmentCloseDate) < new Date();
+  const ctaText = enrollment ? "Continue Learning" : isEnrollmentClosed ? "Enrollment Closed" : (lp?.ctaText ?? "Enroll Now");
   const totalLessons = (course.sections ?? []).reduce((sum: number, s: any) => sum + (s.lessons?.length ?? 0), 0)
     + ((course as any).topLevelLessons?.length ?? 0);
   const totalDuration = (course.sections ?? []).reduce((sum: number, s: any) =>

@@ -3456,3 +3456,27 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Add 'Insert Table' button to the content block picker (alongside Text, Image, Video, etc.)
 - [ ] Render TableBlock in read-only mode in CoursePlayer and funnel page preview
 - [ ] Support copy/paste of external tables into the TableBlock editor
+
+## Cohort Student Page (May 2026)
+- [x] Create /cohort/:courseId student-facing page showing sessions and assignments
+- [x] Show upcoming live sessions with date/time, meeting link, recording link
+- [x] Show assignments with due dates and submission type
+- [x] Show enrollment close date / enrollment status
+- [x] Gate page to enrolled users only (redirect to course landing if not enrolled)
+- [x] Add route in App.tsx for /cohort/:courseId
+
+## Standalone Table Content Block (May 2026)
+- [ ] Add 'table' block type to lesson/page content block schema
+- [ ] Build TableBlock component with add/remove rows and columns, cell text editing
+- [ ] Add cell background color picker per cell
+- [ ] Add border style toggle (bordered/borderless/header-only)
+- [ ] Add 'Insert Table' button to content block picker
+- [ ] Render TableBlock in read-only mode in CoursePlayer and funnel page preview
+- [ ] Support copy/paste of external tables into the TableBlock editor
+
+## Enrollment Close Date Enforcement (May 2026)
+- [x] Server: check enrollmentCloseDate in createCheckoutSession — reject if past
+- [x] Server: check enrollmentCloseDate in embeddedCheckoutRouter — reject if past
+- [ ] Server: check enrollmentCloseDate in funnelRouter checkout — reject if past
+- [x] Client: CourseLanding shows "Enrollment Closed" badge when past enrollmentCloseDate
+- [x] Client: CourseLanding disables/hides all purchase buttons when enrollment is closed

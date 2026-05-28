@@ -37,10 +37,11 @@ function CourseCard({ course, enrolledCourseIds, purchasedProductSlugs }: { cour
     ? (isOwned ? `/downloads/${course.slug}/files` : `/downloads/${course.slug}`)
     : course._source === "sono_quiz"
     ? `/quiz/${course.id}`
+    : course.type === "cohort" && isOwned ? `/cohort/${course.id}`
     : (isOwned ? `/courses/${course.slug}/player` : `/courses/${course.slug}`);
   const ctaLabel = isOwned
-    ? (course.type === "download" ? "Access Download" : course.type === "quiz" ? "Continue Quiz" : "Continue Learning")
-    : (course.type === "quiz" ? "Take Quiz" : course.type === "download" ? "Get Download" : "View Course");
+    ? (course.type === "download" ? "Access Download" : course.type === "quiz" ? "Continue Quiz" : course.type === "cohort" ? "View Schedule" : "Continue Learning")
+    : (course.type === "quiz" ? "Take Quiz" : course.type === "download" ? "Get Download" : course.type === "cohort" ? "View Cohort" : "View Course");
   return (
     <Link href={href}>
       <div className="group bg-white rounded-xl border border-gray-200 hover:border-teal-400 hover:shadow-lg transition-all duration-200 overflow-hidden cursor-pointer flex flex-col h-full">

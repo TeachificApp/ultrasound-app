@@ -980,6 +980,11 @@ export const lmsLearnerRouter = router({
       const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
 
+      // Block checkout if enrollment close date has passed
+      if (course.enrollmentCloseDate && new Date(course.enrollmentCloseDate) < new Date()) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Enrollment is closed for this cohort" });
+      }
+
       // Resolve pricing: secondary option overrides primary course pricing
       let pricingType: string = course.pricingType ?? (course.isFree ? "free" : "one_time");
       let effectivePrice = course.price;
@@ -1517,6 +1522,38 @@ export const lmsLearnerRouter = router({
 
       return { course, enrollment: effectiveEnrollment, sections: sectionsWithLessons, topLevelLessons, progress, instructors, isAdminPreview: !!isAdminPreview && !enrollment };
     }),
+
+  /** Get cohort schedule (sessions + assignments) for an enrolled student */
+  getCohortSchedule: protectedProcedure
+    .input(z.object({ courseId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Verify the user is enrolled (or is admin)
+      const isAdmin = ctx.user.role === "admin";
+      if (!isAdmin) {
+        const [enrollment] = await db.select({ id: lmsEnrollments.id })
+          .from(lmsEnrollments)
+          .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, input.courseId)))
+          .limit(1);
+        if (!enrollment) throw new TRPCError({ code: "FORBIDDEN", message: "You are not enrolled in this cohort" });
+      }
+      const [course] = await db.select({
+        id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug,
+        description: lmsCourses.description, thumbnailUrl: lmsCourses.thumbnailUrl,
+        enrollmentCloseDate: lmsCourses.enrollmentCloseDate,
+      }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      const [sessions, assignments] = await Promise.all([
+        db.select().from(lmsCohortSessions)
+          .where(and(eq(lmsCohortSessions.courseId, input.courseId), eq(lmsCohortSessions.status, "published")))
+          .orderBy(asc(lmsCohortSessions.sessionDate)),
+        db.select().from(lmsCohortAssignments)
+          .where(and(eq(lmsCohortAssignments.courseId, input.courseId), eq(lmsCohortAssignments.status, "published")))
+          .orderBy(asc(lmsCohortAssignments.position), asc(lmsCohortAssignments.dueDate)),
+      ]);
+      return { course, sessions, assignments };
+    }),
 });
 
 // ─── Admin Router ─────────────────────────────────────────────────────────────
@@ -1561,14 +1598,14 @@ export const lmsAdminRouter = router({
       type: z.enum(["course", "quiz", "download", "cohort"]).default("course"),
       brand: z.enum(["aaus", "iheartecho"]).default("aaus"),
       pricingType: z.enum(["free", "one_time", "subscription", "payment_plan", "trial_then_subscription"]).default("one_time"),
-      price: z.number().int().min(0).default(0),
+      price: z.number().min(0).default(0),
       isFree: z.boolean().default(false),
       subscriptionInterval: z.enum(["monthly", "quarterly", "annual"]).optional(),
       trialDays: z.number().int().min(0).nullable().optional(),
       accessDurationDays: z.number().int().min(1).nullable().optional(),
-      downPayment: z.number().int().min(0).optional(),
+      downPayment: z.number().min(0).optional(),
       installmentCount: z.number().int().min(0).optional(),
-      installmentAmount: z.number().int().min(0).optional(),
+      installmentAmount: z.number().min(0).optional(),
       installmentIntervalDays: z.number().int().min(1).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -1607,15 +1644,15 @@ export const lmsAdminRouter = router({
       type: z.enum(["course", "quiz", "download", "cohort"]).optional(),
       enrollmentCloseDate: z.string().nullable().optional(), // ISO date string or null
       brand: z.enum(["aaus", "iheartecho"]).optional(),
-      price: z.number().int().min(0).optional(),
+      price: z.number().min(0).optional(),
       isFree: z.boolean().optional(),
       pricingType: z.enum(["free", "one_time", "subscription", "payment_plan", "trial_then_subscription"]).optional(),
       subscriptionInterval: z.enum(["monthly", "quarterly", "annual"]).nullable().optional(),
       trialDays: z.number().int().min(0).nullable().optional(),
       accessDurationDays: z.number().int().min(1).nullable().optional(),
-      downPayment: z.number().int().min(0).nullable().optional(),
+      downPayment: z.number().min(0).nullable().optional(),
       installmentCount: z.number().int().min(0).nullable().optional(),
-      installmentAmount: z.number().int().min(0).nullable().optional(),
+      installmentAmount: z.number().min(0).nullable().optional(),
       installmentIntervalDays: z.number().int().min(1).nullable().optional(),
       hasCertificate: z.boolean().optional(),
       certificateTemplateId: z.number().int().positive().nullable().optional(),
@@ -5018,12 +5055,12 @@ export const lmsGroupRouter = router({
       label: z.string().min(1).max(255),
       sublabel: z.string().max(500).optional(),
       pricingType: z.enum(["one_time", "subscription", "payment_plan", "free"]),
-      price: z.number().int().min(0),
+      price: z.number().min(0),
       stripePriceId: z.string().optional(),
       subscriptionInterval: z.enum(["monthly", "quarterly", "annual"]).optional(),
-      downPayment: z.number().int().min(0).optional(),
+      downPayment: z.number().min(0).optional(),
       installmentCount: z.number().int().min(0).optional(),
-      installmentAmount: z.number().int().min(0).optional(),
+      installmentAmount: z.number().min(0).optional(),
       installmentIntervalDays: z.number().int().min(1).optional(),
       ctaLabel: z.string().max(100).optional(),
       sortOrder: z.number().int().min(0).default(0),
@@ -5059,12 +5096,12 @@ export const lmsGroupRouter = router({
       label: z.string().min(1).max(255).optional(),
       sublabel: z.string().max(500).nullable().optional(),
       pricingType: z.enum(["one_time", "subscription", "payment_plan", "free"]).optional(),
-      price: z.number().int().min(0).optional(),
+      price: z.number().min(0).optional(),
       stripePriceId: z.string().nullable().optional(),
       subscriptionInterval: z.enum(["monthly", "quarterly", "annual"]).nullable().optional(),
-      downPayment: z.number().int().min(0).optional(),
+      downPayment: z.number().min(0).optional(),
       installmentCount: z.number().int().min(0).optional(),
-      installmentAmount: z.number().int().min(0).optional(),
+      installmentAmount: z.number().min(0).optional(),
       installmentIntervalDays: z.number().int().min(1).optional(),
       ctaLabel: z.string().max(100).nullable().optional(),
       sortOrder: z.number().int().min(0).optional(),
