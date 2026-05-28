@@ -1003,6 +1003,8 @@ export const lmsLearnerRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Enrollment is closed for this cohort" });
       }
 
+      // DEBUG: log incoming pricingOptionId
+      console.log(`[createCheckout] courseSlug=${input.courseSlug} pricingOptionId=${input.pricingOptionId} (type=${typeof input.pricingOptionId})`);
       // Resolve pricing: secondary option overrides primary course pricing
       let pricingType: string = course.pricingType ?? (course.isFree ? "free" : "one_time");
       let effectivePrice = course.price;
