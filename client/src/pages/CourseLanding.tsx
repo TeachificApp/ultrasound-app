@@ -734,6 +734,40 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
         </div>
       );
     }
+    case "cohort_sessions_auto": {
+      const sessions: any[] = course.cohortSessions ?? [];
+      const now = new Date();
+      const visibleSessions = d.showPastSessions
+        ? sessions
+        : sessions.filter((s: any) => new Date(s.sessionDate) >= now);
+      const accentColor = d.accentColor ?? "#179ca3";
+      if (visibleSessions.length === 0) return null;
+      return (
+        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          {d.headline && <h2 className="text-2xl font-bold mb-6" style={{ color: d.headlineColor ?? "#111827", textAlign: "center" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          <div className="space-y-3 max-w-2xl mx-auto">
+            {visibleSessions.map((s: any, i: number) => {
+              const sessionDate = new Date(s.sessionDate);
+              const tz = s.timezone ?? "America/New_York";
+              const dateStr = sessionDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: tz });
+              const timeStr = sessionDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZoneName: "short", timeZone: tz });
+              const isPast = sessionDate < now;
+              return (
+                <div key={s.id} className="flex items-start gap-4 p-4 rounded-xl border" style={{ borderColor: `${accentColor}33`, backgroundColor: isPast ? "#f9fafb" : `${accentColor}08`, opacity: isPast ? 0.7 : 1 }}>
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 mt-0.5" style={{ backgroundColor: isPast ? "#9ca3af" : accentColor }}>{i + 1}</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 text-sm">{s.title}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{dateStr} · {timeStr}{d.showDuration !== false && s.durationMinutes ? ` · ${s.durationMinutes} min` : ""}</p>
+                    {d.showDescription !== false && s.description && <p className="text-xs text-gray-600 mt-1 line-clamp-2">{s.description}</p>}
+                  </div>
+                  {isPast && <span className="text-xs text-gray-400 flex-shrink-0 mt-1">Past</span>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
     case "divider":
       return <div style={{ padding: `${d.spacing ?? 32}px 32px` }}><hr style={{ borderTop: `${d.thickness ?? 1}px ${d.style ?? "solid"} ${d.color ?? "#e5e7eb"}`, borderRadius: d.borderRadius ? `${d.borderRadius}px` : undefined }} /></div>;
     case "two_column":
@@ -822,6 +856,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
         if (beh === "scroll_to_section" && tier.ctaScrollAnchor) attrs["data-anchor"] = tier.ctaScrollAnchor;
         if (beh === "open_popup" && tier.ctaPopupUrl) attrs["data-popup"] = tier.ctaPopupUrl;
         if (beh === "download_file" && tier.ctaDownloadUrl) attrs["data-download"] = tier.ctaDownloadUrl;
+        if (beh === "pricing_option" && (tier as any).ctaPricingOptionId) attrs["data-pricing-option"] = String((tier as any).ctaPricingOptionId);
         return attrs;
       };
       return (
@@ -874,10 +909,13 @@ export default function CourseLanding() {
   const { user } = useAuth();
   const [enrolling, setEnrolling] = useState(false);
   const [selectedOrderBumpId, setSelectedOrderBumpId] = useState<number | undefined>();
-  const [selectedPricingOptionId, setSelectedPricingOptionId] = useState<number | undefined>();
+  // Read pricingOptionId from URL so ?pricingOptionId=N&checkout=1 links open the correct Stripe price
+  const _urlSearchParams = new URLSearchParams(window.location.search);
+  const _urlPricingOptionId = _urlSearchParams.get("pricingOptionId") ? Number(_urlSearchParams.get("pricingOptionId")) : undefined;
+  const [selectedPricingOptionId, setSelectedPricingOptionId] = useState<number | undefined>(_urlPricingOptionId);
   const [promoCode, setPromoCode] = useState<string | null>(null);
-  const isPreview = new URLSearchParams(window.location.search).get("preview") === "admin";
-  const autoCheckout = new URLSearchParams(window.location.search).get("checkout") === "1";
+  const isPreview = _urlSearchParams.get("preview") === "admin";
+  const autoCheckout = _urlSearchParams.get("checkout") === "1";
   // Free Preview modal state
   const [freePreviewOpen, setFreePreviewOpen] = useState(false);
   const [freePreviewLessonId, setFreePreviewLessonId] = useState<number | null>(null);
@@ -977,7 +1015,8 @@ export default function CourseLanding() {
   // MUST be before early returns to comply with React Rules of Hooks
   useEffect(() => {
     if (autoCheckout && course && !isLoading) {
-      handleEnroll();
+      // Pass the URL pricing option ID directly to bypass React state closure timing issues
+      handleEnrollWithOption(_urlPricingOptionId);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoCheckout, course?.id, isLoading]);

@@ -53,6 +53,9 @@ export const orderBumpsAdminRouter = router({
       ctaColor: z.string().default("#179ca3"),
       skipText: z.string().default("No thanks, continue"),
       isActive: z.boolean().default(true),
+      presentationMode: z.enum(["widget", "landing_page"]).default("widget"),
+      pageBlocks: z.string().optional(), // JSON-serialized Block[]
+      slug: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
@@ -73,6 +76,9 @@ export const orderBumpsAdminRouter = router({
         ctaColor: input.ctaColor,
         skipText: input.skipText,
         isActive: input.isActive,
+        presentationMode: input.presentationMode,
+        pageBlocks: input.pageBlocks ?? null,
+        slug: input.slug ?? null,
       });
       return { id: result.insertId };
     }),
@@ -96,6 +102,9 @@ export const orderBumpsAdminRouter = router({
       ctaColor: z.string().optional(),
       skipText: z.string().optional(),
       isActive: z.boolean().optional(),
+      presentationMode: z.enum(["widget", "landing_page"]).optional(),
+      pageBlocks: z.string().nullable().optional(), // JSON-serialized Block[]
+      slug: z.string().nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });

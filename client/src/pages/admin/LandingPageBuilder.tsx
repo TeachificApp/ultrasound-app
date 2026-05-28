@@ -313,6 +313,8 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
       lessonCountColor: "#9ca3af", iconStyle: "lock", cornerRadius: 12 } },
   { type: "pricing_options_auto", label: "Pricing Options (Auto)", icon: <CreditCard size={14} />, category: "Smart",
     defaultData: { headline: "Choose Your Plan", bgColor: "#f9fafb" } },
+  { type: "cohort_sessions_auto", label: "Live Sessions (Auto)", icon: <Timer size={14} />, category: "Smart",
+    defaultData: { headline: "Upcoming Live Sessions", headlineColor: "#111827", bgColor: "#ffffff", accentColor: "#179ca3", showDescription: true, showDuration: true } },
   { type: "related_products", label: "Related Products", icon: <Package size={14} />, category: "Smart",
     defaultData: {
       headline: "You Might Also Like",
@@ -3919,6 +3921,29 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
         </div>
       );
     }
+    case "cohort_sessions_auto":
+      return (
+        <div className="space-y-3">
+          <BSTextField data={d} onSet={set} label="Section Headline" field="headline" />
+          <div className="border-t pt-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Design</p>
+            <div className="space-y-2">
+              <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
+              <BSColorField data={d} onSet={set} label="Headline Color" field="headlineColor" />
+              <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />
+            </div>
+          </div>
+          <div className="border-t pt-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Display Options</p>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2"><input type="checkbox" checked={d.showDescription ?? true} onChange={e => set("showDescription", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show session description</label></div>
+              <div className="flex items-center gap-2"><input type="checkbox" checked={d.showDuration ?? true} onChange={e => set("showDuration", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show duration</label></div>
+              <div className="flex items-center gap-2"><input type="checkbox" checked={d.showPastSessions ?? false} onChange={e => set("showPastSessions", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Show past sessions</label></div>
+            </div>
+          </div>
+          <p className="text-xs text-gray-500 bg-gray-50 p-2 rounded">Sessions are auto-populated from the cohort live sessions you create in the Course → Cohort tab.</p>
+        </div>
+      );
     case "divider":
       return (<div className="space-y-3"><div><label className="text-xs text-gray-500 block mb-1">Style</label><div className="flex gap-1">{(["solid", "dashed", "dotted"] as const).map(s => <button key={s} onClick={() => set("style", s)} className={`flex-1 py-1 text-xs rounded border capitalize ${(d.style ?? "solid") === s ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>{s}</button>)}</div></div><BSColorField data={d} onSet={set} label="Color" field="color" /><div><label className="text-xs text-gray-500 block mb-1">Thickness (px)</label><Input type="number" value={d.thickness ?? 1} onChange={e => set("thickness", Number(e.target.value))} className="h-8 text-sm" min={1} max={10} /></div><div><label className="text-xs text-gray-500 block mb-1">Rounding (px)</label><Input type="number" value={d.borderRadius ?? 0} onChange={e => set("borderRadius", Number(e.target.value))} className="h-8 text-sm" min={0} max={20} /></div><div><label className="text-xs text-gray-500 block mb-1">Vertical Spacing (px)</label><Input type="number" value={d.spacing ?? 32} onChange={e => set("spacing", Number(e.target.value))} className="h-8 text-sm" min={0} max={200} /></div></div>);
     case "two_column": {

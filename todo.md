@@ -3557,3 +3557,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Cohort calendar view (Month/Week/Day/List) with ICS download and Add to Google Calendar
 - [x] Gate Join Live Session button to only be active 15 minutes before session start
 - [x] Add resizable panel to LessonBlockEditor (drag handle to resize settings panel)
+- [x] Fix pricing option checkout: read pricingOptionId from URL params and pass to autoCheckout flow
+- [x] Fix pricing_cards block tierDataAttrs to include data-pricing-option attribute for pricing_option behavior
+- [x] Add cohort_sessions_auto block type to BlockPreview, LandingPageBuilder, and CourseLanding
+- [x] Add cohortSessions to getCourse public procedure in lmsRouter
+- [x] Upgrade Order Bump editor: add presentation mode toggle (Widget vs Landing Page)
+- [x] Order Bump Landing Page mode: full block editor with drag-and-drop, per-block settings, and live preview
+- [x] Add pageBlocks, presentationMode, slug to orderBumpsAdmin create/update procedures

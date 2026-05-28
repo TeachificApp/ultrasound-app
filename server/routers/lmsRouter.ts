@@ -463,7 +463,7 @@ export const lmsPublicRouter = router({
 
       // Sections + preview lessons
       // Batch all sub-queries in parallel to avoid sequential round-trips
-      const [sections, allLessonsRaw, cis, landingPageRow, pricingOptions] = await Promise.all([
+      const [sections, allLessonsRaw, cis, landingPageRow, pricingOptions, cohortSessions] = await Promise.all([
         db.select().from(lmsSections).where(eq(lmsSections.courseId, course.id)).orderBy(asc(lmsSections.position)),
         db.select({
           id: lmsLessons.id, title: lmsLessons.title, type: lmsLessons.type,
@@ -479,6 +479,19 @@ export const lmsPublicRouter = router({
         db.select().from(lmsPricingOptions)
           .where(and(eq(lmsPricingOptions.courseId, course.id), eq(lmsPricingOptions.isActive, true)))
           .orderBy(asc(lmsPricingOptions.sortOrder)),
+        // Cohort sessions — only published, ordered by date (for cohort_sessions_auto landing block)
+        db.select({
+          id: lmsCohortSessions.id,
+          title: lmsCohortSessions.title,
+          description: lmsCohortSessions.description,
+          sessionDate: lmsCohortSessions.sessionDate,
+          durationMinutes: lmsCohortSessions.durationMinutes,
+          timezone: lmsCohortSessions.timezone,
+          meetingUrl: lmsCohortSessions.meetingUrl,
+          status: lmsCohortSessions.status,
+        }).from(lmsCohortSessions)
+          .where(and(eq(lmsCohortSessions.courseId, course.id), eq(lmsCohortSessions.status, "published")))
+          .orderBy(asc(lmsCohortSessions.sessionDate)),
       ]);
 
       // Group lessons by sectionId
@@ -509,7 +522,7 @@ export const lmsPublicRouter = router({
 
       const landingPage = landingPageRow[0] ?? null;
 
-      return { ...course, sections: sectionsWithLessons, instructors: instructors.filter(Boolean), landingPage, pricingOptions };
+      return { ...course, sections: sectionsWithLessons, instructors: instructors.filter(Boolean), landingPage, pricingOptions, cohortSessions };
     }),
 
   /** Get instructor public profile */

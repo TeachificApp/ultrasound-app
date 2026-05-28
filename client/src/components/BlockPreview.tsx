@@ -80,7 +80,8 @@ export type BlockType =
   | "lesson_assignment"
   | "upgrade_prompt"
   | "data_table"
-  | "file_upload";
+  | "file_upload"
+  | "cohort_sessions_auto";
 
 export interface Block {
   id: string;
@@ -1256,6 +1257,31 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       return <DataTableBlockPreview d={d} />;
     case "file_upload":
       return <FileUploadBlockPreview d={d} />;
+    case "cohort_sessions_auto": {
+      const accentColor = d.accentColor ?? "#179ca3";
+      const sampleSessions = [
+        { title: "Session 1: Introduction", date: "Mon, Jun 2 · 10:00 AM" },
+        { title: "Session 2: Core Concepts", date: "Mon, Jun 9 · 10:00 AM" },
+        { title: "Session 3: Advanced Topics", date: "Mon, Jun 16 · 10:00 AM" },
+      ];
+      return (
+        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+          {d.headline && <h2 className="text-2xl font-bold mb-6 text-center" style={{ color: d.headlineColor ?? "#111827" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          <div className="space-y-3 max-w-2xl mx-auto">
+            {sampleSessions.map((s, i) => (
+              <div key={i} className="flex items-center gap-4 p-4 rounded-xl border" style={{ borderColor: `${accentColor}33`, backgroundColor: `${accentColor}08` }}>
+                <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0" style={{ backgroundColor: accentColor }}>{i + 1}</div>
+                <div>
+                  <p className="font-semibold text-gray-900 text-sm">{s.title}</p>
+                  <p className="text-xs text-gray-500">{s.date}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-gray-400 mt-3 text-center">Auto-populated from cohort live sessions</p>
+        </div>
+      );
+    }
     default:
       return <div className="px-8 py-4 text-gray-400 text-sm text-center">Block preview not available</div>;
   }
