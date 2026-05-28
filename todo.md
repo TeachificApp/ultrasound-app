@@ -3537,3 +3537,13 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] In assignment context: stores to lms_cohort_submissions.file_url
 - [ ] In page context: stores to media_upload_responses with folder
 - [ ] Admin: media upload responses viewer (by folder, by page, by user)
+
+## Page Builder Improvements (May 28, 2026)
+- [x] FAQ block: collapsible items in settings panel (caret toggle, collapsed by default)
+- [x] FAQ block: new questions prepend to top of list instead of appending to bottom
+- [x] Sticky enrollment countdown banner: stays fixed at top of CourseLanding on scroll
+- [x] Countdown V2 block: fix border not showing on live page (wrong prop name d→data in CourseLanding)
+- [x] Countdown V2 block: expose subtext, showBorder, borderColor, text color, accent color in settings panel
+- [x] Pricing cards block: upgrade tier CTA buttons to full CTAActionPicker (all behaviors: direct_checkout, url, scroll, popup, email, download)
+- [x] Pricing cards block: CourseLanding renders pricing_cards with handleCtaBtnClick delegation (onEnroll support)
+- [x] CTA actions: pricing option linking available in CTA blocks

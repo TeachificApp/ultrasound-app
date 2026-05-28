@@ -29,6 +29,48 @@ import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+/**
+ * Click-delegation handler for [data-cta-btn] elements inserted via the rich text CTA button dialog.
+ * Attach as onClick on any container that renders dangerouslySetInnerHTML rich text.
+ */
+export function handleCtaBtnClick(e: React.MouseEvent<HTMLElement>, onEnroll?: () => void) {
+  const target = (e.target as HTMLElement).closest("[data-cta-btn]") as HTMLElement | null;
+  if (!target) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const action = target.dataset.action ?? "url";
+  if (action === "url") {
+    const link = target.dataset.link;
+    if (link && link !== "#") window.open(link, "_blank", "noopener,noreferrer");
+  } else if (action === "send_email") {
+    const email = target.dataset.email;
+    if (email) window.location.href = `mailto:${email}`;
+  } else if (action === "phone") {
+    const phone = target.dataset.phone;
+    if (phone) window.location.href = `tel:${phone.replace(/\s/g, "")}`;
+  } else if (action === "scroll_to_section") {
+    const anchor = target.dataset.anchor;
+    if (anchor) {
+      const el = document.getElementById(anchor.replace(/^#/, ""));
+      if (el) el.scrollIntoView({ behavior: "smooth" });
+    }
+  } else if (action === "open_popup") {
+    const popup = target.dataset.popup;
+    if (popup) {
+      const w = 800, h = 600;
+      const left = window.screenX + (window.outerWidth - w) / 2;
+      const top = window.screenY + (window.outerHeight - h) / 2;
+      window.open(popup, "_blank", `width=${w},height=${h},left=${left},top=${top},resizable=yes,scrollbars=yes`);
+    }
+  } else if (action === "download_file") {
+    const dl = target.dataset.download;
+    if (dl) window.open(dl, "_blank", "noopener,noreferrer");
+  } else if (action === "direct_checkout" || action === "pricing_option") {
+    // Trigger the course enroll flow
+    onEnroll?.();
+  }
+}
+
 const TYPE_ICONS: Record<string, React.ReactNode> = {
   course: <BookOpen className="w-5 h-5" />,
   quiz: <HelpCircle className="w-5 h-5" />,
@@ -217,7 +259,8 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
     }
     case "text":
       return (
-        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff", color: d.textColor ?? "#1a1a1a", textAlign: d.align ?? "left" }}>
+        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff", color: d.textColor ?? "#1a1a1a", textAlign: d.align ?? "left" }}
+          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, handleEnroll)}>
           <div className="max-w-3xl mx-auto prose" dangerouslySetInnerHTML={{ __html: d.html ?? "" }} />
         </div>
       );
@@ -448,7 +491,7 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
       );
     }
     case "countdown_v2": {
-      return <CountdownV2Block d={d} />;
+      return <CountdownV2Block data={d} />;
     }
     case "alert": {
       const alertStyles: Record<string, string> = { info: "bg-blue-50 border-blue-300 text-blue-800", success: "bg-green-50 border-green-300 text-green-800", warning: "bg-yellow-50 border-yellow-300 text-yellow-800", error: "bg-red-50 border-red-300 text-red-800" };
@@ -671,7 +714,8 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
       return <div style={{ padding: `${d.spacing ?? 32}px 32px` }}><hr style={{ borderTop: `${d.thickness ?? 1}px ${d.style ?? "solid"} ${d.color ?? "#e5e7eb"}`, borderRadius: d.borderRadius ? `${d.borderRadius}px` : undefined }} /></div>;
     case "two_column":
       return (
-        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
+          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll)}>
           <div className="flex gap-8">
             <div className="prose" style={{ flex: d.leftRatio ?? 50 }} dangerouslySetInnerHTML={{ __html: d.leftHtml ?? "" }} />
             <div className="prose" style={{ flex: 100 - (d.leftRatio ?? 50) }} dangerouslySetInnerHTML={{ __html: d.rightHtml ?? "" }} />
@@ -681,7 +725,8 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
     case "divided_columns": {
       const cols = d.columns ?? [{ html: "" }, { html: "" }];
       return (
-        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
+          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll)}>
           <div className="max-w-5xl mx-auto grid" style={{ gridTemplateColumns: `repeat(${cols.length}, 1fr)`, gap: `${d.gap ?? 32}px` }}>
             {cols.map((col: any, i: number) => (
               <div key={i} className="prose" dangerouslySetInnerHTML={{ __html: col.html ?? "" }} />
@@ -693,7 +738,8 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
     case "three_column": {
       const divStyle3 = d.showDividers ? { borderRightWidth: `${d.dividerWidth ?? 1}px`, borderRightStyle: (d.dividerStyle ?? "solid") as any, borderRightColor: d.dividerColor ?? "#e5e7eb", borderRadius: d.dividerRadius ? `${d.dividerRadius}px` : undefined } : {};
       return (
-        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}
+          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll)}>
           <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
             <div className="prose prose-lg pr-4" style={divStyle3} dangerouslySetInnerHTML={{ __html: d.col1Html ?? "" }} />
             <div className="prose prose-lg px-4" style={divStyle3} dangerouslySetInnerHTML={{ __html: d.col2Html ?? "" }} />
@@ -740,6 +786,57 @@ function RenderBlock({ block, course, onEnroll, enrolling, ctaText, price, selec
       return <div className="px-4 py-4"><CarouselBlock data={d} /></div>;
     case "form_embed":
       return <FormEmbedBlockPreview d={d} />;
+    case "pricing_cards": {
+      // Render pricing cards with full CTA action support — clicks delegated to handleCtaBtnClick
+      const pcTiers: Array<{ name: string; price: string; interval?: string; description?: string; badge?: string; features: string[]; ctaText: string; ctaLink?: string; ctaBehavior?: string; ctaEmailAddress?: string; ctaScrollAnchor?: string; ctaPopupUrl?: string; ctaDownloadUrl?: string; highlighted?: boolean }> = d.tiers ?? [];
+      const accentColor = d.accentColor ?? "#179ca3";
+      const tierDataAttrs = (tier: typeof pcTiers[0]) => {
+        const beh = tier.ctaBehavior ?? (tier.ctaLink ? "url" : "direct_checkout");
+        const attrs: Record<string, string> = { "data-cta-btn": "1", "data-action": beh };
+        if (beh === "url" && tier.ctaLink) attrs["data-link"] = tier.ctaLink;
+        if (beh === "send_email" && tier.ctaEmailAddress) attrs["data-email"] = tier.ctaEmailAddress;
+        if (beh === "scroll_to_section" && tier.ctaScrollAnchor) attrs["data-anchor"] = tier.ctaScrollAnchor;
+        if (beh === "open_popup" && tier.ctaPopupUrl) attrs["data-popup"] = tier.ctaPopupUrl;
+        if (beh === "download_file" && tier.ctaDownloadUrl) attrs["data-download"] = tier.ctaDownloadUrl;
+        return attrs;
+      };
+      return (
+        <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}
+          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll)}>
+          {d.headline && <h2 className="text-2xl font-bold mb-2 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          {d.subtext && <p className="text-center text-gray-500 mb-8 text-sm" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
+          {!d.subtext && d.headline && <div className="mb-8" />}
+          <div className="grid gap-6" style={{ gridTemplateColumns: `repeat(${pcTiers.length || 1}, 1fr)`, maxWidth: "900px", margin: "0 auto" }}>
+            {pcTiers.map((tier, ti) => (
+              <div key={ti} className="rounded-2xl overflow-hidden flex flex-col" style={{ border: tier.highlighted ? `2px solid ${accentColor}` : "1px solid #e5e7eb", boxShadow: tier.highlighted ? `0 8px 32px ${accentColor}22` : "0 1px 4px rgba(0,0,0,0.06)" }}>
+                {tier.badge && (
+                  <div className="text-center text-xs font-bold py-1.5 text-white" style={{ backgroundColor: accentColor }}>{tier.badge}</div>
+                )}
+                <div className="p-6 flex-1 flex flex-col">
+                  <h3 className="font-bold text-gray-900 text-lg mb-1">{tier.name}</h3>
+                  {tier.description && <p className="text-gray-500 text-xs mb-4">{tier.description}</p>}
+                  <div className="mb-4">
+                    <span className="text-3xl font-black" style={{ color: accentColor }}>{tier.price}</span>
+                    {tier.interval && <span className="text-sm text-gray-400 ml-1">{tier.interval}</span>}
+                  </div>
+                  <ul className="space-y-2 mb-6 flex-1">
+                    {(tier.features ?? []).map((feat, fi) => (
+                      <li key={fi} className="flex items-start gap-2 text-sm text-gray-700">
+                        <span className="flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-white text-[10px] font-bold mt-0.5" style={{ backgroundColor: accentColor }}>✓</span>
+                        {feat}
+                      </li>
+                    ))}
+                  </ul>
+                  <button {...tierDataAttrs(tier)} disabled={enrolling} className="block w-full text-center py-2.5 rounded-xl font-semibold text-sm cursor-pointer disabled:opacity-60" style={{ backgroundColor: tier.highlighted ? accentColor : "transparent", color: tier.highlighted ? "#fff" : accentColor, border: `2px solid ${accentColor}` }}>
+                    {enrolling ? "Processing…" : (tier.ctaText || "Get Started")}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
     default:
       return null;
   }
@@ -880,7 +977,7 @@ export default function CourseLanding() {
   })();
 
   const EnrollmentCountdownBanner = enrollmentCountdownDays !== null ? (
-    <div className="w-full bg-amber-50 border-b border-amber-200 py-2.5 px-4">
+    <div className="w-full bg-amber-50 border-b border-amber-200 py-2.5 px-4 sticky top-0 z-50 shadow-sm">
       <div className="max-w-5xl mx-auto flex items-center justify-center gap-2 text-sm font-medium text-amber-800">
         <span className="text-amber-500">⏳</span>
         {enrollmentCountdownDays === 1

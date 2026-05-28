@@ -1944,20 +1944,33 @@ function SortableFaqItem({
   onRemove: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
+  const [expanded, setExpanded] = useState(false);
   return (
-    <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }} className="border border-gray-200 rounded p-2 space-y-1 bg-white">
-      <div className="flex justify-between items-center mb-1">
-        <div className="flex items-center gap-1">
-          <button {...attributes} {...listeners} className="text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing"><GripVertical size={12} /></button>
-          <span className="text-xs text-gray-500">Q{index + 1}</span>
+    <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }} className="border border-gray-200 rounded bg-white overflow-hidden">
+      {/* Header row — always visible */}
+      <div className="flex items-center gap-1 px-2 py-1.5">
+        <button {...attributes} {...listeners} className="text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing flex-shrink-0"><GripVertical size={12} /></button>
+        <span className="text-xs text-gray-400 flex-shrink-0">Q{index + 1}</span>
+        <button
+          type="button"
+          onClick={() => setExpanded(v => !v)}
+          className="flex-1 flex items-center gap-1 text-left min-w-0"
+        >
+          <span className="text-xs text-gray-700 truncate flex-1">{item.q || <span className="italic text-gray-400">Question…</span>}</span>
+          {expanded ? <ChevronUp size={12} className="flex-shrink-0 text-gray-400" /> : <ChevronDown size={12} className="flex-shrink-0 text-gray-400" />}
+        </button>
+        <button onClick={onRemove} className="text-red-400 hover:text-red-600 flex-shrink-0 ml-1"><X size={10} /></button>
+      </div>
+      {/* Expanded body */}
+      {expanded && (
+        <div className="border-t border-gray-100 px-2 pb-2 pt-1.5 space-y-1.5">
+          <DebouncedInput value={item.q} onChange={onUpdateQ} className="h-7 text-xs" placeholder="Question" />
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">Answer (rich text)</label>
+            <RichTextEditor value={item.a} onChange={onUpdateA} minHeight={80} maxHeight={300} placeholder="Answer..." />
+          </div>
         </div>
-        <button onClick={onRemove} className="text-red-400 hover:text-red-600"><X size={10} /></button>
-      </div>
-      <DebouncedInput value={item.q} onChange={onUpdateQ} className="h-7 text-xs" placeholder="Question" />
-      <div className="mt-1">
-        <label className="text-xs text-gray-400 block mb-1">Answer (rich text)</label>
-        <RichTextEditor value={item.a} onChange={onUpdateA} minHeight={80} maxHeight={300} placeholder="Answer..." />
-      </div>
+      )}
     </div>
   );
 }
@@ -2812,7 +2825,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
           <div className="border-t pt-3">
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs text-gray-500 font-medium">FAQ Items <span className="text-gray-400">(drag to reorder)</span></label>
-              <button onClick={() => set("items", [...items, { id: `faq-${Date.now()}`, q: "Question?", a: "Answer." }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button>
+              <button onClick={() => set("items", [{ id: `faq-${Date.now()}`, q: "Question?", a: "Answer." }, ...items])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button>
             </div>
             <DndContext sensors={faqSensors} collisionDetection={closestCenter} onDragEnd={e => { const { active, over } = e; if (over && active.id !== over.id) { const oldIdx = items.findIndex(it => it.id === active.id); const newIdx = items.findIndex(it => it.id === over.id); if (oldIdx !== -1 && newIdx !== -1) set("items", arrayMove(items, oldIdx, newIdx)); } }}>
               <SortableContext items={items.map(it => it.id)} strategy={verticalListSortingStrategy}>
@@ -2927,6 +2940,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
       return (
         <div className="space-y-3">
           <BSTextField data={d} onSet={set} label="Headline" field="headline" />
+          <BSTextField data={d} onSet={set} label="Subtext (below headline)" field="subtext" multiline />
           <div>
             <label className="text-xs text-gray-500 block mb-1">Mode</label>
             <select value={d.mode ?? "duration"} onChange={e => set("mode", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
@@ -2942,26 +2956,38 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
           ) : (
             <div><label className="text-xs text-gray-500 block mb-1">Target Date &amp; Time</label><Input type="datetime-local" value={d.targetDate ?? ""} onChange={e => set("targetDate", e.target.value)} className="h-7 text-xs" /></div>
           )}
-          <BSTextField data={d} onSet={set} label="Expired Message" field="expiredMessage" placeholder="Offer has ended" />
+          <BSTextField data={d} onSet={set} label="Expired Message" field="expiredText" placeholder="This offer has expired." />
           <div className="grid grid-cols-2 gap-2">
             <div className="flex items-center gap-2"><input type="checkbox" checked={d.showDays !== false} onChange={e => set("showDays", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Days</label></div>
             <div className="flex items-center gap-2"><input type="checkbox" checked={d.showHours !== false} onChange={e => set("showHours", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Hours</label></div>
             <div className="flex items-center gap-2"><input type="checkbox" checked={d.showMinutes !== false} onChange={e => set("showMinutes", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Minutes</label></div>
             <div className="flex items-center gap-2"><input type="checkbox" checked={d.showSeconds !== false} onChange={e => set("showSeconds", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Seconds</label></div>
           </div>
-          <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
-          <BSColorField data={d} onSet={set} label="Digit Background" field="digitBg" />
-          <BSColorField data={d} onSet={set} label="Digit Text Color" field="digitColor" />
-          <BSColorField data={d} onSet={set} label="Label Color" field="labelColor" />
-          <BSColorField data={d} onSet={set} label="Separator Color" field="separatorColor" />
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">Corner Radius</label>
-            <select value={d.radius ?? "rounded"} onChange={e => set("radius", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
-              <option value="rounded-none">Square</option>
-              <option value="rounded">Rounded</option>
-              <option value="rounded-lg">Large Radius</option>
-              <option value="rounded-full">Pill</option>
-            </select>
+          <div className="border-t pt-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Colors</p>
+            <div className="space-y-2">
+              <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
+              <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
+              <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />
+              <BSColorField data={d} onSet={set} label="Digit Background" field="digitBg" />
+              <BSColorField data={d} onSet={set} label="Digit Text Color" field="digitTextColor" />
+              <BSColorField data={d} onSet={set} label="Label Color" field="labelColor" />
+              <BSColorField data={d} onSet={set} label="Separator Color" field="separatorColor" />
+            </div>
+          </div>
+          <div className="border-t pt-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Border &amp; Shape</p>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id="cdv2-border" checked={d.showBorder ?? false} onChange={e => set("showBorder", e.target.checked)} className="rounded" />
+                <label htmlFor="cdv2-border" className="text-xs text-gray-600">Show border</label>
+              </div>
+              {d.showBorder && <BSColorField data={d} onSet={set} label="Border Color" field="borderColor" />}
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Corner Radius (px)</label>
+                <Input type="number" value={d.cornerRadius ?? 8} onChange={e => set("cornerRadius", Number(e.target.value))} className="h-7 text-xs" min={0} max={64} />
+              </div>
+            </div>
           </div>
         </div>
       );
@@ -4316,7 +4342,8 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
       );
     }
     case "pricing_cards": {
-      const pcTiers: Array<{ name: string; price: string; interval?: string; description?: string; badge?: string; features: string[]; ctaText: string; ctaLink?: string; highlighted?: boolean }> = d.tiers ?? [];
+      const pcTiers: Array<{ name: string; price: string; interval?: string; description?: string; badge?: string; features: string[]; ctaText: string; ctaLink?: string; ctaBehavior?: string; ctaEmailAddress?: string; ctaScrollAnchor?: string; ctaPopupUrl?: string; ctaDownloadUrl?: string; checkoutProductType?: string; checkoutProductId?: number | null; highlighted?: boolean }> = d.tiers ?? [];
+      const setTier = (ti: number, patch: Record<string, any>) => set("tiers", pcTiers.map((t, j) => j === ti ? { ...t, ...patch } : t));
       return (
         <div className="space-y-3">
           <BSTextField data={d} onSet={set} label="Headline" field="headline" />
@@ -4327,7 +4354,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs text-gray-500 font-medium">Pricing Tiers</label>
               <button
-                onClick={() => set("tiers", [...pcTiers, { name: "New Tier", price: "$0", interval: "/ month", description: "", badge: "", features: ["Feature A"], ctaText: "Get Started", ctaLink: "#", highlighted: false }])}
+                onClick={() => set("tiers", [...pcTiers, { name: "New Tier", price: "$0", interval: "/ month", description: "", badge: "", features: ["Feature A"], ctaText: "Get Started", ctaBehavior: "direct_checkout", ctaLink: "", highlighted: false }])}
                 className="text-xs text-teal-600 flex items-center gap-1"
               ><Plus size={12} /> Add Tier</button>
             </div>
@@ -4339,35 +4366,55 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                     <button onClick={() => set("tiers", pcTiers.filter((_, j) => j !== ti))} className="text-red-400 hover:text-red-600"><X size={10} /></button>
                   </div>
                   <div className="flex items-center gap-2">
-                    <input type="checkbox" checked={tier.highlighted ?? false} onChange={e => set("tiers", pcTiers.map((t, j) => j === ti ? { ...t, highlighted: e.target.checked } : t))} className="rounded" />
+                    <input type="checkbox" checked={tier.highlighted ?? false} onChange={e => setTier(ti, { highlighted: e.target.checked })} className="rounded" />
                     <label className="text-xs text-gray-600">Highlight this tier</label>
                   </div>
-                  <DebouncedInput value={tier.name} onChange={v => set("tiers", pcTiers.map((t, j) => j === ti ? { ...t, name: v } : t))} className="h-7 text-xs" placeholder="Tier name" />
-                  <DebouncedInput value={tier.badge ?? ""} onChange={v => set("tiers", pcTiers.map((t, j) => j === ti ? { ...t, badge: v } : t))} className="h-7 text-xs" placeholder="Badge label (e.g. Most Popular)" />
-                  <DebouncedInput value={tier.description ?? ""} onChange={v => set("tiers", pcTiers.map((t, j) => j === ti ? { ...t, description: v } : t))} className="h-7 text-xs" placeholder="Short description" />
+                  <DebouncedInput value={tier.name} onChange={v => setTier(ti, { name: v })} className="h-7 text-xs" placeholder="Tier name" />
+                  <DebouncedInput value={tier.badge ?? ""} onChange={v => setTier(ti, { badge: v })} className="h-7 text-xs" placeholder="Badge label (e.g. Most Popular)" />
+                  <DebouncedInput value={tier.description ?? ""} onChange={v => setTier(ti, { description: v })} className="h-7 text-xs" placeholder="Short description" />
                   <div className="grid grid-cols-2 gap-1">
-                    <DebouncedInput value={tier.price} onChange={v => set("tiers", pcTiers.map((t, j) => j === ti ? { ...t, price: v } : t))} className="h-7 text-xs" placeholder="$49" />
-                    <DebouncedInput value={tier.interval ?? ""} onChange={v => set("tiers", pcTiers.map((t, j) => j === ti ? { ...t, interval: v } : t))} className="h-7 text-xs" placeholder="/ month" />
+                    <DebouncedInput value={tier.price} onChange={v => setTier(ti, { price: v })} className="h-7 text-xs" placeholder="$49" />
+                    <DebouncedInput value={tier.interval ?? ""} onChange={v => setTier(ti, { interval: v })} className="h-7 text-xs" placeholder="/ month" />
                   </div>
                   {/* Features */}
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className="text-[10px] text-gray-400">Features</label>
-                      <button onClick={() => set("tiers", pcTiers.map((t, j) => j === ti ? { ...t, features: [...(t.features ?? []), "New feature"] } : t))} className="text-[10px] text-teal-600 flex items-center gap-0.5"><Plus size={10} /> Add</button>
+                      <button onClick={() => setTier(ti, { features: [...(tier.features ?? []), "New feature"] })} className="text-[10px] text-teal-600 flex items-center gap-0.5"><Plus size={10} /> Add</button>
                     </div>
                     <div className="space-y-1">
                       {(tier.features ?? []).map((feat, fi) => (
                         <div key={fi} className="flex items-center gap-1">
-                          <DebouncedInput value={feat} onChange={v => set("tiers", pcTiers.map((t, j) => j === ti ? { ...t, features: (t.features ?? []).map((f, k) => k === fi ? v : f) } : t))} className="h-6 text-[10px] flex-1" placeholder="Feature" />
-                          <button onClick={() => set("tiers", pcTiers.map((t, j) => j === ti ? { ...t, features: (t.features ?? []).filter((_, k) => k !== fi) } : t))} className="text-red-400 hover:text-red-600 flex-shrink-0"><X size={10} /></button>
+                          <DebouncedInput value={feat} onChange={v => setTier(ti, { features: (tier.features ?? []).map((f, k) => k === fi ? v : f) })} className="h-6 text-[10px] flex-1" placeholder="Feature" />
+                          <button onClick={() => setTier(ti, { features: (tier.features ?? []).filter((_, k) => k !== fi) })} className="text-red-400 hover:text-red-600 flex-shrink-0"><X size={10} /></button>
                         </div>
                       ))}
                     </div>
                   </div>
-                  {/* CTA */}
-                  <div className="grid grid-cols-2 gap-1">
-                    <DebouncedInput value={tier.ctaText} onChange={v => set("tiers", pcTiers.map((t, j) => j === ti ? { ...t, ctaText: v } : t))} className="h-7 text-xs" placeholder="Button text" />
-                    <DebouncedInput value={tier.ctaLink ?? ""} onChange={v => set("tiers", pcTiers.map((t, j) => j === ti ? { ...t, ctaLink: v } : t))} className="h-7 text-xs" placeholder="https://..." />
+                  {/* CTA — full action picker */}
+                  <div className="border-t border-gray-100 pt-2 space-y-1.5">
+                    <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Button</label>
+                    <DebouncedInput value={tier.ctaText} onChange={v => setTier(ti, { ctaText: v })} className="h-7 text-xs" placeholder="Button text" />
+                    <CTAActionPicker
+                      label="Button Action"
+                      behaviorValue={tier.ctaBehavior ?? "url"}
+                      onBehaviorChange={v => setTier(ti, { ctaBehavior: v })}
+                      linkValue={tier.ctaLink ?? ""}
+                      onLinkChange={v => setTier(ti, { ctaLink: v })}
+                      emailValue={tier.ctaEmailAddress ?? ""}
+                      onEmailChange={v => setTier(ti, { ctaEmailAddress: v })}
+                      productCatalog={productCatalog}
+                      orderBumpsList={orderBumpsList}
+                      anchorValue={tier.ctaScrollAnchor ?? ""}
+                      onAnchorChange={v => setTier(ti, { ctaScrollAnchor: v })}
+                      popupValue={tier.ctaPopupUrl ?? ""}
+                      onPopupChange={v => setTier(ti, { ctaPopupUrl: v })}
+                      downloadValue={tier.ctaDownloadUrl ?? ""}
+                      onDownloadChange={v => setTier(ti, { ctaDownloadUrl: v })}
+                      checkoutProductTypeValue={tier.checkoutProductType}
+                      checkoutProductIdValue={tier.checkoutProductId ?? null}
+                      onCheckoutProductChange={(type, id) => setTier(ti, { checkoutProductType: type, checkoutProductId: id })}
+                    />
                   </div>
                 </div>
               ))}
@@ -7274,3 +7321,4 @@ function UpgradePromptBlockSettings({ d, set }: { d: Record<string, any>; set: (
     </div>
   );
 }
+

@@ -124,6 +124,14 @@ import { cn } from "@/lib/utils";
 import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
 import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 // ─── Custom Video TipTap Node ─────────────────────────────────────────────────
 
@@ -159,7 +167,22 @@ interface RichTextEditorProps {
   maxHeight?: number;
   className?: string;
   disabled?: boolean;
+  /** Optional: pass courseId to enable pricing option checkout in CTA dialog */
+  courseId?: number;
 }
+
+// CTA action types available in rich text
+type RteCTAAction = "url" | "scroll_to_section" | "direct_checkout" | "pricing_option" | "open_popup" | "download_file" | "send_email" | "phone";
+const RTE_CTA_ACTION_LABELS: Record<RteCTAAction, string> = {
+  url: "Link to URL",
+  scroll_to_section: "Scroll to Section",
+  direct_checkout: "Direct Checkout (Stripe)",
+  pricing_option: "Pricing Option Checkout",
+  open_popup: "Open Video / Popup",
+  download_file: "Download File",
+  send_email: "Send Email",
+  phone: "Phone Number",
+};
 
 // ─── Toolbar Button ───────────────────────────────────────────────────────────
 
@@ -449,6 +472,7 @@ export default function RichTextEditor({
   maxHeight = 600,
   className,
   disabled = false,
+  courseId,
 }: RichTextEditorProps) {
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
@@ -468,11 +492,30 @@ export default function RichTextEditor({
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [ctaDialogOpen, setCtaDialogOpen] = useState(false);
   const [ctaText, setCtaText] = useState("Click Here");
+  const [ctaAction, setCtaAction] = useState<RteCTAAction>("url");
   const [ctaUrl, setCtaUrl] = useState("");
+  const [ctaEmail, setCtaEmail] = useState("");
+  const [ctaPhone, setCtaPhone] = useState("");
+  const [ctaAnchor, setCtaAnchor] = useState("");
+  const [ctaPopup, setCtaPopup] = useState("");
+  const [ctaDownload, setCtaDownload] = useState("");
+  const [ctaCheckoutProductType, setCtaCheckoutProductType] = useState("");
+  const [ctaCheckoutProductId, setCtaCheckoutProductId] = useState<number | null>(null);
+  const [ctaPricingOptionId, setCtaPricingOptionId] = useState<number | null>(null);
   const [ctaBgColor, setCtaBgColor] = useState("#149096");
   const [ctaTextColor, setCtaTextColor] = useState("#ffffff");
   const [ctaSize, setCtaSize] = useState<"sm" | "md" | "lg">("md");
   const [ctaFullWidth, setCtaFullWidth] = useState(false);
+  // Fetch pricing options when courseId is available and dialog is open
+  const { data: pricingOptions } = trpc.lmsAdmin.listPricingOptions.useQuery(
+    { courseId: courseId! },
+    { enabled: !!courseId && ctaDialogOpen && ctaAction === "pricing_option", staleTime: 30_000 }
+  );
+  // Fetch product catalog for direct checkout
+  const { data: productCatalog } = trpc.funnel.listAllProducts.useQuery(
+    undefined,
+    { enabled: ctaDialogOpen && ctaAction === "direct_checkout", staleTime: 60_000 }
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoFileInputRef = useRef<HTMLInputElement>(null);
   const [tableMenuOpen, setTableMenuOpen] = useState(false);
@@ -604,10 +647,21 @@ export default function RichTextEditor({
     const fontSize = ctaSize === "sm" ? "13px" : ctaSize === "lg" ? "18px" : "15px";
     const display = ctaFullWidth ? "block" : "inline-block";
     const width = ctaFullWidth ? "100%" : "auto";
-    const html = `<a href="${ctaUrl.trim() || "#"}" style="display:${display};width:${width};text-align:center;padding:${padding};background-color:${ctaBgColor};color:${ctaTextColor};border-radius:8px;font-weight:700;font-size:${fontSize};text-decoration:none;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.12);">${ctaText.trim()}</a>`;
+    const baseStyle = `display:${display};width:${width};text-align:center;padding:${padding};background-color:${ctaBgColor};color:${ctaTextColor};border-radius:8px;font-weight:700;font-size:${fontSize};text-decoration:none;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.12);`;
+    // Build data attributes based on action type
+    let dataAttrs = `data-cta-btn data-action="${ctaAction}"`;
+    if (ctaAction === "url") dataAttrs += ` data-link="${ctaUrl.trim() || "#"}"`;
+    else if (ctaAction === "send_email") dataAttrs += ` data-email="${ctaEmail.trim()}"`;
+    else if (ctaAction === "phone") dataAttrs += ` data-phone="${ctaPhone.trim()}"`;
+    else if (ctaAction === "scroll_to_section") dataAttrs += ` data-anchor="${ctaAnchor.trim()}"`;
+    else if (ctaAction === "open_popup") dataAttrs += ` data-popup="${ctaPopup.trim()}"`;
+    else if (ctaAction === "download_file") dataAttrs += ` data-download="${ctaDownload.trim()}"`;
+    else if (ctaAction === "direct_checkout") dataAttrs += ` data-checkout-type="${ctaCheckoutProductType}" data-checkout-id="${ctaCheckoutProductId ?? ""}"`;
+    else if (ctaAction === "pricing_option") dataAttrs += ` data-pricing-option="${ctaPricingOptionId ?? ""}"`;
+    const html = `<span ${dataAttrs} style="${baseStyle}">${ctaText.trim()}</span>`;
     editor.chain().focus().insertContent(html).run();
     setCtaDialogOpen(false);
-  }, [editor, ctaText, ctaUrl, ctaBgColor, ctaTextColor, ctaSize, ctaFullWidth]);
+  }, [editor, ctaText, ctaAction, ctaUrl, ctaEmail, ctaPhone, ctaAnchor, ctaPopup, ctaDownload, ctaCheckoutProductType, ctaCheckoutProductId, ctaPricingOptionId, ctaBgColor, ctaTextColor, ctaSize, ctaFullWidth]);
 
   // Image alignment using wrapperStyle (supported by tiptap-extension-resize-image)
   const setImageAlign = (align: string) => {
@@ -1042,6 +1096,9 @@ export default function RichTextEditor({
         .rte-content .tiptap s { text-decoration: line-through; }
         .rte-content .tiptap p { margin: 0.3em 0; }
         .rte-content .tiptap a { color: #149096; text-decoration: underline; cursor: pointer; }
+        /* CTA buttons inserted via Insert CTA Button dialog — rendered as styled spans, not links */
+        .rte-content .tiptap [data-cta-btn] { display: inline-block; border-radius: 8px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.12); text-decoration: none !important; color: inherit; }
+        .rte-content .tiptap [data-cta-btn]:hover { opacity: 0.88; transition: opacity 0.15s; }
         .rte-content .tiptap code { background: #f3f4f6; border-radius: 3px; padding: 0.1em 0.3em; font-family: monospace; font-size: 0.85em; }
         .rte-content .tiptap img { max-width: 100%; border-radius: 8px; margin: 0.5em 0; display: block; }
         .rte-content .tiptap img.float-left { float: left; margin: 0.5em 1em 0.5em 0; display: inline; }
@@ -1221,59 +1278,157 @@ export default function RichTextEditor({
 
       {/* CTA Button Dialog */}
       <Dialog open={ctaDialogOpen} onOpenChange={setCtaDialogOpen}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MousePointerClick className="w-5 h-5 text-[#149096]" /> Insert CTA Button
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
+            {/* Button Text */}
             <div>
               <label className="text-sm font-medium text-gray-700 block mb-1.5">Button Text</label>
               <Input placeholder="Click Here" value={ctaText} onChange={e => setCtaText(e.target.value)} autoFocus />
             </div>
+
+            {/* Action Type */}
             <div>
-              <label className="text-sm font-medium text-gray-700 block mb-1.5">Link URL</label>
-              <Input placeholder="https://example.com" value={ctaUrl} onChange={e => setCtaUrl(e.target.value)} />
+              <label className="text-sm font-medium text-gray-700 block mb-1.5">Button Action</label>
+              <Select value={ctaAction} onValueChange={v => setCtaAction(v as RteCTAAction)}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(Object.entries(RTE_CTA_ACTION_LABELS) as [RteCTAAction, string][]).map(([val, lbl]) => (
+                    <SelectItem key={val} value={val}>{lbl}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+
+            {/* Action-specific fields */}
+            {ctaAction === "url" && (
               <div>
-                <label className="text-sm font-medium text-gray-700 block mb-1.5">Background Color</label>
-                <div className="flex items-center gap-2">
-                  <input type="color" value={ctaBgColor} onChange={e => setCtaBgColor(e.target.value)} className="w-8 h-8 rounded border border-gray-200 cursor-pointer p-0" />
-                  <Input value={ctaBgColor} onChange={e => setCtaBgColor(e.target.value)} className="h-8 text-xs font-mono" />
+                <label className="text-sm font-medium text-gray-700 block mb-1.5">Link URL</label>
+                <Input placeholder="https://example.com" value={ctaUrl} onChange={e => setCtaUrl(e.target.value)} />
+              </div>
+            )}
+            {ctaAction === "send_email" && (
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-1.5">Email Address</label>
+                <Input placeholder="hello@example.com" value={ctaEmail} onChange={e => setCtaEmail(e.target.value)} />
+              </div>
+            )}
+            {ctaAction === "phone" && (
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-1.5">Phone Number</label>
+                <Input placeholder="+1 (555) 000-0000" value={ctaPhone} onChange={e => setCtaPhone(e.target.value)} />
+              </div>
+            )}
+            {ctaAction === "scroll_to_section" && (
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-1.5">Section Anchor ID</label>
+                <Input placeholder="e.g. pricing" value={ctaAnchor} onChange={e => setCtaAnchor(e.target.value)} />
+                <p className="text-xs text-gray-400 mt-1">Add <code className="bg-gray-100 px-0.5 rounded">id="pricing"</code> to a section, then enter <code className="bg-gray-100 px-0.5 rounded">pricing</code> here.</p>
+              </div>
+            )}
+            {ctaAction === "open_popup" && (
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-1.5">Video / Popup URL or Embed Code</label>
+                <Input placeholder="https://youtube.com/... or iframe code" value={ctaPopup} onChange={e => setCtaPopup(e.target.value)} />
+                <p className="text-xs text-gray-400 mt-1">YouTube, Vimeo, Wistia URLs and iframe embed codes are supported.</p>
+              </div>
+            )}
+            {ctaAction === "download_file" && (
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-1.5">File URL</label>
+                <Input placeholder="https://... (direct file URL)" value={ctaDownload} onChange={e => setCtaDownload(e.target.value)} />
+                <p className="text-xs text-gray-400 mt-1">Triggers a file download when clicked. Use a direct link to a PDF, ZIP, etc.</p>
+              </div>
+            )}
+            {ctaAction === "direct_checkout" && (
+              <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 space-y-2">
+                <p className="text-xs text-teal-700 font-medium">Opens Stripe Checkout. After payment, user is sent to /my-dashboard.</p>
+                <div>
+                  <label className="text-xs text-gray-600 block mb-1">Product</label>
+                  <select
+                    value={ctaCheckoutProductId ? `${ctaCheckoutProductType}:${ctaCheckoutProductId}` : ""}
+                    onChange={e => { const [type, id] = e.target.value.split(":"); setCtaCheckoutProductType(type || ""); setCtaCheckoutProductId(id ? Number(id) : null); }}
+                    className="w-full h-8 text-sm rounded border border-gray-200 px-2"
+                  >
+                    <option value="">-- Select product --</option>
+                    {(productCatalog ?? []).map(p => (
+                      <option key={`${p.type}:${p.id}`} value={`${p.type}:${p.id}`}>{p.name} ({p.type}) — ${Number(p.price).toFixed(2)}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700 block mb-1.5">Text Color</label>
-                <div className="flex items-center gap-2">
-                  <input type="color" value={ctaTextColor} onChange={e => setCtaTextColor(e.target.value)} className="w-8 h-8 rounded border border-gray-200 cursor-pointer p-0" />
-                  <Input value={ctaTextColor} onChange={e => setCtaTextColor(e.target.value)} className="h-8 text-xs font-mono" />
+            )}
+            {ctaAction === "pricing_option" && (
+              <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 space-y-2">
+                <p className="text-xs text-teal-700 font-medium">Links directly to a specific pricing option checkout for this course.</p>
+                {!courseId ? (
+                  <p className="text-xs text-amber-600">Pricing option checkout is only available when editing a course landing page.</p>
+                ) : (
+                  <div>
+                    <label className="text-xs text-gray-600 block mb-1">Pricing Option</label>
+                    <select
+                      value={ctaPricingOptionId ?? ""}
+                      onChange={e => setCtaPricingOptionId(e.target.value ? Number(e.target.value) : null)}
+                      className="w-full h-8 text-sm rounded border border-gray-200 px-2"
+                    >
+                      <option value="">-- Select pricing option --</option>
+                      {(pricingOptions ?? []).map(opt => (
+                        <option key={opt.id} value={opt.id}>{opt.label} — ${Number(opt.price).toFixed(2)}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Appearance */}
+            <div className="border-t border-gray-100 pt-3">
+              <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Appearance</p>
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label className="text-sm font-medium text-gray-700 block mb-1.5">Background Color</label>
+                  <div className="flex items-center gap-2">
+                    <input type="color" value={ctaBgColor} onChange={e => setCtaBgColor(e.target.value)} className="w-8 h-8 rounded border border-gray-200 cursor-pointer p-0" />
+                    <Input value={ctaBgColor} onChange={e => setCtaBgColor(e.target.value)} className="h-8 text-xs font-mono" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 block mb-1.5">Text Color</label>
+                  <div className="flex items-center gap-2">
+                    <input type="color" value={ctaTextColor} onChange={e => setCtaTextColor(e.target.value)} className="w-8 h-8 rounded border border-gray-200 cursor-pointer p-0" />
+                    <Input value={ctaTextColor} onChange={e => setCtaTextColor(e.target.value)} className="h-8 text-xs font-mono" />
+                  </div>
                 </div>
               </div>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700 block mb-1.5">Size</label>
-              <div className="flex gap-2">
-                {(["sm", "md", "lg"] as const).map(s => (
-                  <button key={s} type="button"
-                    onClick={() => setCtaSize(s)}
-                    className={`flex-1 h-8 rounded text-xs font-medium border transition-all ${
-                      ctaSize === s ? "border-[#149096] bg-[#149096] text-white" : "border-gray-200 text-gray-600 hover:border-gray-300"
-                    }`}>
-                    {s === "sm" ? "Small" : s === "md" ? "Medium" : "Large"}
-                  </button>
-                ))}
+              <div className="mb-3">
+                <label className="text-sm font-medium text-gray-700 block mb-1.5">Size</label>
+                <div className="flex gap-2">
+                  {(["sm", "md", "lg"] as const).map(s => (
+                    <button key={s} type="button"
+                      onClick={() => setCtaSize(s)}
+                      className={`flex-1 h-8 rounded text-xs font-medium border transition-all ${
+                        ctaSize === s ? "border-[#149096] bg-[#149096] text-white" : "border-gray-200 text-gray-600 hover:border-gray-300"
+                      }`}>
+                      {s === "sm" ? "Small" : s === "md" ? "Medium" : "Large"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id="cta-full-width" checked={ctaFullWidth} onChange={e => setCtaFullWidth(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-[#149096]" />
+                <label htmlFor="cta-full-width" className="text-sm text-gray-700 cursor-pointer">Full width button</label>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <input type="checkbox" id="cta-full-width" checked={ctaFullWidth} onChange={e => setCtaFullWidth(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-[#149096]" />
-              <label htmlFor="cta-full-width" className="text-sm text-gray-700 cursor-pointer">Full width button</label>
-            </div>
+
+            {/* Preview */}
             <div className="p-3 rounded-lg border border-gray-100 bg-gray-50 flex justify-center">
-              <a href="#" onClick={e => e.preventDefault()} style={{ display: ctaFullWidth ? "block" : "inline-block", textAlign: "center", width: ctaFullWidth ? "100%" : "auto", padding: ctaSize === "sm" ? "8px 18px" : ctaSize === "lg" ? "16px 36px" : "12px 28px", backgroundColor: ctaBgColor, color: ctaTextColor, borderRadius: "8px", fontWeight: 700, fontSize: ctaSize === "sm" ? "13px" : ctaSize === "lg" ? "18px" : "15px", textDecoration: "none", boxShadow: "0 2px 8px rgba(0,0,0,0.12)" }}>
+              <span style={{ display: ctaFullWidth ? "block" : "inline-block", textAlign: "center", width: ctaFullWidth ? "100%" : "auto", padding: ctaSize === "sm" ? "8px 18px" : ctaSize === "lg" ? "16px 36px" : "12px 28px", backgroundColor: ctaBgColor, color: ctaTextColor, borderRadius: "8px", fontWeight: 700, fontSize: ctaSize === "sm" ? "13px" : ctaSize === "lg" ? "18px" : "15px", boxShadow: "0 2px 8px rgba(0,0,0,0.12)", cursor: "default" }}>
                 {ctaText || "Click Here"}
-              </a>
+              </span>
             </div>
           </div>
           <DialogFooter>

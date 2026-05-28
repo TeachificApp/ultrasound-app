@@ -13,6 +13,7 @@ import { Users } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import { ButtonSubtext } from "@/lib/ctaSubtext";
+import { handleCtaBtnClick } from "@/pages/CourseLanding";
 
 /**
  * Wraps an image element with the correct click action based on the CTAActionPicker behavior.
@@ -187,7 +188,8 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
     }
     case "text":
       return (
-        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff", color: d.textColor ?? "#1a1a1a", textAlign: d.align ?? "left" }}>
+        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff", color: d.textColor ?? "#1a1a1a", textAlign: d.align ?? "left" }}
+          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>)}>
           <div className="max-w-3xl mx-auto prose" dangerouslySetInnerHTML={{ __html: d.html ?? "" }} />
         </div>
       );
@@ -808,7 +810,8 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
         }
       };
       return (
-        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
+          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>)}>
           <div className="flex gap-8">
             <div style={{ flex: d.leftRatio ?? 50 }}>{renderCol("left")}</div>
             <div style={{ flex: 100 - (d.leftRatio ?? 50) }}>{renderCol("right")}</div>
@@ -819,7 +822,8 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
     case "divided_columns": {
       const cols = d.columns ?? [{ html: "" }, { html: "" }];
       return (
-        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
+          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>)}>
           <div className="grid" style={{ gridTemplateColumns: `repeat(${cols.length}, 1fr)`, gap: `${d.gap ?? 32}px` }}>
             {cols.map((col: any, i: number) => (
               <div key={i} className="prose" dangerouslySetInnerHTML={{ __html: col.html ?? "" }} />
@@ -831,7 +835,8 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
     case "three_column": {
       const divStyle = d.showDividers ? { borderRightWidth: `${d.dividerWidth ?? 1}px`, borderRightStyle: d.dividerStyle ?? "solid", borderRightColor: d.dividerColor ?? "#e5e7eb", borderRadius: d.dividerRadius ? `${d.dividerRadius}px` : undefined } : {};
       return (
-        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}>
+        <div className="px-8 py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
+          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>)}>
           <div className="grid grid-cols-3 gap-6 items-stretch">
             <div className="prose prose-sm pr-4" style={divStyle} dangerouslySetInnerHTML={{ __html: d.col1Html ?? "" }} />
             <div className="prose prose-sm px-4" style={divStyle} dangerouslySetInnerHTML={{ __html: d.col2Html ?? "" }} />
@@ -1194,8 +1199,19 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       );
     }
     case "pricing_cards": {
-      const tiers: Array<{ name: string; price: string; interval?: string; description?: string; badge?: string; features: string[]; ctaText: string; ctaLink?: string; highlighted?: boolean }> = d.tiers ?? [];
+      const tiers: Array<{ name: string; price: string; interval?: string; description?: string; badge?: string; features: string[]; ctaText: string; ctaLink?: string; ctaBehavior?: string; ctaEmailAddress?: string; ctaScrollAnchor?: string; ctaPopupUrl?: string; ctaDownloadUrl?: string; checkoutProductType?: string; checkoutProductId?: number | null; highlighted?: boolean }> = d.tiers ?? [];
       const accentColor = d.accentColor ?? "#179ca3";
+      // Build data attributes for click delegation (mirrors handleCtaBtnClick)
+      const tierDataAttrs = (tier: typeof tiers[0]) => {
+        const beh = tier.ctaBehavior ?? (tier.ctaLink ? "url" : "direct_checkout");
+        const attrs: Record<string, string> = { "data-cta-btn": "1", "data-action": beh };
+        if (beh === "url" && tier.ctaLink) attrs["data-link"] = tier.ctaLink;
+        if (beh === "send_email" && tier.ctaEmailAddress) attrs["data-email"] = tier.ctaEmailAddress;
+        if (beh === "scroll_to_section" && tier.ctaScrollAnchor) attrs["data-anchor"] = tier.ctaScrollAnchor;
+        if (beh === "open_popup" && tier.ctaPopupUrl) attrs["data-popup"] = tier.ctaPopupUrl;
+        if (beh === "download_file" && tier.ctaDownloadUrl) attrs["data-download"] = tier.ctaDownloadUrl;
+        return attrs;
+      };
       return (
         <div className="px-8 py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}>
           {d.headline && <h2 className="text-2xl font-bold mb-2 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
@@ -1222,9 +1238,9 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
                       </li>
                     ))}
                   </ul>
-                  <a href={tier.ctaLink ?? "#"} className="block text-center py-2.5 rounded-xl font-semibold text-sm" style={{ backgroundColor: tier.highlighted ? accentColor : "transparent", color: tier.highlighted ? "#fff" : accentColor, border: `2px solid ${accentColor}` }}>
+                  <button {...tierDataAttrs(tier)} className="block w-full text-center py-2.5 rounded-xl font-semibold text-sm cursor-pointer" style={{ backgroundColor: tier.highlighted ? accentColor : "transparent", color: tier.highlighted ? "#fff" : accentColor, border: `2px solid ${accentColor}` }}>
                     {tier.ctaText || "Get Started"}
-                  </a>
+                  </button>
                 </div>
               </div>
             ))}
@@ -1440,6 +1456,7 @@ export function CountdownV2Block({ data: d }: { data: Record<string, any> }) {
   ].filter(u => u.show);
 
   return (
+    <div style={{ backgroundColor: bgColor, padding: d.showBorder ? "16px" : undefined }}>
     <div
       className={`px-8 py-10 text-center ${d.showBorder ? "border-2" : ""}`}
       style={{
@@ -1501,6 +1518,7 @@ export function CountdownV2Block({ data: d }: { data: Record<string, any> }) {
           ))}
         </div>
       )}
+    </div>
     </div>
   );
 }
