@@ -29,7 +29,7 @@ function CourseCard({ course, enrolledCourseIds, purchasedProductSlugs }: { cour
     ? (course.subscriptionInterval === "annual" ? "/yr" : course.subscriptionInterval === "quarterly" ? "/qtr" : "/mo")
     : course.pricingType === "payment_plan" ? " (plan)"
     : "";
-  const price = (course.isFree || course.price === 0) ? "Free" : `$${(course.price / 100).toFixed(2)}${subscriptionSuffix}`;
+  const price = (course.isFree || course.price === 0) ? "Free" : `$${Number(course.price).toFixed(2)}${subscriptionSuffix}`;
   const isOwned = course._source === "digital_product"
     ? purchasedProductSlugs.has(course.slug)
     : enrolledCourseIds.has(course.id);

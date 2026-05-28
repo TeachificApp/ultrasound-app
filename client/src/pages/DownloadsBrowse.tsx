@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { FileDown, Search, Package } from "lucide-react";
 
 function ProductCard({ product }: { product: any }) {
-  const price = (product.isFree || product.price === 0) ? "Free" : `$${(product.price / 100).toFixed(2)}`;
+  const price = (product.isFree || product.price === 0) ? "Free" : `$${Number(product.price).toFixed(2)}`;
   return (
     <Link href={`/downloads/${product.slug}`}>
       <div className="group bg-white rounded-xl border border-gray-200 hover:border-teal-400 hover:shadow-lg transition-all duration-200 overflow-hidden cursor-pointer flex flex-col h-full">
@@ -63,10 +63,10 @@ function BundlesSection() {
                     <h3 className="font-semibold text-gray-900 group-hover:text-teal-700 transition-colors">{b.title}</h3>
                     {b.subtitle && <p className="text-sm text-gray-500 mt-0.5">{b.subtitle}</p>}
                     <div className="flex items-center gap-2 mt-2">
-                      <span className="font-bold text-teal-700">${(b.discountPrice / 100).toFixed(2)}</span>
+                      <span className="font-bold text-teal-700">${Number(b.discountPrice).toFixed(2)}</span>
                       {savings > 0 && (
                         <>
-                          <span className="text-sm text-gray-400 line-through">${(b.originalPrice / 100).toFixed(2)}</span>
+                          <span className="text-sm text-gray-400 line-through">${Number(b.originalPrice).toFixed(2)}</span>
                           <Badge className="bg-teal-500 text-white text-xs">Save {pct}%</Badge>
                         </>
                       )}

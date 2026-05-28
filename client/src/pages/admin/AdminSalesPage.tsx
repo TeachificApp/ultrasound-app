@@ -69,11 +69,11 @@ const STATUS_COLORS: Record<string, string> = {
   failed: "bg-red-100 text-red-700",
 };
 
-function formatCurrency(cents: number, currency = "usd") {
+function formatCurrency(dollars: number, currency = "usd") {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: currency.toUpperCase(),
-  }).format(cents / 100);
+  }).format(Number(dollars));
 }
 
 function formatDate(date: Date | string) {

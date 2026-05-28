@@ -186,7 +186,7 @@ async function scrapeThinkificSalesPage(slug: string, customDomain: string): Pro
     const priceMatches = [...body.matchAll(/\$(\d+(?:[.,]\d{2})?)/g)];
     if (priceMatches.length > 0) {
       const priceStr = priceMatches[0][1].replace(",", "");
-      price = Math.round(parseFloat(priceStr) * 100);
+      price = parseFloat(priceStr);
     }
 
     // ── 2. Extract hero image (first thinkific CDN file upload image) ──
@@ -490,7 +490,7 @@ export const thinkificImportRouter = router({
           const result = await scrapeThinkificSalesPage(course.slug, customDomain);
           salesPageBlocks = result.blocks;
           scrapedPrice = result.price;
-          log.push(`Scraped sales page: ${salesPageBlocks.length} blocks, price: $${(scrapedPrice / 100).toFixed(2)}`);
+          log.push(`Scraped sales page: ${salesPageBlocks.length} blocks, price: $${Number(scrapedPrice).toFixed(2)}`);
         }
 
         // 4. Fetch instructor info
@@ -523,7 +523,7 @@ export const thinkificImportRouter = router({
           createdByUserId: ctx.user.id,
         });
         const lmsCourseId = (courseResult as unknown as { insertId: number }).insertId;
-        log.push(`Created LMS course ID: ${lmsCourseId} (draft, price: $${(coursePrice / 100).toFixed(2)})`);
+        log.push(`Created LMS course ID: ${lmsCourseId} (draft, price: $${Number(coursePrice).toFixed(2)})`);
 
         // 5b. Create landing page record
         let finalLandingBlocks = salesPageBlocks;
@@ -1490,7 +1490,7 @@ export const thinkificImportRouter = router({
       }
       log.push(`URLs to try: ${urlsToTry.join(", ")}`);
       const result = await scrapeThinkificSalesPage(input.courseSlug, input.customDomain || "");
-      log.push(`Scraped ${result.blocks.length} blocks, price: $${(result.price / 100).toFixed(2)}`);
+      log.push(`Scraped ${result.blocks.length} blocks, price: $${Number(result.price).toFixed(2)}`);
       log.push(`Block types: ${result.blocks.map(b => b.type).join(", ")}`);
       return {
         log,

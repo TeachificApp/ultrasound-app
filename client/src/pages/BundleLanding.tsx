@@ -89,10 +89,10 @@ export default function BundleLanding() {
 
           {/* Pricing */}
           <div className="mt-8 flex items-end gap-4">
-            <span className="text-4xl font-bold">${(bundle.discountPrice / 100).toFixed(2)}</span>
+            <span className="text-4xl font-bold">${Number(bundle.discountPrice).toFixed(2)}</span>
             {savings > 0 && (
               <>
-                <span className="text-xl text-gray-400 line-through">${(bundle.originalPrice / 100).toFixed(2)}</span>
+                <span className="text-xl text-gray-400 line-through">${Number(bundle.originalPrice).toFixed(2)}</span>
                 <Badge className="bg-teal-500 text-white text-sm">Save {savingsPercent}%</Badge>
               </>
             )}
@@ -152,7 +152,7 @@ export default function BundleLanding() {
                     {item.title}
                   </Link>
                   <p className="text-xs text-muted-foreground">
-                    {item.isFree ? "Free" : `$${(item.price / 100).toFixed(2)}`}
+                    {item.isFree ? "Free" : `$${Number(item.price).toFixed(2)}`}
                   </p>
                 </div>
                 <Check className="w-5 h-5 text-teal-500" />

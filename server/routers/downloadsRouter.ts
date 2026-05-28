@@ -245,7 +245,7 @@ export const downloadsLearnerRouter = router({
             description: product.subtitle ?? undefined,
             images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined,
           },
-          unit_amount: product.price,
+          unit_amount: Math.round(Number(product.price) * 100),
         },
         quantity: 1,
       }];
@@ -353,7 +353,7 @@ export const downloadsLearnerRouter = router({
               description: bundle.subtitle ?? undefined,
               images: bundle.thumbnailUrl ? [bundle.thumbnailUrl] : undefined,
             },
-            unit_amount: bundle.discountPrice,
+            unit_amount: Math.round(Number(bundle.discountPrice) * 100),
           },
           quantity: 1,
         }],
@@ -1071,7 +1071,7 @@ export const downloadsAdminRouter = router({
       }).from(digitalProducts).where(eq(digitalProducts.id, input.productId)).limit(1);
       if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Product not found" });
 
-      const priceText = product.isFree ? "Free" : product.price ? `$${(product.price / 100).toFixed(2)}` : "Free";
+      const priceText = product.isFree ? "Free" : product.price ? `$${Number(product.price).toFixed(2)}` : "Free";
 
       const systemPrompt = `You are an expert landing page designer for digital products. Generate a complete, compelling landing page block structure as JSON. The blocks should be professional, conversion-focused, and specific to the content provided. Return ONLY valid JSON, no markdown.`;
       const userPrompt = `Generate a landing page for this digital download product:

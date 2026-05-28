@@ -31,7 +31,44 @@ import Underline from "@tiptap/extension-underline";
 import Color from "@tiptap/extension-color";
 import { TextStyle } from "@tiptap/extension-text-style";
 import Youtube from "@tiptap/extension-youtube";
-import { useState, useRef, useCallback, useEffect } from "react";
+import Table from "@tiptap/extension-table";
+import TableRow from "@tiptap/extension-table-row";
+import TableCell from "@tiptap/extension-table-cell";
+import TableHeader from "@tiptap/extension-table-header";
+
+// Extended TableCell with backgroundColor attribute
+const CustomTableCell = TableCell.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      backgroundColor: {
+        default: null,
+        parseHTML: (el) => el.style.backgroundColor || null,
+        renderHTML: (attrs) => {
+          if (!attrs.backgroundColor) return {};
+          return { style: `background-color: ${attrs.backgroundColor}` };
+        },
+      },
+    };
+  },
+});
+
+const CustomTableHeader = TableHeader.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      backgroundColor: {
+        default: null,
+        parseHTML: (el) => el.style.backgroundColor || null,
+        renderHTML: (attrs) => {
+          if (!attrs.backgroundColor) return {};
+          return { style: `background-color: ${attrs.backgroundColor}` };
+        },
+      },
+    };
+  },
+});
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
@@ -75,6 +112,13 @@ import {
   MoveLeft,
   MoveRight,
   MoveHorizontal,
+  Table as TableIcon,
+  Rows3,
+  Columns3,
+  Merge,
+  Split,
+  Trash2 as TrashIcon,
+  ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Picker from "@emoji-mart/react";
@@ -230,6 +274,171 @@ async function uploadVideoToMediaRepo(
   return lastResult.s3Url as string;
 }
 
+// ─── Media Style Panel ───────────────────────────────────────────────────────
+
+function MediaStylePanel({ editor, onClose }: { editor: any; onClose: () => void }) {
+  // Read current style from selected image or video node
+  const getNodeStyle = () => {
+    const { state } = editor;
+    const { from } = state.selection;
+    let style = "";
+    state.doc.nodesBetween(Math.max(0, from - 1), Math.min(state.doc.content.size, from + 1), (node: any) => {
+      if (["image", "imageResize", "video"].includes(node.type.name)) {
+        style = node.attrs.style ?? node.attrs.wrapperStyle ?? "";
+        return false;
+      }
+    });
+    return style;
+  };
+
+  const parseStyleProp = (style: string, prop: string) => {
+    const m = style.match(new RegExp(`${prop}:\\s*([^;]+)`));
+    return m ? m[1].trim() : "";
+  };
+
+  const currentStyle = getNodeStyle();
+  const [borderWidth, setBorderWidth] = React.useState(parseStyleProp(currentStyle, "border-width") || "0px");
+  const [borderColor, setBorderColor] = React.useState(parseStyleProp(currentStyle, "border-color") || "#d1d5db");
+  const [borderStyle, setBorderStyle] = React.useState(parseStyleProp(currentStyle, "border-style") || "solid");
+  const [borderRadius, setBorderRadius] = React.useState(parseStyleProp(currentStyle, "border-radius") || "0px");
+  const [shadow, setShadow] = React.useState(parseStyleProp(currentStyle, "box-shadow") || "none");
+  const [marginTop, setMarginTop] = React.useState(parseStyleProp(currentStyle, "margin-top") || "8px");
+  const [marginBottom, setMarginBottom] = React.useState(parseStyleProp(currentStyle, "margin-bottom") || "8px");
+  const [marginLeft, setMarginLeft] = React.useState(parseStyleProp(currentStyle, "margin-left") || "0px");
+  const [marginRight, setMarginRight] = React.useState(parseStyleProp(currentStyle, "margin-right") || "0px");
+
+  const applyStyle = () => {
+    const styleStr = [
+      `border-width: ${borderWidth}`,
+      `border-color: ${borderColor}`,
+      `border-style: ${borderStyle}`,
+      `border-radius: ${borderRadius}`,
+      `box-shadow: ${shadow}`,
+      `margin-top: ${marginTop}`,
+      `margin-bottom: ${marginBottom}`,
+      `margin-left: ${marginLeft}`,
+      `margin-right: ${marginRight}`,
+    ].join("; ");
+    const { state } = editor;
+    const { from } = state.selection;
+    state.doc.nodesBetween(Math.max(0, from - 1), Math.min(state.doc.content.size, from + 1), (node: any) => {
+      if (["image", "imageResize"].includes(node.type.name)) {
+        editor.chain().focus().updateAttributes(node.type.name, { style: styleStr }).run();
+        return false;
+      }
+      if (node.type.name === "video") {
+        editor.chain().focus().updateAttributes("video", { style: styleStr }).run();
+        return false;
+      }
+    });
+    onClose();
+  };
+
+  const SHADOW_PRESETS = [
+    { label: "None", value: "none" },
+    { label: "Soft", value: "0 2px 8px rgba(0,0,0,0.10)" },
+    { label: "Medium", value: "0 4px 16px rgba(0,0,0,0.15)" },
+    { label: "Strong", value: "0 8px 32px rgba(0,0,0,0.22)" },
+    { label: "Teal", value: "0 4px 16px rgba(20,144,150,0.30)" },
+  ];
+
+  const RADIUS_PRESETS = [
+    { label: "None", value: "0px" },
+    { label: "Sm", value: "4px" },
+    { label: "Md", value: "8px" },
+    { label: "Lg", value: "16px" },
+    { label: "Full", value: "9999px" },
+  ];
+
+  return (
+    <div className="absolute top-9 left-0 z-50 bg-white border border-gray-200 rounded-xl shadow-xl p-3 w-72" onMouseLeave={onClose}>
+      <p className="text-xs font-semibold text-gray-700 mb-2">Image / Video Style</p>
+      <div className="space-y-2.5">
+        {/* Border */}
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Border</label>
+          <div className="flex items-center gap-2">
+            <input type="number" min={0} max={20} value={parseInt(borderWidth)||0}
+              onChange={e => setBorderWidth(`${e.target.value}px`)}
+              className="w-14 h-7 text-xs border border-gray-200 rounded px-2" />
+            <span className="text-xs text-gray-400">px</span>
+            <select value={borderStyle} onChange={e => setBorderStyle(e.target.value)}
+              className="flex-1 h-7 text-xs border border-gray-200 rounded px-1">
+              <option value="solid">Solid</option>
+              <option value="dashed">Dashed</option>
+              <option value="dotted">Dotted</option>
+              <option value="double">Double</option>
+            </select>
+            <input type="color" value={borderColor} onChange={e => setBorderColor(e.target.value)}
+              className="w-7 h-7 rounded border border-gray-200 cursor-pointer p-0" />
+          </div>
+        </div>
+        {/* Corner Radius */}
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Corner Radius</label>
+          <div className="flex gap-1 flex-wrap">
+            {RADIUS_PRESETS.map(p => (
+              <button key={p.value} type="button"
+                className={`px-2 py-0.5 text-xs rounded border ${borderRadius === p.value ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}
+                onMouseDown={(e) => { e.preventDefault(); setBorderRadius(p.value); }}>
+                {p.label}
+              </button>
+            ))}
+            <input type="text" value={borderRadius} onChange={e => setBorderRadius(e.target.value)}
+              className="w-16 h-6 text-xs border border-gray-200 rounded px-1" placeholder="8px" />
+          </div>
+        </div>
+        {/* Shadow */}
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Shadow</label>
+          <div className="flex gap-1 flex-wrap">
+            {SHADOW_PRESETS.map(p => (
+              <button key={p.label} type="button"
+                className={`px-2 py-0.5 text-xs rounded border ${shadow === p.value ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}
+                onMouseDown={(e) => { e.preventDefault(); setShadow(p.value); }}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {/* Margins */}
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Margin (px)</label>
+          <div className="grid grid-cols-2 gap-1.5">
+            {[{label:"Top",val:marginTop,set:setMarginTop},{label:"Bottom",val:marginBottom,set:setMarginBottom},{label:"Left",val:marginLeft,set:setMarginLeft},{label:"Right",val:marginRight,set:setMarginRight}].map(({label,val,set}) => (
+              <div key={label} className="flex items-center gap-1">
+                <span className="text-xs text-gray-400 w-10">{label}</span>
+                <input type="number" min={0} max={200} value={parseInt(val)||0}
+                  onChange={e => set(`${e.target.value}px`)}
+                  className="flex-1 h-6 text-xs border border-gray-200 rounded px-1" />
+              </div>
+            ))}
+          </div>
+        </div>
+        <button type="button" className="w-full py-1.5 text-sm font-medium text-white rounded-lg bg-teal-600 hover:bg-teal-700"
+          onMouseDown={(e) => { e.preventDefault(); applyStyle(); }}>
+          Apply Style
+        </button>
+        <button type="button" className="w-full py-1 text-xs text-gray-400 hover:text-gray-600"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            const { state } = editor;
+            const { from } = state.selection;
+            state.doc.nodesBetween(Math.max(0, from - 1), Math.min(state.doc.content.size, from + 1), (node: any) => {
+              if (["image", "imageResize", "video"].includes(node.type.name)) {
+                editor.chain().focus().updateAttributes(node.type.name, { style: "" }).run();
+                return false;
+              }
+            });
+            onClose();
+          }}>
+          Reset style
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Editor ──────────────────────────────────────────────────────────────
 
 export default function RichTextEditor({
@@ -266,6 +475,12 @@ export default function RichTextEditor({
   const [ctaFullWidth, setCtaFullWidth] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoFileInputRef = useRef<HTMLInputElement>(null);
+  const [tableMenuOpen, setTableMenuOpen] = useState(false);
+  const [tableRows, setTableRows] = useState(3);
+  const [tableCols, setTableCols] = useState(3);
+  const [tableInsertOpen, setTableInsertOpen] = useState(false);
+  const [cellBgColor, setCellBgColor] = useState("#ffffff");
+  const [mediaStyleOpen, setMediaStyleOpen] = useState(false);
 
   const editor = useEditor({
     extensions: [
@@ -283,6 +498,10 @@ export default function RichTextEditor({
       }),
       Youtube.configure({ controls: true, nocookie: true }),
       Placeholder.configure({ placeholder }),
+      Table.configure({ resizable: true }),
+      TableRow,
+      CustomTableHeader,
+      CustomTableCell,
     ],
     content: value,
     editable: !disabled,
@@ -621,6 +840,16 @@ export default function RichTextEditor({
             <MoveRight className="w-3.5 h-3.5" />
           </ToolbarBtn>
 
+          {/* Media Style (border, shadow, radius, margin) */}
+          <div className="relative">
+            <ToolbarBtn title="Image/video style (border, shadow, radius, margin)" onClick={() => setMediaStyleOpen(p => !p)}>
+              <WrapText className="w-3.5 h-3.5" />
+            </ToolbarBtn>
+            {mediaStyleOpen && (
+              <MediaStylePanel editor={editor} onClose={() => setMediaStyleOpen(false)} />
+            )}
+          </div>
+
           {/* Video Upload (direct file) */}
           <ToolbarBtn title="Upload video file (saved to Media Repository)" onClick={() => videoFileInputRef.current?.click()}>
             <Video className="w-3.5 h-3.5" />
@@ -640,6 +869,118 @@ export default function RichTextEditor({
           <ToolbarBtn title="Insert raw HTML code" onClick={() => setHtmlDialogOpen(true)}>
             <FileCode className="w-3.5 h-3.5" />
           </ToolbarBtn>
+
+          <Sep />
+
+          {/* Table */}
+          <div className="relative">
+            <ToolbarBtn title="Table" active={editor.isActive("table")} onClick={() => setTableMenuOpen(p => !p)}>
+              <TableIcon className="w-3.5 h-3.5" />
+            </ToolbarBtn>
+            {tableMenuOpen && (
+              <div className="absolute top-9 left-0 z-50 bg-white border border-gray-200 rounded-xl shadow-xl p-3 w-64" onMouseLeave={() => setTableMenuOpen(false)}>
+                {!editor.isActive("table") ? (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-gray-600 mb-2">Insert Table</p>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1">
+                        <label className="text-xs text-gray-500">Rows</label>
+                        <input type="number" min={1} max={20} value={tableRows} onChange={e => setTableRows(parseInt(e.target.value)||3)}
+                          className="w-full h-7 text-sm border border-gray-200 rounded px-2 mt-0.5" />
+                      </div>
+                      <div className="flex-1">
+                        <label className="text-xs text-gray-500">Columns</label>
+                        <input type="number" min={1} max={20} value={tableCols} onChange={e => setTableCols(parseInt(e.target.value)||3)}
+                          className="w-full h-7 text-sm border border-gray-200 rounded px-2 mt-0.5" />
+                      </div>
+                    </div>
+                    <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                      <input type="checkbox" id="table-header-row" defaultChecked className="rounded" />
+                      Header row
+                    </label>
+                    <button type="button" className="w-full py-1.5 text-sm font-medium text-white rounded-lg bg-teal-600 hover:bg-teal-700"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        const withHeader = (document.getElementById("table-header-row") as HTMLInputElement)?.checked ?? true;
+                        editor.chain().focus().insertTable({ rows: tableRows, cols: tableCols, withHeaderRow: withHeader }).run();
+                        setTableMenuOpen(false);
+                      }}>Insert Table</button>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-gray-600 mb-2">Table Actions</p>
+                    <button type="button" className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-gray-50 flex items-center gap-2"
+                      onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().addRowAfter().run(); setTableMenuOpen(false); }}>
+                      <Rows3 className="w-3.5 h-3.5 text-gray-500" /> Add row below
+                    </button>
+                    <button type="button" className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-gray-50 flex items-center gap-2"
+                      onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().addRowBefore().run(); setTableMenuOpen(false); }}>
+                      <Rows3 className="w-3.5 h-3.5 text-gray-500" /> Add row above
+                    </button>
+                    <button type="button" className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-gray-50 flex items-center gap-2"
+                      onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().deleteRow().run(); setTableMenuOpen(false); }}>
+                      <TrashIcon className="w-3.5 h-3.5 text-red-400" /> Delete row
+                    </button>
+                    <div className="border-t border-gray-100 my-1" />
+                    <button type="button" className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-gray-50 flex items-center gap-2"
+                      onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().addColumnAfter().run(); setTableMenuOpen(false); }}>
+                      <Columns3 className="w-3.5 h-3.5 text-gray-500" /> Add column right
+                    </button>
+                    <button type="button" className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-gray-50 flex items-center gap-2"
+                      onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().addColumnBefore().run(); setTableMenuOpen(false); }}>
+                      <Columns3 className="w-3.5 h-3.5 text-gray-500" /> Add column left
+                    </button>
+                    <button type="button" className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-gray-50 flex items-center gap-2"
+                      onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().deleteColumn().run(); setTableMenuOpen(false); }}>
+                      <TrashIcon className="w-3.5 h-3.5 text-red-400" /> Delete column
+                    </button>
+                    <div className="border-t border-gray-100 my-1" />
+                    <button type="button" className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-gray-50 flex items-center gap-2"
+                      onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().mergeCells().run(); setTableMenuOpen(false); }}>
+                      <Merge className="w-3.5 h-3.5 text-gray-500" /> Merge cells
+                    </button>
+                    <button type="button" className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-gray-50 flex items-center gap-2"
+                      onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().splitCell().run(); setTableMenuOpen(false); }}>
+                      <Split className="w-3.5 h-3.5 text-gray-500" /> Split cell
+                    </button>
+                    <button type="button" className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-gray-50 flex items-center gap-2"
+                      onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleHeaderRow().run(); setTableMenuOpen(false); }}>
+                      <Rows3 className="w-3.5 h-3.5 text-gray-500" /> Toggle header row
+                    </button>
+                    <button type="button" className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-gray-50 flex items-center gap-2"
+                      onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleHeaderColumn().run(); setTableMenuOpen(false); }}>
+                      <Columns3 className="w-3.5 h-3.5 text-gray-500" /> Toggle header column
+                    </button>
+                    <div className="border-t border-gray-100 my-1" />
+                    <div className="px-2 py-1">
+                      <label className="text-xs text-gray-500 block mb-1">Cell background color</label>
+                      <div className="flex items-center gap-2">
+                        <input type="color" value={cellBgColor} onChange={e => setCellBgColor(e.target.value)}
+                          className="w-7 h-7 rounded border border-gray-200 cursor-pointer p-0" />
+                        <button type="button" className="flex-1 h-7 text-xs font-medium text-white rounded bg-teal-600 hover:bg-teal-700"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            editor.chain().focus().setCellAttribute("backgroundColor", cellBgColor).run();
+                            setTableMenuOpen(false);
+                          }}>Apply</button>
+                        <button type="button" className="h-7 px-2 text-xs text-gray-500 rounded border border-gray-200 hover:bg-gray-50"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            editor.chain().focus().setCellAttribute("backgroundColor", null).run();
+                            setTableMenuOpen(false);
+                          }}>Clear</button>
+                      </div>
+                    </div>
+                    <div className="border-t border-gray-100 my-1" />
+                    <button type="button" className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-red-50 text-red-500 flex items-center gap-2"
+                      onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().deleteTable().run(); setTableMenuOpen(false); }}>
+                      <TrashIcon className="w-3.5 h-3.5" /> Delete table
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           <Sep />
 
@@ -716,6 +1057,15 @@ export default function RichTextEditor({
         .rte-content .tiptap iframe { max-width: 100%; border-radius: 8px; margin: 0.5em 0; }
         .rte-content .tiptap .youtube-embed { max-width: 100%; }
         .rte-content .tiptap video { max-width: 100%; border-radius: 8px; margin: 0.5em 0; }
+        /* Table styles */
+        .rte-content .tiptap table { border-collapse: collapse; width: 100%; margin: 0.75em 0; overflow: hidden; border-radius: 6px; }
+        .rte-content .tiptap table td, .rte-content .tiptap table th { border: 1px solid #d1d5db; padding: 6px 10px; min-width: 60px; vertical-align: top; position: relative; }
+        .rte-content .tiptap table th { background-color: #f0fdfa; font-weight: 600; color: #0e4a50; text-align: left; }
+        .rte-content .tiptap table tr:nth-child(even) td { background-color: #f9fafb; }
+        .rte-content .tiptap table .selectedCell:after { z-index: 2; position: absolute; content: ""; left: 0; right: 0; top: 0; bottom: 0; background: rgba(20,144,150,0.12); pointer-events: none; }
+        .rte-content .tiptap table .column-resize-handle { position: absolute; right: -2px; top: 0; bottom: -2px; width: 4px; background-color: #149096; pointer-events: none; }
+        .rte-content .tableWrapper { overflow-x: auto; }
+        .rte-content .resize-cursor { cursor: col-resize; }
       `}</style>
 
       {/* ── Dialogs ── */}
@@ -1009,6 +1359,10 @@ export function RichTextDisplay({
         "[&_img]:max-w-full [&_img]:rounded-lg [&_img]:my-2",
         "[&_iframe]:max-w-full [&_iframe]:rounded-lg [&_iframe]:my-2",
         "[&_video]:max-w-full [&_video]:rounded-lg [&_video]:my-2",
+        "[&_table]:w-full [&_table]:border-collapse [&_table]:my-3 [&_table]:text-sm",
+        "[&_th]:border [&_th]:border-gray-300 [&_th]:bg-teal-50 [&_th]:px-3 [&_th]:py-2 [&_th]:font-semibold [&_th]:text-left [&_th]:text-teal-800",
+        "[&_td]:border [&_td]:border-gray-300 [&_td]:px-3 [&_td]:py-2 [&_td]:align-top",
+        "[&_tr:nth-child(even)_td]:bg-gray-50",
         className,
       )}
       dangerouslySetInnerHTML={{ __html: html }}

@@ -3401,3 +3401,58 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Add sortOrder column to lms_courses table (libraryOrder already existed in schema)
 - [x] Add drag-and-drop reorder in LMS admin course list (Reorder button + DnD mode)
 - [x] Education Library respects sortOrder for display (orderBy libraryOrder ASC in lms.listCourses)
+
+## Cohort Course Type (May 2026)
+- [x] Add 'cohort' to lmsCourses.type enum in schema (DB migration)
+- [x] Add enrollmentCloseDate column to lmsCourses table (DB migration)
+- [x] Create lmsCohortSessions table (courseId, title, description, sessionDate, durationMinutes, meetingUrl, recordingUrl, status)
+- [x] Create lmsCohortAssignments table (courseId, title, description, dueDate, maxPoints, submissionType)
+- [x] Add cohort tRPC procedures: listCohortSessions, createCohortSession, updateCohortSession, deleteCohortSession
+- [x] Add cohort tRPC procedures: listCohortAssignments, createCohortAssignment, updateCohortAssignment, deleteCohortAssignment
+- [x] Update listCourses (admin + public) to accept 'cohort' type filter
+- [x] Update updateCourse to accept enrollmentCloseDate
+- [x] Update createCourse to accept 'cohort' type
+- [x] Add CohortTab UI component in LMSAdmin.tsx (Sessions + Assignments sub-tabs)
+- [x] Wire CohortTab into course editor tabs (show only when type === 'cohort')
+- [x] Add 'Cohorts' sidebar entry in LMS admin nav
+- [x] Add cohort to TYPE_ICONS, CoursesTab typeFilter, and CreateCourseDialog
+- [x] Add Content Type dropdown option for 'cohort' in CourseSettingsForm
+- [x] Add enrollmentCloseDate date picker in CourseSettingsForm (cohort only)
+
+## Price Field Fixes (May 2026)
+- [x] Fix order bump triggerType/bumpType enum: add quiz and cohort
+- [x] Migrate all price columns from INT cents to DECIMAL(10,2) dollars in DB
+- [x] Fix server routers: remove all /100 and *100 price conversions, fix Stripe unit_amount boundaries
+- [x] Fix admin UI: remove all /100 and *100 price conversions (LMSAdmin, BundlesAdmin, DigitalDownloadsAdmin, PhysicalProductsAdmin, OrderBumpsAdmin, LandingPageBuilder, AdminSalesDashboard, AdminSalesPage)
+- [x] Fix public pages: remove all /100 price display conversions (CourseLanding, DownloadLanding, DownloadsBrowse, EducationLibrary, LMSHome, ProductLanding, BundleLanding, CollectionDetail)
+- [x] Fix AdminDiscountCodesPage: fmtDollars for Stripe amount_off (already in cents from Stripe, kept /100 conversion)
+
+## Rich Text Media Styling (May 2026)
+- [x] Add border controls (style, width, color) for images/videos in rich text editor
+- [x] Add shadow controls for images/videos in rich text editor
+- [x] Add corner rounding controls for images/videos in rich text editor
+- [x] Add text wrap/float controls (left, right, none) for images/videos in rich text editor
+- [x] Add margin controls for images/videos in rich text editor
+
+## Duplicate/Copy Behavior Fix (May 2026)
+- [x] Course/quiz/cohort duplicate: do NOT copy lms_enrollments, lms_progress, lms_orders (already correct — only copies metadata/content)
+- [x] Download duplicate: do NOT copy download access/purchase records (already correct)
+- [x] Bundle duplicate: do NOT copy bundle purchase/access records (already correct)
+- [x] Physical product duplicate: do NOT copy physical_product_orders (already correct — only copies pricing options)
+
+## Rich Text Table Editing (May 2026)
+- [x] Install @tiptap/extension-table and related table extensions
+- [x] Add table toolbar button to RichTextEditor (Insert Table with row/col picker)
+- [x] Support copy/paste of tables from Word, spreadsheets, and web pages (TipTap handles natively)
+- [x] Add row/column insert and delete controls (dropdown menu in toolbar)
+- [x] Add cell background shading color picker
+- [x] Add merge/split cell controls
+- [x] Add toggle header row/column
+- [x] Render tables properly in read-only/preview mode (RichTextDisplay with table CSS classes)
+
+## Standalone Table Content Block (May 2026)
+- [ ] Add 'table' block type to the lesson/page content block schema
+- [ ] Add TableBlock component: full table editor with add/remove rows and columns, cell shading, borders
+- [ ] Add 'Insert Table' button to the content block picker (alongside Text, Image, Video, etc.)
+- [ ] Render TableBlock in read-only mode in CoursePlayer and funnel page preview
+- [ ] Support copy/paste of external tables into the TableBlock editor

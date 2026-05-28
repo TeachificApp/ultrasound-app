@@ -19,9 +19,9 @@ import {
 
 type OrderBump = {
   id: number;
-  triggerType: "course" | "quiz" | "download" | "bundle" | "physical";
+  triggerType: "course" | "quiz" | "download" | "bundle" | "physical" | "cohort";
   triggerProductId: number;
-  bumpType: "course" | "quiz" | "download" | "bundle" | "physical";
+  bumpType: "course" | "quiz" | "download" | "bundle" | "physical" | "cohort";
   bumpProductId: number;
   timing: "before_checkout" | "after_checkout";
   bumpPrice: number;
@@ -151,7 +151,7 @@ export default function OrderBumpsAdmin() {
                     <span className="flex items-center gap-1 font-medium text-teal-700">{TYPE_ICONS[bump.bumpType]} {getProductName(bump.bumpType, bump.bumpProductId)}</span>
                   </div>
                   <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                    <span>Price: <strong className="text-gray-700">${(bump.bumpPrice / 100).toFixed(2)}</strong></span>
+                    <span>Price: <strong className="text-gray-700">${Number(bump.bumpPrice).toFixed(2)}</strong></span>
                     {bump.discountLabel && <span className="text-green-600">{bump.discountLabel}</span>}
                     <span className="flex items-center gap-1"><TrendingUp size={10} /> {bump.conversions}/{bump.impressions} ({bump.impressions > 0 ? ((bump.conversions / bump.impressions) * 100).toFixed(1) : "0"}%)</span>
                   </div>
@@ -264,6 +264,7 @@ function OrderBumpEditor({ bump, onClose, onSaved }: {
             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm mb-2">
             <option value="course">Course</option>
             <option value="quiz">Quiz</option>
+            <option value="cohort">Cohort</option>
             <option value="download">Download</option>
             <option value="bundle">Bundle</option>
             <option value="physical">Physical Product</option>
@@ -283,6 +284,7 @@ function OrderBumpEditor({ bump, onClose, onSaved }: {
             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm mb-2">
             <option value="course">Course</option>
             <option value="quiz">Quiz</option>
+            <option value="cohort">Cohort</option>
             <option value="download">Download</option>
             <option value="bundle">Bundle</option>
             <option value="physical">Physical Product</option>
@@ -309,9 +311,8 @@ function OrderBumpEditor({ bump, onClose, onSaved }: {
           </select>
         </div>
         <div>
-          <label className="text-xs font-medium text-gray-600 block mb-1">Bump Price (cents)</label>
-          <Input type="number" value={form.bumpPrice} onChange={e => setForm({ ...form, bumpPrice: Number(e.target.value) })} />
-          <span className="text-[10px] text-gray-400">${(form.bumpPrice / 100).toFixed(2)}</span>
+          <label className="text-xs font-medium text-gray-600 block mb-1">Bump Price ($)</label>
+          <Input type="number" step="0.01" min="0" value={form.bumpPrice} onChange={e => setForm({ ...form, bumpPrice: parseFloat(e.target.value) || 0 })} placeholder="0.00" />
         </div>
         <div>
           <label className="text-xs font-medium text-gray-600 block mb-1">Discount Label</label>
@@ -370,7 +371,7 @@ function OrderBumpEditor({ bump, onClose, onSaved }: {
           {form.bodyHtml && <div className="prose text-sm mb-4" dangerouslySetInnerHTML={{ __html: form.bodyHtml }} />}
           <div className="flex flex-col gap-2">
             <button className="w-full py-3 rounded-lg text-white font-semibold text-sm" style={{ backgroundColor: form.ctaColor }}>
-              {form.ctaText} — ${(form.bumpPrice / 100).toFixed(2)}
+              {form.ctaText} — ${Number(form.bumpPrice).toFixed(2)}
             </button>
             <button className="text-xs text-gray-400 hover:text-gray-600 underline">{form.skipText}</button>
           </div>

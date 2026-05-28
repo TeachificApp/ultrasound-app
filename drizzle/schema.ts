@@ -2722,7 +2722,9 @@ export const lmsCourses = mysqlTable("lms_courses", {
   description: longtext("description"),
   coverImageUrl: text("cover_image_url"),
   status: mysqlEnum("status", ["draft", "public", "hidden", "private", "archived"]).default("draft").notNull(),
-  type: mysqlEnum("type", ["course", "quiz", "download"]).default("course").notNull(),
+  type: mysqlEnum("type", ["course", "quiz", "download", "cohort"]).default("course").notNull(),
+  // Cohort-specific: close enrollment after this date (null = always open)
+  enrollmentCloseDate: timestamp("enrollment_close_date"),
   brand: mysqlEnum("brand", ["aaus", "iheartecho"]).default("aaus").notNull(),
   price: int("price").default(0).notNull(), // cents — used for one_time and payment_plan total
   isFree: boolean("is_free").default(false).notNull(),
@@ -3280,10 +3282,10 @@ export const orderBumps = mysqlTable("order_bumps", {
   conditionProductType: mysqlEnum("condition_product_type", ["course", "quiz", "download", "bundle", "physical"]),
   conditionProductId: int("condition_product_id"),
   // The trigger product — when a user buys this, the bump is offered (nullable for standalone)
-  triggerType: mysqlEnum("trigger_type", ["course", "quiz", "download", "bundle", "physical"]).notNull().default("course"),
+  triggerType: mysqlEnum("trigger_type", ["course", "quiz", "download", "bundle", "physical", "cohort"]).notNull().default("course"),
   triggerProductId: int("trigger_product_id").default(0).notNull(),
   // The bump offer — what product is being offered as the bump
-  bumpType: mysqlEnum("bump_type", ["course", "quiz", "download", "bundle", "physical"]).notNull().default("download"),
+  bumpType: mysqlEnum("bump_type", ["course", "quiz", "download", "bundle", "physical", "cohort"]).notNull().default("download"),
   bumpProductId: int("bump_product_id").default(0).notNull(),
   // When to show the bump
   timing: mysqlEnum("timing", ["before_checkout", "after_checkout", "direct_link"]).default("after_checkout").notNull(),
@@ -4822,3 +4824,40 @@ export const mediaUploadSessions = mysqlTable("media_upload_sessions", {
   expiresAt: timestamp("expires_at").notNull(),
 });
 export type MediaUploadSession = typeof mediaUploadSessions.$inferSelect;
+
+// ─── LMS Cohort Sessions & Assignments ───────────────────────────────────────
+
+export const lmsCohortSessions = mysqlTable("lms_cohort_sessions", {
+  id: int("id").autoincrement().primaryKey(),
+  courseId: int("course_id").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  sessionDate: timestamp("session_date").notNull(),
+  durationMinutes: int("duration_minutes").default(60).notNull(),
+  meetingUrl: text("meeting_url"),
+  recordingUrl: text("recording_url"),
+  // draft = not yet visible to students; published = visible; cancelled = cancelled
+  status: mysqlEnum("status", ["draft", "published", "cancelled"]).default("draft").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type LmsCohortSession = typeof lmsCohortSessions.$inferSelect;
+export type InsertLmsCohortSession = typeof lmsCohortSessions.$inferInsert;
+
+export const lmsCohortAssignments = mysqlTable("lms_cohort_assignments", {
+  id: int("id").autoincrement().primaryKey(),
+  courseId: int("course_id").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  dueDate: timestamp("due_date"),
+  maxPoints: int("max_points").default(100).notNull(),
+  // text = typed submission; file = file upload; url = link submission; none = no submission required
+  submissionType: mysqlEnum("submission_type", ["text", "file", "url", "none"]).default("none").notNull(),
+  // draft = not yet visible; published = visible to enrolled students
+  status: mysqlEnum("status", ["draft", "published"]).default("draft").notNull(),
+  position: int("position").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type LmsCohortAssignment = typeof lmsCohortAssignments.$inferSelect;
+export type InsertLmsCohortAssignment = typeof lmsCohortAssignments.$inferInsert;

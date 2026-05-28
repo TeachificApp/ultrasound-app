@@ -32,8 +32,8 @@ import {
 } from "lucide-react";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-function fmtCents(cents: number, currency = "usd") {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: currency.toUpperCase() }).format(cents / 100);
+function fmtDollars(amount: number, currency = "usd") {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: currency.toUpperCase() }).format(amount);
 }
 function fmtDate(ts: number) {
   return new Date(ts * 1000).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
@@ -67,7 +67,7 @@ function CreateCouponDialog({ open, onClose, onCreated }: { open: boolean; onClo
     createMutation.mutate({
       name: name.trim(),
       discountType,
-      discountValue: discountType === "fixed" ? Math.round(val * 100) : val, // fixed = cents
+      discountValue: val, // always in dollars/percent — server multiplies by 100 for Stripe
       promoCode: promoCode.trim() || undefined,
       maxRedemptions: maxRedemptions ? parseInt(maxRedemptions) : undefined,
       redeemBy: redeemBy || undefined,
@@ -167,7 +167,7 @@ function CouponRow({ coupon, promoCodes, onRefresh }: { coupon: any; promoCodes:
 
   const discountLabel = coupon.percent_off != null
     ? `${coupon.percent_off}% off`
-    : `${fmtCents(coupon.amount_off, coupon.currency)} off`;
+    : `${fmtDollars(coupon.amount_off / 100, coupon.currency)} off`; // Stripe returns amount_off in cents
 
   const isValid = coupon.valid !== false;
 

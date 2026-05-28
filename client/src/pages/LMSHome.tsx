@@ -148,7 +148,7 @@ export default function LMSHome() {
                     )}
                     <div className="mt-auto flex items-center justify-between">
                       <span className="text-sm font-bold text-[#189aa1]">
-                        {(course.isFree || course.price === 0) ? "Free" : `$${(course.price / 100).toFixed(2)}${course.pricingType === "subscription" ? (course.subscriptionInterval === "annual" ? "/yr" : course.subscriptionInterval === "quarterly" ? "/qtr" : "/mo") : course.pricingType === "payment_plan" ? " (plan)" : ""}`}
+                        {(course.isFree || course.price === 0) ? "Free" : `$${Number(course.price).toFixed(2)}${course.pricingType === "subscription" ? (course.subscriptionInterval === "annual" ? "/yr" : course.subscriptionInterval === "quarterly" ? "/qtr" : "/mo") : course.pricingType === "payment_plan" ? " (plan)" : ""}`}
                       </span>
                       {course.instructor && (
                         <span className="text-xs text-gray-400 truncate ml-2">
@@ -229,7 +229,7 @@ export default function LMSHome() {
                       </h3>
                       <div className="mt-auto flex items-center justify-between">
                         <span className="text-sm font-bold text-[#189aa1]">
-                          {product.price === 0 ? "Free" : `$${(product.price / 100).toFixed(2)}`}
+                          {product.price === 0 ? "Free" : `$${Number(product.price).toFixed(2)}`}
                         </span>
                         <FileDown className="w-4 h-4 text-gray-400 group-hover:text-[#4ad9e0] transition-colors" />
                       </div>

@@ -284,7 +284,7 @@ function PricingOptionSelector({
           }`}
         >
           <span className="font-medium text-gray-900">{opt.label}</span>
-          <span className="font-bold text-teal-700">${(opt.price / 100).toFixed(2)}</span>
+          <span className="font-bold text-teal-700">${Number(opt.price).toFixed(2)}</span>
         </button>
       ))}
     </div>
@@ -356,8 +356,8 @@ export default function ProductLanding() {
   const displayPrice = product.isFree
     ? "Free"
     : selectedOption
-      ? `$${(selectedOption.price / 100).toFixed(2)}`
-      : `$${(product.price / 100).toFixed(2)}`;
+      ? `$${Number(selectedOption.price).toFixed(2)}`
+      : `$${Number(product.price).toFixed(2)}`;
 
   const handleBuy = () => {
     if (product.checkoutMode === "shopify" && product.shopifyProductUrl && !product.shopifyEmbedCode) {

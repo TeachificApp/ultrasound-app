@@ -41,20 +41,20 @@ function formatPrice(c: any): string {
   if (pt === "trial_then_subscription") {
     const trialDays = c.trialDays ?? 7;
     const intervalLabel: Record<string, string> = { monthly: "/mo", quarterly: "/qtr", annual: "/yr" };
-    return `${trialDays}-day free trial, then $${(c.price / 100).toFixed(2)}${intervalLabel[c.subscriptionInterval ?? "monthly"] ?? "/mo"}`;
+    return `${trialDays}-day free trial, then $${Number(c.price).toFixed(2)}${intervalLabel[c.subscriptionInterval ?? "monthly"] ?? "/mo"}`;
   }
   if (pt === "subscription") {
     const intervalLabel: Record<string, string> = { monthly: "/mo", quarterly: "/qtr", annual: "/yr" };
-    return `$${(c.price / 100).toFixed(2)}${intervalLabel[c.subscriptionInterval ?? "monthly"] ?? "/mo"}`;
+    return `$${Number(c.price).toFixed(2)}${intervalLabel[c.subscriptionInterval ?? "monthly"] ?? "/mo"}`;
   }
   if (pt === "payment_plan") {
-    const dp = c.downPayment ? `$${(c.downPayment / 100).toFixed(2)} down` : "";
+    const dp = c.downPayment ? `$${Number(c.downPayment).toFixed(2)} down` : "";
     const inst = c.installmentCount && c.installmentAmount
-      ? ` + ${c.installmentCount}×$${(c.installmentAmount / 100).toFixed(2)}`
+      ? ` + ${c.installmentCount}×$${Number(c.installmentAmount).toFixed(2)}`
       : "";
-    return dp + inst || `$${(c.price / 100).toFixed(2)}`;
+    return dp + inst || `$${Number(c.price).toFixed(2)}`;
   }
-  return `$${(c.price / 100).toFixed(2)}`;
+  return `$${Number(c.price).toFixed(2)}`;
 }
 
 function formatPricingOption(opt: any): string {
@@ -62,16 +62,16 @@ function formatPricingOption(opt: any): string {
   if (pt === "free") return "Free";
   if (pt === "subscription") {
     const intervalLabel: Record<string, string> = { monthly: "/mo", quarterly: "/qtr", annual: "/yr" };
-    return `$${(opt.price / 100).toFixed(2)}${intervalLabel[opt.subscriptionInterval ?? "monthly"] ?? "/mo"}`;
+    return `$${Number(opt.price).toFixed(2)}${intervalLabel[opt.subscriptionInterval ?? "monthly"] ?? "/mo"}`;
   }
   if (pt === "payment_plan") {
-const dp = opt.downPayment ? `$${(opt.downPayment / 100).toFixed(2)} down` : "";
+const dp = opt.downPayment ? `$${Number(opt.downPayment).toFixed(2)} down` : "";
     const inst = opt.installmentCount && opt.installmentAmount
-      ? ` + ${opt.installmentCount}×$${(opt.installmentAmount / 100).toFixed(2)}`
+      ? ` + ${opt.installmentCount}×$${Number(opt.installmentAmount).toFixed(2)}`
       : "";
-    return dp + inst || `$${(opt.price / 100).toFixed(2)}`;
+    return dp + inst || `$${Number(opt.price).toFixed(2)}`;
   }
-  return `$${(opt.price / 100).toFixed(2)}`;
+  return `$${Number(opt.price).toFixed(2)}`;
 }
 
 function accessLabel(c: any): string {
@@ -1028,7 +1028,7 @@ export default function CourseLanding() {
               )}
               {pricingType === "subscription" && <p className="text-xs text-gray-500">Billed {course.subscriptionInterval ?? "monthly"} — cancel anytime</p>}
               {pricingType === "payment_plan" && course.downPayment && (
-                <p className="text-xs text-gray-500">${(course.downPayment / 100).toFixed(0)} due today{course.installmentCount && course.installmentAmount ? `, then ${course.installmentCount}×$${(course.installmentAmount / 100).toFixed(0)} every ${course.installmentIntervalDays ?? 30} days` : ""}</p>
+                <p className="text-xs text-gray-500">${Number(course.downPayment).toFixed(0)} due today{course.installmentCount && course.installmentAmount ? `, then ${course.installmentCount}×$${Number(course.installmentAmount).toFixed(0)} every ${course.installmentIntervalDays ?? 30} days` : ""}</p>
               )}
               {pricingType === "free" && <p className="text-xs text-gray-500">No payment required</p>}
             </div>

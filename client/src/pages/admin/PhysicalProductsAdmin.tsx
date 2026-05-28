@@ -93,8 +93,8 @@ function ProductList({ onEdit }: { onEdit: (id: number) => void }) {
                     )}
                   </div>
                   <div className="text-sm text-muted-foreground mt-0.5">
-                    {p.isFree ? "Free" : `$${(p.price / 100).toFixed(2)}`}
-                    {p.compareAtPrice ? <span className="line-through ml-1 text-xs">${(p.compareAtPrice / 100).toFixed(2)}</span> : null}
+                    {p.isFree ? "Free" : `$${Number(p.price).toFixed(2)}`}
+                    {p.compareAtPrice ? <span className="line-through ml-1 text-xs">${Number(p.compareAtPrice).toFixed(2)}</span> : null}
                     {" · "}/products/{p.slug}
                     {" · "}{p.orderCount} orders
                   </div>
@@ -182,8 +182,8 @@ function PricingOptionsManager({ productId }: { productId: number }) {
     addMut.mutate({
       productId,
       label: newLabel.trim(),
-      price: Math.round(parseFloat(newPrice || "0") * 100),
-      compareAtPrice: newCompare ? Math.round(parseFloat(newCompare) * 100) : undefined,
+      price: parseFloat(newPrice || "0"),
+      compareAtPrice: newCompare ? parseFloat(newCompare) : undefined,
       ctaLabel: newCta.trim() || undefined,
     });
     setNewLabel(""); setNewPrice(""); setNewCompare(""); setNewCta(""); setShowAdd(false);
@@ -241,8 +241,8 @@ function PricingOptionsManager({ productId }: { productId: number }) {
                     <Switch checked={opt.isActive} onCheckedChange={(v) => updateMut.mutate({ id: opt.id, isActive: v })} />
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    ${(opt.price / 100).toFixed(2)}
-                    {opt.compareAtPrice ? <span className="line-through ml-1">${(opt.compareAtPrice / 100).toFixed(2)}</span> : null}
+                    ${Number(opt.price).toFixed(2)}
+                    {opt.compareAtPrice ? <span className="line-through ml-1">${Number(opt.compareAtPrice).toFixed(2)}</span> : null}
                     {opt.ctaLabel ? ` · CTA: ${opt.ctaLabel}` : ""}
                   </div>
                 </div>
@@ -305,7 +305,7 @@ function OrdersTab({ productId }: { productId: number }) {
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColors[order.fulfillmentStatus] ?? ""}`}>
                         {order.fulfillmentStatus}
                       </span>
-                      <span className="text-xs text-muted-foreground">${(order.amountPaid / 100).toFixed(2)}</span>
+                      <span className="text-xs text-muted-foreground">${Number(order.amountPaid).toFixed(2)}</span>
                     </div>
                     <div className="text-xs text-muted-foreground mt-0.5">
                       {new Date(order.orderedAt).toLocaleDateString()} · {user?.email}
@@ -498,8 +498,8 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
       subtitle: product.subtitle ?? "",
       description: product.description ?? "",
       details: product.details ?? "",
-      price: (product.price / 100).toFixed(2),
-      compareAtPrice: product.compareAtPrice ? (product.compareAtPrice / 100).toFixed(2) : "",
+      price: Number(product.price).toFixed(2),
+      compareAtPrice: product.compareAtPrice ? Number(product.compareAtPrice).toFixed(2) : "",
       isFree: product.isFree,
       currency: product.currency,
       checkoutMode: product.checkoutMode,
@@ -523,8 +523,8 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
       subtitle: form.subtitle || null,
       description: form.description || null,
       details: form.details || null,
-      price: Math.round(parseFloat(form.price || "0") * 100),
-      compareAtPrice: form.compareAtPrice ? Math.round(parseFloat(form.compareAtPrice) * 100) : null,
+      price: parseFloat(form.price || "0"),
+      compareAtPrice: form.compareAtPrice ? parseFloat(form.compareAtPrice) : null,
       isFree: form.isFree,
       currency: form.currency || "usd",
       checkoutMode: form.checkoutMode,

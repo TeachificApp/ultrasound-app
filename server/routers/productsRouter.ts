@@ -228,7 +228,7 @@ export const productsLearnerRouter = router({
               description: product.subtitle ?? undefined,
               images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined,
             },
-            unit_amount: unitAmount,
+            unit_amount: Math.round(Number(unitAmount) * 100),
           },
           quantity: 1,
         }],
@@ -677,7 +677,7 @@ export const productsAdminRouter = router({
         .where(eq(physicalProductPricingOptions.productId, input.productId))
         .limit(5);
       const priceText = pricingOptions.length > 0
-        ? pricingOptions.map(p => `${p.label}: $${(p.price / 100).toFixed(2)}`).join(", ")
+        ? pricingOptions.map(p => `${p.label}: $${Number(p.price).toFixed(2)}`).join(", ")
         : "Contact for pricing";
 
       const systemPrompt = `You are an expert landing page designer for physical products. Generate a complete, compelling landing page block structure as JSON. The blocks should be professional, conversion-focused, and specific to the content provided. Return ONLY valid JSON, no markdown.`;

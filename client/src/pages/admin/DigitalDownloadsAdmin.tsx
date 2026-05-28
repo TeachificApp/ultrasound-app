@@ -39,7 +39,7 @@ function SortableProductRow({ product, onEdit, onDuplicate, onDelete }: { produc
       )}
       <div className="flex-1 min-w-0">
         <p className="font-medium text-gray-900 text-sm truncate">{product.title}</p>
-        <p className="text-xs text-gray-400">{product.isFree ? "Free" : `$${(product.price / 100).toFixed(2)}`} · /{product.slug}</p>
+        <p className="text-xs text-gray-400">{product.isFree ? "Free" : `$${Number(product.price).toFixed(2)}`} · /{product.slug}</p>
       </div>
       <Badge variant={product.status === "published" ? "default" : product.status === "archived" ? "secondary" : "outline"} className="text-xs">
         {product.status}
@@ -186,7 +186,7 @@ function ProductList({ onEdit }: { onEdit: (id: number) => void }) {
                     </Badge>
                   </div>
                   <div className="text-sm text-muted-foreground mt-0.5">
-                    {p.isFree ? "Free" : `$${(p.price / 100).toFixed(2)}`} · /{p.slug}
+                    {p.isFree ? "Free" : `$${Number(p.price).toFixed(2)}`} · /{p.slug}
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
@@ -283,7 +283,7 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
       title: product.title,
       subtitle: product.subtitle ?? "",
       description: product.description ?? "",
-      price: (product.price / 100).toFixed(2),
+      price: Number(product.price).toFixed(2),
       isFree: product.isFree,
       bundleOnly: (product as any).bundleOnly ?? false,
       status: product.status,
@@ -301,7 +301,7 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
       title: form.title,
       subtitle: form.subtitle || null,
       description: form.description || null,
-      price: Math.round(parseFloat(form.price || "0") * 100),
+      price: parseFloat(form.price || "0"),
       isFree: form.isFree,
       bundleOnly: form.bundleOnly ?? false,
       status: form.status,

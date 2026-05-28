@@ -20,7 +20,7 @@ function CourseCard({ course }: { course: any }) {
     ? (course.subscriptionInterval === "annual" ? "/yr" : course.subscriptionInterval === "quarterly" ? "/qtr" : "/mo")
     : course.pricingType === "payment_plan" ? " (plan)"
     : "";
-  const price = (course.isFree || course.price === 0) ? "Free" : `$${(course.price / 100).toFixed(2)}${subscriptionSuffix}`;
+  const price = (course.isFree || course.price === 0) ? "Free" : `$${Number(course.price).toFixed(2)}${subscriptionSuffix}`;
   return (
     <Link href={`/courses/${course.slug}`}>
       <div className="group bg-white rounded-xl border border-gray-200 hover:border-teal-400 hover:shadow-lg transition-all duration-200 overflow-hidden cursor-pointer flex flex-col h-full">

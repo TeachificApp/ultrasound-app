@@ -75,6 +75,7 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
   course: <BookOpen className="w-4 h-4" />,
   quiz: <HelpCircle className="w-4 h-4" />,
   download: <Download className="w-4 h-4" />,
+  cohort: <Users className="w-4 h-4" />,
   video: <Video className="w-4 h-4" />,
   text: <FileText className="w-4 h-4" />,
   embed: <Monitor className="w-4 h-4" />,
@@ -117,7 +118,7 @@ function SortableCourseRow({ course, onEdit, onDuplicate, onDelete }: { course: 
       <span className="text-gray-400">{TYPE_ICONS[course.type]}</span>
       <div className="flex-1 min-w-0">
         <p className="font-medium text-gray-900 text-sm truncate">{course.title}</p>
-        <p className="text-xs text-gray-400">{course.brand === "aaus" ? "All About Ultrasound™" : "iHeartEcho™"} · {course.type} · {course.isFree ? "Free" : `$${(course.price / 100).toFixed(0)}`}</p>
+        <p className="text-xs text-gray-400">{course.brand === "aaus" ? "All About Ultrasound™" : "iHeartEcho™"} · {course.type} · {course.isFree ? "Free" : `$${Number(course.price).toFixed(2)}`}</p>
       </div>
       <Badge className={`text-xs ${STATUS_COLORS[course.status]}`}>{course.status}</Badge>
       <Button size="sm" variant="ghost" className="h-7 text-xs text-teal-600 hover:bg-teal-50" onClick={() => onEdit(course.id)}>
@@ -134,7 +135,7 @@ function SortableCourseRow({ course, onEdit, onDuplicate, onDelete }: { course: 
   );
 }
 
-function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) => void; typeFilter?: "course" | "quiz" | "download" }) {
+function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) => void; typeFilter?: "course" | "quiz" | "download" | "cohort" }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
@@ -142,8 +143,8 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
   const [reorderMode, setReorderMode] = useState(false);
   const [activeDragId, setActiveDragId] = useState<number | null>(null);
 
-  const typeLabel = typeFilter === "quiz" ? "Quiz" : typeFilter === "download" ? "Download" : "Course";
-  const typeLabelPlural = typeFilter === "quiz" ? "quizzes" : typeFilter === "download" ? "downloads" : "courses";
+  const typeLabel = typeFilter === "quiz" ? "Quiz" : typeFilter === "download" ? "Download" : typeFilter === "cohort" ? "Cohort" : "Course";
+  const typeLabelPlural = typeFilter === "quiz" ? "quizzes" : typeFilter === "download" ? "downloads" : typeFilter === "cohort" ? "cohorts" : "courses";
 
   const { data, isLoading, error, refetch } = trpc.lmsAdmin.listCourses.useQuery({ status: statusFilter as any, type: typeFilter, page, pageSize: 200 });
 
@@ -297,11 +298,11 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
 
 // ─── Create Course Dialog ─────────────────────────────────────────────────────
 
-function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }: { open: boolean; onClose: () => void; onCreated: (id: number) => void; defaultType?: "course" | "quiz" | "download" }) {
+function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }: { open: boolean; onClose: () => void; onCreated: (id: number) => void; defaultType?: "course" | "quiz" | "download" | "cohort" }) {
   const [mode, setMode] = useState<"manual" | "ai">("manual");
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
-  const [type, setType] = useState<"course" | "quiz" | "download">(defaultType);
+  const [type, setType] = useState<"course" | "quiz" | "download" | "cohort">(defaultType);
   const [brand, setBrand] = useState<"aaus" | "iheartecho">("aaus");
   const [pricingType, setPricingType] = useState<"free"|"one_time"|"subscription"|"payment_plan">("one_time");
   const [price, setPrice] = useState("");
@@ -361,7 +362,7 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
     });
   };
 
-  const productLabel = type === "quiz" ? "Quiz" : type === "download" ? "Download" : "Course";
+  const productLabel = type === "quiz" ? "Quiz" : type === "download" ? "Download" : type === "cohort" ? "Cohort" : "Course";
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -398,6 +399,7 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
                       <SelectItem value="course">Course</SelectItem>
                       <SelectItem value="quiz">Quiz</SelectItem>
                       <SelectItem value="download">Download</SelectItem>
+                      <SelectItem value="cohort">Cohort</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -701,11 +703,11 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
                 title: title.trim(), subtitle: subtitle.trim() || undefined,
                 type, brand, pricingType,
                 isFree: pricingType === "free",
-                price: pricingType === "free" ? 0 : Math.round(parseFloat(price || "0") * 100),
+                price: pricingType === "free" ? 0 : parseFloat(price || "0"),
                 subscriptionInterval: pricingType === "subscription" ? subscriptionInterval : undefined,
-                downPayment: pricingType === "payment_plan" ? Math.round(parseFloat(downPayment || "0") * 100) : undefined,
+                downPayment: pricingType === "payment_plan" ? parseFloat(downPayment || "0") : undefined,
                 installmentCount: pricingType === "payment_plan" ? parseInt(installmentCount || "0") : undefined,
-                installmentAmount: pricingType === "payment_plan" ? Math.round(parseFloat(installmentAmount || "0") * 100) : undefined,
+                installmentAmount: pricingType === "payment_plan" ? parseFloat(installmentAmount || "0") : undefined,
                 installmentIntervalDays: pricingType === "payment_plan" ? parseInt(installmentIntervalDays || "30") : undefined,
               })}
             >
@@ -1152,6 +1154,9 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="bg-gray-100">
           <TabsTrigger value="settings" className="text-xs">Settings</TabsTrigger>
+          {course.type === "cohort" && (
+            <TabsTrigger value="cohort" className="text-xs">Cohort</TabsTrigger>
+          )}
           <TabsTrigger value="curriculum" className="text-xs">
             {course.type === "quiz" ? "Questions" : course.type === "download" ? "Files" : "Curriculum"}
           </TabsTrigger>
@@ -1317,6 +1322,10 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
         </TabsContent>
         <TabsContent value="sales" className="mt-4">
           <LMSSalesTab courseId={courseId} />
+        </TabsContent>
+        {/* Cohort Tab — only visible for cohort type */}
+        <TabsContent value="cohort" className="mt-4">
+          <CohortTab courseId={courseId} />
         </TabsContent>
       </Tabs>
 
@@ -1501,15 +1510,18 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
   const [description, setDescription] = useState(course.description ?? "");
   const [status, setStatus] = useState(course.status);
   const [brand, setBrand] = useState(course.brand);
-  const [courseType, setCourseType] = useState<"course" | "quiz" | "download">(course.type ?? "course");
+  const [courseType, setCourseType] = useState<"course" | "quiz" | "download" | "cohort">(course.type ?? "course");
+  const [enrollmentCloseDate, setEnrollmentCloseDate] = useState<string>(
+    course.enrollmentCloseDate ? new Date(course.enrollmentCloseDate).toISOString().split("T")[0] : ""
+  );
   const [pricingType, setPricingType] = useState<"free"|"one_time"|"subscription"|"payment_plan"|"trial_then_subscription">(course.pricingType ?? (course.isFree ? "free" : "one_time"));
-  const [price, setPrice] = useState(String((course.price / 100).toFixed(2)));
+  const [price, setPrice] = useState(String(Number(course.price).toFixed(2)));
   const [subscriptionInterval, setSubscriptionInterval] = useState<"monthly"|"quarterly"|"annual">(course.subscriptionInterval ?? "monthly");
   const [trialDays, setTrialDays] = useState(String(course.trialDays ?? ""));
   const [accessDurationDays, setAccessDurationDays] = useState(String(course.accessDurationDays ?? ""));
-  const [downPayment, setDownPayment] = useState(String(((course.downPayment ?? 0) / 100).toFixed(2)));
+  const [downPayment, setDownPayment] = useState(String(Number(course.downPayment ?? 0).toFixed(2)));
   const [installmentCount, setInstallmentCount] = useState(String(course.installmentCount ?? ""));
-  const [installmentAmount, setInstallmentAmount] = useState(String(((course.installmentAmount ?? 0) / 100).toFixed(2)));
+  const [installmentAmount, setInstallmentAmount] = useState(String(Number(course.installmentAmount ?? 0).toFixed(2)));
   const [installmentIntervalDays, setInstallmentIntervalDays] = useState(String(course.installmentIntervalDays ?? 30));
   const [hasCertificate, setHasCertificate] = useState(course.hasCertificate);
   const [certificateTemplateId, setCertificateTemplateId] = useState<number | null>((course as any).certificateTemplateId ?? null);
@@ -1587,6 +1599,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
           onClick={() => onSave({
             title: title.trim(), subtitle: subtitle.trim() || undefined,
             description: description || undefined, status, brand, type: courseType,
+            enrollmentCloseDate: courseType === "cohort" ? (enrollmentCloseDate || null) : null,
             pricingType,
             isFree: pricingType === "free",
             hasCertificate,
@@ -1595,11 +1608,11 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
             hideProgress,
             showInstructor,
             showInLibrary,
-            price: pricingType === "free" ? 0 : Math.round(parseFloat(price || "0") * 100),
+            price: pricingType === "free" ? 0 : parseFloat(price || "0"),
             subscriptionInterval: pricingType === "subscription" ? subscriptionInterval : null,
-            downPayment: pricingType === "payment_plan" ? Math.round(parseFloat(downPayment || "0") * 100) : null,
+            downPayment: pricingType === "payment_plan" ? parseFloat(downPayment || "0") : null,
             installmentCount: pricingType === "payment_plan" ? parseInt(installmentCount || "0") : null,
-            installmentAmount: pricingType === "payment_plan" ? Math.round(parseFloat(installmentAmount || "0") * 100) : null,
+            installmentAmount: pricingType === "payment_plan" ? parseFloat(installmentAmount || "0") : null,
             installmentIntervalDays: pricingType === "payment_plan" ? parseInt(installmentIntervalDays || "30") : null,
             trialDays: pricingType === "trial_then_subscription" ? (trialDays ? parseInt(trialDays) : null) : null,
             accessDurationDays: accessDurationDays ? parseInt(accessDurationDays) : null,
@@ -1652,16 +1665,29 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
         </div>
         <div>
           <Label className="text-sm">Content Type</Label>
-          <Select value={courseType} onValueChange={v => setCourseType(v as "course" | "quiz" | "download")}>
+          <Select value={courseType} onValueChange={v => setCourseType(v as "course" | "quiz" | "download" | "cohort")}>
             <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="course">Course — appears in Courses section</SelectItem>
               <SelectItem value="quiz">Quiz — appears in Quizzes section</SelectItem>
               <SelectItem value="download">Download — appears in Downloads section</SelectItem>
+              <SelectItem value="cohort">Cohort — live/coaching program with sessions &amp; assignments</SelectItem>
             </SelectContent>
           </Select>
           <p className="text-xs text-gray-400 mt-1">Changing this moves the content to a different section of the Education Library.</p>
         </div>
+        {courseType === "cohort" && (
+          <div>
+            <Label className="text-sm">Enrollment Close Date</Label>
+            <Input
+              type="date"
+              value={enrollmentCloseDate}
+              onChange={e => setEnrollmentCloseDate(e.target.value)}
+              className="mt-1"
+            />
+            <p className="text-xs text-gray-400 mt-1">Leave blank to keep enrollment open indefinitely. After this date, new students cannot enroll.</p>
+          </div>
+        )}
       </div>
 
       {/* Cover Image */}
@@ -2140,11 +2166,11 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
           hideProgress,
           showInstructor,
           showInLibrary,
-          price: pricingType === "free" ? 0 : Math.round(parseFloat(price || "0") * 100),
+          price: pricingType === "free" ? 0 : parseFloat(price || "0"),
           subscriptionInterval: pricingType === "subscription" ? subscriptionInterval : null,
-          downPayment: pricingType === "payment_plan" ? Math.round(parseFloat(downPayment || "0") * 100) : null,
+          downPayment: pricingType === "payment_plan" ? parseFloat(downPayment || "0") : null,
           installmentCount: pricingType === "payment_plan" ? parseInt(installmentCount || "0") : null,
-          installmentAmount: pricingType === "payment_plan" ? Math.round(parseFloat(installmentAmount || "0") * 100) : null,
+          installmentAmount: pricingType === "payment_plan" ? parseFloat(installmentAmount || "0") : null,
           installmentIntervalDays: pricingType === "payment_plan" ? parseInt(installmentIntervalDays || "30") : null,
           trialDays: pricingType === "trial_then_subscription" ? (trialDays ? parseInt(trialDays) : null) : null,
           accessDurationDays: accessDurationDays ? parseInt(accessDurationDays) : null,
@@ -3338,7 +3364,7 @@ function AddLessonDialog({ courseId, sectionId, onClose, onCreated }: {
       mediaAssetId: selectedAsset?.id ?? undefined,
       durationMinutes: durationMinutes ? parseInt(durationMinutes) : undefined,
       requireVideoCompletion,
-      requireManualComplete,
+      requireManualComplete: requireManualComplete ?? false,
     });
   };
 
@@ -5217,7 +5243,7 @@ function AnalyticsTab() {
               <tr key={o.id} className="hover:bg-gray-50">
                 <td className="px-4 py-2.5 text-gray-700">{o.user?.displayName ?? o.user?.email ?? "—"}</td>
                 <td className="px-4 py-2.5 text-gray-700 truncate max-w-[160px]">{o.course?.title ?? "—"}</td>
-                <td className="px-4 py-2.5 font-medium text-gray-900">${(o.amount / 100).toFixed(2)}</td>
+                <td className="px-4 py-2.5 font-medium text-gray-900">${Number(o.amount).toFixed(2)}</td>
                 <td className="px-4 py-2.5">
                   <Badge className={`text-xs ${o.status === "paid" ? "bg-green-100 text-green-700" : o.status === "pending" ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"}`}>{o.status}</Badge>
                 </td>
@@ -5243,6 +5269,7 @@ const LMS_NAV_GROUPS = [
     items: [
       { value: "courses",     label: "Courses",     icon: BookOpen },
       { value: "quizzes",     label: "Quizzes",     icon: HelpCircle },
+      { value: "cohorts",     label: "Cohorts",     icon: Users },
       { value: "downloads",   label: "Downloads",   icon: Download },
       { value: "products",    label: "Products",    icon: ShoppingBag },
       { value: "webinars",    label: "Webinars",    icon: Radio },
@@ -5394,6 +5421,7 @@ export default function LMSAdmin() {
             <main className="flex-1 min-w-0">
               {activeTab === "courses"     && <CoursesTab onEdit={setEditingCourseId} typeFilter="course" />}
               {activeTab === "quizzes"     && <CoursesTab onEdit={setEditingCourseId} typeFilter="quiz" />}
+              {activeTab === "cohorts"     && <CoursesTab onEdit={setEditingCourseId} typeFilter="cohort" />}
               {activeTab === "downloads"   && <DigitalDownloadsAdmin initialEditId={urlEditDownload ? Number(urlEditDownload) : undefined} />}
               {activeTab === "products"    && <PhysicalProductsAdmin initialEditId={urlEditProduct ? Number(urlEditProduct) : undefined} />}
               {activeTab === "webinars"    && <LMSComingSoonTab icon={Radio} title="Webinars" description="Host and manage live webinar sessions with registration, reminders, and replay access." color="teal" />}
@@ -7100,7 +7128,7 @@ function CourseAnalyticsTab({ courseId }: { courseId: number }) {
               {data.orders.slice(0, 20).map((o: any, i: number) => (
                 <tr key={i} className="hover:bg-gray-50">
                   <td className="px-4 py-2 text-xs text-gray-600">{new Date(o.createdAt).toLocaleDateString()}</td>
-                  <td className="px-4 py-2 text-xs font-medium text-gray-900">${(o.amount / 100).toFixed(2)}</td>
+                  <td className="px-4 py-2 text-xs font-medium text-gray-900">${Number(o.amount).toFixed(2)}</td>
                   <td className="px-4 py-2">
                     <Badge className="text-xs bg-green-100 text-green-700">{o.status}</Badge>
                   </td>
@@ -7149,12 +7177,12 @@ function PricingOptionForm({
   const [label, setLabel] = useState(initial?.label ?? "");
   const [sublabel, setSublabel] = useState(initial?.sublabel ?? "");
   const [pricingType, setPricingType] = useState<PricingOption["pricingType"]>(initial?.pricingType ?? "one_time");
-  const [price, setPrice] = useState(String(((initial?.price ?? 0) / 100).toFixed(2)));
+  const [price, setPrice] = useState(String(Number(initial?.price ?? 0).toFixed(2)));
   const [stripePriceId, setStripePriceId] = useState(initial?.stripePriceId ?? "");
   const [subscriptionInterval, setSubscriptionInterval] = useState<"monthly" | "quarterly" | "annual">(initial?.subscriptionInterval ?? "monthly");
-  const [downPayment, setDownPayment] = useState(String(((initial?.downPayment ?? 0) / 100).toFixed(2)));
+  const [downPayment, setDownPayment] = useState(String(Number(initial?.downPayment ?? 0).toFixed(2)));
   const [installmentCount, setInstallmentCount] = useState(String(initial?.installmentCount ?? ""));
-  const [installmentAmount, setInstallmentAmount] = useState(String(((initial?.installmentAmount ?? 0) / 100).toFixed(2)));
+  const [installmentAmount, setInstallmentAmount] = useState(String(Number(initial?.installmentAmount ?? 0).toFixed(2)));
   const [installmentIntervalDays, setInstallmentIntervalDays] = useState(String(initial?.installmentIntervalDays ?? 30));
   const [ctaLabel, setCtaLabel] = useState(initial?.ctaLabel ?? "");
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
@@ -7250,12 +7278,12 @@ function PricingOptionForm({
               label: label.trim(),
               sublabel: sublabel.trim() || null,
               pricingType,
-              price: pricingType === "free" ? 0 : Math.round(parseFloat(price || "0") * 100),
+              price: pricingType === "free" ? 0 : parseFloat(price || "0"),
               stripePriceId: stripePriceId.trim() || null,
               subscriptionInterval: pricingType === "subscription" ? subscriptionInterval : null,
-              downPayment: pricingType === "payment_plan" ? Math.round(parseFloat(downPayment || "0") * 100) : null,
+              downPayment: pricingType === "payment_plan" ? parseFloat(downPayment || "0") : null,
               installmentCount: pricingType === "payment_plan" ? parseInt(installmentCount || "0") : null,
-              installmentAmount: pricingType === "payment_plan" ? Math.round(parseFloat(installmentAmount || "0") * 100) : null,
+              installmentAmount: pricingType === "payment_plan" ? parseFloat(installmentAmount || "0") : null,
               installmentIntervalDays: pricingType === "payment_plan" ? parseInt(installmentIntervalDays || "30") : null,
               ctaLabel: ctaLabel.trim() || null,
               isActive,
@@ -7298,15 +7326,15 @@ function CoursePricingOptionsEditor({ courseId }: { courseId: number }) {
   const formatPrice = (opt: PricingOption) => {
     if (opt.pricingType === "free") return "Free";
     if (opt.pricingType === "payment_plan") {
-      const dp = ((opt.downPayment ?? 0) / 100).toFixed(2);
-      const inst = ((opt.installmentAmount ?? 0) / 100).toFixed(2);
+      const dp = Number(opt.downPayment ?? 0).toFixed(2);
+      const inst = Number(opt.installmentAmount ?? 0).toFixed(2);
       const n = opt.installmentCount ?? 0;
       return `$${dp} down + ${n}×$${inst}`;
     }
     if (opt.pricingType === "subscription") {
-      return `$${(opt.price / 100).toFixed(2)}/${opt.subscriptionInterval ?? "month"}`;
+      return `$${Number(opt.price).toFixed(2)}/${opt.subscriptionInterval ?? "month"}`;
     }
-    return `$${(opt.price / 100).toFixed(2)}`;
+    return `$${Number(opt.price).toFixed(2)}`;
   };
 
   return (
@@ -7766,6 +7794,416 @@ function QuestionBankEditDialog({ question, tags, onClose, onSaved }: {
           </Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CohortTab — Sessions & Assignments manager for cohort-type courses
+// ─────────────────────────────────────────────────────────────────────────────
+
+type CohortSession = {
+  id: number;
+  courseId: number;
+  title: string;
+  description: string | null;
+  sessionDate: Date | string;
+  durationMinutes: number;
+  meetingUrl: string | null;
+  recordingUrl: string | null;
+  status: "draft" | "published" | "cancelled";
+};
+
+type CohortAssignment = {
+  id: number;
+  courseId: number;
+  title: string;
+  description: string | null;
+  dueDate: Date | string | null;
+  maxPoints: number;
+  submissionType: "text" | "file" | "url" | "none";
+  status: "draft" | "published";
+  position: number;
+};
+
+function CohortTab({ courseId }: { courseId: number }) {
+  const [activeTab, setActiveTab] = useState<"sessions" | "assignments">("sessions");
+  const utils = trpc.useUtils();
+
+  // Sessions
+  const { data: sessions = [], isLoading: sessionsLoading } = trpc.lmsAdmin.listCohortSessions.useQuery({ courseId });
+  const createSession = trpc.lmsAdmin.createCohortSession.useMutation({
+    onSuccess: () => { utils.lmsAdmin.listCohortSessions.invalidate({ courseId }); toast.success("Session created"); },
+    onError: (e) => toast.error(e.message),
+  });
+  const updateSession = trpc.lmsAdmin.updateCohortSession.useMutation({
+    onSuccess: () => { utils.lmsAdmin.listCohortSessions.invalidate({ courseId }); toast.success("Session updated"); },
+    onError: (e) => toast.error(e.message),
+  });
+  const deleteSession = trpc.lmsAdmin.deleteCohortSession.useMutation({
+    onSuccess: () => { utils.lmsAdmin.listCohortSessions.invalidate({ courseId }); toast.success("Session deleted"); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  // Assignments
+  const { data: assignments = [], isLoading: assignmentsLoading } = trpc.lmsAdmin.listCohortAssignments.useQuery({ courseId });
+  const createAssignment = trpc.lmsAdmin.createCohortAssignment.useMutation({
+    onSuccess: () => { utils.lmsAdmin.listCohortAssignments.invalidate({ courseId }); toast.success("Assignment created"); },
+    onError: (e) => toast.error(e.message),
+  });
+  const updateAssignment = trpc.lmsAdmin.updateCohortAssignment.useMutation({
+    onSuccess: () => { utils.lmsAdmin.listCohortAssignments.invalidate({ courseId }); toast.success("Assignment updated"); },
+    onError: (e) => toast.error(e.message),
+  });
+  const deleteAssignment = trpc.lmsAdmin.deleteCohortAssignment.useMutation({
+    onSuccess: () => { utils.lmsAdmin.listCohortAssignments.invalidate({ courseId }); toast.success("Assignment deleted"); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  // Session dialog state
+  const [sessionDialog, setSessionDialog] = useState<{ open: boolean; session?: CohortSession }>({ open: false });
+  const [sessionForm, setSessionForm] = useState({
+    title: "", description: "", sessionDate: "", durationMinutes: 60,
+    meetingUrl: "", recordingUrl: "", status: "draft" as "draft" | "published" | "cancelled",
+  });
+
+  const openSessionDialog = (session?: CohortSession) => {
+    if (session) {
+      const d = new Date(session.sessionDate);
+      const localISO = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      setSessionForm({
+        title: session.title,
+        description: session.description ?? "",
+        sessionDate: localISO,
+        durationMinutes: session.durationMinutes,
+        meetingUrl: session.meetingUrl ?? "",
+        recordingUrl: session.recordingUrl ?? "",
+        status: session.status,
+      });
+    } else {
+      setSessionForm({ title: "", description: "", sessionDate: "", durationMinutes: 60, meetingUrl: "", recordingUrl: "", status: "draft" });
+    }
+    setSessionDialog({ open: true, session });
+  };
+
+  const handleSaveSession = () => {
+    if (!sessionForm.title.trim() || !sessionForm.sessionDate) {
+      toast.error("Title and date are required"); return;
+    }
+    const payload = {
+      title: sessionForm.title.trim(),
+      description: sessionForm.description || undefined,
+      sessionDate: new Date(sessionForm.sessionDate).toISOString(),
+      durationMinutes: sessionForm.durationMinutes,
+      meetingUrl: sessionForm.meetingUrl || undefined,
+      recordingUrl: sessionForm.recordingUrl || undefined,
+      status: sessionForm.status,
+    };
+    if (sessionDialog.session) {
+      updateSession.mutate({ id: sessionDialog.session.id, ...payload }, { onSuccess: () => setSessionDialog({ open: false }) });
+    } else {
+      createSession.mutate({ courseId, ...payload }, { onSuccess: () => setSessionDialog({ open: false }) });
+    }
+  };
+
+  // Assignment dialog state
+  const [assignDialog, setAssignDialog] = useState<{ open: boolean; assignment?: CohortAssignment }>({ open: false });
+  const [assignForm, setAssignForm] = useState({
+    title: "", description: "", dueDate: "", maxPoints: 100,
+    submissionType: "none" as "text" | "file" | "url" | "none",
+    status: "draft" as "draft" | "published",
+  });
+
+  const openAssignDialog = (assignment?: CohortAssignment) => {
+    if (assignment) {
+      const d = assignment.dueDate ? new Date(assignment.dueDate) : null;
+      const localISO = d ? new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
+      setAssignForm({
+        title: assignment.title,
+        description: assignment.description ?? "",
+        dueDate: localISO,
+        maxPoints: assignment.maxPoints,
+        submissionType: assignment.submissionType,
+        status: assignment.status,
+      });
+    } else {
+      setAssignForm({ title: "", description: "", dueDate: "", maxPoints: 100, submissionType: "none", status: "draft" });
+    }
+    setAssignDialog({ open: true, assignment });
+  };
+
+  const handleSaveAssignment = () => {
+    if (!assignForm.title.trim()) { toast.error("Title is required"); return; }
+    const payload = {
+      title: assignForm.title.trim(),
+      description: assignForm.description || undefined,
+      dueDate: assignForm.dueDate ? new Date(assignForm.dueDate).toISOString() : null,
+      maxPoints: assignForm.maxPoints,
+      submissionType: assignForm.submissionType,
+      status: assignForm.status,
+    };
+    if (assignDialog.assignment) {
+      updateAssignment.mutate({ id: assignDialog.assignment.id, ...payload }, { onSuccess: () => setAssignDialog({ open: false }) });
+    } else {
+      createAssignment.mutate({ courseId, ...payload }, { onSuccess: () => setAssignDialog({ open: false }) });
+    }
+  };
+
+  const fmtDate = (d: Date | string | null) => {
+    if (!d) return "—";
+    return new Date(d).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  };
+
+  const statusBadge = (status: string) => {
+    const map: Record<string, string> = {
+      published: "bg-green-100 text-green-700",
+      draft: "bg-gray-100 text-gray-600",
+      cancelled: "bg-red-100 text-red-600",
+    };
+    return <span className={cn("px-2 py-0.5 rounded-full text-xs font-medium", map[status] ?? "bg-gray-100 text-gray-600")}>{status}</span>;
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Sub-tabs */}
+      <div className="flex gap-1 border-b border-gray-200 pb-0">
+        {(["sessions", "assignments"] as const).map(t => (
+          <button key={t} onClick={() => setActiveTab(t)}
+            className={cn("px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize",
+              activeTab === t ? "border-teal-600 text-teal-700" : "border-transparent text-gray-500 hover:text-gray-700")}>
+            {t === "sessions" ? "Live Sessions" : "Assignments"}
+          </button>
+        ))}
+      </div>
+
+      {/* Sessions */}
+      {activeTab === "sessions" && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-500">Manage live sessions, coaching calls, and recorded replays for this cohort.</p>
+            <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => openSessionDialog()}>
+              <Plus className="w-3.5 h-3.5 mr-1" /> Add Session
+            </Button>
+          </div>
+
+          {sessionsLoading ? (
+            <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-16 rounded-lg" />)}</div>
+          ) : sessions.length === 0 ? (
+            <div className="text-center py-12 text-gray-400">
+              <Radio className="w-8 h-8 mx-auto mb-2 opacity-40" />
+              <p className="text-sm">No sessions yet — add your first live session above.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {(sessions as CohortSession[]).map(s => (
+                <div key={s.id} className="bg-white border border-gray-200 rounded-lg p-4 flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-teal-50 flex items-center justify-center flex-shrink-0">
+                    <Radio className="w-5 h-5 text-teal-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-gray-900 text-sm">{s.title}</span>
+                      {statusBadge(s.status)}
+                    </div>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 flex-wrap">
+                      <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{fmtDate(s.sessionDate)}</span>
+                      <span>{s.durationMinutes} min</span>
+                      {s.meetingUrl && <a href={s.meetingUrl} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline flex items-center gap-1"><LinkIcon className="w-3 h-3" />Meeting Link</a>}
+                      {s.recordingUrl && <a href={s.recordingUrl} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline flex items-center gap-1"><PlayCircle className="w-3 h-3" />Recording</a>}
+                    </div>
+                    {s.description && <p className="text-xs text-gray-400 mt-1 line-clamp-1">{s.description}</p>}
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => openSessionDialog(s)}>
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-400 hover:text-red-600" onClick={() => {
+                      if (confirm("Delete this session?")) deleteSession.mutate({ id: s.id });
+                    }}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Assignments */}
+      {activeTab === "assignments" && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-500">Manage assignments, homework, and projects for cohort participants.</p>
+            <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => openAssignDialog()}>
+              <Plus className="w-3.5 h-3.5 mr-1" /> Add Assignment
+            </Button>
+          </div>
+
+          {assignmentsLoading ? (
+            <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-16 rounded-lg" />)}</div>
+          ) : assignments.length === 0 ? (
+            <div className="text-center py-12 text-gray-400">
+              <ListChecks className="w-8 h-8 mx-auto mb-2 opacity-40" />
+              <p className="text-sm">No assignments yet — add your first assignment above.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {(assignments as CohortAssignment[]).map(a => (
+                <div key={a.id} className="bg-white border border-gray-200 rounded-lg p-4 flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center flex-shrink-0">
+                    <ListChecks className="w-5 h-5 text-amber-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-gray-900 text-sm">{a.title}</span>
+                      {statusBadge(a.status)}
+                      <span className="text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">{a.submissionType !== "none" ? `${a.submissionType} submission` : "No submission"}</span>
+                    </div>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 flex-wrap">
+                      {a.dueDate && <span className="flex items-center gap-1"><Clock className="w-3 h-3" />Due: {fmtDate(a.dueDate)}</span>}
+                      <span>{a.maxPoints} pts</span>
+                    </div>
+                    {a.description && <p className="text-xs text-gray-400 mt-1 line-clamp-1">{a.description}</p>}
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => openAssignDialog(a)}>
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-400 hover:text-red-600" onClick={() => {
+                      if (confirm("Delete this assignment?")) deleteAssignment.mutate({ id: a.id });
+                    }}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Session Dialog */}
+      {sessionDialog.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+              <h3 className="font-bold text-gray-900">{sessionDialog.session ? "Edit Session" : "Add Live Session"}</h3>
+              <Button size="sm" variant="ghost" onClick={() => setSessionDialog({ open: false })}><X className="w-4 h-4" /></Button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-1 block">Session Title *</Label>
+                <Input value={sessionForm.title} onChange={e => setSessionForm(p => ({ ...p, title: e.target.value }))} placeholder="e.g. Week 1: Introduction to Cardiac Assessment" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-1 block">Date & Time *</Label>
+                  <Input type="datetime-local" value={sessionForm.sessionDate} onChange={e => setSessionForm(p => ({ ...p, sessionDate: e.target.value }))} />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-1 block">Duration (minutes)</Label>
+                  <Input type="number" min={1} value={sessionForm.durationMinutes} onChange={e => setSessionForm(p => ({ ...p, durationMinutes: parseInt(e.target.value) || 60 }))} />
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-1 block">Meeting URL</Label>
+                <Input value={sessionForm.meetingUrl} onChange={e => setSessionForm(p => ({ ...p, meetingUrl: e.target.value }))} placeholder="https://zoom.us/j/..." />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-1 block">Recording URL (after session)</Label>
+                <Input value={sessionForm.recordingUrl} onChange={e => setSessionForm(p => ({ ...p, recordingUrl: e.target.value }))} placeholder="https://..." />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-1 block">Description</Label>
+                <textarea value={sessionForm.description} onChange={e => setSessionForm(p => ({ ...p, description: e.target.value }))} rows={3} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="What will be covered in this session..." />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-1 block">Status</Label>
+                <Select value={sessionForm.status} onValueChange={v => setSessionForm(p => ({ ...p, status: v as "draft" | "published" | "cancelled" }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Draft (hidden from students)</SelectItem>
+                    <SelectItem value="published">Published (visible to enrolled students)</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 p-5 border-t border-gray-100">
+              <Button variant="outline" onClick={() => setSessionDialog({ open: false })}>Cancel</Button>
+              <Button className="bg-teal-600 hover:bg-teal-700 text-white"
+                disabled={createSession.isPending || updateSession.isPending}
+                onClick={handleSaveSession}>
+                {(createSession.isPending || updateSession.isPending) ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />Saving...</> : sessionDialog.session ? "Save Changes" : "Create Session"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assignment Dialog */}
+      {assignDialog.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+              <h3 className="font-bold text-gray-900">{assignDialog.assignment ? "Edit Assignment" : "Add Assignment"}</h3>
+              <Button size="sm" variant="ghost" onClick={() => setAssignDialog({ open: false })}><X className="w-4 h-4" /></Button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-1 block">Assignment Title *</Label>
+                <Input value={assignForm.title} onChange={e => setAssignForm(p => ({ ...p, title: e.target.value }))} placeholder="e.g. Case Study: Aortic Stenosis Assessment" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-1 block">Due Date</Label>
+                  <Input type="datetime-local" value={assignForm.dueDate} onChange={e => setAssignForm(p => ({ ...p, dueDate: e.target.value }))} />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-1 block">Max Points</Label>
+                  <Input type="number" min={0} value={assignForm.maxPoints} onChange={e => setAssignForm(p => ({ ...p, maxPoints: parseInt(e.target.value) || 0 }))} />
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-1 block">Submission Type</Label>
+                <Select value={assignForm.submissionType} onValueChange={v => setAssignForm(p => ({ ...p, submissionType: v as "text" | "file" | "url" | "none" }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No submission required</SelectItem>
+                    <SelectItem value="text">Text response</SelectItem>
+                    <SelectItem value="file">File upload</SelectItem>
+                    <SelectItem value="url">URL / link</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-1 block">Description / Instructions</Label>
+                <textarea value={assignForm.description} onChange={e => setAssignForm(p => ({ ...p, description: e.target.value }))} rows={4} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Describe the assignment and what students need to do..." />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-1 block">Status</Label>
+                <Select value={assignForm.status} onValueChange={v => setAssignForm(p => ({ ...p, status: v as "draft" | "published" }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Draft (hidden from students)</SelectItem>
+                    <SelectItem value="published">Published (visible to enrolled students)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 p-5 border-t border-gray-100">
+              <Button variant="outline" onClick={() => setAssignDialog({ open: false })}>Cancel</Button>
+              <Button className="bg-teal-600 hover:bg-teal-700 text-white"
+                disabled={createAssignment.isPending || updateAssignment.isPending}
+                onClick={handleSaveAssignment}>
+                {(createAssignment.isPending || updateAssignment.isPending) ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />Saving...</> : assignDialog.assignment ? "Save Changes" : "Create Assignment"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

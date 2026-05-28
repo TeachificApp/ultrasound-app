@@ -611,7 +611,7 @@ export const funnelRouter = router({
             product_data: {
               name: page.customPriceLabel || page.title || "Funnel Product",
             },
-            unit_amount: page.customPrice,
+            unit_amount: Math.round(Number(page.customPrice) * 100),
           },
           quantity: 1,
         });
@@ -1116,7 +1116,7 @@ export const funnelPublicRouter = router({
           price_data: {
             currency: "usd",
             product_data: { name: selectedProduct.name, description: selectedProduct.description || undefined },
-            unit_amount: selectedProduct.price,
+            unit_amount: Math.round(Number(selectedProduct.price) * 100),
           },
           quantity: 1,
         },
@@ -1130,7 +1130,7 @@ export const funnelPublicRouter = router({
             price_data: {
               currency: "usd",
               product_data: { name: bump.title, description: bump.headline || undefined },
-              unit_amount: bump.price,
+              unit_amount: Math.round(Number(bump.price) * 100),
             },
             quantity: 1,
           });
@@ -1257,13 +1257,13 @@ export const funnelPublicRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid product selection" });
       }
 
-      // Calculate total amount
-      let totalAmount = selectedProduct.price; // cents
+      // Calculate total amount in dollars
+      let totalAmount = Number(selectedProduct.price);
       const bumpDetails: string[] = [];
       for (const bumpIdx of input.addedBumpIndexes) {
         const bump = orderBumps[bumpIdx];
         if (bump && bump.price > 0) {
-          totalAmount += bump.price;
+          totalAmount += Number(bump.price);
           bumpDetails.push(bump.title);
         }
       }
@@ -1441,11 +1441,12 @@ export const funnelPublicRouter = router({
           if (promoCodes.data.length > 0) {
             const coupon = promoCodes.data[0].coupon;
             if (coupon.percent_off) {
-              discountApplied = Math.round(totalAmount * (coupon.percent_off / 100));
+              discountApplied = totalAmount * (coupon.percent_off / 100);
             } else if (coupon.amount_off) {
-              discountApplied = Math.min(coupon.amount_off, totalAmount);
+              // amount_off from Stripe is in cents — convert to dollars
+              discountApplied = Math.min(coupon.amount_off / 100, totalAmount);
             }
-            totalAmount = Math.max(50, totalAmount - discountApplied);
+            totalAmount = Math.max(0.50, totalAmount - discountApplied);
           } else {
             throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid or expired promo code" });
           }
@@ -1454,7 +1455,7 @@ export const funnelPublicRouter = router({
         }
       }
 
-      if (totalAmount < 50) {
+      if (totalAmount < 0.50) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Minimum charge amount is $0.50" });
       }
       // Build description for the payment
@@ -1463,9 +1464,9 @@ export const funnelPublicRouter = router({
         description += " + " + bumpDetails.join(", ");
       }
 
-      // Create PaymentIntent
+      // Create PaymentIntent (Stripe requires amount in cents)
       const paymentIntent = await stripe.paymentIntents.create({
-        amount: totalAmount,
+        amount: Math.round(totalAmount * 100),
         currency: "usd",
         description,
         receipt_email: input.email,
@@ -1717,7 +1718,7 @@ export const funnelPublicRouter = router({
           price_data: {
             currency,
             product_data: { name: productName },
-            unit_amount: unitAmount,
+            unit_amount: Math.round(Number(unitAmount) * 100),
           },
           quantity: 1,
         }],

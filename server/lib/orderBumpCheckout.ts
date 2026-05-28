@@ -96,7 +96,7 @@ export async function buildOrderBumpCheckoutLine(
             order_bump_type: bumpType,
           },
         },
-        unit_amount: amount,
+        unit_amount: Math.round(Number(amount) * 100),
       },
       quantity: 1,
     },

@@ -58,11 +58,11 @@ function BundleList({ onEdit }: { onEdit: (id: number) => void }) {
                     <span className="text-xs text-muted-foreground">{b.items.length} product{b.items.length !== 1 ? "s" : ""}</span>
                     <span className="text-xs text-muted-foreground">·</span>
                     <span className="text-xs font-medium text-green-600">
-                      ${(b.discountPrice / 100).toFixed(2)}
+                      ${Number(b.discountPrice).toFixed(2)}
                     </span>
                     {b.originalPrice > b.discountPrice && (
                       <span className="text-xs text-muted-foreground line-through">
-                        ${(b.originalPrice / 100).toFixed(2)}
+                        ${Number(b.originalPrice).toFixed(2)}
                       </span>
                     )}
                   </div>
@@ -150,8 +150,8 @@ function BundleEditor({ bundleId, onBack }: { bundleId: number; onBack: () => vo
   const [title, setTitle] = useState(bundle?.title ?? "");
   const [subtitle, setSubtitle] = useState(bundle?.subtitle ?? "");
   const [description, setDescription] = useState(bundle?.description ?? "");
-  const [originalPrice, setOriginalPrice] = useState(((bundle?.originalPrice ?? 0) / 100).toFixed(2));
-  const [discountPrice, setDiscountPrice] = useState(((bundle?.discountPrice ?? 0) / 100).toFixed(2));
+  const [originalPrice, setOriginalPrice] = useState(Number(bundle?.originalPrice ?? 0).toFixed(2));
+  const [discountPrice, setDiscountPrice] = useState(Number(bundle?.discountPrice ?? 0).toFixed(2));
   const [status, setStatus] = useState(bundle?.status ?? "draft");
   const [slug, setSlug] = useState(bundle?.slug ?? "");
   const [selectedProductIds, setSelectedProductIds] = useState<number[]>(
@@ -166,8 +166,8 @@ function BundleEditor({ bundleId, onBack }: { bundleId: number; onBack: () => vo
       title,
       subtitle: subtitle || null,
       description: description || null,
-      originalPrice: Math.round(parseFloat(originalPrice || "0") * 100),
-      discountPrice: Math.round(parseFloat(discountPrice || "0") * 100),
+      originalPrice: parseFloat(originalPrice || "0"),
+      discountPrice: parseFloat(discountPrice || "0"),
       status,
       productIds: selectedProductIds,
     });
@@ -318,7 +318,7 @@ function BundleEditor({ bundleId, onBack }: { bundleId: number; onBack: () => vo
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{p.title}</p>
                       <p className="text-xs text-muted-foreground">
-                        {p.isFree ? "Free" : `$${(p.price / 100).toFixed(2)}`} · {p.status}
+                        {p.isFree ? "Free" : `$${Number(p.price).toFixed(2)}`} · {p.status}
                       </p>
                     </div>
                   </div>

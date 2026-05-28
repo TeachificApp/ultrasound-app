@@ -744,7 +744,7 @@ export default function DownloadLanding() {
     );
   }
 
-  const price = product.isFree ? "Free" : `$${(product.price / 100).toFixed(2)}`;
+  const price = product.isFree ? "Free" : `$${Number(product.price).toFixed(2)}`;
   const hasPurchased = purchaseStatus?.purchased || product.isFree;
   const features = product.landingFeatures ? product.landingFeatures.split("\n").filter(Boolean) : [];
 

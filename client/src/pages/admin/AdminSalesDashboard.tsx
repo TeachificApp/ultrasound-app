@@ -43,8 +43,8 @@ type Sale = {
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-function fmtCurrency(cents: number, currency = "usd") {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: currency.toUpperCase() }).format(cents / 100);
+function fmtCurrency(dollars: number, currency = "usd") {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: currency.toUpperCase() }).format(Number(dollars));
 }
 function fmtDate(d: Date | string) {
   return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });

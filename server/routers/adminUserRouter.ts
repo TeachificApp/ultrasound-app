@@ -697,7 +697,7 @@ export const adminUserRouter = router({
         duration: "once",
         ...(input.discountType === "percent"
           ? { percent_off: input.discountValue }
-          : { amount_off: Math.round(input.discountValue), currency: input.currency }),
+          : { amount_off: Math.round(input.discountValue * 100), currency: input.currency }), // Stripe requires cents
       };
       if (input.maxRedemptions) couponParams.max_redemptions = input.maxRedemptions;
       if (input.redeemBy) couponParams.redeem_by = Math.floor(new Date(input.redeemBy).getTime() / 1000);

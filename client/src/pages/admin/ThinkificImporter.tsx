@@ -801,7 +801,7 @@ export default function ThinkificImporter() {
               </div>
               {salesPageResult.blocksJson && (
                 <details className="text-xs" open>
-                  <summary className="cursor-pointer font-medium text-gray-600">Scraped Blocks ({salesPageResult.blocks?.length ?? 0} blocks, price: ${(salesPageResult.price / 100).toFixed(2)})</summary>
+                  <summary className="cursor-pointer font-medium text-gray-600">Scraped Blocks ({salesPageResult.blocks?.length ?? 0} blocks, price: ${Number(salesPageResult.price).toFixed(2)})</summary>
                   <pre className="mt-1 p-2 rounded bg-white border text-gray-700 max-h-64 overflow-auto whitespace-pre-wrap">{salesPageResult.blocksJson}</pre>
                 </details>
               )}

@@ -93,10 +93,10 @@ export const embeddedCheckoutRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
-      // Calculate total
-      let totalAmount = input.productPrice;
+      // Calculate total in dollars
+      let totalAmount = Number(input.productPrice);
       for (const bump of input.selectedBumps) {
-        if (bump.price > 0) totalAmount += bump.price;
+        if (bump.price > 0) totalAmount += Number(bump.price);
       }
 
       // Apply promo code discount if provided
@@ -112,11 +112,13 @@ export const embeddedCheckoutRouter = router({
             promoCodeId = promoCodeObj.id;
             const coupon = promoCodeObj.coupon;
             if (coupon.percent_off) {
-              discountApplied = Math.round(totalAmount * (coupon.percent_off / 100));
+              // percent_off is a percentage (0-100)
+              discountApplied = totalAmount * (coupon.percent_off / 100);
             } else if (coupon.amount_off) {
-              discountApplied = Math.min(coupon.amount_off, totalAmount);
+              // amount_off from Stripe is in cents — convert to dollars for comparison
+              discountApplied = Math.min(coupon.amount_off / 100, totalAmount);
             }
-            totalAmount = Math.max(50, totalAmount - discountApplied);
+            totalAmount = Math.max(0.50, totalAmount - discountApplied);
           } else {
             throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid or expired promo code" });
           }
@@ -126,9 +128,12 @@ export const embeddedCheckoutRouter = router({
         }
       }
 
-      if (totalAmount < 50) {
+      if (totalAmount < 0.50) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Minimum charge amount is $0.50" });
       }
+
+      // Convert to cents for Stripe API
+      const totalAmountCents = Math.round(totalAmount * 100);
 
       const Stripe = (await import("stripe")).default;
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
@@ -197,7 +202,7 @@ export const embeddedCheckoutRouter = router({
       }
 
       const paymentIntent = await stripe.paymentIntents.create({
-        amount: totalAmount,
+        amount: totalAmountCents,
         currency: "usd",
         description: description.slice(0, 1000),
         receipt_email: input.email,
@@ -214,7 +219,7 @@ export const embeddedCheckoutRouter = router({
         productName: input.productName,
         productType: input.productType,
         orderBumps: input.selectedBumps.length > 0 ? JSON.stringify(input.selectedBumps.map(b => ({ title: b.title, price: b.price }))) : null,
-        amountPaid: totalAmount,
+        amountPaid: totalAmount, // stored in dollars
         currency: "usd",
         stripePaymentIntentId: paymentIntent.id,
         sourceType: input.sourceType,
@@ -235,7 +240,7 @@ export const embeddedCheckoutRouter = router({
       return {
         clientSecret: paymentIntent.client_secret!,
         paymentIntentId: paymentIntent.id,
-        amount: totalAmount,
+        amount: totalAmount, // dollars for display
         successUrl,
       };
     }),

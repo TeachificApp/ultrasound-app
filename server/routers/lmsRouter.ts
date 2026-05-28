@@ -60,6 +60,8 @@ import {
   freePreviewEnrollments,
   lmsSectionTemplates,
   lessonTemplates,
+  lmsCohortSessions,
+  lmsCohortAssignments,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
@@ -240,7 +242,7 @@ export const lmsPublicRouter = router({
   listCourses: publicProcedure
     .input(z.object({
       brand: z.enum(["aaus", "iheartecho"]).optional(),
-      type: z.enum(["course", "quiz", "download"]).optional(),
+      type: z.enum(["course", "quiz", "download", "cohort"]).optional(),
       isFree: z.boolean().optional(),
       search: z.string().optional(),
       page: z.number().int().min(1).default(1),
@@ -1065,7 +1067,7 @@ export const lmsLearnerRouter = router({
               price_data: {
                 currency: course.currency,
                 product_data: { name: productName, description: course.subtitle ?? undefined },
-                unit_amount: effectivePrice,
+                unit_amount: Math.round(Number(effectivePrice) * 100),
               },
               quantity: input.seats,
             };
@@ -1094,7 +1096,7 @@ export const lmsLearnerRouter = router({
           });
           const stripePrice = await stripe.prices.create({
             product: stripeProduct.id,
-            unit_amount: effectivePrice,
+            unit_amount: Math.round(Number(effectivePrice) * 100),
             currency: course.currency,
             recurring: { interval: intervalMap[interval], interval_count: intervalCountMap[interval] },
           });
@@ -1129,7 +1131,7 @@ export const lmsLearnerRouter = router({
             price_data: {
               currency: course.currency,
               product_data: { name: `${productName} — Down Payment` },
-              unit_amount: downPayment,
+              unit_amount: Math.round(Number(downPayment) * 100),
             },
             quantity: 1,
           });
@@ -1144,7 +1146,7 @@ export const lmsLearnerRouter = router({
             const intervalMonths = Math.round(intervalDays / 30) || 1;
             const stripePrice = await stripe.prices.create({
               product: stripeProduct.id,
-              unit_amount: installmentAmount,
+              unit_amount: Math.round(Number(installmentAmount) * 100),
               currency: course.currency,
               recurring: { interval: "month", interval_count: intervalMonths },
             });
@@ -1219,7 +1221,7 @@ export const lmsLearnerRouter = router({
           customer_email: ctx.user.email ?? undefined,
           client_reference_id: ctx.user.id.toString(),
           ...(discounts ? { discounts } : { allow_promotion_codes: true }),
-          line_items: [{ price_data: { currency: course.currency ?? "usd", product_data: { name: course.title, images: course.coverImageUrl ? [course.coverImageUrl] : undefined }, unit_amount: course.price }, quantity: 1 }],
+          line_items: [{ price_data: { currency: course.currency ?? "usd", product_data: { name: course.title, images: course.coverImageUrl ? [course.coverImageUrl] : undefined }, unit_amount: Math.round(Number(course.price) * 100) }, quantity: 1 }],
           metadata: { type: "lms_course", course_id: course.id.toString(), user_id: ctx.user.id.toString(), customer_email: ctx.user.email ?? "", source: "upgrade_prompt" },
           success_url: `${origin}/courses/${course.slug}?success=1`,
           cancel_url: `${origin}/courses/${course.slug}`,
@@ -1244,7 +1246,7 @@ export const lmsLearnerRouter = router({
           customer_email: ctx.user.email ?? undefined,
           client_reference_id: ctx.user.id.toString(),
           ...(discounts ? { discounts } : { allow_promotion_codes: true }),
-          line_items: [{ price_data: { currency: product.currency, product_data: { name: product.title, images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined }, unit_amount: product.price }, quantity: 1 }],
+          line_items: [{ price_data: { currency: product.currency, product_data: { name: product.title, images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined }, unit_amount: Math.round(Number(product.price) * 100) }, quantity: 1 }],
           metadata: { type: "digital_download", product_id: product.id.toString(), user_id: ctx.user.id.toString(), customer_email: ctx.user.email ?? "", source: "upgrade_prompt" },
           success_url: `${origin}/downloads/${product.slug}/files?success=1`,
           cancel_url: `${origin}/downloads/${product.slug}`,
@@ -1267,7 +1269,7 @@ export const lmsLearnerRouter = router({
           client_reference_id: ctx.user.id.toString(),
           ...(discounts ? { discounts } : { allow_promotion_codes: true }),
           shipping_address_collection: { allowed_countries: allowedCountries as any },
-          line_items: [{ price_data: { currency: product.currency, product_data: { name: product.title, images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined }, unit_amount: product.price }, quantity: 1 }],
+          line_items: [{ price_data: { currency: product.currency, product_data: { name: product.title, images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined }, unit_amount: Math.round(Number(product.price) * 100) }, quantity: 1 }],
           metadata: { type: "physical_product", product_id: product.id.toString(), user_id: ctx.user.id.toString(), customer_email: ctx.user.email ?? "", source: "upgrade_prompt" },
           success_url: `${origin}/product/${product.slug}?success=1`,
           cancel_url: `${origin}/product/${product.slug}`,
@@ -1535,7 +1537,7 @@ export const lmsAdminRouter = router({
   listCourses: protectedProcedure
     .input(z.object({
       status: z.enum(["draft", "public", "hidden", "private", "archived", "all"]).default("all"),
-      type: z.enum(["course", "quiz", "download", "all"]).default("all"),
+      type: z.enum(["course", "quiz", "download", "cohort", "all"]).default("all"),
       page: z.number().int().min(1).default(1),
       pageSize: z.number().int().min(1).max(500).default(20),
     }))
@@ -1545,7 +1547,7 @@ export const lmsAdminRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const conditions: any[] = [];
       if (input.status !== "all") conditions.push(eq(lmsCourses.status, input.status as "draft" | "public" | "hidden" | "private"));
-      if (input.type !== "all") conditions.push(eq(lmsCourses.type, input.type as "course" | "quiz" | "download"));
+      if (input.type !== "all") conditions.push(eq(lmsCourses.type, input.type as "course" | "quiz" | "download" | "cohort"));
       const offset = (input.page - 1) * input.pageSize;
       const courses = await db.select().from(lmsCourses).where(conditions.length ? and(...conditions) : undefined).orderBy(desc(lmsCourses.updatedAt)).limit(input.pageSize).offset(offset);
       const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(lmsCourses).where(conditions.length ? and(...conditions) : undefined);
@@ -1556,7 +1558,7 @@ export const lmsAdminRouter = router({
     .input(z.object({
       title: z.string().min(1).max(255),
       subtitle: z.string().max(500).optional(),
-      type: z.enum(["course", "quiz", "download"]).default("course"),
+      type: z.enum(["course", "quiz", "download", "cohort"]).default("course"),
       brand: z.enum(["aaus", "iheartecho"]).default("aaus"),
       pricingType: z.enum(["free", "one_time", "subscription", "payment_plan", "trial_then_subscription"]).default("one_time"),
       price: z.number().int().min(0).default(0),
@@ -1602,7 +1604,8 @@ export const lmsAdminRouter = router({
       description: z.string().optional(),
       coverImageUrl: z.string().optional(),
       status: z.enum(["draft", "public", "hidden", "private", "archived"]).optional(),
-      type: z.enum(["course", "quiz", "download"]).optional(),
+      type: z.enum(["course", "quiz", "download", "cohort"]).optional(),
+      enrollmentCloseDate: z.string().nullable().optional(), // ISO date string or null
       brand: z.enum(["aaus", "iheartecho"]).optional(),
       price: z.number().int().min(0).optional(),
       isFree: z.boolean().optional(),
@@ -1645,7 +1648,11 @@ export const lmsAdminRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const { id, pricingType, defaultMarkComplete: dmc, ...updates } = input;
+      const { id, pricingType, defaultMarkComplete: dmc, enrollmentCloseDate, ...updates } = input;
+      // Handle enrollmentCloseDate: convert ISO string to Date or null
+      if (enrollmentCloseDate !== undefined) {
+        (updates as any).enrollmentCloseDate = enrollmentCloseDate ? new Date(enrollmentCloseDate) : null;
+      }
       if (dmc !== undefined) (updates as any).defaultMarkComplete = dmc ? 1 : 0;
       // Sync isFree with pricingType
       const extra: Record<string, any> = {};
@@ -2941,8 +2948,8 @@ Rules:
           }).join("\n")
         : lessons.map(l => `- ${l.title} (${l.type})`).join("\n");
       const pricingText = pricing.length > 0
-        ? pricing.map(p => `${p.label ?? "Option"}: $${(p.price ?? 0) / 100}${p.subscriptionInterval ? "/" + p.subscriptionInterval : ""} (${p.pricingType ?? "one_time"})`).join(", ")
-        : course.price ? `$${course.price / 100}` : "Free";
+        ? pricing.map(p => `${p.label ?? "Option"}: $${Number(p.price ?? 0).toFixed(2)}${p.subscriptionInterval ? "/" + p.subscriptionInterval : ""} (${p.pricingType ?? "one_time"})`).join(", ")
+        : course.price ? `$${Number(course.price).toFixed(2)}` : "Free";
 
       const systemPrompt = `You are an expert landing page designer for online ${typeLabel}s. Generate a complete, compelling landing page block structure as JSON. The blocks should be professional, conversion-focused, and specific to the content provided. Return ONLY valid JSON, no markdown.`;
       const userPrompt = `Generate a landing page for this ${typeLabel}:
@@ -4792,6 +4799,156 @@ CRITICAL REQUIREMENTS:
         ].join(",")),
       ];
       return { csv: csvLines.join("\n"), count: rows.length };
+    }),
+
+  // ── Cohort Sessions ──
+  listCohortSessions: protectedProcedure
+    .input(z.object({ courseId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const sessions = await db.select().from(lmsCohortSessions)
+        .where(eq(lmsCohortSessions.courseId, input.courseId))
+        .orderBy(asc(lmsCohortSessions.sessionDate));
+      return sessions;
+    }),
+
+  createCohortSession: protectedProcedure
+    .input(z.object({
+      courseId: z.number(),
+      title: z.string().min(1).max(255),
+      description: z.string().optional(),
+      sessionDate: z.string(), // ISO string
+      durationMinutes: z.number().int().min(1).default(60),
+      meetingUrl: z.string().optional(),
+      recordingUrl: z.string().optional(),
+      status: z.enum(["draft", "published", "cancelled"]).default("draft"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [result] = await db.insert(lmsCohortSessions).values({
+        courseId: input.courseId,
+        title: input.title,
+        description: input.description ?? null,
+        sessionDate: new Date(input.sessionDate),
+        durationMinutes: input.durationMinutes,
+        meetingUrl: input.meetingUrl ?? null,
+        recordingUrl: input.recordingUrl ?? null,
+        status: input.status,
+      }).$returningId();
+      return { id: result.id };
+    }),
+
+  updateCohortSession: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      title: z.string().min(1).max(255).optional(),
+      description: z.string().nullable().optional(),
+      sessionDate: z.string().optional(),
+      durationMinutes: z.number().int().min(1).optional(),
+      meetingUrl: z.string().nullable().optional(),
+      recordingUrl: z.string().nullable().optional(),
+      status: z.enum(["draft", "published", "cancelled"]).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { id, sessionDate, ...rest } = input;
+      const updates: Record<string, any> = { ...Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined)) };
+      if (sessionDate) updates.sessionDate = new Date(sessionDate);
+      if (Object.keys(updates).length > 0) {
+        await db.update(lmsCohortSessions).set(updates).where(eq(lmsCohortSessions.id, id));
+      }
+      return { success: true };
+    }),
+
+  deleteCohortSession: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(lmsCohortSessions).where(eq(lmsCohortSessions.id, input.id));
+      return { success: true };
+    }),
+
+  // ── Cohort Assignments ──
+  listCohortAssignments: protectedProcedure
+    .input(z.object({ courseId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const assignments = await db.select().from(lmsCohortAssignments)
+        .where(eq(lmsCohortAssignments.courseId, input.courseId))
+        .orderBy(asc(lmsCohortAssignments.position), asc(lmsCohortAssignments.createdAt));
+      return assignments;
+    }),
+
+  createCohortAssignment: protectedProcedure
+    .input(z.object({
+      courseId: z.number(),
+      title: z.string().min(1).max(255),
+      description: z.string().optional(),
+      dueDate: z.string().nullable().optional(),
+      maxPoints: z.number().int().min(0).default(100),
+      submissionType: z.enum(["text", "file", "url", "none"]).default("none"),
+      status: z.enum(["draft", "published"]).default("draft"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [{ maxPos }] = await db.select({ maxPos: sql<number>`COALESCE(MAX(position),0)` })
+        .from(lmsCohortAssignments).where(eq(lmsCohortAssignments.courseId, input.courseId));
+      const [result] = await db.insert(lmsCohortAssignments).values({
+        courseId: input.courseId,
+        title: input.title,
+        description: input.description ?? null,
+        dueDate: input.dueDate ? new Date(input.dueDate) : null,
+        maxPoints: input.maxPoints,
+        submissionType: input.submissionType,
+        status: input.status,
+        position: Number(maxPos) + 1,
+      }).$returningId();
+      return { id: result.id };
+    }),
+
+  updateCohortAssignment: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      title: z.string().min(1).max(255).optional(),
+      description: z.string().nullable().optional(),
+      dueDate: z.string().nullable().optional(),
+      maxPoints: z.number().int().min(0).optional(),
+      submissionType: z.enum(["text", "file", "url", "none"]).optional(),
+      status: z.enum(["draft", "published"]).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { id, dueDate, ...rest } = input;
+      const updates: Record<string, any> = { ...Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined)) };
+      if (dueDate !== undefined) updates.dueDate = dueDate ? new Date(dueDate) : null;
+      if (Object.keys(updates).length > 0) {
+        await db.update(lmsCohortAssignments).set(updates).where(eq(lmsCohortAssignments.id, id));
+      }
+      return { success: true };
+    }),
+
+  deleteCohortAssignment: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(lmsCohortAssignments).where(eq(lmsCohortAssignments.id, input.id));
+      return { success: true };
     }),
 });
 
