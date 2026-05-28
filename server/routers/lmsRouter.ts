@@ -62,6 +62,10 @@ import {
   lessonTemplates,
   lmsCohortSessions,
   lmsCohortAssignments,
+  lmsCohortRecordings,
+  lmsCohortSubmissions,
+  mediaUploadFolders,
+  mediaUploadResponses,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
@@ -1544,18 +1548,130 @@ export const lmsLearnerRouter = router({
         enrollmentCloseDate: lmsCourses.enrollmentCloseDate,
       }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
-      const [sessions, assignments] = await Promise.all([
+      const [sessions, assignments, recordings, mySubmissions] = await Promise.all([
         db.select().from(lmsCohortSessions)
           .where(and(eq(lmsCohortSessions.courseId, input.courseId), eq(lmsCohortSessions.status, "published")))
           .orderBy(asc(lmsCohortSessions.sessionDate)),
         db.select().from(lmsCohortAssignments)
           .where(and(eq(lmsCohortAssignments.courseId, input.courseId), eq(lmsCohortAssignments.status, "published")))
           .orderBy(asc(lmsCohortAssignments.position), asc(lmsCohortAssignments.dueDate)),
+        db.select().from(lmsCohortRecordings)
+          .where(and(eq(lmsCohortRecordings.courseId, input.courseId), eq(lmsCohortRecordings.status, "published")))
+          .orderBy(asc(lmsCohortRecordings.position), asc(lmsCohortRecordings.createdAt)),
+        db.select().from(lmsCohortSubmissions)
+          .where(eq(lmsCohortSubmissions.userId, ctx.user.id)),
       ]);
-      return { course, sessions, assignments };
+      return { course, sessions, assignments, recordings, mySubmissions };
+    }),
+
+  submitCohortAssignment: protectedProcedure
+    .input(z.object({
+      assignmentId: z.number(),
+      submissionType: z.enum(["text", "file", "url", "none"]),
+      textContent: z.string().optional(),
+      fileUrl: z.string().optional(),
+      fileKey: z.string().optional(),
+      urlContent: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Verify assignment exists and is published
+      const [assignment] = await db.select().from(lmsCohortAssignments)
+        .where(and(eq(lmsCohortAssignments.id, input.assignmentId), eq(lmsCohortAssignments.status, "published")))
+        .limit(1);
+      if (!assignment) throw new TRPCError({ code: "NOT_FOUND", message: "Assignment not found" });
+      // Verify user is enrolled
+      const [enrollment] = await db.select({ id: lmsEnrollments.id })
+        .from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, assignment.courseId)))
+        .limit(1);
+      if (!enrollment) throw new TRPCError({ code: "FORBIDDEN", message: "Not enrolled in this cohort" });
+      // Upsert submission
+      const existing = await db.select({ id: lmsCohortSubmissions.id })
+        .from(lmsCohortSubmissions)
+        .where(and(eq(lmsCohortSubmissions.assignmentId, input.assignmentId), eq(lmsCohortSubmissions.userId, ctx.user.id)))
+        .limit(1);
+      if (existing.length > 0) {
+        await db.update(lmsCohortSubmissions).set({
+          submissionType: input.submissionType,
+          textContent: input.textContent ?? null,
+          fileUrl: input.fileUrl ?? null,
+          fileKey: input.fileKey ?? null,
+          urlContent: input.urlContent ?? null,
+          status: "pending",
+        }).where(eq(lmsCohortSubmissions.id, existing[0].id));
+        return { id: existing[0].id, updated: true };
+      }
+      const [result] = await db.insert(lmsCohortSubmissions).values({
+        assignmentId: input.assignmentId,
+        userId: ctx.user.id,
+        submissionType: input.submissionType,
+        textContent: input.textContent ?? null,
+        fileUrl: input.fileUrl ?? null,
+        fileKey: input.fileKey ?? null,
+        urlContent: input.urlContent ?? null,
+        status: "pending",
+      }).$returningId();
+      return { id: result.id, updated: false };
+    }),
+
+  /** Upload a file for an assignment submission (student-facing) */
+  uploadSubmissionFile: protectedProcedure
+    .input(z.object({
+      dataUri: z.string().min(1).max(52_428_800), // 50 MB base64 limit
+      mimeType: z.string().min(1),
+      fileName: z.string().min(1).max(255),
+      assignmentId: z.number().int().positive(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Verify assignment exists and user is enrolled
+      const [assignment] = await db.select({ courseId: lmsCohortAssignments.courseId })
+        .from(lmsCohortAssignments).where(eq(lmsCohortAssignments.id, input.assignmentId)).limit(1);
+      if (!assignment) throw new TRPCError({ code: "NOT_FOUND" });
+      const [enrollment] = await db.select({ id: lmsEnrollments.id })
+        .from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, assignment.courseId)))
+        .limit(1);
+      if (!enrollment) throw new TRPCError({ code: "FORBIDDEN", message: "Not enrolled in this cohort" });
+      // Decode and upload
+      const b64Marker = ";base64,";
+      const b64Idx = input.dataUri.indexOf(b64Marker);
+      const base64Data = b64Idx >= 0 ? input.dataUri.slice(b64Idx + b64Marker.length) : input.dataUri;
+      const buffer = Buffer.from(base64Data, "base64");
+      if (buffer.byteLength > 40 * 1024 * 1024) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "File must be under 40 MB" });
+      }
+      const suffix = Math.random().toString(36).slice(2, 10);
+      const sanitizedName = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const fileKey = `cohort-submissions/${ctx.user.id}/${input.assignmentId}/${suffix}-${sanitizedName}`;
+            const { url } = await storagePut(fileKey, buffer, input.mimeType);
+      return { url, fileKey };
+    }),
+
+  getAssignmentDetail: protectedProcedure
+    .input(z.object({ assignmentId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [assignment] = await db.select().from(lmsCohortAssignments)
+        .where(eq(lmsCohortAssignments.id, input.assignmentId)).limit(1);
+      if (!assignment) throw new TRPCError({ code: "NOT_FOUND" });
+      // Verify enrollment
+      const [enrollment] = await db.select({ id: lmsEnrollments.id })
+        .from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, assignment.courseId)))
+        .limit(1);
+      if (!enrollment && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Not enrolled in this cohort" });
+      if (assignment.status !== "published" && ctx.user.role !== "admin") throw new TRPCError({ code: "NOT_FOUND" });
+      const [mySubmission] = await db.select().from(lmsCohortSubmissions)
+        .where(and(eq(lmsCohortSubmissions.assignmentId, input.assignmentId), eq(lmsCohortSubmissions.userId, ctx.user.id)))
+        .limit(1);
+      return { assignment, mySubmission: mySubmission ?? null };
     }),
 });
-
 // ─── Admin Router ─────────────────────────────────────────────────────────────
 
 export const lmsAdminRouter = router({
@@ -4862,6 +4978,9 @@ CRITICAL REQUIREMENTS:
       recordingUrl: z.string().optional(),
       status: z.enum(["draft", "published", "cancelled"]).default("draft"),
       notifyStudents: z.boolean().default(false),
+      timezone: z.string().optional(),
+      recurrenceRule: z.enum(["weekly", "biweekly", "monthly"]).optional(),
+      recurrenceEndDate: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -4876,6 +4995,9 @@ CRITICAL REQUIREMENTS:
         meetingUrl: input.meetingUrl ?? null,
         recordingUrl: input.recordingUrl ?? null,
         status: input.status,
+        timezone: input.timezone ?? "America/New_York",
+        recurrenceRule: input.recurrenceRule ?? null,
+        recurrenceEndDate: input.recurrenceEndDate ? new Date(input.recurrenceEndDate) : null,
       }).$returningId();
 
       // Notify enrolled students if requested
@@ -4927,14 +5049,18 @@ CRITICAL REQUIREMENTS:
       meetingUrl: z.string().nullable().optional(),
       recordingUrl: z.string().nullable().optional(),
       status: z.enum(["draft", "published", "cancelled"]).optional(),
+      timezone: z.string().optional(),
+      recurrenceRule: z.enum(["weekly", "biweekly", "monthly"]).nullable().optional(),
+      recurrenceEndDate: z.string().nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const { id, sessionDate, ...rest } = input;
+      const { id, sessionDate, recurrenceEndDate, ...rest } = input;
       const updates: Record<string, any> = { ...Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined)) };
       if (sessionDate) updates.sessionDate = new Date(sessionDate);
+      if (recurrenceEndDate !== undefined) updates.recurrenceEndDate = recurrenceEndDate ? new Date(recurrenceEndDate) : null;
       if (Object.keys(updates).length > 0) {
         await db.update(lmsCohortSessions).set(updates).where(eq(lmsCohortSessions.id, id));
       }
@@ -4969,6 +5095,7 @@ CRITICAL REQUIREMENTS:
       courseId: z.number(),
       title: z.string().min(1).max(255),
       description: z.string().optional(),
+      contentBlocks: z.array(z.any()).optional(),
       dueDate: z.string().nullable().optional(),
       maxPoints: z.number().int().min(0).default(100),
       submissionType: z.enum(["text", "file", "url", "none"]).default("none"),
@@ -4985,6 +5112,7 @@ CRITICAL REQUIREMENTS:
         courseId: input.courseId,
         title: input.title,
         description: input.description ?? null,
+        contentBlocks: input.contentBlocks ?? null,
         dueDate: input.dueDate ? new Date(input.dueDate) : null,
         maxPoints: input.maxPoints,
         submissionType: input.submissionType,
@@ -5036,6 +5164,7 @@ CRITICAL REQUIREMENTS:
       id: z.number(),
       title: z.string().min(1).max(255).optional(),
       description: z.string().nullable().optional(),
+      contentBlocks: z.array(z.any()).nullable().optional(),
       dueDate: z.string().nullable().optional(),
       maxPoints: z.number().int().min(0).optional(),
       submissionType: z.enum(["text", "file", "url", "none"]).optional(),
@@ -5062,6 +5191,282 @@ CRITICAL REQUIREMENTS:
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       await db.delete(lmsCohortAssignments).where(eq(lmsCohortAssignments.id, input.id));
       return { success: true };
+    }),
+
+  // ── Cohort Recordings (Admin) ────────────────────────────────────────────────────
+  listCohortRecordings: protectedProcedure
+    .input(z.object({ courseId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      return db.select().from(lmsCohortRecordings)
+        .where(eq(lmsCohortRecordings.courseId, input.courseId))
+        .orderBy(asc(lmsCohortRecordings.position), asc(lmsCohortRecordings.createdAt));
+    }),
+
+  createCohortRecording: protectedProcedure
+    .input(z.object({
+      courseId: z.number(),
+      sessionId: z.number().nullable().optional(),
+      title: z.string().min(1).max(255),
+      description: z.string().optional(),
+      videoUrl: z.string().optional(),
+      thumbnailUrl: z.string().optional(),
+      durationSeconds: z.number().int().min(0).optional(),
+      status: z.enum(["draft", "published"]).default("draft"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [{ maxPos }] = await db.select({ maxPos: sql<number>`COALESCE(MAX(position),0)` })
+        .from(lmsCohortRecordings).where(eq(lmsCohortRecordings.courseId, input.courseId));
+      const [result] = await db.insert(lmsCohortRecordings).values({
+        courseId: input.courseId,
+        sessionId: input.sessionId ?? null,
+        title: input.title,
+        description: input.description ?? null,
+        videoUrl: input.videoUrl ?? null,
+        thumbnailUrl: input.thumbnailUrl ?? null,
+        durationSeconds: input.durationSeconds ?? null,
+        status: input.status,
+        position: Number(maxPos) + 1,
+      }).$returningId();
+      return { id: result.id };
+    }),
+
+  updateCohortRecording: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      sessionId: z.number().nullable().optional(),
+      title: z.string().min(1).max(255).optional(),
+      description: z.string().nullable().optional(),
+      videoUrl: z.string().nullable().optional(),
+      thumbnailUrl: z.string().nullable().optional(),
+      durationSeconds: z.number().int().min(0).nullable().optional(),
+      status: z.enum(["draft", "published"]).optional(),
+      position: z.number().int().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { id, ...rest } = input;
+      const updates = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined));
+      if (Object.keys(updates).length > 0) {
+        await db.update(lmsCohortRecordings).set(updates).where(eq(lmsCohortRecordings.id, id));
+      }
+      return { success: true };
+    }),
+
+  deleteCohortRecording: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(lmsCohortRecordings).where(eq(lmsCohortRecordings.id, input.id));
+      return { success: true };
+    }),
+
+  // ── Recurring Session Expansion ──────────────────────────────────────────────────
+  /** Expand a recurring parent session into individual child session rows */
+  expandRecurringSessions: protectedProcedure
+    .input(z.object({ parentSessionId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [parent] = await db.select().from(lmsCohortSessions)
+        .where(eq(lmsCohortSessions.id, input.parentSessionId)).limit(1);
+      if (!parent) throw new TRPCError({ code: "NOT_FOUND", message: "Session not found" });
+      if (!parent.recurrenceRule) throw new TRPCError({ code: "BAD_REQUEST", message: "Session has no recurrence rule" });
+      if (!parent.recurrenceEndDate) throw new TRPCError({ code: "BAD_REQUEST", message: "Recurrence end date is required" });
+
+      // Delete existing child instances first (re-expand)
+      await db.delete(lmsCohortSessions)
+        .where(eq(lmsCohortSessions.parentSessionId, input.parentSessionId));
+
+      const intervalDays = parent.recurrenceRule === "weekly" ? 7
+        : parent.recurrenceRule === "biweekly" ? 14
+        : 30; // monthly approximation
+
+      const instances: typeof lmsCohortSessions.$inferInsert[] = [];
+      let current = new Date(parent.sessionDate);
+      const endDate = new Date(parent.recurrenceEndDate);
+      let weekNum = 1;
+
+      while (true) {
+        // Advance by interval
+        if (parent.recurrenceRule === "monthly") {
+          current = new Date(current);
+          current.setMonth(current.getMonth() + 1);
+        } else {
+          current = new Date(current.getTime() + intervalDays * 24 * 60 * 60 * 1000);
+        }
+        if (current > endDate) break;
+        weekNum++;
+        instances.push({
+          courseId: parent.courseId,
+          title: `${parent.title} (Week ${weekNum})`,
+          description: parent.description,
+          sessionDate: new Date(current),
+          durationMinutes: parent.durationMinutes,
+          meetingUrl: parent.meetingUrl,
+          recordingUrl: null,
+          status: parent.status,
+          timezone: parent.timezone ?? "America/New_York",
+          recurrenceRule: null,
+          recurrenceInterval: null,
+          recurrenceEndDate: null,
+          parentSessionId: parent.id,
+        });
+      }
+
+      if (instances.length === 0) return { created: 0 };
+      await db.insert(lmsCohortSessions).values(instances);
+      return { created: instances.length };
+    }),
+
+  // ── Cohort Submissions (Admin view) ──────────────────────────────────────────────
+  listCohortSubmissions: protectedProcedure
+    .input(z.object({ assignmentId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const subs = await db
+        .select({ sub: lmsCohortSubmissions, userName: users.name, userEmail: users.email })
+        .from(lmsCohortSubmissions)
+        .innerJoin(users, eq(users.id, lmsCohortSubmissions.userId))
+        .where(eq(lmsCohortSubmissions.assignmentId, input.assignmentId));
+      return subs.map(r => ({ ...r.sub, userName: r.userName, userEmail: r.userEmail }));
+    }),
+
+  gradeCohortSubmission: protectedProcedure
+    .input(z.object({
+      submissionId: z.number(),
+      grade: z.number().min(0).nullable().optional(),
+      feedback: z.string().nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(lmsCohortSubmissions).set({
+        grade: input.grade != null ? String(input.grade) : null,
+        feedback: input.feedback ?? null,
+        status: "graded",
+        gradedAt: Date.now(),
+        gradedBy: ctx.user.id,
+      }).where(eq(lmsCohortSubmissions.id, input.submissionId));
+      return { success: true };
+    }),
+
+  /** Get a single assignment with its content blocks (admin or enrolled student) */
+  getAssignmentDetail: protectedProcedure
+    .input(z.object({ assignmentId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [assignment] = await db.select().from(lmsCohortAssignments)
+        .where(eq(lmsCohortAssignments.id, input.assignmentId)).limit(1);
+      if (!assignment) throw new TRPCError({ code: "NOT_FOUND" });
+      // Verify access: admin or enrolled
+      if (ctx.user.role !== "admin") {
+        const [enrollment] = await db.select({ id: lmsEnrollments.id })
+          .from(lmsEnrollments)
+          .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, assignment.courseId)))
+          .limit(1);
+        if (!enrollment) throw new TRPCError({ code: "FORBIDDEN", message: "Not enrolled in this cohort" });
+        if (assignment.status !== "published") throw new TRPCError({ code: "NOT_FOUND" });
+      }
+      // Get the user's own submission if any
+      const [mySubmission] = await db.select().from(lmsCohortSubmissions)
+        .where(and(eq(lmsCohortSubmissions.assignmentId, input.assignmentId), eq(lmsCohortSubmissions.userId, ctx.user.id)))
+        .limit(1);
+      return { assignment, mySubmission: mySubmission ?? null };
+    }),
+
+  /** Upload a file for a media upload block (non-assignment context) */
+  recordMediaUploadResponse: protectedProcedure
+    .input(z.object({
+      blockId: z.string().optional(),
+      pageId: z.string().optional(),
+      pageType: z.string().optional(),
+      folderName: z.string().optional(),
+      fileUrl: z.string(),
+      fileKey: z.string(),
+      fileName: z.string().optional(),
+      mimeType: z.string().optional(),
+      fileSize: z.number().int().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      let folderId: number | null = null;
+      if (input.folderName) {
+        // Find or create folder
+        const [existing] = await db.select({ id: mediaUploadFolders.id })
+          .from(mediaUploadFolders).where(eq(mediaUploadFolders.name, input.folderName)).limit(1);
+        if (existing) {
+          folderId = existing.id;
+        } else {
+          const [res] = await db.insert(mediaUploadFolders).values({
+            name: input.folderName,
+            createdBy: ctx.user.id,
+            createdAt: Date.now(),
+          }).$returningId();
+          folderId = res.id;
+        }
+      }
+      const [res] = await db.insert(mediaUploadResponses).values({
+        userId: ctx.user.id,
+        blockId: input.blockId ?? null,
+        pageId: input.pageId ?? null,
+        pageType: input.pageType ?? null,
+        folderId,
+        fileUrl: input.fileUrl,
+        fileKey: input.fileKey,
+        fileName: input.fileName ?? null,
+        mimeType: input.mimeType ?? null,
+        fileSize: input.fileSize ?? null,
+        createdAt: Date.now(),
+      }).$returningId();
+      return { id: res.id, folderId };
+    }),
+
+  /** Admin: list all media upload responses (optionally filtered by folder/page) */
+  listMediaUploadResponses: protectedProcedure
+    .input(z.object({
+      folderId: z.number().optional(),
+      pageId: z.string().optional(),
+      pageType: z.string().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const conditions = [];
+      if (input.folderId) conditions.push(eq(mediaUploadResponses.folderId, input.folderId));
+      if (input.pageId) conditions.push(eq(mediaUploadResponses.pageId, input.pageId));
+      if (input.pageType) conditions.push(eq(mediaUploadResponses.pageType, input.pageType));
+      const rows = await db
+        .select({ resp: mediaUploadResponses, userName: users.name, userEmail: users.email })
+        .from(mediaUploadResponses)
+        .innerJoin(users, eq(users.id, mediaUploadResponses.userId))
+        .where(conditions.length > 0 ? and(...conditions) : undefined);
+      return rows.map(r => ({ ...r.resp, userName: r.userName, userEmail: r.userEmail }));
+    }),
+
+  /** Admin: list all media upload folders */
+  listMediaUploadFolders: protectedProcedure
+    .query(async ({ ctx }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      return db.select().from(mediaUploadFolders);
     }),
 });
 

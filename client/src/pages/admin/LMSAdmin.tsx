@@ -41,6 +41,7 @@ import {
   Package, Layers, Globe, Radio, Tag, LayoutGrid, ShoppingBag, GraduationCap, TrendingUp,
   Layout as LayoutTemplate, Database,
   Hash, Shield, Flag, Pin, Megaphone, Bell, MessageSquare, Star, Zap, XCircle,
+  Repeat, Film, CalendarRange, ExternalLink,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -52,6 +53,7 @@ import PhysicalProductsAdmin from "./PhysicalProductsAdmin";
 import OrderBumpsAdmin from "./OrderBumpsAdmin";
 import CertificateTemplatesAdmin from "./CertificateTemplatesAdmin";
 import LessonBlockEditor from "@/components/LessonBlockEditor";
+import AssignmentBlockEditor from "@/components/AssignmentBlockEditor";
 import { Block, BlockType, BlockPreview } from "@/components/BlockPreview";
 import { BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, SortableBlock, uid } from "@/pages/admin/LandingPageBuilder";
 import { useLearnLink } from "@/hooks/useLearnLink";
@@ -7813,6 +7815,24 @@ type CohortSession = {
   meetingUrl: string | null;
   recordingUrl: string | null;
   status: "draft" | "published" | "cancelled";
+  timezone: string | null;
+  recurrenceRule: "weekly" | "biweekly" | "monthly" | null;
+  recurrenceInterval: number | null;
+  recurrenceEndDate: Date | string | null;
+  parentSessionId: number | null;
+};
+
+type CohortRecording = {
+  id: number;
+  courseId: number;
+  sessionId: number | null;
+  title: string;
+  description: string | null;
+  videoUrl: string | null;
+  thumbnailUrl: string | null;
+  durationSeconds: number | null;
+  status: "draft" | "published";
+  position: number;
 };
 
 type CohortAssignment = {
@@ -7820,6 +7840,7 @@ type CohortAssignment = {
   courseId: number;
   title: string;
   description: string | null;
+  contentBlocks: any[] | null;
   dueDate: Date | string | null;
   maxPoints: number;
   submissionType: "text" | "file" | "url" | "none";
@@ -7827,8 +7848,21 @@ type CohortAssignment = {
   position: number;
 };
 
+// Common IANA timezones for the picker
+const COMMON_TIMEZONES = [
+  "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles",
+  "America/Phoenix", "America/Anchorage", "Pacific/Honolulu",
+  "America/Toronto", "America/Vancouver", "America/Sao_Paulo",
+  "Europe/London", "Europe/Paris", "Europe/Berlin", "Europe/Amsterdam",
+  "Europe/Rome", "Europe/Madrid", "Europe/Zurich", "Europe/Stockholm",
+  "Asia/Dubai", "Asia/Kolkata", "Asia/Singapore", "Asia/Tokyo",
+  "Asia/Seoul", "Asia/Shanghai", "Asia/Hong_Kong",
+  "Australia/Sydney", "Australia/Melbourne", "Pacific/Auckland",
+  "UTC",
+];
+
 function CohortTab({ courseId }: { courseId: number }) {
-  const [activeTab, setActiveTab] = useState<"sessions" | "assignments">("sessions");
+  const [activeTab, setActiveTab] = useState<"sessions" | "assignments" | "recordings">("sessions");
   const utils = trpc.useUtils();
 
   // Sessions
@@ -7843,6 +7877,10 @@ function CohortTab({ courseId }: { courseId: number }) {
   });
   const deleteSession = trpc.lmsAdmin.deleteCohortSession.useMutation({
     onSuccess: () => { utils.lmsAdmin.listCohortSessions.invalidate({ courseId }); toast.success("Session deleted"); },
+    onError: (e) => toast.error(e.message),
+  });
+  const expandRecurring = trpc.lmsAdmin.expandRecurringSessions.useMutation({
+    onSuccess: (r) => { utils.lmsAdmin.listCohortSessions.invalidate({ courseId }); toast.success(`Expanded into ${r.created} sessions`); },
     onError: (e) => toast.error(e.message),
   });
 
@@ -7861,18 +7899,73 @@ function CohortTab({ courseId }: { courseId: number }) {
     onError: (e) => toast.error(e.message),
   });
 
+  // Recordings
+  const { data: recordings = [], isLoading: recordingsLoading } = trpc.lmsAdmin.listCohortRecordings.useQuery({ courseId });
+  const createRecording = trpc.lmsAdmin.createCohortRecording.useMutation({
+    onSuccess: () => { utils.lmsAdmin.listCohortRecordings.invalidate({ courseId }); toast.success("Recording added"); },
+    onError: (e) => toast.error(e.message),
+  });
+  const updateRecording = trpc.lmsAdmin.updateCohortRecording.useMutation({
+    onSuccess: () => { utils.lmsAdmin.listCohortRecordings.invalidate({ courseId }); toast.success("Recording updated"); },
+    onError: (e) => toast.error(e.message),
+  });
+  const deleteRecording = trpc.lmsAdmin.deleteCohortRecording.useMutation({
+    onSuccess: () => { utils.lmsAdmin.listCohortRecordings.invalidate({ courseId }); toast.success("Recording deleted"); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  // Recording dialog state
+  const [recordingDialog, setRecordingDialog] = useState<{ open: boolean; recording?: CohortRecording }>({ open: false });
+  const [recordingForm, setRecordingForm] = useState({
+    title: "", description: "", videoUrl: "", thumbnailUrl: "",
+    durationSeconds: 0, status: "draft" as "draft" | "published",
+    sessionId: null as number | null,
+  });
+  const openRecordingDialog = (r?: CohortRecording) => {
+    if (r) {
+      setRecordingForm({ title: r.title, description: r.description ?? "", videoUrl: r.videoUrl ?? "",
+        thumbnailUrl: r.thumbnailUrl ?? "", durationSeconds: r.durationSeconds ?? 0,
+        status: r.status, sessionId: r.sessionId });
+    } else {
+      setRecordingForm({ title: "", description: "", videoUrl: "", thumbnailUrl: "", durationSeconds: 0, status: "draft", sessionId: null });
+    }
+    setRecordingDialog({ open: true, recording: r });
+  };
+  const handleSaveRecording = () => {
+    if (!recordingForm.title.trim()) { toast.error("Title is required"); return; }
+    const payload = {
+      title: recordingForm.title.trim(),
+      description: recordingForm.description || undefined,
+      videoUrl: recordingForm.videoUrl || undefined,
+      thumbnailUrl: recordingForm.thumbnailUrl || undefined,
+      durationSeconds: recordingForm.durationSeconds || undefined,
+      status: recordingForm.status,
+      sessionId: recordingForm.sessionId,
+    };
+    if (recordingDialog.recording) {
+      updateRecording.mutate({ id: recordingDialog.recording.id, ...payload }, { onSuccess: () => setRecordingDialog({ open: false }) });
+    } else {
+      createRecording.mutate({ courseId, ...payload }, { onSuccess: () => setRecordingDialog({ open: false }) });
+    }
+  };
+
   // Session dialog state
   const [sessionDialog, setSessionDialog] = useState<{ open: boolean; session?: CohortSession }>({ open: false });
   const [sessionForm, setSessionForm] = useState({
     title: "", description: "", sessionDate: "", durationMinutes: 60,
     meetingUrl: "", recordingUrl: "", status: "draft" as "draft" | "published" | "cancelled",
     notifyStudents: false,
+    timezone: "America/New_York",
+    recurrenceRule: "" as "" | "weekly" | "biweekly" | "monthly",
+    recurrenceEndDate: "",
   });
 
   const openSessionDialog = (session?: CohortSession) => {
     if (session) {
       const d = new Date(session.sessionDate);
       const localISO = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      const endD = session.recurrenceEndDate ? new Date(session.recurrenceEndDate) : null;
+      const endISO = endD ? new Date(endD.getTime() - endD.getTimezoneOffset() * 60000).toISOString().slice(0, 10) : "";
       setSessionForm({
         title: session.title,
         description: session.description ?? "",
@@ -7882,9 +7975,12 @@ function CohortTab({ courseId }: { courseId: number }) {
         recordingUrl: session.recordingUrl ?? "",
         status: session.status,
         notifyStudents: false,
+        timezone: session.timezone ?? "America/New_York",
+        recurrenceRule: session.recurrenceRule ?? "",
+        recurrenceEndDate: endISO,
       });
     } else {
-      setSessionForm({ title: "", description: "", sessionDate: "", durationMinutes: 60, meetingUrl: "", recordingUrl: "", status: "draft", notifyStudents: false });
+      setSessionForm({ title: "", description: "", sessionDate: "", durationMinutes: 60, meetingUrl: "", recordingUrl: "", status: "draft", notifyStudents: false, timezone: "America/New_York", recurrenceRule: "", recurrenceEndDate: "" });
     }
     setSessionDialog({ open: true, session });
   };
@@ -7901,6 +7997,9 @@ function CohortTab({ courseId }: { courseId: number }) {
       meetingUrl: sessionForm.meetingUrl || undefined,
       recordingUrl: sessionForm.recordingUrl || undefined,
       status: sessionForm.status,
+      timezone: sessionForm.timezone,
+      recurrenceRule: (sessionForm.recurrenceRule || undefined) as "weekly" | "biweekly" | "monthly" | undefined,
+      recurrenceEndDate: sessionForm.recurrenceEndDate ? new Date(sessionForm.recurrenceEndDate).toISOString() : undefined,
     };
     if (sessionDialog.session) {
       updateSession.mutate({ id: sessionDialog.session.id, ...payload }, { onSuccess: () => setSessionDialog({ open: false }) });
@@ -7916,6 +8015,7 @@ function CohortTab({ courseId }: { courseId: number }) {
     submissionType: "none" as "text" | "file" | "url" | "none",
     status: "draft" as "draft" | "published",
     notifyStudents: false,
+    contentBlocks: [] as any[],
   });
 
   const openAssignDialog = (assignment?: CohortAssignment) => {
@@ -7930,9 +8030,10 @@ function CohortTab({ courseId }: { courseId: number }) {
         submissionType: assignment.submissionType,
         status: assignment.status,
         notifyStudents: false,
+        contentBlocks: assignment.contentBlocks ?? [],
       });
     } else {
-      setAssignForm({ title: "", description: "", dueDate: "", maxPoints: 100, submissionType: "none", status: "draft", notifyStudents: false });
+      setAssignForm({ title: "", description: "", dueDate: "", maxPoints: 100, submissionType: "none", status: "draft", notifyStudents: false, contentBlocks: [] });
     }
     setAssignDialog({ open: true, assignment });
   };
@@ -7942,6 +8043,7 @@ function CohortTab({ courseId }: { courseId: number }) {
     const payload = {
       title: assignForm.title.trim(),
       description: assignForm.description || undefined,
+      contentBlocks: assignForm.contentBlocks.length > 0 ? assignForm.contentBlocks : undefined,
       dueDate: assignForm.dueDate ? new Date(assignForm.dueDate).toISOString() : null,
       maxPoints: assignForm.maxPoints,
       submissionType: assignForm.submissionType,
@@ -7972,11 +8074,11 @@ function CohortTab({ courseId }: { courseId: number }) {
     <div className="space-y-4">
       {/* Sub-tabs */}
       <div className="flex gap-1 border-b border-gray-200 pb-0">
-        {(["sessions", "assignments"] as const).map(t => (
+        {(["sessions", "assignments", "recordings"] as const).map(t => (
           <button key={t} onClick={() => setActiveTab(t)}
             className={cn("px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize",
               activeTab === t ? "border-teal-600 text-teal-700" : "border-transparent text-gray-500 hover:text-gray-700")}>
-            {t === "sessions" ? "Live Sessions" : "Assignments"}
+            {t === "sessions" ? "Live Sessions" : t === "assignments" ? "Assignments" : "Recordings"}
           </button>
         ))}
       </div>
@@ -8013,6 +8115,9 @@ function CohortTab({ courseId }: { courseId: number }) {
                     <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 flex-wrap">
                       <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{fmtDate(s.sessionDate)}</span>
                       <span>{s.durationMinutes} min</span>
+                      {s.timezone && <span className="flex items-center gap-1"><Globe className="w-3 h-3" />{s.timezone}</span>}
+                      {s.recurrenceRule && <span className="flex items-center gap-1 text-purple-600"><Repeat className="w-3 h-3" />{s.recurrenceRule}</span>}
+                      {s.parentSessionId && <span className="text-purple-400 text-xs">Recurring instance</span>}
                       {s.meetingUrl && <a href={s.meetingUrl} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline flex items-center gap-1"><LinkIcon className="w-3 h-3" />Meeting Link</a>}
                       {s.recordingUrl && <a href={s.recordingUrl} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline flex items-center gap-1"><PlayCircle className="w-3 h-3" />Recording</a>}
                     </div>
@@ -8088,6 +8193,125 @@ function CohortTab({ courseId }: { courseId: number }) {
         </div>
       )}
 
+      {/* Recordings Tab */}
+      {activeTab === "recordings" && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-500">Upload and manage recorded session replays for enrolled students.</p>
+            <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => openRecordingDialog()}>
+              <Plus className="w-3.5 h-3.5 mr-1" /> Add Recording
+            </Button>
+          </div>
+          {recordingsLoading ? (
+            <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-16 rounded-lg" />)}</div>
+          ) : recordings.length === 0 ? (
+            <div className="text-center py-12 text-gray-400">
+              <Film className="w-8 h-8 mx-auto mb-2 opacity-40" />
+              <p className="text-sm">No recordings yet — add your first replay above.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {(recordings as CohortRecording[]).map(r => (
+                <div key={r.id} className="bg-white border border-gray-200 rounded-lg p-4 flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center flex-shrink-0">
+                    <Film className="w-5 h-5 text-purple-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-gray-900 text-sm">{r.title}</span>
+                      {statusBadge(r.status)}
+                      {r.durationSeconds && <span className="text-xs text-gray-400">{Math.floor(r.durationSeconds / 60)}m {r.durationSeconds % 60}s</span>}
+                    </div>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 flex-wrap">
+                      {r.videoUrl && <a href={r.videoUrl} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline flex items-center gap-1"><ExternalLink className="w-3 h-3" />Watch Video</a>}
+                      {r.sessionId && <span className="text-gray-400">Linked to session #{r.sessionId}</span>}
+                    </div>
+                    {r.description && <p className="text-xs text-gray-400 mt-1 line-clamp-1">{r.description}</p>}
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => openRecordingDialog(r)}>
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-400 hover:text-red-600" onClick={() => {
+                      if (confirm("Delete this recording?")) deleteRecording.mutate({ id: r.id });
+                    }}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Recording Dialog */}
+      {recordingDialog.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+              <h3 className="font-bold text-gray-900">{recordingDialog.recording ? "Edit Recording" : "Add Recording"}</h3>
+              <Button size="sm" variant="ghost" onClick={() => setRecordingDialog({ open: false })}><X className="w-4 h-4" /></Button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-1 block">Title *</Label>
+                <Input value={recordingForm.title} onChange={e => setRecordingForm(p => ({ ...p, title: e.target.value }))} placeholder="e.g. Week 1 Replay — Cardiac Assessment" />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-1 block">Video URL</Label>
+                <Input value={recordingForm.videoUrl} onChange={e => setRecordingForm(p => ({ ...p, videoUrl: e.target.value }))} placeholder="https://vimeo.com/... or https://youtube.com/..." />
+                <p className="text-xs text-gray-400 mt-1">Paste a Vimeo, YouTube, Wistia, or direct MP4 URL. Students will watch it in an embedded player.</p>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-1 block">Thumbnail URL (optional)</Label>
+                <Input value={recordingForm.thumbnailUrl} onChange={e => setRecordingForm(p => ({ ...p, thumbnailUrl: e.target.value }))} placeholder="https://..." />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-1 block">Duration (seconds)</Label>
+                  <Input type="number" min={0} value={recordingForm.durationSeconds} onChange={e => setRecordingForm(p => ({ ...p, durationSeconds: parseInt(e.target.value) || 0 }))} />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-1 block">Link to Session (optional)</Label>
+                  <Select value={recordingForm.sessionId?.toString() ?? ""} onValueChange={v => setRecordingForm(p => ({ ...p, sessionId: v ? parseInt(v) : null }))}>
+                    <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">None</SelectItem>
+                      {(sessions as CohortSession[]).map(s => (
+                        <SelectItem key={s.id} value={s.id.toString()}>{s.title}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-1 block">Description</Label>
+                <textarea value={recordingForm.description} onChange={e => setRecordingForm(p => ({ ...p, description: e.target.value }))} rows={3} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="What was covered in this session..." />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-1 block">Status</Label>
+                <Select value={recordingForm.status} onValueChange={v => setRecordingForm(p => ({ ...p, status: v as "draft" | "published" }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Draft (hidden from students)</SelectItem>
+                    <SelectItem value="published">Published (visible to enrolled students)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 p-5 border-t border-gray-100">
+              <Button variant="outline" onClick={() => setRecordingDialog({ open: false })}>Cancel</Button>
+              <Button className="bg-teal-600 hover:bg-teal-700 text-white"
+                disabled={createRecording.isPending || updateRecording.isPending}
+                onClick={handleSaveRecording}>
+                {(createRecording.isPending || updateRecording.isPending) ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />Saving...</> : recordingDialog.recording ? "Save Changes" : "Add Recording"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Session Dialog */}
       {sessionDialog.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -8111,6 +8335,36 @@ function CohortTab({ courseId }: { courseId: number }) {
                   <Input type="number" min={1} value={sessionForm.durationMinutes} onChange={e => setSessionForm(p => ({ ...p, durationMinutes: parseInt(e.target.value) || 60 }))} />
                 </div>
               </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-1 block">Timezone</Label>
+                <Select value={sessionForm.timezone} onValueChange={v => setSessionForm(p => ({ ...p, timezone: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {COMMON_TIMEZONES.map(tz => (
+                      <SelectItem key={tz} value={tz}>{tz}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-1 block">Recurrence</Label>
+                <Select value={sessionForm.recurrenceRule} onValueChange={v => setSessionForm(p => ({ ...p, recurrenceRule: v as "" | "weekly" | "biweekly" | "monthly" }))}>
+                  <SelectTrigger><SelectValue placeholder="No recurrence" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No recurrence (one-time)</SelectItem>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="biweekly">Bi-weekly (every 2 weeks)</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {sessionForm.recurrenceRule && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-1 block">Recurrence End Date</Label>
+                  <Input type="date" value={sessionForm.recurrenceEndDate} onChange={e => setSessionForm(p => ({ ...p, recurrenceEndDate: e.target.value }))} />
+                  <p className="text-xs text-gray-400 mt-1">Sessions will be auto-expanded up to this date. You can also expand them manually after saving.</p>
+                </div>
+              )}
               <div>
                 <Label className="text-sm font-medium text-gray-700 mb-1 block">Meeting URL</Label>
                 <Input value={sessionForm.meetingUrl} onChange={e => setSessionForm(p => ({ ...p, meetingUrl: e.target.value }))} placeholder="https://zoom.us/j/..." />
@@ -8157,26 +8411,34 @@ function CohortTab({ courseId }: { courseId: number }) {
 
       {/* Assignment Dialog */}
       {assignDialog.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-5 border-b border-gray-100">
-              <h3 className="font-bold text-gray-900">{assignDialog.assignment ? "Edit Assignment" : "Add Assignment"}</h3>
+        <div className="fixed inset-0 z-50 flex flex-col bg-white overflow-hidden">
+          {/* Top bar */}
+          <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 bg-white shrink-0">
+            <div className="flex items-center gap-3">
               <Button size="sm" variant="ghost" onClick={() => setAssignDialog({ open: false })}><X className="w-4 h-4" /></Button>
+              <h3 className="font-bold text-gray-900 text-base">{assignDialog.assignment ? "Edit Assignment" : "New Assignment"}</h3>
             </div>
-            <div className="p-5 space-y-4">
+            <Button className="bg-teal-600 hover:bg-teal-700 text-white"
+              disabled={createAssignment.isPending || updateAssignment.isPending}
+              onClick={handleSaveAssignment}>
+              {(createAssignment.isPending || updateAssignment.isPending) ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />Saving...</> : assignDialog.assignment ? "Save Changes" : "Create Assignment"}
+            </Button>
+          </div>
+          {/* Two-column layout: settings left, block editor right */}
+          <div className="flex flex-1 overflow-hidden">
+            {/* Settings panel */}
+            <div className="w-80 shrink-0 border-r border-gray-200 overflow-y-auto p-5 space-y-4 bg-gray-50">
               <div>
                 <Label className="text-sm font-medium text-gray-700 mb-1 block">Assignment Title *</Label>
                 <Input value={assignForm.title} onChange={e => setAssignForm(p => ({ ...p, title: e.target.value }))} placeholder="e.g. Case Study: Aortic Stenosis Assessment" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-1 block">Due Date</Label>
-                  <Input type="datetime-local" value={assignForm.dueDate} onChange={e => setAssignForm(p => ({ ...p, dueDate: e.target.value }))} />
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-1 block">Max Points</Label>
-                  <Input type="number" min={0} value={assignForm.maxPoints} onChange={e => setAssignForm(p => ({ ...p, maxPoints: parseInt(e.target.value) || 0 }))} />
-                </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-1 block">Due Date</Label>
+                <Input type="datetime-local" value={assignForm.dueDate} onChange={e => setAssignForm(p => ({ ...p, dueDate: e.target.value }))} />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-1 block">Max Points</Label>
+                <Input type="number" min={0} value={assignForm.maxPoints} onChange={e => setAssignForm(p => ({ ...p, maxPoints: parseInt(e.target.value) || 0 }))} />
               </div>
               <div>
                 <Label className="text-sm font-medium text-gray-700 mb-1 block">Submission Type</Label>
@@ -8191,10 +8453,6 @@ function CohortTab({ courseId }: { courseId: number }) {
                 </Select>
               </div>
               <div>
-                <Label className="text-sm font-medium text-gray-700 mb-1 block">Description / Instructions</Label>
-                <textarea value={assignForm.description} onChange={e => setAssignForm(p => ({ ...p, description: e.target.value }))} rows={4} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Describe the assignment and what students need to do..." />
-              </div>
-              <div>
                 <Label className="text-sm font-medium text-gray-700 mb-1 block">Status</Label>
                 <Select value={assignForm.status} onValueChange={v => setAssignForm(p => ({ ...p, status: v as "draft" | "published" }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -8204,22 +8462,25 @@ function CohortTab({ courseId }: { courseId: number }) {
                   </SelectContent>
                 </Select>
               </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-1 block">Brief Description (optional)</Label>
+                <textarea value={assignForm.description} onChange={e => setAssignForm(p => ({ ...p, description: e.target.value }))} rows={3} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Short summary shown in the assignment list..." />
+              </div>
               {!assignDialog.assignment && (
                 <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                   <input type="checkbox" id="assign-notify" checked={assignForm.notifyStudents} onChange={e => setAssignForm(p => ({ ...p, notifyStudents: e.target.checked }))} className="w-4 h-4 accent-teal-600" />
                   <label htmlFor="assign-notify" className="text-sm text-amber-800 cursor-pointer">
-                    <span className="font-medium">Notify enrolled students</span> — send email with assignment details when status is Published
+                    <span className="font-medium">Notify enrolled students</span> — send email when status is Published
                   </label>
                 </div>
               )}
             </div>
-            <div className="flex justify-end gap-2 p-5 border-t border-gray-100">
-              <Button variant="outline" onClick={() => setAssignDialog({ open: false })}>Cancel</Button>
-              <Button className="bg-teal-600 hover:bg-teal-700 text-white"
-                disabled={createAssignment.isPending || updateAssignment.isPending}
-                onClick={handleSaveAssignment}>
-                {(createAssignment.isPending || updateAssignment.isPending) ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />Saving...</> : assignDialog.assignment ? "Save Changes" : "Create Assignment"}
-              </Button>
+            {/* Block editor */}
+            <div className="flex-1 overflow-y-auto bg-white">
+              <AssignmentBlockEditor
+                blocks={assignForm.contentBlocks}
+                onChange={blocks => setAssignForm(p => ({ ...p, contentBlocks: blocks }))}
+              />
             </div>
           </div>
         </div>

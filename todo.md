@@ -3487,3 +3487,53 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Data Table block: add 'data_table' BlockType, DataTableBlockPreview component, BLOCK_CATALOG entry in Content category
 - [x] Data Table block: BlockSettings editor (add/remove rows/columns, cell editing, style controls)
 - [x] Cohort admin notifications: send email to enrolled students when session/assignment is published (with send toggle)
+
+## Assignment Submissions & Data Table Paste (May 2026)
+- [ ] DB: lms_cohort_submissions table (id, assignmentId, userId, submissionType, textContent, fileUrl, fileKey, urlContent, status, submittedAt, updatedAt)
+- [ ] Server: createSubmission, getMySubmission, updateSubmission, listSubmissions (admin) procedures
+- [ ] Client: CohortSchedule assignments tab — show submission form per assignment (text/file/url based on submissionType)
+- [ ] Client: CohortSchedule — show submission status badge (Not submitted / Submitted / Graded)
+- [ ] Client: Data Table block editor — "Paste from spreadsheet" button that parses TSV clipboard content into table rows
+- [x] DB: add recurrence columns to lms_cohort_sessions (recurrenceRule, recurrenceInterval, recurrenceEndDate, parentSessionId)
+- [ ] Server: expandRecurringSessions procedure — generates child session rows from a parent recurring session
+- [ ] Admin UI: Add Session dialog — recurrence toggle with frequency (weekly/biweekly/monthly), interval, end date, and "Expand to instances" button
+- [ ] Admin UI: sessions list — show recurrence badge on recurring sessions; child sessions show parent link
+- [ ] Student UI: CohortSchedule — recurring sessions grouped/labeled naturally (Week 1, Week 2, etc.)
+- [x] DB: add timezone column to lms_cohort_sessions (IANA timezone string, e.g. "America/New_York")
+- [ ] Admin UI: timezone picker in Add/Edit Session dialog (searchable IANA timezone list)
+- [ ] Student UI: CohortSchedule — display session times in the session's timezone with user's local time in parentheses
+- [x] DB: lms_cohort_recordings table (id, courseId, sessionId nullable, title, description, videoUrl, thumbnailUrl, durationSeconds, publishedAt, status, position)
+- [ ] Server: createRecording, updateRecording, deleteRecording, listRecordings (admin); getRecordingsForCohort (learner)
+- [ ] Admin UI: Recordings tab in cohort admin panel — upload video to S3, set title/description/thumbnail, link to session
+- [ ] Student UI: Replays tab on /cohort/:id — grid of recordings with video player modal
+
+## Assignment Page Builder (May 2026)
+- [ ] DB: add contentBlocks JSON column to lms_cohort_assignments
+- [ ] DB: add fileUrl, fileKey, grade, feedback, gradedAt, gradedBy to lms_cohort_submissions
+- [ ] Server: update createCohortAssignment/updateCohortAssignment to accept contentBlocks
+- [ ] Server: add getAssignmentDetail procedure (public blocks + submission for current user)
+- [ ] Server: add gradeSubmission procedure (admin only)
+- [ ] Admin UI: replace description textarea with full LessonBlockEditor in assignment dialog
+- [ ] Admin UI: settings panel for due date, points, submission type alongside block editor
+- [ ] Student UI: AssignmentDetail page /cohort/:courseId/assignment/:assignmentId
+- [ ] Student UI: block content renderer (same as lesson player)
+- [ ] Student UI: submission form (text/file/URL) with file upload to S3
+- [ ] Student UI: submission status badge (pending/submitted/graded) + grade display
+- [ ] Route: /cohort/:courseId/assignment/:assignmentId in App.tsx
+- [ ] AssignmentCard in CohortSchedule links to detail page
+- [ ] Admin: submissions list view per assignment with grade input
+- [ ] CohortSchedule: add Replays tab for recordings
+- [ ] Data Table block: paste from clipboard (spreadsheet)
+
+## File Upload Content Block (May 2026)
+- [ ] DB: media_upload_responses table (id, userId, blockId, pageId, pageType, fileUrl, fileKey, fileName, mimeType, folderId, createdAt)
+- [ ] DB: media_upload_folders table (id, name, description, createdBy, createdAt)
+- [ ] Server: uploadToMediaFolder procedure (creates folder if needed, stores response)
+- [ ] Server: listMediaUploadResponses procedure (admin: list by folder/page/user)
+- [ ] BlockType: add file_upload to union in BlockPreview.tsx
+- [ ] Block settings: label, instructions, accepted file types, max size, folder name (for non-assignment use)
+- [ ] BlockPreview: file_upload block preview in page builder
+- [ ] FileUploadBlock component: context-aware (assignment vs page), S3 upload, progress bar
+- [ ] In assignment context: stores to lms_cohort_submissions.file_url
+- [ ] In page context: stores to media_upload_responses with folder
+- [ ] Admin: media upload responses viewer (by folder, by page, by user)

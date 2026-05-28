@@ -1,5 +1,6 @@
 import {
   boolean,
+  decimal,
   int,
   json,
   longtext,
@@ -4838,6 +4839,15 @@ export const lmsCohortSessions = mysqlTable("lms_cohort_sessions", {
   recordingUrl: text("recording_url"),
   // draft = not yet visible to students; published = visible; cancelled = cancelled
   status: mysqlEnum("status", ["draft", "published", "cancelled"]).default("draft").notNull(),
+  // IANA timezone string for this session (e.g. "America/New_York", "Europe/London")
+  timezone: varchar("timezone", { length: 64 }).default("America/New_York"),
+  // ── Recurrence ──────────────────────────────────────────────────────────────
+  // recurrenceRule: weekly | biweekly | monthly | null (one-off)
+  recurrenceRule: mysqlEnum("recurrence_rule", ["weekly", "biweekly", "monthly"]),
+  recurrenceInterval: int("recurrence_interval").default(1), // multiplier (reserved for future use)
+  recurrenceEndDate: timestamp("recurrence_end_date"),       // inclusive last occurrence date
+  // parentSessionId links child instances back to the template/parent session
+  parentSessionId: int("parent_session_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -4849,6 +4859,7 @@ export const lmsCohortAssignments = mysqlTable("lms_cohort_assignments", {
   courseId: int("course_id").notNull(),
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
+  contentBlocks: json("content_blocks").$type<any[]>(),  // page-builder blocks
   dueDate: timestamp("due_date"),
   maxPoints: int("max_points").default(100).notNull(),
   // text = typed submission; file = file upload; url = link submission; none = no submission required
@@ -4861,3 +4872,72 @@ export const lmsCohortAssignments = mysqlTable("lms_cohort_assignments", {
 });
 export type LmsCohortAssignment = typeof lmsCohortAssignments.$inferSelect;
 export type InsertLmsCohortAssignment = typeof lmsCohortAssignments.$inferInsert;
+
+// ─── Cohort Recordings ──────────────────────────────────────────────────────
+export const lmsCohortRecordings = mysqlTable("lms_cohort_recordings", {
+  id: int("id").autoincrement().primaryKey(),
+  courseId: int("course_id").notNull(),
+  sessionId: int("session_id"),           // optional link to a live session
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  videoUrl: text("video_url"),
+  thumbnailUrl: text("thumbnail_url"),
+  durationSeconds: int("duration_seconds"),
+  status: mysqlEnum("status", ["draft", "published"]).default("draft").notNull(),
+  position: int("position").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type LmsCohortRecording = typeof lmsCohortRecordings.$inferSelect;
+export type InsertLmsCohortRecording = typeof lmsCohortRecordings.$inferInsert;
+
+// ─── Cohort Assignment Submissions ───────────────────────────────────────────
+export const lmsCohortSubmissions = mysqlTable("lms_cohort_submissions", {
+  id: int("id").autoincrement().primaryKey(),
+  assignmentId: int("assignment_id").notNull(),
+  userId: int("user_id").notNull(),
+  // mirrors assignment submissionType
+  submissionType: mysqlEnum("submission_type", ["text", "file", "url", "none"]).default("none").notNull(),
+  textContent: text("text_content"),
+  fileUrl: text("file_url"),
+  fileKey: varchar("file_key", { length: 512 }),
+  urlContent: text("url_content"),
+  // pending = submitted, awaiting review; graded = instructor has reviewed
+  status: mysqlEnum("status", ["pending", "graded"]).default("pending").notNull(),
+  grade: decimal("grade", { precision: 6, scale: 2 }),  // optional numeric grade
+  feedback: text("feedback"),    // optional instructor feedback
+  gradedAt: bigint("graded_at", { mode: "number" }),
+  gradedBy: int("graded_by"),
+  submittedAt: timestamp("submitted_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type LmsCohortSubmission = typeof lmsCohortSubmissions.$inferSelect;
+export type InsertLmsCohortSubmission = typeof lmsCohortSubmissions.$inferInsert;
+
+// ─── Media Upload Folders & Responses ────────────────────────────────────────
+export const mediaUploadFolders = mysqlTable("media_upload_folders", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  createdBy: int("created_by"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+});
+export type MediaUploadFolder = typeof mediaUploadFolders.$inferSelect;
+export type InsertMediaUploadFolder = typeof mediaUploadFolders.$inferInsert;
+
+export const mediaUploadResponses = mysqlTable("media_upload_responses", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  blockId: varchar("block_id", { length: 128 }),   // block ID from page builder
+  pageId: varchar("page_id", { length: 128 }),      // page/funnel/course slug or ID
+  pageType: varchar("page_type", { length: 64 }),   // landing|funnel|lesson|cohort_assignment|other
+  folderId: int("folder_id"),
+  fileUrl: varchar("file_url", { length: 1024 }).notNull(),
+  fileKey: varchar("file_key", { length: 512 }).notNull(),
+  fileName: varchar("file_name", { length: 512 }),
+  mimeType: varchar("mime_type", { length: 128 }),
+  fileSize: int("file_size"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+});
+export type MediaUploadResponse = typeof mediaUploadResponses.$inferSelect;
+export type InsertMediaUploadResponse = typeof mediaUploadResponses.$inferInsert;

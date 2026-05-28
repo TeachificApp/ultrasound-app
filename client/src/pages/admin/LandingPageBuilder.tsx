@@ -404,6 +404,17 @@ BLOCK_CATALOG.push(
       accentColor: "#189aa1",
       bgColor: "#f8fafc",
     } },
+  { type: "file_upload", label: "File Upload", icon: <Upload size={14} />, category: "Content",
+    defaultData: {
+      label: "Upload Your File",
+      instructions: "Please upload your completed work below.",
+      acceptedTypes: "PDF, Word, Images",
+      maxSizeMb: 10,
+      folderName: "",
+      accentColor: "#0d9488",
+      bgColor: "#f8fafc",
+      borderColor: "#e2e8f0",
+    } },
 );
 
 // ─── Extra catalog entries ────────────────────────────────────────────────────
@@ -4440,6 +4451,23 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
             <button onClick={addRow} className="px-2 py-1 text-xs bg-teal-50 text-teal-700 border border-teal-200 rounded hover:bg-teal-100">+ Row</button>
             <button onClick={addCol} className="px-2 py-1 text-xs bg-teal-50 text-teal-700 border border-teal-200 rounded hover:bg-teal-100">+ Column</button>
             <button onClick={removeCol} className="px-2 py-1 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100">− Last Column</button>
+            <button
+              onClick={async () => {
+                try {
+                  const text = await navigator.clipboard.readText();
+                  const splitLines = text.trim().split("\n").map((l: string) => l.replace(/\r$/, ""));
+                  const parsed = splitLines.map((line: string) => line.split("\t"));
+                  if (parsed.length > 0 && parsed[0].length > 0) {
+                    set("rows", parsed);
+                  }
+                } catch {
+                  alert("Could not read clipboard. Copy cells from Excel or Google Sheets first, then try again.");
+                }
+              }}
+              className="px-2 py-1 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100"
+            >
+              Paste from Spreadsheet
+            </button>
           </div>
           {/* Style controls */}
           <div className="flex items-center gap-2">
@@ -4471,6 +4499,23 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
             <label className="text-xs text-gray-500 block mb-1">Font Size (px)</label>
             <input type="number" value={d.fontSize ?? 14} onChange={e => set("fontSize", Number(e.target.value))} className="w-full h-8 text-xs rounded border border-gray-200 px-2" min={10} max={24} />
           </div>
+        </div>
+      );
+    }
+    case "file_upload": {
+      return (
+        <div className="space-y-3">
+          <BSTextField data={d} onSet={set} label="Label / Heading" field="label" />
+          <BSTextField data={d} onSet={set} label="Instructions" field="instructions" />
+          <BSTextField data={d} onSet={set} label="Accepted File Types (display text)" field="acceptedTypes" />
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Max File Size (MB)</label>
+            <input type="number" value={d.maxSizeMb ?? 10} onChange={e => set("maxSizeMb", Number(e.target.value))} className="w-full h-8 text-xs rounded border border-gray-200 px-2" min={1} max={100} />
+          </div>
+          <BSTextField data={d} onSet={set} label="Media Library Folder Name (leave blank to use page name)" field="folderName" />
+          <p className="text-[10px] text-gray-400">When used in an assignment, uploaded files are stored to the student's submission. On other pages, files go to the named folder in the Media Library.</p>
+          <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />
+          <BSColorField data={d} onSet={set} label="Background Color" field="bgColor" />
         </div>
       );
     }

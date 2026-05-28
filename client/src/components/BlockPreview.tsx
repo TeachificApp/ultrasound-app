@@ -78,7 +78,8 @@ export type BlockType =
   | "cohort_class"
   | "lesson_assignment"
   | "upgrade_prompt"
-  | "data_table";
+  | "data_table"
+  | "file_upload";
 
 export interface Block {
   id: string;
@@ -1237,6 +1238,8 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       return <UpgradePromptBlockPreview d={d} />;
     case "data_table":
       return <DataTableBlockPreview d={d} />;
+    case "file_upload":
+      return <FileUploadBlockPreview d={d} />;
     default:
       return <div className="px-8 py-4 text-gray-400 text-sm text-center">Block preview not available</div>;
   }
@@ -2249,6 +2252,49 @@ function DataTableBlockPreview({ d }: { d: Record<string, any> }) {
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// ─── File Upload Block Preview ────────────────────────────────────────────────
+function FileUploadBlockPreview({ d }: { d: Record<string, any> }) {
+  const label = d.label ?? "Upload Your File";
+  const instructions = d.instructions ?? "";
+  const acceptedTypes = d.acceptedTypes ?? "Any file type";
+  const maxSizeMb = d.maxSizeMb ?? 10;
+  const bgColor = d.bgColor ?? "#f8fafc";
+  const accentColor = d.accentColor ?? "#0d9488";
+  const borderColor = d.borderColor ?? "#e2e8f0";
+
+  return (
+    <div className="px-8 py-10" style={{ backgroundColor: bgColor }}>
+      <div className="max-w-xl mx-auto">
+        {label && (
+          <h3 className="text-lg font-semibold mb-2" style={{ color: "#111827" }}>{label}</h3>
+        )}
+        {instructions && (
+          <p className="text-sm text-gray-500 mb-4">{instructions}</p>
+        )}
+        <div
+          className="rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-3 py-10 px-6 text-center"
+          style={{ borderColor: accentColor, backgroundColor: "#fff" }}
+        >
+          <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: accentColor + "18" }}>
+            <Upload size={22} style={{ color: accentColor }} />
+          </div>
+          <div>
+            <p className="font-medium text-gray-700">Click to upload or drag & drop</p>
+            <p className="text-xs text-gray-400 mt-1">{acceptedTypes} · Max {maxSizeMb} MB</p>
+          </div>
+          <button
+            className="mt-1 px-5 py-2 rounded-lg text-sm font-semibold text-white"
+            style={{ backgroundColor: accentColor }}
+            disabled
+          >
+            Choose File
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
