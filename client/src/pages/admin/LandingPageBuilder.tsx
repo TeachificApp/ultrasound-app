@@ -905,6 +905,9 @@ function CTAActionPicker({
   onCheckoutProductChange,
   groupDiscountTiersValue,
   onGroupDiscountTiersChange,
+  pricingOptionIdValue,
+  onPricingOptionChange,
+  pricingOptionCourseIdValue,
 }: {
   label?: string;
   behaviorValue: string;
