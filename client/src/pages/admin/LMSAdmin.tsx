@@ -7866,6 +7866,7 @@ function CohortTab({ courseId }: { courseId: number }) {
   const [sessionForm, setSessionForm] = useState({
     title: "", description: "", sessionDate: "", durationMinutes: 60,
     meetingUrl: "", recordingUrl: "", status: "draft" as "draft" | "published" | "cancelled",
+    notifyStudents: false,
   });
 
   const openSessionDialog = (session?: CohortSession) => {
@@ -7880,9 +7881,10 @@ function CohortTab({ courseId }: { courseId: number }) {
         meetingUrl: session.meetingUrl ?? "",
         recordingUrl: session.recordingUrl ?? "",
         status: session.status,
+        notifyStudents: false,
       });
     } else {
-      setSessionForm({ title: "", description: "", sessionDate: "", durationMinutes: 60, meetingUrl: "", recordingUrl: "", status: "draft" });
+      setSessionForm({ title: "", description: "", sessionDate: "", durationMinutes: 60, meetingUrl: "", recordingUrl: "", status: "draft", notifyStudents: false });
     }
     setSessionDialog({ open: true, session });
   };
@@ -7903,7 +7905,7 @@ function CohortTab({ courseId }: { courseId: number }) {
     if (sessionDialog.session) {
       updateSession.mutate({ id: sessionDialog.session.id, ...payload }, { onSuccess: () => setSessionDialog({ open: false }) });
     } else {
-      createSession.mutate({ courseId, ...payload }, { onSuccess: () => setSessionDialog({ open: false }) });
+      createSession.mutate({ courseId, ...payload, notifyStudents: sessionForm.notifyStudents }, { onSuccess: () => setSessionDialog({ open: false }) });
     }
   };
 
@@ -7913,6 +7915,7 @@ function CohortTab({ courseId }: { courseId: number }) {
     title: "", description: "", dueDate: "", maxPoints: 100,
     submissionType: "none" as "text" | "file" | "url" | "none",
     status: "draft" as "draft" | "published",
+    notifyStudents: false,
   });
 
   const openAssignDialog = (assignment?: CohortAssignment) => {
@@ -7926,9 +7929,10 @@ function CohortTab({ courseId }: { courseId: number }) {
         maxPoints: assignment.maxPoints,
         submissionType: assignment.submissionType,
         status: assignment.status,
+        notifyStudents: false,
       });
     } else {
-      setAssignForm({ title: "", description: "", dueDate: "", maxPoints: 100, submissionType: "none", status: "draft" });
+      setAssignForm({ title: "", description: "", dueDate: "", maxPoints: 100, submissionType: "none", status: "draft", notifyStudents: false });
     }
     setAssignDialog({ open: true, assignment });
   };
@@ -7946,7 +7950,7 @@ function CohortTab({ courseId }: { courseId: number }) {
     if (assignDialog.assignment) {
       updateAssignment.mutate({ id: assignDialog.assignment.id, ...payload }, { onSuccess: () => setAssignDialog({ open: false }) });
     } else {
-      createAssignment.mutate({ courseId, ...payload }, { onSuccess: () => setAssignDialog({ open: false }) });
+      createAssignment.mutate({ courseId, ...payload, notifyStudents: assignForm.notifyStudents }, { onSuccess: () => setAssignDialog({ open: false }) });
     }
   };
 
@@ -8130,6 +8134,14 @@ function CohortTab({ courseId }: { courseId: number }) {
                   </SelectContent>
                 </Select>
               </div>
+              {!sessionDialog.session && (
+                <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <input type="checkbox" id="session-notify" checked={sessionForm.notifyStudents} onChange={e => setSessionForm(p => ({ ...p, notifyStudents: e.target.checked }))} className="w-4 h-4 accent-teal-600" />
+                  <label htmlFor="session-notify" className="text-sm text-amber-800 cursor-pointer">
+                    <span className="font-medium">Notify enrolled students</span> — send email with session details when status is Published
+                  </label>
+                </div>
+              )}
             </div>
             <div className="flex justify-end gap-2 p-5 border-t border-gray-100">
               <Button variant="outline" onClick={() => setSessionDialog({ open: false })}>Cancel</Button>
@@ -8192,6 +8204,14 @@ function CohortTab({ courseId }: { courseId: number }) {
                   </SelectContent>
                 </Select>
               </div>
+              {!assignDialog.assignment && (
+                <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <input type="checkbox" id="assign-notify" checked={assignForm.notifyStudents} onChange={e => setAssignForm(p => ({ ...p, notifyStudents: e.target.checked }))} className="w-4 h-4 accent-teal-600" />
+                  <label htmlFor="assign-notify" className="text-sm text-amber-800 cursor-pointer">
+                    <span className="font-medium">Notify enrolled students</span> — send email with assignment details when status is Published
+                  </label>
+                </div>
+              )}
             </div>
             <div className="flex justify-end gap-2 p-5 border-t border-gray-100">
               <Button variant="outline" onClick={() => setAssignDialog({ open: false })}>Cancel</Button>

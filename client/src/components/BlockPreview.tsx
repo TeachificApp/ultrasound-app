@@ -77,7 +77,8 @@ export type BlockType =
   | "form_embed"
   | "cohort_class"
   | "lesson_assignment"
-  | "upgrade_prompt";
+  | "upgrade_prompt"
+  | "data_table";
 
 export interface Block {
   id: string;
@@ -1234,6 +1235,8 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       return <FormEmbedBlockPreview d={d} />;
     case "upgrade_prompt":
       return <UpgradePromptBlockPreview d={d} />;
+    case "data_table":
+      return <DataTableBlockPreview d={d} />;
     default:
       return <div className="px-8 py-4 text-gray-400 text-sm text-center">Block preview not available</div>;
   }
@@ -2191,6 +2194,61 @@ function UpgradePromptBlockPreview({ d }: { d: Record<string, any> }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Data Table Block Preview ─────────────────────────────────────────────────
+function DataTableBlockPreview({ d }: { d: Record<string, any> }) {
+  const rows: string[][] = d.rows ?? [["Header 1", "Header 2", "Header 3"], ["Cell 1", "Cell 2", "Cell 3"]];
+  const hasHeader = d.hasHeader !== false;
+  const bordered = d.bordered !== false;
+  const striped = d.striped !== false;
+  const caption = d.caption ?? "";
+  const bgColor = d.bgColor ?? "#ffffff";
+  const headerBg = d.headerBg ?? "#f0fafa";
+  const headerTextColor = d.headerTextColor ?? "#0e4a50";
+  const borderColor = d.borderColor ?? "#d1fae5";
+  const fontSize = d.fontSize ?? 14;
+  const textAlign = d.textAlign ?? "left";
+
+  if (!rows || rows.length === 0) {
+    return <div className="px-8 py-6 text-gray-400 text-sm text-center">No table data yet. Click to edit.</div>;
+  }
+
+  return (
+    <div className="px-4 py-6 overflow-x-auto" style={{ backgroundColor: bgColor }}>
+      {caption && <p className="text-center text-sm text-gray-500 mb-2 italic">{caption}</p>}
+      <table className="w-full" style={{ fontSize, borderCollapse: "collapse" }}>
+        <tbody>
+          {rows.map((row, ri) => {
+            const isHeader = hasHeader && ri === 0;
+            const isStriped = striped && !isHeader && ri % 2 === 0;
+            return (
+              <tr key={ri} style={{ backgroundColor: isHeader ? headerBg : isStriped ? "#f9fafb" : "transparent" }}>
+                {row.map((cell, ci) => {
+                  const Tag = isHeader ? "th" : "td";
+                  return (
+                    <Tag
+                      key={ci}
+                      style={{
+                        padding: "8px 12px",
+                        textAlign: textAlign as any,
+                        fontWeight: isHeader ? 600 : 400,
+                        color: isHeader ? headerTextColor : "#374151",
+                        border: bordered ? `1px solid ${borderColor}` : "none",
+                        borderBottom: !bordered ? `1px solid ${borderColor}` : undefined,
+                      }}
+                    >
+                      {cell}
+                    </Tag>
+                  );
+                })}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

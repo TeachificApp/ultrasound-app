@@ -870,6 +870,25 @@ export default function CourseLanding() {
   const pricingType = course.pricingType ?? (course.isFree ? "free" : "one_time");
   const isEnrollmentClosed = !enrollment && course.enrollmentCloseDate && new Date(course.enrollmentCloseDate) < new Date();
   const ctaText = enrollment ? "Continue Learning" : isEnrollmentClosed ? "Enrollment Closed" : (lp?.ctaText ?? "Enroll Now");
+
+  // Enrollment countdown: days remaining until close (only for cohorts, not yet closed, not enrolled)
+  const enrollmentCountdownDays = (() => {
+    if (enrollment || isEnrollmentClosed || !course.enrollmentCloseDate) return null;
+    const diff = new Date(course.enrollmentCloseDate).getTime() - Date.now();
+    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+    return days > 0 && days <= 30 ? days : null; // show banner up to 30 days out
+  })();
+
+  const EnrollmentCountdownBanner = enrollmentCountdownDays !== null ? (
+    <div className="w-full bg-amber-50 border-b border-amber-200 py-2.5 px-4">
+      <div className="max-w-5xl mx-auto flex items-center justify-center gap-2 text-sm font-medium text-amber-800">
+        <span className="text-amber-500">⏳</span>
+        {enrollmentCountdownDays === 1
+          ? "Enrollment closes tomorrow — last chance to join this cohort!"
+          : `Enrollment closes in ${enrollmentCountdownDays} day${enrollmentCountdownDays === 1 ? "" : "s"} — secure your spot now.`}
+      </div>
+    </div>
+  ) : null;
   const totalLessons = (course.sections ?? []).reduce((sum: number, s: any) => sum + (s.lessons?.length ?? 0), 0)
     + ((course as any).topLevelLessons?.length ?? 0);
   const totalDuration = (course.sections ?? []).reduce((sum: number, s: any) =>
@@ -885,6 +904,7 @@ export default function CourseLanding() {
   if (blocks.length > 0) {
     return (
       <div className="min-h-screen bg-white">
+        {EnrollmentCountdownBanner}
         {blocks.map(block => {
           // Full-bleed block types must never be wrapped in a contentWidth constraint at the outer level.
           const FULL_BLEED_TYPES_CL = ["hero", "pricing_cta", "cta_standalone", "divider", "spacer", "footer", "logo_strip", "urgency_offer", "product_offer_stack", "price_stack", "image_content"];
@@ -941,6 +961,7 @@ export default function CourseLanding() {
 
   return (
     <>
+    {EnrollmentCountdownBanner}
     <div className="min-h-screen bg-gray-50">
       {/* Breadcrumb */}
       <div className="bg-white border-b border-gray-100">

@@ -3480,3 +3480,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Server: check enrollmentCloseDate in funnelRouter checkout — reject if past
 - [x] Client: CourseLanding shows "Enrollment Closed" badge when past enrollmentCloseDate
 - [x] Client: CourseLanding disables/hides all purchase buttons when enrollment is closed
+
+## Build Fix & New Features (May 2026)
+- [x] Fix deployment build error: wrong useAuth import path in CohortSchedule.tsx (@/hooks/useAuth → @/_core/hooks/useAuth)
+- [x] CourseLanding: enrollment countdown banner (shows "Enrollment closes in N days" for cohorts within 30 days of close)
+- [x] Data Table block: add 'data_table' BlockType, DataTableBlockPreview component, BLOCK_CATALOG entry in Content category
+- [x] Data Table block: BlockSettings editor (add/remove rows/columns, cell editing, style controls)
+- [x] Cohort admin notifications: send email to enrolled students when session/assignment is published (with send toggle)

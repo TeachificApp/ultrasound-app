@@ -4861,6 +4861,7 @@ CRITICAL REQUIREMENTS:
       meetingUrl: z.string().optional(),
       recordingUrl: z.string().optional(),
       status: z.enum(["draft", "published", "cancelled"]).default("draft"),
+      notifyStudents: z.boolean().default(false),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -4876,6 +4877,43 @@ CRITICAL REQUIREMENTS:
         recordingUrl: input.recordingUrl ?? null,
         status: input.status,
       }).$returningId();
+
+      // Notify enrolled students if requested
+      if (input.notifyStudents && input.status === "published") {
+        try {
+          const [course] = await db.select({ title: lmsCourses.title, slug: lmsCourses.slug }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+          const enrolledUsers = await db
+            .select({ email: users.email, name: users.name })
+            .from(lmsEnrollments)
+            .innerJoin(users, eq(users.id, lmsEnrollments.userId))
+            .where(eq(lmsEnrollments.courseId, input.courseId));
+          const sessionDateStr = new Date(input.sessionDate).toLocaleString("en-US", { dateStyle: "full", timeStyle: "short", timeZone: "America/New_York" });
+          for (const u of enrolledUsers) {
+            if (!u.email) continue;
+            await sendEmail({
+              to: u.email,
+              subject: `New Live Session: ${input.title} — ${course?.title ?? "Your Course"}`,
+              html: `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;">
+                <h2 style="color:#0e4a50;">New Live Session Added</h2>
+                <p>Hi ${u.name ?? "there"},</p>
+                <p>A new live session has been scheduled for <strong>${course?.title ?? "your cohort course"}</strong>:</p>
+                <table style="border-collapse:collapse;width:100%;margin:16px 0;">
+                  <tr><td style="padding:8px 12px;background:#f0fafa;font-weight:600;border:1px solid #d1fae5;">Session</td><td style="padding:8px 12px;border:1px solid #d1fae5;">${input.title}</td></tr>
+                  <tr><td style="padding:8px 12px;background:#f0fafa;font-weight:600;border:1px solid #d1fae5;">Date &amp; Time</td><td style="padding:8px 12px;border:1px solid #d1fae5;">${sessionDateStr} ET</td></tr>
+                  <tr><td style="padding:8px 12px;background:#f0fafa;font-weight:600;border:1px solid #d1fae5;">Duration</td><td style="padding:8px 12px;border:1px solid #d1fae5;">${input.durationMinutes} minutes</td></tr>
+                  ${input.meetingUrl ? `<tr><td style="padding:8px 12px;background:#f0fafa;font-weight:600;border:1px solid #d1fae5;">Join Link</td><td style="padding:8px 12px;border:1px solid #d1fae5;"><a href="${input.meetingUrl}" style="color:#0d9488;">Click to join</a></td></tr>` : ""}
+                </table>
+                ${input.description ? `<p style="color:#475569;">${input.description}</p>` : ""}
+                <p><a href="https://members.allaboutultrasound.com/cohort/${input.courseId}" style="display:inline-block;padding:10px 20px;background:#0d9488;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;">View Your Schedule</a></p>
+                <p style="color:#94a3b8;font-size:12px;">All About Ultrasound™</p>
+              </div>`,
+            });
+          }
+        } catch (e) {
+          console.error("[cohortSession] Failed to send student notifications:", e);
+        }
+      }
+
       return { id: result.id };
     }),
 
@@ -4935,6 +4973,7 @@ CRITICAL REQUIREMENTS:
       maxPoints: z.number().int().min(0).default(100),
       submissionType: z.enum(["text", "file", "url", "none"]).default("none"),
       status: z.enum(["draft", "published"]).default("draft"),
+      notifyStudents: z.boolean().default(false),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -4952,6 +4991,43 @@ CRITICAL REQUIREMENTS:
         status: input.status,
         position: Number(maxPos) + 1,
       }).$returningId();
+
+      // Notify enrolled students if requested
+      if (input.notifyStudents && input.status === "published") {
+        try {
+          const [course] = await db.select({ title: lmsCourses.title }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+          const enrolledUsers = await db
+            .select({ email: users.email, name: users.name })
+            .from(lmsEnrollments)
+            .innerJoin(users, eq(users.id, lmsEnrollments.userId))
+            .where(eq(lmsEnrollments.courseId, input.courseId));
+          const dueDateStr = input.dueDate ? new Date(input.dueDate).toLocaleDateString("en-US", { dateStyle: "full", timeZone: "America/New_York" }) : "No due date";
+          for (const u of enrolledUsers) {
+            if (!u.email) continue;
+            await sendEmail({
+              to: u.email,
+              subject: `New Assignment: ${input.title} — ${course?.title ?? "Your Course"}`,
+              html: `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;">
+                <h2 style="color:#0e4a50;">New Assignment Posted</h2>
+                <p>Hi ${u.name ?? "there"},</p>
+                <p>A new assignment has been posted for <strong>${course?.title ?? "your cohort course"}</strong>:</p>
+                <table style="border-collapse:collapse;width:100%;margin:16px 0;">
+                  <tr><td style="padding:8px 12px;background:#f0fafa;font-weight:600;border:1px solid #d1fae5;">Assignment</td><td style="padding:8px 12px;border:1px solid #d1fae5;">${input.title}</td></tr>
+                  <tr><td style="padding:8px 12px;background:#f0fafa;font-weight:600;border:1px solid #d1fae5;">Due Date</td><td style="padding:8px 12px;border:1px solid #d1fae5;">${dueDateStr}</td></tr>
+                  <tr><td style="padding:8px 12px;background:#f0fafa;font-weight:600;border:1px solid #d1fae5;">Points</td><td style="padding:8px 12px;border:1px solid #d1fae5;">${input.maxPoints}</td></tr>
+                  <tr><td style="padding:8px 12px;background:#f0fafa;font-weight:600;border:1px solid #d1fae5;">Submission</td><td style="padding:8px 12px;border:1px solid #d1fae5;">${input.submissionType}</td></tr>
+                </table>
+                ${input.description ? `<p style="color:#475569;">${input.description}</p>` : ""}
+                <p><a href="https://members.allaboutultrasound.com/cohort/${input.courseId}" style="display:inline-block;padding:10px 20px;background:#0d9488;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;">View Assignments</a></p>
+                <p style="color:#94a3b8;font-size:12px;">All About Ultrasound™</p>
+              </div>`,
+            });
+          }
+        } catch (e) {
+          console.error("[cohortAssignment] Failed to send student notifications:", e);
+        }
+      }
+
       return { id: result.id };
     }),
 

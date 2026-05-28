@@ -369,6 +369,14 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
       // inline mode options
       inlineHeight: 600,
     } },
+  { type: "data_table", label: "Data Table", icon: <Table2 size={14} />, category: "Content",
+    defaultData: {
+      rows: [["Header 1", "Header 2", "Header 3"], ["Row 1 Col 1", "Row 1 Col 2", "Row 1 Col 3"], ["Row 2 Col 1", "Row 2 Col 2", "Row 2 Col 3"]],
+      hasHeader: true, bordered: true, striped: true,
+      caption: "",
+      bgColor: "#ffffff", headerBg: "#f0fafa", headerTextColor: "#0e4a50", borderColor: "#d1fae5",
+      fontSize: 14, textAlign: "left",
+    } },
 ];
 
 export const CATALOG_CATEGORIES = ["Layout", "Content", "Marketing", "Conversion", "Funnel", "Smart"];
@@ -4387,6 +4395,82 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
           <BSTextField data={d} onSet={set} label="Submit Button Text" field="submitText" />
           <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />
           <BSColorField data={d} onSet={set} label="Background Color" field="bgColor" />
+        </div>
+      );
+    }
+    case "data_table": {
+      const rows: string[][] = d.rows ?? [["Header 1", "Header 2"], ["Cell 1", "Cell 2"]];
+      const updateCell = (ri: number, ci: number, val: string) => {
+        const next = rows.map((r: string[], i: number) => i === ri ? r.map((c: string, j: number) => j === ci ? val : c) : [...r]);
+        set("rows", next);
+      };
+      const addRow = () => set("rows", [...rows, Array(rows[0]?.length ?? 2).fill("")]);
+      const removeRow = (ri: number) => { if (rows.length > 1) set("rows", rows.filter((_: any, i: number) => i !== ri)); };
+      const addCol = () => set("rows", rows.map((r: string[]) => [...r, ""]));
+      const removeCol = () => { if ((rows[0]?.length ?? 0) > 1) set("rows", rows.map((r: string[]) => r.slice(0, -1))); };
+      return (
+        <div className="space-y-3">
+          <p className="text-[10px] text-gray-500">Click any cell to edit. Use the buttons below to add/remove rows and columns.</p>
+          {/* Cell editor */}
+          <div className="overflow-x-auto border border-gray-200 rounded">
+            <table className="w-full text-xs" style={{ borderCollapse: "collapse" }}>
+              <tbody>
+                {rows.map((row: string[], ri: number) => (
+                  <tr key={ri} className={ri === 0 && d.hasHeader !== false ? "bg-teal-50" : ri % 2 === 0 ? "bg-gray-50" : "bg-white"}>
+                    {row.map((cell: string, ci: number) => (
+                      <td key={ci} className="border border-gray-200 p-0">
+                        <input
+                          value={cell}
+                          onChange={e => updateCell(ri, ci, e.target.value)}
+                          className="w-full px-1.5 py-1 text-xs bg-transparent focus:outline-none focus:ring-1 focus:ring-teal-400 min-w-[60px]"
+                          placeholder={ri === 0 && d.hasHeader !== false ? `Header ${ci + 1}` : `R${ri}C${ci + 1}`}
+                        />
+                      </td>
+                    ))}
+                    <td className="border border-gray-200 px-1">
+                      <button onClick={() => removeRow(ri)} className="text-red-400 hover:text-red-600 text-[10px] px-0.5">✕</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {/* Row/col controls */}
+          <div className="flex gap-2 flex-wrap">
+            <button onClick={addRow} className="px-2 py-1 text-xs bg-teal-50 text-teal-700 border border-teal-200 rounded hover:bg-teal-100">+ Row</button>
+            <button onClick={addCol} className="px-2 py-1 text-xs bg-teal-50 text-teal-700 border border-teal-200 rounded hover:bg-teal-100">+ Column</button>
+            <button onClick={removeCol} className="px-2 py-1 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100">− Last Column</button>
+          </div>
+          {/* Style controls */}
+          <div className="flex items-center gap-2">
+            <input type="checkbox" id="dt-header" checked={d.hasHeader !== false} onChange={e => set("hasHeader", e.target.checked)} className="w-3.5 h-3.5" />
+            <label htmlFor="dt-header" className="text-xs text-gray-600">First row is header</label>
+          </div>
+          <div className="flex items-center gap-2">
+            <input type="checkbox" id="dt-bordered" checked={d.bordered !== false} onChange={e => set("bordered", e.target.checked)} className="w-3.5 h-3.5" />
+            <label htmlFor="dt-bordered" className="text-xs text-gray-600">Show cell borders</label>
+          </div>
+          <div className="flex items-center gap-2">
+            <input type="checkbox" id="dt-striped" checked={d.striped !== false} onChange={e => set("striped", e.target.checked)} className="w-3.5 h-3.5" />
+            <label htmlFor="dt-striped" className="text-xs text-gray-600">Alternate row shading</label>
+          </div>
+          <BSTextField data={d} onSet={set} label="Caption (optional)" field="caption" />
+          <BSColorField data={d} onSet={set} label="Background Color" field="bgColor" />
+          <BSColorField data={d} onSet={set} label="Header Row Background" field="headerBg" />
+          <BSColorField data={d} onSet={set} label="Header Text Color" field="headerTextColor" />
+          <BSColorField data={d} onSet={set} label="Border Color" field="borderColor" />
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Text Alignment</label>
+            <select value={d.textAlign ?? "left"} onChange={e => set("textAlign", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+              <option value="left">Left</option>
+              <option value="center">Center</option>
+              <option value="right">Right</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Font Size (px)</label>
+            <input type="number" value={d.fontSize ?? 14} onChange={e => set("fontSize", Number(e.target.value))} className="w-full h-8 text-xs rounded border border-gray-200 px-2" min={10} max={24} />
+          </div>
         </div>
       );
     }
