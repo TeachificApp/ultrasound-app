@@ -3371,3 +3371,9 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix duplicate /admin/contacts and /admin/user-analytics routes in App.tsx
 - [x] Remove stale User Analytics and Contacts cards from Platform Admin dashboard
 >>>>>>> Stashed changes
+
+## Enrollments Tab Upgrade (May 2026)
+- [x] Add content type filter (course / download / product / quiz) to enrollmentsList procedure
+- [x] Add sort options (date, user name, course name, status, progress) to enrollmentsList procedure
+- [x] Add user drill-down: click a row to see full enrollment detail for that user
+- [x] Rebuild Enrollments tab UI with filter bar, sortable column headers, and drill-down panel

@@ -12,9 +12,9 @@
  *   Contacts    — leads/contacts (embeds ContactsAdmin)
  *   Activity    — global activity log across all users
  */
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,11 +23,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Users, BookOpen, DollarSign, Crown, Mail, Activity,
-  ChevronLeft, ChevronRight, Search, Download, RefreshCw,
-  CheckCircle, Clock, Filter,
+  ChevronLeft, ChevronRight, Search, Download,
+  CheckCircle, Clock, ArrowUpDown, ArrowUp, ArrowDown,
+  X, ExternalLink, GraduationCap, FileDown, HelpCircle,
 } from "lucide-react";
 import { toast } from "sonner";
-import { Link } from "wouter";
 
 // Lazy-load the heavy sub-pages to keep initial bundle small
 import AdminSalesDashboard from "./AdminSalesDashboard";
@@ -59,12 +59,145 @@ const EVENT_TYPE_COLORS: Record<string, string> = {
   module_complete: "bg-cyan-100 text-cyan-700",
 };
 
+// Content type icon helper
+const CONTENT_TYPE_ICON: Record<string, React.ReactNode> = {
+  course: <GraduationCap className="w-3.5 h-3.5 text-teal-600" />,
+  quiz: <HelpCircle className="w-3.5 h-3.5 text-purple-600" />,
+  download: <FileDown className="w-3.5 h-3.5 text-indigo-600" />,
+};
+const CONTENT_TYPE_BADGE: Record<string, string> = {
+  course: "bg-teal-50 text-teal-700 border-teal-200",
+  quiz: "bg-purple-50 text-purple-700 border-purple-200",
+  download: "bg-indigo-50 text-indigo-700 border-indigo-200",
+};
+
+// ─── Enrollment Drill-Down Panel ──────────────────────────────────────────────
+function EnrollmentDrillDown({ userId, userEmail, onClose }: { userId: number | null; userEmail: string; onClose: () => void }) {
+  const { data, isLoading } = trpc.analyticsAdmin.userEnrollmentDetail.useQuery(
+    userId ? { userId } : { userEmail },
+    { enabled: !!(userId || userEmail) }
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-end">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+      {/* Panel */}
+      <div className="relative w-full max-w-lg h-full bg-white shadow-2xl flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="flex items-start justify-between px-5 py-4 border-b border-gray-200 bg-gray-50">
+          <div>
+            {isLoading ? (
+              <Skeleton className="h-5 w-40 mb-1" />
+            ) : data ? (
+              <>
+                <div className="font-semibold text-gray-900 text-base">{data.userName}</div>
+                <div className="text-xs text-gray-500">{data.userEmail}</div>
+              </>
+            ) : (
+              <div className="text-sm text-gray-500">User not found</div>
+            )}
+          </div>
+          <button onClick={onClose} className="p-1 rounded hover:bg-gray-200 transition-colors">
+            <X className="w-4 h-4 text-gray-500" />
+          </button>
+        </div>
+
+        {/* Stats row */}
+        {data && (
+          <div className="grid grid-cols-3 divide-x divide-gray-100 border-b border-gray-200">
+            <div className="px-4 py-3 text-center">
+              <div className="text-xl font-bold text-gray-900">{data.totalEnrollments}</div>
+              <div className="text-xs text-gray-500">Enrollments</div>
+            </div>
+            <div className="px-4 py-3 text-center">
+              <div className="text-xl font-bold text-green-600">{data.completedCount}</div>
+              <div className="text-xs text-gray-500">Completed</div>
+            </div>
+            <div className="px-4 py-3 text-center">
+              <div className="text-xl font-bold text-teal-600">{data.isPremium ? "Premium" : "Free"}</div>
+              <div className="text-xs text-gray-500">Membership</div>
+            </div>
+          </div>
+        )}
+        {data && (
+          <div className="flex items-center gap-4 px-5 py-2 border-b border-gray-100 text-xs text-gray-500 bg-gray-50">
+            <span>Joined: <span className="text-gray-700">{fmtDate(data.userCreatedAt)}</span></span>
+            <span>Last seen: <span className="text-gray-700">{fmtDate(data.lastSignedIn)}</span></span>
+            {data.userId && (
+              <a href={`/admin/user/${data.userId}`} className="ml-auto flex items-center gap-1 text-teal-600 hover:underline">
+                Full Profile <ExternalLink className="w-3 h-3" />
+              </a>
+            )}
+          </div>
+        )}
+
+        {/* Enrollments list */}
+        <div className="flex-1 overflow-y-auto">
+          {isLoading ? (
+            <div className="p-5 space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}
+            </div>
+          ) : !data?.enrollments.length ? (
+            <div className="p-8 text-center text-gray-400 text-sm">No enrollments found</div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {data.enrollments.map(e => (
+                <div key={e.enrollmentId} className="px-5 py-3 hover:bg-gray-50">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {CONTENT_TYPE_ICON[e.courseType] ?? CONTENT_TYPE_ICON.course}
+                      <span className="text-sm font-medium text-gray-900 truncate" title={e.courseTitle}>
+                        {e.courseTitle}
+                      </span>
+                    </div>
+                    <Badge variant="outline" className={`text-xs shrink-0 ${CONTENT_TYPE_BADGE[e.courseType] ?? ''}` }>
+                      {e.courseType}
+                    </Badge>
+                  </div>
+                  <div className="mt-1.5 flex items-center gap-3">
+                    {/* Progress bar */}
+                    <div className="flex items-center gap-1.5 flex-1">
+                      <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="h-full bg-teal-500 rounded-full" style={{ width: `${e.progressPct}%` }} />
+                      </div>
+                      <span className="text-xs text-gray-500 w-8 text-right">{e.progressPct}%</span>
+                    </div>
+                    {e.completedAt ? (
+                      <div className="flex items-center gap-1 text-xs text-green-600">
+                        <CheckCircle className="w-3 h-3" />
+                        {fmtDate(e.completedAt)}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 text-xs text-gray-400">
+                        <Clock className="w-3 h-3" />
+                        In progress
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-0.5 text-xs text-gray-400">Enrolled {fmtDate(e.enrolledAt)}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Enrollments Tab ──────────────────────────────────────────────────────────
+type SortKey = 'enrolledAt' | 'userName' | 'courseTitle' | 'progressPct' | 'completedAt';
+
 function EnrollmentsTab() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<"all" | "active" | "completed">("all");
+  const [contentType, setContentType] = useState<"all" | "course" | "quiz" | "download">("all");
+  const [sortBy, setSortBy] = useState<SortKey>("enrolledAt");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [drillDown, setDrillDown] = useState<{ userId: number | null; userEmail: string } | null>(null);
   const PAGE_SIZE = 50;
 
   const handleSearch = (v: string) => {
@@ -76,14 +209,27 @@ function EnrollmentsTab() {
     }, 400);
   };
 
+  const handleSort = (col: SortKey) => {
+    if (sortBy === col) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(col);
+      setSortDir('desc');
+    }
+    setPage(1);
+  };
+
   const { data, isLoading } = trpc.analyticsAdmin.enrollmentsList.useQuery({
     search: debouncedSearch || undefined,
     page,
     pageSize: PAGE_SIZE,
     status,
+    contentType,
+    sortBy,
+    sortDir,
   });
 
-  const { data: csvData, isFetching: csvLoading, refetch: fetchCsv } = trpc.analyticsAdmin.exportEnrollmentsCsv.useQuery(
+  const { isFetching: csvLoading, refetch: fetchCsv } = trpc.analyticsAdmin.exportEnrollmentsCsv.useQuery(
     { search: debouncedSearch || undefined, status },
     { enabled: false }
   );
@@ -104,19 +250,52 @@ function EnrollmentsTab() {
 
   const totalPages = Math.ceil((data?.total ?? 0) / PAGE_SIZE);
 
+  // Sort indicator helper
+  const SortIcon = ({ col }: { col: SortKey }) => {
+    if (sortBy !== col) return <ArrowUpDown className="w-3 h-3 text-gray-400 ml-1 inline" />;
+    return sortDir === 'asc'
+      ? <ArrowUp className="w-3 h-3 text-teal-600 ml-1 inline" />
+      : <ArrowDown className="w-3 h-3 text-teal-600 ml-1 inline" />;
+  };
+
+  const SortTh = ({ col, label, className = "" }: { col: SortKey; label: string; className?: string }) => (
+    <th
+      className={`text-xs font-semibold text-gray-600 cursor-pointer select-none hover:text-teal-700 transition-colors ${className}`}
+      onClick={() => handleSort(col)}
+    >
+      {label}<SortIcon col={col} />
+    </th>
+  );
+
   return (
     <div className="space-y-4">
-      {/* Controls */}
-      <div className="flex items-center gap-3 flex-wrap">
+      {/* Filter bar */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* Search */}
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400" />
           <Input
-            placeholder="Search by name, email, or course…"
+            placeholder="Search name, email, or course…"
             value={search}
             onChange={e => handleSearch(e.target.value)}
             className="pl-8 h-8 text-sm"
           />
         </div>
+
+        {/* Content type filter */}
+        <Select value={contentType} onValueChange={v => { setContentType(v as any); setPage(1); }}>
+          <SelectTrigger className="w-36 h-8 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="course">Courses</SelectItem>
+            <SelectItem value="quiz">Quizzes</SelectItem>
+            <SelectItem value="download">Downloads</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {/* Status filter */}
         <Select value={status} onValueChange={v => { setStatus(v as any); setPage(1); }}>
           <SelectTrigger className="w-36 h-8 text-sm">
             <SelectValue />
@@ -127,13 +306,24 @@ function EnrollmentsTab() {
             <SelectItem value="completed">Completed</SelectItem>
           </SelectContent>
         </Select>
+
+        {/* Active filter chips */}
+        {(contentType !== 'all' || status !== 'all' || debouncedSearch) && (
+          <button
+            onClick={() => { setContentType('all'); setStatus('all'); setSearch(''); setDebouncedSearch(''); setPage(1); }}
+            className="flex items-center gap-1 text-xs text-gray-500 hover:text-red-500 transition-colors"
+          >
+            <X className="w-3 h-3" /> Clear filters
+          </button>
+        )}
+
         {data && (
-          <span className="text-sm text-gray-400">{data.total.toLocaleString()} enrollments</span>
+          <span className="text-sm text-gray-400 ml-auto">{data.total.toLocaleString()} enrollments</span>
         )}
         <Button
           size="sm"
           variant="outline"
-          className="h-8 gap-1.5 text-xs ml-auto"
+          className="h-8 gap-1.5 text-xs"
           onClick={handleExportCsv}
           disabled={csvLoading}
         >
@@ -149,12 +339,12 @@ function EnrollmentsTab() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-600">User</th>
-                  <th className="text-left px-3 py-2.5 text-xs font-semibold text-gray-600">Course</th>
-                  <th className="text-right px-3 py-2.5 text-xs font-semibold text-gray-600">Progress</th>
-                  <th className="text-right px-3 py-2.5 text-xs font-semibold text-gray-600">Enrolled</th>
-                  <th className="text-right px-3 py-2.5 text-xs font-semibold text-gray-600">Completed</th>
-                  <th className="text-right px-3 py-2.5 text-xs font-semibold text-gray-600">Type</th>
+                  <SortTh col="userName" label="User" className="text-left px-4 py-2.5" />
+                  <SortTh col="courseTitle" label="Course" className="text-left px-3 py-2.5" />
+                  <th className="text-left px-3 py-2.5 text-xs font-semibold text-gray-600">Type</th>
+                  <SortTh col="progressPct" label="Progress" className="text-right px-3 py-2.5" />
+                  <SortTh col="enrolledAt" label="Enrolled" className="text-right px-3 py-2.5" />
+                  <SortTh col="completedAt" label="Completed" className="text-right px-3 py-2.5" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -174,23 +364,32 @@ function EnrollmentsTab() {
                   </tr>
                 ) : (
                   data.enrollments.map(e => (
-                    <tr key={e.enrollmentId} className="hover:bg-gray-50">
+                    <tr
+                      key={e.enrollmentId}
+                      className="hover:bg-teal-50/40 cursor-pointer transition-colors"
+                      onClick={() => setDrillDown({ userId: e.userId, userEmail: e.userEmail })}
+                    >
                       <td className="px-4 py-2.5">
                         <div className="font-medium text-gray-900 text-sm">{e.userName || "—"}</div>
                         <div className="text-xs text-gray-400">{e.userEmail}</div>
                       </td>
-                      <td className="px-3 py-2.5 max-w-[220px]">
+                      <td className="px-3 py-2.5 max-w-[200px]">
                         <span className="text-sm text-gray-700 truncate block" title={e.courseTitle}>
                           {e.courseTitle}
                         </span>
                       </td>
+                      <td className="px-3 py-2.5">
+                        <Badge variant="outline" className={`text-xs ${CONTENT_TYPE_BADGE[e.courseType] ?? ''}` }>
+                          <span className="flex items-center gap-1">
+                            {CONTENT_TYPE_ICON[e.courseType]}
+                            {e.courseType}
+                          </span>
+                        </Badge>
+                      </td>
                       <td className="px-3 py-2.5 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-teal-500 rounded-full"
-                              style={{ width: `${e.progressPct}%` }}
-                            />
+                          <div className="w-14 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                            <div className="h-full bg-teal-500 rounded-full" style={{ width: `${e.progressPct}%` }} />
                           </div>
                           <span className="text-xs text-gray-600 w-8 text-right">{e.progressPct}%</span>
                         </div>
@@ -206,13 +405,6 @@ function EnrollmentsTab() {
                           </div>
                         ) : (
                           <Clock className="w-3.5 h-3.5 text-gray-300 ml-auto" />
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5 text-right">
-                        {e.enrollmentType && (
-                          <Badge variant="outline" className="text-xs">
-                            {e.enrollmentType}
-                          </Badge>
                         )}
                       </td>
                     </tr>
@@ -233,17 +425,15 @@ function EnrollmentsTab() {
                 <Button
                   size="sm" variant="outline" className="h-7 px-3 text-xs gap-1"
                   disabled={page <= 1}
-                  onClick={() => setPage(p => p - 1)}
+                  onClick={ev => { ev.stopPropagation(); setPage(p => p - 1); }}
                 >
                   <ChevronLeft className="w-3.5 h-3.5" /> Prev
                 </Button>
-                <span className="text-xs text-gray-500 px-2">
-                  {page} / {totalPages}
-                </span>
+                <span className="text-xs text-gray-500 px-2">{page} / {totalPages}</span>
                 <Button
                   size="sm" variant="outline" className="h-7 px-3 text-xs gap-1"
                   disabled={page >= totalPages}
-                  onClick={() => setPage(p => p + 1)}
+                  onClick={ev => { ev.stopPropagation(); setPage(p => p + 1); }}
                 >
                   Next <ChevronRight className="w-3.5 h-3.5" />
                 </Button>
@@ -252,6 +442,15 @@ function EnrollmentsTab() {
           )}
         </CardContent>
       </Card>
+
+      {/* Drill-down panel */}
+      {drillDown && (
+        <EnrollmentDrillDown
+          userId={drillDown.userId}
+          userEmail={drillDown.userEmail}
+          onClose={() => setDrillDown(null)}
+        />
+      )}
     </div>
   );
 }

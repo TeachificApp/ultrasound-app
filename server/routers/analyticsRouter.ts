@@ -796,6 +796,9 @@ export const analyticsAdminRouter = router({
       page: z.number().int().default(1),
       pageSize: z.number().int().default(50),
       status: z.enum(['all', 'active', 'completed']).default('all'),
+      contentType: z.enum(['all', 'course', 'quiz', 'download']).default('all'),
+      sortBy: z.enum(['enrolledAt', 'userName', 'courseTitle', 'progressPct', 'completedAt']).default('enrolledAt'),
+      sortDir: z.enum(['asc', 'desc']).default('desc'),
     }))
     .query(async ({ ctx, input }) => {
       if (ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' });
@@ -804,23 +807,39 @@ export const analyticsAdminRouter = router({
 
       const offset = (input.page - 1) * input.pageSize;
       const searchCond = input.search
-        ? sql`(COALESCE(u.name, '') LIKE ${`%${input.search}%`} OR COALESCE(u.email, e.thinkific_email, '') LIKE ${`%${input.search}%`} OR c.title LIKE ${`%${input.search}%`})`
-        : sql`1=1`;
+        ? sql`AND (COALESCE(u.name, '') LIKE ${`%${input.search}%`} OR COALESCE(u.email, e.thinkific_email, '') LIKE ${`%${input.search}%`} OR COALESCE(c.title, ti.thinkific_course_name, '') LIKE ${`%${input.search}%`})`
+        : sql``;
       const courseCond = input.courseId ? sql`AND e.course_id = ${input.courseId}` : sql``;
       const statusCond = input.status === 'completed'
         ? sql`AND e.completed_at IS NOT NULL`
         : input.status === 'active'
         ? sql`AND e.completed_at IS NULL`
         : sql``;
+      const contentTypeCond = input.contentType !== 'all'
+        ? sql`AND c.type = ${input.contentType}`
+        : sql``;
+
+      // Build ORDER BY clause safely
+      const sortColMap: Record<string, string> = {
+        enrolledAt: 'e.enrolled_at',
+        userName: 'userName',
+        courseTitle: 'courseTitle',
+        progressPct: 'e.progress_pct',
+        completedAt: 'e.completed_at',
+      };
+      const sortCol = sortColMap[input.sortBy] ?? 'e.enrolled_at';
+      const sortDir = input.sortDir === 'asc' ? 'ASC' : 'DESC';
 
       const rows = await db.execute(sql`
         SELECT
           e.id AS enrollmentId,
           e.user_id AS userId,
           COALESCE(u.name, u.email, CONCAT('User #', e.user_id)) AS userName,
-          COALESCE(u.email, '') AS userEmail,
+          COALESCE(u.email, e.thinkific_email, '') AS userEmail,
+          u.membership_tier AS membershipTier,
           e.course_id AS courseId,
           COALESCE(c.title, ti.thinkific_course_name, CONCAT('Course #', e.course_id)) AS courseTitle,
+          COALESCE(c.type, 'course') AS courseType,
           e.progress_pct AS progressPct,
           e.enrolled_at AS enrolledAt,
           e.completed_at AS completedAt,
@@ -829,9 +848,9 @@ export const analyticsAdminRouter = router({
         LEFT JOIN users u ON u.id = e.user_id
         LEFT JOIN lms_courses c ON c.id = e.course_id
         LEFT JOIN lms_thinkific_imports ti ON ti.lms_course_id = e.course_id
-        WHERE ${searchCond} ${courseCond} ${statusCond}
+        WHERE 1=1 ${searchCond} ${courseCond} ${statusCond} ${contentTypeCond}
         GROUP BY e.id
-        ORDER BY e.enrolled_at DESC
+        ORDER BY ${sql.raw(sortCol)} ${sql.raw(sortDir)}
         LIMIT ${input.pageSize} OFFSET ${offset}
       `);
 
@@ -840,17 +859,20 @@ export const analyticsAdminRouter = router({
         FROM lms_enrollments e
         LEFT JOIN users u ON u.id = e.user_id
         LEFT JOIN lms_courses c ON c.id = e.course_id
-        WHERE ${searchCond} ${courseCond} ${statusCond}
+        LEFT JOIN lms_thinkific_imports ti ON ti.lms_course_id = e.course_id
+        WHERE 1=1 ${searchCond} ${courseCond} ${statusCond} ${contentTypeCond}
       `);
 
       return {
         enrollments: (rows as any[]).map(r => ({
           enrollmentId: Number(r.enrollmentId),
-          userId: Number(r.userId),
+          userId: r.userId ? Number(r.userId) : null,
           userName: r.userName as string,
           userEmail: r.userEmail as string,
+          membershipTier: (r.membershipTier as string) ?? null,
           courseId: Number(r.courseId),
           courseTitle: r.courseTitle as string,
+          courseType: (r.courseType as string) ?? 'course',
           progressPct: Number(r.progressPct ?? 0),
           enrolledAt: r.enrolledAt as Date | null,
           completedAt: r.completedAt as Date | null,
@@ -965,6 +987,75 @@ export const analyticsAdminRouter = router({
          escape(r.enrollment_type ?? '')].join(',')
       );
       return { csv: [header, ...lines].join('\n'), totalRows: lines.length };
+    }),
+
+  /** Drill-down: all enrollments for a single user */
+  userEnrollmentDetail: protectedProcedure
+    .input(z.object({
+      userId: z.number().int().optional(),
+      userEmail: z.string().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' });
+      if (!input.userId && !input.userEmail) throw new TRPCError({ code: 'BAD_REQUEST', message: 'userId or userEmail required' });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+
+      const userCond = input.userId
+        ? sql`e.user_id = ${input.userId}`
+        : sql`(u.email = ${input.userEmail} OR e.thinkific_email = ${input.userEmail})`;
+
+      const rows = await db.execute(sql`
+        SELECT
+          e.id AS enrollmentId,
+          e.user_id AS userId,
+          COALESCE(u.name, u.email, CONCAT('User #', e.user_id)) AS userName,
+          COALESCE(u.email, e.thinkific_email, '') AS userEmail,
+          u.isPremium AS isPremium,
+          u.createdAt AS userCreatedAt,
+          u.lastSignedIn AS lastSignedIn,
+          e.course_id AS courseId,
+          COALESCE(c.title, ti.thinkific_course_name, CONCAT('Course #', e.course_id)) AS courseTitle,
+          COALESCE(c.type, 'course') AS courseType,
+          c.slug AS courseSlug,
+          e.progress_pct AS progressPct,
+          e.enrolled_at AS enrolledAt,
+          e.completed_at AS completedAt,
+          e.enrollment_type AS enrollmentType
+        FROM lms_enrollments e
+        LEFT JOIN users u ON u.id = e.user_id
+        LEFT JOIN lms_courses c ON c.id = e.course_id
+        LEFT JOIN lms_thinkific_imports ti ON ti.lms_course_id = e.course_id
+        WHERE ${userCond}
+        ORDER BY e.enrolled_at DESC
+      `);
+
+      const enrollments = (rows as any[]).map(r => ({
+        enrollmentId: Number(r.enrollmentId),
+        courseId: Number(r.courseId),
+        courseTitle: r.courseTitle as string,
+        courseType: (r.courseType as string) ?? 'course',
+        courseSlug: r.courseSlug as string | null,
+        progressPct: Number(r.progressPct ?? 0),
+        enrolledAt: r.enrolledAt as Date | null,
+        completedAt: r.completedAt as Date | null,
+        enrollmentType: r.enrollmentType as string | null,
+      }));
+
+      if (!enrollments.length) return null;
+
+      const first = rows[0] as any;
+      return {
+        userId: first.userId ? Number(first.userId) : null,
+        userName: first.userName as string,
+        userEmail: first.userEmail as string,
+        isPremium: Boolean(first.isPremium),
+        userCreatedAt: first.userCreatedAt as Date | null,
+        lastSignedIn: first.lastSignedIn as Date | null,
+        enrollments,
+        totalEnrollments: enrollments.length,
+        completedCount: enrollments.filter(e => e.completedAt).length,
+      };
     }),
 });
 
