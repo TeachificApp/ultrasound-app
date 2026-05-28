@@ -905,7 +905,7 @@ export const analyticsAdminRouter = router({
           userId: Number(r.userId),
           userName: r.userName as string,
           userEmail: r.userEmail as string,
-          eventType: r.eventType as string,
+          eventType: (r.eventType as string) ?? 'unknown',
           description: r.description as string,
           path: r.path as string | null,
           ipAddress: r.ipAddress as string | null,

@@ -771,7 +771,7 @@ function ActivityLogTab({ userId, userName }: { userId: number; userName: string
           <div>
             <CardTitle className="text-sm font-semibold text-gray-900">Activity Log</CardTitle>
             <p className="text-xs text-gray-500 mt-0.5">
-              {data?.total ?? 0} total events{activeFilter ? ` (filtered: ${activeFilter.replace(/_/g, ' ')})` : ''}
+              {data?.total ?? 0} total events{activeFilter ? ` (filtered: ${(activeFilter ?? '').replace(/_/g, ' ')})` : ''}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -829,7 +829,7 @@ function ActivityLogTab({ userId, userName }: { userId: number; userName: string
                       </td>
                       <td className="px-3 py-2.5">
                         <Badge className={`text-xs ${eventTypeColors[log.eventType] || 'bg-gray-100 text-gray-700'}`}>
-                          {log.eventType.replace(/_/g, ' ')}
+                          {(log.eventType ?? 'unknown').replace(/_/g, ' ')}
                         </Badge>
                       </td>
                       <td className="px-3 py-2.5 text-xs text-gray-700 max-w-[200px] truncate" title={log.description}>
