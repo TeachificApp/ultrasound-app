@@ -942,7 +942,7 @@ function CTAActionPicker({
     { enabled: behavior === "pricing_option" }
   );
   const poCourses = (poCoursesData?.courses ?? []) as Array<{ id: number; title: string; type: string }>;
-  const { data: poOptionsData } = trpc.lmsAdmin.listPricingOptions.useQuery(
+  const { data: poOptionsData } = trpc.lmsGroup.listPricingOptions.useQuery(
     { courseId: poCourseId! },
     { enabled: behavior === "pricing_option" && !!poCourseId }
   );

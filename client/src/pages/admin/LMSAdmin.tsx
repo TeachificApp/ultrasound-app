@@ -41,7 +41,7 @@ import {
   Package, Layers, Globe, Radio, Tag, LayoutGrid, ShoppingBag, GraduationCap, TrendingUp,
   Layout as LayoutTemplate, Database,
   Hash, Shield, Flag, Pin, Megaphone, Bell, MessageSquare, Star, Zap, XCircle,
-  Repeat, Film, CalendarRange, ExternalLink,
+  Repeat, Film, CalendarRange, ExternalLink, Link2,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -1868,7 +1868,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
         )}
 
         {/* Additional Pricing Options */}
-        <CoursePricingOptionsEditor courseId={course.id} />
+        <CoursePricingOptionsEditor courseId={course.id} courseSlug={course.slug} />
       </div>
 
             <div className="flex items-center gap-2">
@@ -6060,7 +6060,8 @@ function FreePreviewEnrollmentsTab() {
   const [page, setPage] = useState(1);
   const [exportLoading, setExportLoading] = useState(false);
 
-  const { data: courses } = trpc.lmsPublic.listCourses.useQuery({ limit: 200 });
+  const { data: coursesData } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", type: "all", page: 1, pageSize: 500 });
+  const courses = coursesData?.courses;
   const { data, isLoading } = trpc.lmsAdmin.listFreePreviewEnrollments.useQuery(
     { courseId: courseFilter, search: search || undefined, page, pageSize: 50 },
     { refetchOnWindowFocus: false }
@@ -6115,7 +6116,7 @@ function FreePreviewEnrollmentsTab() {
           className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
         >
           <option value="">All Courses</option>
-          {((courses as any)?.courses ?? []).map((c: any) => (
+          {(courses ?? []).map((c: any) => (
             <option key={c.id} value={c.id}>{c.title}</option>
           ))}
         </select>
@@ -7309,12 +7310,83 @@ function PricingOptionForm({
   );
 }
 
-function CoursePricingOptionsEditor({ courseId }: { courseId: number }) {
+function PricingOptionRow({ opt, editingId, setEditingId, setShowAdd, updateOption, deleteOption, formatPrice, courseSlug }: {
+  opt: PricingOption;
+  editingId: number | null;
+  setEditingId: (id: number | null) => void;
+  setShowAdd: (v: boolean) => void;
+  updateOption: any;
+  deleteOption: any;
+  formatPrice: (opt: PricingOption) => string;
+  courseSlug?: string | null;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: opt.id });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+  if (editingId === opt.id) {
+    return (
+      <div ref={setNodeRef} style={style}>
+        <PricingOptionForm
+          initial={opt}
+          onSave={(data) => updateOption.mutate({ id: opt.id, label: data.label, sublabel: data.sublabel, pricingType: data.pricingType, price: data.price, stripePriceId: data.stripePriceId, subscriptionInterval: data.subscriptionInterval, downPayment: data.downPayment ?? undefined, installmentCount: data.installmentCount ?? undefined, installmentAmount: data.installmentAmount ?? undefined, installmentIntervalDays: data.installmentIntervalDays ?? undefined, ctaLabel: data.ctaLabel, ctaUrl: data.ctaUrl, isActive: data.isActive })}
+          onCancel={() => setEditingId(null)}
+          saving={updateOption.isPending}
+        />
+      </div>
+    );
+  }
+  return (
+    <div ref={setNodeRef} style={style} className={`flex items-center gap-2 bg-white rounded-lg border px-3 py-2 ${opt.isActive ? "border-gray-200" : "border-gray-100 opacity-60"}`}>
+      <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 p-0.5 flex-shrink-0" title="Drag to reorder">
+        <GripVertical className="w-3.5 h-3.5" />
+      </button>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-gray-800 truncate">{opt.label}</p>
+        <p className="text-xs text-gray-400">{formatPrice(opt)}{opt.sublabel ? ` · ${opt.sublabel}` : ""}{opt.ctaLabel ? ` · CTA: "${opt.ctaLabel}"` : ""}{opt.ctaUrl ? ` · 🔗 ${opt.ctaUrl.length > 40 ? opt.ctaUrl.slice(0, 40) + "…" : opt.ctaUrl}` : ""}</p>
+      </div>
+      <Badge className={`text-xs flex-shrink-0 ${opt.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+        {opt.isActive ? "Active" : "Hidden"}
+      </Badge>
+      <button onClick={() => updateOption.mutate({ id: opt.id, isActive: !opt.isActive })} className="text-xs text-gray-400 hover:text-gray-600 p-1 flex-shrink-0" title={opt.isActive ? "Hide" : "Show"}>
+        {opt.isActive ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+      </button>
+            <button onClick={() => { setEditingId(opt.id); setShowAdd(false); }} className="text-xs text-teal-500 hover:text-teal-700 p-1 flex-shrink-0">
+        <Edit2 className="w-3.5 h-3.5" />
+      </button>
+      {courseSlug && (
+        <button
+          onClick={() => {
+            const url = `${window.location.origin}/courses/${courseSlug}?pricingOptionId=${opt.id}&checkout=1`;
+            navigator.clipboard.writeText(url).then(() => toast.success("Checkout link copied!"));
+          }}
+          className="text-xs text-blue-400 hover:text-blue-600 p-1 flex-shrink-0"
+          title={`Copy direct checkout link\n${window.location.origin}/courses/${courseSlug}?pricingOptionId=${opt.id}&checkout=1`}
+        >
+          <Link2 className="w-3.5 h-3.5" />
+        </button>
+      )}
+      <button onClick={() => { if (confirm("Delete this pricing option?")) deleteOption.mutate({ id: opt.id }); }} className="text-xs text-red-400 hover:text-red-600 p-1 flex-shrink-0">
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
+function CoursePricingOptionsEditor({ courseId, courseSlug }: { courseId: number; courseSlug?: string | null }) {
   const utils = trpc.useUtils();
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [localOrder, setLocalOrder] = useState<number[]>([]);
 
   const { data: options = [], isLoading } = trpc.lmsGroup.listPricingOptions.useQuery({ courseId });
+
+  // Keep local order in sync with server data
+  useEffect(() => {
+    setLocalOrder((options as PricingOption[]).map(o => o.id));
+  }, [options]);
 
   const createOption = trpc.lmsGroup.createPricingOption.useMutation({
     onSuccess: () => { toast.success("Pricing option added"); setShowAdd(false); utils.lmsGroup.listPricingOptions.invalidate({ courseId }); },
@@ -7331,8 +7403,24 @@ function CoursePricingOptionsEditor({ courseId }: { courseId: number }) {
     onError: e => toast.error(e.message),
   });
 
-  const toggleActive = (opt: PricingOption) => {
-    updateOption.mutate({ id: opt.id, isActive: !opt.isActive });
+  const reorderOptions = trpc.lmsGroup.reorderPricingOptions.useMutation({
+    onSuccess: () => utils.lmsGroup.listPricingOptions.invalidate({ courseId }),
+    onError: e => toast.error(e.message),
+  });
+
+  const poSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handlePoDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIdx = localOrder.indexOf(active.id as number);
+    const newIdx = localOrder.indexOf(over.id as number);
+    const newOrder = arrayMove(localOrder, oldIdx, newIdx);
+    setLocalOrder(newOrder);
+    reorderOptions.mutate({ orderedIds: newOrder });
   };
 
   const formatPrice = (opt: PricingOption) => {
@@ -7349,6 +7437,11 @@ function CoursePricingOptionsEditor({ courseId }: { courseId: number }) {
     return `$${Number(opt.price).toFixed(2)}`;
   };
 
+  // Build sorted list using localOrder
+  const sortedOptions = localOrder
+    .map(id => (options as PricingOption[]).find(o => o.id === id))
+    .filter(Boolean) as PricingOption[];
+
   return (
     <div className="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
       <div className="flex items-center justify-between">
@@ -7359,46 +7452,32 @@ function CoursePricingOptionsEditor({ courseId }: { courseId: number }) {
           <Plus className="w-3 h-3 mr-1" /> Add Option
         </Button>
       </div>
-      <p className="text-xs text-gray-400">Add payment plans, group rates, or alternate pricing. The primary course price is always the default CTA. These appear as selectable alternatives on the landing page.</p>
+      <p className="text-xs text-gray-400">Add payment plans, group rates, or alternate pricing. Drag <GripVertical className="inline w-3 h-3" /> to reorder. The primary course price is always the default CTA.</p>
 
       {isLoading ? (
         <div className="space-y-2">{[0,1].map(i => <Skeleton key={i} className="h-10 w-full rounded" />)}</div>
-      ) : options.length === 0 && !showAdd ? (
+      ) : sortedOptions.length === 0 && !showAdd ? (
         <p className="text-xs text-gray-400 italic py-2">No secondary pricing options yet.</p>
       ) : (
-        <div className="space-y-2">
-          {(options as PricingOption[]).map((opt) => (
-            <div key={opt.id}>
-              {editingId === opt.id ? (
-                <PricingOptionForm
-                  initial={opt}
-                  onSave={(data) => updateOption.mutate({ id: opt.id, label: data.label, sublabel: data.sublabel, pricingType: data.pricingType, price: data.price, stripePriceId: data.stripePriceId, subscriptionInterval: data.subscriptionInterval, downPayment: data.downPayment ?? undefined, installmentCount: data.installmentCount ?? undefined, installmentAmount: data.installmentAmount ?? undefined, installmentIntervalDays: data.installmentIntervalDays ?? undefined, ctaLabel: data.ctaLabel, ctaUrl: data.ctaUrl, isActive: data.isActive })}
-                  onCancel={() => setEditingId(null)}
-                  saving={updateOption.isPending}
+        <DndContext sensors={poSensors} collisionDetection={closestCenter} onDragEnd={handlePoDragEnd}>
+          <SortableContext items={localOrder} strategy={verticalListSortingStrategy}>
+            <div className="space-y-2">
+              {sortedOptions.map((opt) => (
+                <PricingOptionRow
+                  key={opt.id}
+                  opt={opt}
+                  editingId={editingId}
+                  setEditingId={setEditingId}
+                  setShowAdd={setShowAdd}
+                  updateOption={updateOption}
+                  deleteOption={deleteOption}
+                  formatPrice={formatPrice}
+                  courseSlug={courseSlug}
                 />
-              ) : (
-                <div className={`flex items-center gap-3 bg-white rounded-lg border px-3 py-2 ${opt.isActive ? "border-gray-200" : "border-gray-100 opacity-60"}`}>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800 truncate">{opt.label}</p>
-                    <p className="text-xs text-gray-400">{formatPrice(opt)}{opt.sublabel ? ` · ${opt.sublabel}` : ""}{opt.ctaLabel ? ` · CTA: "${opt.ctaLabel}"` : ""}{opt.ctaUrl ? ` · 🔗 ${opt.ctaUrl.length > 40 ? opt.ctaUrl.slice(0, 40) + "…" : opt.ctaUrl}` : ""}</p>
-                  </div>
-                  <Badge className={`text-xs ${opt.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                    {opt.isActive ? "Active" : "Hidden"}
-                  </Badge>
-                  <button onClick={() => toggleActive(opt)} className="text-xs text-gray-400 hover:text-gray-600 p-1" title={opt.isActive ? "Hide" : "Show"}>
-                    {opt.isActive ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                  </button>
-                  <button onClick={() => { setEditingId(opt.id); setShowAdd(false); }} className="text-xs text-teal-500 hover:text-teal-700 p-1">
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </button>
-                  <button onClick={() => { if (confirm("Delete this pricing option?")) deleteOption.mutate({ id: opt.id }); }} className="text-xs text-red-400 hover:text-red-600 p-1">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )}
+              ))}
             </div>
-          ))}
-        </div>
+          </SortableContext>
+        </DndContext>
       )}
 
       {showAdd && (

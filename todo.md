@@ -3547,3 +3547,13 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Pricing cards block: upgrade tier CTA buttons to full CTAActionPicker (all behaviors: direct_checkout, url, scroll, popup, email, download)
 - [x] Pricing cards block: CourseLanding renders pricing_cards with handleCtaBtnClick delegation (onEnroll support)
 - [x] CTA actions: pricing option linking available in CTA blocks
+
+## May 2026 Updates
+
+- [x] Pricing option drag-and-drop reordering in CoursePricingOptionsEditor (LMSAdmin)
+- [x] Fix CTAActionPicker to use lmsGroup.listPricingOptions (was incorrectly using lmsAdmin)
+- [x] Add copy-link button to each pricing option row showing direct checkout URL (even for draft courses)
+- [x] Fix FreePreviewEnrollmentsTab to use lmsAdmin.listCourses (includes draft courses)
+- [x] Cohort calendar view (Month/Week/Day/List) with ICS download and Add to Google Calendar
+- [x] Gate Join Live Session button to only be active 15 minutes before session start
+- [x] Add resizable panel to LessonBlockEditor (drag handle to resize settings panel)
