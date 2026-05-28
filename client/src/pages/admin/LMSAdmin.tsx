@@ -3667,7 +3667,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-teal-700 font-bold text-sm uppercase tracking-wide shrink-0">Edit Lesson</span>
             <span className="text-gray-300 text-sm shrink-0">·</span>
-            <span className="text-gray-800 font-semibold text-sm truncate" title={lesson.title}>{lesson.title}</span>
+            <span className="text-gray-800 font-semibold text-sm truncate min-w-[15ch] max-w-[40vw]" title={lesson.title}>{lesson.title}</span>
           </div>
         </div>
         {/* Save / Close actions — always visible in header */}
