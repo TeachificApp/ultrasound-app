@@ -43,6 +43,7 @@ import {
   Hash, Shield, Flag, Pin, Megaphone, Bell, MessageSquare, Star, Zap, XCircle,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { useAuth } from "@/_core/hooks/useAuth";
 import LessonEffectEditor from "@/components/LessonEffectEditor";
 import ThinkificImporter from "@/pages/admin/ThinkificImporter";
 import { LMSSalesTab } from "@/components/LMSSalesTab";
@@ -1500,6 +1501,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
   const [description, setDescription] = useState(course.description ?? "");
   const [status, setStatus] = useState(course.status);
   const [brand, setBrand] = useState(course.brand);
+  const [courseType, setCourseType] = useState<"course" | "quiz" | "download">(course.type ?? "course");
   const [pricingType, setPricingType] = useState<"free"|"one_time"|"subscription"|"payment_plan"|"trial_then_subscription">(course.pricingType ?? (course.isFree ? "free" : "one_time"));
   const [price, setPrice] = useState(String((course.price / 100).toFixed(2)));
   const [subscriptionInterval, setSubscriptionInterval] = useState<"monthly"|"quarterly"|"annual">(course.subscriptionInterval ?? "monthly");
@@ -1584,7 +1586,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
           disabled={saving}
           onClick={() => onSave({
             title: title.trim(), subtitle: subtitle.trim() || undefined,
-            description: description || undefined, status, brand,
+            description: description || undefined, status, brand, type: courseType,
             pricingType,
             isFree: pricingType === "free",
             hasCertificate,
@@ -1647,6 +1649,18 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
               <SelectItem value="iheartecho">iHeartEcho™</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+        <div>
+          <Label className="text-sm">Content Type</Label>
+          <Select value={courseType} onValueChange={v => setCourseType(v as "course" | "quiz" | "download")}>
+            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="course">Course — appears in Courses section</SelectItem>
+              <SelectItem value="quiz">Quiz — appears in Quizzes section</SelectItem>
+              <SelectItem value="download">Download — appears in Downloads section</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-gray-400 mt-1">Changing this moves the content to a different section of the Education Library.</p>
         </div>
       </div>
 
@@ -5552,7 +5566,7 @@ function ChannelFormInline({
 // ─── Communities Tab ────────────────────────────────────────────────────────
 
 function CommunitiesTab() {
-  const { user } = trpc.auth.me.useQuery(undefined, { select: d => d }).data as any ?? {};
+  const { user } = useAuth();
   const isAdmin = (user as any)?.role === "admin";
   const utils = trpc.useUtils();
 

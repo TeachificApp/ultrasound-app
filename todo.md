@@ -3394,3 +3394,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Fix userList: sort by u.lastSignedIn DESC (not alias), use actual login_events count
 - [x] Fix globalActivityLog: UNION with page_view_events and login_events for complete activity picture
 - [x] Fix Activity tab crash: null-safe eventType in UserAnalytics and globalActivityLog server return
+
+## LMS Content Management (May 2026)
+- [x] Fix SCORM R2 proxy — stream files through app server instead of redirecting to private R2
+- [x] Add courseType recategorization in LMS course settings (course ↔ quiz)
+- [x] Add sortOrder column to lms_courses table (libraryOrder already existed in schema)
+- [x] Add drag-and-drop reorder in LMS admin course list (Reorder button + DnD mode)
+- [x] Education Library respects sortOrder for display (orderBy libraryOrder ASC in lms.listCourses)

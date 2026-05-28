@@ -28,6 +28,7 @@ import path from "path";
 import fs from "fs";
 import os from "os";
 import unzipper from "unzipper";
+import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import {
   mediaAssets,
   mediaVersions,
@@ -36,6 +37,56 @@ import {
 } from "../../drizzle/schema";
 
 const router = Router();
+
+// ─── R2 authenticated client for SCORM proxy ─────────────────────────────────
+let _r2Client: S3Client | null = null;
+function getScormR2Client(): S3Client | null {
+  if (_r2Client) return _r2Client;
+  const accountId = process.env.CF_R2_ACCOUNT_ID;
+  const accessKeyId = process.env.CF_R2_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.CF_R2_SECRET_ACCESS_KEY;
+  if (!accountId || !accessKeyId || !secretAccessKey) return null;
+  _r2Client = new S3Client({
+    region: "auto",
+    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+    credentials: { accessKeyId, secretAccessKey },
+  });
+  return _r2Client;
+}
+function getScormR2Bucket(): string {
+  return process.env.CF_R2_BUCKET_NAME || "ultrasound-assist";
+}
+
+/** Proxy a file from R2 through the app server (handles private buckets) */
+async function proxyR2File(key: string, res: import("express").Response): Promise<boolean> {
+  const r2 = getScormR2Client();
+  if (!r2) return false;
+  try {
+    const cmd = new GetObjectCommand({ Bucket: getScormR2Bucket(), Key: key });
+    const obj = await r2.send(cmd);
+    if (!obj.Body) return false;
+    const ext = key.split(".").pop()?.toLowerCase() ?? "";
+    const mimeMap: Record<string, string> = {
+      html: "text/html", htm: "text/html", js: "application/javascript",
+      css: "text/css", json: "application/json", xml: "application/xml",
+      png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg",
+      gif: "image/gif", svg: "image/svg+xml", webp: "image/webp",
+      ico: "image/x-icon", woff: "font/woff", woff2: "font/woff2",
+      ttf: "font/ttf", eot: "application/vnd.ms-fontobject",
+      mp4: "video/mp4", mp3: "audio/mpeg", pdf: "application/pdf",
+      cur: "image/vnd.microsoft.icon",
+    };
+    const contentType = obj.ContentType ?? mimeMap[ext] ?? "application/octet-stream";
+    res.setHeader("Content-Type", contentType);
+    if (obj.ContentLength) res.setHeader("Content-Length", obj.ContentLength);
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    (obj.Body as NodeJS.ReadableStream).pipe(res);
+    return true;
+  } catch (err: any) {
+    if (err?.name === "NoSuchKey" || err?.$metadata?.httpStatusCode === 404) return false;
+    throw err;
+  }
+}
 
 // ─── Shared access check ──────────────────────────────────────────────────────
 
@@ -329,20 +380,20 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
     const rawRelative = req.path.replace(prefix, "").replace(/^\//, "");
     const relativePath = decodeURIComponent(rawRelative);
 
-    // ─── Strategy 1: Serve from pre-extracted R2 files (fast, no download needed) ───
+    // ─── Strategy 1: Serve from pre-extracted R2 files via authenticated proxy ───
+    // We proxy through the app server (not redirect) because the R2 bucket is private.
     if (version.scormExtractedPrefix) {
-      const r2PublicUrl = process.env.CF_R2_PUBLIC_URL;
-      if (r2PublicUrl) {
-        const baseUrl = r2PublicUrl.replace(/\/+$/, "");
-        const extractedPrefix = version.scormExtractedPrefix;
-        const targetFile = relativePath === "" ? (version.scormLaunchFile || "index.html") : relativePath;
-        // URL-encode each path segment (handles spaces and special chars in filenames)
-        const encodedPath = targetFile.split("/").map(seg => encodeURIComponent(seg)).join("/");
-        const encodedPrefix = extractedPrefix.split("/").map(seg => encodeURIComponent(seg)).join("/");
-        const fileUrl = `${baseUrl}/${encodedPrefix}/${encodedPath}`;
-        // Redirect to R2 URL — browser will load directly from CDN
-        res.redirect(302, fileUrl);
-        return;
+      const extractedPrefix = version.scormExtractedPrefix;
+      const targetFile = relativePath === "" ? (version.scormLaunchFile || "index.html") : relativePath;
+      const r2Key = `${extractedPrefix}/${targetFile}`;
+      try {
+        const served = await proxyR2File(r2Key, res);
+        if (served) return;
+        // Key not found — fall through to Strategy 2
+        console.warn(`[ScormServe] R2 key not found: ${r2Key}, falling back to on-the-fly extraction`);
+      } catch (err) {
+        console.error(`[ScormServe] R2 proxy error for ${r2Key}:`, err);
+        // Fall through to Strategy 2
       }
     }
 
@@ -416,7 +467,7 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
           } catch {}
         };
         search(searchRoot, 0);
-        if (found && found.startsWith(cacheDir)) {
+        if (found && (found as string).startsWith(cacheDir)) {
           targetFile = path.relative(cacheDir, found);
           fullPath = found;
         } else {
