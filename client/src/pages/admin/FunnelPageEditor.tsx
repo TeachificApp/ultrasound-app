@@ -61,7 +61,30 @@ export default function FunnelPageEditor() {
   });
   const [selectedSourceFunnelId, setSelectedSourceFunnelId] = useState<number | null>(null);
   const [selectedSourcePageId, setSelectedSourcePageId] = useState<number | null>(null);
+  const [selectedSourceCourseId, setSelectedSourceCourseId] = useState<number | null>(null);
+  const [selectedSourceDownloadId, setSelectedSourceDownloadId] = useState<number | null>(null);
+  const [selectedSourceProductId, setSelectedSourceProductId] = useState<number | null>(null);
   const [blockSearch, setBlockSearch] = useState("");
+  // Right panel resizable width
+  const [rightPanelWidth, setRightPanelWidth] = useState(288);
+  const rightPanelDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  const handleRightPanelMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    rightPanelDragRef.current = { startX: e.clientX, startWidth: rightPanelWidth };
+    const onMove = (ev: MouseEvent) => {
+      if (!rightPanelDragRef.current) return;
+      const delta = rightPanelDragRef.current.startX - ev.clientX;
+      const newWidth = Math.min(700, Math.max(240, rightPanelDragRef.current.startWidth + delta));
+      setRightPanelWidth(newWidth);
+    };
+    const onUp = () => {
+      rightPanelDragRef.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
 
   // Auto-scroll preview canvas to the selected block
   useEffect(() => {
@@ -324,31 +347,45 @@ export default function FunnelPageEditor() {
   const catalogByCat = BLOCK_CATALOG.filter(c => c.category === activeCat);
 
   // Block picker: fetch funnels with pages (for "Copy from Other Pages" tab)
-  const { data: funnelsWithPages } = trpc.funnelAdmin.getFunnelsWithPages.useQuery(
-    undefined,
-    { enabled: addMenuOpen && pickerTab === "from_pages" }
-  );
-
+    const { data: funnelsWithPages } = trpc.funnelAdmin.getFunnelsWithPages.useQuery(undefined, { enabled: addMenuOpen && pickerTab === "from_pages" });
+  const { data: coursesWithBlocks } = trpc.lmsAdmin.getCoursesWithLandingBlocks.useQuery(undefined, { enabled: addMenuOpen && pickerTab === "from_pages" });
+  const { data: downloadsWithBlocks } = trpc.lmsAdmin.getDownloadsWithLandingBlocks.useQuery(undefined, { enabled: addMenuOpen && pickerTab === "from_pages" });
+  const { data: productsWithBlocks } = trpc.lmsAdmin.getProductsWithLandingBlocks.useQuery(undefined, { enabled: addMenuOpen && pickerTab === "from_pages" });
   // Parse blocks for the selected source page
   const sourcePageBlocks = useMemo<Block[]>(() => {
     if (!selectedSourceFunnelId || !selectedSourcePageId || !funnelsWithPages) return [];
     const funnel = funnelsWithPages.find(f => f.id === selectedSourceFunnelId);
     const page = funnel?.pages.find(p => p.id === selectedSourcePageId);
     if (!page?.blocks) return [];
-    try {
-      const parsed = typeof page.blocks === "string" ? JSON.parse(page.blocks) : page.blocks;
-      return Array.isArray(parsed) ? parsed : [];
-    } catch { return []; }
+    try { const parsed = typeof page.blocks === "string" ? JSON.parse(page.blocks) : page.blocks; return Array.isArray(parsed) ? parsed : []; } catch { return []; }
   }, [selectedSourceFunnelId, selectedSourcePageId, funnelsWithPages]);
-
+  const sourceCourseBlocks = useMemo<Block[]>(() => {
+    if (!selectedSourceCourseId || !coursesWithBlocks) return [];
+    const course = coursesWithBlocks.find((c: any) => c.id === selectedSourceCourseId);
+    if (!course?.blocks) return [];
+    try { const p = typeof course.blocks === "string" ? JSON.parse(course.blocks) : course.blocks; return Array.isArray(p) ? p : []; } catch { return []; }
+  }, [selectedSourceCourseId, coursesWithBlocks]);
+  const sourceDownloadBlocks = useMemo<Block[]>(() => {
+    if (!selectedSourceDownloadId || !downloadsWithBlocks) return [];
+    const download = downloadsWithBlocks.find((d: any) => d.id === selectedSourceDownloadId);
+    if (!download?.landingBlocks) return [];
+    try { const p = typeof download.landingBlocks === "string" ? JSON.parse(download.landingBlocks) : download.landingBlocks; return Array.isArray(p) ? p : []; } catch { return []; }
+  }, [selectedSourceDownloadId, downloadsWithBlocks]);
+  const sourceProductBlocks = useMemo<Block[]>(() => {
+    if (!selectedSourceProductId || !productsWithBlocks) return [];
+    const product = productsWithBlocks.find((p: any) => p.id === selectedSourceProductId);
+    if (!product?.landingBlocks) return [];
+    try { const parsed = typeof product.landingBlocks === "string" ? JSON.parse(product.landingBlocks) : product.landingBlocks; return Array.isArray(parsed) ? parsed : []; } catch { return []; }
+  }, [selectedSourceProductId, productsWithBlocks]);
+  const activeSourceBlocks = selectedSourcePageId ? sourcePageBlocks : selectedSourceCourseId ? sourceCourseBlocks : selectedSourceDownloadId ? sourceDownloadBlocks : sourceProductBlocks;
   const filteredSourceBlocks = useMemo(() => {
-    if (!blockSearch.trim()) return sourcePageBlocks;
+    if (!blockSearch.trim()) return activeSourceBlocks;
     const q = blockSearch.toLowerCase();
-    return sourcePageBlocks.filter(b =>
+    return activeSourceBlocks.filter(b =>
       b.type.toLowerCase().includes(q) ||
       JSON.stringify(b.data).toLowerCase().includes(q)
     );
-  }, [sourcePageBlocks, blockSearch]);
+  }, [activeSourceBlocks, blockSearch]);
 
   const copyBlockFromPage = (block: Block) => {
     const copy: Block = { ...block, id: uid() };
@@ -1069,7 +1106,9 @@ export default function FunnelPageEditor() {
         </div>
 
         {/* Right Panel: Block Settings */}
-        <div className="w-72 flex-shrink-0 bg-white border-l border-gray-200 overflow-y-auto">
+        <div className="flex-shrink-0 bg-white border-l border-gray-200 overflow-y-auto relative" style={{ width: rightPanelWidth }}>
+          {/* Drag handle */}
+          <div onMouseDown={handleRightPanelMouseDown} className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-teal-400 active:bg-teal-500 z-10 transition-colors" title="Drag to resize panel" />
           {selectedBlock ? (
             <>
               <div className="flex items-center justify-between p-3 border-b border-gray-100">
@@ -1190,16 +1229,37 @@ export default function FunnelPageEditor() {
         {/* ── Copy from Other Pages tab ── */}
         {pickerTab === "from_pages" && (
           <div className="flex flex-1 overflow-hidden gap-3 min-h-0">
-            {/* Left: Funnel + Page picker */}
+            {/* Left: All page source pickers */}
             <div className="w-52 shrink-0 flex flex-col gap-2 overflow-y-auto border-r border-gray-100 pr-2">
               <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Course Page</label>
+                <select className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400" value={selectedSourceCourseId ?? ""} onChange={e => { setSelectedSourceCourseId(e.target.value ? Number(e.target.value) : null); setSelectedSourceDownloadId(null); setSelectedSourceProductId(null); setSelectedSourceFunnelId(null); setSelectedSourcePageId(null); setBlockSearch(""); }}>
+                  <option value="">— select course —</option>
+                  {coursesWithBlocks?.map((c: any) => <option key={c.id} value={c.id}>{c.title}</option>)}
+                </select>
+              </div>
+              <div className="border-t border-gray-100 pt-2">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Download Product</label>
+                <select className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400" value={selectedSourceDownloadId ?? ""} onChange={e => { setSelectedSourceDownloadId(e.target.value ? Number(e.target.value) : null); setSelectedSourceCourseId(null); setSelectedSourceProductId(null); setSelectedSourceFunnelId(null); setSelectedSourcePageId(null); setBlockSearch(""); }}>
+                  <option value="">— select product —</option>
+                  {downloadsWithBlocks?.map((d: any) => <option key={d.id} value={d.id}>{d.title}</option>)}
+                </select>
+              </div>
+              <div className="border-t border-gray-100 pt-2">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Physical Product</label>
+                <select className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400" value={selectedSourceProductId ?? ""} onChange={e => { setSelectedSourceProductId(e.target.value ? Number(e.target.value) : null); setSelectedSourceCourseId(null); setSelectedSourceDownloadId(null); setSelectedSourceFunnelId(null); setSelectedSourcePageId(null); setBlockSearch(""); }}>
+                  <option value="">— select product —</option>
+                  {productsWithBlocks?.map((p: any) => <option key={p.id} value={p.id}>{p.title}</option>)}
+                </select>
+              </div>
+              <div className="border-t border-gray-100 pt-2">
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Funnel</label>
                 <select
                   className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-teal-400"
                   value={selectedSourceFunnelId ?? ""}
                   onChange={e => {
                     setSelectedSourceFunnelId(e.target.value ? Number(e.target.value) : null);
-                    setSelectedSourcePageId(null);
+                    setSelectedSourcePageId(null); setSelectedSourceCourseId(null); setSelectedSourceDownloadId(null); setSelectedSourceProductId(null);
                   }}
                 >
                   <option value="">— select funnel —</option>
@@ -1243,7 +1303,7 @@ export default function FunnelPageEditor() {
 
             {/* Right: Block list */}
             <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-              {!selectedSourcePageId ? (
+              {!selectedSourcePageId && !selectedSourceCourseId && !selectedSourceDownloadId && !selectedSourceProductId ? (
                 <div className="flex flex-col items-center justify-center h-full text-gray-400 text-xs gap-2">
                   <BookOpen className="w-8 h-8 opacity-30" />
                   <p>Select a page to browse its blocks</p>

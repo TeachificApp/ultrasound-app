@@ -1726,7 +1726,22 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
 
       {/* Pricing */}
       <div className="border border-gray-200 rounded-lg p-4 space-y-4">
-        <h3 className="text-sm font-semibold text-gray-700">Pricing</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-700">Pricing</h3>
+          {course.slug && (
+            <button
+              onClick={() => {
+                const url = `${window.location.origin}/courses/${course.slug}?checkout=1`;
+                navigator.clipboard.writeText(url).then(() => toast.success("Main checkout link copied!"));
+              }}
+              className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700 px-2 py-1 rounded border border-blue-200 hover:bg-blue-50 transition-colors"
+              title={`Copy main checkout link`}
+            >
+              <Link2 className="w-3 h-3" />
+              Copy checkout link
+            </button>
+          )}
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <Label className="text-sm">Pricing Type</Label>
