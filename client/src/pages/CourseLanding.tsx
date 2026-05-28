@@ -239,6 +239,13 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
               el?.scrollIntoView({ behavior: "smooth" });
             } else if (beh === "download_file" && d.heroDownloadUrl) window.open(d.heroDownloadUrl, "_blank");
             else if (beh === "open_popup" && d.heroPopupUrl) window.open(d.heroPopupUrl, "_blank");
+            else if (beh === "pricing_option") {
+              const poId = d.heroPricingOptionId ? Number(d.heroPricingOptionId) : undefined;
+              if (onEnrollWithOption) onEnrollWithOption(poId);
+              else onEnroll();
+            } else if (beh === "direct_checkout") {
+              onEnroll();
+            }
           }
         : undefined;
       return (

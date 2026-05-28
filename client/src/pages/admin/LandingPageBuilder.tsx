@@ -1169,7 +1169,7 @@ function PricingCtaSettings({ d, set, setMany }: { d: Record<string, any>; set: 
   const ctaLink: string = d.ctaLink ?? d.ctaUrl ?? "";
   const linkedFromUrl = priceSource === "linked"
     ? allItems.find((item: any) => {
-        const urlMap: Record<string, string> = { course: `/courses/${item.slug}`, quiz: `/courses/${item.slug}`, download: `/downloads/${item.slug}`, bundle: `/bundles/${item.slug}`, product: `/product/${item.slug}` };
+        const urlMap: Record<string, string> = { course: `/courses/${item.slug}`, quiz: `/courses/${item.slug}`, cohort: `/courses/${item.slug}`, download: `/downloads/${item.slug}`, bundle: `/bundles/${item.slug}`, product: `/product/${item.slug}` };
         const expected = urlMap[item.type] ?? `/courses/${item.slug}`;
         return ctaLink && ctaLink.includes(expected);
       })
@@ -1204,7 +1204,7 @@ function PricingCtaSettings({ d, set, setMany }: { d: Record<string, any>; set: 
     }
     const item = allItems.find((i: any) => i.id === Number(idStr));
     if (!item) return;
-    const urlMap: Record<string, string> = { course: `/courses/${item.slug}`, quiz: `/courses/${item.slug}`, download: `/downloads/${item.slug}`, bundle: `/bundles/${item.slug}`, product: `/product/${item.slug}` };
+    const urlMap: Record<string, string> = { course: `/courses/${item.slug}`, quiz: `/courses/${item.slug}`, cohort: `/courses/${item.slug}`, download: `/downloads/${item.slug}`, bundle: `/bundles/${item.slug}`, product: `/product/${item.slug}` };
     const autoUrl = urlMap[item.type] ?? `/courses/${item.slug}`;
     const priceDisplay = formatItemPrice(item);
     const intervalLabel = item.pricingType === "subscription" && item.subscriptionInterval

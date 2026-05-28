@@ -48,13 +48,13 @@ export const funnelRouter = router({
     if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
     const db = await getDb();
     const [courses, downloads, bundles, physical] = await Promise.all([
-      db.select({ id: lmsCourses.id, title: lmsCourses.title, price: lmsCourses.price, thumbnailUrl: lmsCourses.thumbnailUrl }).from(lmsCourses).orderBy(asc(lmsCourses.title)),
+      db.select({ id: lmsCourses.id, title: lmsCourses.title, price: lmsCourses.price, thumbnailUrl: lmsCourses.thumbnailUrl, courseType: lmsCourses.type }).from(lmsCourses).orderBy(asc(lmsCourses.title)),
       db.select({ id: digitalProducts.id, title: digitalProducts.title, price: digitalProducts.price, thumbnailUrl: digitalProducts.thumbnailUrl }).from(digitalProducts).orderBy(asc(digitalProducts.title)),
       db.select({ id: digitalBundles.id, title: digitalBundles.title, price: digitalBundles.discountPrice, thumbnailUrl: digitalBundles.thumbnailUrl }).from(digitalBundles).orderBy(asc(digitalBundles.title)),
       db.select({ id: physicalProducts.id, title: physicalProducts.title, price: physicalProducts.price, thumbnailUrl: physicalProducts.thumbnailUrl }).from(physicalProducts).orderBy(asc(physicalProducts.title)),
     ]);
     return [
-      ...courses.map(c => ({ id: c.id, type: "course" as const, name: c.title, price: c.price ?? 0, imageUrl: c.thumbnailUrl ?? "" })),
+      ...courses.map(c => ({ id: c.id, type: (c.courseType === "cohort" ? "cohort" : c.courseType === "quiz" ? "quiz" : "course") as string, name: c.title, price: c.price ?? 0, imageUrl: c.thumbnailUrl ?? "" })),
       ...downloads.map(d => ({ id: d.id, type: "download" as const, name: d.title, price: d.price ?? 0, imageUrl: d.thumbnailUrl ?? "" })),
       ...bundles.map(b => ({ id: b.id, type: "bundle" as const, name: b.title, price: b.price ?? 0, imageUrl: b.thumbnailUrl ?? "" })),
       ...physical.map(p => ({ id: p.id, type: "physical" as const, name: p.title, price: p.price ?? 0, imageUrl: p.thumbnailUrl ?? "" })),
@@ -73,14 +73,16 @@ export const funnelRouter = router({
       if (input.items.length === 0) return [];
       const db = await getDb();
 
-      const courseIds = input.items.filter(i => i.type === "course").map(i => i.id);
+      const courseIds = input.items.filter(i => i.type === "course" || i.type === "quiz").map(i => i.id);
+      const cohortIds = input.items.filter(i => i.type === "cohort").map(i => i.id);
       const downloadIds = input.items.filter(i => i.type === "download").map(i => i.id);
       const bundleIds = input.items.filter(i => i.type === "bundle").map(i => i.id);
       const physicalIds = input.items.filter(i => i.type === "physical").map(i => i.id);
+      const allLmsCourseIds = [...new Set([...courseIds, ...cohortIds])];
 
       const [courses, downloads, bundles, physicals] = await Promise.all([
-        courseIds.length > 0
-          ? db.select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug, price: lmsCourses.price, isFree: lmsCourses.isFree, description: lmsCourses.subtitle, imageUrl: lmsCourses.coverImageUrl }).from(lmsCourses).where(inArray(lmsCourses.id, courseIds))
+        allLmsCourseIds.length > 0
+          ? db.select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug, price: lmsCourses.price, isFree: lmsCourses.isFree, description: lmsCourses.subtitle, imageUrl: lmsCourses.coverImageUrl, courseType: lmsCourses.type }).from(lmsCourses).where(inArray(lmsCourses.id, allLmsCourseIds))
           : [],
         downloadIds.length > 0
           ? db.select({ id: digitalProducts.id, title: digitalProducts.title, slug: digitalProducts.slug, price: digitalProducts.price, isFree: digitalProducts.isFree, description: digitalProducts.subtitle, imageUrl: digitalProducts.thumbnailUrl }).from(digitalProducts).where(inArray(digitalProducts.id, downloadIds))
@@ -108,7 +110,12 @@ export const funnelRouter = router({
 
       // Preserve the order specified by input.items
       const map = new Map<string, object>();
-      for (const c of courses as any[]) map.set(`course-${c.id}`, { ...c, type: "course", isFree: c.isFree ?? false, href: `/courses/${c.slug}` });
+      for (const c of courses as any[]) {
+        const resolvedType = c.courseType === "cohort" ? "cohort" : c.courseType === "quiz" ? "quiz" : "course";
+        const entry = { ...c, type: resolvedType, isFree: c.isFree ?? false, href: `/courses/${c.slug}` };
+        map.set(`course-${c.id}`, entry);
+        map.set(`${resolvedType}-${c.id}`, entry);
+      }
       // Register fallback downloads under BOTH keys so the original course-{id} lookup resolves
       for (const d of fallbackDownloads as any[]) {
         const entry = { ...d, type: "download", isFree: d.isFree ?? false, href: `/downloads/${d.slug}` };
@@ -1657,7 +1664,7 @@ export const funnelPublicRouter = router({
   createDirectCheckout: publicProcedure
     .input(
       z.object({
-        productType: z.enum(["course", "download", "product", "bundle"]),
+        productType: z.enum(["course", "quiz", "cohort", "download", "product", "bundle"]),
         productId: z.number().int().positive(),
         origin: z.string(),
         email: z.string().email().optional(),
@@ -1675,7 +1682,7 @@ export const funnelPublicRouter = router({
       let productName = "";
       let unitAmount = 0; // in cents
       let currency = "usd";
-      if (input.productType === "course") {
+      if (input.productType === "course" || input.productType === "quiz" || input.productType === "cohort") {
         const [course] = await db.select({ id: lmsCourses.id, title: lmsCourses.title, price: lmsCourses.price, currency: lmsCourses.currency, isFree: lmsCourses.isFree, pricingType: lmsCourses.pricingType })
           .from(lmsCourses).where(eq(lmsCourses.id, input.productId)).limit(1);
         if (!course) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });

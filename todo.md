@@ -3564,3 +3564,10 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Upgrade Order Bump editor: add presentation mode toggle (Widget vs Landing Page)
 - [x] Order Bump Landing Page mode: full block editor with drag-and-drop, per-block settings, and live preview
 - [x] Add pageBlocks, presentationMode, slug to orderBumpsAdmin create/update procedures
+- [ ] Fix downloads not showing in Education Library (debug brand filter / query issue)
+- [ ] Add analytics, student management, and access management to Downloads admin (matching Courses)
+- [ ] Add cohort as selectable type in all CTA pickers across the app
+- [ ] Add image upload support to Order Bumps editor
+- [ ] Fix purchase access link resend for students who didn't receive it
+- [ ] Add user search to enrollments tab in course admin
+- [x] Fix heroClickHandler missing pricing_option and direct_checkout cases in CourseLanding (hero whole-clickable mode)
