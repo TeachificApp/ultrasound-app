@@ -3664,11 +3664,10 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <span className="text-teal-700 font-bold text-sm uppercase tracking-wide shrink-0">Edit Lesson</span>
             <span className="text-gray-300 text-sm shrink-0">·</span>
             <span className="text-gray-800 font-semibold text-sm truncate" title={lesson.title}>{lesson.title}</span>
-            <span className="text-gray-400 text-xs shrink-0 ml-1">({LESSON_TYPE_LABELS[lesson.type] ?? lesson.type})</span>
           </div>
         </div>
         {/* Save / Close actions — always visible in header */}
