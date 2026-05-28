@@ -157,6 +157,84 @@ const VideoNode = Node.create({
   },
 });
 
+// ─── Custom CTA Button TipTap Node ──────────────────────────────────────────
+// TipTap v3 strips data-* attributes from unknown <span> elements.
+// This inline atom node preserves all CTA button attributes through parse/serialize.
+const CtaButtonNode = Node.create({
+  name: "ctaButton",
+  group: "inline",
+  inline: true,
+  atom: true,
+
+  addAttributes() {
+    return {
+      // The visible button text
+      label: { default: "" },
+      // Inline style string (background, color, padding, etc.)
+      buttonStyle: { default: "" },
+      // Action type
+      action: { default: "url" },
+      // URL for action=url
+      link: { default: null },
+      // Email for action=send_email
+      email: { default: null },
+      // Phone for action=phone
+      phone: { default: null },
+      // Anchor for action=scroll_to_section
+      anchor: { default: null },
+      // Popup URL/embed for action=open_popup
+      popup: { default: null },
+      // Download URL for action=download_file
+      download: { default: null },
+      // Checkout type for action=direct_checkout
+      checkoutType: { default: null },
+      // Checkout product ID for action=direct_checkout
+      checkoutId: { default: null },
+      // Pricing option ID for action=pricing_option
+      pricingOption: { default: null },
+    };
+  },
+
+  parseHTML() {
+    return [{
+      tag: "span[data-cta-btn]",
+      getAttrs: (el: HTMLElement) => ({
+        label: el.textContent ?? "",
+        buttonStyle: el.getAttribute("style") ?? "",
+        action: el.getAttribute("data-action") ?? "url",
+        link: el.getAttribute("data-link"),
+        email: el.getAttribute("data-email"),
+        phone: el.getAttribute("data-phone"),
+        anchor: el.getAttribute("data-anchor"),
+        popup: el.getAttribute("data-popup"),
+        download: el.getAttribute("data-download"),
+        checkoutType: el.getAttribute("data-checkout-type"),
+        checkoutId: el.getAttribute("data-checkout-id"),
+        pricingOption: el.getAttribute("data-pricing-option"),
+      }),
+    }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    const { label, buttonStyle, action, link, email, phone, anchor, popup, download, checkoutType, checkoutId, pricingOption } = HTMLAttributes;
+    const attrs: Record<string, string> = {
+      "data-cta-btn": "1",
+      style: buttonStyle ?? "",
+      "data-action": action ?? "url",
+    };
+    if (link) attrs["data-link"] = link;
+    if (email) attrs["data-email"] = email;
+    if (phone) attrs["data-phone"] = phone;
+    if (anchor) attrs["data-anchor"] = anchor;
+    if (popup) attrs["data-popup"] = popup;
+    if (download) attrs["data-download"] = download;
+    if (checkoutType) attrs["data-checkout-type"] = checkoutType;
+    if (checkoutId != null) attrs["data-checkout-id"] = String(checkoutId);
+    if (pricingOption != null) attrs["data-pricing-option"] = String(pricingOption);
+    return ["span", attrs, label ?? ""];
+  },
+});
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface RichTextEditorProps {
@@ -534,6 +612,7 @@ export default function RichTextEditor({
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       ImageResize.configure({ inline: false, allowBase64: true }),
       VideoNode,
+      CtaButtonNode,
       Link.configure({
         openOnClick: false,
         autolink: true,
@@ -647,19 +726,25 @@ export default function RichTextEditor({
     const fontSize = ctaSize === "sm" ? "13px" : ctaSize === "lg" ? "18px" : "15px";
     const display = ctaFullWidth ? "block" : "inline-block";
     const width = ctaFullWidth ? "100%" : "auto";
-    const baseStyle = `display:${display};width:${width};text-align:center;padding:${padding};background-color:${ctaBgColor};color:${ctaTextColor};border-radius:8px;font-weight:700;font-size:${fontSize};text-decoration:none;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.12);`;
-    // Build data attributes based on action type
-    let dataAttrs = `data-cta-btn data-action="${ctaAction}"`;
-    if (ctaAction === "url") dataAttrs += ` data-link="${ctaUrl.trim() || "#"}"`;
-    else if (ctaAction === "send_email") dataAttrs += ` data-email="${ctaEmail.trim()}"`;
-    else if (ctaAction === "phone") dataAttrs += ` data-phone="${ctaPhone.trim()}"`;
-    else if (ctaAction === "scroll_to_section") dataAttrs += ` data-anchor="${ctaAnchor.trim()}"`;
-    else if (ctaAction === "open_popup") dataAttrs += ` data-popup="${ctaPopup.trim()}"`;
-    else if (ctaAction === "download_file") dataAttrs += ` data-download="${ctaDownload.trim()}"`;
-    else if (ctaAction === "direct_checkout") dataAttrs += ` data-checkout-type="${ctaCheckoutProductType}" data-checkout-id="${ctaCheckoutProductId ?? ""}"`;
-    else if (ctaAction === "pricing_option") dataAttrs += ` data-pricing-option="${ctaPricingOptionId ?? ""}"`;
-    const html = `<span ${dataAttrs} style="${baseStyle}">${ctaText.trim()}</span>`;
-    editor.chain().focus().insertContent(html).run();
+    const buttonStyle = `display:${display};width:${width};text-align:center;padding:${padding};background-color:${ctaBgColor};color:${ctaTextColor};border-radius:8px;font-weight:700;font-size:${fontSize};text-decoration:none;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.12);`;
+    // Insert as a CtaButtonNode to preserve all data-* attributes through TipTap's serialization
+    editor.chain().focus().insertContent({
+      type: "ctaButton",
+      attrs: {
+        label: ctaText.trim(),
+        buttonStyle,
+        action: ctaAction,
+        link: ctaAction === "url" ? (ctaUrl.trim() || "#") : null,
+        email: ctaAction === "send_email" ? ctaEmail.trim() : null,
+        phone: ctaAction === "phone" ? ctaPhone.trim() : null,
+        anchor: ctaAction === "scroll_to_section" ? ctaAnchor.trim() : null,
+        popup: ctaAction === "open_popup" ? ctaPopup.trim() : null,
+        download: ctaAction === "download_file" ? ctaDownload.trim() : null,
+        checkoutType: ctaAction === "direct_checkout" ? ctaCheckoutProductType : null,
+        checkoutId: ctaAction === "direct_checkout" ? (ctaCheckoutProductId ?? null) : null,
+        pricingOption: ctaAction === "pricing_option" ? (ctaPricingOptionId ?? null) : null,
+      },
+    }).run();
     setCtaDialogOpen(false);
   }, [editor, ctaText, ctaAction, ctaUrl, ctaEmail, ctaPhone, ctaAnchor, ctaPopup, ctaDownload, ctaCheckoutProductType, ctaCheckoutProductId, ctaPricingOptionId, ctaBgColor, ctaTextColor, ctaSize, ctaFullWidth]);
 
@@ -1524,3 +1609,5 @@ export function RichTextDisplay({
     />
   );
 }
+
+

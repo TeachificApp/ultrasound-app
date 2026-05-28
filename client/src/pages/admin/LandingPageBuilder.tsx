@@ -865,7 +865,7 @@ function BSLinkField({ data, onSet, label, field, value, onChange }: {
 type CTAAction =
   | "url" | "send_email" | "next_funnel_step" | "direct_checkout"
   | "free_preview" | "group_purchase" | "order_bump_lp"
-  | "scroll_to_section" | "open_popup" | "download_file";
+  | "scroll_to_section" | "open_popup" | "download_file" | "pricing_option";
 
 const CTA_ACTION_LABELS: Record<CTAAction, string> = {
   url: "Link to URL",
@@ -875,6 +875,7 @@ const CTA_ACTION_LABELS: Record<CTAAction, string> = {
   free_preview: "Direct to Checkout (Free Preview)",
   group_purchase: "Direct to Checkout (Group Purchase)",
   order_bump_lp: "Order Bump Landing Page",
+  pricing_option: "Pricing Option Checkout",
   scroll_to_section: "Scroll to Section",
   open_popup: "Open Video / Form / Popup",
   download_file: "Download File",
@@ -928,9 +929,24 @@ function CTAActionPicker({
   onCheckoutProductChange?: (type: string, id: number | null) => void;
   groupDiscountTiersValue?: Array<{ minSeats: number; discountPercent: number }>;
   onGroupDiscountTiersChange?: (tiers: Array<{ minSeats: number; discountPercent: number }>) => void;
+  pricingOptionIdValue?: number | null;
+  onPricingOptionChange?: (courseId: number | null, pricingOptionId: number | null) => void;
+  pricingOptionCourseIdValue?: number | null;
 }) {
   const behavior = (behaviorValue ?? "url") as CTAAction;
   const isCheckoutBehavior = behavior === "direct_checkout" || behavior === "free_preview" || behavior === "group_purchase";
+  // Pricing option picker state
+  const [poCourseId, setPoCoursId] = React.useState<number | null>(pricingOptionCourseIdValue ?? null);
+  const { data: poCoursesData } = trpc.lmsAdmin.listCourses.useQuery(
+    { status: "all", type: "all", pageSize: 200 },
+    { enabled: behavior === "pricing_option" }
+  );
+  const poCourses = (poCoursesData?.courses ?? []) as Array<{ id: number; title: string; type: string }>;
+  const { data: poOptionsData } = trpc.lmsAdmin.listPricingOptions.useQuery(
+    { courseId: poCourseId! },
+    { enabled: behavior === "pricing_option" && !!poCourseId }
+  );
+  const poOptions = (poOptionsData ?? []) as Array<{ id: number; label: string; pricingType: string; price: number }>;
   return (
     <div className="space-y-2">
       <div>
@@ -1060,6 +1076,46 @@ function CTAActionPicker({
           <label className="text-xs text-gray-500 block mb-1">File URL</label>
           <DebouncedInput value={downloadValue ?? ""} onChange={onDownloadChange ?? (() => {})} className="h-7 text-xs" placeholder="https://... (direct file URL)" />
           <p className="text-[10px] text-gray-400 mt-0.5">Triggers a file download when clicked. Use a direct link to a PDF, ZIP, etc.</p>
+        </div>
+      )}
+      {behavior === "pricing_option" && (
+        <div className="space-y-2 bg-teal-50 border border-teal-200 rounded p-2">
+          <p className="text-[10px] text-teal-700 font-medium">Links directly to a specific pricing option checkout for a course.</p>
+          <div>
+            <label className="text-xs text-gray-500 block mb-0.5">Course</label>
+            <select
+              value={poCourseId ?? ""}
+              onChange={e => {
+                const id = e.target.value ? Number(e.target.value) : null;
+                setPoCoursId(id);
+                onPricingOptionChange?.(id, null);
+              }}
+              className="w-full h-7 text-xs rounded border border-gray-200 px-2"
+            >
+              <option value="">-- Select course --</option>
+              {poCourses.map(c => (
+                <option key={c.id} value={c.id}>{c.title} ({c.type})</option>
+              ))}
+            </select>
+          </div>
+          {poCourseId && (
+            <div>
+              <label className="text-xs text-gray-500 block mb-0.5">Pricing Option</label>
+              <select
+                value={pricingOptionIdValue ?? ""}
+                onChange={e => onPricingOptionChange?.(poCourseId, e.target.value ? Number(e.target.value) : null)}
+                className="w-full h-7 text-xs rounded border border-gray-200 px-2"
+              >
+                <option value="">-- Select pricing option --</option>
+                {poOptions.map(o => (
+                  <option key={o.id} value={o.id}>
+                    {o.label} ({o.pricingType}) — ${Number(o.price).toFixed(2)}
+                  </option>
+                ))}
+              </select>
+              {poOptions.length === 0 && <p className="text-[10px] text-gray-400 mt-0.5">No pricing options found for this course.</p>}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -2425,6 +2481,9 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                   onCheckoutProductChange={(type, id) => setMany({ heroCheckoutProductType: type || undefined, heroCheckoutProductId: id ?? undefined })}
                   groupDiscountTiersValue={d.heroGroupDiscountTiers ?? []}
                   onGroupDiscountTiersChange={v => set("heroGroupDiscountTiers", v)}
+                  pricingOptionIdValue={d.heroPricingOptionId ?? null}
+                  pricingOptionCourseIdValue={d.heroPricingOptionCourseId ?? null}
+                  onPricingOptionChange={(cid, oid) => setMany({ heroPricingOptionCourseId: cid, heroPricingOptionId: oid })}
                 />
               </div>
             )}
@@ -2480,6 +2539,9 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                     onCheckoutProductChange={(type, id) => setBtnMulti(idx, { checkoutProductType: type || undefined, checkoutProductId: id ?? undefined })}
                     groupDiscountTiersValue={(btn as any).groupDiscountTiers ?? []}
                     onGroupDiscountTiersChange={v => setBtnMulti(idx, { groupDiscountTiers: v })}
+                    pricingOptionIdValue={(btn as any).pricingOptionId ?? null}
+                    pricingOptionCourseIdValue={(btn as any).pricingOptionCourseId ?? null}
+                    onPricingOptionChange={(cid, oid) => setBtnMulti(idx, { pricingOptionCourseId: cid, pricingOptionId: oid })}
                   />
                   {(btn.behavior ?? "url") === "send_email" && (
                     <HeroSendEmailSettings btn={btn} idx={idx} setBtn={setBtn} setBtnMulti={setBtnMulti} />
@@ -2576,6 +2638,9 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                 onCheckoutProductChange={(type, id) => setMany({ linkCheckoutProductType: type, linkCheckoutProductId: id })}
                 groupDiscountTiersValue={d.linkGroupDiscountTiers ?? []}
                 onGroupDiscountTiersChange={v => set("linkGroupDiscountTiers", v)}
+                pricingOptionIdValue={d.linkPricingOptionId ?? null}
+                pricingOptionCourseIdValue={d.linkPricingOptionCourseId ?? null}
+                onPricingOptionChange={(cid, oid) => setMany({ linkPricingOptionCourseId: cid, linkPricingOptionId: oid })}
               />
               <div className="flex items-center gap-2">
                 <input type="checkbox" checked={d.openInNewTab ?? true} onChange={e => set("openInNewTab", e.target.checked)} className="rounded" />
@@ -3030,6 +3095,9 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
             onCheckoutProductChange={(type, id) => setMany({ checkoutProductType: type, checkoutProductId: id })}
             groupDiscountTiersValue={d.groupDiscountTiers ?? []}
             onGroupDiscountTiersChange={v => set("groupDiscountTiers", v)}
+            pricingOptionIdValue={d.ctaPricingOptionId ?? null}
+            pricingOptionCourseIdValue={d.ctaPricingOptionCourseId ?? null}
+            onPricingOptionChange={(cid, oid) => setMany({ ctaPricingOptionCourseId: cid, ctaPricingOptionId: oid })}
           />
           <BSColorField data={d} onSet={set} label="CTA Color" field="ctaColor" />
           <BSColorField data={d} onSet={set} label="CTA Text Color" field="ctaTextColor" />
@@ -3204,6 +3272,9 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                     onCheckoutProductChange={(type, id) => set("products", products.map((p, j) => j === i ? { ...p, checkoutProductType: type, checkoutProductId: id } : p))}
                     groupDiscountTiersValue={(product as any).groupDiscountTiers ?? []}
                     onGroupDiscountTiersChange={v => set("products", products.map((p, j) => j === i ? { ...p, groupDiscountTiers: v } : p))}
+                    pricingOptionIdValue={(product as any).ctaPricingOptionId ?? null}
+                    pricingOptionCourseIdValue={(product as any).ctaPricingOptionCourseId ?? null}
+                    onPricingOptionChange={(cid, oid) => set("products", products.map((p, j) => j === i ? { ...p, ctaPricingOptionCourseId: cid, ctaPricingOptionId: oid } : p))}
                   />
                   <DebouncedInput value={product.fulfillment ?? ""} onChange={v => set("products", products.map((p, j) => j === i ? { ...p, fulfillment: v } : p))} className="h-7 text-xs" placeholder="Fulfillment note" />
                   <DebouncedInput value={product.imageUrl ?? ""} onChange={v => set("products", products.map((p, j) => j === i ? { ...p, imageUrl: v } : p))} className="h-7 text-xs" placeholder="Image URL" />
@@ -3311,6 +3382,9 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
             onCheckoutProductChange={(type, id) => setMany({ checkoutProductType: type, checkoutProductId: id })}
             groupDiscountTiersValue={d.groupDiscountTiers ?? []}
             onGroupDiscountTiersChange={v => set("groupDiscountTiers", v)}
+            pricingOptionIdValue={d.ctaPricingOptionId ?? null}
+            pricingOptionCourseIdValue={d.ctaPricingOptionCourseId ?? null}
+            onPricingOptionChange={(cid, oid) => setMany({ ctaPricingOptionCourseId: cid, ctaPricingOptionId: oid })}
           />
           <BSColorField data={d} onSet={set} label="CTA Color" field="ctaColor" />
           <BSColorField data={d} onSet={set} label="CTA Text Color" field="ctaTextColor" />
@@ -3360,6 +3434,9 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
             onCheckoutProductChange={(type, id) => setMany({ checkoutProductType: type, checkoutProductId: id })}
             groupDiscountTiersValue={d.groupDiscountTiers ?? []}
             onGroupDiscountTiersChange={v => set("groupDiscountTiers", v)}
+            pricingOptionIdValue={d.ctaPricingOptionId ?? null}
+            pricingOptionCourseIdValue={d.ctaPricingOptionCourseId ?? null}
+            onPricingOptionChange={(cid, oid) => setMany({ ctaPricingOptionCourseId: cid, ctaPricingOptionId: oid })}
           />
           <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
           <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
@@ -4414,6 +4491,9 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                       checkoutProductTypeValue={tier.checkoutProductType}
                       checkoutProductIdValue={tier.checkoutProductId ?? null}
                       onCheckoutProductChange={(type, id) => setTier(ti, { checkoutProductType: type, checkoutProductId: id })}
+                      pricingOptionIdValue={tier.ctaPricingOptionId ?? null}
+                      pricingOptionCourseIdValue={tier.ctaPricingOptionCourseId ?? null}
+                      onPricingOptionChange={(cid, oid) => setTier(ti, { ctaPricingOptionCourseId: cid, ctaPricingOptionId: oid })}
                     />
                   </div>
                 </div>
@@ -5009,6 +5089,26 @@ export default function LandingPageBuilder() {
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  // Right panel resizable width
+  const [rightPanelWidth, setRightPanelWidth] = useState(288);
+  const rightPanelDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  const handleRightPanelMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    rightPanelDragRef.current = { startX: e.clientX, startWidth: rightPanelWidth };
+    const onMove = (ev: MouseEvent) => {
+      if (!rightPanelDragRef.current) return;
+      const delta = rightPanelDragRef.current.startX - ev.clientX;
+      const newWidth = Math.min(700, Math.max(240, rightPanelDragRef.current.startWidth + delta));
+      setRightPanelWidth(newWidth);
+    };
+    const onUp = () => {
+      rightPanelDragRef.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
   const [hasLoaded, setHasLoaded] = useState(false);
 
   // SEO / Link Preview state
@@ -5647,27 +5747,33 @@ export default function LandingPageBuilder() {
         </div>
 
         {/* Right Panel: Block Settings / Page SEO */}
-        <div className="w-72 flex-shrink-0 bg-white border-l border-gray-200 overflow-y-auto">
+        <div className="flex-shrink-0 bg-white border-l border-gray-200 overflow-y-auto relative" style={{ width: rightPanelWidth }}>
+          {/* Drag handle */}
+          <div
+            onMouseDown={handleRightPanelMouseDown}
+            className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-teal-400 active:bg-teal-500 z-10 transition-colors"
+            title="Drag to resize panel"
+          />
           {selectedBlock ? (
             <>
-              <div className="flex items-center justify-between p-3 border-b border-gray-100">
+              <div className="flex items-center justify-between pl-4 pr-3 py-3 border-b border-gray-100">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   {BLOCK_CATALOG.find(c => c.type === selectedBlock.type)?.label ?? "Block"} Settings
                 </p>
                 <button onClick={() => setSelectedId(null)} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>
               </div>
-              <div className="p-3">
+              <div className="pl-4 pr-3 py-3">
                 <BlockSettings block={selectedBlock} onChange={(data) => updateBlock(selectedBlock.id, data)} courseId={numericCourseId} />
               </div>
             </>
           ) : (
             <div className="flex flex-col h-full">
-              <div className="p-3 border-b border-gray-100">
+              <div className="pl-4 pr-3 py-3 border-b border-gray-100">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
                   <Bookmark size={12} /> Link Preview / SEO
                 </p>
               </div>
-              <div className="p-3 space-y-3 flex-1">
+              <div className="pl-4 pr-3 py-3 space-y-3 flex-1">
                 <p className="text-[10px] text-gray-400">Override what iMessage, WhatsApp, and social media show when this page link is shared.</p>
                 <div>
                   <label className="text-[10px] font-medium text-gray-600 block mb-1">Display Name (og:title)</label>

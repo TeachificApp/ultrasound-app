@@ -417,6 +417,32 @@ textarea,
   color: inherit;
 }
 
+/* Rich text table styles — Tailwind preflight resets borders; restore them for .prose tables */
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid #d1d5db;
+  font-size: 0.9em;
+  margin: 1em 0;
+}
+.prose th,
+.prose td {
+  border: 1px solid #d1d5db;
+  padding: 0.5em 0.75em;
+  text-align: left;
+  vertical-align: top;
+}
+.prose thead tr {
+  background-color: #f3f4f6;
+}
+.prose th {
+  font-weight: 600;
+  background-color: #f3f4f6;
+}
+.prose tr:nth-child(even) {
+  background-color: #fafafa;
+}
+
 /* Page Builder Editor Drawer animation */
 @keyframes slideInRight {
   from { transform: translateX(100%); }

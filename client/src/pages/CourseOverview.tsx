@@ -21,8 +21,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import {
   Award, BookOpen, CheckCircle, ChevronDown, ChevronRight, Clock, Edit3,
   Lock, PlayCircle, User, FileText, HelpCircle, Download, Monitor,
-  ArrowRight, ListChecks, ExternalLink, Video,
+  ArrowRight, ListChecks, ExternalLink, Video, Film, Upload, Link2,
+  CheckCircle2, Calendar, AlertCircle,
 } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
 
@@ -87,10 +89,19 @@ export default function CourseOverview() {
   const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set());
   const [showEditor, setShowEditor] = useState(false);
   const [selectedInstructor, setSelectedInstructor] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<"overview" | "cohort">("overview");
 
   const { data, isLoading, refetch } = trpc.lmsLearner.getCourseOverview.useQuery(
     { slug: slug!, preview: isAdmin },
     { enabled: !!slug && !!user }
+  );
+
+  // Cohort schedule query — only runs when course is a cohort type
+  const courseId = (data as any)?.course?.id as number | undefined;
+  const isCohortCourse = (data as any)?.course?.type === "cohort";
+  const { data: cohortData, isLoading: cohortLoading } = trpc.lmsLearner.getCohortSchedule.useQuery(
+    { courseId: courseId! },
+    { enabled: !!courseId && isCohortCourse && !!user }
   );
 
   // Expand all sections by default
@@ -333,7 +344,57 @@ export default function CourseOverview() {
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto px-6 py-8 space-y-8">
+      {/* Cohort tab bar — only shown for cohort-type courses */}
+      {isCohortCourse && (
+        <div className="bg-white border-b border-gray-200 sticky top-[65px] z-20">
+          <div className="max-w-5xl mx-auto px-6">
+            <div className="flex gap-0">
+              <button
+                onClick={() => setActiveTab("overview")}
+                className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === "overview"
+                    ? "border-teal-600 text-teal-700"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
+              >
+                <span className="flex items-center gap-1.5">
+                  <BookOpen className="w-4 h-4" />
+                  Course Overview
+                </span>
+              </button>
+              <button
+                onClick={() => setActiveTab("cohort")}
+                className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === "cohort"
+                    ? "border-teal-600 text-teal-700"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
+              >
+                <span className="flex items-center gap-1.5">
+                  <Video className="w-4 h-4" />
+                  My Cohort
+                  {(() => {
+                    const cd = cohortData as any;
+                    const upcoming = (cd?.sessions ?? []).filter((s: any) => new Date(s.sessionDate) > new Date()).length;
+                    const pending = (cd?.assignments ?? []).filter((a: any) => a.dueDate && new Date(a.dueDate) > new Date()).length;
+                    const total = upcoming + pending;
+                    return total > 0 ? (
+                      <span className="ml-1 bg-teal-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{total}</span>
+                    ) : null;
+                  })()}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cohort Dashboard Tab */}
+      {isCohortCourse && activeTab === "cohort" && (
+        <CohortDashboardTab courseId={courseId!} cohortData={cohortData as any} isLoading={cohortLoading} />
+      )}
+
+      <div className={`max-w-5xl mx-auto px-6 py-8 space-y-8 ${isCohortCourse && activeTab === "cohort" ? "hidden" : ""}`}>
         {/* Top Zone blocks (above progress bar) */}
         {overviewTopBlocks.length > 0 && (
           <div className="bg-white rounded-xl overflow-hidden shadow-sm border border-gray-200">
@@ -558,5 +619,348 @@ export default function CourseOverview() {
         />
       )}
     </div>
+  );
+}
+
+// ─── Cohort Dashboard Tab ────────────────────────────────────────────────────
+
+function fmtCohortDate(d: Date | string | null | undefined) {
+  if (!d) return "TBD";
+  return new Date(d).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+}
+function fmtCohortTime(d: Date | string | null | undefined) {
+  if (!d) return "";
+  return new Date(d).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZoneName: "short" });
+}
+function fmtCohortDuration(mins: number) {
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+function isUpcomingDate(d: Date | string | null | undefined) {
+  return !!d && new Date(d) > new Date();
+}
+function isPastDate(d: Date | string | null | undefined) {
+  return !!d && new Date(d) < new Date();
+}
+function isDueSoonDate(d: Date | string | null | undefined) {
+  if (!d) return false;
+  const diff = new Date(d).getTime() - Date.now();
+  return diff > 0 && diff < 3 * 24 * 60 * 60 * 1000;
+}
+
+function CohortDashboardTab({ courseId, cohortData, isLoading }: { courseId: number; cohortData: any; isLoading: boolean }) {
+  const [, navigate] = useLocation();
+  const [cohortTab, setCohortTab] = useState<"sessions" | "assignments" | "replays">("sessions");
+
+  if (isLoading) {
+    return (
+      <div className="max-w-5xl mx-auto px-6 py-12 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-gray-500 text-sm">Loading cohort schedule…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!cohortData) {
+    return (
+      <div className="max-w-5xl mx-auto px-6 py-12">
+        <Card className="text-center py-16">
+          <CardContent>
+            <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-500 font-medium">No cohort data available</p>
+            <p className="text-gray-400 text-sm mt-1">Your cohort schedule will appear here once published by your instructor.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const { sessions = [], assignments = [], recordings = [], mySubmissions = [] } = cohortData;
+  const upcomingSessions = sessions.filter((s: any) => isUpcomingDate(s.sessionDate));
+  const pastSessions = sessions.filter((s: any) => isPastDate(s.sessionDate));
+  const pendingAssignments = assignments.filter((a: any) => a.dueDate && isUpcomingDate(a.dueDate));
+  const overdueAssignments = assignments.filter((a: any) => a.dueDate && isPastDate(a.dueDate));
+  const noDeadlineAssignments = assignments.filter((a: any) => !a.dueDate);
+  const submissionMap: Record<number, any> = {};
+  mySubmissions.forEach((s: any) => { submissionMap[s.assignmentId] = s; });
+
+  return (
+    <div className="max-w-5xl mx-auto px-6 py-6">
+      {/* Summary stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white rounded-xl border border-gray-200 p-4 text-center shadow-sm">
+          <p className="text-2xl font-bold text-teal-600">{upcomingSessions.length}</p>
+          <p className="text-xs text-gray-500 mt-0.5">Upcoming Sessions</p>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-200 p-4 text-center shadow-sm">
+          <p className="text-2xl font-bold text-gray-600">{pastSessions.length}</p>
+          <p className="text-xs text-gray-500 mt-0.5">Past Sessions</p>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-200 p-4 text-center shadow-sm">
+          <p className="text-2xl font-bold text-amber-600">{pendingAssignments.length}</p>
+          <p className="text-xs text-gray-500 mt-0.5">Pending Assignments</p>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-200 p-4 text-center shadow-sm">
+          <p className="text-2xl font-bold text-purple-600">{recordings.length}</p>
+          <p className="text-xs text-gray-500 mt-0.5">Recordings</p>
+        </div>
+      </div>
+
+      {/* Sub-tabs */}
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6">
+        {([
+          { key: "sessions", label: "Live Sessions", icon: <Video className="w-4 h-4" />, count: upcomingSessions.length },
+          { key: "assignments", label: "Assignments", icon: <FileText className="w-4 h-4" />, count: pendingAssignments.length },
+          { key: "replays", label: "Replays", icon: <Film className="w-4 h-4" />, count: recordings.length },
+        ] as const).map(({ key, label, icon, count }) => (
+          <button
+            key={key}
+            onClick={() => setCohortTab(key)}
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              cohortTab === key ? "bg-white text-teal-700 shadow-sm" : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {icon}
+            {label}
+            {count > 0 && (
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${cohortTab === key ? "bg-teal-500 text-white" : "bg-gray-300 text-gray-600"}`}>
+                {count}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Sessions tab */}
+      {cohortTab === "sessions" && (
+        <div className="space-y-4">
+          {sessions.length === 0 ? (
+            <Card className="text-center py-16"><CardContent className="pt-6">
+              <Video className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500 font-medium">No sessions scheduled yet</p>
+              <p className="text-gray-400 text-sm mt-1">Live sessions will appear here once published.</p>
+            </CardContent></Card>
+          ) : (
+            <>
+              {upcomingSessions.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Upcoming</p>
+                  <div className="space-y-3">
+                    {upcomingSessions.map((s: any) => <CohortSessionCard key={s.id} session={s} isUpcoming />)}
+                  </div>
+                </div>
+              )}
+              {pastSessions.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Past Sessions</p>
+                  <div className="space-y-3">
+                    {pastSessions.map((s: any) => <CohortSessionCard key={s.id} session={s} isUpcoming={false} />)}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Assignments tab */}
+      {cohortTab === "assignments" && (
+        <div className="space-y-6">
+          {assignments.length === 0 ? (
+            <Card className="text-center py-16"><CardContent className="pt-6">
+              <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500 font-medium">No assignments yet</p>
+              <p className="text-gray-400 text-sm mt-1">Assignments will appear here once published.</p>
+            </CardContent></Card>
+          ) : (
+            <>
+              {overdueAssignments.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-red-500 uppercase tracking-wide mb-3">Overdue</p>
+                  <div className="space-y-3">
+                    {overdueAssignments.map((a: any) => (
+                      <CohortAssignmentCard key={a.id} assignment={a} overdue courseId={courseId} mySubmission={submissionMap[a.id]} onOpen={() => navigate(`/cohort/${courseId}/assignment/${a.id}`)} />
+                    ))}
+                  </div>
+                </div>
+              )}
+              {pendingAssignments.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide mb-3">Pending</p>
+                  <div className="space-y-3">
+                    {pendingAssignments.map((a: any) => (
+                      <CohortAssignmentCard key={a.id} assignment={a} courseId={courseId} mySubmission={submissionMap[a.id]} onOpen={() => navigate(`/cohort/${courseId}/assignment/${a.id}`)} />
+                    ))}
+                  </div>
+                </div>
+              )}
+              {noDeadlineAssignments.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">No Deadline</p>
+                  <div className="space-y-3">
+                    {noDeadlineAssignments.map((a: any) => (
+                      <CohortAssignmentCard key={a.id} assignment={a} courseId={courseId} mySubmission={submissionMap[a.id]} onOpen={() => navigate(`/cohort/${courseId}/assignment/${a.id}`)} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Replays tab */}
+      {cohortTab === "replays" && (
+        <div className="space-y-4">
+          {recordings.length === 0 ? (
+            <Card className="text-center py-16"><CardContent className="pt-6">
+              <Film className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500 font-medium">No recordings yet</p>
+              <p className="text-gray-400 text-sm mt-1">Session recordings will appear here once uploaded.</p>
+            </CardContent></Card>
+          ) : (
+            <div className="space-y-4">
+              {recordings.map((rec: any) => <CohortRecordingCard key={rec.id} recording={rec} />)}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CohortSessionCard({ session, isUpcoming }: { session: any; isUpcoming: boolean }) {
+  return (
+    <Card className={`border ${isUpcoming ? "border-teal-200 bg-teal-50/30" : "border-gray-200 bg-white opacity-80"}`}>
+      <CardContent className="p-4">
+        <div className="flex items-start gap-4">
+          <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${isUpcoming ? "bg-teal-100" : "bg-gray-100"}`}>
+            <Video className={`w-5 h-5 ${isUpcoming ? "text-teal-600" : "text-gray-400"}`} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2 flex-wrap">
+              <h3 className="font-semibold text-gray-900 text-sm leading-tight">{session.title}</h3>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                {isUpcoming ? (
+                  <Badge className="bg-teal-500 text-white text-xs">Upcoming</Badge>
+                ) : session.recordingUrl ? (
+                  <Badge variant="outline" className="text-xs text-gray-500">Recorded</Badge>
+                ) : (
+                  <Badge variant="outline" className="text-xs text-gray-400">Completed</Badge>
+                )}
+              </div>
+            </div>
+            {session.description && <p className="text-gray-500 text-xs mt-1 line-clamp-2">{session.description}</p>}
+            <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 flex-wrap">
+              <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{fmtCohortDate(session.sessionDate)}</span>
+              <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{fmtCohortTime(session.sessionDate)} · {fmtCohortDuration(session.durationMinutes)}</span>
+            </div>
+            <div className="flex gap-2 mt-3 flex-wrap">
+              {isUpcoming && session.meetingUrl && (
+                <Button size="sm" className="bg-teal-600 hover:bg-teal-700 h-7 text-xs gap-1.5" asChild>
+                  <a href={session.meetingUrl} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="w-3 h-3" /> Join Live Session
+                  </a>
+                </Button>
+              )}
+              {session.recordingUrl && (
+                <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5 border-teal-300 text-teal-700 hover:bg-teal-50" asChild>
+                  <a href={session.recordingUrl} target="_blank" rel="noopener noreferrer">
+                    <PlayCircle className="w-3 h-3" /> Watch Recording
+                  </a>
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CohortAssignmentCard({ assignment, overdue, courseId, mySubmission, onOpen }: {
+  assignment: any; overdue?: boolean; courseId: number; mySubmission?: any; onOpen: () => void;
+}) {
+  const dueSoon = !overdue && isDueSoonDate(assignment.dueDate);
+  const isSubmitted = !!mySubmission;
+  const isGraded = mySubmission?.status === "graded";
+  return (
+    <Card
+      className={`border cursor-pointer hover:shadow-md transition-shadow ${overdue && !isSubmitted ? "border-red-200 bg-red-50/20" : dueSoon ? "border-amber-200 bg-amber-50/20" : isGraded ? "border-green-200 bg-green-50/10" : isSubmitted ? "border-blue-200 bg-blue-50/10" : "border-gray-200 bg-white"}`}
+      onClick={onOpen}
+    >
+      <CardContent className="p-4">
+        <div className="flex items-start gap-4">
+          <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${overdue && !isSubmitted ? "bg-red-100" : dueSoon ? "bg-amber-100" : isGraded ? "bg-green-100" : isSubmitted ? "bg-blue-100" : "bg-gray-100"}`}>
+            {isGraded ? <CheckCircle2 className="w-5 h-5 text-green-600" /> : isSubmitted ? <CheckCircle className="w-5 h-5 text-blue-500" /> : <FileText className={`w-5 h-5 ${overdue && !isSubmitted ? "text-red-500" : dueSoon ? "text-amber-600" : "text-gray-400"}`} />}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2 flex-wrap">
+              <h3 className="font-semibold text-gray-900 text-sm leading-tight">{assignment.title}</h3>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                {isGraded && <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">Graded</Badge>}
+                {isSubmitted && !isGraded && <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-xs">Submitted</Badge>}
+                {overdue && !isSubmitted && <Badge className="bg-red-500 text-white text-xs">Overdue</Badge>}
+                {dueSoon && !overdue && !isSubmitted && <Badge className="bg-amber-500 text-white text-xs">Due Soon</Badge>}
+                {(assignment.maxPoints ?? assignment.points) > 0 && <Badge variant="outline" className="text-xs text-gray-500">{assignment.maxPoints ?? assignment.points} pts</Badge>}
+              </div>
+            </div>
+            {assignment.description && <p className="text-gray-500 text-xs mt-1 line-clamp-2">{assignment.description}</p>}
+            <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 flex-wrap">
+              {assignment.dueDate ? (
+                <span className={`flex items-center gap-1 ${overdue && !isSubmitted ? "text-red-500 font-medium" : dueSoon ? "text-amber-600 font-medium" : ""}`}>
+                  <Calendar className="w-3 h-3" /> Due {fmtCohortDate(assignment.dueDate)}
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-gray-400"><Calendar className="w-3 h-3" /> No deadline</span>
+              )}
+            </div>
+            {isGraded && mySubmission?.grade != null && (
+              <p className="mt-1.5 text-xs text-green-700 font-medium">Grade: {mySubmission.grade}{assignment.points ? ` / ${assignment.points}` : ""}</p>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CohortRecordingCard({ recording }: { recording: any }) {
+  return (
+    <Card className="border border-gray-200 bg-white">
+      <CardContent className="p-4">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-purple-100">
+            <Film className="w-5 h-5 text-purple-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2 flex-wrap">
+              <h3 className="font-semibold text-gray-900 text-sm leading-tight">{recording.title}</h3>
+              <Badge className="bg-purple-100 text-purple-700 border-purple-200 text-xs flex-shrink-0">Recording</Badge>
+            </div>
+            {recording.description && <p className="text-gray-500 text-xs mt-1 line-clamp-2">{recording.description}</p>}
+            {recording.sessionDate && (
+              <p className="flex items-center gap-1 mt-1.5 text-xs text-gray-500"><Calendar className="w-3 h-3" />Session: {fmtCohortDate(recording.sessionDate)}</p>
+            )}
+            {recording.embedCode && (
+              <div className="mt-3 rounded-lg overflow-hidden border border-gray-200" dangerouslySetInnerHTML={{ __html: recording.embedCode }} />
+            )}
+            {recording.videoUrl && !recording.embedCode && (
+              <video src={recording.videoUrl} controls className="w-full rounded-lg border border-gray-200 max-h-[360px] mt-3" preload="metadata" />
+            )}
+            {!recording.embedCode && recording.externalUrl && (
+              <Button size="sm" variant="outline" className="mt-3 h-7 text-xs gap-1.5 border-purple-300 text-purple-700 hover:bg-purple-50" asChild>
+                <a href={recording.externalUrl} target="_blank" rel="noopener noreferrer">
+                  <PlayCircle className="w-3 h-3" /> Watch Recording
+                </a>
+              </Button>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
