@@ -486,8 +486,8 @@ async function finalizeUpload(
       await db.delete(mediaUploadSessions).where(eq(mediaUploadSessions.uploadId, uploadId));
       res.json({ done: true, assetId: existingAssetId, versionNumber: nextVersion, s3Url });
 
-      // Fire-and-forget: extract SCORM package to R2 for fast serving
-      if (mediaType === "scorm") {
+      // Fire-and-forget: extract SCORM/ZIP package to R2 for fast serving
+      if (mediaType === "scorm" || mediaType === "zip") {
         const { extractAndUploadScorm } = await import("./scormExtractor");
         const [insertedVersion] = await db
           .select({ id: mediaVersions.id })
@@ -533,8 +533,8 @@ async function finalizeUpload(
       await db.delete(mediaUploadSessions).where(eq(mediaUploadSessions.uploadId, uploadId));
       res.json({ done: true, assetId, slug, versionNumber: 1, s3Url });
 
-      // Fire-and-forget: extract SCORM package to R2 for fast serving
-      if (mediaType === "scorm") {
+      // Fire-and-forget: extract SCORM/ZIP package to R2 for fast serving
+      if (mediaType === "scorm" || mediaType === "zip") {
         const { extractAndUploadScorm } = await import("./scormExtractor");
         const [insertedVersion] = await db
           .select({ id: mediaVersions.id })

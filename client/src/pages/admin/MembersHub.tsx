@@ -364,8 +364,8 @@ function GlobalActivityTab() {
                         <div className="text-xs text-gray-400">{log.userEmail}</div>
                       </td>
                       <td className="px-3 py-2.5">
-                        <Badge className={`text-xs ${EVENT_TYPE_COLORS[log.eventType] || "bg-gray-100 text-gray-700"}`}>
-                          {log.eventType.replace(/_/g, " ")}
+                        <Badge className={`text-xs ${EVENT_TYPE_COLORS[log.eventType ?? ""] || "bg-gray-100 text-gray-700"}`}>
+                          {(log.eventType ?? "unknown").replace(/_/g, " ")}
                         </Badge>
                       </td>
                       <td className="px-3 py-2.5 text-xs text-gray-700 max-w-[200px] truncate" title={log.description}>
@@ -458,9 +458,11 @@ export default function MembersHub() {
           ))}
         </TabsList>
 
-        {/* Members — full UserAnalytics embedded */}
+        {/* Members — full UserAnalytics embedded (hide its inner breadcrumb/header) */}
         <TabsContent value="members" className="mt-4">
-          <UserAnalytics />
+          <div className="[&>div>div:first-child]:hidden">
+            <UserAnalytics />
+          </div>
         </TabsContent>
 
         {/* Enrollments */}
@@ -468,9 +470,11 @@ export default function MembersHub() {
           <EnrollmentsTab />
         </TabsContent>
 
-        {/* Sales */}
+        {/* Sales — hide inner breadcrumb/header from AdminSalesDashboard */}
         <TabsContent value="sales" className="mt-4">
-          <AdminSalesDashboard />
+          <div className="[&_.max-w-7xl]:max-w-none [&_.max-w-7xl]:px-0 [&_.max-w-7xl]:py-0">
+            <AdminSalesDashboard />
+          </div>
         </TabsContent>
 
         {/* Memberships */}

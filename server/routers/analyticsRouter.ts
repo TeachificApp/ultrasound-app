@@ -17,6 +17,7 @@ import {
   lmsEnrollments,
   lmsCourses,
   lmsLessons,
+  lmsThinkificImports,
   digitalDownloadEvents,
   digitalProducts,
   digitalPurchases,
@@ -803,7 +804,7 @@ export const analyticsAdminRouter = router({
 
       const offset = (input.page - 1) * input.pageSize;
       const searchCond = input.search
-        ? sql`(u.name LIKE ${`%${input.search}%`} OR u.email LIKE ${`%${input.search}%`} OR c.title LIKE ${`%${input.search}%`})`
+        ? sql`(COALESCE(u.name, '') LIKE ${`%${input.search}%`} OR COALESCE(u.email, e.thinkific_email, '') LIKE ${`%${input.search}%`} OR c.title LIKE ${`%${input.search}%`})`
         : sql`1=1`;
       const courseCond = input.courseId ? sql`AND e.course_id = ${input.courseId}` : sql``;
       const statusCond = input.status === 'completed'
@@ -816,18 +817,20 @@ export const analyticsAdminRouter = router({
         SELECT
           e.id AS enrollmentId,
           e.user_id AS userId,
-          u.name AS userName,
-          u.email AS userEmail,
+          COALESCE(u.name, u.email, CONCAT('User #', e.user_id)) AS userName,
+          COALESCE(u.email, '') AS userEmail,
           e.course_id AS courseId,
-          c.title AS courseTitle,
+          COALESCE(c.title, ti.thinkific_course_name, CONCAT('Course #', e.course_id)) AS courseTitle,
           e.progress_pct AS progressPct,
           e.enrolled_at AS enrolledAt,
           e.completed_at AS completedAt,
           e.enrollment_type AS enrollmentType
         FROM lms_enrollments e
-        JOIN users u ON u.id = e.user_id
-        JOIN lms_courses c ON c.id = e.course_id
+        LEFT JOIN users u ON u.id = e.user_id
+        LEFT JOIN lms_courses c ON c.id = e.course_id
+        LEFT JOIN lms_thinkific_imports ti ON ti.lms_course_id = e.course_id
         WHERE ${searchCond} ${courseCond} ${statusCond}
+        GROUP BY e.id
         ORDER BY e.enrolled_at DESC
         LIMIT ${input.pageSize} OFFSET ${offset}
       `);
@@ -835,8 +838,8 @@ export const analyticsAdminRouter = router({
       const [totalRow] = await db.execute(sql`
         SELECT COUNT(*) AS total
         FROM lms_enrollments e
-        JOIN users u ON u.id = e.user_id
-        JOIN lms_courses c ON c.id = e.course_id
+        LEFT JOIN users u ON u.id = e.user_id
+        LEFT JOIN lms_courses c ON c.id = e.course_id
         WHERE ${searchCond} ${courseCond} ${statusCond}
       `);
 
@@ -937,11 +940,17 @@ export const analyticsAdminRouter = router({
         : sql``;
 
       const rows = await db.execute(sql`
-        SELECT u.name, u.email, c.title AS course, e.progress_pct, e.enrolled_at, e.completed_at, e.enrollment_type
+        SELECT
+          COALESCE(u.name, u.email, CONCAT('User #', e.user_id)) AS name,
+          COALESCE(u.email, '') AS email,
+          COALESCE(c.title, ti.thinkific_course_name, CONCAT('Course #', e.course_id)) AS course,
+          e.progress_pct, e.enrolled_at, e.completed_at, e.enrollment_type
         FROM lms_enrollments e
-        JOIN users u ON u.id = e.user_id
-        JOIN lms_courses c ON c.id = e.course_id
+        LEFT JOIN users u ON u.id = e.user_id
+        LEFT JOIN lms_courses c ON c.id = e.course_id
+        LEFT JOIN lms_thinkific_imports ti ON ti.lms_course_id = e.course_id
         WHERE ${searchCond} ${courseCond} ${statusCond}
+        GROUP BY e.id
         ORDER BY e.enrolled_at DESC
         LIMIT 50000
       `);

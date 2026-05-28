@@ -3334,6 +3334,7 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Update User Search quick-access in Platform Admin to point to Members Hub
 - [x] 16 tests passing for Members Hub backend procedures
 
+<<<<<<< Updated upstream
 ## Contacts & Conversion Funnel Tracker (May 2026)
 - [ ] Audit contacts/leads schema (funnelContacts table structure, existing fields)
 - [ ] Separate Contacts from Members in admin hub (Contacts = leads, Members = registered users)
@@ -3346,3 +3347,27 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Time-to-convert metrics: avg days from lead capture to registration, registration to purchase
 - [ ] CSV export of contacts with conversion status
 - [ ] Add conversion tracker link to Platform Admin hub
+=======
+## Members Hub Bug Fixes (May 2026)
+- [ ] Fix Activity tab crash: "Cannot read properties of undefined (reading 'replace')"
+- [ ] Fix Enrollments tab showing 0 enrollments (1138 exist in DB)
+- [ ] Fix Members/Users tab showing 0 users with blank names/emails
+- [ ] Fix Sales tab showing $0 revenue and loading spinner forever
+- [ ] Fix scrollbars disappearing on Members Hub pages
+- [ ] Fix Members Hub subtitle still says "contacts" (Contacts moved to Funnel Management)
+- [ ] Fix double header: Members Hub shows both its own header AND embedded UserAnalytics header
+
+## SCORM Image Fix (May 2026)
+- [x] Audit all 48 SCORM/ZIP files — found 47 had never been extracted to R2 (scormExtractedPrefix = null)
+- [x] Root cause: extraction only triggered on new uploads, never ran for existing files; on-the-fly /tmp extraction is ephemeral and lost on server restart
+- [x] Fix: bulk re-extract all 47 files to R2 — 33 succeeded, 5 corrupted (invalid ZIP signature from old CDN path)
+- [x] Fix: extend upload trigger to also extract zip mediaType (not just scorm)
+- [x] 5 files with corrupted ZIPs need re-upload: advanced-cardiac-sonographer-sample-quiz, advanced-cardiac-sonographer-unlimited-q-k3tgg0, pediatric-echo-flashcards-wyo4on, pediatric-echocardiography-test-learn-qu, acs-flashcards-kt66kl (old versions)
+
+## MembersHub Bug Fixes (May 2026)
+- [x] Fix Activity tab crash — null-safe eventType.replace() call
+- [x] Fix Enrollments showing 0 — change INNER JOIN to LEFT JOIN for users without app accounts
+- [x] Fix zip mediaType extraction trigger on upload
+- [x] Fix duplicate /admin/contacts and /admin/user-analytics routes in App.tsx
+- [x] Remove stale User Analytics and Contacts cards from Platform Admin dashboard
+>>>>>>> Stashed changes
