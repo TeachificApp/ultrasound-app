@@ -428,11 +428,11 @@ function AdminProfilesTab({ communityId, communitySlug }: { communityId: number;
                   {p.bio && <p className="text-sm text-gray-500 truncate">{p.bio}</p>}
                 </div>
                 <div className="flex items-center gap-2">
-                  <a href={`/community/${communitySlug}?postAs=${p.id}`} target="_blank" rel="noopener noreferrer">
+                  <Link href={`/community/${communitySlug}?postAs=${p.id}`}>
                     <Button variant="outline" size="sm" className="text-teal-600 border-teal-200">
                       <PenSquare className="w-3.5 h-3.5 mr-1" />Post As
                     </Button>
-                  </a>
+                  </Link>
                   <Button variant="outline" size="sm" onClick={() => openEdit(p)}>
                     <Edit2 className="w-3.5 h-3.5" />
                   </Button>
@@ -746,16 +746,16 @@ export default function CommunityAdmin() {
       </Select>
       {activeCommunity && (
         <>
-          <a href={`/community/${activeCommunity.slug}`} target="_blank" rel="noopener noreferrer">
+          <Link href={`/community/${activeCommunity.slug}`}>
             <Button variant="outline" size="sm" className="text-teal-600 border-teal-200">
               <ExternalLink className="w-3.5 h-3.5 mr-1" />View Community
             </Button>
-          </a>
-          <a href={`/community/${activeCommunity.slug}?compose=true`} target="_blank" rel="noopener noreferrer">
+          </Link>
+          <Link href={`/community/${activeCommunity.slug}?compose=true`}>
             <Button variant="outline" size="sm" className="text-teal-600 border-teal-200">
               <PenSquare className="w-3.5 h-3.5 mr-1" />Post in Community
             </Button>
-          </a>
+          </Link>
         </>
       )}
     </div>
@@ -838,11 +838,11 @@ export default function CommunityAdmin() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <a href={`/community/${c.slug}`} target="_blank" rel="noopener noreferrer">
+                      <Link href={`/community/${c.slug}`}>
                         <Button variant="outline" size="sm" className="text-teal-600 border-teal-200">
                           <ExternalLink className="w-3.5 h-3.5 mr-1" />View
                         </Button>
-                      </a>
+                      </Link>
                       <Button variant="outline" size="sm" onClick={() => setActiveCommunityId(c.id)}>
                         <Hash className="w-3.5 h-3.5 mr-1" />Select
                       </Button>

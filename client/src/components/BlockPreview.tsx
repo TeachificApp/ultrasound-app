@@ -21,39 +21,31 @@ import { handleCtaBtnClick } from "@/pages/CourseLanding";
  * For checkout/funnel behaviors the image is not wrapped (no-op).
  */
 export function ImageLinkWrapper({ d, children }: { d: Record<string, any>; children: React.ReactNode }) {
-  const behavior: string = d.linkBehavior ?? (d.linkUrl ? "url" : "");
+  // Determine effective behavior: explicit linkBehavior wins; fall back to "url" if linkUrl is set
+  const behavior: string = d.linkBehavior && d.linkBehavior !== "" ? d.linkBehavior : (d.linkUrl ? "url" : "");
   const newTab = d.openInNewTab !== false;
-  const style: React.CSSProperties = { display: "inline-block", cursor: "pointer" };
+  const style: React.CSSProperties = { display: "inline-block", cursor: "pointer", pointerEvents: "auto" };
 
   if (!behavior) return <>{children}</>;
 
   if (behavior === "url" && d.linkUrl) {
-    return <a href={d.linkUrl} target={newTab ? "_blank" : undefined} rel="noopener noreferrer" style={style}>{children}</a>;
+    return <a href={d.linkUrl} target={newTab ? "_blank" : undefined} rel="noopener noreferrer" style={style} onClick={e => e.stopPropagation()}>{children}</a>;
   }
   if (behavior === "send_email" && d.linkEmailAddress) {
-    return <a href={`mailto:${d.linkEmailAddress}`} style={style}>{children}</a>;
+    return <a href={`mailto:${d.linkEmailAddress}`} style={style} onClick={e => e.stopPropagation()}>{children}</a>;
   }
   if (behavior === "download_file" && d.linkDownloadUrl) {
-    return <a href={d.linkDownloadUrl} download target="_blank" rel="noopener noreferrer" style={style}>{children}</a>;
+    return <a href={d.linkDownloadUrl} download target="_blank" rel="noopener noreferrer" style={style} onClick={e => e.stopPropagation()}>{children}</a>;
   }
   if (behavior === "scroll_to_section" && d.linkScrollAnchor) {
     const anchor = d.linkScrollAnchor.replace(/^#/, "");
     return (
-      <span style={style} onClick={() => {
-        const el = document.getElementById(anchor);
-        if (el) el.scrollIntoView({ behavior: "smooth" });
-      }}>{children}</span>
+      <span style={style} onClick={e => { e.stopPropagation(); const el = document.getElementById(anchor); if (el) el.scrollIntoView({ behavior: "smooth" }); }}>{children}</span>
     );
   }
   if (behavior === "open_popup" && d.linkPopupUrl) {
-    // Open in a centered popup window
     return (
-      <span style={style} onClick={() => {
-        const w = 800, h = 600;
-        const left = window.screenX + (window.outerWidth - w) / 2;
-        const top = window.screenY + (window.outerHeight - h) / 2;
-        window.open(d.linkPopupUrl, "_blank", `width=${w},height=${h},left=${left},top=${top},resizable=yes,scrollbars=yes`);
-      }}>{children}</span>
+      <span style={style} onClick={e => { e.stopPropagation(); const w = 800, h = 600; const left = window.screenX + (window.outerWidth - w) / 2; const top = window.screenY + (window.outerHeight - h) / 2; window.open(d.linkPopupUrl, "_blank", `width=${w},height=${h},left=${left},top=${top},resizable=yes,scrollbars=yes`); }}>{children}</span>
     );
   }
   return <>{children}</>;

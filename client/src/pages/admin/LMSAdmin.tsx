@@ -5664,11 +5664,11 @@ export default function LMSAdmin() {
                 <p className="text-xs text-gray-400">Education Library · Courses · Products · Enrollments</p>
               </div>
             </div>
-            <Link href="/education-library">
+            <a href="/education-library" target="_blank" rel="noopener noreferrer">
               <Button size="sm" variant="outline" className="h-8 text-xs text-teal-600 border-teal-200 hover:bg-teal-50">
                 <LinkIcon className="w-3 h-3 mr-1.5" /> View Education Library
               </Button>
-            </Link>
+            </a>
           </div>
         </div>
       </div>
@@ -8258,7 +8258,7 @@ const COMMON_TIMEZONES = [
 ];
 
 function CohortTab({ courseId }: { courseId: number }) {
-  const [activeTab, setActiveTab] = useState<"sessions" | "assignments" | "recordings" | "groups" | "settings">("sessions");
+  const [activeTab, setActiveTab] = useState<"settings" | "groups" | "sessions" | "assignments" | "recordings">("settings");
   // Multi-cohort mode toggle
   const { data: courseData, refetch: refetchCourse } = trpc.lmsAdmin.getCourse.useQuery({ id: courseId });
   const updateCourse = trpc.lmsAdmin.updateCourse.useMutation({ onSuccess: () => { refetchCourse(); toast.success("Cohort settings saved"); }, onError: (e) => toast.error(e.message) });
@@ -8278,7 +8278,7 @@ function CohortTab({ courseId }: { courseId: number }) {
     onError: (e) => toast.error(e.message),
   });
   const [groupDialog, setGroupDialog] = useState<{ open: boolean; group?: any }>({ open: false });
-  const [groupForm, setGroupForm] = useState({ name: "", slug: "", description: "", startDate: "", endDate: "", enrollmentCloseDate: "", maxStudents: "", status: "draft" as "draft" | "open" | "active" | "completed" | "archived", sortOrder: 0, isFeaturedOnLanding: false });
+  const [groupForm, setGroupForm] = useState({ name: "", slug: "", description: "", startDate: "", endDate: "", enrollmentCloseDate: "", maxStudents: "", status: "draft" as "draft" | "open" | "active" | "completed" | "archived", sortOrder: 0, isFeaturedOnLanding: false, accessDurationDays: "" });
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const { data: groupStudents = [], isLoading: groupStudentsLoading, refetch: refetchGroupStudents } = trpc.lmsAdmin.listCohortGroupStudents.useQuery({ cohortGroupId: selectedGroupId ?? 0 }, { enabled: !!selectedGroupId });
   const { data: unassignedStudents = [] } = trpc.lmsAdmin.listUnassignedCohortStudents.useQuery({ courseId }, { enabled: activeTab === "groups" });
@@ -8296,21 +8296,63 @@ function CohortTab({ courseId }: { courseId: number }) {
     onSuccess: () => { refetchGroupStudents(); refetchGroups(); toast.success("Student moved to new group"); setMovingStudentId(null); },
     onError: (e) => { toast.error(e.message); setMovingStudentId(null); },
   });
+  const transferStudent = trpc.lmsAdmin.transferStudentToCohortGroup.useMutation({
+    onSuccess: () => { refetchGroupStudents(); refetchGroups(); toast.success("Student transferred"); setTransferDialog(null); },
+    onError: (e) => toast.error(e.message),
+  });
+  const [transferDialog, setTransferDialog] = useState<{ userId: number; userName: string; fromGroupId: number } | null>(null);
+  const [activityDialog, setActivityDialog] = useState<{ userId: number; userName: string } | null>(null);
+  const { data: activityData } = trpc.lmsAdmin.getCohortStudentActivity.useQuery(
+    { cohortGroupId: selectedGroupId ?? 0, userId: activityDialog?.userId ?? 0, courseId },
+    { enabled: !!activityDialog && !!selectedGroupId }
+  );
+  // Cohort message thread
+  const [discussionGroupId, setDiscussionGroupId] = useState<number | null>(null);
+  const { data: cohortMessages = [], refetch: refetchMessages } = trpc.lmsAdmin.listCohortMessages.useQuery(
+    { cohortGroupId: discussionGroupId ?? 0, courseId },
+    { enabled: !!discussionGroupId }
+  );
+  const postMessage = trpc.lmsAdmin.postCohortMessage.useMutation({
+    onSuccess: () => { refetchMessages(); setMessageBody(""); setMessageMedia([]); },
+    onError: (e) => toast.error(e.message),
+  });
+  const deleteMessage = trpc.lmsAdmin.deleteCohortMessage.useMutation({
+    onSuccess: () => refetchMessages(),
+    onError: (e) => toast.error(e.message),
+  });
+  const [messageBody, setMessageBody] = useState("");
+  const [messageMedia, setMessageMedia] = useState<{ url: string; mimeType: string; fileName: string }[]>([]);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const handleMediaUpload = async (file: File) => {
+    setUploadingMedia(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload/cohort-media", { method: "POST", body: formData });
+      if (!res.ok) throw new Error("Upload failed");
+      const { url } = await res.json();
+      setMessageMedia(prev => [...prev, { url, mimeType: file.type, fileName: file.name }]);
+    } catch (e: any) {
+      toast.error(e.message ?? "Upload failed");
+    } finally {
+      setUploadingMedia(false);
+    }
+  };
   const bulkAssign = trpc.lmsAdmin.bulkAssignStudentsToCohortGroup.useMutation({
     onSuccess: (r) => { refetchGroupStudents(); refetchGroups(); toast.success(`${r.assigned} students assigned`); setBulkSelected([]); },
     onError: (e) => toast.error(e.message),
   });
   const openGroupDialog = (group?: any) => {
     if (group) {
-      setGroupForm({ name: group.name, slug: group.slug, description: group.description ?? "", startDate: group.startDate ? new Date(group.startDate).toISOString().slice(0, 10) : "", endDate: group.endDate ? new Date(group.endDate).toISOString().slice(0, 10) : "", enrollmentCloseDate: group.enrollmentCloseDate ? new Date(group.enrollmentCloseDate).toISOString().slice(0, 10) : "", maxStudents: group.maxStudents?.toString() ?? "", status: group.status, sortOrder: group.sortOrder, isFeaturedOnLanding: group.isFeaturedOnLanding });
+      setGroupForm({ name: group.name, slug: group.slug, description: group.description ?? "", startDate: group.startDate ? new Date(group.startDate).toISOString().slice(0, 10) : "", endDate: group.endDate ? new Date(group.endDate).toISOString().slice(0, 10) : "", enrollmentCloseDate: group.enrollmentCloseDate ? new Date(group.enrollmentCloseDate).toISOString().slice(0, 10) : "", maxStudents: group.maxStudents?.toString() ?? "", status: group.status, sortOrder: group.sortOrder, isFeaturedOnLanding: group.isFeaturedOnLanding, accessDurationDays: group.accessDurationDays?.toString() ?? "" });
     } else {
-      setGroupForm({ name: "", slug: "", description: "", startDate: "", endDate: "", enrollmentCloseDate: "", maxStudents: "", status: "draft", sortOrder: cohortGroups.length, isFeaturedOnLanding: false });
+      setGroupForm({ name: "", slug: "", description: "", startDate: "", endDate: "", enrollmentCloseDate: "", maxStudents: "", status: "draft", sortOrder: cohortGroups.length, isFeaturedOnLanding: false, accessDurationDays: "" });
     }
     setGroupDialog({ open: true, group });
   };
   const handleSaveGroup = () => {
     if (!groupForm.name.trim() || !groupForm.slug.trim()) { toast.error("Name and slug are required"); return; }
-    const payload = { courseId, name: groupForm.name.trim(), slug: groupForm.slug.trim(), description: groupForm.description || undefined, startDate: groupForm.startDate || undefined, endDate: groupForm.endDate || undefined, enrollmentCloseDate: groupForm.enrollmentCloseDate || undefined, maxStudents: groupForm.maxStudents ? parseInt(groupForm.maxStudents) : undefined, status: groupForm.status, sortOrder: groupForm.sortOrder };
+    const payload = { courseId, name: groupForm.name.trim(), slug: groupForm.slug.trim(), description: groupForm.description || undefined, startDate: groupForm.startDate || undefined, endDate: groupForm.endDate || undefined, enrollmentCloseDate: groupForm.enrollmentCloseDate || undefined, maxStudents: groupForm.maxStudents ? parseInt(groupForm.maxStudents) : undefined, status: groupForm.status, sortOrder: groupForm.sortOrder, accessDurationDays: groupForm.accessDurationDays ? parseInt(groupForm.accessDurationDays) : undefined };
     if (groupDialog.group) {
       updateCohortGroup.mutate({ id: groupDialog.group.id, ...payload, isFeaturedOnLanding: groupForm.isFeaturedOnLanding });
     } else {
@@ -8598,7 +8640,7 @@ function CohortTab({ courseId }: { courseId: number }) {
     <div className="space-y-4">
       {/* Sub-tabs */}
       <div className="flex gap-1 border-b border-gray-200 pb-0">
-        {(["sessions", "assignments", "recordings", "groups", "settings"] as const).map(t => (
+        {(["settings", "groups", "sessions", "assignments", "recordings"] as const).map(t => (
           <button key={t} onClick={() => setActiveTab(t)}
             className={cn("px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize",
               activeTab === t ? "border-teal-600 text-teal-700" : "border-transparent text-gray-500 hover:text-gray-700")}>
@@ -9270,6 +9312,7 @@ function CohortTab({ courseId }: { courseId: number }) {
                         {group.startDate && <span>Starts: {new Date(group.startDate).toLocaleDateString()}</span>}
                         {group.endDate && <span>Ends: {new Date(group.endDate).toLocaleDateString()}</span>}
                         {group.maxStudents && <span>Max: {group.maxStudents}</span>}
+                        {group.accessDurationDays ? <span>Access: {group.accessDurationDays}d from start</span> : null}
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
@@ -9301,28 +9344,95 @@ function CohortTab({ courseId }: { courseId: number }) {
                                 <span className="text-xs text-gray-400 ml-2">{s.userEmail}</span>
                               </div>
                               <div className="flex items-center gap-1">
-                                {/* Move to another group */}
+                                <Button size="sm" variant="ghost" onClick={() => setActivityDialog({ userId: s.userId, userName: s.userName ?? s.userEmail ?? "Student" })} className="text-xs text-blue-600 hover:text-blue-800 h-6 px-2">Activity</Button>
                                 {cohortGroups.filter((g: any) => g.id !== group.id).length > 0 && (
-                                  <div className="relative">
-                                    {movingStudentId === s.userId ? (
-                                      <div className="absolute right-0 top-7 z-20 bg-white border border-gray-200 rounded-lg shadow-lg min-w-[160px] py-1">
-                                        <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 border-b">Move to group</div>
-                                        {cohortGroups.filter((g: any) => g.id !== group.id).map((g: any) => (
-                                          <button key={g.id} className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-teal-50 hover:text-teal-700"
-                                            onClick={() => moveStudent.mutate({ cohortGroupId: g.id, userId: s.userId, courseId })}>
-                                            {g.name}
-                                          </button>
-                                        ))}
-                                        <button className="w-full text-left px-3 py-1.5 text-sm text-gray-400 hover:bg-gray-50 border-t" onClick={() => setMovingStudentId(null)}>Cancel</button>
-                                      </div>
-                                    ) : null}
-                                    <Button size="sm" variant="ghost" onClick={() => setMovingStudentId(movingStudentId === s.userId ? null : s.userId)} className="text-xs text-teal-600 hover:text-teal-800 h-6 px-2">Move to...</Button>
-                                  </div>
+                                  <Button size="sm" variant="ghost" onClick={() => setTransferDialog({ userId: s.userId, userName: s.userName ?? s.userEmail ?? "Student", fromGroupId: group.id })} className="text-xs text-teal-600 hover:text-teal-800 h-6 px-2">Transfer</Button>
                                 )}
                                 <Button size="sm" variant="ghost" onClick={() => removeStudent.mutate({ cohortGroupId: group.id, userId: s.userId })} className="text-xs text-red-500 hover:text-red-700 h-6 px-2">Remove</Button>
                               </div>
                             </div>
                           ))}
+                        </div>
+                      )}
+
+                      {/* Discussion thread button */}
+                      <div className="mt-3 flex justify-end">
+                        <Button size="sm" variant="outline" onClick={() => setDiscussionGroupId(discussionGroupId === group.id ? null : group.id)} className="text-xs text-teal-700 border-teal-300 hover:bg-teal-50">
+                          💬 {discussionGroupId === group.id ? "Hide Discussion" : "Group Discussion"}
+                        </Button>
+                      </div>
+
+                      {/* Discussion thread panel */}
+                      {discussionGroupId === group.id && (
+                        <div className="mt-3 border border-teal-200 rounded-xl bg-teal-50/30 p-4 space-y-3">
+                          <div className="text-sm font-semibold text-teal-800">Group Discussion Thread</div>
+                          {/* Messages */}
+                          <div className="space-y-2 max-h-80 overflow-y-auto">
+                            {cohortMessages.length === 0 ? (
+                              <div className="text-sm text-gray-400 italic text-center py-4">No messages yet. Start the conversation!</div>
+                            ) : cohortMessages.map((msg: any) => (
+                              <div key={msg.id} className={`flex gap-2 ${msg.isAdminPost ? "flex-row" : "flex-row"}`}>
+                                <div className="w-7 h-7 rounded-full bg-teal-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                                  {(msg.userName ?? msg.userEmail ?? "?")[0].toUpperCase()}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-semibold text-gray-800">{msg.userName ?? msg.userEmail}</span>
+                                    {msg.isAdminPost && <span className="text-xs bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded font-medium">Admin</span>}
+                                    <span className="text-xs text-gray-400">{new Date(msg.createdAt).toLocaleString()}</span>
+                                    <button onClick={() => { if (confirm("Delete this message?")) deleteMessage.mutate({ id: msg.id }); }} className="ml-auto text-xs text-red-400 hover:text-red-600">Delete</button>
+                                  </div>
+                                  {msg.body && <p className="text-sm text-gray-700 mt-0.5 whitespace-pre-wrap">{msg.body}</p>}
+                                  {msg.mediaUrls && msg.mediaUrls.length > 0 && (
+                                    <div className="flex flex-wrap gap-2 mt-1">
+                                      {msg.mediaUrls.map((m: any, i: number) => (
+                                        m.mimeType?.startsWith("image/") ? (
+                                          <img key={i} src={m.url} alt={m.fileName} className="max-h-40 rounded-lg border border-gray-200 object-cover" />
+                                        ) : m.mimeType?.startsWith("video/") ? (
+                                          <video key={i} src={m.url} controls className="max-h-40 rounded-lg border border-gray-200" />
+                                        ) : (
+                                          <a key={i} href={m.url} target="_blank" rel="noopener noreferrer" className="text-xs text-teal-600 underline">{m.fileName}</a>
+                                        )
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          {/* Compose */}
+                          <div className="border-t border-teal-200 pt-3 space-y-2">
+                            <textarea
+                              value={messageBody}
+                              onChange={e => setMessageBody(e.target.value)}
+                              rows={2}
+                              placeholder="Write a message to this cohort group..."
+                              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500"
+                            />
+                            {messageMedia.length > 0 && (
+                              <div className="flex flex-wrap gap-2">
+                                {messageMedia.map((m, i) => (
+                                  <div key={i} className="relative group">
+                                    {m.mimeType.startsWith("image/") ? (
+                                      <img src={m.url} alt={m.fileName} className="h-16 w-16 object-cover rounded border border-gray-200" />
+                                    ) : (
+                                      <div className="h-16 w-16 flex items-center justify-center bg-gray-100 rounded border border-gray-200 text-xs text-gray-500 text-center p-1">{m.fileName}</div>
+                                    )}
+                                    <button onClick={() => setMessageMedia(prev => prev.filter((_, j) => j !== i))} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 text-xs flex items-center justify-center">×</button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            <div className="flex items-center gap-2">
+                              <label className="cursor-pointer text-xs text-teal-600 hover:text-teal-800 border border-teal-300 rounded px-2 py-1">
+                                {uploadingMedia ? "Uploading..." : "📎 Attach"}
+                                <input type="file" accept="image/*,video/*" className="hidden" disabled={uploadingMedia} onChange={e => { const f = e.target.files?.[0]; if (f) handleMediaUpload(f); e.target.value = ""; }} />
+                              </label>
+                              <Button size="sm" onClick={() => postMessage.mutate({ cohortGroupId: group.id, courseId, body: messageBody || undefined, mediaUrls: messageMedia.length > 0 ? messageMedia : undefined })} disabled={postMessage.isPending || (!messageBody.trim() && messageMedia.length === 0)} className="bg-teal-600 hover:bg-teal-700 text-white text-xs h-7 px-3 ml-auto">
+                                {postMessage.isPending ? "Posting..." : "Post"}
+                              </Button>
+                            </div>
+                          </div>
                         </div>
                       )}
 
@@ -9355,6 +9465,103 @@ function CohortTab({ courseId }: { courseId: number }) {
                   )}
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Transfer student dialog */}
+          {transferDialog && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+                <div className="flex items-center justify-between p-5 border-b">
+                  <h2 className="text-lg font-semibold">Transfer Student</h2>
+                  <button onClick={() => setTransferDialog(null)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+                </div>
+                <div className="p-5 space-y-4">
+                  <p className="text-sm text-gray-600">Transfer <strong>{transferDialog.userName}</strong> to a different cohort group:</p>
+                  <div className="space-y-2">
+                    {cohortGroups.filter((g: any) => g.id !== transferDialog.fromGroupId).map((g: any) => (
+                      <button key={g.id} onClick={() => transferStudent.mutate({ fromGroupId: transferDialog.fromGroupId, toGroupId: g.id, userId: transferDialog.userId, courseId })} disabled={transferStudent.isPending} className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-teal-400 hover:bg-teal-50 transition-colors">
+                        <div className="font-medium text-sm text-gray-800">{g.name}</div>
+                        <div className="text-xs text-gray-400">{g.studentCount} student{g.studentCount !== 1 ? "s" : ""} · {g.status}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex justify-end px-5 py-4 border-t">
+                  <Button variant="outline" onClick={() => setTransferDialog(null)}>Cancel</Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Student activity dialog */}
+          {activityDialog && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+                <div className="flex items-center justify-between p-5 border-b">
+                  <h2 className="text-lg font-semibold">Activity: {activityDialog.userName}</h2>
+                  <button onClick={() => setActivityDialog(null)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+                </div>
+                <div className="p-5 overflow-y-auto space-y-5">
+                  {/* Assignments */}
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-2">Assignments</h3>
+                    {!activityData ? (
+                      <div className="text-sm text-gray-400">Loading...</div>
+                    ) : activityData.assignments.length === 0 ? (
+                      <div className="text-sm text-gray-400 italic">No assignments in this cohort group.</div>
+                    ) : (
+                      <div className="divide-y divide-gray-100 rounded-lg border border-gray-100 overflow-hidden">
+                        {activityData.assignments.map((a: any) => (
+                          <div key={a.id} className="flex items-center justify-between px-3 py-2">
+                            <div>
+                              <div className="text-sm font-medium text-gray-800">{a.title}</div>
+                              {a.dueDate && <div className="text-xs text-gray-400">Due: {new Date(a.dueDate).toLocaleDateString()}</div>}
+                            </div>
+                            <div className="text-right">
+                              {a.submission ? (
+                                <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Submitted {new Date(a.submission.submittedAt).toLocaleDateString()}</span>
+                              ) : (
+                                <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium">Not submitted</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {/* Lesson progress */}
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-2">Lesson Progress</h3>
+                    {!activityData ? (
+                      <div className="text-sm text-gray-400">Loading...</div>
+                    ) : activityData.lessonProgress.length === 0 ? (
+                      <div className="text-sm text-gray-400 italic">No lesson activity yet.</div>
+                    ) : (
+                      <div className="divide-y divide-gray-100 rounded-lg border border-gray-100 overflow-hidden">
+                        {activityData.lessonProgress.map((p: any) => (
+                          <div key={p.lessonId} className="flex items-center justify-between px-3 py-2">
+                            <div>
+                              <div className="text-sm font-medium text-gray-800">{p.lessonTitle}</div>
+                              <div className="text-xs text-gray-400">{p.sectionTitle}</div>
+                            </div>
+                            <div className="text-right">
+                              {p.completed ? (
+                                <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">✓ Completed</span>
+                              ) : (
+                                <span className="text-xs text-gray-400">{p.watchedSeconds ? `${Math.round(p.watchedSeconds / 60)}m watched` : "Started"}</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex justify-end px-5 py-4 border-t">
+                  <Button variant="outline" onClick={() => setActivityDialog(null)}>Close</Button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -9414,6 +9621,11 @@ function CohortTab({ courseId }: { courseId: number }) {
                       <Label className="text-sm font-medium text-gray-700 mb-1 block">Sort Order</Label>
                       <input type="number" value={groupForm.sortOrder} onChange={e => setGroupForm(p => ({ ...p, sortOrder: parseInt(e.target.value) || 0 }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
                     </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700 mb-1 block">Access Duration (days from group start)</Label>
+                    <input type="number" min="1" value={groupForm.accessDurationDays} onChange={e => setGroupForm(p => ({ ...p, accessDurationDays: e.target.value }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Leave blank for indefinite access" />
+                    <p className="text-xs text-gray-400 mt-1">Students lose access this many days after the group start date. Leave blank for indefinite access.</p>
                   </div>
                   <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                     <input type="checkbox" id="group-featured" checked={groupForm.isFeaturedOnLanding} onChange={e => setGroupForm(p => ({ ...p, isFeaturedOnLanding: e.target.checked }))} className="w-4 h-4 accent-teal-600" />

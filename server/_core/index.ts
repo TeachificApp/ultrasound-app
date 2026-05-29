@@ -18,6 +18,7 @@ import { registerAuthLoginRoute } from "../routes/authLogin";
 import { registerMediaServeRoutes } from "../routes/mediaServe";
 import { registerUploadMediaRepoRoute } from "../routes/uploadMediaRepo";
 import { registerUploadCourseImageRoute } from "../routes/uploadCourseImage";
+import { registerUploadCohortMediaRoute } from "../routes/uploadCohortMedia";
 import { registerUploadSocialImageRoute } from "../routes/uploadSocialImage";
 import { registerSsoAutoRoute } from "../routes/ssoAuto";
 import { registerFunnelOgMetaRoutes } from "../routes/funnelOgMeta";
@@ -206,6 +207,8 @@ async function startServer() {
   registerUploadMediaRepoRoute(app);
   // Course/landing-page image upload (multipart, bypasses JSON body limit)
   registerUploadCourseImageRoute(app);
+  // Cohort group discussion media upload (images + videos, admin only)
+  registerUploadCohortMediaRoute(app);
   // Social content image upload (multipart, admin only)
   registerUploadSocialImageRoute(app);
   // Cross-domain silent SSO endpoint — must be before tRPC so it's not caught by the SPA catch-all

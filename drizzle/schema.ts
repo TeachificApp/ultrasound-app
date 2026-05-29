@@ -5043,6 +5043,8 @@ export const lmsCohortGroups = mysqlTable("lms_cohort_groups", {
   // Landing page link override — which cohort to feature on the course landing page
   isFeaturedOnLanding: boolean("is_featured_on_landing").default(false).notNull(),
   sortOrder: int("sort_order").default(0).notNull(),
+  // How many days students retain access from group start date (null = indefinite)
+  accessDurationDays: int("access_duration_days"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -5061,3 +5063,19 @@ export const lmsCohortGroupEnrollments = mysqlTable("lms_cohort_group_enrollment
 });
 export type LmsCohortGroupEnrollment = typeof lmsCohortGroupEnrollments.$inferSelect;
 export type InsertLmsCohortGroupEnrollment = typeof lmsCohortGroupEnrollments.$inferInsert;
+
+// ─── Cohort Group Messages ────────────────────────────────────────────────────
+export const lmsCohortMessages = mysqlTable("lms_cohort_messages", {
+  id: int("id").autoincrement().primaryKey(),
+  cohortGroupId: int("cohort_group_id").notNull(),
+  courseId: int("course_id").notNull(),
+  userId: int("user_id").notNull(),
+  body: text("body"),
+  // JSON array of { url, mimeType, fileName } objects
+  mediaUrls: json("media_urls").$type<{ url: string; mimeType: string; fileName: string }[]>(),
+  isAdminPost: boolean("is_admin_post").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type LmsCohortMessage = typeof lmsCohortMessages.$inferSelect;
+export type InsertLmsCohortMessage = typeof lmsCohortMessages.$inferInsert;

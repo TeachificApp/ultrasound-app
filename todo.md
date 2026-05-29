@@ -3777,3 +3777,30 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] UI: Featured group selector (landing page link)
 - [ ] UI: Per-group page block editor
 - [x] Learner: CohortSchedule shows group-specific page content
+
+## Cohort Group Enhancements (May 29 2026)
+- [ ] DB: add accessDurationDays (nullable) to lms_groups table (null = indefinite)
+- [ ] DB: cohort_messages table (id, groupId, courseId, userId, body, mediaUrls JSON, createdAt)
+- [ ] Server: transferStudent procedure (move enrollment from one group to another)
+- [ ] Server: getCohortActivity procedure (assignments + lesson progress per student in group)
+- [ ] Server: cohort message CRUD (listMessages, postMessage, deleteMessage)
+- [ ] Server: upload endpoint for cohort message media (images/videos)
+- [ ] Admin UI: Transfer student button on each student row → select target group dialog
+- [ ] Admin UI: Student activity panel (assignments + lesson progress per student)
+- [ ] Admin UI: Cohort message thread panel in Cohort Groups tab
+- [ ] Admin UI: Access duration field in cohort group Settings tab (days from start date or blank = indefinite)
+- [ ] Student UI: Cohort message thread visible in course player sidebar
+
+## Cohort Group Enhancements (2026-05-29)
+- [x] Transfer student between cohort groups (Transfer button + dialog in Cohort Groups tab)
+- [x] Student activity view (assignments + lesson progress per student in Cohort Groups tab)
+- [x] Cohort group discussion thread with image/video media upload (Discussion panel per group)
+- [x] Access duration setting in group dialog (days from group start, or blank for indefinite)
+- [x] Access duration displayed on group card info line
+- [x] Cohort sub-tabs reordered: Settings, Cohort Groups, Live Sessions, Assignments, Recordings
+- [x] View Education Library link opens in new tab
+- [x] Education library card price display reverted to correct dollar display (no /100 division)
+- [x] Image block link clicks fixed (pointerEvents: auto, stopPropagation on ImageLinkWrapper)
+- [x] lms_cohort_messages table created in DB (id, cohort_group_id, course_id, user_id, body, media_urls, is_admin_post)
+- [x] access_duration_days column added to lms_cohort_groups
+- [x] /api/upload/cohort-media endpoint created (images + videos, admin only, 100 MB limit)

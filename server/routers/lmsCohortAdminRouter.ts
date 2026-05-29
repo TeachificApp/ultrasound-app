@@ -74,6 +74,7 @@ import {
   mediaUploadResponses,
   lmsCohortGroups,
   lmsCohortGroupEnrollments,
+  lmsCohortMessages,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
@@ -840,6 +841,7 @@ export const lmsCohortAdminRouter = router({
       maxStudents: z.number().nullable().optional(),
       status: z.enum(["draft", "open", "active", "completed", "archived"]).optional(),
       sortOrder: z.number().optional(),
+      accessDurationDays: z.number().int().min(1).nullable().optional(),
       pageBlocks: z.string().optional(),
       isFeaturedOnLanding: z.boolean().optional(),
     }))
@@ -951,6 +953,156 @@ export const lmsCohortAdminRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       await db.delete(lmsCohortGroupEnrollments)
         .where(and(eq(lmsCohortGroupEnrollments.cohortGroupId, input.cohortGroupId), eq(lmsCohortGroupEnrollments.userId, input.userId)));
+      return { success: true };
+    }),
+
+  /** Transfer a student from one cohort group to another */
+  transferStudentToCohortGroup: protectedProcedure
+    .input(z.object({
+      fromGroupId: z.number(),
+      toGroupId: z.number(),
+      userId: z.number(),
+      courseId: z.number(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [enrollment] = await db.select({ id: lmsEnrollments.id })
+        .from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.userId, input.userId), eq(lmsEnrollments.courseId, input.courseId)))
+        .limit(1);
+      await db.delete(lmsCohortGroupEnrollments)
+        .where(and(
+          eq(lmsCohortGroupEnrollments.userId, input.userId),
+          eq(lmsCohortGroupEnrollments.courseId, input.courseId),
+        ));
+      await db.insert(lmsCohortGroupEnrollments).values({
+        cohortGroupId: input.toGroupId,
+        enrollmentId: enrollment?.id ?? 0,
+        userId: input.userId,
+        courseId: input.courseId,
+      });
+      return { success: true };
+    }),
+
+  /** Get student activity in a cohort group (assignments + lesson progress) */
+  getCohortStudentActivity: protectedProcedure
+    .input(z.object({ cohortGroupId: z.number(), userId: z.number(), courseId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const assignments = await db
+        .select()
+        .from(lmsCohortAssignments)
+        .where(and(
+          eq(lmsCohortAssignments.courseId, input.courseId),
+          eq(lmsCohortAssignments.cohortGroupId, input.cohortGroupId),
+        ))
+        .orderBy(asc(lmsCohortAssignments.dueDate));
+      const submissions = assignments.length > 0
+        ? await db.select().from(lmsCohortSubmissions)
+            .where(and(
+              eq(lmsCohortSubmissions.userId, input.userId),
+              inArray(lmsCohortSubmissions.assignmentId, assignments.map(a => a.id)),
+            ))
+        : [];
+      const submissionMap = Object.fromEntries(submissions.map(s => [s.assignmentId, s]));
+      const progress = await db
+        .select({
+          lessonId: lmsLessonProgress.lessonId,
+          completed: lmsLessonProgress.completed,
+          completedAt: lmsLessonProgress.completedAt,
+          watchedSeconds: lmsLessonProgress.watchedSeconds,
+          lessonTitle: lmsLessons.title,
+          sectionTitle: lmsSections.title,
+        })
+        .from(lmsLessonProgress)
+        .innerJoin(lmsLessons, eq(lmsLessons.id, lmsLessonProgress.lessonId))
+        .innerJoin(lmsSections, eq(lmsSections.id, lmsLessons.sectionId))
+        .where(and(
+          eq(lmsLessonProgress.userId, input.userId),
+          eq(lmsLessonProgress.courseId, input.courseId),
+        ))
+        .orderBy(asc(lmsSections.position), asc(lmsLessons.position));
+      return {
+        assignments: assignments.map(a => ({ ...a, submission: submissionMap[a.id] ?? null })),
+        lessonProgress: progress,
+      };
+    }),
+
+  // ── Cohort Messages ─────────────────────────────────────────────────────
+
+  listCohortMessages: protectedProcedure
+    .input(z.object({ cohortGroupId: z.number(), courseId: z.number(), limit: z.number().int().min(1).max(100).default(50), offset: z.number().int().min(0).default(0) }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const rows = await db
+        .select({
+          id: lmsCohortMessages.id,
+          cohortGroupId: lmsCohortMessages.cohortGroupId,
+          courseId: lmsCohortMessages.courseId,
+          userId: lmsCohortMessages.userId,
+          body: lmsCohortMessages.body,
+          mediaUrls: lmsCohortMessages.mediaUrls,
+          isAdminPost: lmsCohortMessages.isAdminPost,
+          createdAt: lmsCohortMessages.createdAt,
+          updatedAt: lmsCohortMessages.updatedAt,
+          userName: users.name,
+          userEmail: users.email,
+          userAvatar: users.avatarUrl,
+        })
+        .from(lmsCohortMessages)
+        .innerJoin(users, eq(users.id, lmsCohortMessages.userId))
+        .where(and(
+          eq(lmsCohortMessages.cohortGroupId, input.cohortGroupId),
+          eq(lmsCohortMessages.courseId, input.courseId),
+        ))
+        .orderBy(desc(lmsCohortMessages.createdAt))
+        .limit(input.limit)
+        .offset(input.offset);
+      return rows.reverse();
+    }),
+
+  postCohortMessage: protectedProcedure
+    .input(z.object({
+      cohortGroupId: z.number(),
+      courseId: z.number(),
+      body: z.string().max(5000).optional(),
+      mediaUrls: z.array(z.object({
+        url: z.string(),
+        mimeType: z.string(),
+        fileName: z.string(),
+      })).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (!input.body && (!input.mediaUrls || input.mediaUrls.length === 0)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Message must have body or media" });
+      }
+      const [result] = await db.insert(lmsCohortMessages).values({
+        cohortGroupId: input.cohortGroupId,
+        courseId: input.courseId,
+        userId: ctx.user.id,
+        body: input.body ?? null,
+        mediaUrls: input.mediaUrls ?? null,
+        isAdminPost: ctx.user.role === "admin",
+      }).$returningId();
+      return { id: result.id };
+    }),
+
+  deleteCohortMessage: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(lmsCohortMessages).where(eq(lmsCohortMessages.id, input.id));
       return { success: true };
     }),
 
