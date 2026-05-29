@@ -25,6 +25,7 @@ import { randomBytes } from "crypto";
 import path from "path";
 import fs from "fs";
 import os from "os";
+import { execFile } from "child_process";
 import {
   S3Client,
   CreateMultipartUploadCommand,
@@ -127,6 +128,42 @@ function resolveMimeType(mimeType: string, fileName: string): string {
     ".svg": "image/svg+xml",
   };
   return extMap[ext] || mimeType || "application/octet-stream";
+}
+
+/**
+ * Peek inside a ZIP buffer (first 2 MB) using `unzip -l` to detect SCORM packages.
+ * Returns true if the ZIP contains imsmanifest.xml OR a root-level index.html.
+ * This runs synchronously in a tmp file so it doesn't block the event loop for long.
+ */
+async function detectScormInZip(zipBuffer: Buffer): Promise<boolean> {
+  return new Promise((resolve) => {
+    const tmpPath = path.join(os.tmpdir(), `scorm-detect-${randomBytes(4).toString("hex")}.zip`);
+    try {
+      // Write a partial buffer (first 2 MB is enough to read the ZIP central directory)
+      const partial = zipBuffer.slice(0, Math.min(zipBuffer.length, 2 * 1024 * 1024));
+      fs.writeFileSync(tmpPath, partial);
+    } catch {
+      resolve(false);
+      return;
+    }
+    execFile("unzip", ["-l", tmpPath], { timeout: 8000 }, (err, stdout) => {
+      try { fs.unlinkSync(tmpPath); } catch {}
+      if (err && !stdout) { resolve(false); return; }
+      // Check for imsmanifest.xml (SCORM 1.2 / 2004) or root index.html
+      const lines = stdout.split("\n");
+      const hasManifest = lines.some(l => /imsmanifest\.xml$/i.test(l.trim()));
+      // Root-level index.html: no path separator before the filename
+      const hasRootIndex = lines.some(l => {
+        const m = l.match(/\s+(\S+)$/);
+        if (!m) return false;
+        const p = m[1].replace(/\\/g, "/");
+        // Allow one level of nesting (some SCORM packages wrap in a single folder)
+        const parts = p.split("/").filter(Boolean);
+        return parts.length <= 2 && parts[parts.length - 1].toLowerCase() === "index.html";
+      });
+      resolve(hasManifest || hasRootIndex);
+    });
+  });
 }
 
 async function authenticateAdmin(req: Request): Promise<{ id: number; role: string } | null> {
@@ -449,9 +486,42 @@ async function finalizeUpload(
   userId: number,
   uploadId: string
 ) {
-  const { fileName, mimeType, fileSize, title, description, tags, access, notes, mediaType, folder, brand, existingAssetId } = session;
+  let { fileName, mimeType, fileSize, title, description, tags, access, notes, mediaType, folder, brand, existingAssetId } = session;
 
   try {
+    // Auto-detect SCORM packages: if the file is a ZIP, peek inside to check for
+    // imsmanifest.xml or a root-level index.html and upgrade mediaType to "scorm".
+    if (mediaType === "zip") {
+      try {
+        const https = await import("https");
+        const http = await import("http");
+        const partialBuffer = await new Promise<Buffer>((resolve, reject) => {
+          const proto = s3Url.startsWith("https") ? https.default : http.default;
+          const encodedUrl = (() => {
+            try {
+              const u = new URL(s3Url);
+              u.pathname = u.pathname.split("/").map(encodeURIComponent).join("/");
+              return u.toString();
+            } catch { return s3Url; }
+          })();
+          const reqOpts = Object.assign(new URL(encodedUrl), { headers: { Range: "bytes=0-2097151" } });
+          proto.get(reqOpts as any, (res: any) => {
+            const chunks: Buffer[] = [];
+            res.on("data", (c: Buffer) => chunks.push(c));
+            res.on("end", () => resolve(Buffer.concat(chunks)));
+            res.on("error", reject);
+          }).on("error", reject);
+        });
+        const isScorm = await detectScormInZip(partialBuffer);
+        if (isScorm) {
+          mediaType = "scorm";
+          console.log(`[Upload] Auto-detected SCORM package for ${fileName}, upgrading mediaType zip→scorm`);
+        }
+      } catch (e: any) {
+        console.warn("[Upload] SCORM auto-detect failed (non-fatal):", e.message);
+      }
+    }
+
     if (existingAssetId) {
       const [asset] = await db
         .select({ slug: mediaAssets.slug })
