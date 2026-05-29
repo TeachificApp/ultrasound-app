@@ -27,7 +27,7 @@ import http from "http";
 import path from "path";
 import fs from "fs";
 import os from "os";
-import { execFile } from "child_process";
+import unzipper from "unzipper";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import {
   mediaAssets,
@@ -277,12 +277,17 @@ async function extractScormZip(
     // Stream download to disk (no memory buffering)
     await downloadToFile(zipUrl, zipPath);
 
-    // Extract using system unzip command — handles filenames with spaces/special chars reliably
-    await new Promise<void>((resolve, reject) => {
-      execFile("unzip", ["-q", "-o", zipPath, "-d", cacheDir], (err) => {
-        if (err) reject(err); else resolve();
-      });
-    });
+    // Extract using unzipper.Open.file — pure Node.js, no system binary required.
+    // Uses the Open API (not Extract stream) which correctly handles filenames with spaces.
+    const directory = await unzipper.Open.file(zipPath);
+    for (const entry of directory.files) {
+      if (entry.type === "File") {
+        const destPath = path.join(cacheDir, entry.path);
+        fs.mkdirSync(path.dirname(destPath), { recursive: true });
+        const content = await entry.buffer();
+        fs.writeFileSync(destPath, content);
+      }
+    }
 
     // Clean up the downloaded ZIP to free /tmp space
     try { fs.unlinkSync(zipPath); } catch {}

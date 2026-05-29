@@ -19,7 +19,7 @@ import os from "os";
 import https from "https";
 import http from "http";
 import { createHash } from "crypto";
-import { execFile } from "child_process";
+import unzipper from "unzipper";
 import { eq, and } from "drizzle-orm";
 import { getDb } from "../db";
 import { mediaVersions } from "../../drizzle/schema";
@@ -154,12 +154,17 @@ export async function extractAndUploadScorm(
     await downloadToFile(encodedUrl, zipPath);
     console.log(`[ScormExtractor] Downloaded ZIP to ${zipPath}`);
 
-    // 2. Extract using system unzip — handles filenames with spaces/special chars reliably
-    await new Promise<void>((resolve, reject) => {
-      execFile("unzip", ["-q", "-o", zipPath, "-d", workDir], (err) => {
-        if (err) reject(err); else resolve();
-      });
-    });
+    // 2. Extract using unzipper.Open.file — pure Node.js, no system binary required.
+    // Uses the Open API (not Extract stream) which correctly handles filenames with spaces.
+    const directory = await unzipper.Open.file(zipPath);
+    for (const entry of directory.files) {
+      if (entry.type === "File") {
+        const destPath = path.join(workDir, entry.path);
+        fs.mkdirSync(path.dirname(destPath), { recursive: true });
+        const content = await entry.buffer();
+        fs.writeFileSync(destPath, content);
+      }
+    }
     console.log(`[ScormExtractor] Extracted to ${workDir}`);
 
     // Clean up ZIP file to save /tmp space
