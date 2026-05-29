@@ -106,7 +106,11 @@ export const lmsCohortAdminRouter = router({
       notifyStudents: z.boolean().default(false),
       timezone: z.string().optional(),
       recurrenceRule: z.enum(["weekly", "biweekly", "monthly"]).optional(),
+      // Comma-separated days of week: "1,3,5" (0=Sun … 6=Sat)
+      recurrenceDaysOfWeek: z.string().optional(),
       recurrenceEndDate: z.string().optional(),
+      // Alternative to end date
+      recurrenceOccurrenceCount: z.number().int().min(1).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -123,7 +127,9 @@ export const lmsCohortAdminRouter = router({
         status: input.status,
         timezone: input.timezone ?? "America/New_York",
         recurrenceRule: input.recurrenceRule ?? null,
+        recurrenceDaysOfWeek: input.recurrenceDaysOfWeek ?? null,
         recurrenceEndDate: input.recurrenceEndDate ? new Date(input.recurrenceEndDate) : null,
+        recurrenceOccurrenceCount: input.recurrenceOccurrenceCount ?? null,
       }).$returningId();
 
       // Notify enrolled students if requested
@@ -177,7 +183,9 @@ export const lmsCohortAdminRouter = router({
       status: z.enum(["draft", "published", "cancelled"]).optional(),
       timezone: z.string().optional(),
       recurrenceRule: z.enum(["weekly", "biweekly", "monthly"]).nullable().optional(),
+      recurrenceDaysOfWeek: z.string().nullable().optional(),
       recurrenceEndDate: z.string().nullable().optional(),
+      recurrenceOccurrenceCount: z.number().int().min(1).nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -408,22 +416,29 @@ export const lmsCohortAdminRouter = router({
         .where(eq(lmsCohortSessions.id, input.parentSessionId)).limit(1);
       if (!parent) throw new TRPCError({ code: "NOT_FOUND", message: "Session not found" });
       if (!parent.recurrenceRule) throw new TRPCError({ code: "BAD_REQUEST", message: "Session has no recurrence rule" });
-      if (!parent.recurrenceEndDate) throw new TRPCError({ code: "BAD_REQUEST", message: "Recurrence end date is required" });
+      if (!parent.recurrenceEndDate && !parent.recurrenceOccurrenceCount)
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Recurrence end date or occurrence count is required" });
 
       // Delete existing child instances first (re-expand)
       await db.delete(lmsCohortSessions)
         .where(eq(lmsCohortSessions.parentSessionId, input.parentSessionId));
 
+      // Parse allowed days of week (0=Sun … 6=Sat). Empty = any day.
+      const allowedDays: number[] = parent.recurrenceDaysOfWeek
+        ? parent.recurrenceDaysOfWeek.split(",").map(Number).filter(n => !isNaN(n))
+        : [];
+
       const intervalDays = parent.recurrenceRule === "weekly" ? 7
         : parent.recurrenceRule === "biweekly" ? 14
-        : 30; // monthly approximation
+        : 1; // monthly: advance month-by-month below
 
       const instances: typeof lmsCohortSessions.$inferInsert[] = [];
       let current = new Date(parent.sessionDate);
-      const endDate = new Date(parent.recurrenceEndDate);
-      let weekNum = 1;
+      const endDate = parent.recurrenceEndDate ? new Date(parent.recurrenceEndDate) : null;
+      const maxCount = parent.recurrenceOccurrenceCount ?? 999;
+      let occurrenceNum = 1;
 
-      while (true) {
+      while (occurrenceNum < maxCount) {
         // Advance by interval
         if (parent.recurrenceRule === "monthly") {
           current = new Date(current);
@@ -431,11 +446,15 @@ export const lmsCohortAdminRouter = router({
         } else {
           current = new Date(current.getTime() + intervalDays * 24 * 60 * 60 * 1000);
         }
-        if (current > endDate) break;
-        weekNum++;
+        if (endDate && current > endDate) break;
+
+        // If specific days of week are required, skip dates that don't match
+        if (allowedDays.length > 0 && !allowedDays.includes(current.getDay())) continue;
+
+        occurrenceNum++;
         instances.push({
           courseId: parent.courseId,
-          title: `${parent.title} (Week ${weekNum})`,
+          title: `${parent.title} (${occurrenceNum})`,
           description: parent.description,
           sessionDate: new Date(current),
           durationMinutes: parent.durationMinutes,
@@ -444,8 +463,10 @@ export const lmsCohortAdminRouter = router({
           status: parent.status,
           timezone: parent.timezone ?? "America/New_York",
           recurrenceRule: null,
+          recurrenceDaysOfWeek: null,
           recurrenceInterval: null,
           recurrenceEndDate: null,
+          recurrenceOccurrenceCount: null,
           parentSessionId: parent.id,
         });
       }
@@ -453,6 +474,77 @@ export const lmsCohortAdminRouter = router({
       if (instances.length === 0) return { created: 0 };
       await db.insert(lmsCohortSessions).values(instances);
       return { created: instances.length };
+    }),
+
+  // ── Duplicate Session ─────────────────────────────────────────────────────────
+  /** Duplicate a session (copy all fields, reset recording URL, set status to draft) */
+  duplicateCohortSession: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [src] = await db.select().from(lmsCohortSessions)
+        .where(eq(lmsCohortSessions.id, input.id)).limit(1);
+      if (!src) throw new TRPCError({ code: "NOT_FOUND" });
+      const { id: _id, createdAt: _ca, updatedAt: _ua, ...rest } = src;
+      const [result] = await db.insert(lmsCohortSessions).values({
+        ...rest,
+        title: `${rest.title} (Copy)`,
+        recordingUrl: null,
+        status: "draft",
+        parentSessionId: null,
+      }).$returningId();
+      return { id: result.id };
+    }),
+
+  // ── ICS Calendar Export ───────────────────────────────────────────────────────
+  /** Return all published sessions for a cohort as an ICS calendar string */
+  getCohortSessionsIcs: protectedProcedure
+    .input(z.object({ courseId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [course] = await db.select({ title: lmsCourses.title })
+        .from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+      const sessions = await db.select().from(lmsCohortSessions)
+        .where(and(eq(lmsCohortSessions.courseId, input.courseId), eq(lmsCohortSessions.status, "published")))
+        .orderBy(asc(lmsCohortSessions.sessionDate));
+
+      const formatIcsDate = (d: Date) =>
+        d.toISOString().replace(/[-:]/g, "").replace(".000", "");
+
+      const escIcs = (s: string) => s.replace(/[\\;,]/g, c => `\\${c}`).replace(/\n/g, "\\n");
+
+      const lines: string[] = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//AllAboutUltrasound//CohortSchedule//EN",
+        `X-WR-CALNAME:${escIcs(course?.title ?? "Cohort Schedule")}`,
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+      ];
+
+      for (const s of sessions) {
+        const start = new Date(s.sessionDate);
+        const end = new Date(start.getTime() + (s.durationMinutes ?? 60) * 60 * 1000);
+        lines.push(
+          "BEGIN:VEVENT",
+          `UID:cohort-session-${s.id}@allaboutultrasound.com`,
+          `DTSTAMP:${formatIcsDate(new Date())}`,
+          `DTSTART:${formatIcsDate(start)}`,
+          `DTEND:${formatIcsDate(end)}`,
+          `SUMMARY:${escIcs(s.title)}`,
+          s.description ? `DESCRIPTION:${escIcs(s.description)}` : "",
+          s.meetingUrl ? `URL:${s.meetingUrl}` : "",
+          s.timezone ? `TZID:${s.timezone}` : "",
+          "END:VEVENT",
+        ).filter(Boolean);
+      }
+
+      lines.push("END:VCALENDAR");
+      return { ics: lines.join("\r\n"), courseTitle: course?.title ?? "Cohort" };
     }),
 
   // ── Cohort Submissions (Admin view) ──────────────────────────────────────────────

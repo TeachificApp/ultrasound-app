@@ -7921,8 +7921,10 @@ type CohortSession = {
   status: "draft" | "published" | "cancelled";
   timezone: string | null;
   recurrenceRule: "weekly" | "biweekly" | "monthly" | null;
+  recurrenceDaysOfWeek: string | null;
   recurrenceInterval: number | null;
   recurrenceEndDate: Date | string | null;
+  recurrenceOccurrenceCount: number | null;
   parentSessionId: number | null;
 };
 
@@ -7983,10 +7985,15 @@ function CohortTab({ courseId }: { courseId: number }) {
     onSuccess: () => { utils.lmsAdmin.listCohortSessions.invalidate({ courseId }); toast.success("Session deleted"); },
     onError: (e) => toast.error(e.message),
   });
+  const duplicateSession = trpc.lmsAdmin.duplicateCohortSession.useMutation({
+    onSuccess: () => { utils.lmsAdmin.listCohortSessions.invalidate({ courseId }); toast.success("Session duplicated"); },
+    onError: (e) => toast.error(e.message),
+  });
   const expandRecurring = trpc.lmsAdmin.expandRecurringSessions.useMutation({
     onSuccess: (r) => { utils.lmsAdmin.listCohortSessions.invalidate({ courseId }); toast.success(`Expanded into ${r.created} sessions`); },
     onError: (e) => toast.error(e.message),
   });
+  const getIcs = trpc.lmsAdmin.getCohortSessionsIcs.useQuery({ courseId }, { enabled: false });
 
   // Assignments
   const { data: assignments = [], isLoading: assignmentsLoading } = trpc.lmsAdmin.listCohortAssignments.useQuery({ courseId });
@@ -8055,13 +8062,18 @@ function CohortTab({ courseId }: { courseId: number }) {
 
   // Session dialog state
   const [sessionDialog, setSessionDialog] = useState<{ open: boolean; session?: CohortSession }>({ open: false });
+  const [sessionCalView, setSessionCalView] = useState<"list" | "calendar">("list");
+  const [calMonth, setCalMonth] = useState(() => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() }; });
   const [sessionForm, setSessionForm] = useState({
     title: "", description: "", sessionDate: "", durationMinutes: 60,
     meetingUrl: "", recordingUrl: "", status: "draft" as "draft" | "published" | "cancelled",
     notifyStudents: false,
     timezone: "America/New_York",
     recurrenceRule: "" as "" | "weekly" | "biweekly" | "monthly",
+    recurrenceDaysOfWeek: [] as number[], // 0=Sun…6=Sat
+    recurrenceEndType: "date" as "date" | "count",
     recurrenceEndDate: "",
+    recurrenceOccurrenceCount: 10,
   });
 
   const openSessionDialog = (session?: CohortSession) => {
@@ -8070,6 +8082,7 @@ function CohortTab({ courseId }: { courseId: number }) {
       const localISO = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
       const endD = session.recurrenceEndDate ? new Date(session.recurrenceEndDate) : null;
       const endISO = endD ? new Date(endD.getTime() - endD.getTimezoneOffset() * 60000).toISOString().slice(0, 10) : "";
+      const parsedDays = session.recurrenceDaysOfWeek ? session.recurrenceDaysOfWeek.split(",").map(Number) : [];
       setSessionForm({
         title: session.title,
         description: session.description ?? "",
@@ -8081,10 +8094,13 @@ function CohortTab({ courseId }: { courseId: number }) {
         notifyStudents: false,
         timezone: session.timezone ?? "America/New_York",
         recurrenceRule: session.recurrenceRule ?? "",
+        recurrenceDaysOfWeek: parsedDays,
+        recurrenceEndType: session.recurrenceOccurrenceCount ? "count" : "date",
         recurrenceEndDate: endISO,
+        recurrenceOccurrenceCount: session.recurrenceOccurrenceCount ?? 10,
       });
     } else {
-      setSessionForm({ title: "", description: "", sessionDate: "", durationMinutes: 60, meetingUrl: "", recordingUrl: "", status: "draft", notifyStudents: false, timezone: "America/New_York", recurrenceRule: "", recurrenceEndDate: "" });
+      setSessionForm({ title: "", description: "", sessionDate: "", durationMinutes: 60, meetingUrl: "", recordingUrl: "", status: "draft", notifyStudents: false, timezone: "America/New_York", recurrenceRule: "", recurrenceDaysOfWeek: [], recurrenceEndType: "date", recurrenceEndDate: "", recurrenceOccurrenceCount: 10 });
     }
     setSessionDialog({ open: true, session });
   };
@@ -8103,13 +8119,45 @@ function CohortTab({ courseId }: { courseId: number }) {
       status: sessionForm.status,
       timezone: sessionForm.timezone,
       recurrenceRule: (sessionForm.recurrenceRule || undefined) as "weekly" | "biweekly" | "monthly" | undefined,
-      recurrenceEndDate: sessionForm.recurrenceEndDate ? new Date(sessionForm.recurrenceEndDate).toISOString() : undefined,
+      recurrenceDaysOfWeek: sessionForm.recurrenceDaysOfWeek.length > 0 ? sessionForm.recurrenceDaysOfWeek.join(",") : undefined,
+      recurrenceEndDate: (sessionForm.recurrenceRule && sessionForm.recurrenceEndType === "date" && sessionForm.recurrenceEndDate)
+        ? new Date(sessionForm.recurrenceEndDate).toISOString() : undefined,
+      recurrenceOccurrenceCount: (sessionForm.recurrenceRule && sessionForm.recurrenceEndType === "count")
+        ? sessionForm.recurrenceOccurrenceCount : undefined,
     };
     if (sessionDialog.session) {
       updateSession.mutate({ id: sessionDialog.session.id, ...payload }, { onSuccess: () => setSessionDialog({ open: false }) });
     } else {
       createSession.mutate({ courseId, ...payload, notifyStudents: sessionForm.notifyStudents }, { onSuccess: () => setSessionDialog({ open: false }) });
     }
+  };
+
+  // ── Calendar helpers ──
+  const buildGoogleCalUrl = (s: CohortSession) => {
+    const start = new Date(s.sessionDate);
+    const end = new Date(start.getTime() + (s.durationMinutes ?? 60) * 60 * 1000);
+    const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(".000Z", "Z");
+    const params = new URLSearchParams({
+      action: "TEMPLATE",
+      text: s.title,
+      dates: `${fmt(start)}/${fmt(end)}`,
+      details: [s.description ?? "", s.meetingUrl ? `Join: ${s.meetingUrl}` : ""].filter(Boolean).join("\n"),
+    });
+    return `https://calendar.google.com/calendar/render?${params}`;
+  };
+
+  const downloadIcs = async () => {
+    try {
+      const result = await getIcs.refetch();
+      if (!result.data) return;
+      const blob = new Blob([result.data.ics], { type: "text/calendar" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${result.data.courseTitle.replace(/[^a-z0-9]/gi, "-")}-sessions.ics`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch { toast.error("Failed to generate ICS"); }
   };
 
   // Assignment dialog state
@@ -8190,11 +8238,30 @@ function CohortTab({ courseId }: { courseId: number }) {
       {/* Sessions */}
       {activeTab === "sessions" && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-500">Manage live sessions, coaching calls, and recorded replays for this cohort.</p>
-            <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => openSessionDialog()}>
-              <Plus className="w-3.5 h-3.5 mr-1" /> Add Session
-            </Button>
+          {/* Toolbar */}
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
+              <button
+                onClick={() => setSessionCalView("list")}
+                className={cn("px-3 py-1 rounded-md text-xs font-medium transition-colors", sessionCalView === "list" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
+              >
+                List
+              </button>
+              <button
+                onClick={() => setSessionCalView("calendar")}
+                className={cn("px-3 py-1 rounded-md text-xs font-medium transition-colors", sessionCalView === "calendar" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
+              >
+                Calendar
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={downloadIcs} disabled={getIcs.isFetching} className="text-xs">
+                <Download className="w-3.5 h-3.5 mr-1" /> ICS
+              </Button>
+              <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => openSessionDialog()}>
+                <Plus className="w-3.5 h-3.5 mr-1" /> Add Session
+              </Button>
+            </div>
           </div>
 
           {sessionsLoading ? (
@@ -8204,7 +8271,7 @@ function CohortTab({ courseId }: { courseId: number }) {
               <Radio className="w-8 h-8 mx-auto mb-2 opacity-40" />
               <p className="text-sm">No sessions yet — add your first live session above.</p>
             </div>
-          ) : (
+          ) : sessionCalView === "list" ? (
             <div className="space-y-2">
               {(sessions as CohortSession[]).map(s => (
                 <div key={s.id} className="bg-white border border-gray-200 rounded-lg p-4 flex items-start gap-3">
@@ -8220,7 +8287,7 @@ function CohortTab({ courseId }: { courseId: number }) {
                       <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{fmtDate(s.sessionDate)}</span>
                       <span>{s.durationMinutes} min</span>
                       {s.timezone && <span className="flex items-center gap-1"><Globe className="w-3 h-3" />{s.timezone}</span>}
-                      {s.recurrenceRule && <span className="flex items-center gap-1 text-purple-600"><Repeat className="w-3 h-3" />{s.recurrenceRule}</span>}
+                      {s.recurrenceRule && <span className="flex items-center gap-1 text-purple-600"><Repeat className="w-3 h-3" />{s.recurrenceRule}{s.recurrenceDaysOfWeek ? ` (${s.recurrenceDaysOfWeek.split(",").map(d => ["Su","Mo","Tu","We","Th","Fr","Sa"][+d]).join(",")})` : ""}</span>}
                       {s.parentSessionId && <span className="text-purple-400 text-xs">Recurring instance</span>}
                       {s.meetingUrl && <a href={s.meetingUrl} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline flex items-center gap-1"><LinkIcon className="w-3 h-3" />Meeting Link</a>}
                       {s.recordingUrl && <a href={s.recordingUrl} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline flex items-center gap-1"><PlayCircle className="w-3 h-3" />Recording</a>}
@@ -8228,6 +8295,24 @@ function CohortTab({ courseId }: { courseId: number }) {
                     {s.description && <p className="text-xs text-gray-400 mt-1 line-clamp-1">{s.description}</p>}
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
+                    {/* Google Calendar */}
+                    <a href={buildGoogleCalUrl(s)} target="_blank" rel="noopener noreferrer" title="Add to Google Calendar">
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-blue-400 hover:text-blue-600">
+                        <CalendarRange className="w-3.5 h-3.5" />
+                      </Button>
+                    </a>
+                    {/* Duplicate */}
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400 hover:text-gray-600" title="Duplicate session"
+                      onClick={() => duplicateSession.mutate({ id: s.id })} disabled={duplicateSession.isPending}>
+                      <Copy className="w-3.5 h-3.5" />
+                    </Button>
+                    {/* Expand recurring */}
+                    {s.recurrenceRule && !s.parentSessionId && (
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-purple-400 hover:text-purple-600" title="Expand recurring sessions"
+                        onClick={() => expandRecurring.mutate({ parentSessionId: s.id })} disabled={expandRecurring.isPending}>
+                        <Repeat className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
                     <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => openSessionDialog(s)}>
                       <Pencil className="w-3.5 h-3.5" />
                     </Button>
@@ -8239,6 +8324,69 @@ function CohortTab({ courseId }: { courseId: number }) {
                   </div>
                 </div>
               ))}
+            </div>
+          ) : (
+            /* ─── Calendar View ─── */
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              {/* Month navigation */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                <button onClick={() => setCalMonth(m => {
+                  const d = new Date(m.year, m.month - 1, 1);
+                  return { year: d.getFullYear(), month: d.getMonth() };
+                })} className="p-1 rounded hover:bg-gray-100">
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="font-semibold text-gray-800 text-sm">
+                  {new Date(calMonth.year, calMonth.month, 1).toLocaleString("en-US", { month: "long", year: "numeric" })}
+                </span>
+                <button onClick={() => setCalMonth(m => {
+                  const d = new Date(m.year, m.month + 1, 1);
+                  return { year: d.getFullYear(), month: d.getMonth() };
+                })} className="p-1 rounded hover:bg-gray-100">
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+              {/* Day headers */}
+              <div className="grid grid-cols-7 border-b border-gray-100">
+                {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => (
+                  <div key={d} className="text-center text-xs font-medium text-gray-400 py-2">{d}</div>
+                ))}
+              </div>
+              {/* Calendar grid */}
+              {(() => {
+                const firstDay = new Date(calMonth.year, calMonth.month, 1).getDay();
+                const daysInMonth = new Date(calMonth.year, calMonth.month + 1, 0).getDate();
+                const cells: React.ReactNode[] = [];
+                // Leading empty cells
+                for (let i = 0; i < firstDay; i++) cells.push(<div key={`e${i}`} className="min-h-[64px] border-r border-b border-gray-50" />);
+                // Day cells
+                for (let day = 1; day <= daysInMonth; day++) {
+                  const cellDate = new Date(calMonth.year, calMonth.month, day);
+                  const daySessions = (sessions as CohortSession[]).filter(s => {
+                    const sd = new Date(s.sessionDate);
+                    return sd.getFullYear() === calMonth.year && sd.getMonth() === calMonth.month && sd.getDate() === day;
+                  });
+                  const isToday = new Date().toDateString() === cellDate.toDateString();
+                  cells.push(
+                    <div key={day} className={cn("min-h-[64px] border-r border-b border-gray-50 p-1", isToday && "bg-teal-50/40")}>
+                      <span className={cn("text-xs font-medium block mb-1 w-6 h-6 flex items-center justify-center rounded-full",
+                        isToday ? "bg-teal-600 text-white" : "text-gray-500")}>{day}</span>
+                      {daySessions.map(s => (
+                        <div key={s.id}
+                          className={cn("text-[10px] leading-tight rounded px-1 py-0.5 mb-0.5 cursor-pointer truncate",
+                            s.status === "published" ? "bg-teal-100 text-teal-800" :
+                            s.status === "cancelled" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-600")}
+                          title={s.title}
+                          onClick={() => openSessionDialog(s)}
+                        >
+                          {new Date(s.sessionDate).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })} {s.title}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                }
+                return <div className="grid grid-cols-7">{cells}</div>;
+              })()}
             </div>
           )}
         </div>
@@ -8450,25 +8598,74 @@ function CohortTab({ courseId }: { courseId: number }) {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-700 mb-1 block">Recurrence</Label>
-                <Select value={sessionForm.recurrenceRule || "__none__"} onValueChange={v => setSessionForm(p => ({ ...p, recurrenceRule: (v === "__none__" ? "" : v) as "" | "weekly" | "biweekly" | "monthly" }))}>
-                  <SelectTrigger><SelectValue placeholder="No recurrence" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">No recurrence (one-time)</SelectItem>
-                    <SelectItem value="weekly">Weekly</SelectItem>
-                    <SelectItem value="biweekly">Bi-weekly (every 2 weeks)</SelectItem>
-                    <SelectItem value="monthly">Monthly</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              {sessionForm.recurrenceRule && (
+              {/* ── Recurrence ── */}
+              <div className="space-y-3 border border-gray-100 rounded-lg p-3 bg-gray-50">
                 <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-1 block">Recurrence End Date</Label>
-                  <Input type="date" value={sessionForm.recurrenceEndDate} onChange={e => setSessionForm(p => ({ ...p, recurrenceEndDate: e.target.value }))} />
-                  <p className="text-xs text-gray-400 mt-1">Sessions will be auto-expanded up to this date. You can also expand them manually after saving.</p>
+                  <Label className="text-sm font-medium text-gray-700 mb-1 block">Recurrence</Label>
+                  <Select value={sessionForm.recurrenceRule || "__none__"} onValueChange={v => setSessionForm(p => ({ ...p, recurrenceRule: (v === "__none__" ? "" : v) as "" | "weekly" | "biweekly" | "monthly" }))}>
+                    <SelectTrigger><SelectValue placeholder="No recurrence" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">No recurrence (one-time)</SelectItem>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="biweekly">Bi-weekly (every 2 weeks)</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-              )}
+                {sessionForm.recurrenceRule && (
+                  <>
+                    {/* Days of week */}
+                    <div>
+                      <Label className="text-xs font-medium text-gray-600 mb-1.5 block">Repeat on days (optional — leave blank for same day each cycle)</Label>
+                      <div className="flex gap-1.5 flex-wrap">
+                        {(["Su","Mo","Tu","We","Th","Fr","Sa"] as const).map((label, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setSessionForm(p => ({
+                              ...p,
+                              recurrenceDaysOfWeek: p.recurrenceDaysOfWeek.includes(idx)
+                                ? p.recurrenceDaysOfWeek.filter(d => d !== idx)
+                                : [...p.recurrenceDaysOfWeek, idx].sort(),
+                            }))}
+                            className={cn(
+                              "w-9 h-9 rounded-full text-xs font-medium border transition-colors",
+                              sessionForm.recurrenceDaysOfWeek.includes(idx)
+                                ? "bg-teal-600 text-white border-teal-600"
+                                : "bg-white text-gray-600 border-gray-200 hover:border-teal-400"
+                            )}
+                          >{label}</button>
+                        ))}
+                      </div>
+                    </div>
+                    {/* End condition */}
+                    <div>
+                      <Label className="text-xs font-medium text-gray-600 mb-1.5 block">End condition</Label>
+                      <div className="flex gap-3 mb-2">
+                        <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                          <input type="radio" checked={sessionForm.recurrenceEndType === "date"} onChange={() => setSessionForm(p => ({ ...p, recurrenceEndType: "date" }))} className="accent-teal-600" />
+                          End date
+                        </label>
+                        <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                          <input type="radio" checked={sessionForm.recurrenceEndType === "count"} onChange={() => setSessionForm(p => ({ ...p, recurrenceEndType: "count" }))} className="accent-teal-600" />
+                          # of occurrences
+                        </label>
+                      </div>
+                      {sessionForm.recurrenceEndType === "date" ? (
+                        <Input type="date" value={sessionForm.recurrenceEndDate} onChange={e => setSessionForm(p => ({ ...p, recurrenceEndDate: e.target.value }))} />
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <Input type="number" min={1} max={200} value={sessionForm.recurrenceOccurrenceCount}
+                            onChange={e => setSessionForm(p => ({ ...p, recurrenceOccurrenceCount: parseInt(e.target.value) || 10 }))}
+                            className="w-24" />
+                          <span className="text-sm text-gray-500">occurrences total</span>
+                        </div>
+                      )}
+                      <p className="text-xs text-gray-400 mt-1">After saving, click the <Repeat className="inline w-3 h-3" /> button on the session to expand all instances.</p>
+                    </div>
+                  </>
+                )}
+              </div>
               <div>
                 <Label className="text-sm font-medium text-gray-700 mb-1 block">Meeting URL</Label>
                 <Input value={sessionForm.meetingUrl} onChange={e => setSessionForm(p => ({ ...p, meetingUrl: e.target.value }))} placeholder="https://zoom.us/j/..." />

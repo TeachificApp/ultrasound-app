@@ -1,12 +1,17 @@
 /**
  * Order Bumps Router
- * Admin CRUD for order bump offers + public query for displaying bumps at checkout
+ * Admin CRUD for order bump offers + public query for displaying bumps at checkout.
+ *
+ * Conditional order bumps:
+ *   - triggerPricingOptionId (nullable) — when set, the bump is ONLY shown when the
+ *     user is purchasing that specific pricing option.  null means "show for all
+ *     pricing options of the trigger product".
  */
 import { z } from "zod";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
-import { sql, eq, and } from "drizzle-orm";
-import { orderBumps, orderBumpConversions } from "../../drizzle/schema";
+import { sql, eq, and, isNull, or } from "drizzle-orm";
+import { orderBumps, orderBumpConversions, lmsPricingOptions } from "../../drizzle/schema";
 
 // Helper to get DB
 async function getDb() {
@@ -40,6 +45,8 @@ export const orderBumpsAdminRouter = router({
     .input(z.object({
       triggerType: z.enum(["course", "quiz", "download", "bundle", "physical", "cohort"]),
       triggerProductId: z.number(),
+      // Optional: only show this bump when the user is purchasing this specific pricing option
+      triggerPricingOptionId: z.number().nullable().optional(),
       bumpType: z.enum(["course", "quiz", "download", "bundle", "physical", "cohort"]),
       bumpProductId: z.number(),
       timing: z.enum(["before_checkout", "after_checkout"]).default("after_checkout"),
@@ -63,6 +70,7 @@ export const orderBumpsAdminRouter = router({
       const [result] = await db.insert(orderBumps).values({
         triggerType: input.triggerType,
         triggerProductId: input.triggerProductId,
+        triggerPricingOptionId: input.triggerPricingOptionId ?? null,
         bumpType: input.bumpType,
         bumpProductId: input.bumpProductId,
         timing: input.timing,
@@ -89,6 +97,7 @@ export const orderBumpsAdminRouter = router({
       id: z.number(),
       triggerType: z.enum(["course", "quiz", "download", "bundle", "physical", "cohort"]).optional(),
       triggerProductId: z.number().optional(),
+      triggerPricingOptionId: z.number().nullable().optional(),
       bumpType: z.enum(["course", "quiz", "download", "bundle", "physical", "cohort"]).optional(),
       bumpProductId: z.number().optional(),
       timing: z.enum(["before_checkout", "after_checkout"]).optional(),
@@ -158,28 +167,68 @@ export const orderBumpsAdminRouter = router({
       });
       return { id: result.insertId };
     }),
+
+  /** Get pricing options for a course (used in the admin form to pick a trigger pricing option) */
+  getPricingOptionsForCourse: protectedProcedure
+    .input(z.object({ courseId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      const rows = await db
+        .select()
+        .from(lmsPricingOptions)
+        .where(and(eq(lmsPricingOptions.courseId, input.courseId), eq(lmsPricingOptions.isActive, true)))
+        .orderBy(lmsPricingOptions.sortOrder);
+      return rows;
+    }),
 });
 
 // ─── Public Router (for checkout flow) ───────────────────────────────────────
 export const orderBumpsPublicRouter = router({
-  /** Get active bumps for a given trigger product (used at checkout) */
+  /**
+   * Get active bumps for a given trigger product (used at checkout).
+   *
+   * Conditional filtering:
+   *   - If triggerPricingOptionId is provided, returns bumps that either:
+   *       a) have triggerPricingOptionId = null (applies to all pricing options), OR
+   *       b) have triggerPricingOptionId = the provided value (specific to this option)
+   *   - If triggerPricingOptionId is NOT provided, returns all active bumps for the product
+   *     (backward-compatible behaviour).
+   */
   getForProduct: publicProcedure
     .input(z.object({
       triggerType: z.enum(["course", "quiz", "download", "bundle", "physical", "cohort"]),
       triggerProductId: z.number(),
+      triggerPricingOptionId: z.number().nullable().optional(),
       timing: z.enum(["before_checkout", "after_checkout"]).optional(),
     }))
     .query(async ({ input }) => {
       const db = await getDb();
-      const conditions = [
+      const baseConditions = [
         eq(orderBumps.triggerType, input.triggerType),
         eq(orderBumps.triggerProductId, input.triggerProductId),
         eq(orderBumps.isActive, true),
       ];
       if (input.timing) {
-        conditions.push(eq(orderBumps.timing, input.timing));
+        baseConditions.push(eq(orderBumps.timing, input.timing));
       }
-      const rows = await db.select().from(orderBumps).where(and(...conditions));
+
+      // Conditional pricing option filter:
+      // Show bumps that apply to ALL pricing options (null) OR to this specific one
+      if (input.triggerPricingOptionId != null) {
+        const pricingOptionFilter = or(
+          isNull(orderBumps.triggerPricingOptionId),
+          eq(orderBumps.triggerPricingOptionId, input.triggerPricingOptionId),
+        );
+        const rows = await db
+          .select()
+          .from(orderBumps)
+          .where(and(...baseConditions, pricingOptionFilter));
+        return rows;
+      }
+
+      // No pricing option specified — return all bumps for this product
+      const rows = await db.select().from(orderBumps).where(and(...baseConditions));
       return rows;
     }),
 

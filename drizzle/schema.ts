@@ -3285,6 +3285,9 @@ export const orderBumps = mysqlTable("order_bumps", {
   // The trigger product — when a user buys this, the bump is offered (nullable for standalone)
   triggerType: mysqlEnum("trigger_type", ["course", "quiz", "download", "bundle", "physical", "cohort"]).notNull().default("course"),
   triggerProductId: int("trigger_product_id").default(0).notNull(),
+  // Conditional: if set, only show this bump when the user is purchasing this specific pricing option
+  // null = show for ALL pricing options of the trigger product
+  triggerPricingOptionId: int("trigger_pricing_option_id"),
   // The bump offer — what product is being offered as the bump
   bumpType: mysqlEnum("bump_type", ["course", "quiz", "download", "bundle", "physical", "cohort"]).notNull().default("download"),
   bumpProductId: int("bump_product_id").default(0).notNull(),
@@ -4846,8 +4849,12 @@ export const lmsCohortSessions = mysqlTable("lms_cohort_sessions", {
   // ── Recurrence ──────────────────────────────────────────────────────────────
   // recurrenceRule: weekly | biweekly | monthly | null (one-off)
   recurrenceRule: mysqlEnum("recurrence_rule", ["weekly", "biweekly", "monthly"]),
+  // Comma-separated days of week for custom recurrence: "0,1,2,3,4,5,6" (0=Sun)
+  recurrenceDaysOfWeek: varchar("recurrence_days_of_week", { length: 20 }),
   recurrenceInterval: int("recurrence_interval").default(1), // multiplier (reserved for future use)
   recurrenceEndDate: timestamp("recurrence_end_date"),       // inclusive last occurrence date
+  // Alternative to end date: stop after N occurrences
+  recurrenceOccurrenceCount: int("recurrence_occurrence_count"),
   // parentSessionId links child instances back to the template/parent session
   parentSessionId: int("parent_session_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

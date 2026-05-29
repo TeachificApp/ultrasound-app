@@ -38,6 +38,7 @@ type OrderBump = {
   id: number;
   triggerType: "course" | "quiz" | "download" | "bundle" | "physical" | "cohort";
   triggerProductId: number;
+  triggerPricingOptionId: number | null;
   bumpType: "course" | "quiz" | "download" | "bundle" | "physical" | "cohort";
   bumpProductId: number;
   timing: "before_checkout" | "after_checkout";
