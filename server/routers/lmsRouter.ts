@@ -5060,9 +5060,9 @@ CRITICAL REQUIREMENTS:
       if (p.search) {
         const like = `%${p.search}%`;
         conditions.push(or(
-          sql`${freePreviewEnrollments.email} LIKE ${like}`,
-          sql`${freePreviewEnrollments.firstName} LIKE ${like}`,
-          sql`${freePreviewEnrollments.lastName} LIKE ${like}`,
+          sql`${freePreviewEnrollments.email} LIKE ${like}` as any,
+          sql`${freePreviewEnrollments.firstName} LIKE ${like}` as any,
+          sql`${freePreviewEnrollments.lastName} LIKE ${like}` as any,
         ));
       }
 
@@ -5111,9 +5111,9 @@ CRITICAL REQUIREMENTS:
       if (p.search) {
         const like = `%${p.search}%`;
         conditions.push(or(
-          sql`${freePreviewEnrollments.email} LIKE ${like}`,
-          sql`${freePreviewEnrollments.firstName} LIKE ${like}`,
-          sql`${freePreviewEnrollments.lastName} LIKE ${like}`,
+          sql`${freePreviewEnrollments.email} LIKE ${like}` as any,
+          sql`${freePreviewEnrollments.firstName} LIKE ${like}` as any,
+          sql`${freePreviewEnrollments.lastName} LIKE ${like}` as any,
         ));
       }
       const where = conditions.length > 0 ? and(...conditions) : undefined;
@@ -5216,7 +5216,7 @@ CRITICAL REQUIREMENTS:
           for (const u of enrolledUsers) {
             if (!u.email) continue;
             await sendEmail({
-              to: u.email,
+              to: { name: u.name ?? undefined, email: u.email },
               subject: `New Live Session: ${input.title} — ${course?.title ?? "Your Course"}`,
               html: `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;">
                 <h2 style="color:#0e4a50;">New Live Session Added</h2>
@@ -5336,7 +5336,7 @@ CRITICAL REQUIREMENTS:
           for (const u of enrolledUsers) {
             if (!u.email) continue;
             await sendEmail({
-              to: u.email,
+              to: { name: u.name ?? undefined, email: u.email },
               subject: `New Assignment: ${input.title} — ${course?.title ?? "Your Course"}`,
               html: `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;">
                 <h2 style="color:#0e4a50;">New Assignment Posted</h2>

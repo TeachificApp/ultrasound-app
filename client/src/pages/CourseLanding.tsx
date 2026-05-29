@@ -1456,7 +1456,7 @@ export default function CourseLanding() {
       </div>
     </div>
 
-    {/* Guest Checkout Modal — shown to unauthenticated users who click a CTA */}
+    {/* Guest Checkout Modal — shown to unauthenticated users who click a CTA — build:v3 */}
     <Dialog open={guestModalOpen} onOpenChange={setGuestModalOpen}>
       <DialogContent className="max-w-md">
         <DialogHeader>
