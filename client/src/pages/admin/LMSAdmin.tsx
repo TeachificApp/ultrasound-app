@@ -5202,6 +5202,276 @@ function AffiliatesTab() {
   );
 }
 
+// ─── Orders Management Tab ──────────────────────────────────────────────────
+
+function OrdersManagementTab() {
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "paid" | "cancelled">("pending");
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+
+  const { data, isLoading, refetch } = trpc.lmsAdmin.listPendingOrders.useQuery({
+    page, pageSize: 25, search: search || undefined, status: statusFilter,
+  });
+
+  const deleteOrder = trpc.lmsAdmin.deleteOrder.useMutation({
+    onSuccess: () => { toast.success("Order deleted"); refetch(); setSelectedIds([]); },
+    onError: e => toast.error(e.message),
+  });
+  const bulkDelete = trpc.lmsAdmin.bulkDeleteOrders.useMutation({
+    onSuccess: (d) => { toast.success(`${d.deleted} orders deleted`); refetch(); setSelectedIds([]); },
+    onError: e => toast.error(e.message),
+  });
+
+  const orders = data?.orders ?? [];
+  const allSelected = orders.length > 0 && orders.every(o => selectedIds.includes(o.id));
+
+  const toggleAll = () => {
+    if (allSelected) setSelectedIds([]);
+    else setSelectedIds(orders.map(o => o.id));
+  };
+
+  const STATUS_BADGE: Record<string, string> = {
+    pending: "bg-yellow-100 text-yellow-700",
+    paid: "bg-green-100 text-green-700",
+    cancelled: "bg-red-100 text-red-700",
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-base font-semibold text-gray-900">Orders</h2>
+          <p className="text-xs text-gray-400 mt-0.5">View, filter, and delete orders. Pending orders are checkout sessions that were not completed.</p>
+        </div>
+        {selectedIds.length > 0 && (
+          <Button size="sm" variant="outline" className="h-8 text-red-500 border-red-200 hover:bg-red-50"
+            onClick={() => { if (confirm(`Delete ${selectedIds.length} selected orders?`)) bulkDelete.mutate({ orderIds: selectedIds }); }}>
+            <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Delete {selectedIds.length} Selected
+          </Button>
+        )}
+      </div>
+
+      {/* Filters */}
+      <div className="flex items-center gap-3">
+        <Input
+          placeholder="Search email, name, course, session ID..."
+          value={search}
+          onChange={e => { setSearch(e.target.value); setPage(1); }}
+          className="h-8 text-sm max-w-xs"
+        />
+        <Select value={statusFilter} onValueChange={v => { setStatusFilter(v as any); setPage(1); }}>
+          <SelectTrigger className="w-36 h-8 text-sm"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="paid">Paid</SelectItem>
+            <SelectItem value="cancelled">Cancelled</SelectItem>
+          </SelectContent>
+        </Select>
+        <span className="text-xs text-gray-400">{data?.total ?? 0} orders</span>
+      </div>
+
+      {isLoading ? <Skeleton className="h-48 w-full" /> : (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-4 py-2.5 w-8">
+                  <input type="checkbox" checked={allSelected} onChange={toggleAll} className="rounded" />
+                </th>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">User</th>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Course</th>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Amount</th>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Status</th>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Enrolled?</th>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Date</th>
+                <th className="px-4 py-2.5 w-10"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {orders.map((o: any) => (
+                <tr key={o.id} className={cn("hover:bg-gray-50", selectedIds.includes(o.id) && "bg-teal-50")}>
+                  <td className="px-4 py-2.5">
+                    <input type="checkbox" checked={selectedIds.includes(o.id)}
+                      onChange={() => setSelectedIds(ids => ids.includes(o.id) ? ids.filter(i => i !== o.id) : [...ids, o.id])}
+                      className="rounded" />
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <p className="font-medium text-gray-900 text-xs">{o.user?.displayName ?? o.user?.name ?? "Unknown"}</p>
+                    <p className="text-xs text-gray-400">{o.user?.email}</p>
+                  </td>
+                  <td className="px-4 py-2.5 text-xs text-gray-700 max-w-[160px] truncate">{o.course?.title ?? "—"}</td>
+                  <td className="px-4 py-2.5 text-xs font-medium text-gray-900">${(Number(o.amount) / 100).toFixed(2)}</td>
+                  <td className="px-4 py-2.5">
+                    <Badge className={`text-xs ${STATUS_BADGE[o.status] ?? "bg-gray-100 text-gray-600"}`}>{o.status}</Badge>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    {o.hasEnrollment
+                      ? <Badge className="text-xs bg-green-100 text-green-700">Yes</Badge>
+                      : <Badge className="text-xs bg-gray-100 text-gray-500">No</Badge>}
+                  </td>
+                  <td className="px-4 py-2.5 text-xs text-gray-400">{new Date(o.createdAt).toLocaleDateString()}</td>
+                  <td className="px-4 py-2.5">
+                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-red-400 hover:bg-red-50"
+                      onClick={() => { if (confirm("Delete this order?")) deleteOrder.mutate({ orderId: o.id }); }}>
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {orders.length === 0 && (
+            <div className="text-center py-10 text-gray-400 text-sm">
+              <ShoppingBag className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              No orders found
+            </div>
+          )}
+        </div>
+      )}
+
+      {(data?.total ?? 0) > 25 && (
+        <div className="flex justify-center gap-2">
+          <Button size="sm" variant="outline" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Previous</Button>
+          <span className="text-xs text-gray-400 self-center">Page {page}</span>
+          <Button size="sm" variant="outline" disabled={page * 25 >= (data?.total ?? 0)} onClick={() => setPage(p => p + 1)}>Next</Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Enrollment Export Tab ────────────────────────────────────────────────────
+
+function EnrollmentExportTab() {
+  const [courseId, setCourseId] = useState<number | undefined>(undefined);
+  const [includePending, setIncludePending] = useState(false);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [enabled, setEnabled] = useState(false);
+
+  const { data: courses } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", type: "all", page: 1, pageSize: 500 });
+
+  const { data: exportData, isLoading: exportLoading } = trpc.lmsAdmin.exportEnrollmentsCSV.useQuery(
+    { courseId, includePending, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined },
+    { enabled }
+  );
+
+  const handleDownloadCSV = () => {
+    if (!exportData?.csv) return;
+    const blob = new Blob([exportData.csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `enrollments-export-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportToEmailCampaign = () => {
+    if (!exportData?.emails?.length) { toast.error("No emails to export"); return; }
+    const emailList = exportData.emails.join("\n");
+    // Navigate to email admin with pre-filled emails
+    const params = new URLSearchParams({ prefillEmails: emailList });
+    window.location.href = `/admin/email?${params.toString()}`;
+  };
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-base font-semibold text-gray-900">Export Enrollments</h2>
+        <p className="text-xs text-gray-400 mt-0.5">Export enrollment data as CSV or send directly to an email campaign.</p>
+      </div>
+
+      {/* Filters */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+        <h3 className="text-sm font-semibold text-gray-700">Export Filters</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label className="text-xs text-gray-500 mb-1.5 block">Course (optional)</Label>
+            <Select value={courseId?.toString() ?? "all"} onValueChange={v => setCourseId(v === "all" ? undefined : Number(v))}>
+              <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="All courses" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Courses</SelectItem>
+                {(courses?.courses ?? []).map((c: any) => (
+                  <SelectItem key={c.id} value={c.id.toString()}>{c.title}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-3 pt-5">
+            <Switch checked={includePending} onCheckedChange={setIncludePending} id="include-pending" />
+            <Label htmlFor="include-pending" className="text-sm text-gray-700 cursor-pointer">Include pending orders</Label>
+          </div>
+          <div>
+            <Label className="text-xs text-gray-500 mb-1.5 block">Date From</Label>
+            <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-8 text-sm" />
+          </div>
+          <div>
+            <Label className="text-xs text-gray-500 mb-1.5 block">Date To</Label>
+            <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="h-8 text-sm" />
+          </div>
+        </div>
+        <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white h-8"
+          onClick={() => { setEnabled(true); }}
+          disabled={exportLoading}>
+          {exportLoading ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Loading...</> : <><RefreshCw className="w-3.5 h-3.5 mr-1.5" />Generate Export</>}
+        </Button>
+      </div>
+
+      {/* Results */}
+      {exportData && (
+        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-gray-900">{exportData.count} records ready</p>
+              <p className="text-xs text-gray-400">{exportData.emails.length} unique email addresses</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" className="h-8" onClick={handleDownloadCSV}>
+                <Download className="w-3.5 h-3.5 mr-1.5" /> Download CSV
+              </Button>
+              <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white h-8" onClick={handleExportToEmailCampaign}
+                disabled={!exportData.emails.length}>
+                <Megaphone className="w-3.5 h-3.5 mr-1.5" /> Export to Email Campaign
+              </Button>
+            </div>
+          </div>
+
+          {/* Preview table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  {["Type", "Email", "Name", "Course", "Date", "Progress", "Amount", "Status"].map(h => (
+                    <th key={h} className="text-left px-3 py-2 text-xs font-semibold text-gray-500">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {exportData.csv.split("\n").slice(1, 11).map((row, i) => {
+                  const cols = row.split(",").map(c => c.replace(/^"|"$/g, ""));
+                  return (
+                    <tr key={i} className="hover:bg-gray-50">
+                      {cols.slice(0, 8).map((c, j) => (
+                        <td key={j} className="px-3 py-2 text-gray-700 max-w-[120px] truncate">{c}</td>
+                      ))}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {exportData.count > 10 && (
+              <p className="text-xs text-gray-400 text-center py-2">Showing first 10 of {exportData.count} rows. Download CSV for full data.</p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Analytics Tab ────────────────────────────────────────────────────────────
 
 function AnalyticsTab() {
@@ -5320,6 +5590,8 @@ const LMS_NAV_GROUPS = [
       { value: "instructors", label: "Instructors", icon: GraduationCap },
       { value: "certificates",label: "Certificates",icon: CheckCircle },
       { value: "enrollments", label: "Enrollments", icon: UserCheck },
+      { value: "orders",       label: "Orders",       icon: ShoppingBag },
+      { value: "export",       label: "Export",       icon: Download },
     ],
   },
   {
@@ -5466,6 +5738,8 @@ export default function LMSAdmin() {
               {activeTab === "instructors" && <InstructorsTab />}
               {activeTab === "certificates"&& <CertificateTemplatesAdmin />}
               {activeTab === "enrollments" && <EnrollmentsWithPreviewsTab />}
+              {activeTab === "orders"      && <OrdersManagementTab />}
+              {activeTab === "export"      && <EnrollmentExportTab />}
               {activeTab === "analytics"   && <AnalyticsTab />}
               {activeTab === "affiliates"  && <AffiliatesTab />}
               {activeTab === "question_bank" && <QuestionBankAdmin />}
@@ -7984,7 +8258,57 @@ const COMMON_TIMEZONES = [
 ];
 
 function CohortTab({ courseId }: { courseId: number }) {
-  const [activeTab, setActiveTab] = useState<"sessions" | "assignments" | "recordings">("sessions");
+  const [activeTab, setActiveTab] = useState<"sessions" | "assignments" | "recordings" | "groups">("sessions");
+
+  // Cohort Groups
+  const { data: cohortGroups = [], isLoading: groupsLoading, refetch: refetchGroups } = trpc.lmsAdmin.listCohortGroups.useQuery({ courseId });
+  const createCohortGroup = trpc.lmsAdmin.createCohortGroup.useMutation({
+    onSuccess: () => { refetchGroups(); toast.success("Group created"); setGroupDialog({ open: false }); },
+    onError: (e) => toast.error(e.message),
+  });
+  const updateCohortGroup = trpc.lmsAdmin.updateCohortGroup.useMutation({
+    onSuccess: () => { refetchGroups(); toast.success("Group updated"); setGroupDialog({ open: false }); },
+    onError: (e) => toast.error(e.message),
+  });
+  const deleteCohortGroup = trpc.lmsAdmin.deleteCohortGroup.useMutation({
+    onSuccess: () => { refetchGroups(); toast.success("Group deleted"); },
+    onError: (e) => toast.error(e.message),
+  });
+  const [groupDialog, setGroupDialog] = useState<{ open: boolean; group?: any }>({ open: false });
+  const [groupForm, setGroupForm] = useState({ name: "", slug: "", description: "", startDate: "", endDate: "", enrollmentCloseDate: "", maxStudents: "", status: "draft" as "draft" | "open" | "active" | "completed" | "archived", sortOrder: 0, isFeaturedOnLanding: false });
+  const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
+  const { data: groupStudents = [], isLoading: groupStudentsLoading, refetch: refetchGroupStudents } = trpc.lmsAdmin.listCohortGroupStudents.useQuery({ cohortGroupId: selectedGroupId ?? 0 }, { enabled: !!selectedGroupId });
+  const { data: unassignedStudents = [] } = trpc.lmsAdmin.listUnassignedCohortStudents.useQuery({ courseId }, { enabled: activeTab === "groups" });
+  const assignStudent = trpc.lmsAdmin.assignStudentToCohortGroup.useMutation({
+    onSuccess: () => { refetchGroupStudents(); refetchGroups(); toast.success("Student assigned"); },
+    onError: (e) => toast.error(e.message),
+  });
+  const removeStudent = trpc.lmsAdmin.removeStudentFromCohortGroup.useMutation({
+    onSuccess: () => { refetchGroupStudents(); refetchGroups(); toast.success("Student removed"); },
+    onError: (e) => toast.error(e.message),
+  });
+  const [bulkSelected, setBulkSelected] = useState<number[]>([]);
+  const bulkAssign = trpc.lmsAdmin.bulkAssignStudentsToCohortGroup.useMutation({
+    onSuccess: (r) => { refetchGroupStudents(); refetchGroups(); toast.success(`${r.assigned} students assigned`); setBulkSelected([]); },
+    onError: (e) => toast.error(e.message),
+  });
+  const openGroupDialog = (group?: any) => {
+    if (group) {
+      setGroupForm({ name: group.name, slug: group.slug, description: group.description ?? "", startDate: group.startDate ? new Date(group.startDate).toISOString().slice(0, 10) : "", endDate: group.endDate ? new Date(group.endDate).toISOString().slice(0, 10) : "", enrollmentCloseDate: group.enrollmentCloseDate ? new Date(group.enrollmentCloseDate).toISOString().slice(0, 10) : "", maxStudents: group.maxStudents?.toString() ?? "", status: group.status, sortOrder: group.sortOrder, isFeaturedOnLanding: group.isFeaturedOnLanding });
+    } else {
+      setGroupForm({ name: "", slug: "", description: "", startDate: "", endDate: "", enrollmentCloseDate: "", maxStudents: "", status: "draft", sortOrder: cohortGroups.length, isFeaturedOnLanding: false });
+    }
+    setGroupDialog({ open: true, group });
+  };
+  const handleSaveGroup = () => {
+    if (!groupForm.name.trim() || !groupForm.slug.trim()) { toast.error("Name and slug are required"); return; }
+    const payload = { courseId, name: groupForm.name.trim(), slug: groupForm.slug.trim(), description: groupForm.description || undefined, startDate: groupForm.startDate || undefined, endDate: groupForm.endDate || undefined, enrollmentCloseDate: groupForm.enrollmentCloseDate || undefined, maxStudents: groupForm.maxStudents ? parseInt(groupForm.maxStudents) : undefined, status: groupForm.status, sortOrder: groupForm.sortOrder };
+    if (groupDialog.group) {
+      updateCohortGroup.mutate({ id: groupDialog.group.id, ...payload, isFeaturedOnLanding: groupForm.isFeaturedOnLanding });
+    } else {
+      createCohortGroup.mutate(payload);
+    }
+  };
   const utils = trpc.useUtils();
 
   // Sessions
@@ -8260,11 +8584,11 @@ function CohortTab({ courseId }: { courseId: number }) {
     <div className="space-y-4">
       {/* Sub-tabs */}
       <div className="flex gap-1 border-b border-gray-200 pb-0">
-        {(["sessions", "assignments", "recordings"] as const).map(t => (
+        {(["sessions", "assignments", "recordings", "groups"] as const).map(t => (
           <button key={t} onClick={() => setActiveTab(t)}
             className={cn("px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize",
               activeTab === t ? "border-teal-600 text-teal-700" : "border-transparent text-gray-500 hover:text-gray-700")}>
-            {t === "sessions" ? "Live Sessions" : t === "assignments" ? "Assignments" : "Recordings"}
+            {t === "sessions" ? "Live Sessions" : t === "assignments" ? "Assignments" : t === "recordings" ? "Recordings" : "Cohort Groups"}
           </button>
         ))}
       </div>
@@ -8837,6 +9161,191 @@ function CohortTab({ courseId }: { courseId: number }) {
               />
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Cohort Groups */}
+      {activeTab === "groups" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-semibold text-gray-900">Cohort Groups</h3>
+              <p className="text-sm text-gray-500 mt-0.5">Create separate cohort groups (e.g. June 2026, January 2027). Each group has its own page and student list. Students only see their assigned group.</p>
+            </div>
+            <Button size="sm" onClick={() => openGroupDialog()} className="bg-teal-600 hover:bg-teal-700 text-white">
+              <Plus className="w-3.5 h-3.5 mr-1" /> New Group
+            </Button>
+          </div>
+
+          {groupsLoading ? (
+            <div className="text-center py-8 text-gray-400">Loading groups...</div>
+          ) : cohortGroups.length === 0 ? (
+            <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-xl">
+              <div className="text-4xl mb-3">👥</div>
+              <p className="text-gray-500 font-medium">No cohort groups yet</p>
+              <p className="text-sm text-gray-400 mt-1">Create groups like "June 2026 Cohort" or "January 2027 Cohort"</p>
+              <Button size="sm" onClick={() => openGroupDialog()} className="mt-4 bg-teal-600 hover:bg-teal-700 text-white">
+                <Plus className="w-3.5 h-3.5 mr-1" /> Create First Group
+              </Button>
+            </div>
+          ) : (
+            <div className="grid gap-3">
+              {cohortGroups.map((group: any) => (
+                <div key={group.id} className={cn("border rounded-xl p-4 bg-white shadow-sm", selectedGroupId === group.id && "ring-2 ring-teal-500")}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-gray-900">{group.name}</span>
+                        {group.isFeaturedOnLanding && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Featured on Landing</span>}
+                        <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium", group.status === "active" ? "bg-green-100 text-green-700" : group.status === "open" ? "bg-blue-100 text-blue-700" : group.status === "completed" ? "bg-gray-100 text-gray-600" : "bg-yellow-100 text-yellow-700")}>{group.status}</span>
+                        <span className="text-xs text-gray-400">{group.studentCount} student{group.studentCount !== 1 ? "s" : ""}</span>
+                      </div>
+                      <div className="flex items-center gap-4 mt-1 text-xs text-gray-500 flex-wrap">
+                        <span>/{group.slug}</span>
+                        {group.startDate && <span>Starts: {new Date(group.startDate).toLocaleDateString()}</span>}
+                        {group.endDate && <span>Ends: {new Date(group.endDate).toLocaleDateString()}</span>}
+                        {group.maxStudents && <span>Max: {group.maxStudents}</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button size="sm" variant="outline" onClick={() => { setSelectedGroupId(selectedGroupId === group.id ? null : group.id); }} className="text-xs">
+                        {selectedGroupId === group.id ? "Hide Students" : "Manage Students"}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => openGroupDialog(group)} className="text-xs">Edit</Button>
+                      <Button size="sm" variant="outline" onClick={() => { if (confirm(`Delete group "${group.name}"? This will unassign all students.`)) deleteCohortGroup.mutate({ id: group.id }); }} className="text-xs text-red-600 border-red-200 hover:bg-red-50">Delete</Button>
+                    </div>
+                  </div>
+
+                  {/* Student management panel */}
+                  {selectedGroupId === group.id && (
+                    <div className="mt-4 border-t pt-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-700">Students in this group</span>
+                        <span className="text-xs text-gray-400">{groupStudents.length} assigned</span>
+                      </div>
+                      {groupStudentsLoading ? (
+                        <div className="text-sm text-gray-400">Loading...</div>
+                      ) : groupStudents.length === 0 ? (
+                        <div className="text-sm text-gray-400 italic">No students assigned yet</div>
+                      ) : (
+                        <div className="divide-y divide-gray-100 rounded-lg border border-gray-100 overflow-hidden">
+                          {groupStudents.map((s: any) => (
+                            <div key={s.id} className="flex items-center justify-between px-3 py-2 bg-white hover:bg-gray-50">
+                              <div>
+                                <span className="text-sm font-medium text-gray-800">{s.userName}</span>
+                                <span className="text-xs text-gray-400 ml-2">{s.userEmail}</span>
+                              </div>
+                              <Button size="sm" variant="ghost" onClick={() => removeStudent.mutate({ cohortGroupId: group.id, userId: s.userId })} className="text-xs text-red-500 hover:text-red-700 h-6 px-2">Remove</Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Unassigned students */}
+                      {unassignedStudents.length > 0 && (
+                        <div className="mt-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-gray-700">Unassigned students ({unassignedStudents.length})</span>
+                            {bulkSelected.length > 0 && (
+                              <Button size="sm" onClick={() => bulkAssign.mutate({ cohortGroupId: group.id, courseId, userIds: bulkSelected })} className="text-xs bg-teal-600 hover:bg-teal-700 text-white h-7">
+                                Assign {bulkSelected.length} selected
+                              </Button>
+                            )}
+                          </div>
+                          <div className="divide-y divide-gray-100 rounded-lg border border-gray-100 overflow-hidden max-h-48 overflow-y-auto">
+                            {unassignedStudents.map((s: any) => (
+                              <div key={s.userId} className="flex items-center gap-2 px-3 py-2 bg-white hover:bg-gray-50">
+                                <input type="checkbox" checked={bulkSelected.includes(s.userId)} onChange={e => setBulkSelected(prev => e.target.checked ? [...prev, s.userId] : prev.filter(id => id !== s.userId))} className="w-3.5 h-3.5 accent-teal-600" />
+                                <div className="flex-1 min-w-0">
+                                  <span className="text-sm font-medium text-gray-800">{s.userName}</span>
+                                  <span className="text-xs text-gray-400 ml-2">{s.userEmail}</span>
+                                </div>
+                                <Button size="sm" variant="ghost" onClick={() => assignStudent.mutate({ cohortGroupId: group.id, userId: s.userId, courseId })} className="text-xs text-teal-600 hover:text-teal-800 h-6 px-2">Assign</Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Group create/edit dialog */}
+          {groupDialog.open && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-y-auto max-h-[90vh]">
+                <div className="flex items-center justify-between p-5 border-b">
+                  <h2 className="text-lg font-semibold">{groupDialog.group ? "Edit Cohort Group" : "Create Cohort Group"}</h2>
+                  <button onClick={() => setGroupDialog({ open: false })} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+                </div>
+                <div className="p-5 space-y-4">
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700 mb-1 block">Group Name *</Label>
+                    <input value={groupForm.name} onChange={e => { setGroupForm(p => ({ ...p, name: e.target.value, slug: p.slug || e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") })); }} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="e.g. June 2026 Cohort" />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700 mb-1 block">Slug (URL identifier) *</Label>
+                    <input value={groupForm.slug} onChange={e => setGroupForm(p => ({ ...p, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="june-2026" />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700 mb-1 block">Description</Label>
+                    <textarea value={groupForm.description} onChange={e => setGroupForm(p => ({ ...p, description: e.target.value }))} rows={2} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Brief description of this cohort group..." />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700 mb-1 block">Start Date</Label>
+                      <input type="date" value={groupForm.startDate} onChange={e => setGroupForm(p => ({ ...p, startDate: e.target.value }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700 mb-1 block">End Date</Label>
+                      <input type="date" value={groupForm.endDate} onChange={e => setGroupForm(p => ({ ...p, endDate: e.target.value }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700 mb-1 block">Enrollment Closes</Label>
+                      <input type="date" value={groupForm.enrollmentCloseDate} onChange={e => setGroupForm(p => ({ ...p, enrollmentCloseDate: e.target.value }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700 mb-1 block">Max Students</Label>
+                      <input type="number" value={groupForm.maxStudents} onChange={e => setGroupForm(p => ({ ...p, maxStudents: e.target.value }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Unlimited" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700 mb-1 block">Status</Label>
+                      <select value={groupForm.status} onChange={e => setGroupForm(p => ({ ...p, status: e.target.value as any }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
+                        <option value="draft">Draft</option>
+                        <option value="open">Open (accepting enrollments)</option>
+                        <option value="active">Active (in progress)</option>
+                        <option value="completed">Completed</option>
+                        <option value="archived">Archived</option>
+                      </select>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700 mb-1 block">Sort Order</Label>
+                      <input type="number" value={groupForm.sortOrder} onChange={e => setGroupForm(p => ({ ...p, sortOrder: parseInt(e.target.value) || 0 }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <input type="checkbox" id="group-featured" checked={groupForm.isFeaturedOnLanding} onChange={e => setGroupForm(p => ({ ...p, isFeaturedOnLanding: e.target.checked }))} className="w-4 h-4 accent-teal-600" />
+                    <label htmlFor="group-featured" className="text-sm text-amber-800 cursor-pointer">
+                      <span className="font-medium">Feature on course landing page</span> — links the landing page CTA to this group's details
+                    </label>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 px-5 py-4 border-t bg-gray-50 rounded-b-2xl">
+                  <Button variant="outline" onClick={() => setGroupDialog({ open: false })}>Cancel</Button>
+                  <Button onClick={handleSaveGroup} disabled={createCohortGroup.isPending || updateCohortGroup.isPending} className="bg-teal-600 hover:bg-teal-700 text-white">
+                    {createCohortGroup.isPending || updateCohortGroup.isPending ? "Saving..." : groupDialog.group ? "Save Changes" : "Create Group"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

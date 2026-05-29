@@ -519,7 +519,7 @@ export default function CohortSchedule() {
     );
   }
 
-  const { course, sessions, assignments, recordings, mySubmissions } = data as any;
+  const { course, sessions, assignments, recordings, mySubmissions, myGroup } = data as any;
   const upcomingSessions = sessions.filter((s: any) => isUpcoming(s.sessionDate));
   const pastSessions = sessions.filter((s: any) => isPast(s.sessionDate));
   const pendingAssignments = assignments.filter((a: any) => a.dueDate && isUpcoming(a.dueDate));
@@ -543,7 +543,11 @@ export default function CohortSchedule() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap mb-1">
                 <Badge className="bg-teal-100 text-teal-700 border-teal-200 text-xs">Cohort</Badge>
-
+                {myGroup && (
+                  <Badge className="bg-purple-100 text-purple-700 border-purple-200 text-xs">
+                    {myGroup.name}
+                  </Badge>
+                )}
               </div>
               <h1 className="text-2xl font-bold text-gray-900 leading-tight">{course.title}</h1>
               {course.description && (

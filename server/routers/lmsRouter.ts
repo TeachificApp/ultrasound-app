@@ -78,6 +78,8 @@ import {
   mediaUploadFolders,
   mediaUploadResponses,
   funnelLeads,
+  lmsCohortGroups,
+  lmsCohortGroupEnrollments,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
@@ -1623,7 +1625,34 @@ export const lmsLearnerRouter = router({
         db.select().from(lmsCohortSubmissions)
           .where(eq(lmsCohortSubmissions.userId, ctx.user.id)),
       ]);
-      return { course, sessions, assignments, recordings, mySubmissions };
+      // Get the user's cohort group assignment
+      const [myGroupEnrollment] = await db
+        .select({ cohortGroupId: lmsCohortGroupEnrollments.cohortGroupId })
+        .from(lmsCohortGroupEnrollments)
+        .where(and(eq(lmsCohortGroupEnrollments.userId, ctx.user.id), eq(lmsCohortGroupEnrollments.courseId, input.courseId)))
+        .limit(1);
+      let myGroup = null;
+      if (myGroupEnrollment) {
+        const [g] = await db.select().from(lmsCohortGroups).where(eq(lmsCohortGroups.id, myGroupEnrollment.cohortGroupId)).limit(1);
+        myGroup = g ?? null;
+      }
+      return { course, sessions, assignments, recordings, mySubmissions, myGroup };
+    }),
+
+  /** Get the learner's assigned cohort group for a course */
+  getMyCohortGroup: protectedProcedure
+    .input(z.object({ courseId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return null;
+      const [groupEnrollment] = await db
+        .select({ cohortGroupId: lmsCohortGroupEnrollments.cohortGroupId })
+        .from(lmsCohortGroupEnrollments)
+        .where(and(eq(lmsCohortGroupEnrollments.userId, ctx.user.id), eq(lmsCohortGroupEnrollments.courseId, input.courseId)))
+        .limit(1);
+      if (!groupEnrollment) return null;
+      const [group] = await db.select().from(lmsCohortGroups).where(eq(lmsCohortGroups.id, groupEnrollment.cohortGroupId)).limit(1);
+      return group ?? null;
     }),
 
   submitCohortAssignment: protectedProcedure

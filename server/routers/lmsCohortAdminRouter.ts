@@ -72,6 +72,8 @@ import {
   lmsCohortSubmissions,
   mediaUploadFolders,
   mediaUploadResponses,
+  lmsCohortGroups,
+  lmsCohortGroupEnrollments,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
@@ -756,5 +758,210 @@ export const lmsCohortAdminRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       return db.select().from(mediaUploadFolders);
+    }),
+
+  // ── Cohort Groups ──────────────────────────────────────────────────────────
+
+  /** List all cohort groups for a cohort course */
+  listCohortGroups: protectedProcedure
+    .input(z.object({ courseId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const groups = await db
+        .select()
+        .from(lmsCohortGroups)
+        .where(eq(lmsCohortGroups.courseId, input.courseId))
+        .orderBy(asc(lmsCohortGroups.sortOrder), asc(lmsCohortGroups.createdAt));
+      const counts = await db
+        .select({ cohortGroupId: lmsCohortGroupEnrollments.cohortGroupId, count: sql<number>`count(*)` })
+        .from(lmsCohortGroupEnrollments)
+        .where(eq(lmsCohortGroupEnrollments.courseId, input.courseId))
+        .groupBy(lmsCohortGroupEnrollments.cohortGroupId);
+      const countMap = Object.fromEntries(counts.map(c => [c.cohortGroupId, c.count]));
+      return groups.map(g => ({ ...g, studentCount: countMap[g.id] ?? 0 }));
+    }),
+
+  /** Create a new cohort group */
+  createCohortGroup: protectedProcedure
+    .input(z.object({
+      courseId: z.number(),
+      name: z.string().min(1).max(255),
+      slug: z.string().min(1).max(255),
+      description: z.string().optional(),
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
+      enrollmentCloseDate: z.string().optional(),
+      maxStudents: z.number().optional(),
+      status: z.enum(["draft", "open", "active", "completed", "archived"]).default("draft"),
+      sortOrder: z.number().default(0),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { courseId, name, slug, description, startDate, endDate, enrollmentCloseDate, maxStudents, status, sortOrder } = input;
+      const [result] = await db.insert(lmsCohortGroups).values({
+        courseId, name, slug, description,
+        startDate: startDate ? new Date(startDate) : undefined,
+        endDate: endDate ? new Date(endDate) : undefined,
+        enrollmentCloseDate: enrollmentCloseDate ? new Date(enrollmentCloseDate) : undefined,
+        maxStudents, status, sortOrder,
+      }).$returningId();
+      return { id: result.id };
+    }),
+
+  /** Update a cohort group */
+  updateCohortGroup: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      name: z.string().min(1).max(255).optional(),
+      slug: z.string().min(1).max(255).optional(),
+      description: z.string().optional(),
+      startDate: z.string().nullable().optional(),
+      endDate: z.string().nullable().optional(),
+      enrollmentCloseDate: z.string().nullable().optional(),
+      maxStudents: z.number().nullable().optional(),
+      status: z.enum(["draft", "open", "active", "completed", "archived"]).optional(),
+      sortOrder: z.number().optional(),
+      pageBlocks: z.string().optional(),
+      isFeaturedOnLanding: z.boolean().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { id, startDate, endDate, enrollmentCloseDate, ...rest } = input;
+      const updateData: any = { ...rest };
+      if (startDate !== undefined) updateData.startDate = startDate ? new Date(startDate) : null;
+      if (endDate !== undefined) updateData.endDate = endDate ? new Date(endDate) : null;
+      if (enrollmentCloseDate !== undefined) updateData.enrollmentCloseDate = enrollmentCloseDate ? new Date(enrollmentCloseDate) : null;
+      if (input.isFeaturedOnLanding) {
+        const [group] = await db.select({ courseId: lmsCohortGroups.courseId }).from(lmsCohortGroups).where(eq(lmsCohortGroups.id, id));
+        if (group) await db.update(lmsCohortGroups).set({ isFeaturedOnLanding: false }).where(eq(lmsCohortGroups.courseId, group.courseId));
+      }
+      await db.update(lmsCohortGroups).set(updateData).where(eq(lmsCohortGroups.id, id));
+      return { success: true };
+    }),
+
+  /** Delete a cohort group */
+  deleteCohortGroup: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(lmsCohortGroupEnrollments).where(eq(lmsCohortGroupEnrollments.cohortGroupId, input.id));
+      await db.delete(lmsCohortGroups).where(eq(lmsCohortGroups.id, input.id));
+      return { success: true };
+    }),
+
+  /** List students in a specific cohort group */
+  listCohortGroupStudents: protectedProcedure
+    .input(z.object({ cohortGroupId: z.number(), search: z.string().optional() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const rows = await db
+        .select({
+          id: lmsCohortGroupEnrollments.id,
+          userId: lmsCohortGroupEnrollments.userId,
+          enrollmentId: lmsCohortGroupEnrollments.enrollmentId,
+          joinedAt: lmsCohortGroupEnrollments.joinedAt,
+          userName: users.name,
+          userEmail: users.email,
+          userAvatar: users.avatarUrl,
+        })
+        .from(lmsCohortGroupEnrollments)
+        .innerJoin(users, eq(users.id, lmsCohortGroupEnrollments.userId))
+        .where(eq(lmsCohortGroupEnrollments.cohortGroupId, input.cohortGroupId))
+        .orderBy(asc(users.name));
+      if (input.search) {
+        const q = input.search.toLowerCase();
+        return rows.filter(r => r.userName?.toLowerCase().includes(q) || r.userEmail?.toLowerCase().includes(q));
+      }
+      return rows;
+    }),
+
+  /** List students enrolled in a cohort course but NOT yet assigned to any group */
+  listUnassignedCohortStudents: protectedProcedure
+    .input(z.object({ courseId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const enrolled = await db
+        .select({ userId: lmsEnrollments.userId, userName: users.name, userEmail: users.email, userAvatar: users.avatarUrl, enrollmentId: lmsEnrollments.id })
+        .from(lmsEnrollments)
+        .innerJoin(users, eq(users.id, lmsEnrollments.userId))
+        .where(and(eq(lmsEnrollments.courseId, input.courseId), eq(lmsEnrollments.status, "active")));
+      const assigned = await db
+        .select({ userId: lmsCohortGroupEnrollments.userId })
+        .from(lmsCohortGroupEnrollments)
+        .where(eq(lmsCohortGroupEnrollments.courseId, input.courseId));
+      const assignedIds = new Set(assigned.map(a => a.userId));
+      return enrolled.filter(e => !assignedIds.has(e.userId));
+    }),
+
+  /** Assign a student to a cohort group (moves from any existing group) */
+  assignStudentToCohortGroup: protectedProcedure
+    .input(z.object({ cohortGroupId: z.number(), userId: z.number(), courseId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [enrollment] = await db.select({ id: lmsEnrollments.id })
+        .from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.userId, input.userId), eq(lmsEnrollments.courseId, input.courseId)))
+        .limit(1);
+      await db.delete(lmsCohortGroupEnrollments)
+        .where(and(eq(lmsCohortGroupEnrollments.userId, input.userId), eq(lmsCohortGroupEnrollments.courseId, input.courseId)));
+      await db.insert(lmsCohortGroupEnrollments).values({
+        cohortGroupId: input.cohortGroupId,
+        enrollmentId: enrollment?.id ?? 0,
+        userId: input.userId,
+        courseId: input.courseId,
+      });
+      return { success: true };
+    }),
+
+  /** Remove a student from their cohort group */
+  removeStudentFromCohortGroup: protectedProcedure
+    .input(z.object({ cohortGroupId: z.number(), userId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(lmsCohortGroupEnrollments)
+        .where(and(eq(lmsCohortGroupEnrollments.cohortGroupId, input.cohortGroupId), eq(lmsCohortGroupEnrollments.userId, input.userId)));
+      return { success: true };
+    }),
+
+  /** Bulk assign multiple students to a cohort group */
+  bulkAssignStudentsToCohortGroup: protectedProcedure
+    .input(z.object({ cohortGroupId: z.number(), courseId: z.number(), userIds: z.array(z.number()) }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      let assigned = 0;
+      for (const userId of input.userIds) {
+        const [enrollment] = await db.select({ id: lmsEnrollments.id })
+          .from(lmsEnrollments)
+          .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, input.courseId)))
+          .limit(1);
+        await db.delete(lmsCohortGroupEnrollments)
+          .where(and(eq(lmsCohortGroupEnrollments.userId, userId), eq(lmsCohortGroupEnrollments.courseId, input.courseId)));
+        await db.insert(lmsCohortGroupEnrollments).values({
+          cohortGroupId: input.cohortGroupId,
+          enrollmentId: enrollment?.id ?? 0,
+          userId,
+          courseId: input.courseId,
+        });
+        assigned++;
+      }
+      return { assigned };
     }),
 });

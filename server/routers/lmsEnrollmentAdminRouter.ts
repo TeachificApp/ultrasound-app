@@ -1779,4 +1779,173 @@ CRITICAL REQUIREMENTS:
       ];
       return { csv: csvLines.join("\n"), count: rows.length };
     }),
+
+  // ── Pending Orders Management ────────────────────────────────────────────────
+  listPendingOrders: protectedProcedure
+    .input(z.object({
+      page: z.number().int().min(1).default(1),
+      pageSize: z.number().int().min(1).max(100).default(25),
+      search: z.string().optional(),
+      status: z.enum(["all", "pending", "paid", "cancelled"]).default("pending"),
+    }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const offset = (input.page - 1) * input.pageSize;
+      const conditions: any[] = [];
+      if (input.status !== "all") conditions.push(eq(lmsOrders.status, input.status as any));
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+      const ordersRaw = await db.select().from(lmsOrders)
+        .where(whereClause)
+        .orderBy(desc(lmsOrders.createdAt))
+        .limit(input.pageSize * 3) // fetch extra for in-memory search
+        .offset(offset);
+      const enriched = await Promise.all(ordersRaw.map(async (o) => {
+        const [u] = await db.select({ displayName: users.displayName, email: users.email, name: users.name })
+          .from(users).where(eq(users.id, o.userId)).limit(1);
+        const [c] = await db.select({ title: lmsCourses.title, slug: lmsCourses.slug })
+          .from(lmsCourses).where(eq(lmsCourses.id, o.courseId)).limit(1);
+        const [enrollment] = await db.select({ id: lmsEnrollments.id })
+          .from(lmsEnrollments)
+          .where(and(eq(lmsEnrollments.userId, o.userId), eq(lmsEnrollments.courseId, o.courseId)))
+          .limit(1);
+        return { ...o, user: u ?? null, course: c ?? null, hasEnrollment: !!enrollment };
+      }));
+      const filtered = input.search
+        ? enriched.filter(o => {
+            const q = input.search!.toLowerCase();
+            return (
+              o.user?.email?.toLowerCase().includes(q) ||
+              o.user?.displayName?.toLowerCase().includes(q) ||
+              o.user?.name?.toLowerCase().includes(q) ||
+              o.course?.title?.toLowerCase().includes(q) ||
+              o.stripeSessionId?.toLowerCase().includes(q)
+            );
+          })
+        : enriched;
+      const [{ total }] = await db.select({ total: sql<number>`count(*)` }).from(lmsOrders).where(whereClause);
+      return { orders: filtered.slice(0, input.pageSize), total: Number(total), page: input.page, pageSize: input.pageSize };
+    }),
+
+  deleteOrder: protectedProcedure
+    .input(z.object({ orderId: z.number().int() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [order] = await db.select().from(lmsOrders).where(eq(lmsOrders.id, input.orderId)).limit(1);
+      if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Order not found" });
+      await db.delete(lmsOrders).where(eq(lmsOrders.id, input.orderId));
+      return { deleted: true, orderId: input.orderId };
+    }),
+
+  bulkDeleteOrders: protectedProcedure
+    .input(z.object({ orderIds: z.array(z.number().int()).min(1).max(200) }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(lmsOrders).where(inArray(lmsOrders.id, input.orderIds));
+      return { deleted: input.orderIds.length };
+    }),
+
+  // ── Enrollment CSV Export ────────────────────────────────────────────────────
+  exportEnrollmentsCSV: protectedProcedure
+    .input(z.object({
+      courseId: z.number().int().optional(),
+      includePending: z.boolean().default(false),
+      dateFrom: z.string().optional(),
+      dateTo: z.string().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Active enrollments
+      const enrollConds: any[] = [];
+      if (input.courseId) enrollConds.push(eq(lmsEnrollments.courseId, input.courseId));
+      if (input.dateFrom) enrollConds.push(sql`${lmsEnrollments.enrolledAt} >= ${new Date(input.dateFrom)}`);
+      if (input.dateTo) enrollConds.push(sql`${lmsEnrollments.enrolledAt} <= ${new Date(input.dateTo)}`);
+
+      const enrollmentRows = await db
+        .select({
+          rowType: sql<string>`'enrolled'`,
+          userId: lmsEnrollments.userId,
+          courseId: lmsEnrollments.courseId,
+          rowDate: lmsEnrollments.enrolledAt,
+          orderId: lmsEnrollments.orderId,
+          progressPct: lmsEnrollments.progressPct,
+          email: users.email,
+          displayName: users.displayName,
+          name: users.name,
+          courseTitle: lmsCourses.title,
+          courseSlug: lmsCourses.slug,
+          orderAmount: lmsOrders.amount,
+          orderStatus: lmsOrders.status,
+          stripeSessionId: lmsOrders.stripeSessionId,
+        })
+        .from(lmsEnrollments)
+        .leftJoin(users, eq(lmsEnrollments.userId, users.id))
+        .leftJoin(lmsCourses, eq(lmsEnrollments.courseId, lmsCourses.id))
+        .leftJoin(lmsOrders, eq(lmsEnrollments.orderId, lmsOrders.id))
+        .where(enrollConds.length > 0 ? and(...enrollConds) : undefined)
+        .orderBy(desc(lmsEnrollments.enrolledAt));
+
+      // Pending orders (if requested)
+      type ExportRow = typeof enrollmentRows[0];
+      let pendingRows: ExportRow[] = [];
+      if (input.includePending) {
+        const pendConds: any[] = [eq(lmsOrders.status, "pending")];
+        if (input.courseId) pendConds.push(eq(lmsOrders.courseId, input.courseId));
+        if (input.dateFrom) pendConds.push(sql`${lmsOrders.createdAt} >= ${new Date(input.dateFrom)}`);
+        if (input.dateTo) pendConds.push(sql`${lmsOrders.createdAt} <= ${new Date(input.dateTo)}`);
+        const pending = await db
+          .select({
+            rowType: sql<string>`'pending_order'`,
+            userId: lmsOrders.userId,
+            courseId: lmsOrders.courseId,
+            rowDate: lmsOrders.createdAt,
+            orderId: lmsOrders.id,
+            progressPct: sql<number>`0`,
+            email: users.email,
+            displayName: users.displayName,
+            name: users.name,
+            courseTitle: lmsCourses.title,
+            courseSlug: lmsCourses.slug,
+            orderAmount: lmsOrders.amount,
+            orderStatus: lmsOrders.status,
+            stripeSessionId: lmsOrders.stripeSessionId,
+          })
+          .from(lmsOrders)
+          .leftJoin(users, eq(lmsOrders.userId, users.id))
+          .leftJoin(lmsCourses, eq(lmsOrders.courseId, lmsCourses.id))
+          .where(and(...pendConds))
+          .orderBy(desc(lmsOrders.createdAt));
+        pendingRows = pending as ExportRow[];
+      }
+
+      const allRows = [...enrollmentRows, ...pendingRows];
+      const esc = (v: string | null | undefined | number) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+      const headers = ["Type", "Email", "Name", "Course", "Course Slug", "Date", "Progress %", "Order Amount ($)", "Order Status", "Stripe Session ID"];
+      const csvLines = [
+        headers.join(","),
+        ...allRows.map(r => [
+          esc(r.rowType),
+          esc(r.email),
+          esc(r.displayName ?? r.name),
+          esc(r.courseTitle),
+          esc(r.courseSlug),
+          r.rowDate ? new Date(r.rowDate).toISOString() : "",
+          r.progressPct ?? 0,
+          r.orderAmount != null ? (Number(r.orderAmount) / 100).toFixed(2) : "",
+          esc(r.orderStatus),
+          esc(r.stripeSessionId),
+        ].join(",")),
+      ];
+
+      const emails = [...new Set(allRows.map(r => r.email).filter(Boolean))] as string[];
+      return { csv: csvLines.join("\n"), count: allRows.length, emails };
+    }),
 });

@@ -3740,3 +3740,40 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] All Members tab with search/filter/pagination
 - [x] Collapsible sidebar with tooltip labels
 - [x] All existing sub-components (Sales, Product Analytics, Memberships, Contacts, Sharing Monitor) accessible via sidebar nav
+
+## Orders & Enrollment Export (May 2026)
+- [ ] Server: deleteOrder procedure (admin only)
+- [ ] Server: listPendingOrders procedure (paginated, with user/course details)
+- [x] Server: exportEnrollmentsCSV (all enrollments + pending orders, filterable)
+- [ ] Server: exportToEmailCampaign (push enrollment list to SendGrid contact list)
+- [x] UI: Pending Orders panel in LMSAdmin Analytics with delete button
+- [x] UI: Enrollment export panel (CSV download + email campaign export) in Enrollments tab
+
+## Community Enhancements (May 2026)
+- [x] Server: updateCommunity extended with sortOrder, accessType=restricted, iconImage, linkedAccessItems
+- [x] Server: reorderCommunities procedure
+- [x] Server: uploadCommunityIcon procedure
+- [x] Server: listAdminProfiles, createAdminProfile, updateAdminProfile, deleteAdminProfile
+- [x] Server: join updated to handle restricted (sets memberStatus=pending)
+- [x] Server: listPendingMembers, approveMember, rejectMember
+- [x] Server: createPost updated to accept adminProfileId (post-as)
+- [x] UI: Community sort order drag-and-drop in CommunityAdmin
+- [x] UI: Access type selector (free/paid/restricted) with restricted approval queue
+- [x] UI: Linked course/product access panel in community settings
+- [x] UI: Icon image upload in community form
+- [x] UI: Admin Profiles tab (create/edit/delete profiles to post as)
+- [x] UI: View Community + Post in Community quick links in admin
+- [ ] UI: Full-page editor for community editable regions
+- [x] UI: Post-as selector when creating posts (choose admin profile)
+- [ ] Public: Restricted community shows "Request to Join" button + pending state
+
+## Multi-Cohort Groups (May 2026)
+- [x] Server: listCohortGroups, createCohortGroup, updateCohortGroup, deleteCohortGroup
+- [x] Server: setFeaturedCohortGroup (controls landing page link)
+- [x] Server: listCohortGroupStudents, assignStudentToCohortGroup, removeStudentFromCohortGroup
+- [x] Server: getMyCohortGroup (learner — returns which group they're in)
+- [x] UI: Cohort Groups sub-tab in LMSAdmin CohortTab
+- [x] UI: Per-group student list and assignment UI
+- [x] UI: Featured group selector (landing page link)
+- [ ] UI: Per-group page block editor
+- [x] Learner: CohortSchedule shows group-specific page content

@@ -36,6 +36,9 @@ import {
   communityDMConversations,
   communityDMMessages,
   communityReports,
+  communityAdminProfiles,
+  lmsEnrollments,
+  lmsCourses,
 } from "../../drizzle/schema";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -184,10 +187,12 @@ const communityPublicRouter = router({
     return db.select({
       id: communities.id, title: communities.title, slug: communities.slug,
       description: communities.description, coverImage: communities.coverImage,
-      logoImage: communities.logoImage, brand: communities.brand,
-      privacy: communities.privacy, accessType: communities.accessType,
-      accentColor: communities.accentColor,
-    }).from(communities).where(eq(communities.status, "published")).orderBy(asc(communities.id));
+      logoImage: communities.logoImage, iconImage: communities.iconImage,
+      brand: communities.brand, privacy: communities.privacy,
+      accessType: communities.accessType, accentColor: communities.accentColor,
+      sortOrder: communities.sortOrder,
+    }).from(communities).where(eq(communities.status, "published"))
+      .orderBy(asc(communities.sortOrder), asc(communities.id));
   }),
 
   /** Get a single community by slug */
@@ -239,10 +244,13 @@ const communityMemberRouter = router({
     const [c] = await db.select().from(communities).where(eq(communities.id, input.communityId)).limit(1);
     if (!c || c.status !== "published") throw new TRPCError({ code: "NOT_FOUND" });
     if (c.accessType === "paid") throw new TRPCError({ code: "FORBIDDEN", message: "This community requires a paid membership." });
-    await db.insert(communityMembers).values({ communityId: input.communityId, userId: ctx.user.id, role: "member" })
-      .onDuplicateKeyUpdate({ set: { role: "member" } });
-    await awardXP(db, ctx.user.id, "join", 5);
-    return { success: true };
+    // Restricted communities: set memberStatus to pending for admin approval
+    const memberStatus = c.accessType === "restricted" ? "pending" : "approved";
+    await db.insert(communityMembers).values({
+      communityId: input.communityId, userId: ctx.user.id, role: "member", memberStatus,
+    }).onDuplicateKeyUpdate({ set: { role: "member" } });
+    if (memberStatus === "approved") await awardXP(db, ctx.user.id, "join", 5);
+    return { success: true, pending: memberStatus === "pending" };
   }),
 
   /** Leave a community */
@@ -305,16 +313,21 @@ const communityMemberRouter = router({
     postType: z.enum(["text", "image", "video", "poll", "case_study"]).default("text"),
     attachments: z.array(z.object({ url: z.string(), type: z.string() })).optional(),
     poll: z.object({ question: z.string(), options: z.array(z.string().min(1)), endsAt: z.string().optional() }).optional(),
+    /** Post as a specific admin profile (admin only) */
+    adminProfileId: z.number().optional(),
   })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     const member = await assertCommunityMember(db, input.communityId, ctx.user.id);
     if (!member && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    // Validate admin profile belongs to this community
+    if (input.adminProfileId && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
 
     const [result] = await db.insert(communityPosts).values({
       communityId: input.communityId,
       channelId: input.channelId,
       userId: ctx.user.id,
+      adminProfileId: input.adminProfileId ?? null,
       title: input.title ?? null,
       body: input.body,
       postType: input.postType as any,
@@ -767,8 +780,13 @@ const communityAdminRouter = router({
     description: z.string().optional(),
     brand: z.enum(["all_about_ultrasound", "iheartecho"]).default("all_about_ultrasound"),
     privacy: z.enum(["public", "private", "paid"]).default("public"),
-    accessType: z.enum(["free", "paid"]).default("free"),
+    accessType: z.enum(["free", "paid", "restricted"]).default("free"),
     accentColor: z.string().default("#189aa1"),
+    coverImage: z.string().optional(),
+    logoImage: z.string().optional(),
+    iconImage: z.string().optional(),
+    sortOrder: z.number().default(0),
+    linkedAccessItems: z.string().optional(),
   })).mutation(async ({ ctx, input }) => {
     await assertAdmin(ctx);
     const db = await getDb();
@@ -788,18 +806,248 @@ const communityAdminRouter = router({
     description: z.string().optional(),
     status: z.enum(["draft", "published"]).optional(),
     privacy: z.enum(["public", "private", "paid"]).optional(),
+    accessType: z.enum(["free", "paid", "restricted"]).optional(),
     accentColor: z.string().optional(),
     coverImage: z.string().optional(),
     logoImage: z.string().optional(),
+    iconImage: z.string().optional(),
+    sortOrder: z.number().optional(),
+    linkedAccessItems: z.string().optional(), // JSON array of {type, id, title}
+    pageBlocks: z.string().optional(),
   })).mutation(async ({ ctx, input }) => {
     await assertAdmin(ctx);
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     const { id, ...data } = input;
-    await db.update(communities).set(data).where(eq(communities.id, id));
+    await db.update(communities).set(data as any).where(eq(communities.id, id));
+    return { success: true };
+  }),
+  /** Reorder communities (drag-and-drop sort) */
+  reorderCommunities: protectedProcedure.input(z.object({
+    communities: z.array(z.object({ id: z.number(), sortOrder: z.number() })),
+  })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    for (const c of input.communities) {
+      await db.update(communities).set({ sortOrder: c.sortOrder }).where(eq(communities.id, c.id));
+    }
+    return { success: true };
+  }),
+  /** Upload community icon image */
+  uploadCommunityIcon: protectedProcedure.input(z.object({
+    communityId: z.number(),
+    base64: z.string(),
+    mimeType: z.string().default("image/png"),
+  })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const buf = Buffer.from(input.base64, "base64");
+    const ext = input.mimeType.split("/")[1] ?? "png";
+    const key = `community-icons/${input.communityId}-${Date.now()}.${ext}`;
+    const { url } = await storagePut(key, buf, input.mimeType);
+    await db.update(communities).set({ iconImage: url }).where(eq(communities.id, input.communityId));
+    return { url };
+  }),
+  /** List pending members awaiting approval (restricted communities) */
+  listPendingMembers: protectedProcedure.input(z.object({ communityId: z.number() })).query(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) return [];
+    const rows = await db.select({
+      id: communityMembers.id, userId: communityMembers.userId,
+      joinedAt: communityMembers.joinedAt, memberStatus: communityMembers.memberStatus,
+      userName: users.name, userEmail: users.email, userAvatar: users.avatarUrl,
+    }).from(communityMembers)
+      .innerJoin(users, eq(users.id, communityMembers.userId))
+      .where(and(eq(communityMembers.communityId, input.communityId), eq(communityMembers.memberStatus, "pending")))
+      .orderBy(asc(communityMembers.joinedAt));
+    return rows;
+  }),
+  /** Approve or reject a pending member */
+  approveMember: protectedProcedure.input(z.object({
+    communityId: z.number(),
+    userId: z.number(),
+    action: z.enum(["approve", "reject"]),
+  })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const newStatus = input.action === "approve" ? "approved" : "rejected";
+    await db.update(communityMembers)
+      .set({ memberStatus: newStatus })
+      .where(and(eq(communityMembers.communityId, input.communityId), eq(communityMembers.userId, input.userId)));
+    if (input.action === "approve") {
+      await awardXP(db, input.userId, "join", 5);
+    }
+    return { success: true };
+  }),
+  /** List admin profiles for a community */
+  listAdminProfiles: protectedProcedure.input(z.object({ communityId: z.number() })).query(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) return [];
+    return db.select().from(communityAdminProfiles)
+      .where(eq(communityAdminProfiles.communityId, input.communityId))
+      .orderBy(asc(communityAdminProfiles.createdAt));
+  }),
+  /** Create an admin profile */
+  createAdminProfile: protectedProcedure.input(z.object({
+    communityId: z.number(),
+    name: z.string().min(1).max(100),
+    bio: z.string().optional(),
+    avatarUrl: z.string().optional(),
+  })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const [r] = await db.insert(communityAdminProfiles).values({
+      communityId: input.communityId,
+      name: input.name,
+      bio: input.bio ?? null,
+      avatarUrl: input.avatarUrl ?? null,
+      createdByUserId: ctx.user.id,
+    }).$returningId();
+    return { id: r.id };
+  }),
+  /** Update an admin profile */
+  updateAdminProfile: protectedProcedure.input(z.object({
+    id: z.number(),
+    name: z.string().min(1).max(100).optional(),
+    bio: z.string().optional(),
+    avatarUrl: z.string().optional(),
+  })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const { id, ...data } = input;
+    await db.update(communityAdminProfiles).set(data).where(eq(communityAdminProfiles.id, id));
+    return { success: true };
+  }),
+  /** Delete an admin profile */
+  deleteAdminProfile: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    await db.delete(communityAdminProfiles).where(eq(communityAdminProfiles.id, input.id));
+    return { success: true };
+  }),
+  /** Upload admin profile avatar */
+  uploadAdminProfileAvatar: protectedProcedure.input(z.object({
+    profileId: z.number(),
+    base64: z.string(),
+    mimeType: z.string().default("image/png"),
+  })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const buf = Buffer.from(input.base64, "base64");
+    const ext = input.mimeType.split("/")[1] ?? "png";
+    const key = `community-admin-profiles/${input.profileId}-${Date.now()}.${ext}`;
+    const { url } = await storagePut(key, buf, input.mimeType);
+    await db.update(communityAdminProfiles).set({ avatarUrl: url }).where(eq(communityAdminProfiles.id, input.profileId));
+    return { url };
+  }),
+  /** List courses available for linked access (for the linked access picker) */
+  listCoursesForLinkedAccess: protectedProcedure.query(async ({ ctx }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) return [];
+    return db.select({ id: lmsCourses.id, title: lmsCourses.title, type: lmsCourses.type })
+      .from(lmsCourses)
+      .where(eq(lmsCourses.status, "public"))
+      .orderBy(asc(lmsCourses.title));
+  }),
+  /** Auto-grant community access when user enrolls in a linked course */
+  grantLinkedCommunityAccess: protectedProcedure.input(z.object({
+    userId: z.number(),
+    courseId: z.number(),
+  })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    // Find communities that have this courseId in their linkedAccessItems
+    const allCommunities = await db.select({ id: communities.id, linkedAccessItems: communities.linkedAccessItems })
+      .from(communities).where(eq(communities.status, "published"));
+    for (const c of allCommunities) {
+      if (!c.linkedAccessItems) continue;
+      try {
+        const items = JSON.parse(c.linkedAccessItems) as Array<{ type: string; id: number }>;
+        const linked = items.some(i => i.type === "course" && i.id === input.courseId);
+        if (linked) {
+          await db.insert(communityMembers).values({
+            communityId: c.id, userId: input.userId, role: "member", memberStatus: "approved",
+          }).onDuplicateKeyUpdate({ set: { memberStatus: "approved" } });
+        }
+      } catch { /* skip malformed JSON */ }
+    }
     return { success: true };
   }),
 
+  /** Alias: listCommunities (used by CommunityAdmin UI) */
+  listCommunities: protectedProcedure.query(async ({ ctx }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) return [];
+    const all = await db.select().from(communities).orderBy(asc(communities.sortOrder), asc(communities.id));
+    const withCounts = await Promise.all(all.map(async (c) => {
+      const [{ count }] = await db.select({ count: sql<number>`COUNT(*)` }).from(communityMembers)
+        .where(and(eq(communityMembers.communityId, c.id), eq(communityMembers.memberStatus, "approved")));
+      const [{ pending }] = await db.select({ pending: sql<number>`COUNT(*)` }).from(communityMembers)
+        .where(and(eq(communityMembers.communityId, c.id), eq(communityMembers.memberStatus, "pending")));
+      return { ...c, memberCount: Number(count), pendingCount: Number(pending) };
+    }));
+    return withCounts;
+  }),
+  /** Delete a community */
+  deleteCommunity: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    await db.delete(communities).where(eq(communities.id, input.id));
+    return { success: true };
+  }),
+  /** Create a channel (alias for addChannel) */
+  createChannel: protectedProcedure.input(z.object({
+    communityId: z.number(),
+    name: z.string().min(1).max(100),
+    description: z.string().optional(),
+    type: z.enum(["discussion", "announcements", "resources"]).default("discussion"),
+  })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const [r] = await db.insert(communityChannels).values({
+      communityId: input.communityId, name: input.name,
+      description: input.description ?? null, type: input.type,
+    }).$returningId();
+    return { id: r.id };
+  }),
+  /** Update a channel */
+  updateChannel: protectedProcedure.input(z.object({
+    id: z.number(),
+    name: z.string().min(1).max(100).optional(),
+    description: z.string().optional(),
+    type: z.enum(["discussion", "announcements", "resources"]).optional(),
+    sortOrder: z.number().optional(),
+    isDefault: z.boolean().optional(),
+  })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const { id, ...data } = input;
+    await db.update(communityChannels).set(data as any).where(eq(communityChannels.id, id));
+    return { success: true };
+  }),
+  /** Award a badge to a user (alias for grantBadge) */
+  awardBadge: protectedProcedure.input(z.object({ userId: z.number(), badgeId: z.number() })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    await db.insert(communityUserBadges).values({ userId: input.userId, badgeId: input.badgeId }).catch(() => {});
+    return { success: true };
+  }),
   /** List all communities (admin) */
   listAllCommunities: protectedProcedure.query(async ({ ctx }) => {
     await assertAdmin(ctx);

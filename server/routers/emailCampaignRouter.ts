@@ -17,7 +17,7 @@
 
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { eq, and, desc, lte, isNull, isNotNull } from "drizzle-orm";
+import { eq, and, desc, lte, isNull, isNotNull, inArray } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import {
@@ -25,6 +25,7 @@ import {
   emailTemplates,
   emailCampaigns,
   userRoles,
+  lmsEnrollments,
 } from "../../drizzle/schema";
 import { sendEmail } from "../_core/email";
 import { randomBytes } from "crypto";
@@ -51,6 +52,8 @@ const AudienceFilterSchema = z.object({
   userStatus: z.enum(["all", "active", "pending"]).default("all"),
   /** Specific email addresses — overrides all other filters when non-empty */
   specificEmails: z.array(z.string().email()).default([]),
+  /** Filter to users enrolled in specific course IDs */
+  enrolledInCourseIds: z.array(z.number().int()).default([]),
 });
 
 // ─── Unsubscribe token helper ─────────────────────────────────────────────────
@@ -211,6 +214,19 @@ async function resolveRecipients(
         return false;
       }
     });
+  }
+
+  // Apply course enrollment filter
+  if (filter.enrolledInCourseIds && filter.enrolledInCourseIds.length > 0) {
+    const enrolledUserIds = new Set<number>();
+    for (const courseId of filter.enrolledInCourseIds) {
+      const rows = await db
+        .select({ userId: lmsEnrollments.userId })
+        .from(lmsEnrollments)
+        .where(eq(lmsEnrollments.courseId, courseId));
+      rows.forEach(r => enrolledUserIds.add(r.userId));
+    }
+    allUsers = allUsers.filter(u => enrolledUserIds.has(u.id));
   }
 
   return allUsers.map((u) => ({

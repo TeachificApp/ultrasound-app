@@ -157,7 +157,7 @@ export default function EmailAdmin() {
   const [userStatus, setUserStatus] = useState<"all" | "active" | "pending">("active");
   const [specificEmailsInput, setSpecificEmailsInput] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    return params.get("to") ?? "";
+    return params.get("prefillEmails") ?? params.get("to") ?? "";
   });
   const [audienceExpanded, setAudienceExpanded] = useState(true);
 
