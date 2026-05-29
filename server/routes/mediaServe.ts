@@ -27,7 +27,7 @@ import http from "http";
 import path from "path";
 import fs from "fs";
 import os from "os";
-import unzipper from "unzipper";
+import { execFile } from "child_process";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import {
   mediaAssets,
@@ -198,8 +198,19 @@ function downloadToFile(url: string, destPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const follow = (targetUrl: string, redirects = 0): void => {
       if (redirects > 5) { reject(new Error("Too many redirects")); return; }
-      const proto = targetUrl.startsWith("https") ? https : http;
-      proto.get(targetUrl, (res) => {
+      // URL-encode the path portion to handle filenames with spaces and special chars
+      let safeUrl = targetUrl;
+      try {
+        const parsed = new URL(targetUrl);
+        // Re-encode only the pathname — preserve existing %xx sequences by decoding first
+        parsed.pathname = parsed.pathname
+          .split("/")
+          .map((seg) => encodeURIComponent(decodeURIComponent(seg)))
+          .join("/");
+        safeUrl = parsed.toString();
+      } catch { /* leave safeUrl as-is if URL parsing fails */ }
+      const proto = safeUrl.startsWith("https") ? https : http;
+      proto.get(safeUrl, (res) => {
         // Follow redirects
         if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           follow(res.headers.location, redirects + 1);
@@ -266,12 +277,11 @@ async function extractScormZip(
     // Stream download to disk (no memory buffering)
     await downloadToFile(zipUrl, zipPath);
 
-    // Stream-extract from disk file (unzipper uses streaming — much lower memory than AdmZip)
+    // Extract using system unzip command — handles filenames with spaces/special chars reliably
     await new Promise<void>((resolve, reject) => {
-      fs.createReadStream(zipPath)
-        .pipe(unzipper.Extract({ path: cacheDir }))
-        .on("close", resolve)
-        .on("error", reject);
+      execFile("unzip", ["-q", "-o", zipPath, "-d", cacheDir], (err) => {
+        if (err) reject(err); else resolve();
+      });
     });
 
     // Clean up the downloaded ZIP to free /tmp space

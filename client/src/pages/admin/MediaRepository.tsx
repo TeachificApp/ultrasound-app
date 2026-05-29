@@ -798,6 +798,10 @@ function AssetDetailDialog({ assetId, onClose, onRefresh }: AssetDetailDialogPro
   const revokeMutation = trpc.mediaRepo.revokeGrant.useMutation({
     onSuccess: () => { toast.success("Grant revoked"); refetch(); },
   });
+  const reExtractMutation = trpc.mediaRepo.reExtractScorm.useMutation({
+    onSuccess: () => toast.success("Re-extraction started — runs in the background, may take a minute."),
+    onError: (e) => toast.error(`Re-extraction failed: ${e.message}`),
+  });
 
   if (!data) return null;
   const { asset, versions, grants } = data;
@@ -998,9 +1002,23 @@ function AssetDetailDialog({ assetId, onClose, onRefresh }: AssetDetailDialogPro
                   <p className="text-sm font-semibold">Version History</p>
                   <p className="text-xs text-muted-foreground">{versions.length} version{versions.length !== 1 ? 's' : ''} · links always point to the current version</p>
                 </div>
-                <Button size="sm" onClick={() => setReuploadOpen(true)}>
-                  <Upload className="w-3 h-3 mr-1.5" />Upload New Version
-                </Button>
+                <div className="flex items-center gap-2">
+                  {(asset.mediaType === "scorm" || asset.mediaType === "zip") && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => reExtractMutation.mutate({ assetId: asset.id })}
+                      disabled={reExtractMutation.isPending}
+                      title="Re-extract SCORM/ZIP to R2 for fast CDN delivery"
+                    >
+                      <RefreshCw className={`w-3 h-3 mr-1.5 ${reExtractMutation.isPending ? "animate-spin" : ""}`} />
+                      Re-extract to CDN
+                    </Button>
+                  )}
+                  <Button size="sm" onClick={() => setReuploadOpen(true)}>
+                    <Upload className="w-3 h-3 mr-1.5" />Upload New Version
+                  </Button>
+                </div>
               </div>
               <div className="space-y-2">
                 {versions.map((v, i) => (

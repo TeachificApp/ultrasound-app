@@ -19,7 +19,7 @@ import os from "os";
 import https from "https";
 import http from "http";
 import { createHash } from "crypto";
-import unzipper from "unzipper";
+import { execFile } from "child_process";
 import { eq, and } from "drizzle-orm";
 import { getDb } from "../db";
 import { mediaVersions } from "../../drizzle/schema";
@@ -143,16 +143,22 @@ export async function extractAndUploadScorm(
     fs.mkdirSync(SCORM_EXTRACT_DIR, { recursive: true });
     fs.mkdirSync(workDir, { recursive: true });
 
-    // 1. Stream download ZIP to disk
-    await downloadToFile(s3Url, zipPath);
+    // 1. Stream download ZIP to disk (URL-encode path to handle spaces/special chars)
+    const encodedUrl = (() => {
+      try {
+        const u = new URL(s3Url);
+        u.pathname = u.pathname.split("/").map(encodeURIComponent).join("/");
+        return u.toString();
+      } catch { return s3Url; }
+    })();
+    await downloadToFile(encodedUrl, zipPath);
     console.log(`[ScormExtractor] Downloaded ZIP to ${zipPath}`);
 
-    // 2. Extract
+    // 2. Extract using system unzip — handles filenames with spaces/special chars reliably
     await new Promise<void>((resolve, reject) => {
-      fs.createReadStream(zipPath)
-        .pipe(unzipper.Extract({ path: workDir }))
-        .on("close", resolve)
-        .on("error", reject);
+      execFile("unzip", ["-q", "-o", zipPath, "-d", workDir], (err) => {
+        if (err) reject(err); else resolve();
+      });
     });
     console.log(`[ScormExtractor] Extracted to ${workDir}`);
 

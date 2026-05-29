@@ -1020,4 +1020,35 @@ export const mediaRepoRouter = router({
       return { ok: true };
     }),
 
+  /**
+   * Re-trigger SCORM extraction to R2 for an existing asset.
+   * Useful when the original background extraction failed (e.g. due to URL encoding issues).
+   * Clears existing scormExtractedPrefix so the next embed request also falls back to fresh extraction.
+   */
+  reExtractScorm: protectedProcedure
+    .input(z.object({ assetId: z.number().int() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const [version] = await db.select().from(mediaVersions)
+        .where(eq(mediaVersions.assetId, input.assetId))
+        .orderBy(desc(mediaVersions.createdAt))
+        .limit(1);
+      if (!version) throw new TRPCError({ code: "NOT_FOUND", message: "No version found for asset" });
+      const [asset] = await db.select().from(mediaAssets)
+        .where(eq(mediaAssets.id, input.assetId)).limit(1);
+      if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Asset not found" });
+      // Clear stale extraction data
+      await db.update(mediaVersions)
+        .set({ scormExtractedPrefix: null, scormLaunchFile: null })
+        .where(eq(mediaVersions.id, version.id));
+      // Fire-and-forget re-extraction
+      const { extractAndUploadScorm } = await import("../routes/scormExtractor");
+      extractAndUploadScorm(version.id, version.s3Url, asset.slug).catch((e: any) =>
+        console.error(`[ReExtract] Failed for asset ${input.assetId}:`, e)
+      );
+      return { ok: true, versionId: version.id };
+    }),
+
 });
