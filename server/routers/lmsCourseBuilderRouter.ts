@@ -201,6 +201,8 @@ export const lmsCourseBuilderRouter = router({
       defaultMarkComplete: z.boolean().optional(),
       // Course player theme: 'light' or 'dark'
       playerTheme: z.enum(["light", "dark"]).optional(),
+      // Multi-cohort mode: when true, sessions/assignments/recordings are scoped per cohort group
+      multiCohortMode: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);

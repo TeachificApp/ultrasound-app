@@ -1610,22 +1610,10 @@ export const lmsLearnerRouter = router({
         id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug,
         description: lmsCourses.description, thumbnailUrl: lmsCourses.thumbnailUrl,
         enrollmentCloseDate: lmsCourses.enrollmentCloseDate,
+        multiCohortMode: lmsCourses.multiCohortMode,
       }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
-      const [sessions, assignments, recordings, mySubmissions] = await Promise.all([
-        db.select().from(lmsCohortSessions)
-          .where(eq(lmsCohortSessions.courseId, input.courseId))
-          .orderBy(asc(lmsCohortSessions.sessionDate)),
-        db.select().from(lmsCohortAssignments)
-          .where(and(eq(lmsCohortAssignments.courseId, input.courseId), eq(lmsCohortAssignments.status, "published")))
-          .orderBy(asc(lmsCohortAssignments.position), asc(lmsCohortAssignments.dueDate)),
-        db.select().from(lmsCohortRecordings)
-          .where(and(eq(lmsCohortRecordings.courseId, input.courseId), eq(lmsCohortRecordings.status, "published")))
-          .orderBy(asc(lmsCohortRecordings.position), asc(lmsCohortRecordings.createdAt)),
-        db.select().from(lmsCohortSubmissions)
-          .where(eq(lmsCohortSubmissions.userId, ctx.user.id)),
-      ]);
-      // Get the user's cohort group assignment
+      // Get the user's cohort group assignment first (needed for filtering)
       const [myGroupEnrollment] = await db
         .select({ cohortGroupId: lmsCohortGroupEnrollments.cohortGroupId })
         .from(lmsCohortGroupEnrollments)
@@ -1636,6 +1624,27 @@ export const lmsLearnerRouter = router({
         const [g] = await db.select().from(lmsCohortGroups).where(eq(lmsCohortGroups.id, myGroupEnrollment.cohortGroupId)).limit(1);
         myGroup = g ?? null;
       }
+      // When multi-cohort mode is on, filter content by the student's group
+      const groupId = course.multiCohortMode && myGroup ? myGroup.id : null;
+      const [sessions, assignments, recordings, mySubmissions] = await Promise.all([
+        db.select().from(lmsCohortSessions)
+          .where(groupId
+            ? and(eq(lmsCohortSessions.courseId, input.courseId), eq(lmsCohortSessions.cohortGroupId, groupId))
+            : eq(lmsCohortSessions.courseId, input.courseId))
+          .orderBy(asc(lmsCohortSessions.sessionDate)),
+        db.select().from(lmsCohortAssignments)
+          .where(groupId
+            ? and(eq(lmsCohortAssignments.courseId, input.courseId), eq(lmsCohortAssignments.status, "published"), eq(lmsCohortAssignments.cohortGroupId, groupId))
+            : and(eq(lmsCohortAssignments.courseId, input.courseId), eq(lmsCohortAssignments.status, "published")))
+          .orderBy(asc(lmsCohortAssignments.position), asc(lmsCohortAssignments.dueDate)),
+        db.select().from(lmsCohortRecordings)
+          .where(groupId
+            ? and(eq(lmsCohortRecordings.courseId, input.courseId), eq(lmsCohortRecordings.status, "published"), eq(lmsCohortRecordings.cohortGroupId, groupId))
+            : and(eq(lmsCohortRecordings.courseId, input.courseId), eq(lmsCohortRecordings.status, "published")))
+          .orderBy(asc(lmsCohortRecordings.position), asc(lmsCohortRecordings.createdAt)),
+        db.select().from(lmsCohortSubmissions)
+          .where(eq(lmsCohortSubmissions.userId, ctx.user.id)),
+      ]);
       return { course, sessions, assignments, recordings, mySubmissions, myGroup };
     }),
 

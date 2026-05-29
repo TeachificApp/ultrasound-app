@@ -2800,6 +2800,8 @@ export const lmsCourses = mysqlTable("lms_courses", {
   libraryOrder: int("library_order").default(0).notNull(),
   // Per-course publish domain override (null = use global coursePublishDomain from platform_settings)
   publishDomain: varchar("publish_domain", { length: 255 }),
+  // Multi-cohort mode: when true, live sessions/assignments/recordings are scoped per cohort group
+  multiCohortMode: boolean("multi_cohort_mode").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -4903,6 +4905,8 @@ export const lmsCohortSessions = mysqlTable("lms_cohort_sessions", {
   recurrenceOccurrenceCount: int("recurrence_occurrence_count"),
   // parentSessionId links child instances back to the template/parent session
   parentSessionId: int("parent_session_id"),
+  // Cohort group this session belongs to (null = shared across all groups / single-cohort mode)
+  cohortGroupId: int("cohort_group_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -4922,6 +4926,8 @@ export const lmsCohortAssignments = mysqlTable("lms_cohort_assignments", {
   // draft = not yet visible; published = visible to enrolled students
   status: mysqlEnum("status", ["draft", "published"]).default("draft").notNull(),
   position: int("position").default(0).notNull(),
+  // Cohort group this assignment belongs to (null = shared / single-cohort mode)
+  cohortGroupId: int("cohort_group_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -4940,6 +4946,8 @@ export const lmsCohortRecordings = mysqlTable("lms_cohort_recordings", {
   durationSeconds: int("duration_seconds"),
   status: mysqlEnum("status", ["draft", "published"]).default("draft").notNull(),
   position: int("position").default(0).notNull(),
+  // Cohort group this recording belongs to (null = shared / single-cohort mode)
+  cohortGroupId: int("cohort_group_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });

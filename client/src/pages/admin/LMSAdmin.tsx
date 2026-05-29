@@ -8258,7 +8258,10 @@ const COMMON_TIMEZONES = [
 ];
 
 function CohortTab({ courseId }: { courseId: number }) {
-  const [activeTab, setActiveTab] = useState<"sessions" | "assignments" | "recordings" | "groups">("sessions");
+  const [activeTab, setActiveTab] = useState<"sessions" | "assignments" | "recordings" | "groups" | "settings">("sessions");
+  // Multi-cohort mode toggle
+  const { data: courseData, refetch: refetchCourse } = trpc.lmsAdmin.getCourse.useQuery({ id: courseId });
+  const updateCourse = trpc.lmsAdmin.updateCourse.useMutation({ onSuccess: () => { refetchCourse(); toast.success("Cohort settings saved"); }, onError: (e) => toast.error(e.message) });
 
   // Cohort Groups
   const { data: cohortGroups = [], isLoading: groupsLoading, refetch: refetchGroups } = trpc.lmsAdmin.listCohortGroups.useQuery({ courseId });
@@ -8288,6 +8291,11 @@ function CohortTab({ courseId }: { courseId: number }) {
     onError: (e) => toast.error(e.message),
   });
   const [bulkSelected, setBulkSelected] = useState<number[]>([]);
+  const [movingStudentId, setMovingStudentId] = useState<number | null>(null);
+  const moveStudent = trpc.lmsAdmin.assignStudentToCohortGroup.useMutation({
+    onSuccess: () => { refetchGroupStudents(); refetchGroups(); toast.success("Student moved to new group"); setMovingStudentId(null); },
+    onError: (e) => { toast.error(e.message); setMovingStudentId(null); },
+  });
   const bulkAssign = trpc.lmsAdmin.bulkAssignStudentsToCohortGroup.useMutation({
     onSuccess: (r) => { refetchGroupStudents(); refetchGroups(); toast.success(`${r.assigned} students assigned`); setBulkSelected([]); },
     onError: (e) => toast.error(e.message),
@@ -8584,11 +8592,11 @@ function CohortTab({ courseId }: { courseId: number }) {
     <div className="space-y-4">
       {/* Sub-tabs */}
       <div className="flex gap-1 border-b border-gray-200 pb-0">
-        {(["sessions", "assignments", "recordings", "groups"] as const).map(t => (
+        {(["sessions", "assignments", "recordings", "groups", "settings"] as const).map(t => (
           <button key={t} onClick={() => setActiveTab(t)}
             className={cn("px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize",
               activeTab === t ? "border-teal-600 text-teal-700" : "border-transparent text-gray-500 hover:text-gray-700")}>
-            {t === "sessions" ? "Live Sessions" : t === "assignments" ? "Assignments" : t === "recordings" ? "Recordings" : "Cohort Groups"}
+            {t === "sessions" ? "Live Sessions" : t === "assignments" ? "Assignments" : t === "recordings" ? "Recordings" : t === "groups" ? "Cohort Groups" : "Settings"}
           </button>
         ))}
       </div>
@@ -9235,7 +9243,27 @@ function CohortTab({ courseId }: { courseId: number }) {
                                 <span className="text-sm font-medium text-gray-800">{s.userName}</span>
                                 <span className="text-xs text-gray-400 ml-2">{s.userEmail}</span>
                               </div>
-                              <Button size="sm" variant="ghost" onClick={() => removeStudent.mutate({ cohortGroupId: group.id, userId: s.userId })} className="text-xs text-red-500 hover:text-red-700 h-6 px-2">Remove</Button>
+                              <div className="flex items-center gap-1">
+                                {/* Move to another group */}
+                                {cohortGroups.filter((g: any) => g.id !== group.id).length > 0 && (
+                                  <div className="relative">
+                                    {movingStudentId === s.userId ? (
+                                      <div className="absolute right-0 top-7 z-20 bg-white border border-gray-200 rounded-lg shadow-lg min-w-[160px] py-1">
+                                        <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 border-b">Move to group</div>
+                                        {cohortGroups.filter((g: any) => g.id !== group.id).map((g: any) => (
+                                          <button key={g.id} className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-teal-50 hover:text-teal-700"
+                                            onClick={() => moveStudent.mutate({ cohortGroupId: g.id, userId: s.userId, courseId })}>
+                                            {g.name}
+                                          </button>
+                                        ))}
+                                        <button className="w-full text-left px-3 py-1.5 text-sm text-gray-400 hover:bg-gray-50 border-t" onClick={() => setMovingStudentId(null)}>Cancel</button>
+                                      </div>
+                                    ) : null}
+                                    <Button size="sm" variant="ghost" onClick={() => setMovingStudentId(movingStudentId === s.userId ? null : s.userId)} className="text-xs text-teal-600 hover:text-teal-800 h-6 px-2">Move to...</Button>
+                                  </div>
+                                )}
+                                <Button size="sm" variant="ghost" onClick={() => removeStudent.mutate({ cohortGroupId: group.id, userId: s.userId })} className="text-xs text-red-500 hover:text-red-700 h-6 px-2">Remove</Button>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -9346,6 +9374,45 @@ function CohortTab({ courseId }: { courseId: number }) {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Settings */}
+      {activeTab === "settings" && (
+        <div className="space-y-6 max-w-xl">
+          <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
+            <h3 className="text-base font-semibold text-gray-900">Cohort Group Mode</h3>
+            <p className="text-sm text-gray-500">Choose how live sessions, assignments, and recordings are organised for this cohort course.</p>
+            <div className="space-y-3">
+              {/* Single cohort option */}
+              <label className={cn("flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-colors",
+                !courseData?.multiCohortMode ? "border-teal-500 bg-teal-50" : "border-gray-200 hover:border-gray-300")}>
+                <input type="radio" name="cohortMode" checked={!courseData?.multiCohortMode}
+                  onChange={() => updateCourse.mutate({ id: courseId, multiCohortMode: false })}
+                  className="mt-0.5 accent-teal-600" />
+                <div>
+                  <div className="text-sm font-semibold text-gray-800">Single Cohort</div>
+                  <div className="text-xs text-gray-500 mt-0.5">All enrolled students share the same live sessions, assignments, and recordings. No group separation.</div>
+                </div>
+              </label>
+              {/* Multi-cohort option */}
+              <label className={cn("flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-colors",
+                courseData?.multiCohortMode ? "border-teal-500 bg-teal-50" : "border-gray-200 hover:border-gray-300")}>
+                <input type="radio" name="cohortMode" checked={!!courseData?.multiCohortMode}
+                  onChange={() => updateCourse.mutate({ id: courseId, multiCohortMode: true })}
+                  className="mt-0.5 accent-teal-600" />
+                <div>
+                  <div className="text-sm font-semibold text-gray-800">Multiple Cohort Groups</div>
+                  <div className="text-xs text-gray-500 mt-0.5">Organise students into named groups (e.g. June 2026, January 2027). Each group has its own sessions, assignments, and recordings. Students only see their group's content.</div>
+                </div>
+              </label>
+            </div>
+            {courseData?.multiCohortMode && (
+              <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 text-xs text-teal-800">
+                <strong>Multi-cohort mode is active.</strong> Go to the <button className="underline font-medium" onClick={() => setActiveTab("groups")}>Cohort Groups</button> tab to manage your groups and assign students.
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
