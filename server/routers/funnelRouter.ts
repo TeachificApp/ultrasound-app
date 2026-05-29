@@ -938,6 +938,8 @@ export const funnelRouter = router({
       metaDescription: z.string().max(500).optional(),
       status: z.enum(["draft", "active", "archived", "paused"]).optional(),
       thankYouUrl: z.string().max(500).optional(),
+      // Per-funnel publish domain override (null = use global funnelPublishDomain from platform_settings)
+      customDomain: z.string().max(255).nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });

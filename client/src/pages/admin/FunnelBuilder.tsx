@@ -38,6 +38,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { restrictToFirstScrollableAncestor } from "@dnd-kit/modifiers";
 import { FunnelFlowDiagram } from "@/components/FunnelFlowDiagram";
+import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 
 type FunnelStatus = "draft" | "active" | "archived";
 type PageType = "landing" | "checkout" | "upsell" | "downsell" | "thank_you" | "custom";
@@ -414,11 +415,25 @@ function FunnelSettingsPanel({ funnel, funnelId, onUpdate }: { funnel: any; funn
   const [metaTitle, setMetaTitle] = useState(funnel.metaTitle ?? "");
   const [metaDescription, setMetaDescription] = useState(funnel.metaDescription ?? "");
   const [thankYouUrl, setThankYouUrl] = useState(funnel.thankYouUrl ?? "");
-  const { data: domainsData } = trpc.lmsAdmin.getCustomDomains.useQuery();
+  const [customDomain, setCustomDomain] = useState<string>(funnel.customDomain ?? "");
   const updateFunnelSettings = trpc.funnel.updateFunnelSettings.useMutation({
     onSuccess: () => toast.success("Funnel settings saved"),
     onError: (e: any) => toast.error(e.message),
   });
+
+  function handleSave() {
+    updateFunnelSettings.mutate({
+      funnelId,
+      slug: slug.trim() || funnel.slug,
+      name: funnel.name,
+      metaTitle: metaTitle.trim() || undefined,
+      metaDescription: metaDescription.trim() || undefined,
+      thankYouUrl: thankYouUrl.trim() || undefined,
+      status: funnel.status,
+      customDomain: customDomain || null,
+    });
+  }
+
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6 space-y-5">
       <h3 className="font-semibold text-gray-900 text-sm">Funnel Settings</h3>
@@ -443,22 +458,19 @@ function FunnelSettingsPanel({ funnel, funnelId, onUpdate }: { funnel: any; funn
         <label className="text-xs text-gray-500 block mb-1">Description</label>
         <Textarea defaultValue={funnel.description || ""} onBlur={e => onUpdate.mutate({ id: funnelId, description: e.target.value || null })} className="text-sm min-h-[60px]" />
       </div>
-      {/* Domain Selector */}
+      {/* Publish Domain Override */}
       <div className="border-t border-gray-100 pt-4 space-y-3">
         <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Published Domain</h4>
         <div>
-          <label className="text-xs text-gray-500 block mb-1">Domain / Subdomain</label>
-          <select
-            className="w-full h-8 text-sm border border-gray-200 rounded-md px-2 bg-white"
-            value={funnel.customDomain ?? ""}
-            onChange={e => onUpdate.mutate({ id: funnelId, customDomain: e.target.value || null })}
-          >
-            <option value="">Default (app domain)</option>
-            {(domainsData?.domains ?? []).map((d: string) => (
-              <option key={d} value={d}>{d}</option>
-            ))}
-          </select>
-          <p className="text-xs text-gray-400 mt-1">Domains are managed in Platform Admin → Domains. New domains appear here automatically.</p>
+          <label className="text-xs text-gray-500 block mb-1">Publish Domain Override</label>
+          <PublishDomainSelect
+            value={customDomain}
+            onChange={setCustomDomain}
+            className="w-full h-9 text-sm"
+          />
+          <p className="text-xs text-gray-400 mt-1">
+            Override the global funnel domain for this funnel only. "Use global default" follows the setting in LMS Admin → Settings.
+          </p>
         </div>
       </div>
       {/* URL & SEO */}
@@ -487,9 +499,9 @@ function FunnelSettingsPanel({ funnel, funnelId, onUpdate }: { funnel: any; funn
         </div>
         <Button size="sm" variant="outline" className="border-teal-300 text-teal-600 hover:bg-teal-50"
           disabled={updateFunnelSettings.isPending}
-          onClick={() => updateFunnelSettings.mutate({ funnelId, slug: slug.trim() || funnel.slug, name: funnel.name, metaTitle: metaTitle.trim() || undefined, metaDescription: metaDescription.trim() || undefined, thankYouUrl: thankYouUrl.trim() || undefined, status: funnel.status })}
+          onClick={handleSave}
         >
-          {updateFunnelSettings.isPending ? "Saving..." : "Save URL & SEO"}
+          {updateFunnelSettings.isPending ? "Saving..." : "Save Settings"}
         </Button>
       </div>
     </div>
