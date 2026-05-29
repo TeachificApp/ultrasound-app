@@ -1184,12 +1184,10 @@ function PricingCtaSettings({ d, set, setMany }: { d: Record<string, any>; set: 
   // The item that drives the displayed price
   const activeItem = priceSource === "linked" ? linkedFromUrl : selectedItem;
 
-  // Format price for display
+    // Format price for display (price is stored in cents)
   const formatItemPrice = (item: typeof allItems[0]) => {
     if (item.isFree) return "Free";
-    const dollars = Number(item.price);
-    
-    const priceStr = cents === 0 ? `$${dollars}` : `$${dollars}.${String(cents).padStart(2, "0")}`;
+    const priceStr = `$${(Number(item.price) / 100).toFixed(2)}`;
     if (item.pricingType === "subscription" && item.subscriptionInterval) {
       const intervalLabel: Record<string, string> = { monthly: "/ mo", quarterly: "/ qtr", annual: "/ yr" };
       return `${priceStr} ${intervalLabel[item.subscriptionInterval] ?? "/ period"}`;
@@ -1896,7 +1894,7 @@ function CheckoutFormBlockSettings({
                   className="w-full text-left flex items-center gap-2 px-2 py-1 rounded hover:bg-teal-50 hover:text-teal-700 text-xs border border-transparent hover:border-teal-200 transition-colors">
                   {item.imageUrl && <img src={item.imageUrl} className="w-6 h-6 rounded object-cover flex-shrink-0" />}
                   <span className="flex-1 truncate">{item.name}</span>
-                  <span className="text-gray-400 flex-shrink-0">${Number(item.price).toFixed(2)}</span>
+                  <span className="text-gray-400 flex-shrink-0">${(Number(item.price) / 100).toFixed(2)}</span>
                   <span className="text-gray-300 flex-shrink-0 capitalize">{item.type}</span>
                 </button>
               ))}
@@ -1913,10 +1911,10 @@ function CheckoutFormBlockSettings({
                 <label className="text-xs text-gray-400 w-24 flex-shrink-0">Override Price</label>
                 <div className="relative flex-1">
                   <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">$</span>
-                  <DebouncedInput type="number" value={Number(p.price).toFixed(2)} onChange={v => { const next = [...cfProds]; next[i] = { ...next[i], price: parseFloat(v || "0") }; set("products", next); }} className="h-7 text-xs pl-5" placeholder="0.00" />
+                  <DebouncedInput type="number" value={(Number(p.price) / 100).toFixed(2)} onChange={v => { const next = [...cfProds]; next[i] = { ...next[i], price: Math.round(parseFloat(v || "0") * 100) }; set("products", next); }} className="h-7 text-xs pl-5" placeholder="0.00" />
                 </div>
                 {(p as any).catalogPrice && (p as any).catalogPrice !== p.price && (
-                  <span className="text-xs text-gray-400 flex-shrink-0">orig ${Number((p as any).catalogPrice).toFixed(2)}</span>
+                  <span className="text-xs text-gray-400 flex-shrink-0">orig ${(Number((p as any).catalogPrice) / 100).toFixed(2)}</span>
                 )}
               </div>
               <div className="flex items-center gap-1">
@@ -1954,7 +1952,7 @@ function CheckoutFormBlockSettings({
                   className="w-full text-left flex items-center gap-2 px-2 py-1 rounded hover:bg-teal-50 hover:text-teal-700 text-xs border border-transparent hover:border-teal-200 transition-colors">
                   {item.imageUrl && <img src={item.imageUrl} className="w-6 h-6 rounded object-cover flex-shrink-0" />}
                   <span className="flex-1 truncate">{item.name}</span>
-                  <span className="text-gray-400 flex-shrink-0">${Number(item.price).toFixed(2)}</span>
+                  <span className="text-gray-400 flex-shrink-0">${(Number(item.price) / 100).toFixed(2)}</span>
                 </button>
               ))}
             </div>
@@ -3517,7 +3515,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                       className="w-full text-left flex items-center gap-2 px-2 py-1 rounded hover:bg-teal-50 hover:text-teal-700 text-xs border border-transparent hover:border-teal-200 transition-colors">
                       {item.imageUrl && <img src={item.imageUrl} className="w-6 h-6 rounded object-cover flex-shrink-0" />}
                       <span className="flex-1 truncate">{item.name}</span>
-                      <span className="text-gray-400 flex-shrink-0">${Number(item.price).toFixed(2)}</span>
+                      <span className="text-gray-400 flex-shrink-0">${(Number(item.price) / 100).toFixed(2)}</span>
                       <span className="text-gray-300 flex-shrink-0 capitalize">{item.type}</span>
                     </button>
                   ))}
@@ -3534,10 +3532,10 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                     <label className="text-xs text-gray-400 w-24 flex-shrink-0">Override Price</label>
                     <div className="relative flex-1">
                       <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">$</span>
-                      <DebouncedInput type="number" value={Number(p.price).toFixed(2)} onChange={v => { const next = [...icProds]; next[i] = { ...next[i], price: parseFloat(v || "0") }; set("products", next); }} className="h-7 text-xs pl-5" placeholder="0.00" />
+                      <DebouncedInput type="number" value={(Number(p.price) / 100).toFixed(2)} onChange={v => { const next = [...icProds]; next[i] = { ...next[i], price: Math.round(parseFloat(v || "0") * 100) }; set("products", next); }} className="h-7 text-xs pl-5" placeholder="0.00" />
                     </div>
                     {(p as any).catalogPrice && (p as any).catalogPrice !== p.price && (
-                      <span className="text-xs text-gray-400 flex-shrink-0">orig ${Number((p as any).catalogPrice).toFixed(2)}</span>
+                      <span className="text-xs text-gray-400 flex-shrink-0">orig ${(Number((p as any).catalogPrice) / 100).toFixed(2)}</span>
                     )}
                   </div>
                   <div className="flex items-center gap-1">
@@ -3635,7 +3633,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                       className="w-full text-left flex items-center gap-2 px-2 py-1 rounded hover:bg-teal-50 hover:text-teal-700 text-xs border border-transparent hover:border-teal-200 transition-colors">
                       {item.imageUrl && <img src={item.imageUrl} className="w-6 h-6 rounded object-cover flex-shrink-0" />}
                       <span className="flex-1 truncate">{item.name}</span>
-                      <span className="text-gray-400 flex-shrink-0">${Number(item.price).toFixed(2)}</span>
+                      <span className="text-gray-400 flex-shrink-0">${(Number(item.price) / 100).toFixed(2)}</span>
                       <span className="text-gray-300 flex-shrink-0 capitalize">{item.type}</span>
                     </button>
                   ))}
@@ -3652,10 +3650,10 @@ export function BlockSettings({ block, onChange, lessonId, courseId }: { block: 
                     <label className="text-xs text-gray-400 w-24 flex-shrink-0">Override Price</label>
                     <div className="relative flex-1">
                       <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">$</span>
-                      <DebouncedInput type="number" value={Number(p.price).toFixed(2)} onChange={v => { const next = [...ecProds]; next[i] = { ...next[i], price: parseFloat(v || "0") }; set("products", next); }} className="h-7 text-xs pl-5" placeholder="0.00" />
+                      <DebouncedInput type="number" value={(Number(p.price) / 100).toFixed(2)} onChange={v => { const next = [...ecProds]; next[i] = { ...next[i], price: Math.round(parseFloat(v || "0") * 100) }; set("products", next); }} className="h-7 text-xs pl-5" placeholder="0.00" />
                     </div>
                     {(p as any).catalogPrice && (p as any).catalogPrice !== p.price && (
-                      <span className="text-xs text-gray-400 flex-shrink-0">orig ${Number((p as any).catalogPrice).toFixed(2)}</span>
+                      <span className="text-xs text-gray-400 flex-shrink-0">orig ${(Number((p as any).catalogPrice) / 100).toFixed(2)}</span>
                     )}
                   </div>
                   <div className="flex items-center gap-1">

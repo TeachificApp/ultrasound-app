@@ -409,6 +409,9 @@ export const productsAdminRouter = router({
         thumbnailUrl: physicalProducts.thumbnailUrl,
         landingBlocks: physicalProducts.landingBlocks,
         landingHeadline: physicalProducts.landingHeadline,
+        seoTitle: physicalProducts.seoTitle,
+        seoDescription: physicalProducts.seoDescription,
+        seoImage: physicalProducts.seoImage,
       }).from(physicalProducts).where(eq(physicalProducts.id, input.productId)).limit(1);
       if (!product) throw new TRPCError({ code: "NOT_FOUND" });
       return {
@@ -418,7 +421,34 @@ export const productsAdminRouter = router({
         heroTitle: product.landingHeadline ?? product.title,
         heroSubtitle: product.subtitle ?? "",
         heroImageUrl: product.thumbnailUrl ?? "",
+        seoTitle: product.seoTitle ?? null,
+        seoDescription: product.seoDescription ?? null,
+        seoImage: product.seoImage ?? null,
       };
+    }),
+
+  /** Save SEO / link preview settings for a physical product landing page */
+  saveLandingPageSeo: protectedProcedure
+    .input(z.object({
+      productId: z.number(),
+      seoTitle: z.string().nullable().optional(),
+      seoDescription: z.string().nullable().optional(),
+      seoImage: z.string().nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if ((ctx.user as any).role !== "admin" && (ctx.user as any).role !== "platform_admin") {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(physicalProducts)
+        .set({
+          seoTitle: input.seoTitle ?? null,
+          seoDescription: input.seoDescription ?? null,
+          seoImage: input.seoImage ?? null,
+        })
+        .where(eq(physicalProducts.id, input.productId));
+      return { success: true };
     }),
 
   /** Save landing page blocks */

@@ -3645,6 +3645,11 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
   - [ ] Add Display Mode selector in Settings tab of GeneralFormBuilder
 - [ ] Add: custom filters and views to form results (sort, filter by field, date range, column visibility, export filtered)
 
+## Critical Overcharge Bug Fix (May 29, 2026)
+- [x] Fix: EmbeddedCheckoutBlock charging 100x the correct amount (e.g. $3700 instead of $37) — server was treating cents input as dollars and multiplying by 100 again
+- [x] Fix: Admin price inputs in LandingPageBuilder (embedded_checkout, inline_checkout, checkout_form blocks) now display in dollars and save in cents correctly
+- [x] Fix: Catalog item price display in LandingPageBuilder now shows correct dollar amounts
+
 ## Form Branching Logic (May 29, 2026)
 - [ ] Fix: /forms/:slug routes missing from LMSRouter, MembersRouter, AccreditationDivisionRouter (page not found on learn.allaboutultrasound.com)
 - [ ] Schema: extend generalFormBranchRules table with action types: show, hide, skip_to, require, set_value

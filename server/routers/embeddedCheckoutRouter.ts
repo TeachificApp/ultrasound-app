@@ -93,14 +93,14 @@ export const embeddedCheckoutRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
-      // Calculate total in dollars
-      let totalAmount = Number(input.productPrice);
+      // All prices are in CENTS (productPrice and bump prices are stored as cents in the DB)
+      let totalAmountCents = Math.round(Number(input.productPrice));
       for (const bump of input.selectedBumps) {
-        if (bump.price > 0) totalAmount += Number(bump.price);
+        if (bump.price > 0) totalAmountCents += Math.round(Number(bump.price));
       }
 
       // Apply promo code discount if provided
-      let discountApplied = 0;
+      let discountAppliedCents = 0;
       let promoCodeId: string | undefined;
       if (input.promoCode) {
         const Stripe2 = (await import("stripe")).default;
@@ -113,12 +113,12 @@ export const embeddedCheckoutRouter = router({
             const coupon = promoCodeObj.coupon;
             if (coupon.percent_off) {
               // percent_off is a percentage (0-100)
-              discountApplied = totalAmount * (coupon.percent_off / 100);
+              discountAppliedCents = Math.round(totalAmountCents * (coupon.percent_off / 100));
             } else if (coupon.amount_off) {
-              // amount_off from Stripe is in cents — convert to dollars for comparison
-              discountApplied = Math.min(coupon.amount_off / 100, totalAmount);
+              // amount_off from Stripe is already in cents
+              discountAppliedCents = Math.min(coupon.amount_off, totalAmountCents);
             }
-            totalAmount = Math.max(0.50, totalAmount - discountApplied);
+            totalAmountCents = Math.max(50, totalAmountCents - discountAppliedCents);
           } else {
             throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid or expired promo code" });
           }
@@ -128,12 +128,12 @@ export const embeddedCheckoutRouter = router({
         }
       }
 
-      if (totalAmount < 0.50) {
+      if (totalAmountCents < 50) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Minimum charge amount is $0.50" });
       }
 
-      // Convert to cents for Stripe API
-      const totalAmountCents = Math.round(totalAmount * 100);
+      // totalAmountCents is already in cents for Stripe API
+      const totalAmount = totalAmountCents / 100; // dollars, for display and DB storage
 
       const Stripe = (await import("stripe")).default;
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" as any });
@@ -187,7 +187,7 @@ export const embeddedCheckoutRouter = router({
       if (input.fulfillmentBrand) metadata.fulfillment_brand = input.fulfillmentBrand;
       if (input.productId) metadata.product_id = input.productId.toString();
       if (input.promoCode) metadata.promo_code = input.promoCode.slice(0, 100);
-      if (discountApplied > 0) metadata.discount_applied = discountApplied.toString();
+      if (discountAppliedCents > 0) metadata.discount_applied = (discountAppliedCents / 100).toString();
       if (promoCodeId) metadata.promo_code_id = promoCodeId;
       // Note: additionalAccess items are stored in block data and resolved server-side
       // from the page blocks after payment — not passed through Stripe metadata.
