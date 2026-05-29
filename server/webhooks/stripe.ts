@@ -183,11 +183,86 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
   if (meta.type !== "digital_download") return; // Not a digital download purchase
 
   const productId = meta.product_id ? parseInt(meta.product_id) : null;
-  const userId = meta.user_id ? parseInt(meta.user_id) : null;
-  if (!productId || !userId) return;
+  if (!productId) return;
 
   const db = await getDb();
   if (!db) return;
+
+  // ── AUTO-ACCOUNT CREATION FOR GUESTS ────────────────────────────────────
+  // If the buyer was a guest (no user_id in metadata), auto-create an account
+  // so we can grant download access and send the access email immediately.
+  let userId = meta.user_id ? parseInt(meta.user_id) : null;
+  const customerEmail = (session.customer_email as string)
+    ?? (session.customer_details as Record<string, string>)?.email
+    ?? meta.customer_email;
+  const customerName = meta.customer_name ?? (session.customer_details as Record<string, string>)?.name ?? null;
+
+  if (!userId && customerEmail) {
+    try {
+      const nameParts = (customerName || "").trim().split(" ");
+      const { user: autoUser, isNew, resetToken } = await getOrCreateUserByEmail({
+        email: customerEmail,
+        firstName: nameParts[0] || undefined,
+        lastName: nameParts.slice(1).join(" ") || undefined,
+        name: customerName || undefined,
+      });
+      userId = autoUser.id;
+      if (isNew && resetToken) {
+        const baseUrl = "https://learn.allaboutultrasound.com";
+        const setPasswordUrl = `${baseUrl}/auth/reset-password?token=${resetToken}`;
+        const firstName = autoUser.firstName || nameParts[0] || "there";
+        let accessTokenForEmail: string | null = null;
+        try {
+          accessTokenForEmail = await getOrCreateAccessToken(autoUser.id);
+        } catch (atErr) {
+          console.error(`[Stripe] Failed to generate access token for ${customerEmail}:`, atErr);
+        }
+        const accessUrl = accessTokenForEmail
+          ? `${baseUrl}/auth/access?token=${accessTokenForEmail}&next=${encodeURIComponent(baseUrl + "/downloads")}`
+          : setPasswordUrl;
+        try {
+          const { buildPasswordResetEmail, sendEmail: _sendEmail } = await import("../_core/email");
+          const emailContent = buildPasswordResetEmail({
+            firstName,
+            resetUrl: setPasswordUrl,
+            brandMode: "aaus",
+          });
+          const subject = `Your purchase is ready — access your download`;
+          const accessNote = accessTokenForEmail
+            ? `<div style="margin:16px 0;padding:14px 16px;background:#f0fbfc;border-left:3px solid #0d9488;border-radius:0 8px 8px 0;">
+                <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#0e4a50;">Quick access link</p>
+                <p style="margin:0;font-size:13px;color:#475569;">Click below to access your download directly — no password needed:</p>
+                <p style="margin:8px 0 0;"><a href="${accessUrl}" style="color:#0d9488;font-weight:600;">${accessUrl}</a></p>
+              </div>`
+            : "";
+          const enhancedBody = emailContent.htmlBody.replace("</body>", `${accessNote}</body>`);
+          await _sendEmail({
+            to: { name: customerName || firstName, email: customerEmail },
+            subject,
+            htmlBody: enhancedBody,
+            previewText: `Access your download on All About Ultrasound`,
+          });
+          console.log(`[Stripe] Auto-created account for ${customerEmail} (userId=${userId}) and sent welcome email`);
+        } catch (emailErr) {
+          console.error(`[Stripe] Failed to send welcome email to ${customerEmail}:`, emailErr);
+        }
+      } else {
+        console.log(`[Stripe] Resolved existing account for ${customerEmail} (userId=${userId})`);
+      }
+    } catch (autoErr) {
+      console.error(`[Stripe] Failed to auto-create account for ${customerEmail}:`, autoErr);
+    }
+  }
+  // ── END AUTO-ACCOUNT CREATION ────────────────────────────────────────────
+
+  if (!userId) {
+    console.warn(`[Stripe] Digital download checkout: no userId and could not resolve from email. Session: ${session.id}`);
+    await notifyOwner({
+      title: "⚠️ Digital Download — No User ID",
+      content: `A digital download purchase was received (product ${productId}) but no user could be identified. Session: ${session.id}. Email: ${customerEmail ?? "unknown"}. Please verify manually.`,
+    });
+    return;
+  }
 
   // Check if already purchased (idempotent)
   const [existing] = await db.select().from(digitalPurchases)
