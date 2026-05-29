@@ -258,6 +258,7 @@ const AdminSalesDashboard = lazy(() => import("./pages/admin/AdminSalesDashboard
 const AdminDiscountCodesPage = lazy(() => import("./pages/admin/AdminDiscountCodesPage"));
 const MembershipAdmin = lazy(() => import("./pages/admin/MembershipAdmin"));
 const MembersHub = lazy(() => import("./pages/admin/MembersHub"));
+const ProductAnalytics = lazy(() => import("./pages/admin/ProductAnalytics"));
 
 // ── Community ─────────────────────────────────────────────────────────────────
 const CommunityHub = lazy(() => import("./pages/Community"));
@@ -452,6 +453,7 @@ function Router() {
         <Route path="/admin/sharing-monitor">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><SharingMonitor /></Suspense></RoleGuard>}</Route>
         {/* ── Unified Members Hub (replaces scattered user/sales/membership pages) ── */}
         <Route path="/admin/members">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><MembersHub /></Suspense></RoleGuard>}</Route>
+        <Route path="/admin/product-analytics">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><ProductAnalytics /></Suspense></RoleGuard>}</Route>
         {/* Legacy redirects — keep old URLs working */}
         <Route path="/admin/user-analytics">{() => { window.location.replace("/admin/members?tab=members"); return null; }}</Route>
         <Route path="/admin/users/:userId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminUserDetailPage /></RoleGuard>}</Route>

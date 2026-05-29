@@ -1,16 +1,9 @@
 /**
  * MembersHub.tsx — Unified Members Administration
  *
- * Consolidates Users, Enrollments, Sales, Memberships, Contacts, and Activity
- * into a single hub, replacing the scattered admin pages.
- *
- * Tabs:
- *   Members     — full user list with analytics, drill-down to user profile
- *   Enrollments — all LMS enrollments across all courses, filterable + CSV export
- *   Sales       — revenue, transactions, refunds (embeds AdminSalesDashboard)
- *   Memberships — premium membership grants/revokes (embeds MembershipAdmin)
- *   Contacts    — leads/contacts (embeds ContactsAdmin)
- *   Activity    — global activity log across all users
+ * Two main tabs:
+ *   Apps — platform users, sales/transactions, memberships, contacts, activity, sharing monitor
+ *   LMS  — course enrollments, LMS users, deep links to courses/content/user profiles
  */
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
@@ -26,15 +19,18 @@ import {
   ChevronLeft, ChevronRight, Search, Download,
   CheckCircle, Clock, ArrowUpDown, ArrowUp, ArrowDown,
   X, ExternalLink, GraduationCap, FileDown, HelpCircle, Shield,
+  LayoutGrid, MonitorSmartphone, BarChart3,
 } from "lucide-react";
 import SharingMonitor from "@/pages/admin/SharingMonitor";
 import { toast } from "sonner";
+import { Link } from "wouter";
 
 // Lazy-load the heavy sub-pages to keep initial bundle small
 import AdminSalesDashboard from "./AdminSalesDashboard";
 import MembershipAdmin from "./MembershipAdmin";
 import ContactsAdmin from "./ContactsAdmin";
 import UserAnalytics from "./UserAnalytics";
+import ProductAnalytics from "./ProductAnalytics";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtDate(d: Date | null | undefined) {
@@ -126,9 +122,9 @@ function EnrollmentDrillDown({ userId, userEmail, onClose }: { userId: number | 
             <span>Joined: <span className="text-gray-700">{fmtDate(data.userCreatedAt)}</span></span>
             <span>Last seen: <span className="text-gray-700">{fmtDate(data.lastSignedIn)}</span></span>
             {data.userId && (
-              <a href={`/admin/user/${data.userId}`} className="ml-auto flex items-center gap-1 text-teal-600 hover:underline">
+              <Link href={`/admin/users/${data.userId}`} className="ml-auto flex items-center gap-1 text-teal-600 hover:underline">
                 Full Profile <ExternalLink className="w-3 h-3" />
-              </a>
+              </Link>
             )}
           </div>
         )}
@@ -204,13 +200,9 @@ function EnrollmentsTab() {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<"all" | "active" | "completed">("all");
   const [contentType, setContentType] = useState<"all" | "course" | "quiz" | "download">("all");
-  const [courseId, setCourseId] = useState<number | undefined>(undefined);
   const [sortBy, setSortBy] = useState<SortKey>("enrolledAt");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [drillDown, setDrillDown] = useState<{ userId: number | null; userEmail: string } | null>(null);
-  const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [bulkAction, setBulkAction] = useState<'grant' | 'revoke' | null>(null);
-  const [grantCourseId, setGrantCourseId] = useState<number | undefined>(undefined);
   const PAGE_SIZE = 50;
 
   const handleSearch = (v: string) => {
@@ -383,8 +375,21 @@ function EnrollmentsTab() {
                       onClick={() => setDrillDown({ userId: e.userId, userEmail: e.userEmail })}
                     >
                       <td className="px-4 py-2.5">
-                        <div className="font-medium text-gray-900 text-sm">{e.userName || "—"}</div>
-                        <div className="text-xs text-gray-400">{e.userEmail}</div>
+                        <div className="flex items-center gap-2">
+                          <div>
+                            <div className="font-medium text-gray-900 text-sm">{e.userName || "—"}</div>
+                            <div className="text-xs text-gray-400">{e.userEmail}</div>
+                          </div>
+                          {e.userId && (
+                            <Link
+                              href={`/admin/users/${e.userId}`}
+                              className="text-teal-600 hover:text-teal-800 shrink-0"
+                              onClick={(ev: React.MouseEvent) => ev.stopPropagation()}
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                            </Link>
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-2.5 max-w-[200px]">
                         <span className="text-sm text-gray-700 truncate block" title={e.courseTitle}>
@@ -572,8 +577,17 @@ function GlobalActivityTab() {
                         {fmtDateTime(log.createdAt)}
                       </td>
                       <td className="px-3 py-2.5">
-                        <div className="text-sm font-medium text-gray-900">{log.userName || "—"}</div>
-                        <div className="text-xs text-gray-400">{log.userEmail}</div>
+                        <div className="flex items-center gap-1.5">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{log.userName || "—"}</div>
+                            <div className="text-xs text-gray-400">{log.userEmail}</div>
+                          </div>
+                          {log.userId && (
+                            <Link href={`/admin/users/${log.userId}`} className="text-teal-600 hover:text-teal-800">
+                              <ExternalLink className="w-3 h-3" />
+                            </Link>
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-2.5">
                         <Badge className={`text-xs ${EVENT_TYPE_COLORS[log.eventType ?? ""] || "bg-gray-100 text-gray-700"}`}>
@@ -628,19 +642,45 @@ function GlobalActivityTab() {
 
 // ─── Main Members Hub ─────────────────────────────────────────────────────────
 export default function MembersHub() {
-  const [activeTab, setActiveTab] = useState(() => {
+  const [mainTab, setMainTab] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    return params.get("tab") ?? "members";
+    const tab = params.get("tab");
+    // Map legacy tab values to new structure
+    if (tab === "enrollments" || tab === "lms") return "lms";
+    return "apps";
   });
 
-  const tabs = [
-    { value: "members",         label: "Members",         icon: Users,      count: null },
-    { value: "enrollments",     label: "Enrollments",     icon: BookOpen,   count: null },
-    { value: "sales",           label: "Sales",           icon: DollarSign, count: null },
-    { value: "memberships",     label: "Memberships",     icon: Crown,      count: null },
-    { value: "contacts",        label: "Contacts",        icon: Mail,       count: null },
-    { value: "activity",        label: "Activity",        icon: Activity,   count: null },
-    { value: "sharing-monitor", label: "Sharing Monitor", icon: Shield,     count: null },
+  const [appsSubTab, setAppsSubTab] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab");
+    if (tab === "sales") return "sales";
+    if (tab === "memberships") return "memberships";
+    if (tab === "contacts") return "contacts";
+    if (tab === "activity") return "activity";
+    if (tab === "sharing-monitor") return "sharing-monitor";
+    return "members";
+  });
+
+  const [lmsSubTab, setLmsSubTab] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab");
+    if (tab === "enrollments") return "enrollments";
+    return "enrollments";
+  });
+
+  const appsSubTabs = [
+    { value: "members",         label: "Users",           icon: Users },
+    { value: "sales",           label: "Transactions",    icon: DollarSign },
+    { value: "analytics",       label: "Product Analytics", icon: BarChart3 },
+    { value: "memberships",     label: "Memberships",     icon: Crown },
+    { value: "contacts",        label: "Contacts",        icon: Mail },
+    { value: "activity",        label: "Activity",        icon: Activity },
+    { value: "sharing-monitor", label: "Sharing Monitor", icon: Shield },
+  ];
+
+  const lmsSubTabs = [
+    { value: "enrollments",     label: "Enrollments",     icon: BookOpen },
+    { value: "activity",        label: "Activity",        icon: Activity },
   ];
 
   return (
@@ -653,64 +693,103 @@ export default function MembersHub() {
             <span>/</span>
             <span className="text-gray-600 font-medium">Members</span>
           </nav>
-          <h2 className="text-xl font-bold text-gray-900">Members</h2>
+          <h2 className="text-xl font-bold text-gray-900">Member Management</h2>
           <p className="text-sm text-gray-500">
-            Unified view of users, enrollments, sales, memberships, contacts, and activity
+            Unified view of platform users, transactions, LMS enrollments, and activity
           </p>
         </div>
       </div>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="bg-gray-100 flex-wrap h-auto gap-1 p-1">
-          {tabs.map(t => (
-            <TabsTrigger key={t.value} value={t.value} className="text-sm gap-1.5 h-8">
-              <t.icon className="w-3.5 h-3.5" />
-              {t.label}
-            </TabsTrigger>
-          ))}
+      {/* Main Tabs: Apps | LMS */}
+      <Tabs value={mainTab} onValueChange={setMainTab}>
+        <TabsList className="bg-gray-100 h-10 gap-1 p-1">
+          <TabsTrigger value="apps" className="text-sm gap-2 h-8 px-4 font-semibold">
+            <MonitorSmartphone className="w-4 h-4" />
+            Apps
+          </TabsTrigger>
+          <TabsTrigger value="lms" className="text-sm gap-2 h-8 px-4 font-semibold">
+            <GraduationCap className="w-4 h-4" />
+            LMS
+          </TabsTrigger>
         </TabsList>
 
-        {/* Members — full UserAnalytics embedded (hide its inner breadcrumb/header) */}
-        <TabsContent value="members" className="mt-4">
-          <div className="[&>div>div:first-child]:hidden">
-            <UserAnalytics />
-          </div>
+        {/* ═══ APPS TAB ═══ */}
+        <TabsContent value="apps" className="mt-4">
+          <Tabs value={appsSubTab} onValueChange={setAppsSubTab}>
+            <TabsList className="bg-gray-50 border border-gray-200 flex-wrap h-auto gap-1 p-1">
+              {appsSubTabs.map(t => (
+                <TabsTrigger key={t.value} value={t.value} className="text-xs gap-1.5 h-7">
+                  <t.icon className="w-3.5 h-3.5" />
+                  {t.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+
+            {/* Users — full UserAnalytics embedded */}
+            <TabsContent value="members" className="mt-4">
+              <div className="[&>div>div:first-child]:hidden">
+                <UserAnalytics />
+              </div>
+            </TabsContent>
+
+            {/* Transactions — AdminSalesDashboard */}
+            <TabsContent value="sales" className="mt-4">
+              <div className="[&_.max-w-7xl]:max-w-none [&_.max-w-7xl]:px-0 [&_.max-w-7xl]:py-0">
+                <AdminSalesDashboard />
+              </div>
+            </TabsContent>
+
+            {/* Product Analytics */}
+            <TabsContent value="analytics" className="mt-4">
+              <ProductAnalytics />
+            </TabsContent>
+
+            {/* Memberships */}
+            <TabsContent value="memberships" className="mt-4">
+              <MembershipAdmin />
+            </TabsContent>
+
+            {/* Contacts */}
+            <TabsContent value="contacts" className="mt-4">
+              <ContactsAdmin />
+            </TabsContent>
+
+            {/* Activity */}
+            <TabsContent value="activity" className="mt-4">
+              <GlobalActivityTab />
+            </TabsContent>
+
+            {/* Sharing Monitor */}
+            <TabsContent value="sharing-monitor" className="mt-4">
+              <div className="[&>div>div:first-child]:hidden">
+                <SharingMonitor />
+              </div>
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
-        {/* Enrollments */}
-        <TabsContent value="enrollments" className="mt-4">
-          <EnrollmentsTab />
-        </TabsContent>
+        {/* ═══ LMS TAB ═══ */}
+        <TabsContent value="lms" className="mt-4">
+          <Tabs value={lmsSubTab} onValueChange={setLmsSubTab}>
+            <TabsList className="bg-gray-50 border border-gray-200 flex-wrap h-auto gap-1 p-1">
+              {lmsSubTabs.map(t => (
+                <TabsTrigger key={t.value} value={t.value} className="text-xs gap-1.5 h-7">
+                  <t.icon className="w-3.5 h-3.5" />
+                  {t.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
 
-        {/* Sales — hide inner breadcrumb/header from AdminSalesDashboard */}
-        <TabsContent value="sales" className="mt-4">
-          <div className="[&_.max-w-7xl]:max-w-none [&_.max-w-7xl]:px-0 [&_.max-w-7xl]:py-0">
-            <AdminSalesDashboard />
-          </div>
-        </TabsContent>
+            {/* Enrollments */}
+            <TabsContent value="enrollments" className="mt-4">
+              <EnrollmentsTab />
+            </TabsContent>
 
-        {/* Memberships */}
-        <TabsContent value="memberships" className="mt-4">
-          <MembershipAdmin />
-        </TabsContent>
-
-        {/* Contacts */}
-        <TabsContent value="contacts" className="mt-4">
-          <ContactsAdmin />
-        </TabsContent>
-
-        {/* Activity */}
-        <TabsContent value="activity" className="mt-4">
-          <GlobalActivityTab />
-        </TabsContent>
-
-        {/* Sharing Monitor */}
-        <TabsContent value="sharing-monitor" className="mt-4">
-          {/* Hide the standalone page header/breadcrumb since we're embedded in a tab */}
-          <div className="[&>div>div:first-child]:hidden">
-            <SharingMonitor />
-          </div>
+            {/* LMS Activity */}
+            <TabsContent value="activity" className="mt-4">
+              <GlobalActivityTab />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
       </Tabs>
     </div>

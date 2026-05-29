@@ -770,6 +770,12 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
       status: "paid",
     });
     console.log(`[Stripe] Funnel purchase recorded: user ${resolvedUserId}, product "${productName}", PI: ${piId}`);
+  } else {
+    // Record already exists (created as "pending" by createPaymentIntent) — update to paid
+    await db.update(funnelPurchases)
+      .set({ status: "paid", userId: resolvedUserId || undefined })
+      .where(eq(funnelPurchases.stripePaymentIntentId, piId));
+    console.log(`[Stripe] Updated existing funnel purchase to paid: PI ${piId}, user ${resolvedUserId}`);
   }
 
   // Track conversion on the funnel page

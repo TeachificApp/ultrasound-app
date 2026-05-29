@@ -99,8 +99,8 @@ function SectionHeader({ title, action }: { title: string; action?: React.ReactN
 }
 
 // ─── Tab types ────────────────────────────────────────────────────────────────
-type Tab = "profile" | "content" | "subscriptions" | "certificates";
-const VALID_TABS: Tab[] = ["profile", "content", "subscriptions", "certificates"];
+type Tab = "profile" | "content" | "transactions" | "subscriptions" | "certificates";
+const VALID_TABS: Tab[] = ["profile", "content", "transactions", "subscriptions", "certificates"];
 
 // ─── Profile Tab ──────────────────────────────────────────────────────────────
 function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refetch: () => void }) {
@@ -771,6 +771,107 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
   );
 }
 
+// ─── Transactions Tab ─────────────────────────────────────────────────────────
+function TransactionsTab({ userId }: { userId: number }) {
+  const [page, setPage] = useState(1);
+  const { data, isLoading } = trpc.productAnalytics.getUserTransactions.useQuery({ userId, page, pageSize: 50 });
+
+  const fmtCurrency = (cents: number, currency = "usd") =>
+    new Intl.NumberFormat("en-US", { style: "currency", currency: currency.toUpperCase() }).format(cents / 100);
+  const fmtDate = (d: Date | string) =>
+    new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+  const STATUS_COLORS: Record<string, string> = {
+    paid: "bg-green-100 text-green-700", pending: "bg-yellow-100 text-yellow-700",
+    refunded: "bg-gray-100 text-gray-600", failed: "bg-red-100 text-red-700",
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Summary */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-teal-50 flex items-center justify-center">
+            <DollarSign className="w-5 h-5 text-teal-600" />
+          </div>
+          <div>
+            <div className="text-xl font-bold text-gray-900">{fmtCurrency(data?.totalSpent ?? 0)}</div>
+            <div className="text-xs text-gray-500">Total Spent</div>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
+            <ShoppingCart className="w-5 h-5 text-blue-600" />
+          </div>
+          <div>
+            <div className="text-xl font-bold text-gray-900">{data?.total ?? 0}</div>
+            <div className="text-xs text-gray-500">Total Transactions</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Transaction List */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-600">Product</th>
+                <th className="text-left px-3 py-2.5 text-xs font-semibold text-gray-600">Date</th>
+                <th className="text-right px-3 py-2.5 text-xs font-semibold text-gray-600">Amount</th>
+                <th className="text-right px-4 py-2.5 text-xs font-semibold text-gray-600">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {isLoading ? (
+                <tr><td colSpan={4} className="text-center py-8 text-gray-400"><RefreshCw className="w-4 h-4 animate-spin inline mr-2" />Loading…</td></tr>
+              ) : (data?.transactions ?? []).length === 0 ? (
+                <tr><td colSpan={4} className="text-center py-8 text-gray-400">No transactions found</td></tr>
+              ) : (data?.transactions ?? []).map((t: any, i: number) => (
+                <tr key={`${t.sourceTable}-${t.transactionId}-${i}`} className="hover:bg-gray-50">
+                  <td className="px-4 py-2.5">
+                    <div className="font-medium text-gray-900 text-sm">{t.productName}</div>
+                    <div className="text-xs text-gray-400 capitalize">{t.productType}</div>
+                    {t.stripePaymentIntentId && (
+                      <div className="text-xs text-gray-300 font-mono mt-0.5 truncate max-w-[200px]">{t.stripePaymentIntentId}</div>
+                    )}
+                  </td>
+                  <td className="px-3 py-2.5 text-xs text-gray-500 whitespace-nowrap">{fmtDate(t.purchasedAt)}</td>
+                  <td className="px-3 py-2.5 text-right font-semibold text-gray-900 text-sm whitespace-nowrap">
+                    {fmtCurrency(t.amountPaid, t.currency)}
+                  </td>
+                  <td className="px-4 py-2.5 text-right">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[t.status] ?? "bg-gray-100 text-gray-600"}`}>
+                      {t.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {data && data.total > 50 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+            <span className="text-xs text-gray-500">
+              Showing {((page - 1) * 50) + 1}–{Math.min(page * 50, data.total)} of {data.total}
+            </span>
+            <div className="flex items-center gap-2">
+              <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border border-gray-200 hover:bg-gray-50 disabled:opacity-40">
+                <ChevronLeft className="w-3.5 h-3.5" /> Prev
+              </button>
+              <button disabled={page * 50 >= data.total} onClick={() => setPage(p => p + 1)}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border border-gray-200 hover:bg-gray-50 disabled:opacity-40">
+                Next <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Certificates Tab ─────────────────────────────────────────────────────────
 function CertificatesTab({ userId, data, refetch }: { userId: number; data: any; refetch: () => void }) {
   const [issueOpen, setIssueOpen] = useState(false);
@@ -908,6 +1009,7 @@ function CertificatesTab({ userId, data, refetch }: { userId: number; data: any;
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: "profile",       label: "Profile",       icon: User },
   { key: "content",       label: "Content",       icon: BookOpen },
+  { key: "transactions",  label: "Transactions",  icon: DollarSign },
   { key: "subscriptions", label: "Subscriptions", icon: CreditCard },
   { key: "certificates",  label: "Certificates",  icon: Award },
 ];
@@ -1029,6 +1131,7 @@ export default function AdminUserDetailPage() {
           {/* Tab Content */}
           {activeTab === "profile"       && <ProfileTab       userId={userId!} data={data} refetch={refetch} />}
           {activeTab === "content"       && <ContentTab       userId={userId!} data={data} refetch={refetch} />}
+          {activeTab === "transactions"  && <TransactionsTab  userId={userId!} />}
           {activeTab === "subscriptions" && <SubscriptionsTab userId={userId!} data={data} refetch={refetch} />}
           {activeTab === "certificates"  && <CertificatesTab  userId={userId!} data={data} refetch={refetch} />}
         </div>

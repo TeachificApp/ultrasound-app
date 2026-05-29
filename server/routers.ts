@@ -47,6 +47,7 @@ import { lessonCommentsRouter } from "./routers/lessonCommentsRouter";
 import { pageScraperRouter } from "./routers/pageScraperRouter";
 import { questionBankRouter } from "./routers/questionBankRouter";
 import { communityRouter } from "./routers/communityRouter";
+import { productAnalyticsRouter } from "./routers/productAnalyticsRouter";
 import {
   getUserById,
   getUsersByIds,
@@ -2046,6 +2047,7 @@ export const appRouter = router({
   dashboard: dashboardRouter,
   embeddedCheckout: embeddedCheckoutRouter,
   adminUser: adminUserRouter,
+  productAnalytics: productAnalyticsRouter,
     lessonComments: lessonCommentsRouter,
   pageScraper: pageScraperRouter,
   // ─── Physician Over-Read Workflow (Step 1 & Step 2) ──────────────────────────

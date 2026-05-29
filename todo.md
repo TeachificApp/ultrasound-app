@@ -3677,3 +3677,21 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Community: full-page editor for editable regions on the community public page (header, bio, sidebar, branding)
 - [ ] Community: admin quick-links — "Go to Community" and "Post in Community" buttons in community admin panel
 - [ ] Community: admin community profiles — admin can create multiple posting identities (e.g. "Support", "Admin", "My Name") and choose which profile to post as
+
+## Unified Member Management System (May 29, 2026) — CRITICAL
+- [x] Build unified Members admin page with two tabs: Apps (platform users) and LMS (course users)
+- [x] Apps tab: list all platform users with search, filter by role, sort by join date/activity
+- [x] LMS tab: list all LMS users with search, deep links to user profiles, courses, content
+- [x] User Profile page: shows user info, analytics (purchases, enrollments, activity), transactions, access
+- [x] User Profile: deep link back to analytics dashboard
+- [x] Transaction Management: view all transactions with search/filter
+- [x] Transaction Management: edit transaction details
+- [x] Transaction Management: process refund/cancel from within the platform (calls Stripe API)
+- [x] Transaction Management: deep link to user profile from each transaction
+- [x] Per-course analytics: who purchased, revenue, enrollments, deep links to user profiles
+- [x] Per-download analytics: who purchased, revenue, deep links to user profiles
+- [x] Per-product analytics: who purchased, revenue, deep links to user profiles
+- [x] Per-funnel analytics: who purchased, revenue, conversion rates, deep links to user profiles
+- [x] Grant access: ability to grant course/download/product access to new or existing platform users
+- [x] Deep links: user profiles ↔ analytics ↔ transactions ↔ courses/products throughout
+- [x] Fix: ensure all Stripe transactions are recorded in the platform DB for analytics (webhook now updates pending→paid)
