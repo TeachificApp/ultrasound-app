@@ -4148,11 +4148,16 @@ export type InsertGeneralFormOption = typeof generalFormOptions.$inferInsert;
 export const generalFormBranchRules = mysqlTable("generalFormBranchRules", {
   id: int("id").autoincrement().primaryKey(),
   templateId: int("templateId").notNull(),
+  ruleLabel: varchar("ruleLabel", { length: 255 }).default(""),
   targetType: varchar("targetType", { length: 20 }).notNull().default("item"),
   targetId: int("targetId").notNull(),
-  action: varchar("action", { length: 10 }).notNull().default("show"),
+  // action: show | hide | skip_to | require | unrequire | set_value
+  action: varchar("action", { length: 20 }).notNull().default("show"),
+  setValue: varchar("setValue", { length: 500 }).default(""),
   logicOperator: varchar("logicOperator", { length: 10 }).notNull().default("any"),
   conditions: longtext("conditions").notNull(),
+  sortOrder: int("sortOrder").notNull().default(0),
+  isEnabled: tinyint("isEnabled").notNull().default(1),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type GeneralFormBranchRule = typeof generalFormBranchRules.$inferSelect;

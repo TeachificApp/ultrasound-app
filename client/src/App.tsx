@@ -533,6 +533,10 @@ function MembersRouter() {
               <Route path="/auth/magic" component={MagicLinkCallback} />
               <Route path="/auth/access" component={AccessLinkCallback} />
               <Route path="/register" component={Register} />
+              {/* ── Public Form Renderer ─────────────────────────────────────────── */}
+              <Route path="/forms/:slug" component={PublicFormRenderer} />
+              <Route path="/forms/:slug/embed" component={PublicFormRenderer} />
+              <Route path="/forms/:slug/preview">{() => <PublicFormRenderer isPreview />}</Route>
               {/* Default: redirect to dashboard */}
               <Route>{() => { window.location.replace("/my-dashboard"); return null; }}</Route>
             </Switch>
@@ -626,6 +630,10 @@ function LMSRouter() {
         <Route path="/my-dashboard" component={StudentDashboardPage} />
         <Route path="/media/:slug/:action" component={MediaRedirect} />
         <Route path="/media/:slug" component={MediaRedirect} />
+            {/* ── Public Form Renderer ─────────────────────────────────────────── */}
+            <Route path="/forms/:slug" component={PublicFormRenderer} />
+            <Route path="/forms/:slug/embed" component={PublicFormRenderer} />
+            <Route path="/forms/:slug/preview">{() => <PublicFormRenderer isPreview />}</Route>
             {/* Funnel pages — catch-all MUST be last so all specific routes above match first */}
             <Route path="/:slug"><FunnelRootRedirect /></Route>
             <Route path="/:slug/:pageSlug">
@@ -885,6 +893,10 @@ function AccreditationDivisionRouter() {
         <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
         <Route path="/admin/diy-accreditation">{() => <RoleGuard roles={["diy_admin", "platform_admin", "accreditation_manager"]} allowAdmin={true}><DIYAccreditationAdmin /></RoleGuard>}</Route>
         <Route path="/accreditation-readiness">{() => <RoleGuard roles={["diy_user", "diy_admin"]} allowAdmin={true}><AccreditationReadiness /></RoleGuard>}</Route>
+        {/* ── Public Form Renderer ─────────────────────────────────────────── */}
+        <Route path="/forms/:slug" component={PublicFormRenderer} />
+        <Route path="/forms/:slug/embed" component={PublicFormRenderer} />
+        <Route path="/forms/:slug/preview">{() => <PublicFormRenderer isPreview />}</Route>
         {/* Default: public landing page */}
         <Route component={DIYAccreditationLanding} />
       </Switch>

@@ -3644,3 +3644,21 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
   - [ ] Build PageByPageRenderer: one question per screen, Enter key to advance, progress bar
   - [ ] Add Display Mode selector in Settings tab of GeneralFormBuilder
 - [ ] Add: custom filters and views to form results (sort, filter by field, date range, column visibility, export filtered)
+
+## Form Branching Logic (May 29, 2026)
+- [ ] Fix: /forms/:slug routes missing from LMSRouter, MembersRouter, AccreditationDivisionRouter (page not found on learn.allaboutultrasound.com)
+- [ ] Schema: extend generalFormBranchRules table with action types: show, hide, skip_to, require, set_value
+- [ ] Schema: add grouping support (AND/OR conditions per rule)
+- [ ] Server: update getBranchRules, createBranchRule, updateBranchRule, deleteBranchRule procedures
+- [ ] Server: update getPublicForm to return full branch rules with new fields
+- [ ] UI: Build visual if/when/then rule builder tab in GeneralFormBuilder
+  - [ ] Condition builder: IF [question dropdown] [operator dropdown] [value input]
+  - [ ] AND/OR grouping for multiple conditions
+  - [ ] Action builder: THEN [action: show/hide/skip_to/require/set_value] [target question/page]
+  - [ ] Rule list with enable/disable toggle and delete
+  - [ ] Drag-to-reorder rules
+- [ ] PublicFormRenderer: evaluate branching rules in all display modes (classic, typeform, paginated, inline)
+  - [ ] show/hide fields based on rules
+  - [ ] skip_to page in page-by-page mode
+  - [ ] require field dynamically based on rules
+  - [ ] set_value action (pre-fill answer)
