@@ -410,14 +410,14 @@ function CreateFunnelDialog({ onClose, onCreated }: { onClose: () => void; onCre
 
 // ─── Funnel Settings Panel ──────────────────────────────────────────────────
 
-function FunnelSettingsPanel({ funnel, funnelId, onUpdate }: { funnel: any; funnelId: number; onUpdate: any }) {
+function FunnelSettingsPanel({ funnel, funnelId, onUpdate, onRefetch }: { funnel: any; funnelId: number; onUpdate: any; onRefetch: () => void }) {
   const [slug, setSlug] = useState(funnel.slug ?? "");
   const [metaTitle, setMetaTitle] = useState(funnel.metaTitle ?? "");
   const [metaDescription, setMetaDescription] = useState(funnel.metaDescription ?? "");
   const [thankYouUrl, setThankYouUrl] = useState(funnel.thankYouUrl ?? "");
   const [customDomain, setCustomDomain] = useState<string>(funnel.customDomain ?? "");
   const updateFunnelSettings = trpc.funnel.updateFunnelSettings.useMutation({
-    onSuccess: () => toast.success("Funnel settings saved"),
+    onSuccess: () => { toast.success("Funnel settings saved"); onRefetch(); },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -1036,7 +1036,7 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
 
       {/* ── SETTINGS TAB ── */}
       {activeTab === "settings" && (
-        <FunnelSettingsPanel funnel={funnel} funnelId={funnelId} onUpdate={updateFunnel} />
+        <FunnelSettingsPanel funnel={funnel} funnelId={funnelId} onUpdate={updateFunnel} onRefetch={refetch} />
       )}
 
       {/* ── CONTACTS TAB ── */}

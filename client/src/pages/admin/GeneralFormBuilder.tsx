@@ -66,6 +66,7 @@ import {
   Layers,
   Sparkles,
 } from "lucide-react";
+import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const BRAND = "#0e7490";
@@ -1319,17 +1320,12 @@ function SettingsTab({ formId, template, onRefetch }: { formId: number; template
           </div>
           <div>
             <Label>Host Domain</Label>
-            <p className="text-xs text-gray-400 mb-1">The domain where this form's public URL will be hosted.</p>
-            <Select value={hostDomain} onValueChange={setHostDomain}>
-              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {CUSTOM_DOMAINS.map(d => (
-                  <SelectItem key={d} value={d}>
-                    {d}{d === DEFAULT_HOST_DOMAIN ? " (default)" : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <p className="text-xs text-gray-400 mb-1">The domain where this form's public URL will be hosted. "Use global default" follows the platform-wide form domain setting.</p>
+            <PublishDomainSelect
+              value={hostDomain === DEFAULT_HOST_DOMAIN ? "" : (hostDomain ?? "")}
+              onChange={(v) => setHostDomain(v || DEFAULT_HOST_DOMAIN)}
+              className="mt-1 w-full text-sm"
+            />
           </div>
         </CardContent>
       </Card>

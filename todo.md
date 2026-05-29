@@ -3597,3 +3597,7 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
   - [x] lmsCohortAdminRouter.ts — cohort sessions, assignments, recordings (597 lines)
   - [x] lmsRouter.ts — thin aggregator with merged lmsAdminRouter (2076 lines)
 >>>>>>> Stashed changes
+
+- [x] Form editor domain override — wire PublishDomainSelect into GeneralFormBuilder settings panel (hostDomain) replacing hardcoded CUSTOM_DOMAINS list
+- [x] Funnel URL preview update — FunnelSettingsPanel now calls refetch() on save so the info bar external link reflects the new customDomain immediately
+- [x] Funnel settings panel — updateFunnelSettings procedure now accepts customDomain alongside slug/SEO in a single save action
