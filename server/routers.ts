@@ -509,6 +509,143 @@ export const appRouter = router({
         return { success: true };
       }),
 
+    // ─── Email + Password Login ──────────────────────────────────────────────
+
+    loginWithPassword: publicProcedure
+      .input(z.object({
+        email: z.string().email().max(320),
+        password: z.string().min(1).max(128),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { getUserByEmail } = await import('./db');
+        const { sdk } = await import('./_core/sdk');
+        const { COOKIE_NAME, ONE_YEAR_MS } = await import('@shared/const');
+        const { getSessionCookieOptions } = await import('./_core/cookies');
+        const bcrypt = await import('bcryptjs');
+
+        const email = input.email.trim().toLowerCase();
+        const user = await getUserByEmail(email);
+
+        // Generic error to prevent user enumeration
+        const authError = new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid email or password.' });
+
+        if (!user) throw authError;
+        if (!user.passwordHash) {
+          // Account exists but has no password — guide them to use magic link or reset
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'This account uses magic link sign-in. Use "Forgot password" to set a password, or sign in with the magic link option.' });
+        }
+
+        const isValid = await bcrypt.compare(input.password, user.passwordHash);
+        if (!isValid) throw authError;
+
+        // Build or ensure openId
+        const openId = user.openId ?? `email:${email}`;
+        if (!user.openId) {
+          const { getDb: _gdb } = await import('./db');
+          const { users: _u } = await import('../drizzle/schema');
+          const { eq: _eq } = await import('drizzle-orm');
+          const _db = await _gdb();
+          if (_db) await _db.update(_u).set({ openId }).where(_eq(_u.id, user.id));
+        }
+
+        // Update lastSignedIn
+        try {
+          const { getDb: _gdb2 } = await import('./db');
+          const { users: _u2 } = await import('../drizzle/schema');
+          const { eq: _eq2 } = await import('drizzle-orm');
+          const _db2 = await _gdb2();
+          if (_db2) await _db2.update(_u2).set({ lastSignedIn: new Date() }).where(_eq2(_u2.id, user.id));
+        } catch { /* non-critical */ }
+
+        const name = user.displayName || user.name || user.email || '';
+        const sessionToken = await sdk.createSessionToken(openId, {
+          name,
+          expiresInMs: ONE_YEAR_MS,
+        });
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+
+        return { success: true };
+      }),
+
+    registerWithPassword: publicProcedure
+      .input(z.object({
+        email: z.string().email().max(320),
+        password: z.string().min(8).max(128),
+        firstName: z.string().min(1).max(100).optional(),
+        lastName: z.string().min(1).max(100).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { getUserByEmail, getDb } = await import('./db');
+        const { sdk } = await import('./_core/sdk');
+        const { COOKIE_NAME, ONE_YEAR_MS } = await import('@shared/const');
+        const { getSessionCookieOptions } = await import('./_core/cookies');
+        const { users: usersTable } = await import('../drizzle/schema');
+        const { eq } = await import('drizzle-orm');
+        const bcrypt = await import('bcryptjs');
+
+        const email = input.email.trim().toLowerCase();
+        const existing = await getUserByEmail(email);
+
+        if (existing) {
+          if (existing.passwordHash) {
+            throw new TRPCError({ code: 'CONFLICT', message: 'An account with this email already exists. Please sign in.' });
+          } else {
+            // Account exists (magic link only) — set the password and log them in
+            const newHash = await bcrypt.hash(input.password, 12);
+            const db = await getDb();
+            if (db) {
+              await db.update(usersTable)
+                .set({ passwordHash: newHash, emailVerified: true })
+                .where(eq(usersTable.id, existing.id));
+            }
+            const openId = existing.openId ?? `email:${email}`;
+            if (!existing.openId) {
+              const db2 = await getDb();
+              if (db2) await db2.update(usersTable).set({ openId }).where(eq(usersTable.id, existing.id));
+            }
+            const name = existing.displayName || existing.name || email;
+            const sessionToken = await sdk.createSessionToken(openId, { name, expiresInMs: ONE_YEAR_MS });
+            const cookieOptions = getSessionCookieOptions(ctx.req);
+            ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+            return { success: true, isNew: false };
+          }
+        }
+
+        // New account
+        const passwordHash = await bcrypt.hash(input.password, 12);
+        const firstName = input.firstName?.trim() || '';
+        const lastName = input.lastName?.trim() || '';
+        const displayName = [firstName, lastName].filter(Boolean).join(' ') || email.split('@')[0];
+        const openId = `email:${email}`;
+
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database unavailable.' });
+
+        await db.insert(usersTable).values({
+          email,
+          name: displayName,
+          firstName: firstName || null,
+          lastName: lastName || null,
+          displayName,
+          openId,
+          loginMethod: 'email_password',
+          emailVerified: true,
+          isPending: false,
+          passwordHash,
+          lastSignedIn: new Date(),
+        });
+
+        const [newUser] = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
+        if (!newUser) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Account creation failed.' });
+
+        const sessionToken = await sdk.createSessionToken(openId, { name: displayName, expiresInMs: ONE_YEAR_MS });
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+
+        return { success: true, isNew: true };
+      }),
+
     verifyMagicLink: publicProcedure
       .input(z.object({
         token: z.string().min(1).max(200),

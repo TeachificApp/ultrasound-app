@@ -3577,3 +3577,12 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Guest checkout modal: name+email form for unauthenticated CTA clicks (no login redirect)
 - [x] guestCheckoutRegister procedure: create/find account, auto sign-in via session cookie, save lead, return Stripe checkout URL
 - [x] Auth state invalidated after guest checkout so useAuth() reflects new session immediately
+
+## Password Auth System (May 2026)
+- [x] Add password_hash column to users table (bcrypt)
+- [x] Server: auth.setPassword, auth.loginWithPassword, auth.changePassword procedures
+- [x] Server: auth.requestPasswordReset and auth.resetPassword procedures (email token)
+- [x] Login page: toggle between magic link and password sign-in modes
+- [x] Login page: password registration form (set password on first use)
+- [x] Login page: forgot password flow
+- [x] Reset password page (/reset-password?token=...)
