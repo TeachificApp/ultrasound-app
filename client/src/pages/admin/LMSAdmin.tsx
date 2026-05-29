@@ -8319,8 +8319,14 @@ function CohortTab({ courseId }: { courseId: number }) {
   };
   const utils = trpc.useUtils();
 
+  // Multi-cohort group selector for sessions/assignments/recordings
+  const multiCohortMode = !!(courseData as any)?.multiCohortMode;
+  const [contentGroupId, setContentGroupId] = useState<number | null>(null);
+  // When multi-cohort mode is on and groups load, default to first group
+  const effectiveGroupId = multiCohortMode ? (contentGroupId ?? cohortGroups[0]?.id ?? undefined) : undefined;
+
   // Sessions
-  const { data: sessions = [], isLoading: sessionsLoading } = trpc.lmsAdmin.listCohortSessions.useQuery({ courseId });
+  const { data: sessions = [], isLoading: sessionsLoading } = trpc.lmsAdmin.listCohortSessions.useQuery({ courseId, cohortGroupId: effectiveGroupId });
   const createSession = trpc.lmsAdmin.createCohortSession.useMutation({
     onSuccess: () => { utils.lmsAdmin.listCohortSessions.invalidate({ courseId }); toast.success("Session created"); },
     onError: (e) => toast.error(e.message),
@@ -8344,7 +8350,7 @@ function CohortTab({ courseId }: { courseId: number }) {
   const getIcs = trpc.lmsAdmin.getCohortSessionsIcs.useQuery({ courseId }, { enabled: false });
 
   // Assignments
-  const { data: assignments = [], isLoading: assignmentsLoading } = trpc.lmsAdmin.listCohortAssignments.useQuery({ courseId });
+  const { data: assignments = [], isLoading: assignmentsLoading } = trpc.lmsAdmin.listCohortAssignments.useQuery({ courseId, cohortGroupId: effectiveGroupId });
   const createAssignment = trpc.lmsAdmin.createCohortAssignment.useMutation({
     onSuccess: () => { utils.lmsAdmin.listCohortAssignments.invalidate({ courseId }); toast.success("Assignment created"); },
     onError: (e) => toast.error(e.message),
@@ -8359,7 +8365,7 @@ function CohortTab({ courseId }: { courseId: number }) {
   });
 
   // Recordings
-  const { data: recordings = [], isLoading: recordingsLoading } = trpc.lmsAdmin.listCohortRecordings.useQuery({ courseId });
+  const { data: recordings = [], isLoading: recordingsLoading } = trpc.lmsAdmin.listCohortRecordings.useQuery({ courseId, cohortGroupId: effectiveGroupId });
   const createRecording = trpc.lmsAdmin.createCohortRecording.useMutation({
     onSuccess: () => { utils.lmsAdmin.listCohortRecordings.invalidate({ courseId }); toast.success("Recording added"); },
     onError: (e) => toast.error(e.message),
@@ -8404,7 +8410,7 @@ function CohortTab({ courseId }: { courseId: number }) {
     if (recordingDialog.recording) {
       updateRecording.mutate({ id: recordingDialog.recording.id, ...payload }, { onSuccess: () => setRecordingDialog({ open: false }) });
     } else {
-      createRecording.mutate({ courseId, ...payload }, { onSuccess: () => setRecordingDialog({ open: false }) });
+      createRecording.mutate({ courseId, cohortGroupId: effectiveGroupId, ...payload }, { onSuccess: () => setRecordingDialog({ open: false }) });
     }
   };
 
@@ -8486,7 +8492,7 @@ function CohortTab({ courseId }: { courseId: number }) {
         }
       });
     } else {
-      createSession.mutate({ courseId, ...payload, notifyStudents: sessionForm.notifyStudents }, {
+      createSession.mutate({ courseId, cohortGroupId: effectiveGroupId, ...payload, notifyStudents: sessionForm.notifyStudents }, {
         onSuccess: (result) => {
           setSessionDialog({ open: false });
           // Auto-expand if this is a recurring session
@@ -8570,7 +8576,7 @@ function CohortTab({ courseId }: { courseId: number }) {
     if (assignDialog.assignment) {
       updateAssignment.mutate({ id: assignDialog.assignment.id, ...payload }, { onSuccess: () => setAssignDialog({ open: false }) });
     } else {
-      createAssignment.mutate({ courseId, ...payload, notifyStudents: assignForm.notifyStudents }, { onSuccess: () => setAssignDialog({ open: false }) });
+      createAssignment.mutate({ courseId, cohortGroupId: effectiveGroupId, ...payload, notifyStudents: assignForm.notifyStudents }, { onSuccess: () => setAssignDialog({ open: false }) });
     }
   };
 
@@ -8604,6 +8610,23 @@ function CohortTab({ courseId }: { courseId: number }) {
       {/* Sessions */}
       {activeTab === "sessions" && (
         <div className="space-y-3">
+          {/* Group selector banner when multi-cohort mode is on */}
+          {multiCohortMode && cohortGroups.length > 0 && (
+            <div className="flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2">
+              <Users className="w-4 h-4 text-teal-600 flex-shrink-0" />
+              <span className="text-xs font-medium text-teal-700">Viewing group:</span>
+              <select
+                value={contentGroupId ?? cohortGroups[0]?.id ?? ""}
+                onChange={e => setContentGroupId(Number(e.target.value))}
+                className="text-xs border border-teal-300 rounded px-2 py-0.5 bg-white text-teal-800 focus:outline-none focus:ring-1 focus:ring-teal-400"
+              >
+                {cohortGroups.map(g => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </select>
+              <span className="text-xs text-teal-500 ml-auto">Sessions created here will be assigned to this group</span>
+            </div>
+          )}
           {/* Toolbar */}
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
@@ -8775,6 +8798,23 @@ function CohortTab({ courseId }: { courseId: number }) {
       {/* Assignments */}
       {activeTab === "assignments" && (
         <div className="space-y-3">
+          {/* Group selector banner when multi-cohort mode is on */}
+          {multiCohortMode && cohortGroups.length > 0 && (
+            <div className="flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2">
+              <Users className="w-4 h-4 text-teal-600 flex-shrink-0" />
+              <span className="text-xs font-medium text-teal-700">Viewing group:</span>
+              <select
+                value={contentGroupId ?? cohortGroups[0]?.id ?? ""}
+                onChange={e => setContentGroupId(Number(e.target.value))}
+                className="text-xs border border-teal-300 rounded px-2 py-0.5 bg-white text-teal-800 focus:outline-none focus:ring-1 focus:ring-teal-400"
+              >
+                {cohortGroups.map(g => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </select>
+              <span className="text-xs text-teal-500 ml-auto">Assignments created here will be assigned to this group</span>
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <p className="text-sm text-gray-500">Manage assignments, homework, and projects for cohort participants.</p>
             <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => openAssignDialog()}>
@@ -8828,6 +8868,23 @@ function CohortTab({ courseId }: { courseId: number }) {
       {/* Recordings Tab */}
       {activeTab === "recordings" && (
         <div className="space-y-3">
+          {/* Group selector banner when multi-cohort mode is on */}
+          {multiCohortMode && cohortGroups.length > 0 && (
+            <div className="flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2">
+              <Users className="w-4 h-4 text-teal-600 flex-shrink-0" />
+              <span className="text-xs font-medium text-teal-700">Viewing group:</span>
+              <select
+                value={contentGroupId ?? cohortGroups[0]?.id ?? ""}
+                onChange={e => setContentGroupId(Number(e.target.value))}
+                className="text-xs border border-teal-300 rounded px-2 py-0.5 bg-white text-teal-800 focus:outline-none focus:ring-1 focus:ring-teal-400"
+              >
+                {cohortGroups.map(g => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </select>
+              <span className="text-xs text-teal-500 ml-auto">Recordings added here will be assigned to this group</span>
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <p className="text-sm text-gray-500">Upload and manage recorded session replays for enrolled students.</p>
             <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => openRecordingDialog()}>

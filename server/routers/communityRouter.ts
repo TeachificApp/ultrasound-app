@@ -1407,6 +1407,28 @@ const communityAdminRouter = router({
     return { success: true };
   }),
 
+  /** Get page blocks for the community page editor */
+  getCommunityPageBlocks: protectedProcedure.input(z.object({ communityId: z.number(), pageType: z.enum(["page", "landing"]).default("page") })).query(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const [community] = await db.select({ pageBlocks: communities.pageBlocks, landingPageBlocks: communities.landingPageBlocks }).from(communities).where(eq(communities.id, input.communityId)).limit(1);
+    if (!community) throw new TRPCError({ code: "NOT_FOUND" });
+    const raw = input.pageType === "landing" ? community.landingPageBlocks : community.pageBlocks;
+    try { return { blocks: raw ? JSON.parse(raw) : [] }; }
+    catch { return { blocks: [] }; }
+  }),
+
+  /** Save page blocks for the community page editor */
+  saveCommunityPageBlocks: protectedProcedure.input(z.object({ communityId: z.number(), pageType: z.enum(["page", "landing"]).default("page"), blocks: z.string() })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const field = input.pageType === "landing" ? { landingPageBlocks: input.blocks } : { pageBlocks: input.blocks };
+    await db.update(communities).set(field).where(eq(communities.id, input.communityId));
+    return { success: true };
+  }),
+
   /** AI: summarize recent posts in a channel */
   aiSummarizeChannel: protectedProcedure.input(z.object({ channelId: z.number(), limit: z.number().default(20) })).mutation(async ({ ctx, input }) => {
     await assertAdmin(ctx);

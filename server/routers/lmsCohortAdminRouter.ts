@@ -84,13 +84,16 @@ import { assertAdmin, generateSlug, uniqueSlug, recalcProgress, issueCertificate
 export const lmsCohortAdminRouter = router({
   // ── Cohort Sessions ──
   listCohortSessions: protectedProcedure
-    .input(z.object({ courseId: z.number() }))
+    .input(z.object({ courseId: z.number(), cohortGroupId: z.number().optional() }))
     .query(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const whereClause = input.cohortGroupId
+        ? and(eq(lmsCohortSessions.courseId, input.courseId), eq(lmsCohortSessions.cohortGroupId, input.cohortGroupId))
+        : eq(lmsCohortSessions.courseId, input.courseId);
       const sessions = await db.select().from(lmsCohortSessions)
-        .where(eq(lmsCohortSessions.courseId, input.courseId))
+        .where(whereClause)
         .orderBy(asc(lmsCohortSessions.sessionDate));
       return sessions;
     }),
@@ -98,6 +101,7 @@ export const lmsCohortAdminRouter = router({
   createCohortSession: protectedProcedure
     .input(z.object({
       courseId: z.number(),
+      cohortGroupId: z.number().optional(),
       title: z.string().min(1).max(255),
       description: z.string().optional(),
       sessionDate: z.string(), // ISO string
@@ -120,6 +124,7 @@ export const lmsCohortAdminRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [result] = await db.insert(lmsCohortSessions).values({
         courseId: input.courseId,
+        cohortGroupId: input.cohortGroupId ?? null,
         title: input.title,
         description: input.description ?? null,
         sessionDate: new Date(input.sessionDate),
@@ -215,13 +220,16 @@ export const lmsCohortAdminRouter = router({
 
   // ── Cohort Assignments ──
   listCohortAssignments: protectedProcedure
-    .input(z.object({ courseId: z.number() }))
+    .input(z.object({ courseId: z.number(), cohortGroupId: z.number().optional() }))
     .query(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const whereClause = input.cohortGroupId
+        ? and(eq(lmsCohortAssignments.courseId, input.courseId), eq(lmsCohortAssignments.cohortGroupId, input.cohortGroupId))
+        : eq(lmsCohortAssignments.courseId, input.courseId);
       const assignments = await db.select().from(lmsCohortAssignments)
-        .where(eq(lmsCohortAssignments.courseId, input.courseId))
+        .where(whereClause)
         .orderBy(asc(lmsCohortAssignments.position), asc(lmsCohortAssignments.createdAt));
       return assignments;
     }),
@@ -229,6 +237,7 @@ export const lmsCohortAdminRouter = router({
   createCohortAssignment: protectedProcedure
     .input(z.object({
       courseId: z.number(),
+      cohortGroupId: z.number().optional(),
       title: z.string().min(1).max(255),
       description: z.string().optional(),
       contentBlocks: z.array(z.any()).optional(),
@@ -246,6 +255,7 @@ export const lmsCohortAdminRouter = router({
         .from(lmsCohortAssignments).where(eq(lmsCohortAssignments.courseId, input.courseId));
       const [result] = await db.insert(lmsCohortAssignments).values({
         courseId: input.courseId,
+        cohortGroupId: input.cohortGroupId ?? null,
         title: input.title,
         description: input.description ?? null,
         contentBlocks: input.contentBlocks ?? null,
@@ -331,19 +341,23 @@ export const lmsCohortAdminRouter = router({
 
   // ── Cohort Recordings (Admin) ────────────────────────────────────────────────────
   listCohortRecordings: protectedProcedure
-    .input(z.object({ courseId: z.number() }))
+    .input(z.object({ courseId: z.number(), cohortGroupId: z.number().optional() }))
     .query(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const whereClause = input.cohortGroupId
+        ? and(eq(lmsCohortRecordings.courseId, input.courseId), eq(lmsCohortRecordings.cohortGroupId, input.cohortGroupId))
+        : eq(lmsCohortRecordings.courseId, input.courseId);
       return db.select().from(lmsCohortRecordings)
-        .where(eq(lmsCohortRecordings.courseId, input.courseId))
+        .where(whereClause)
         .orderBy(asc(lmsCohortRecordings.position), asc(lmsCohortRecordings.createdAt));
     }),
 
   createCohortRecording: protectedProcedure
     .input(z.object({
       courseId: z.number(),
+      cohortGroupId: z.number().optional(),
       sessionId: z.number().nullable().optional(),
       title: z.string().min(1).max(255),
       description: z.string().optional(),
@@ -360,6 +374,7 @@ export const lmsCohortAdminRouter = router({
         .from(lmsCohortRecordings).where(eq(lmsCohortRecordings.courseId, input.courseId));
       const [result] = await db.insert(lmsCohortRecordings).values({
         courseId: input.courseId,
+        cohortGroupId: input.cohortGroupId ?? null,
         sessionId: input.sessionId ?? null,
         title: input.title,
         description: input.description ?? null,

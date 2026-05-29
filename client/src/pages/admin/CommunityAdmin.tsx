@@ -28,8 +28,9 @@ import {
   Hash, Award, Shield, Upload, UserPlus,
   UserMinus, MessageSquare, CheckSquare, X, ExternalLink,
   GripVertical, Link2, Image, UserCircle, ChevronUp, ChevronDown,
-  AlertCircle, Lock, PenSquare
+  AlertCircle, Lock, PenSquare, LayoutTemplate
 } from "lucide-react";
+import CommunityPageEditor from "@/components/CommunityPageEditor";
 import { Link } from "wouter";
 
 function timeAgo(dateStr: string | Date) {
@@ -427,11 +428,11 @@ function AdminProfilesTab({ communityId, communitySlug }: { communityId: number;
                   {p.bio && <p className="text-sm text-gray-500 truncate">{p.bio}</p>}
                 </div>
                 <div className="flex items-center gap-2">
-                  <Link href={`/community/${communitySlug}?postAs=${p.id}`}>
+                  <a href={`/community/${communitySlug}?postAs=${p.id}`} target="_blank" rel="noopener noreferrer">
                     <Button variant="outline" size="sm" className="text-teal-600 border-teal-200">
                       <PenSquare className="w-3.5 h-3.5 mr-1" />Post As
                     </Button>
-                  </Link>
+                  </a>
                   <Button variant="outline" size="sm" onClick={() => openEdit(p)}>
                     <Edit2 className="w-3.5 h-3.5" />
                   </Button>
@@ -745,16 +746,16 @@ export default function CommunityAdmin() {
       </Select>
       {activeCommunity && (
         <>
-          <Link href={`/community/${activeCommunity.slug}`}>
+          <a href={`/community/${activeCommunity.slug}`} target="_blank" rel="noopener noreferrer">
             <Button variant="outline" size="sm" className="text-teal-600 border-teal-200">
               <ExternalLink className="w-3.5 h-3.5 mr-1" />View Community
             </Button>
-          </Link>
-          <Link href={`/community/${activeCommunity.slug}?compose=true`}>
+          </a>
+          <a href={`/community/${activeCommunity.slug}?compose=true`} target="_blank" rel="noopener noreferrer">
             <Button variant="outline" size="sm" className="text-teal-600 border-teal-200">
               <PenSquare className="w-3.5 h-3.5 mr-1" />Post in Community
             </Button>
-          </Link>
+          </a>
         </>
       )}
     </div>
@@ -788,6 +789,8 @@ export default function CommunityAdmin() {
             {totalModerationCount > 0 && <Badge className="ml-1.5 bg-red-500 text-white text-xs">{totalModerationCount}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="badges"><Award className="w-4 h-4 mr-2" />Badges</TabsTrigger>
+          <TabsTrigger value="page-editor"><LayoutTemplate className="w-4 h-4 mr-2" />Page Editor</TabsTrigger>
+          <TabsTrigger value="landing-editor"><LayoutTemplate className="w-4 h-4 mr-2" />Landing Page</TabsTrigger>
         </TabsList>
 
         {/* Communities tab */}
@@ -835,11 +838,11 @@ export default function CommunityAdmin() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <Link href={`/community/${c.slug}`}>
+                      <a href={`/community/${c.slug}`} target="_blank" rel="noopener noreferrer">
                         <Button variant="outline" size="sm" className="text-teal-600 border-teal-200">
                           <ExternalLink className="w-3.5 h-3.5 mr-1" />View
                         </Button>
-                      </Link>
+                      </a>
                       <Button variant="outline" size="sm" onClick={() => setActiveCommunityId(c.id)}>
                         <Hash className="w-3.5 h-3.5 mr-1" />Select
                       </Button>
@@ -1069,8 +1072,35 @@ export default function CommunityAdmin() {
             </div>
           )}
         </TabsContent>
+              {/* Page Editor tab */}
+        <TabsContent value="page-editor">
+          {activeCommunityId ? (
+            <div>
+              <div className="mb-3">
+                <h3 className="font-semibold text-gray-900">Community Page Editor</h3>
+                <p className="text-sm text-gray-500 mt-0.5">Edit the content blocks shown on the community's main page for members.</p>
+              </div>
+              <CommunityPageEditor communityId={activeCommunityId} pageType="page" />
+            </div>
+          ) : (
+            <div className="text-center py-12 text-gray-400">Select a community above to edit its page.</div>
+          )}
+        </TabsContent>
+        {/* Landing Page Editor tab */}
+        <TabsContent value="landing-editor">
+          {activeCommunityId ? (
+            <div>
+              <div className="mb-3">
+                <h3 className="font-semibold text-gray-900">Landing Page Editor</h3>
+                <p className="text-sm text-gray-500 mt-0.5">Edit the public-facing landing page blocks shown before users join the community.</p>
+              </div>
+              <CommunityPageEditor communityId={activeCommunityId} pageType="landing" />
+            </div>
+          ) : (
+            <div className="text-center py-12 text-gray-400">Select a community above to edit its landing page.</div>
+          )}
+        </TabsContent>
       </Tabs>
-
       {/* Community form dialog */}
       <Dialog open={showCommunityForm} onOpenChange={setShowCommunityForm}>
         <DialogContent className="max-w-2xl">
