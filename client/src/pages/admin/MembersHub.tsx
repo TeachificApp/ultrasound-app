@@ -84,12 +84,12 @@ function StatCard({
 }: {
   label: string; value: string | number; sub?: string;
   icon: React.ReactNode; trend?: "up" | "down" | "neutral"; trendLabel?: string;
-  color?: "teal" | "blue" | "purple" | "amber";
+  color?: "teal" | "blue" | "teal2" | "amber";
 }) {
   const colorMap: Record<string, string> = {
     teal:   "bg-teal-50 text-teal-600",
     blue:   "bg-blue-50 text-blue-600",
-    purple: "bg-purple-50 text-purple-600",
+    teal2: "bg-teal-50 text-teal-500",
     amber:  "bg-amber-50 text-amber-600",
   };
   return (
@@ -181,7 +181,7 @@ function OverviewPanel() {
           icon={<TrendingUp size={18} />}
           trend={newTrend}
           trendLabel={newTrendLabel}
-          color="purple"
+          color="teal2"
         />
         <StatCard
           label="Course Completions"
@@ -476,7 +476,7 @@ function AllMembersPanel() {
                   <td className="px-4 py-3">
                     <Badge
                       variant="outline"
-                      className={`text-xs ${m.role === "admin" ? "border-purple-200 text-purple-700 bg-purple-50" : "border-slate-200 text-slate-600"}`}
+                      className={`text-xs ${m.role === "admin" ? "border-teal-200 text-teal-700 bg-teal-50" : "border-slate-200 text-slate-600"}`}
                     >
                       {m.role}
                     </Badge>

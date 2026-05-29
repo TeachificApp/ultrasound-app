@@ -544,7 +544,7 @@ export default function CohortSchedule() {
               <div className="flex items-center gap-2 flex-wrap mb-1">
                 <Badge className="bg-teal-100 text-teal-700 border-teal-200 text-xs">Cohort</Badge>
                 {myGroup && (
-                  <Badge className="bg-purple-100 text-purple-700 border-purple-200 text-xs">
+                  <Badge className="bg-teal-50 text-teal-700 border-teal-200 text-xs">
                     {myGroup.name}
                   </Badge>
                 )}

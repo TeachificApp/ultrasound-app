@@ -818,7 +818,7 @@ export default function CommunityAdmin() {
                         <h3 className="font-semibold text-gray-900">{c.title}</h3>
                         <Badge variant="outline" className="text-xs">{c.privacy}</Badge>
                         <Badge variant={c.accessType === "free" ? "secondary" : "outline"}
-                          className={`text-xs ${c.accessType === "restricted" ? "border-amber-300 text-amber-700 bg-amber-50" : c.accessType === "paid" ? "bg-purple-100 text-purple-700 border-purple-200" : ""}`}>
+                          className={`text-xs ${c.accessType === "restricted" ? "border-amber-300 text-amber-700 bg-amber-50" : c.accessType === "paid" ? "bg-teal-100 text-teal-700 border-teal-200" : ""}`}>
                           {c.accessType === "restricted" && <Lock className="w-2.5 h-2.5 mr-1" />}
                           {c.accessType}
                         </Badge>
