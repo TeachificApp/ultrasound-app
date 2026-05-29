@@ -1,797 +1,645 @@
 /**
- * MembersHub.tsx — Unified Members Administration
+ * MembersHub.tsx — Unified Members Administration (LearnPro-style)
  *
- * Two main tabs:
- *   Apps — platform users, sales/transactions, memberships, contacts, activity, sharing monitor
- *   LMS  — course enrollments, LMS users, deep links to courses/content/user profiles
+ * Left sidebar navigation with sections:
+ *   Members: Overview, All Members, Enrollments, Invitations, Import
+ *   Engagement: Activity, Communications, Certificates
+ *   Analytics: Sales, Product Analytics, Memberships, Contacts
+ *   Settings
  */
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Users, BookOpen, DollarSign, Crown, Mail, Activity,
-  ChevronLeft, ChevronRight, Search, Download,
-  CheckCircle, Clock, ArrowUpDown, ArrowUp, ArrowDown,
-  X, ExternalLink, GraduationCap, FileDown, HelpCircle, Shield,
-  LayoutGrid, MonitorSmartphone, BarChart3,
+  Search, Download, CheckCircle, Clock, TrendingUp,
+  ExternalLink, GraduationCap, Shield, BarChart3,
+  UserPlus, Settings, Award, ChevronRight, ChevronLeft,
+  LayoutDashboard, UserCheck, Upload,
+  MessageSquare, ArrowUpRight, ArrowDownRight,
+  RefreshCw,
 } from "lucide-react";
-import SharingMonitor from "@/pages/admin/SharingMonitor";
 import { toast } from "sonner";
 import { Link } from "wouter";
-
-// Lazy-load the heavy sub-pages to keep initial bundle small
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend,
+} from "recharts";
 import AdminSalesDashboard from "./AdminSalesDashboard";
 import MembershipAdmin from "./MembershipAdmin";
 import ContactsAdmin from "./ContactsAdmin";
 import UserAnalytics from "./UserAnalytics";
 import ProductAnalytics from "./ProductAnalytics";
+import SharingMonitor from "./SharingMonitor";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtDate(d: Date | null | undefined) {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
-function fmtDateTime(d: Date | null | undefined) {
-  if (!d) return "—";
-  return new Date(d).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+function fmtRelative(d: Date | null | undefined) {
+  if (!d) return "Never";
+  const diff = Date.now() - new Date(d).getTime();
+  const days = Math.floor(diff / 86400000);
+  if (days === 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days}d ago`;
+  if (days < 30) return `${Math.floor(days / 7)}w ago`;
+  return fmtDate(d);
+}
+function initials(name: string) {
+  return name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2);
 }
 
-const EVENT_TYPE_COLORS: Record<string, string> = {
-  page_view: "bg-purple-100 text-purple-700",
-  login: "bg-blue-100 text-blue-700",
-  video_play: "bg-orange-100 text-orange-700",
-  video_complete: "bg-green-100 text-green-700",
-  quiz_attempt: "bg-pink-100 text-pink-700",
-  quiz_pass: "bg-emerald-100 text-emerald-700",
-  quiz_fail: "bg-red-100 text-red-700",
-  course_enroll: "bg-teal-100 text-teal-700",
-  course_complete: "bg-green-100 text-green-700",
-  download: "bg-indigo-100 text-indigo-700",
-  module_complete: "bg-cyan-100 text-cyan-700",
-};
+// ─── Sidebar Nav Config ───────────────────────────────────────────────────────
+type NavItem = { id: string; label: string; icon: React.ReactNode; section?: string };
+const NAV_ITEMS: NavItem[] = [
+  { id: "overview",          label: "Overview",          icon: <LayoutDashboard size={16} />, section: "Members" },
+  { id: "all-members",       label: "All Members",       icon: <Users size={16} /> },
+  { id: "enrollments",       label: "Enrollments",       icon: <BookOpen size={16} /> },
+  { id: "invitations",       label: "Invitations",       icon: <UserPlus size={16} /> },
+  { id: "import",            label: "Import",            icon: <Upload size={16} /> },
+  { id: "activity",          label: "Activity",          icon: <Activity size={16} />, section: "Engagement" },
+  { id: "communications",    label: "Communications",    icon: <MessageSquare size={16} /> },
+  { id: "certificates",      label: "Certificates",      icon: <Award size={16} /> },
+  { id: "sales",             label: "Sales",             icon: <DollarSign size={16} />, section: "Analytics" },
+  { id: "product-analytics", label: "Product Analytics", icon: <BarChart3 size={16} /> },
+  { id: "memberships",       label: "Memberships",       icon: <Crown size={16} /> },
+  { id: "contacts",          label: "Contacts",          icon: <Mail size={16} /> },
+  { id: "sharing-monitor",   label: "Sharing Monitor",   icon: <Shield size={16} /> },
+  { id: "settings",          label: "Settings",          icon: <Settings size={16} />, section: "Settings" },
+];
 
-// Content type icon helper
-const CONTENT_TYPE_ICON: Record<string, React.ReactNode> = {
-  course: <GraduationCap className="w-3.5 h-3.5 text-teal-600" />,
-  quiz: <HelpCircle className="w-3.5 h-3.5 text-purple-600" />,
-  download: <FileDown className="w-3.5 h-3.5 text-indigo-600" />,
-};
-const CONTENT_TYPE_BADGE: Record<string, string> = {
-  course: "bg-teal-50 text-teal-700 border-teal-200",
-  quiz: "bg-purple-50 text-purple-700 border-purple-200",
-  download: "bg-indigo-50 text-indigo-700 border-indigo-200",
-};
+const STATUS_COLORS = ["#14b8a6", "#94a3b8", "#f59e0b"];
 
-// ─── Enrollment Drill-Down Panel ──────────────────────────────────────────────
-function EnrollmentDrillDown({ userId, userEmail, onClose }: { userId: number | null; userEmail: string; onClose: () => void }) {
-  const { data, isLoading } = trpc.analyticsAdmin.userEnrollmentDetail.useQuery(
-    userId ? { userId } : { userEmail },
-    { enabled: !!(userId || userEmail) }
-  );
-
+// ─── Stat Card ────────────────────────────────────────────────────────────────
+function StatCard({
+  label, value, sub, icon, trend, trendLabel, color = "teal",
+}: {
+  label: string; value: string | number; sub?: string;
+  icon: React.ReactNode; trend?: "up" | "down" | "neutral"; trendLabel?: string;
+  color?: "teal" | "blue" | "purple" | "amber";
+}) {
+  const colorMap: Record<string, string> = {
+    teal:   "bg-teal-50 text-teal-600",
+    blue:   "bg-blue-50 text-blue-600",
+    purple: "bg-purple-50 text-purple-600",
+    amber:  "bg-amber-50 text-amber-600",
+  };
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-end">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      {/* Panel */}
-      <div className="relative w-full max-w-lg h-full bg-white shadow-2xl flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="flex items-start justify-between px-5 py-4 border-b border-gray-200 bg-gray-50">
+    <Card className="border border-slate-200 shadow-sm">
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between">
           <div>
-            {isLoading ? (
-              <Skeleton className="h-5 w-40 mb-1" />
-            ) : data ? (
-              <>
-                <div className="font-semibold text-gray-900 text-base">{data.userName}</div>
-                <div className="text-xs text-gray-500">{data.userEmail}</div>
-              </>
-            ) : (
-              <div className="text-sm text-gray-500">User not found</div>
-            )}
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{label}</p>
+            <p className="text-2xl font-bold text-slate-800 mt-1">{value}</p>
+            {sub && <p className="text-xs text-slate-500 mt-0.5">{sub}</p>}
           </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-200 transition-colors">
-            <X className="w-4 h-4 text-gray-500" />
-          </button>
+          <div className={`p-2.5 rounded-lg ${colorMap[color]}`}>{icon}</div>
         </div>
-
-        {/* Stats row */}
-        {data && (
-          <div className="grid grid-cols-3 divide-x divide-gray-100 border-b border-gray-200">
-            <div className="px-4 py-3 text-center">
-              <div className="text-xl font-bold text-gray-900">{data.totalEnrollments}</div>
-              <div className="text-xs text-gray-500">Enrollments</div>
-            </div>
-            <div className="px-4 py-3 text-center">
-              <div className="text-xl font-bold text-green-600">{data.completedCount}</div>
-              <div className="text-xs text-gray-500">Completed</div>
-            </div>
-            <div className="px-4 py-3 text-center">
-              <div className="text-xl font-bold text-teal-600">{data.isPremium ? "Premium" : "Free"}</div>
-              <div className="text-xs text-gray-500">Membership</div>
-            </div>
+        {trendLabel && (
+          <div className={`flex items-center gap-1 mt-3 text-xs font-medium ${
+            trend === "up" ? "text-emerald-600" : trend === "down" ? "text-red-500" : "text-slate-500"
+          }`}>
+            {trend === "up" ? <ArrowUpRight size={13} /> : trend === "down" ? <ArrowDownRight size={13} /> : null}
+            {trendLabel}
           </div>
         )}
-        {data && (
-          <div className="flex items-center gap-4 px-5 py-2 border-b border-gray-100 text-xs text-gray-500 bg-gray-50">
-            <span>Joined: <span className="text-gray-700">{fmtDate(data.userCreatedAt)}</span></span>
-            <span>Last seen: <span className="text-gray-700">{fmtDate(data.lastSignedIn)}</span></span>
-            {data.userId && (
-              <Link href={`/admin/users/${data.userId}`} className="ml-auto flex items-center gap-1 text-teal-600 hover:underline">
-                Full Profile <ExternalLink className="w-3 h-3" />
-              </Link>
-            )}
-          </div>
-        )}
+      </CardContent>
+    </Card>
+  );
+}
 
-        {/* Enrollments list */}
-        <div className="flex-1 overflow-y-auto">
-          {isLoading ? (
-            <div className="p-5 space-y-3">
-              {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}
-            </div>
-          ) : !data?.enrollments.length ? (
-            <div className="p-8 text-center text-gray-400 text-sm">No enrollments found</div>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {data.enrollments.map(e => (
-                <div key={e.enrollmentId} className="px-5 py-3 hover:bg-gray-50">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      {CONTENT_TYPE_ICON[e.courseType] ?? CONTENT_TYPE_ICON.course}
-                      <span className="text-sm font-medium text-gray-900 truncate" title={e.courseTitle}>
-                        {e.courseTitle}
-                      </span>
-                    </div>
-                    <Badge variant="outline" className={`text-xs shrink-0 ${CONTENT_TYPE_BADGE[e.courseType] ?? ''}` }>
-                      {e.courseType}
-                    </Badge>
-                  </div>
-                  <div className="mt-1.5 flex items-center gap-3">
-                    {/* Progress bar */}
-                    <div className="flex items-center gap-1.5 flex-1">
-                      <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                        <div className="h-full bg-teal-500 rounded-full" style={{ width: `${e.progressPct}%` }} />
-                      </div>
-                      <span className="text-xs text-gray-500 w-8 text-right">{e.progressPct}%</span>
-                    </div>
-                    {e.completedAt ? (
-                      <div className="flex items-center gap-1 text-xs text-green-600">
-                        <CheckCircle className="w-3 h-3" />
-                        {fmtDate(e.completedAt)}
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1 text-xs text-gray-400">
-                        <Clock className="w-3 h-3" />
-                        In progress
-                      </div>
-                    )}
-                  </div>
-                  <div className="mt-0.5 text-xs text-gray-400">Enrolled {fmtDate(e.enrolledAt)}</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+// ─── Progress Bar ─────────────────────────────────────────────────────────────
+function ProgressBar({ value }: { value: number }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+        <div
+          className="h-full bg-teal-500 rounded-full transition-all"
+          style={{ width: `${Math.min(100, value)}%` }}
+        />
       </div>
+      <span className="text-xs text-slate-500 w-8 text-right">{value}%</span>
     </div>
   );
 }
 
-// Source badge config
-const SOURCE_BADGE: Record<string, { label: string; className: string }> = {
-  purchase:         { label: 'Purchase',  className: 'bg-green-50 text-green-700 border-green-200' },
-  group:            { label: 'Group',     className: 'bg-blue-50 text-blue-700 border-blue-200' },
-  thinkific_import: { label: 'Thinkific', className: 'bg-orange-50 text-orange-700 border-orange-200' },
-  admin_grant:      { label: 'Admin',     className: 'bg-gray-100 text-gray-600 border-gray-300' },
-};
+// ─── Overview Panel ───────────────────────────────────────────────────────────
+function OverviewPanel() {
+  const { data, isLoading, refetch } = trpc.adminUser.getMemberOverview.useQuery();
 
-// ─── Enrollments Tab ──────────────────────────────────────────────────────────
-type SortKey = 'enrolledAt' | 'userName' | 'courseTitle' | 'progressPct' | 'completedAt';
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)}
+        </div>
+        <Skeleton className="h-64 rounded-xl" />
+      </div>
+    );
+  }
 
-function EnrollmentsTab() {
+  const stats = data?.stats;
+  const growth = data?.memberGrowth ?? [];
+  const statusBreakdown = data?.statusBreakdown ?? [];
+  const recentMembers = data?.recentMembers ?? [];
+  const recentActivity = data?.recentActivity ?? [];
+
+  const newDelta = (stats?.newThisMonth ?? 0) - (stats?.newLastMonth ?? 0);
+  const newTrend: "up" | "down" | "neutral" = newDelta > 0 ? "up" : newDelta < 0 ? "down" : "neutral";
+  const newTrendLabel = newDelta === 0
+    ? "Same as last month"
+    : `${Math.abs(newDelta)} ${newDelta > 0 ? "more" : "fewer"} than last month`;
+
+  return (
+    <div className="space-y-6">
+      {/* Stat Cards */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        <StatCard
+          label="Total Members"
+          value={(stats?.totalMembers ?? 0).toLocaleString()}
+          icon={<Users size={18} />}
+          color="teal"
+        />
+        <StatCard
+          label="Active (30d)"
+          value={(stats?.activeMembers ?? 0).toLocaleString()}
+          sub={`${stats?.engagementRate ?? 0}% engagement rate`}
+          icon={<UserCheck size={18} />}
+          color="blue"
+        />
+        <StatCard
+          label="New This Month"
+          value={(stats?.newThisMonth ?? 0).toLocaleString()}
+          icon={<TrendingUp size={18} />}
+          trend={newTrend}
+          trendLabel={newTrendLabel}
+          color="purple"
+        />
+        <StatCard
+          label="Course Completions"
+          value={(stats?.totalCompletions ?? 0).toLocaleString()}
+          icon={<GraduationCap size={18} />}
+          color="amber"
+        />
+      </div>
+
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        {/* Member Growth Chart */}
+        <Card className="xl:col-span-2 border border-slate-200 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-slate-700">Member Growth (6 months)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {growth.length === 0 ? (
+              <div className="h-48 flex items-center justify-center text-slate-400 text-sm">No data yet</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={growth} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#94a3b8" }} />
+                  <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 12 }}
+                    formatter={(v: number) => [v, "New Members"]}
+                  />
+                  <Line type="monotone" dataKey="count" stroke="#14b8a6" strokeWidth={2.5} dot={{ r: 4, fill: "#14b8a6" }} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Status Donut */}
+        <Card className="border border-slate-200 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-slate-700">Members by Status</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {statusBreakdown.every((s: any) => s.count === 0) ? (
+              <div className="h-48 flex items-center justify-center text-slate-400 text-sm">No data yet</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie
+                    data={statusBreakdown}
+                    cx="50%"
+                    cy="45%"
+                    innerRadius={55}
+                    outerRadius={80}
+                    dataKey="count"
+                    nameKey="status"
+                    paddingAngle={3}
+                  >
+                    {statusBreakdown.map((_: any, i: number) => (
+                      <Cell key={i} fill={STATUS_COLORS[i % STATUS_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Legend iconSize={10} iconType="circle" wrapperStyle={{ fontSize: 11 }} />
+                  <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 12 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent Members + Activity */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        {/* Recent Members Table */}
+        <Card className="xl:col-span-2 border border-slate-200 shadow-sm">
+          <CardHeader className="pb-2 flex flex-row items-center justify-between">
+            <CardTitle className="text-sm font-semibold text-slate-700">Recent Members</CardTitle>
+            <Link href="/admin/users">
+              <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-700 text-xs h-7 px-2">
+                View all <ChevronRight size={13} className="ml-1" />
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent className="p-0">
+            {recentMembers.length === 0 ? (
+              <div className="h-32 flex items-center justify-center text-slate-400 text-sm">No members yet</div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {recentMembers.map((m: any) => (
+                  <div key={m.id} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition-colors">
+                    <Avatar className="h-8 w-8 flex-shrink-0">
+                      <AvatarImage src={m.avatarUrl ?? undefined} />
+                      <AvatarFallback className="bg-teal-100 text-teal-700 text-xs font-semibold">
+                        {initials(m.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Link href={`/admin/users/${m.id}`}>
+                          <span className="text-sm font-medium text-slate-800 hover:text-teal-600 cursor-pointer truncate">
+                            {m.name}
+                          </span>
+                        </Link>
+                        {m.enrollmentCount > 0 && (
+                          <Badge variant="outline" className="text-xs h-4 px-1.5 border-slate-200 text-slate-500">
+                            {m.enrollmentCount} course{m.enrollmentCount !== 1 ? "s" : ""}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400 truncate">{m.email}</p>
+                      {m.enrollmentCount > 0 && <ProgressBar value={m.progress} />}
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-xs text-slate-500">{fmtDate(m.createdAt)}</p>
+                      <p className="text-xs text-slate-400">{fmtRelative(m.lastSignedIn)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Recent Activity Feed */}
+        <Card className="border border-slate-200 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-slate-700">Recent Activity</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {recentActivity.length === 0 ? (
+              <div className="h-32 flex items-center justify-center text-slate-400 text-sm">No activity yet</div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {recentActivity.map((a: any, i: number) => {
+                  const iconMap: Record<string, React.ReactNode> = {
+                    enrollment:  <BookOpen size={13} className="text-teal-500" />,
+                    completion:  <CheckCircle size={13} className="text-emerald-500" />,
+                    certificate: <Award size={13} className="text-amber-500" />,
+                  };
+                  const labelMap: Record<string, string> = {
+                    enrollment:  "enrolled in",
+                    completion:  "completed",
+                    certificate: "earned certificate for",
+                  };
+                  return (
+                    <div key={i} className="flex items-start gap-2.5 px-4 py-2.5 hover:bg-slate-50 transition-colors">
+                      <div className="mt-0.5 p-1.5 bg-slate-100 rounded-full flex-shrink-0">
+                        {iconMap[a.type] ?? <Activity size={13} className="text-slate-500" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-slate-700 leading-snug">
+                          <span className="font-medium">{a.userName}</span>{" "}
+                          <span className="text-slate-500">{labelMap[a.type] ?? a.type}</span>{" "}
+                          <span className="font-medium">{a.subject}</span>
+                        </p>
+                        <p className="text-xs text-slate-400 mt-0.5">{fmtRelative(a.occurredAt)}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Quick Actions */}
+      <Card className="border border-slate-200 shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold text-slate-700">Quick Actions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/admin/users">
+              <Button variant="outline" size="sm" className="text-xs gap-1.5 border-slate-200">
+                <Users size={13} /> View All Members
+              </Button>
+            </Link>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs gap-1.5 border-slate-200"
+              onClick={() => toast.info("Import feature coming soon")}
+            >
+              <Upload size={13} /> Import Members
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs gap-1.5 border-slate-200"
+              onClick={() => toast.info("Bulk email feature coming soon")}
+            >
+              <Mail size={13} /> Send Bulk Email
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs gap-1.5 border-slate-200"
+              onClick={() => refetch()}
+            >
+              <RefreshCw size={13} /> Refresh Stats
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ─── All Members Panel ────────────────────────────────────────────────────────
+function AllMembersPanel() {
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [status, setStatus] = useState<"all" | "active" | "inactive">("all");
   const [page, setPage] = useState(1);
-  const [status, setStatus] = useState<"all" | "active" | "completed">("all");
-  const [contentType, setContentType] = useState<"all" | "course" | "quiz" | "download">("all");
-  const [sortBy, setSortBy] = useState<SortKey>("enrolledAt");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-  const [drillDown, setDrillDown] = useState<{ userId: number | null; userEmail: string } | null>(null);
-  const PAGE_SIZE = 50;
 
-  const handleSearch = (v: string) => {
-    setSearch(v);
-    clearTimeout((window as any)._enrollSearchTimer);
-    (window as any)._enrollSearchTimer = setTimeout(() => {
-      setDebouncedSearch(v);
-      setPage(1);
-    }, 400);
-  };
-
-  const handleSort = (col: SortKey) => {
-    if (sortBy === col) {
-      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(col);
-      setSortDir('desc');
-    }
-    setPage(1);
-  };
-
-  const { data, isLoading } = trpc.analyticsAdmin.enrollmentsList.useQuery({
-    search: debouncedSearch || undefined,
-    page,
-    pageSize: PAGE_SIZE,
-    status,
-    contentType,
-    sortBy,
-    sortDir,
-  });
-
-  const { isFetching: csvLoading, refetch: fetchCsv } = trpc.analyticsAdmin.exportEnrollmentsCsv.useQuery(
-    { search: debouncedSearch || undefined, status },
-    { enabled: false }
+  const { data, isLoading } = trpc.adminUser.listMembers.useQuery(
+    { search: search || undefined, status, page, pageSize: 25 },
+    { keepPreviousData: true } as any
   );
 
-  const handleExportCsv = async () => {
-    const result = await fetchCsv();
-    if (result.data?.csv) {
-      const blob = new Blob([result.data.csv], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `enrollments-${new Date().toISOString().split("T")[0]}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success(`Exported ${result.data.totalRows} enrollment records`);
-    }
-  };
-
-  const totalPages = Math.ceil((data?.total ?? 0) / PAGE_SIZE);
-
-  // Sort indicator helper
-  const SortIcon = ({ col }: { col: SortKey }) => {
-    if (sortBy !== col) return <ArrowUpDown className="w-3 h-3 text-gray-400 ml-1 inline" />;
-    return sortDir === 'asc'
-      ? <ArrowUp className="w-3 h-3 text-teal-600 ml-1 inline" />
-      : <ArrowDown className="w-3 h-3 text-teal-600 ml-1 inline" />;
-  };
-
-  const SortTh = ({ col, label, className = "" }: { col: SortKey; label: string; className?: string }) => (
-    <th
-      className={`text-xs font-semibold text-gray-600 cursor-pointer select-none hover:text-teal-700 transition-colors ${className}`}
-      onClick={() => handleSort(col)}
-    >
-      {label}<SortIcon col={col} />
-    </th>
-  );
+  const members = data?.members ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = data?.totalPages ?? 1;
 
   return (
     <div className="space-y-4">
-      {/* Filter bar */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {/* Search */}
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400" />
+      {/* Filters */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-48">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <Input
-            placeholder="Search name, email, or course…"
+            placeholder="Search by name or email…"
             value={search}
-            onChange={e => handleSearch(e.target.value)}
-            className="pl-8 h-8 text-sm"
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
+            className="pl-9 h-9 text-sm border-slate-200"
           />
         </div>
-
-        {/* Content type filter */}
-        <Select value={contentType} onValueChange={v => { setContentType(v as any); setPage(1); }}>
-          <SelectTrigger className="w-36 h-8 text-sm">
+        <Select value={status} onValueChange={(v: any) => { setStatus(v); setPage(1); }}>
+          <SelectTrigger className="w-36 h-9 text-sm border-slate-200">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="course">Courses</SelectItem>
-            <SelectItem value="quiz">Quizzes</SelectItem>
-            <SelectItem value="download">Downloads</SelectItem>
+            <SelectItem value="all">All Members</SelectItem>
+            <SelectItem value="active">Active (30d)</SelectItem>
+            <SelectItem value="inactive">Inactive</SelectItem>
           </SelectContent>
         </Select>
-
-        {/* Status filter */}
-        <Select value={status} onValueChange={v => { setStatus(v as any); setPage(1); }}>
-          <SelectTrigger className="w-36 h-8 text-sm">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="active">In Progress</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {/* Active filter chips */}
-        {(contentType !== 'all' || status !== 'all' || debouncedSearch) && (
-          <button
-            onClick={() => { setContentType('all'); setStatus('all'); setSearch(''); setDebouncedSearch(''); setPage(1); }}
-            className="flex items-center gap-1 text-xs text-gray-500 hover:text-red-500 transition-colors"
-          >
-            <X className="w-3 h-3" /> Clear filters
-          </button>
-        )}
-
-        {data && (
-          <span className="text-sm text-gray-400 ml-auto">{data.total.toLocaleString()} enrollments</span>
-        )}
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-8 gap-1.5 text-xs"
-          onClick={handleExportCsv}
-          disabled={csvLoading}
-        >
-          <Download className="w-3.5 h-3.5" />
-          {csvLoading ? "Exporting…" : "Export CSV"}
-        </Button>
+        <span className="text-xs text-slate-500">{total.toLocaleString()} total</span>
       </div>
 
       {/* Table */}
-      <Card className="border border-gray-200">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <SortTh col="userName" label="User" className="text-left px-4 py-2.5" />
-                  <SortTh col="courseTitle" label="Course" className="text-left px-3 py-2.5" />
-                  <th className="text-left px-3 py-2.5 text-xs font-semibold text-gray-600">Type</th>
-                  <SortTh col="progressPct" label="Progress" className="text-right px-3 py-2.5" />
-                  <SortTh col="enrolledAt" label="Enrolled" className="text-right px-3 py-2.5" />
-                  <SortTh col="completedAt" label="Completed" className="text-right px-3 py-2.5" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {isLoading ? (
-                  Array.from({ length: 8 }).map((_, i) => (
-                    <tr key={i}>
-                      <td colSpan={6} className="px-4 py-2.5">
-                        <Skeleton className="h-4 w-full" />
-                      </td>
-                    </tr>
-                  ))
-                ) : !data?.enrollments.length ? (
-                  <tr>
-                    <td colSpan={6} className="text-center py-10 text-gray-400 text-sm">
-                      No enrollments found
-                    </td>
+      <Card className="border border-slate-200 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Member</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Role</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Courses</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Progress</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Joined</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Last Seen</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {isLoading ? (
+                [...Array(8)].map((_, i) => (
+                  <tr key={i}>
+                    <td colSpan={7} className="px-4 py-3"><Skeleton className="h-8 w-full" /></td>
                   </tr>
-                ) : (
-                  data.enrollments.map(e => (
-                    <tr
-                      key={e.enrollmentId}
-                      className="hover:bg-teal-50/40 cursor-pointer transition-colors"
-                      onClick={() => setDrillDown({ userId: e.userId, userEmail: e.userEmail })}
+                ))
+              ) : members.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center text-slate-400 text-sm">No members found</td>
+                </tr>
+              ) : members.map((m: any) => (
+                <tr key={m.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2.5">
+                      <Avatar className="h-8 w-8 flex-shrink-0">
+                        <AvatarImage src={m.avatarUrl ?? undefined} />
+                        <AvatarFallback className="bg-teal-100 text-teal-700 text-xs font-semibold">
+                          {initials(m.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <p className="font-medium text-slate-800 truncate">{m.name}</p>
+                        <p className="text-xs text-slate-400 truncate">{m.email}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge
+                      variant="outline"
+                      className={`text-xs ${m.role === "admin" ? "border-purple-200 text-purple-700 bg-purple-50" : "border-slate-200 text-slate-600"}`}
                     >
-                      <td className="px-4 py-2.5">
-                        <div className="flex items-center gap-2">
-                          <div>
-                            <div className="font-medium text-gray-900 text-sm">{e.userName || "—"}</div>
-                            <div className="text-xs text-gray-400">{e.userEmail}</div>
-                          </div>
-                          {e.userId && (
-                            <Link
-                              href={`/admin/users/${e.userId}`}
-                              className="text-teal-600 hover:text-teal-800 shrink-0"
-                              onClick={(ev: React.MouseEvent) => ev.stopPropagation()}
-                            >
-                              <ExternalLink className="w-3 h-3" />
-                            </Link>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2.5 max-w-[200px]">
-                        <span className="text-sm text-gray-700 truncate block" title={e.courseTitle}>
-                          {e.courseTitle}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <Badge variant="outline" className={`text-xs ${CONTENT_TYPE_BADGE[e.courseType] ?? ''}` }>
-                          <span className="flex items-center gap-1">
-                            {CONTENT_TYPE_ICON[e.courseType]}
-                            {e.courseType}
-                          </span>
-                        </Badge>
-                      </td>
-                      <td className="px-3 py-2.5 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <div className="w-14 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                            <div className="h-full bg-teal-500 rounded-full" style={{ width: `${e.progressPct}%` }} />
-                          </div>
-                          <span className="text-xs text-gray-600 w-8 text-right">{e.progressPct}%</span>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2.5 text-right text-xs text-gray-500 whitespace-nowrap">
-                        {fmtDate(e.enrolledAt)}
-                      </td>
-                      <td className="px-3 py-2.5 text-right">
-                        {e.completedAt ? (
-                          <div className="flex items-center justify-end gap-1">
-                            <CheckCircle className="w-3.5 h-3.5 text-green-500" />
-                            <span className="text-xs text-gray-400">{fmtDate(e.completedAt)}</span>
-                          </div>
-                        ) : (
-                          <Clock className="w-3.5 h-3.5 text-gray-300 ml-auto" />
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
-              <span className="text-xs text-gray-500">
-                Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, data?.total ?? 0)} of{" "}
-                {data?.total ?? 0}
-              </span>
-              <div className="flex items-center gap-1">
-                <Button
-                  size="sm" variant="outline" className="h-7 px-3 text-xs gap-1"
-                  disabled={page <= 1}
-                  onClick={ev => { ev.stopPropagation(); setPage(p => p - 1); }}
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" /> Prev
-                </Button>
-                <span className="text-xs text-gray-500 px-2">{page} / {totalPages}</span>
-                <Button
-                  size="sm" variant="outline" className="h-7 px-3 text-xs gap-1"
-                  disabled={page >= totalPages}
-                  onClick={ev => { ev.stopPropagation(); setPage(p => p + 1); }}
-                >
-                  Next <ChevronRight className="w-3.5 h-3.5" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
+                      {m.role}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">{m.enrollmentCount}</td>
+                  <td className="px-4 py-3 w-32">
+                    {m.enrollmentCount > 0 ? <ProgressBar value={m.progress} /> : <span className="text-xs text-slate-400">—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-xs text-slate-500">{fmtDate(m.createdAt)}</td>
+                  <td className="px-4 py-3 text-xs text-slate-500">{fmtRelative(m.lastSignedIn)}</td>
+                  <td className="px-4 py-3">
+                    <Link href={`/admin/users/${m.id}`}>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-slate-400 hover:text-teal-600">
+                        <ExternalLink size={13} />
+                      </Button>
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </Card>
 
-      {/* Drill-down panel */}
-      {drillDown && (
-        <EnrollmentDrillDown
-          userId={drillDown.userId}
-          userEmail={drillDown.userEmail}
-          onClose={() => setDrillDown(null)}
-        />
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between text-xs text-slate-500">
+          <span>Page {page} of {totalPages}</span>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="h-8 px-3 text-xs border-slate-200" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
+              Previous
+            </Button>
+            <Button variant="outline" size="sm" className="h-8 px-3 text-xs border-slate-200" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
+              Next
+            </Button>
+          </div>
+        </div>
       )}
     </div>
   );
 }
 
-// ─── Global Activity Tab ──────────────────────────────────────────────────────
-function GlobalActivityTab() {
-  const [page, setPage] = useState(1);
-  const [eventFilter, setEventFilter] = useState<string>("all_events");
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const PAGE_SIZE = 50;
-
-  const handleSearch = (v: string) => {
-    setSearch(v);
-    clearTimeout((window as any)._activitySearchTimer);
-    (window as any)._activitySearchTimer = setTimeout(() => {
-      setDebouncedSearch(v);
-      setPage(1);
-    }, 400);
-  };
-
-  const activeFilter = eventFilter === "all_events" ? undefined : eventFilter;
-
-  const { data, isLoading } = trpc.analyticsAdmin.globalActivityLog.useQuery({
-    page,
-    pageSize: PAGE_SIZE,
-    eventType: activeFilter,
-    search: debouncedSearch || undefined,
-  });
-
-  const totalPages = Math.ceil((data?.total ?? 0) / PAGE_SIZE);
-
-  const eventTypes = [
-    { value: "all_events", label: "All Events" },
-    { value: "page_view", label: "Page Views" },
-    { value: "login", label: "Logins" },
-    { value: "video_play", label: "Video Plays" },
-    { value: "video_complete", label: "Video Completes" },
-    { value: "quiz_attempt", label: "Quiz Attempts" },
-    { value: "course_enroll", label: "Enrollments" },
-    { value: "course_complete", label: "Completions" },
-    { value: "download", label: "Downloads" },
-  ];
-
+// ─── Placeholder Panel ────────────────────────────────────────────────────────
+function PlaceholderPanel({ title, description }: { title: string; description: string }) {
   return (
-    <div className="space-y-4">
-      {/* Controls */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400" />
-          <Input
-            placeholder="Search by user name or email…"
-            value={search}
-            onChange={e => handleSearch(e.target.value)}
-            className="pl-8 h-8 text-sm"
-          />
-        </div>
-        <Select value={eventFilter} onValueChange={v => { setEventFilter(v); setPage(1); }}>
-          <SelectTrigger className="w-40 h-8 text-sm">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {eventTypes.map(et => (
-              <SelectItem key={et.value} value={et.value}>{et.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {data && (
-          <span className="text-sm text-gray-400">{data.total.toLocaleString()} events</span>
-        )}
+    <div className="flex flex-col items-center justify-center h-64 text-center">
+      <div className="p-4 bg-slate-100 rounded-full mb-4">
+        <Clock size={24} className="text-slate-400" />
       </div>
-
-      <Card className="border border-gray-200">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-600">Timestamp</th>
-                  <th className="text-left px-3 py-2.5 text-xs font-semibold text-gray-600">User</th>
-                  <th className="text-left px-3 py-2.5 text-xs font-semibold text-gray-600">Event</th>
-                  <th className="text-left px-3 py-2.5 text-xs font-semibold text-gray-600">Description</th>
-                  <th className="text-left px-3 py-2.5 text-xs font-semibold text-gray-600">Path</th>
-                  <th className="text-left px-3 py-2.5 text-xs font-semibold text-gray-600">IP Address</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {isLoading ? (
-                  Array.from({ length: 8 }).map((_, i) => (
-                    <tr key={i}>
-                      <td colSpan={6} className="px-4 py-2.5">
-                        <Skeleton className="h-4 w-full" />
-                      </td>
-                    </tr>
-                  ))
-                ) : !data?.logs.length ? (
-                  <tr>
-                    <td colSpan={6} className="text-center py-10 text-gray-400 text-sm">
-                      No activity logged yet
-                    </td>
-                  </tr>
-                ) : (
-                  data.logs.map(log => (
-                    <tr key={log.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">
-                        {fmtDateTime(log.createdAt)}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <div className="flex items-center gap-1.5">
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">{log.userName || "—"}</div>
-                            <div className="text-xs text-gray-400">{log.userEmail}</div>
-                          </div>
-                          {log.userId && (
-                            <Link href={`/admin/users/${log.userId}`} className="text-teal-600 hover:text-teal-800">
-                              <ExternalLink className="w-3 h-3" />
-                            </Link>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <Badge className={`text-xs ${EVENT_TYPE_COLORS[log.eventType ?? ""] || "bg-gray-100 text-gray-700"}`}>
-                          {(log.eventType ?? "unknown").replace(/_/g, " ")}
-                        </Badge>
-                      </td>
-                      <td className="px-3 py-2.5 text-xs text-gray-700 max-w-[200px] truncate" title={log.description}>
-                        {log.description}
-                      </td>
-                      <td className="px-3 py-2.5 text-xs text-gray-500 font-mono max-w-[120px] truncate" title={log.path || ""}>
-                        {log.path || "—"}
-                      </td>
-                      <td className="px-3 py-2.5 text-xs text-gray-500 font-mono whitespace-nowrap">
-                        {log.ipAddress || "—"}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
-              <span className="text-xs text-gray-500">
-                Page {page} of {totalPages} ({data?.total ?? 0} total)
-              </span>
-              <div className="flex items-center gap-1">
-                <Button
-                  size="sm" variant="ghost" className="h-7 w-7 p-0"
-                  disabled={page <= 1}
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                <Button
-                  size="sm" variant="ghost" className="h-7 w-7 p-0"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage(p => p + 1)}
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <h3 className="text-base font-semibold text-slate-700">{title}</h3>
+      <p className="text-sm text-slate-400 mt-1 max-w-xs">{description}</p>
+      <Badge variant="outline" className="mt-3 text-xs border-slate-200 text-slate-500">Coming Soon</Badge>
     </div>
   );
 }
 
-// ─── Main Members Hub ─────────────────────────────────────────────────────────
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function MembersHub() {
-  const [mainTab, setMainTab] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    const tab = params.get("tab");
-    // Map legacy tab values to new structure
-    if (tab === "enrollments" || tab === "lms") return "lms";
-    return "apps";
-  });
+  const [activeNav, setActiveNav] = useState("overview");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  const [appsSubTab, setAppsSubTab] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    const tab = params.get("tab");
-    if (tab === "sales") return "sales";
-    if (tab === "memberships") return "memberships";
-    if (tab === "contacts") return "contacts";
-    if (tab === "activity") return "activity";
-    if (tab === "sharing-monitor") return "sharing-monitor";
-    return "members";
-  });
+  const pageTitle = NAV_ITEMS.find(n => n.id === activeNav)?.label ?? "Members";
 
-  const [lmsSubTab, setLmsSubTab] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    const tab = params.get("tab");
-    if (tab === "enrollments") return "enrollments";
-    return "enrollments";
-  });
-
-  const appsSubTabs = [
-    { value: "members",         label: "Users",           icon: Users },
-    { value: "sales",           label: "Transactions",    icon: DollarSign },
-    { value: "analytics",       label: "Product Analytics", icon: BarChart3 },
-    { value: "memberships",     label: "Memberships",     icon: Crown },
-    { value: "contacts",        label: "Contacts",        icon: Mail },
-    { value: "activity",        label: "Activity",        icon: Activity },
-    { value: "sharing-monitor", label: "Sharing Monitor", icon: Shield },
-  ];
-
-  const lmsSubTabs = [
-    { value: "enrollments",     label: "Enrollments",     icon: BookOpen },
-    { value: "activity",        label: "Activity",        icon: Activity },
-  ];
+  function renderContent() {
+    switch (activeNav) {
+      case "overview":          return <OverviewPanel />;
+      case "all-members":       return <AllMembersPanel />;
+      case "enrollments":       return <UserAnalytics />;
+      case "invitations":       return <PlaceholderPanel title="Invitations" description="Send and manage member invitations. Track invite status and acceptance rates." />;
+      case "import":            return <PlaceholderPanel title="Import Members" description="Bulk import members from CSV or connect your existing platform." />;
+      case "activity":          return <UserAnalytics />;
+      case "communications":    return <ContactsAdmin />;
+      case "certificates":      return <PlaceholderPanel title="Certificates" description="View and manage all issued certificates across courses." />;
+      case "sales":             return <AdminSalesDashboard />;
+      case "product-analytics": return <ProductAnalytics />;
+      case "memberships":       return <MembershipAdmin />;
+      case "contacts":          return <ContactsAdmin />;
+      case "sharing-monitor":   return <SharingMonitor />;
+      case "settings":          return <PlaceholderPanel title="Member Settings" description="Configure member registration, approval workflows, and access rules." />;
+      default:                  return <OverviewPanel />;
+    }
+  }
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <nav className="flex items-center gap-1.5 text-xs text-gray-400 mb-1">
-            <a href="/platform-admin" className="hover:text-teal-600 transition-colors">Platform Admin</a>
-            <span>/</span>
-            <span className="text-gray-600 font-medium">Members</span>
-          </nav>
-          <h2 className="text-xl font-bold text-gray-900">Member Management</h2>
-          <p className="text-sm text-gray-500">
-            Unified view of platform users, transactions, LMS enrollments, and activity
-          </p>
+    <div className="flex h-full min-h-0 bg-slate-50">
+      {/* Sidebar */}
+      <aside className={`flex-shrink-0 bg-white border-r border-slate-200 flex flex-col transition-all duration-200 ${sidebarCollapsed ? "w-14" : "w-56"}`}>
+        {/* Sidebar Header */}
+        <div className="flex items-center justify-between px-3 py-3 border-b border-slate-100">
+          {!sidebarCollapsed && (
+            <span className="text-sm font-semibold text-slate-700 truncate">Members</span>
+          )}
+          <button
+            onClick={() => setSidebarCollapsed(c => !c)}
+            className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors ml-auto"
+          >
+            {sidebarCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+          </button>
+        </div>
+
+        {/* Nav Items */}
+        <nav className="flex-1 overflow-y-auto py-2">
+          {NAV_ITEMS.map((item, idx) => {
+            const isActive = activeNav === item.id;
+            const showSection = !sidebarCollapsed && item.section && (idx === 0 || NAV_ITEMS[idx - 1].section !== item.section);
+            return (
+              <div key={item.id}>
+                {showSection && (
+                  <p className="px-3 pt-3 pb-1 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    {item.section}
+                  </p>
+                )}
+                <button
+                  onClick={() => setActiveNav(item.id)}
+                  title={sidebarCollapsed ? item.label : undefined}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors
+                    ${isActive
+                      ? "bg-teal-50 text-teal-700 font-medium border-r-2 border-teal-500"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-800"
+                    }
+                    ${sidebarCollapsed ? "justify-center" : ""}
+                  `}
+                >
+                  <span className="flex-shrink-0">{item.icon}</span>
+                  {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
+                </button>
+              </div>
+            );
+          })}
+        </nav>
+      </aside>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Top bar */}
+        <div className="flex-shrink-0 bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between">
+          <h1 className="text-base font-semibold text-slate-800">{pageTitle}</h1>
+          <div className="flex items-center gap-2">
+            {activeNav === "all-members" && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs gap-1.5 border-slate-200 h-8"
+                onClick={() => toast.info("Export feature coming soon")}
+              >
+                <Download size={13} /> Export
+              </Button>
+            )}
+            {activeNav === "overview" && (
+              <Link href="/admin/users">
+                <Button size="sm" className="text-xs gap-1.5 bg-teal-600 hover:bg-teal-700 h-8">
+                  <Users size={13} /> All Members
+                </Button>
+              </Link>
+            )}
+          </div>
+        </div>
+
+        {/* Content Area */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {renderContent()}
         </div>
       </div>
-
-      {/* Main Tabs: Apps | LMS */}
-      <Tabs value={mainTab} onValueChange={setMainTab}>
-        <TabsList className="bg-gray-100 h-10 gap-1 p-1">
-          <TabsTrigger value="apps" className="text-sm gap-2 h-8 px-4 font-semibold">
-            <MonitorSmartphone className="w-4 h-4" />
-            Apps
-          </TabsTrigger>
-          <TabsTrigger value="lms" className="text-sm gap-2 h-8 px-4 font-semibold">
-            <GraduationCap className="w-4 h-4" />
-            LMS
-          </TabsTrigger>
-        </TabsList>
-
-        {/* ═══ APPS TAB ═══ */}
-        <TabsContent value="apps" className="mt-4">
-          <Tabs value={appsSubTab} onValueChange={setAppsSubTab}>
-            <TabsList className="bg-gray-50 border border-gray-200 flex-wrap h-auto gap-1 p-1">
-              {appsSubTabs.map(t => (
-                <TabsTrigger key={t.value} value={t.value} className="text-xs gap-1.5 h-7">
-                  <t.icon className="w-3.5 h-3.5" />
-                  {t.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-
-            {/* Users — full UserAnalytics embedded */}
-            <TabsContent value="members" className="mt-4">
-              <div className="[&>div>div:first-child]:hidden">
-                <UserAnalytics />
-              </div>
-            </TabsContent>
-
-            {/* Transactions — AdminSalesDashboard */}
-            <TabsContent value="sales" className="mt-4">
-              <div className="[&_.max-w-7xl]:max-w-none [&_.max-w-7xl]:px-0 [&_.max-w-7xl]:py-0">
-                <AdminSalesDashboard />
-              </div>
-            </TabsContent>
-
-            {/* Product Analytics */}
-            <TabsContent value="analytics" className="mt-4">
-              <ProductAnalytics />
-            </TabsContent>
-
-            {/* Memberships */}
-            <TabsContent value="memberships" className="mt-4">
-              <MembershipAdmin />
-            </TabsContent>
-
-            {/* Contacts */}
-            <TabsContent value="contacts" className="mt-4">
-              <ContactsAdmin />
-            </TabsContent>
-
-            {/* Activity */}
-            <TabsContent value="activity" className="mt-4">
-              <GlobalActivityTab />
-            </TabsContent>
-
-            {/* Sharing Monitor */}
-            <TabsContent value="sharing-monitor" className="mt-4">
-              <div className="[&>div>div:first-child]:hidden">
-                <SharingMonitor />
-              </div>
-            </TabsContent>
-          </Tabs>
-        </TabsContent>
-
-        {/* ═══ LMS TAB ═══ */}
-        <TabsContent value="lms" className="mt-4">
-          <Tabs value={lmsSubTab} onValueChange={setLmsSubTab}>
-            <TabsList className="bg-gray-50 border border-gray-200 flex-wrap h-auto gap-1 p-1">
-              {lmsSubTabs.map(t => (
-                <TabsTrigger key={t.value} value={t.value} className="text-xs gap-1.5 h-7">
-                  <t.icon className="w-3.5 h-3.5" />
-                  {t.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-
-            {/* Enrollments */}
-            <TabsContent value="enrollments" className="mt-4">
-              <EnrollmentsTab />
-            </TabsContent>
-
-            {/* LMS Activity */}
-            <TabsContent value="activity" className="mt-4">
-              <GlobalActivityTab />
-            </TabsContent>
-          </Tabs>
-        </TabsContent>
-      </Tabs>
     </div>
   );
 }

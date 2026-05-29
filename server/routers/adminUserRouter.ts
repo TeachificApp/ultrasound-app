@@ -834,4 +834,162 @@ export const adminUserRouter = router({
         })),
       };
     }),
+
+  /** Member Management Overview: stats, growth chart, status breakdown, recent members, activity feed */
+  getMemberOverview: protectedProcedure.query(async ({ ctx }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    const toArr2 = (r: any) => Array.isArray(r) ? r : (r?.[0] ?? []);
+
+    const [totalRow] = await db.execute(sql`SELECT COUNT(*) as total FROM users`) as any;
+    const totalMembers = Number(toArr2(totalRow)[0]?.total ?? 0);
+
+    const [activeRow] = await db.execute(sql`SELECT COUNT(*) as total FROM users WHERE last_signed_in >= DATE_SUB(NOW(), INTERVAL 30 DAY)`) as any;
+    const activeMembers = Number(toArr2(activeRow)[0]?.total ?? 0);
+
+    const [newRow] = await db.execute(sql`SELECT COUNT(*) as total FROM users WHERE created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')`) as any;
+    const newThisMonth = Number(toArr2(newRow)[0]?.total ?? 0);
+
+    const [newLastRow] = await db.execute(sql`SELECT COUNT(*) as total FROM users WHERE created_at >= DATE_FORMAT(DATE_SUB(NOW(), INTERVAL 1 MONTH), '%Y-%m-01') AND created_at < DATE_FORMAT(NOW(), '%Y-%m-01')`) as any;
+    const newLastMonth = Number(toArr2(newLastRow)[0]?.total ?? 0);
+
+    const [completionRow] = await db.execute(sql`SELECT COUNT(*) as total FROM lms_enrollments WHERE completed_at IS NOT NULL`) as any;
+    const totalCompletions = Number(toArr2(completionRow)[0]?.total ?? 0);
+
+    const [growthRows] = await db.execute(sql`
+      SELECT DATE_FORMAT(created_at, '%Y-%m') as month, COUNT(*) as count
+      FROM users
+      WHERE created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+      GROUP BY month
+      ORDER BY month ASC
+    `) as any;
+    const memberGrowth = toArr2(growthRows).map((r: any) => ({ month: r.month, count: Number(r.count) }));
+
+    const [recentRows] = await db.execute(sql`
+      SELECT u.id, u.name, u.email, u.avatar_url, u.created_at, u.last_signed_in,
+        (SELECT COUNT(*) FROM lms_enrollments e WHERE e.user_id = u.id) as enrollment_count,
+        (SELECT COUNT(*) FROM lms_enrollments e WHERE e.user_id = u.id AND e.completed_at IS NOT NULL) as completion_count
+      FROM users u
+      ORDER BY u.created_at DESC
+      LIMIT 10
+    `) as any;
+    const recentMembers = toArr2(recentRows).map((r: any) => ({
+      id: Number(r.id),
+      name: r.name ?? r.email ?? 'Unknown',
+      email: r.email ?? '',
+      avatarUrl: r.avatar_url ?? null,
+      createdAt: r.created_at,
+      lastSignedIn: r.last_signed_in ?? null,
+      enrollmentCount: Number(r.enrollment_count ?? 0),
+      completionCount: Number(r.completion_count ?? 0),
+      progress: Number(r.enrollment_count ?? 0) > 0 ? Math.round((Number(r.completion_count ?? 0) / Number(r.enrollment_count)) * 100) : 0,
+    }));
+
+    const [activityRows] = await db.execute(sql`
+      SELECT 'enrollment' as type, u.name as user_name, u.avatar_url, c.title as subject, e.enrolled_at as occurred_at
+      FROM lms_enrollments e
+      JOIN users u ON u.id = e.user_id
+      JOIN lms_courses c ON c.id = e.course_id
+      UNION ALL
+      SELECT 'completion' as type, u.name as user_name, u.avatar_url, c.title as subject, e.completed_at as occurred_at
+      FROM lms_enrollments e
+      JOIN users u ON u.id = e.user_id
+      JOIN lms_courses c ON c.id = e.course_id
+      WHERE e.completed_at IS NOT NULL
+      UNION ALL
+      SELECT 'certificate' as type, u.name as user_name, u.avatar_url, c.title as subject, cert.issued_at as occurred_at
+      FROM lms_certificates cert
+      JOIN users u ON u.id = cert.user_id
+      JOIN lms_courses c ON c.id = cert.course_id
+      ORDER BY occurred_at DESC
+      LIMIT 15
+    `) as any;
+    const recentActivity = toArr2(activityRows).map((r: any) => ({
+      type: r.type as string,
+      userName: r.user_name ?? 'Unknown',
+      avatarUrl: r.avatar_url ?? null,
+      subject: r.subject ?? '',
+      occurredAt: r.occurred_at,
+    }));
+
+    return {
+      stats: {
+        totalMembers,
+        activeMembers,
+        newThisMonth,
+        newLastMonth,
+        totalCompletions,
+        engagementRate: totalMembers > 0 ? Math.round((activeMembers / totalMembers) * 100) : 0,
+      },
+      memberGrowth,
+      statusBreakdown: [
+        { status: 'Active', count: activeMembers },
+        { status: 'Inactive', count: Math.max(0, totalMembers - activeMembers) },
+      ],
+      recentMembers,
+      recentActivity,
+    };
+  }),
+
+  /** Search/list all members with filters and pagination */
+  listMembers: protectedProcedure
+    .input(z.object({
+      search: z.string().optional(),
+      status: z.enum(['all', 'active', 'inactive']).default('all'),
+      page: z.number().int().min(1).default(1),
+      pageSize: z.number().int().min(1).max(100).default(25),
+    }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      const toArr2 = (r: any) => Array.isArray(r) ? r : (r?.[0] ?? []);
+      const offset = (input.page - 1) * input.pageSize;
+
+      let statusFilter = sql`1=1`;
+      if (input.status === 'active') {
+        statusFilter = sql`u.last_signed_in >= DATE_SUB(NOW(), INTERVAL 30 DAY)`;
+      } else if (input.status === 'inactive') {
+        statusFilter = sql`(u.last_signed_in < DATE_SUB(NOW(), INTERVAL 30 DAY) OR u.last_signed_in IS NULL)`;
+      }
+
+      let searchFilter = sql`1=1`;
+      if (input.search) {
+        const s = `%${input.search}%`;
+        searchFilter = sql`(u.name LIKE ${s} OR u.email LIKE ${s})`;
+      }
+
+      const [rows] = await db.execute(sql`
+        SELECT u.id, u.name, u.email, u.avatar_url, u.created_at, u.last_signed_in, u.role,
+          (SELECT COUNT(*) FROM lms_enrollments e WHERE e.user_id = u.id) as enrollment_count,
+          (SELECT COUNT(*) FROM lms_enrollments e WHERE e.user_id = u.id AND e.completed_at IS NOT NULL) as completion_count
+        FROM users u
+        WHERE ${statusFilter} AND ${searchFilter}
+        ORDER BY u.created_at DESC
+        LIMIT ${input.pageSize} OFFSET ${offset}
+      `) as any;
+
+      const [countRow] = await db.execute(sql`
+        SELECT COUNT(*) as total FROM users u WHERE ${statusFilter} AND ${searchFilter}
+      `) as any;
+      const total = Number(toArr2(countRow)[0]?.total ?? 0);
+
+      return {
+        members: toArr2(rows).map((r: any) => ({
+          id: Number(r.id),
+          name: r.name ?? r.email ?? 'Unknown',
+          email: r.email ?? '',
+          avatarUrl: r.avatar_url ?? null,
+          createdAt: r.created_at,
+          lastSignedIn: r.last_signed_in ?? null,
+          role: r.role ?? 'user',
+          enrollmentCount: Number(r.enrollment_count ?? 0),
+          completionCount: Number(r.completion_count ?? 0),
+          progress: Number(r.enrollment_count ?? 0) > 0 ? Math.round((Number(r.completion_count ?? 0) / Number(r.enrollment_count)) * 100) : 0,
+        })),
+        total,
+        page: input.page,
+        pageSize: input.pageSize,
+        totalPages: Math.ceil(total / input.pageSize),
+      };
+    }),
 });

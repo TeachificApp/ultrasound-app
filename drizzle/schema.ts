@@ -4363,7 +4363,13 @@ export const webinars = mysqlTable("webinars", {
   meetingUrl: text("meeting_url"),
   replayUrl: text("replay_url"),
   replayEnabled: boolean("replay_enabled").default(true).notNull(),
-  accessType: mysqlEnum("access_type", ["free", "paid"]).default("free").notNull(),
+  accessType: mysqlEnum("access_type", ["free", "paid", "restricted"]).default("free").notNull(),
+  // Sort order for public community listing (lower = first)
+  sortOrder: int("sort_order").default(0).notNull(),
+  // Icon image URL (separate from coverImage — shown as community avatar/icon)
+  iconImage: text("icon_image"),
+  // JSON array of course/product IDs that grant automatic access to this community
+  linkedAccessItems: longtext("linked_access_items"),
   pricingOptions: longtext("pricing_options"),
   landingPageBlocks: longtext("landing_page_blocks"),
   hostName: varchar("host_name", { length: 200 }),
@@ -4516,6 +4522,10 @@ export const communityMembers = mysqlTable("community_members", {
   pricingOptionId: varchar("pricing_option_id", { length: 64 }),
   stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 128 }),
   approvedToPost: boolean("approved_to_post").default(true).notNull(),
+  // pending = awaiting admin approval (for restricted communities)
+  memberStatus: mysqlEnum("member_status", ["pending", "approved", "rejected"]).default("approved").notNull(),
+  // For admin-profile posts: which admin profile this member is linked to
+  adminProfileId: int("admin_profile_id"),
 });
 export type CommunityMember = typeof communityMembers.$inferSelect;
 
@@ -4536,6 +4546,8 @@ export const communityPosts = mysqlTable("community_posts", {
   channelId: int("channel_id").notNull(),
   communityId: int("community_id").notNull(),
   userId: int("user_id").notNull(),
+  // If posted as an admin profile, this overrides the display name/avatar
+  adminProfileId: int("admin_profile_id"),
   title: varchar("title", { length: 255 }),
   body: longtext("body").notNull(),
   attachments: longtext("attachments"),
@@ -4984,3 +4996,57 @@ export const mediaUploadResponses = mysqlTable("media_upload_responses", {
 });
 export type MediaUploadResponse = typeof mediaUploadResponses.$inferSelect;
 export type InsertMediaUploadResponse = typeof mediaUploadResponses.$inferInsert;
+
+// ─── Community Admin Profiles ──────────────────────────────────────────────────
+// Admins can create multiple posting profiles (e.g., "Support", "Admin", "Lara")
+// and choose which profile to post as in the community.
+export const communityAdminProfiles = mysqlTable("community_admin_profiles", {
+  id: int("id").autoincrement().primaryKey(),
+  communityId: int("community_id").notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  avatarUrl: text("avatar_url"),
+  bio: text("bio"),
+  createdByUserId: int("created_by_user_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type CommunityAdminProfile = typeof communityAdminProfiles.$inferSelect;
+export type InsertCommunityAdminProfile = typeof communityAdminProfiles.$inferInsert;
+
+// ─── LMS Cohort Groups ─────────────────────────────────────────────────────────
+// Multiple cohort groups under one parent cohort course (e.g., "June 2026", "January 2027")
+// Each group has its own page content, enrollment list, and sessions.
+export const lmsCohortGroups = mysqlTable("lms_cohort_groups", {
+  id: int("id").autoincrement().primaryKey(),
+  courseId: int("course_id").notNull(), // FK to lms_courses.id (type = 'cohort')
+  name: varchar("name", { length: 255 }).notNull(), // e.g. "June 2026 Cohort"
+  slug: varchar("slug", { length: 255 }).notNull(), // URL-safe identifier
+  description: text("description"),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  enrollmentCloseDate: timestamp("enrollment_close_date"),
+  maxStudents: int("max_students"), // null = unlimited
+  status: mysqlEnum("status", ["draft", "open", "active", "completed", "archived"]).default("draft").notNull(),
+  // Page builder blocks for this specific cohort group's overview page
+  pageBlocks: longtext("page_blocks"),
+  // Landing page link override — which cohort to feature on the course landing page
+  isFeaturedOnLanding: boolean("is_featured_on_landing").default(false).notNull(),
+  sortOrder: int("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type LmsCohortGroup = typeof lmsCohortGroups.$inferSelect;
+export type InsertLmsCohortGroup = typeof lmsCohortGroups.$inferInsert;
+
+// ─── LMS Cohort Group Enrollments ─────────────────────────────────────────────
+// Links a student enrollment to a specific cohort group within a course.
+export const lmsCohortGroupEnrollments = mysqlTable("lms_cohort_group_enrollments", {
+  id: int("id").autoincrement().primaryKey(),
+  cohortGroupId: int("cohort_group_id").notNull(),
+  enrollmentId: int("enrollment_id").notNull(), // FK to lms_enrollments.id
+  userId: int("user_id").notNull(),
+  courseId: int("course_id").notNull(),
+  joinedAt: timestamp("joined_at").defaultNow().notNull(),
+});
+export type LmsCohortGroupEnrollment = typeof lmsCohortGroupEnrollments.$inferSelect;
+export type InsertLmsCohortGroupEnrollment = typeof lmsCohortGroupEnrollments.$inferInsert;

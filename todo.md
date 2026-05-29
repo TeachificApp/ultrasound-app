@@ -3695,3 +3695,48 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Grant access: ability to grant course/download/product access to new or existing platform users
 - [x] Deep links: user profiles ↔ analytics ↔ transactions ↔ courses/products throughout
 - [x] Fix: ensure all Stripe transactions are recorded in the platform DB for analytics (webhook now updates pending→paid)
+
+## Member Management Hub Redesign (May 29, 2026)
+- [x] Rebuild MembersHub as LearnPro-style full-page dashboard with left sidebar nav
+- [ ] Sidebar sections: MEMBERS (Members, Groups, Enrollments, Invitations, Import), ENGAGEMENT (Activity, Communications, Certificates), SETTINGS (Settings, Custom Fields)
+- [ ] Overview dashboard: stat cards (Total Members, Active Members, New This Month, Engagement Rate, Completions)
+- [ ] Member Growth chart (line chart, last 6 months)
+- [ ] Members by Status donut chart (Active, Inactive, Pending, Suspended)
+- [ ] Recent Members table with avatar, name, email, group/membership, status, last active, progress bar
+- [ ] Quick Actions panel (Add New Member, Invite Members, Import Members, Create Group, Send Announcement)
+- [ ] Recent Activity feed (course completions, enrollments, certificates, new members)
+- [ ] Full Members list with search, filter by status/role, sort, pagination
+- [ ] Deep links from member rows to AdminUserDetailPage
+
+## Community Enhancements (May 29, 2026)
+- [ ] Community sort order: admin can drag-reorder communities; public UI respects this order
+- [ ] Community types: Free (open join), Paid (requires purchase), Restricted (free but requires admin approval)
+- [ ] Restricted communities: admin approval queue for pending join requests
+- [ ] Course/product-linked access: link one or multiple courses/cohorts/products to a community; enrolled users auto-get community access
+- [ ] Community icon upload: image upload field in community settings
+- [ ] Full-page rich text editor for editable regions in the community page
+- [ ] Admin links: "View Community" and "Post in Community" buttons in community admin
+- [ ] Multi-profile posting: admin can set up multiple community profiles (Support, Admin, Personal) and choose which profile to post as
+
+## Multi-Cohort System (May 29, 2026)
+- [ ] Multiple cohorts under one cohort course (e.g., June 2026, January 2027)
+- [ ] Each cohort has its own page, content, and student list
+- [ ] Admin can edit each cohort page independently
+- [ ] Admin sees students per cohort (not just overall course)
+- [ ] Single shared landing page/URL for the cohort course
+- [ ] Landing page can link to a specific cohort for details/smart options (cohort content block)
+- [ ] Cohort members only see their specific cohort page/content
+
+## Member Management Hub v2 (May 2026)
+- [x] Add getMemberOverview procedure to adminUserRouter (stats, growth chart, status breakdown, recent members, activity feed)
+- [x] Add listMembers procedure to adminUserRouter (search, status filter, pagination)
+- [x] Rewrite MembersHub.tsx with LearnPro-style left sidebar navigation
+- [x] Overview dashboard: stat cards (Total, Active, New This Month, Completions)
+- [x] Member growth line chart (6 months)
+- [x] Members-by-status donut chart
+- [x] Recent members table with progress bars and deep links
+- [x] Recent activity feed (enrollments, completions, certificates)
+- [x] Quick actions panel (View All, Import, Bulk Email, Refresh)
+- [x] All Members tab with search/filter/pagination
+- [x] Collapsible sidebar with tooltip labels
+- [x] All existing sub-components (Sales, Product Analytics, Memberships, Contacts, Sharing Monitor) accessible via sidebar nav
