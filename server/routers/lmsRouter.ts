@@ -1612,7 +1612,7 @@ export const lmsLearnerRouter = router({
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
       const [sessions, assignments, recordings, mySubmissions] = await Promise.all([
         db.select().from(lmsCohortSessions)
-          .where(and(eq(lmsCohortSessions.courseId, input.courseId), eq(lmsCohortSessions.status, "published")))
+          .where(eq(lmsCohortSessions.courseId, input.courseId))
           .orderBy(asc(lmsCohortSessions.sessionDate)),
         db.select().from(lmsCohortAssignments)
           .where(and(eq(lmsCohortAssignments.courseId, input.courseId), eq(lmsCohortAssignments.status, "published")))

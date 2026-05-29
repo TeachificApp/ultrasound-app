@@ -8154,7 +8154,15 @@ function CohortTab({ courseId }: { courseId: number }) {
         }
       });
     } else {
-      createSession.mutate({ courseId, ...payload, notifyStudents: sessionForm.notifyStudents }, { onSuccess: () => setSessionDialog({ open: false }) });
+      createSession.mutate({ courseId, ...payload, notifyStudents: sessionForm.notifyStudents }, {
+        onSuccess: (result) => {
+          setSessionDialog({ open: false });
+          // Auto-expand if this is a recurring session
+          if (payload.recurrenceRule && result?.id) {
+            expandRecurring.mutate({ parentSessionId: result.id });
+          }
+        }
+      });
     }
   };
 
@@ -8284,6 +8292,20 @@ function CohortTab({ courseId }: { courseId: number }) {
               <Button size="sm" variant="outline" onClick={downloadIcs} disabled={getIcs.isFetching} className="text-xs">
                 <Download className="w-3.5 h-3.5 mr-1" /> ICS
               </Button>
+              {(sessions as CohortSession[]).some(s => s.recurrenceRule && !s.parentSessionId) && (
+                <Button size="sm" variant="outline" className="text-xs text-purple-600 border-purple-200 hover:bg-purple-50"
+                  disabled={expandRecurring.isPending}
+                  onClick={async () => {
+                    const parents = (sessions as CohortSession[]).filter(s => s.recurrenceRule && !s.parentSessionId);
+                    for (const p of parents) {
+                      await expandRecurring.mutateAsync({ parentSessionId: p.id });
+                    }
+                    toast.success(`Expanded ${parents.length} recurring session(s)`);
+                  }}
+                >
+                  <Repeat className="w-3.5 h-3.5 mr-1" /> Expand All Recurring
+                </Button>
+              )}
               <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => openSessionDialog()}>
                 <Plus className="w-3.5 h-3.5 mr-1" /> Add Session
               </Button>
