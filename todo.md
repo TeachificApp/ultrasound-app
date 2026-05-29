@@ -3548,6 +3548,7 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Pricing cards block: CourseLanding renders pricing_cards with handleCtaBtnClick delegation (onEnroll support)
 - [x] CTA actions: pricing option linking available in CTA blocks
 
+<<<<<<< Updated upstream
 ## May 2026 Updates
 
 - [x] Pricing option drag-and-drop reordering in CoursePricingOptionsEditor (LMSAdmin)
@@ -3586,3 +3587,13 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Login page: password registration form (set password on first use)
 - [x] Login page: forgot password flow
 - [x] Reset password page (/reset-password?token=...)
+=======
+## Code Architecture (May 29, 2026)
+- [x] Split lmsRouter.ts (6011 lines) into focused sub-routers to fix TypeScript OOM
+  - [x] lmsHelpers.ts — shared imports + helper functions (244 lines)
+  - [x] lmsCourseBuilderRouter.ts — course/section/lesson CRUD (1050 lines)
+  - [x] lmsQuizLandingRouter.ts — quiz builder + landing pages (702 lines)
+  - [x] lmsEnrollmentAdminRouter.ts — enrollments, groups, analytics, orders (1774 lines)
+  - [x] lmsCohortAdminRouter.ts — cohort sessions, assignments, recordings (597 lines)
+  - [x] lmsRouter.ts — thin aggregator with merged lmsAdminRouter (2076 lines)
+>>>>>>> Stashed changes
