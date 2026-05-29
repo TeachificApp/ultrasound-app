@@ -352,14 +352,20 @@ function PageByPageRenderer({
     const hidden = new Set<number>();
     for (const rule of branchRules ?? []) {
       try {
-        const r = JSON.parse(rule.ruleJson ?? "{}");
-        const tv = responses[r.triggerItemId?.toString()];
-        const met = r.operator === "equals" ? tv === r.value
-          : r.operator === "not_equals" ? tv !== r.value
-          : r.operator === "contains" ? (Array.isArray(tv) ? tv.includes(r.value) : String(tv ?? "").includes(r.value))
-          : false;
-        if (!met && r.action === "show") hidden.add(r.targetItemId);
-        if (met && r.action === "hide") hidden.add(r.targetItemId);
+        const conditions: Array<{itemId: number; operator: string; value: string}> = JSON.parse(rule.conditions ?? "[]");
+        if (!conditions.length) continue;
+        const results = conditions.map((c: any) => {
+          const tv = responses[String(c.itemId)];
+          if (c.operator === "equals") return tv === c.value;
+          if (c.operator === "not_equals") return tv !== c.value;
+          if (c.operator === "contains") return Array.isArray(tv) ? tv.includes(c.value) : String(tv ?? "").includes(c.value);
+          if (c.operator === "is_empty") return !tv || (Array.isArray(tv) ? !tv.length : tv === "");
+          if (c.operator === "is_not_empty") return !!(tv && (Array.isArray(tv) ? tv.length : tv !== ""));
+          return false;
+        });
+        const met = rule.logicOperator === "all" ? results.every(Boolean) : results.some(Boolean);
+        if (!met && rule.action === "show") hidden.add(rule.targetId);
+        if (met && rule.action === "hide") hidden.add(rule.targetId);
       } catch {}
     }
     return hidden;
@@ -576,14 +582,20 @@ function ClassicRenderer({
     const hidden = new Set<number>();
     for (const rule of branchRules ?? []) {
       try {
-        const r = JSON.parse(rule.ruleJson ?? "{}");
-        const tv = responses[r.triggerItemId?.toString()];
-        const met = r.operator === "equals" ? tv === r.value
-          : r.operator === "not_equals" ? tv !== r.value
-          : r.operator === "contains" ? (Array.isArray(tv) ? tv.includes(r.value) : String(tv ?? "").includes(r.value))
-          : false;
-        if (!met && r.action === "show") hidden.add(r.targetItemId);
-        if (met && r.action === "hide") hidden.add(r.targetItemId);
+        const conditions: Array<{itemId: number; operator: string; value: string}> = JSON.parse(rule.conditions ?? "[]");
+        if (!conditions.length) continue;
+        const results = conditions.map((c: any) => {
+          const tv = responses[String(c.itemId)];
+          if (c.operator === "equals") return tv === c.value;
+          if (c.operator === "not_equals") return tv !== c.value;
+          if (c.operator === "contains") return Array.isArray(tv) ? tv.includes(c.value) : String(tv ?? "").includes(c.value);
+          if (c.operator === "is_empty") return !tv || (Array.isArray(tv) ? !tv.length : tv === "");
+          if (c.operator === "is_not_empty") return !!(tv && (Array.isArray(tv) ? tv.length : tv !== ""));
+          return false;
+        });
+        const met = rule.logicOperator === "all" ? results.every(Boolean) : results.some(Boolean);
+        if (!met && rule.action === "show") hidden.add(rule.targetId);
+        if (met && rule.action === "hide") hidden.add(rule.targetId);
       } catch {}
     }
     return hidden;

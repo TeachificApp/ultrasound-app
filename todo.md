@@ -3662,3 +3662,13 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
   - [ ] skip_to page in page-by-page mode
   - [ ] require field dynamically based on rules
   - [ ] set_value action (pre-fill answer)
+
+## Cohort & Community Backlog (May 29, 2026)
+- [x] Fix: recurring cohort session expansion only generates first day of week, not all selected days
+- [ ] Community: sort order control for public UI display (drag-to-reorder or sort field in admin)
+- [ ] Community: add membership types — Free (open join), Paid (Stripe-gated), Restricted (free but requires admin approval)
+- [ ] Community: link community access to course(s)/cohort(s)/product(s) — auto-grant membership when user is enrolled in linked content
+- [ ] Community: image upload for community icon (replace URL text field with file upload picker)
+- [ ] Community: full-page editor for editable regions on the community public page (header, bio, sidebar, branding)
+- [ ] Community: admin quick-links — "Go to Community" and "Post in Community" buttons in community admin panel
+- [ ] Community: admin community profiles — admin can create multiple posting identities (e.g. "Support", "Admin", "My Name") and choose which profile to post as

@@ -8142,7 +8142,17 @@ function CohortTab({ courseId }: { courseId: number }) {
         ? sessionForm.recurrenceOccurrenceCount : undefined,
     };
     if (sessionDialog.session) {
-      updateSession.mutate({ id: sessionDialog.session.id, ...payload }, { onSuccess: () => setSessionDialog({ open: false }) });
+      const parentId = sessionDialog.session.id;
+      const isParent = !sessionDialog.session.parentSessionId;
+      updateSession.mutate({ id: parentId, ...payload }, {
+        onSuccess: () => {
+          setSessionDialog({ open: false });
+          // Auto-expand if this is a parent recurring session
+          if (isParent && payload.recurrenceRule) {
+            expandRecurring.mutate({ parentSessionId: parentId });
+          }
+        }
+      });
     } else {
       createSession.mutate({ courseId, ...payload, notifyStudents: sessionForm.notifyStudents }, { onSuccess: () => setSessionDialog({ open: false }) });
     }

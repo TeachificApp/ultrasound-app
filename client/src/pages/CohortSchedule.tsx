@@ -146,7 +146,15 @@ function sameDay(a: Date, b: Date) {
 
 function CohortCalendar({ sessions, courseTitle }: { sessions: any[]; courseTitle: string }) {
   const [view, setView] = useState<CalView>("month");
-  const [cursor, setCursor] = useState(() => new Date());
+  const [cursor, setCursor] = useState(() => {
+    // Start at the month of the first upcoming session, or today if none
+    const now = new Date();
+    const upcoming = sessions
+      .map(s => new Date(s.sessionDate))
+      .filter(d => d >= now)
+      .sort((a, b) => a.getTime() - b.getTime());
+    return upcoming.length > 0 ? upcoming[0] : now;
+  });
   const today = new Date();
   const [now, setNow] = useState(() => Date.now());
 
@@ -535,15 +543,11 @@ export default function CohortSchedule() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap mb-1">
                 <Badge className="bg-teal-100 text-teal-700 border-teal-200 text-xs">Cohort</Badge>
-                {course.enrollmentCloseDate && (
-                  <Badge variant="outline" className="text-xs text-gray-500">
-                    Enrollment closed {fmtDate(course.enrollmentCloseDate)}
-                  </Badge>
-                )}
+
               </div>
               <h1 className="text-2xl font-bold text-gray-900 leading-tight">{course.title}</h1>
               {course.description && (
-                <p className="text-gray-500 text-sm mt-1 line-clamp-2">{course.description}</p>
+                <div className="text-gray-500 text-sm mt-1 line-clamp-2" dangerouslySetInnerHTML={{ __html: course.description }} />
               )}
             </div>
           </div>
@@ -572,26 +576,26 @@ export default function CohortSchedule() {
 
       <div className="max-w-5xl mx-auto px-4 py-6">
         <Tabs defaultValue="sessions">
-          <TabsList className="mb-6">
-            <TabsTrigger value="sessions" className="flex items-center gap-1.5">
+          <TabsList className="mb-6 flex-wrap h-auto gap-1 py-1">
+            <TabsTrigger value="sessions" className="flex items-center gap-1.5 text-xs sm:text-sm whitespace-nowrap">
               <Video className="w-4 h-4" />
               Live Sessions
               {upcomingSessions.length > 0 && (
                 <Badge className="ml-1 bg-teal-500 text-white text-xs px-1.5 py-0">{upcomingSessions.length}</Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="calendar" className="flex items-center gap-1.5">
+            <TabsTrigger value="calendar" className="flex items-center gap-1.5 text-xs sm:text-sm whitespace-nowrap">
               <CalendarDays className="w-4 h-4" />
               Calendar
             </TabsTrigger>
-            <TabsTrigger value="assignments" className="flex items-center gap-1.5">
+            <TabsTrigger value="assignments" className="flex items-center gap-1.5 text-xs sm:text-sm whitespace-nowrap">
               <FileText className="w-4 h-4" />
               Assignments
               {pendingAssignments.length > 0 && (
                 <Badge className="ml-1 bg-amber-500 text-white text-xs px-1.5 py-0">{pendingAssignments.length}</Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="replays" className="flex items-center gap-1.5">
+            <TabsTrigger value="replays" className="flex items-center gap-1.5 text-xs sm:text-sm whitespace-nowrap">
               <Film className="w-4 h-4" />
               Replays
               {(recordings ?? []).length > 0 && (

@@ -201,7 +201,10 @@ export default function AssignmentDetail() {
         {blocks.length === 0 && assignment.description && (
           <Card>
             <CardContent className="pt-5">
-              <p className="text-gray-700 whitespace-pre-wrap">{assignment.description}</p>
+              <div
+                className="prose prose-sm max-w-none text-gray-700"
+                dangerouslySetInnerHTML={{ __html: assignment.description }}
+              />
             </CardContent>
           </Card>
         )}

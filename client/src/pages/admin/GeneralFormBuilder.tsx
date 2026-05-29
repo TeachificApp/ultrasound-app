@@ -126,7 +126,7 @@ const DEFAULT_THEME = {
   layoutMode: "condensed" as "condensed" | "fullpage",
   stickyHeader: false,
   // Background
-  bgType: "color" as "color" | "gradient" | "image",
+  bgType: "color" as "color" | "gradient" | "image" | "transparent",
   bgGradientFrom: "#e0f7fa",
   bgGradientTo: "#ffffff",
   bgGradientAngle: 135,
@@ -748,6 +748,27 @@ function ItemEditDialog({ item, onSave, onClose, scoreEnabled }: {
   );
 }
 
+// ─── ColorField helper (module-level to prevent focus loss on re-render) ────────
+function ColorField({ label, field, theme, set }: { label: string; field: string; theme: any; set: (k: string, v: any) => void }) {
+  return (
+    <div className="flex items-center gap-3">
+      <input
+        type="color"
+        value={theme[field] as string}
+        onChange={e => set(field, e.target.value)}
+        className="w-9 h-9 rounded border border-gray-200 cursor-pointer p-0.5"
+      />
+      <div className="flex-1">
+        <Label className="text-xs">{label}</Label>
+        <Input
+          value={theme[field] as string}
+          onChange={e => set(field, e.target.value)}
+          className="mt-0.5 h-7 text-xs font-mono"
+        />
+      </div>
+    </div>
+  );
+}
 // ─── Style / Branding Tab ─────────────────────────────────────────────────────
 function StyleTab({ formId, template }: { formId: number; template: any }) {
   const [theme, setTheme] = useState<typeof DEFAULT_THEME>(() => {
@@ -786,25 +807,6 @@ function StyleTab({ formId, template }: { formId: number; template: any }) {
     setSaving(true);
     updateTheme.mutate({ id: formId, themeSettings: JSON.stringify(theme) });
   };
-
-  const ColorField = ({ label, field }: { label: string; field: keyof typeof DEFAULT_THEME }) => (
-    <div className="flex items-center gap-3">
-      <input
-        type="color"
-        value={theme[field] as string}
-        onChange={e => set(field, e.target.value)}
-        className="w-9 h-9 rounded border border-gray-200 cursor-pointer p-0.5"
-      />
-      <div className="flex-1">
-        <Label className="text-xs">{label}</Label>
-        <Input
-          value={theme[field] as string}
-          onChange={e => set(field, e.target.value)}
-          className="mt-0.5 h-7 text-xs font-mono"
-        />
-      </div>
-    </div>
-  );
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -851,7 +853,7 @@ function StyleTab({ formId, template }: { formId: number; template: any }) {
             <div>
               <Label className="text-xs mb-1 block">Background Type</Label>
               <div className="flex gap-2">
-                {(["color", "gradient", "image"] as const).map(t => (
+                {(["color", "gradient", "image", "transparent"] as const).map(t => (
                   <button key={t} type="button"
                     onClick={() => set("bgType", t)}
                     className={`flex-1 py-1.5 px-2 text-xs rounded border font-medium transition-all capitalize ${
@@ -859,18 +861,21 @@ function StyleTab({ formId, template }: { formId: number; template: any }) {
                         ? "border-teal-600 bg-teal-50 text-teal-700"
                         : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
                     }`}>
-                    {t === "color" ? "🎨 Color" : t === "gradient" ? "🌈 Gradient" : "🖼 Image"}
+                    {t === "color" ? "🎨 Color" : t === "gradient" ? "🌈 Gradient" : t === "image" ? "🖼 Image" : "✨ None"}
                   </button>
                 ))}
               </div>
             </div>
             {theme.bgType === "color" && (
-              <ColorField label="Background Color" field="backgroundColor" />
+              <ColorField label="Background Color" field="backgroundColor" theme={theme} set={set} />
+            )}
+            {theme.bgType === "transparent" && (
+              <p className="text-xs text-gray-400">The page background will be transparent — useful for embeds on colored pages.</p>
             )}
             {theme.bgType === "gradient" && (
               <>
-                <ColorField label="Gradient From" field="bgGradientFrom" />
-                <ColorField label="Gradient To" field="bgGradientTo" />
+                <ColorField label="Gradient From" field="bgGradientFrom" theme={theme} set={set} />
+                <ColorField label="Gradient To" field="bgGradientTo" theme={theme} set={set} />
                 <div>
                   <Label className="text-xs">Gradient Angle (°)</Label>
                   <Input type="number" min={0} max={360} value={theme.bgGradientAngle}
@@ -917,7 +922,7 @@ function StyleTab({ formId, template }: { formId: number; template: any }) {
                 ))}
               </div>
             </div>
-            <ColorField label="Form Card Background" field="formBackground" />
+            <ColorField label="Form Card Background" field="formBackground" theme={theme} set={set} />
             <div>
               <Label className="text-xs">Card Background Opacity ({theme.cardBgOpacity}%)</Label>
               <input type="range" min={10} max={100} value={theme.cardBgOpacity}
@@ -931,9 +936,9 @@ function StyleTab({ formId, template }: { formId: number; template: any }) {
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm">Interactive Elements</CardTitle></CardHeader>
           <CardContent className="space-y-3">
-            <ColorField label="Dropdown Highlight Color" field="dropdownAccentColor" />
+            <ColorField label="Dropdown Highlight Color" field="dropdownAccentColor" theme={theme} set={set} />
             <p className="text-xs text-gray-400">Controls the highlight color of selected dropdown options (the blue row).</p>
-            <ColorField label="Primary / Accent Color" field="primaryColor" />
+            <ColorField label="Primary / Accent Color" field="primaryColor" theme={theme} set={set} />
             <p className="text-xs text-gray-400">Used for radio/checkbox focus rings, submit button, and field borders on focus.</p>
           </CardContent>
         </Card>
@@ -941,16 +946,16 @@ function StyleTab({ formId, template }: { formId: number; template: any }) {
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm">Colors</CardTitle></CardHeader>
           <CardContent className="space-y-3">
-            <ColorField label="Page Background" field="backgroundColor" />
-            <ColorField label="Form Card Background" field="formBackground" />
-            <ColorField label="Primary / Accent Color" field="primaryColor" />
-            <ColorField label="Body Text Color" field="textColor" />
-            <ColorField label="Label Color" field="labelColor" />
-            <ColorField label="Border Color" field="borderColor" />
-            <ColorField label="Button Color" field="buttonColor" />
-            <ColorField label="Button Text Color" field="buttonTextColor" />
-            <ColorField label="Header Background" field="headerBackground" />
-            <ColorField label="Header Text Color" field="headerTextColor" />
+            <ColorField label="Page Background" field="backgroundColor" theme={theme} set={set} />
+            <ColorField label="Form Card Background" field="formBackground" theme={theme} set={set} />
+            <ColorField label="Primary / Accent Color" field="primaryColor" theme={theme} set={set} />
+            <ColorField label="Body Text Color" field="textColor" theme={theme} set={set} />
+            <ColorField label="Label Color" field="labelColor" theme={theme} set={set} />
+            <ColorField label="Border Color" field="borderColor" theme={theme} set={set} />
+            <ColorField label="Button Color" field="buttonColor" theme={theme} set={set} />
+            <ColorField label="Button Text Color" field="buttonTextColor" theme={theme} set={set} />
+            <ColorField label="Header Background" field="headerBackground" theme={theme} set={set} />
+            <ColorField label="Header Text Color" field="headerTextColor" theme={theme} set={set} />
           </CardContent>
         </Card>
 

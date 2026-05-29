@@ -10,12 +10,16 @@
   - Live preview panel with org filter simulation
 */
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -58,6 +62,8 @@ import {
   GripVertical,
   Mail,
   FileCode,
+  Palette,
+  CheckCircle2,
 } from "lucide-react";
 import { Link } from "wouter";
 import FormPreview from "@/components/FormPreview";
@@ -163,6 +169,375 @@ const FORM_TYPES = [
 ];
 
 const BRAND = "#0891b2";
+
+// ─── Theme defaults ───────────────────────────────────────────────────────────
+const DEFAULT_DIY_THEME = {
+  backgroundColor: "#ffffff",
+  formBackground: "#f9fafb",
+  primaryColor: "#0891b2",
+  textColor: "#111827",
+  labelColor: "#374151",
+  borderColor: "#d1d5db",
+  borderRadius: "8",
+  fontFamily: "Inter, sans-serif",
+  fontSize: "15",
+  buttonColor: "#0891b2",
+  buttonTextColor: "#ffffff",
+  headerBackground: "#0891b2",
+  headerTextColor: "#ffffff",
+  showLogo: false,
+  logoUrl: "",
+  headerTitle: "",
+  headerSubtitle: "",
+  layoutMode: "condensed" as "condensed" | "fullpage",
+  stickyHeader: false,
+  bgType: "color" as "color" | "gradient" | "image" | "transparent",
+  bgGradientFrom: "#e0f7fa",
+  bgGradientTo: "#ffffff",
+  bgGradientAngle: 135,
+  bgImageUrl: "",
+  bgOpacity: 100,
+  cardShadow: "md" as "none" | "sm" | "md" | "lg",
+  cardBgOpacity: 100,
+  dropdownAccentColor: "#1d6fa4",
+};
+
+// ─── ColorField (module-level to prevent focus loss) ──────────────────────────
+function DIYColorField({ label, field, theme, set }: { label: string; field: string; theme: any; set: (k: string, v: any) => void }) {
+  return (
+    <div className="flex items-center gap-3">
+      <input
+        type="color"
+        value={theme[field] as string}
+        onChange={e => set(field, e.target.value)}
+        className="w-9 h-9 rounded border border-gray-200 cursor-pointer p-0.5"
+      />
+      <div className="flex-1">
+        <Label className="text-xs">{label}</Label>
+        <Input
+          value={theme[field] as string}
+          onChange={e => set(field, e.target.value)}
+          className="mt-0.5 h-7 text-xs font-mono"
+        />
+      </div>
+    </div>
+  );
+}
+
+// ─── DIY Style / Branding Tab ─────────────────────────────────────────────────
+function DIYStyleTab({ templateId, template }: { templateId: number; template: any }) {
+  const [theme, setTheme] = useState<typeof DEFAULT_DIY_THEME>(() => {
+    try { return { ...DEFAULT_DIY_THEME, ...JSON.parse(template.themeSettings ?? "{}") }; }
+    catch { return DEFAULT_DIY_THEME; }
+  });
+  const [saving, setSaving] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const logoFileRef = useRef<HTMLInputElement>(null);
+
+  const updateThemeMutation = trpc.formBuilder.updateTheme.useMutation({
+    onSuccess: () => { setSaving(false); toast.success("Theme saved"); },
+    onError: (e) => { setSaving(false); toast.error(e.message); },
+  });
+  const uploadPageMedia = trpc.auth.uploadPageMedia.useMutation();
+
+  const set = (key: string, val: any) => setTheme(t => ({ ...t, [key]: val }));
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { toast.error("Logo must be under 10 MB"); return; }
+    setLogoUploading(true);
+    try {
+      const reader = new FileReader();
+      const dataUri = await new Promise<string>((resolve) => { reader.onload = () => resolve(reader.result as string); reader.readAsDataURL(file); });
+      const result = await uploadPageMedia.mutateAsync({ dataUri, mimeType: file.type, fileName: file.name, context: "form_logo" });
+      set("logoUrl", result.url);
+      toast.success("Logo uploaded");
+    } catch (err: any) { toast.error(err.message || "Upload failed"); }
+    setLogoUploading(false);
+    if (logoFileRef.current) logoFileRef.current.value = "";
+  };
+
+  const save = () => {
+    setSaving(true);
+    updateThemeMutation.mutate({ templateId, themeSettings: JSON.stringify(theme) });
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Controls */}
+      <div className="space-y-5">
+        {/* Layout */}
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Layout Mode</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <Label className="text-xs mb-1 block">Form Layout</Label>
+              <div className="flex gap-2">
+                {(["condensed", "fullpage"] as const).map(mode => (
+                  <button key={mode} type="button"
+                    onClick={() => set("layoutMode", mode)}
+                    className={`flex-1 py-1.5 px-2 text-xs rounded border font-medium transition-all capitalize ${
+                      theme.layoutMode === mode
+                        ? "border-teal-600 bg-teal-50 text-teal-700"
+                        : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                    }`}>
+                    {mode === "condensed" ? "Condensed" : "Full Page"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Sticky Header</Label>
+              <Switch checked={theme.stickyHeader} onCheckedChange={v => set("stickyHeader", v)} />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Background */}
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Page Background</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <Label className="text-xs mb-1 block">Background Type</Label>
+              <div className="flex gap-2 flex-wrap">
+                {(["color", "gradient", "image", "transparent"] as const).map(t => (
+                  <button key={t} type="button"
+                    onClick={() => set("bgType", t)}
+                    className={`flex-1 py-1.5 px-2 text-xs rounded border font-medium transition-all capitalize ${
+                      theme.bgType === t
+                        ? "border-teal-600 bg-teal-50 text-teal-700"
+                        : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                    }`}>
+                    {t === "color" ? "Color" : t === "gradient" ? "Gradient" : t === "image" ? "Image" : "None"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {theme.bgType === "color" && (
+              <DIYColorField label="Background Color" field="backgroundColor" theme={theme} set={set} />
+            )}
+            {theme.bgType === "transparent" && (
+              <p className="text-xs text-gray-400">The page background will be transparent — useful for embeds on colored pages.</p>
+            )}
+            {theme.bgType === "gradient" && (
+              <>
+                <DIYColorField label="Gradient From" field="bgGradientFrom" theme={theme} set={set} />
+                <DIYColorField label="Gradient To" field="bgGradientTo" theme={theme} set={set} />
+                <div>
+                  <Label className="text-xs">Gradient Angle (°)</Label>
+                  <Input type="number" min={0} max={360} value={theme.bgGradientAngle}
+                    onChange={e => set("bgGradientAngle", parseInt(e.target.value) || 0)}
+                    className="mt-1 h-8 text-sm w-24" />
+                </div>
+              </>
+            )}
+            {theme.bgType === "image" && (
+              <>
+                <div>
+                  <Label className="text-xs">Background Image URL</Label>
+                  <Input value={theme.bgImageUrl} onChange={e => set("bgImageUrl", e.target.value)}
+                    placeholder="https://…/background.jpg" className="mt-1 h-8 text-sm" />
+                </div>
+                <div>
+                  <Label className="text-xs">Image Opacity ({theme.bgOpacity}%)</Label>
+                  <input type="range" min={10} max={100} value={theme.bgOpacity}
+                    onChange={e => set("bgOpacity", parseInt(e.target.value))}
+                    className="w-full mt-1 accent-teal-600" />
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Form Card */}
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Form Card</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <Label className="text-xs mb-1 block">Card Shadow</Label>
+              <div className="flex gap-2">
+                {(["none", "sm", "md", "lg"] as const).map(s => (
+                  <button key={s} type="button"
+                    onClick={() => set("cardShadow", s)}
+                    className={`flex-1 py-1.5 px-2 text-xs rounded border font-medium transition-all ${
+                      theme.cardShadow === s
+                        ? "border-teal-600 bg-teal-50 text-teal-700"
+                        : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                    }`}>
+                    {s === "none" ? "None" : s === "sm" ? "Soft" : s === "md" ? "Medium" : "Strong"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <DIYColorField label="Form Card Background" field="formBackground" theme={theme} set={set} />
+            <div>
+              <Label className="text-xs">Card Background Opacity ({theme.cardBgOpacity}%)</Label>
+              <input type="range" min={10} max={100} value={theme.cardBgOpacity}
+                onChange={e => set("cardBgOpacity", parseInt(e.target.value))}
+                className="w-full mt-1 accent-teal-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Colors */}
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Colors</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <DIYColorField label="Primary / Accent Color" field="primaryColor" theme={theme} set={set} />
+            <DIYColorField label="Body Text Color" field="textColor" theme={theme} set={set} />
+            <DIYColorField label="Label Color" field="labelColor" theme={theme} set={set} />
+            <DIYColorField label="Border Color" field="borderColor" theme={theme} set={set} />
+            <DIYColorField label="Button Color" field="buttonColor" theme={theme} set={set} />
+            <DIYColorField label="Button Text Color" field="buttonTextColor" theme={theme} set={set} />
+            <DIYColorField label="Header Background" field="headerBackground" theme={theme} set={set} />
+            <DIYColorField label="Header Text Color" field="headerTextColor" theme={theme} set={set} />
+          </CardContent>
+        </Card>
+
+        {/* Typography */}
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Typography</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <Label className="text-xs">Font Family</Label>
+              <Select value={theme.fontFamily} onValueChange={v => set("fontFamily", v)}>
+                <SelectTrigger className="mt-1 h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Inter, sans-serif">Inter (Default)</SelectItem>
+                  <SelectItem value="'Merriweather', serif">Merriweather (Serif)</SelectItem>
+                  <SelectItem value="'Roboto', sans-serif">Roboto</SelectItem>
+                  <SelectItem value="'Open Sans', sans-serif">Open Sans</SelectItem>
+                  <SelectItem value="'Lato', sans-serif">Lato</SelectItem>
+                  <SelectItem value="'Poppins', sans-serif">Poppins</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Base Font Size (px)</Label>
+              <Input type="number" min={12} max={24} value={theme.fontSize} onChange={e => set("fontSize", e.target.value)} className="mt-1 h-8 text-sm w-24" />
+            </div>
+            <div>
+              <Label className="text-xs">Border Radius (px)</Label>
+              <Input type="number" min={0} max={24} value={theme.borderRadius} onChange={e => set("borderRadius", e.target.value)} className="mt-1 h-8 text-sm w-24" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Header / Branding */}
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Header / Branding</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <Label className="text-xs">Header Title</Label>
+              <Input value={theme.headerTitle} onChange={e => set("headerTitle", e.target.value)} placeholder="Your form title in the header" className="mt-1 h-8 text-sm" />
+            </div>
+            <div>
+              <Label className="text-xs">Header Subtitle</Label>
+              <Input value={theme.headerSubtitle} onChange={e => set("headerSubtitle", e.target.value)} placeholder="Optional subtitle or tagline" className="mt-1 h-8 text-sm" />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Show Logo</Label>
+              <Switch checked={theme.showLogo} onCheckedChange={v => set("showLogo", v)} />
+            </div>
+            {theme.showLogo && (
+              <div>
+                <Label className="text-xs">Logo URL</Label>
+                <div className="flex gap-2 mt-1">
+                  <Input value={theme.logoUrl} onChange={e => set("logoUrl", e.target.value)} placeholder="https://…/logo.png" className="h-8 text-sm" />
+                  <Button type="button" variant="outline" size="sm" onClick={() => logoFileRef.current?.click()} disabled={logoUploading}>
+                    {logoUploading ? <RefreshCw className="w-3 h-3 animate-spin" /> : "Upload"}
+                  </Button>
+                  <input ref={logoFileRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+                </div>
+                {theme.logoUrl && <img src={theme.logoUrl} alt="Logo preview" className="mt-2 h-10 object-contain rounded border border-gray-100" />}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="flex justify-end">
+          <Button onClick={save} disabled={saving} className="text-white gap-2" style={{ background: BRAND }}>
+            {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+            Save Theme
+          </Button>
+        </div>
+      </div>
+
+      {/* Live Preview */}
+      <div className="sticky top-4">
+        <div className="rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+          <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 flex items-center gap-2">
+            <Eye className="w-3.5 h-3.5 text-gray-400" />
+            <span className="text-xs text-gray-500 font-medium">Live Preview</span>
+          </div>
+          <div
+            className="min-h-[400px] p-6"
+            style={{
+              background: theme.bgType === "transparent" ? "transparent"
+                : theme.bgType === "gradient" ? `linear-gradient(${theme.bgGradientAngle}deg, ${theme.bgGradientFrom}, ${theme.bgGradientTo})`
+                : theme.bgType === "image" ? `url(${theme.bgImageUrl}) center/cover no-repeat`
+                : theme.backgroundColor,
+              fontFamily: theme.fontFamily,
+              fontSize: `${theme.fontSize}px`,
+              color: theme.textColor,
+            }}
+          >
+            {theme.showLogo && theme.logoUrl && (
+              <div className="mb-4 flex justify-center">
+                <img src={theme.logoUrl} alt="Logo" className="h-12 object-contain" />
+              </div>
+            )}
+            {(theme.headerTitle || theme.headerSubtitle) && (
+              <div className="mb-4 p-3 rounded-lg text-center" style={{ background: theme.headerBackground, color: theme.headerTextColor }}>
+                {theme.headerTitle && <div className="font-bold text-sm">{theme.headerTitle}</div>}
+                {theme.headerSubtitle && <div className="text-xs opacity-80 mt-0.5">{theme.headerSubtitle}</div>}
+              </div>
+            )}
+            <div
+              className={`rounded-lg p-4 ${
+                theme.cardShadow === "none" ? "" : theme.cardShadow === "sm" ? "shadow-sm" : theme.cardShadow === "md" ? "shadow-md" : "shadow-lg"
+              }`}
+              style={{
+                background: theme.formBackground,
+                borderRadius: `${theme.borderRadius}px`,
+                opacity: theme.cardBgOpacity / 100,
+              }}
+            >
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: theme.labelColor }}>Sample Question</label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 text-sm rounded border"
+                    style={{ borderColor: theme.borderColor, borderRadius: `${theme.borderRadius}px`, color: theme.textColor, background: "white" }}
+                    placeholder="Your answer here"
+                    readOnly
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: theme.labelColor }}>Multiple Choice</label>
+                  {["Option A", "Option B"].map(opt => (
+                    <label key={opt} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input type="radio" name="preview-diy" readOnly style={{ accentColor: theme.primaryColor }} />
+                      <span style={{ color: theme.textColor }}>{opt}</span>
+                    </label>
+                  ))}
+                </div>
+                <button
+                  className="w-full py-2 text-sm font-medium rounded"
+                  style={{ background: theme.buttonColor, color: theme.buttonTextColor, borderRadius: `${theme.borderRadius}px` }}
+                >
+                  Submit
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── Assignments Panel ────────────────────────────────────────────────────────
 function AssignmentsPanel({ templates }: { templates: Array<{ id: number; name: string; formType: string; isActive: boolean }> }) {
@@ -1198,7 +1573,7 @@ function FormResultsTab({ templateId }: { templateId: number }) {
 
 function FormEditor({ templateId }: { templateId: number }) {
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<"editor" | "branching" | "org-visibility" | "preview" | "settings" | "results">("editor");
+  const [activeTab, setActiveTab] = useState<"editor" | "branching" | "org-visibility" | "style" | "preview" | "settings" | "results">("editor");
   const [urlImportOpen, setUrlImportOpen] = useState(false);
   const [urlImportValue, setUrlImportValue] = useState("");
   const [editingItem, setEditingItem] = useState<FormItem | null>(null);
@@ -1363,6 +1738,7 @@ function FormEditor({ templateId }: { templateId: number }) {
           { id: "editor" as const, label: "Form Editor", icon: Edit3, badge: null },
           { id: "branching" as const, label: "Branching Logic", icon: GitBranch, badge: branchRulesCount > 0 ? branchRulesCount : null },
           { id: "org-visibility" as const, label: "Org Visibility", icon: Building2, badge: orgVisRulesCount > 0 ? orgVisRulesCount : null },
+          { id: "style" as const, label: "Style", icon: Palette, badge: null },
           { id: "preview" as const, label: "Preview", icon: Eye, badge: null },
           { id: "settings" as const, label: "Settings", icon: Save, badge: null },
           { id: "results" as const, label: "Results", icon: BarChart2, badge: null },
@@ -1532,6 +1908,10 @@ function FormEditor({ templateId }: { templateId: number }) {
         </Card>
       )}
 
+      {/* Style Tab */}
+      {activeTab === "style" && (
+        <DIYStyleTab templateId={templateId} template={template} />
+      )}
       {/* Preview Tab */}
       {activeTab === "preview" && (
         <FormPreview
@@ -1725,3 +2105,4 @@ export default function FormBuilderAdmin() {
     </Layout>
   );
 }
+

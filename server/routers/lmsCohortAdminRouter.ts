@@ -462,8 +462,8 @@ export const lmsCohortAdminRouter = router({
             parentSessionId: parent.id,
           });
         }
-      } else if (allowedDays.length > 1) {
-        // Weekly/biweekly with multiple days selected:
+      } else if (allowedDays.length >= 1) {
+        // Weekly/biweekly with one or more days selected:
         // For each week cycle, emit one instance per selected day (sorted), preserving the
         // parent's time-of-day. Start from the Monday of the parent's week.
         const parentDay = parentDate.getDay(); // 0=Sun
@@ -516,7 +516,7 @@ export const lmsCohortAdminRouter = router({
           if (weekOffset > 520) break; // hard cap: 10 years of weekly
         }
       } else {
-        // Weekly/biweekly with single day (or no day specified — same day as parent)
+        // Weekly/biweekly with no day specified — same day as parent
         let current = new Date(parentDate);
         while (occurrenceNum < maxCount) {
           current = new Date(current.getTime() + weekIntervalDays * 24 * 60 * 60 * 1000);
