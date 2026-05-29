@@ -592,7 +592,6 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
     </div>
   );
 }
-}
 
 // ─── Grant Download Access Dialog ──────────────────────────────────────────
 function GrantDownloadAccessDialog({ open, productId, onClose }: { open: boolean; productId: number; onClose: () => void }) {
