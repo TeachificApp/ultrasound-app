@@ -518,6 +518,10 @@ function MembersRouter() {
       {/* Redirect all /admin/* routes to app subdomain */}
       <Route path="/admin/:rest*">{(params: { rest?: string }) => { window.location.replace(`${LEARN_APP_URL}/admin/${params.rest ?? ""}`); return null; }}</Route>
       <Route path="/platform-admin">{() => { window.location.replace(`${LEARN_APP_URL}/platform-admin`); return null; }}</Route>
+      {/* ── Public Form Renderer — outside MembersLayout (full-screen, no nav) ── */}
+      <Route path="/forms/:slug" component={PublicFormRenderer} />
+      <Route path="/forms/:slug/embed">{() => <PublicFormRenderer isEmbed />}</Route>
+      <Route path="/forms/:slug/preview">{() => <PublicFormRenderer isPreview />}</Route>
       {/* ── Members-only routes (user profile / dashboard hub) ─────────── */}
       <Route>
         <MembersLayout>
@@ -533,10 +537,6 @@ function MembersRouter() {
               <Route path="/auth/magic" component={MagicLinkCallback} />
               <Route path="/auth/access" component={AccessLinkCallback} />
               <Route path="/register" component={Register} />
-              {/* ── Public Form Renderer ─────────────────────────────────────────── */}
-              <Route path="/forms/:slug" component={PublicFormRenderer} />
-              <Route path="/forms/:slug/embed" component={PublicFormRenderer} />
-              <Route path="/forms/:slug/preview">{() => <PublicFormRenderer isPreview />}</Route>
               {/* Default: redirect to dashboard */}
               <Route>{() => { window.location.replace("/my-dashboard"); return null; }}</Route>
             </Switch>
@@ -577,6 +577,10 @@ function LMSRouter() {
       <Route path="/downloads/:slug" component={DownloadLanding} />
       <Route path="/product/:slug" component={ProductLanding} />
       <Route path="/bundles/:slug" component={BundleLanding} />
+      {/* ── Public Form Renderer — outside LMSLayout (full-screen, no nav) ── */}
+      <Route path="/forms/:slug" component={PublicFormRenderer} />
+      <Route path="/forms/:slug/embed">{() => <PublicFormRenderer isEmbed />}</Route>
+      <Route path="/forms/:slug/preview">{() => <PublicFormRenderer isPreview />}</Route>
       {/* All other LMS routes — wrapped in LMSLayout */}
       <Route>
         <LMSLayout>
@@ -630,10 +634,6 @@ function LMSRouter() {
         <Route path="/my-dashboard" component={StudentDashboardPage} />
         <Route path="/media/:slug/:action" component={MediaRedirect} />
         <Route path="/media/:slug" component={MediaRedirect} />
-            {/* ── Public Form Renderer ─────────────────────────────────────────── */}
-            <Route path="/forms/:slug" component={PublicFormRenderer} />
-            <Route path="/forms/:slug/embed" component={PublicFormRenderer} />
-            <Route path="/forms/:slug/preview">{() => <PublicFormRenderer isPreview />}</Route>
             {/* Funnel pages — catch-all MUST be last so all specific routes above match first */}
             <Route path="/:slug"><FunnelRootRedirect /></Route>
             <Route path="/:slug/:pageSlug">

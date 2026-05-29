@@ -1123,21 +1123,33 @@ function ShareTab({ formId, template, onRefetch }: { formId: number; template: a
 
   return (
     <div className="max-w-2xl space-y-6">
-      {/* Visibility toggle */}
-      <Card>
-        <CardContent className="pt-4 pb-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {template.isPublic ? <Globe className="w-5 h-5 text-green-500" /> : <Lock className="w-5 h-5 text-gray-400" />}
+      {/* Visibility */}
+      <Card className={template.isPublic ? "border-green-200 bg-green-50" : "border-amber-200 bg-amber-50"}>
+        <CardContent className="pt-5 pb-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              {template.isPublic
+                ? <Globe className="w-6 h-6 text-green-600 mt-0.5 shrink-0" />
+                : <Lock className="w-6 h-6 text-amber-500 mt-0.5 shrink-0" />}
               <div>
-                <p className="font-semibold text-gray-800">{template.isPublic ? "Form is Public" : "Form is Private"}</p>
-                <p className="text-xs text-gray-500">{template.isPublic ? "Anyone with the link can access this form" : "Only admins can view this form"}</p>
+                <p className="font-semibold text-gray-900 text-base">
+                  {template.isPublic ? "Form is Published & Public" : "Form is Private (Draft)"}
+                </p>
+                <p className="text-sm text-gray-600 mt-0.5">
+                  {template.isPublic
+                    ? "Anyone with the link can view and submit this form."
+                    : "Only admins can see this form. Click \"Publish Form\" to make it accessible to the public."}
+                </p>
               </div>
             </div>
-            <Switch
-              checked={template.isPublic}
-              onCheckedChange={v => updateForm.mutate({ id: formId, isPublic: v })}
-            />
+            <Button
+              size="sm"
+              className={`shrink-0 gap-2 ${template.isPublic ? "bg-gray-600 hover:bg-gray-700 text-white" : "bg-green-600 hover:bg-green-700 text-white"}`}
+              onClick={() => updateForm.mutate({ id: formId, isPublic: !template.isPublic })}
+              disabled={updateForm.isPending}
+            >
+              {template.isPublic ? <><Lock className="w-3.5 h-3.5" /> Make Private</> : <><Globe className="w-3.5 h-3.5" /> Publish Form</>}
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -1859,9 +1871,9 @@ function FormEditorShell({ formId, onBack }: { formId: number; onBack: () => voi
           variant="outline"
           size="sm"
           className="gap-1"
-          onClick={() => template.publicSlug && window.open(getPublicUrl(template.publicSlug, template.hostDomain), "_blank")}
-          disabled={!template.publicSlug || !template.isPublic}
-          title={!template.isPublic ? "Form must be published to preview" : "Preview form"}
+          onClick={() => template.publicSlug && window.open(`${getPublicUrl(template.publicSlug, template.hostDomain)}/preview`, "_blank")}
+          disabled={!template.publicSlug}
+          title="Admin preview (always accessible regardless of public status)"
         >
           <Eye className="w-3.5 h-3.5" /> Preview
         </Button>

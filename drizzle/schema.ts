@@ -4157,7 +4157,7 @@ export const generalFormBranchRules = mysqlTable("generalFormBranchRules", {
   logicOperator: varchar("logicOperator", { length: 10 }).notNull().default("any"),
   conditions: longtext("conditions").notNull(),
   sortOrder: int("sortOrder").notNull().default(0),
-  isEnabled: tinyint("isEnabled").notNull().default(1),
+  isEnabled: boolean("isEnabled").notNull().default(true),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type GeneralFormBranchRule = typeof generalFormBranchRules.$inferSelect;
