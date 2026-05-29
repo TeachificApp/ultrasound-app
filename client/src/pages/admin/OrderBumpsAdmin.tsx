@@ -63,10 +63,10 @@ type OrderBump = {
 
 const TYPE_ICONS: Record<string, React.ReactNode> = {
   course: <BookOpen size={14} className="text-teal-600" />,
-  quiz: <BookOpen size={14} className="text-purple-600" />,
+  quiz: <BookOpen size={14} className="text-teal-600" />,
   cohort: <BookOpen size={14} className="text-orange-500" />,
   download: <Download size={14} className="text-blue-600" />,
-  bundle: <Layers size={14} className="text-purple-600" />,
+  bundle: <Layers size={14} className="text-teal-600" />,
   physical: <Package size={14} className="text-amber-600" />,
 };
 
@@ -342,7 +342,7 @@ export default function OrderBumpsAdmin() {
                     <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${bump.timing === "before_checkout" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>
                       {bump.timing === "before_checkout" ? "Before Checkout" : "After Checkout"}
                     </span>
-                    {bump.presentationMode === "landing_page" && <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700 flex items-center gap-1"><LayoutTemplate size={9} /> Landing Page</span>}
+                    {bump.presentationMode === "landing_page" && <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-teal-100 text-teal-700 flex items-center gap-1"><LayoutTemplate size={9} /> Landing Page</span>}
                     {!bump.isActive && <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-gray-200 text-gray-600">Inactive</span>}
                   </div>
                   <div className="flex items-center gap-2 text-sm">
@@ -510,7 +510,7 @@ function OrderBumpEditor({ bump, onClose, onSaved }: {
           </button>
           <button
             onClick={() => setForm(f => ({ ...f, presentationMode: "landing_page" }))}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border-2 text-sm font-medium transition-all ${form.presentationMode === "landing_page" ? "border-purple-600 bg-purple-50 text-purple-700" : "border-gray-200 text-gray-600 hover:border-gray-300"}`}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border-2 text-sm font-medium transition-all ${form.presentationMode === "landing_page" ? "border-teal-600 bg-teal-50 text-teal-700" : "border-gray-200 text-gray-600 hover:border-gray-300"}`}
           >
             <LayoutTemplate size={16} /> Landing Page (full page)
           </button>

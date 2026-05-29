@@ -67,7 +67,7 @@ function StatusBadge({ status }: { status: string }) {
     canceled:   { label: "Cancelled",  color: "bg-red-100 text-red-700 border-red-200" },
     expired:    { label: "Expired",    color: "bg-gray-100 text-gray-500 border-gray-200" },
     pending:    { label: "Pending",    color: "bg-amber-100 text-amber-700 border-amber-200" },
-    refunded:   { label: "Refunded",   color: "bg-purple-100 text-purple-700 border-purple-200" },
+    refunded:   { label: "Refunded",   color: "bg-teal-100 text-teal-700 border-teal-200" },
     trialing:   { label: "Trial",      color: "bg-blue-100 text-blue-700 border-blue-200" },
     past_due:   { label: "Past Due",   color: "bg-red-100 text-red-700 border-red-200" },
     free:       { label: "Free",       color: "bg-gray-100 text-gray-600 border-gray-200" },
@@ -633,7 +633,7 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
                           <span className="font-semibold text-gray-800 capitalize">{m.tier} Membership</span>
                           <StatusBadge status={m.status} />
                           {m.source === "admin" && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200">Admin granted</span>
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 border border-teal-200">Admin granted</span>
                           )}
                         </div>
                         <div className="text-xs text-gray-500 space-y-0.5">

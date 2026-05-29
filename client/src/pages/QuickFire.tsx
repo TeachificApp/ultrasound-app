@@ -92,7 +92,7 @@ const DIFFICULTY_OPTIONS = ["beginner", "intermediate", "advanced"] as const;
 
 const TYPE_LABELS: Record<string, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
   scenario: { label: "Scenario", color: "bg-blue-100 text-blue-700", icon: ({ className }) => <span className={className}>📋</span> },
-  image: { label: "Image", color: "bg-purple-100 text-purple-700", icon: ({ className }) => <span className={className}>🖼️</span> },
+  image: { label: "Image", color: "bg-teal-100 text-teal-700", icon: ({ className }) => <span className={className}>🖼️</span> },
   quickReview: { label: "Quick Review", color: "bg-amber-100 text-amber-700", icon: ({ className }) => <span className={className}>⚡</span> },
   connect: { label: "Connect", color: "bg-teal-100 text-teal-700", icon: ({ className }) => <span className={className}>🔗</span> },
   identifier: { label: "Identifier", color: "bg-indigo-100 text-indigo-700", icon: ({ className }) => <span className={className}>🎯</span> },
@@ -111,7 +111,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   "Arterial": "bg-red-100 text-red-700",
   "Vascular": "bg-sky-100 text-sky-700",
   "OB 2nd/3rd Trimester": "bg-pink-100 text-pink-700",
-  "Fetal Echo": "bg-purple-100 text-purple-700",
+  "Fetal Echo": "bg-teal-100 text-teal-700",
   "POCUS": "bg-amber-100 text-amber-700",
   "Pelvic/Gyn": "bg-rose-100 text-rose-700",
   "OB 1st Trimester": "bg-pink-100 text-pink-700",

@@ -1203,16 +1203,16 @@ export default function CoursePlayer() {
 
       {/* Admin Preview Banner */}
       {(isPreviewMode || adminPreviewStudent) && (
-        <div className="bg-purple-700 text-white text-center py-2 px-4 text-sm font-medium flex items-center justify-center gap-2 shrink-0 z-50">
+        <div className="bg-teal-700 text-white text-center py-2 px-4 text-sm font-medium flex items-center justify-center gap-2 shrink-0 z-50">
           <Eye className="w-4 h-4" />
           <span>Student Preview — viewing as a student</span>
           {isAdmin && !isPreviewMode && (
-            <button onClick={() => setAdminPreviewStudent(false)} className="ml-4 px-2 py-0.5 bg-purple-800 hover:bg-purple-900 rounded text-xs">
+            <button onClick={() => setAdminPreviewStudent(false)} className="ml-4 px-2 py-0.5 bg-teal-800 hover:bg-teal-900 rounded text-xs">
               Exit Preview
             </button>
           )}
           {isPreviewMode && (
-            <button onClick={() => window.close()} className="ml-4 px-2 py-0.5 bg-purple-800 hover:bg-purple-900 rounded text-xs">
+            <button onClick={() => window.close()} className="ml-4 px-2 py-0.5 bg-teal-800 hover:bg-teal-900 rounded text-xs">
               Close
             </button>
           )}

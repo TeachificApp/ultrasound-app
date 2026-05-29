@@ -167,7 +167,7 @@ export default function SonoQuizHost() {
   const quizMeta = quizSnapshot?.quiz ?? null;
   const joinUrl = sessionRow ? `${window.location.origin}/quiz/${sessionRow.joinCode}` : "";
   const totalAnswers = answerCounts.reduce((a, b) => a + b, 0);
-  const themeColor = quizMeta?.theme === "purple" ? "#7c3aed"
+  const themeColor = quizMeta?.theme === "teal" ? "#7c3aed"
     : quizMeta?.theme === "orange" ? "#ea580c"
     : quizMeta?.theme === "blue" ? "#2563eb"
     : quizMeta?.theme === "green" ? "#16a34a"

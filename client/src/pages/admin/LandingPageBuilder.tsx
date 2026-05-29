@@ -981,12 +981,12 @@ function CTAActionPicker({
         <div className={`space-y-2 rounded p-2 border ${
           behavior === "direct_checkout" ? "bg-teal-50 border-teal-200" :
           behavior === "free_preview" ? "bg-blue-50 border-blue-200" :
-          "bg-purple-50 border-purple-200"
+          "bg-teal-50 border-teal-200"
         }`}>
           <p className={`text-[10px] font-medium ${
             behavior === "direct_checkout" ? "text-teal-700" :
             behavior === "free_preview" ? "text-blue-700" :
-            "text-purple-700"
+            "text-teal-700"
           }`}>
             {behavior === "direct_checkout" && "Opens Stripe Checkout. After payment, user is sent to /my-dashboard."}
             {behavior === "free_preview" && "Opens Stripe Checkout with a 100% discount (free preview). Product must support free enrollment."}
@@ -1006,33 +1006,33 @@ function CTAActionPicker({
             </select>
           </div>
           {behavior === "group_purchase" && (
-            <div className="border-t border-purple-200 pt-2 mt-1 space-y-2">
+            <div className="border-t border-teal-200 pt-2 mt-1 space-y-2">
               <div className="flex items-center justify-between">
-                <p className="text-[10px] font-semibold text-purple-700">Volume Discount Tiers</p>
+                <p className="text-[10px] font-semibold text-teal-700">Volume Discount Tiers</p>
                 <button
                   type="button"
                   onClick={() => onGroupDiscountTiersChange?.([...(groupDiscountTiersValue ?? []), { minSeats: 5, discountPercent: 10 }])}
-                  className="text-[10px] text-purple-600 hover:text-purple-800 flex items-center gap-0.5"
+                  className="text-[10px] text-teal-600 hover:text-teal-800 flex items-center gap-0.5"
                 ><Plus size={10} /> Add Tier</button>
               </div>
               {(groupDiscountTiersValue ?? []).length === 0 && (
-                <p className="text-[10px] text-purple-400 italic">No discount tiers. Buyer pays full price regardless of seat count.</p>
+                <p className="text-[10px] text-teal-400 italic">No discount tiers. Buyer pays full price regardless of seat count.</p>
               )}
               {(groupDiscountTiersValue ?? []).map((tier, i) => (
                 <div key={i} className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-purple-600 whitespace-nowrap">If seats ≥</span>
+                  <span className="text-[10px] text-teal-600 whitespace-nowrap">If seats ≥</span>
                   <input
                     type="number" min={1} max={999} value={tier.minSeats}
                     onChange={e => { const next = [...(groupDiscountTiersValue ?? [])]; next[i] = { ...next[i], minSeats: Number(e.target.value) }; onGroupDiscountTiersChange?.(next); }}
-                    className="w-14 h-6 text-xs rounded border border-purple-200 px-1 text-center"
+                    className="w-14 h-6 text-xs rounded border border-teal-200 px-1 text-center"
                   />
-                  <span className="text-[10px] text-purple-600 whitespace-nowrap">then discount</span>
+                  <span className="text-[10px] text-teal-600 whitespace-nowrap">then discount</span>
                   <input
                     type="number" min={1} max={100} value={tier.discountPercent}
                     onChange={e => { const next = [...(groupDiscountTiersValue ?? [])]; next[i] = { ...next[i], discountPercent: Number(e.target.value) }; onGroupDiscountTiersChange?.(next); }}
-                    className="w-14 h-6 text-xs rounded border border-purple-200 px-1 text-center"
+                    className="w-14 h-6 text-xs rounded border border-teal-200 px-1 text-center"
                   />
-                  <span className="text-[10px] text-purple-600">% per seat</span>
+                  <span className="text-[10px] text-teal-600">% per seat</span>
                   <button
                     type="button"
                     onClick={() => onGroupDiscountTiersChange?.((groupDiscountTiersValue ?? []).filter((_, j) => j !== i))}

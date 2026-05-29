@@ -567,8 +567,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                           <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider px-2 mb-1">Platform Admin</div>
                           <WouterLink href="/platform-admin">
                             <button onClick={() => setAccountOpen(false)}
-                              className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-all text-left">
-                              <Shield className="w-3.5 h-3.5 text-purple-500" />
+                              className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs text-gray-700 hover:bg-teal-50 hover:text-teal-600 transition-all text-left">
+                              <Shield className="w-3.5 h-3.5 text-teal-500" />
                               <span className="flex-1">Platform Management</span>
                               <PendingBadge />
                             </button>

@@ -123,7 +123,7 @@ const ROLE_META: Record<AppRole, { label: string; color: string; icon: React.Ele
   },
   platform_admin: {
     label: "Platform Admin",
-    color: "bg-purple-100 text-purple-700",
+    color: "bg-teal-100 text-teal-700",
     icon: Shield,
     description: "Full platform management access",
   },
@@ -778,7 +778,7 @@ function DemoModePanel() {
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-semibold text-gray-800 flex items-center gap-2">
-            <FlaskConical className="w-4 h-4 text-purple-600" />
+            <FlaskConical className="w-4 h-4 text-teal-600" />
             Demo Mode
           </CardTitle>
           <Button variant="outline" size="sm" onClick={() => refetch()} className="flex items-center gap-1 text-xs">
@@ -786,13 +786,13 @@ function DemoModePanel() {
           </Button>
         </div>
         <p className="text-xs text-gray-500 mt-1">
-          Enter the DIY Accreditation experience as a demo user. A purple banner will appear — click <strong>Exit Demo</strong> to return to your admin account.
+          Enter the DIY Accreditation experience as a demo user. A teal banner will appear — click <strong>Exit Demo</strong> to return to your admin account.
         </p>
       </CardHeader>
       <CardContent className="pt-0">
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <RefreshCw className="w-5 h-5 animate-spin text-purple-500" />
+            <RefreshCw className="w-5 h-5 animate-spin text-teal-500" />
           </div>
         ) : !demoUsers || demoUsers.length === 0 ? (
           <div className="text-center py-8 text-gray-400 text-sm">
@@ -812,7 +812,7 @@ function DemoModePanel() {
                       key={u.id}
                       onClick={() => startDemo.mutate({ targetUserId: u.id })}
                       disabled={startDemo.isPending}
-                      className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 bg-white hover:border-purple-200 hover:bg-purple-50/50 transition-all text-left group disabled:opacity-60"
+                      className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 bg-white hover:border-teal-200 hover:bg-teal-50/50 transition-all text-left group disabled:opacity-60"
                     >
                       <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold text-white" style={{ background: 'linear-gradient(135deg, #7c3aed, #6d28d9)' }}>
                         {(u.displayName ?? '?').charAt(0).toUpperCase()}
@@ -820,11 +820,11 @@ function DemoModePanel() {
                       <div className="min-w-0 flex-1">
                         <div className="text-xs font-semibold text-gray-800 truncate">{u.displayName}</div>
                         {u.credentials && <div className="text-[10px] text-gray-400 truncate">{u.credentials}</div>}
-                        <div className="text-[10px] text-purple-500 font-medium mt-0.5 capitalize">
+                        <div className="text-[10px] text-teal-500 font-medium mt-0.5 capitalize">
                           {u.memberRole === 'admin' ? 'Lab Admin' : u.memberRole ?? 'Member'}
                         </div>
                       </div>
-                      <ChevronRight className="w-3.5 h-3.5 text-gray-300 group-hover:text-purple-400 flex-shrink-0" />
+                      <ChevronRight className="w-3.5 h-3.5 text-gray-300 group-hover:text-teal-400 flex-shrink-0" />
                     </button>
                   ))}
                 </div>

@@ -194,7 +194,7 @@ export default function CommunityProfile() {
                   <p className="text-xs text-gray-500 mt-1">Day Streak 🔥</p>
                 </div>
                 <div className="text-center p-3 bg-gray-50 rounded-xl">
-                  <p className="text-2xl font-bold text-purple-600">{profile.xp?.level ?? 1}</p>
+                  <p className="text-2xl font-bold text-teal-600">{profile.xp?.level ?? 1}</p>
                   <p className="text-xs text-gray-500 mt-1">Level</p>
                 </div>
               </div>

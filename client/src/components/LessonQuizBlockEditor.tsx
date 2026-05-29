@@ -602,7 +602,7 @@ export default function LessonQuizBlockEditor({ data, onChange, handleFileUpload
         ) : (
           <Badge variant="outline" className="text-xs text-gray-500 border-gray-300">No pass required</Badge>
         )}
-        {data.shuffleQuestions && <Badge variant="outline" className="text-xs text-purple-600 border-purple-300">Shuffled</Badge>}
+        {data.shuffleQuestions && <Badge variant="outline" className="text-xs text-teal-600 border-teal-300">Shuffled</Badge>}
         {data.shuffleAnswers && <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">Answers shuffled</Badge>}
       </div>
     </div>

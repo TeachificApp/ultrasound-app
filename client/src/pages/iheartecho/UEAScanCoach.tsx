@@ -1101,15 +1101,15 @@ function UEAScanCoachInner() {
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mb-4" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
             <div className="flex items-start gap-3 mb-3">
               <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "#fdf4ff" }}>
-                <Activity className="w-4 h-4 text-purple-600" />
+                <Activity className="w-4 h-4 text-teal-600" />
               </div>
               <div>
                 <h3 className="text-sm font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>PLSVC Evaluation Protocol</h3>
                 <p className="text-xs text-gray-500">Persistent Left Superior Vena Cava — bubble study from left arm</p>
               </div>
             </div>
-            <div className="p-3 rounded-lg bg-purple-50 border border-purple-200 mb-3">
-              <p className="text-xs text-purple-800 leading-relaxed">
+            <div className="p-3 rounded-lg bg-teal-50 border border-teal-200 mb-3">
+              <p className="text-xs text-teal-800 leading-relaxed">
                 <strong>Key concept:</strong> In PLSVC, the left SVC drains into the right atrium via a dilated coronary sinus. Injecting agitated saline from the LEFT arm opacifies the coronary sinus BEFORE the RA/RV — this is pathognomonic for PLSVC.
               </p>
             </div>
@@ -1482,38 +1482,38 @@ function UEAScanCoachInner() {
                 </div>
                 <div>
                   <h3 className="text-white font-black text-base" style={{ fontFamily: "Merriweather, serif" }}>Optison (Perflutren Protein-Type A Microspheres)</h3>
-                  <p className="text-purple-200 text-xs">GE HealthCare · FDA approved 1997 · Oldest commercially available UEA</p>
+                  <p className="text-teal-200 text-xs">GE HealthCare · FDA approved 1997 · Oldest commercially available UEA</p>
                 </div>
               </div>
               <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-2">Chemical Makeup</p>
                   <div className="space-y-1.5 text-xs text-gray-700">
-                    <div className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-purple-500 flex-shrink-0 mt-1.5" /><span><strong>Shell:</strong> Human albumin (5%) — protein shell, NOT a phospholipid</span></div>
-                    <div className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-purple-500 flex-shrink-0 mt-1.5" /><span><strong>Gas core:</strong> Octafluoropropane (C₃F₈) — same gas as Definity</span></div>
-                    <div className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-purple-500 flex-shrink-0 mt-1.5" /><span><strong>Microsphere size:</strong> Mean diameter 3.0–4.5 μm (larger than Definity/Lumason)</span></div>
-                    <div className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-purple-500 flex-shrink-0 mt-1.5" /><span><strong>Concentration:</strong> 5–8 × 10⁸ microspheres/mL</span></div>
-                    <div className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-purple-500 flex-shrink-0 mt-1.5" /><span><strong>Key difference:</strong> Albumin shell — CONTRAINDICATED in patients with known albumin or blood product hypersensitivity</span></div>
+                    <div className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-teal-500 flex-shrink-0 mt-1.5" /><span><strong>Shell:</strong> Human albumin (5%) — protein shell, NOT a phospholipid</span></div>
+                    <div className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-teal-500 flex-shrink-0 mt-1.5" /><span><strong>Gas core:</strong> Octafluoropropane (C₃F₈) — same gas as Definity</span></div>
+                    <div className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-teal-500 flex-shrink-0 mt-1.5" /><span><strong>Microsphere size:</strong> Mean diameter 3.0–4.5 μm (larger than Definity/Lumason)</span></div>
+                    <div className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-teal-500 flex-shrink-0 mt-1.5" /><span><strong>Concentration:</strong> 5–8 × 10⁸ microspheres/mL</span></div>
+                    <div className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-teal-500 flex-shrink-0 mt-1.5" /><span><strong>Key difference:</strong> Albumin shell — CONTRAINDICATED in patients with known albumin or blood product hypersensitivity</span></div>
                   </div>
                 </div>
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-2">Preparation</p>
                   <div className="space-y-1.5 text-xs text-gray-700">
-                    <div className="flex items-start gap-2"><div className="w-5 h-5 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-[10px] font-black flex-shrink-0">1</div><span>Store at 2–8°C; do not freeze; protect from light</span></div>
-                    <div className="flex items-start gap-2"><div className="w-5 h-5 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-[10px] font-black flex-shrink-0">2</div><span>Allow to reach room temperature before use (5–10 min)</span></div>
-                    <div className="flex items-start gap-2"><div className="w-5 h-5 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-[10px] font-black flex-shrink-0">3</div><span>Gently roll vial between palms to resuspend — do NOT shake</span></div>
-                    <div className="flex items-start gap-2"><div className="w-5 h-5 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-[10px] font-black flex-shrink-0">4</div><span>Inspect: white to off-white suspension — discard if particulate matter or discoloration present</span></div>
-                    <div className="flex items-start gap-2"><div className="w-5 h-5 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-[10px] font-black flex-shrink-0">5</div><span>Use within 30 minutes of opening; discard unused portion</span></div>
+                    <div className="flex items-start gap-2"><div className="w-5 h-5 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center text-[10px] font-black flex-shrink-0">1</div><span>Store at 2–8°C; do not freeze; protect from light</span></div>
+                    <div className="flex items-start gap-2"><div className="w-5 h-5 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center text-[10px] font-black flex-shrink-0">2</div><span>Allow to reach room temperature before use (5–10 min)</span></div>
+                    <div className="flex items-start gap-2"><div className="w-5 h-5 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center text-[10px] font-black flex-shrink-0">3</div><span>Gently roll vial between palms to resuspend — do NOT shake</span></div>
+                    <div className="flex items-start gap-2"><div className="w-5 h-5 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center text-[10px] font-black flex-shrink-0">4</div><span>Inspect: white to off-white suspension — discard if particulate matter or discoloration present</span></div>
+                    <div className="flex items-start gap-2"><div className="w-5 h-5 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center text-[10px] font-black flex-shrink-0">5</div><span>Use within 30 minutes of opening; discard unused portion</span></div>
                   </div>
                 </div>
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-2">Dosing — LVO (Bolus)</p>
                   <div className="space-y-1.5 text-xs text-gray-700">
-                    <div className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-purple-500 flex-shrink-0 mt-1.5" /><span><strong>Standard dose:</strong> 0.5 mL IV bolus (range 0.5–5.0 mL)</span></div>
-                    <div className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-purple-500 flex-shrink-0 mt-1.5" /><span><strong>Flush:</strong> 10 mL normal saline immediately after bolus</span></div>
-                    <div className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-purple-500 flex-shrink-0 mt-1.5" /><span><strong>Repeat dosing:</strong> May repeat up to 2 additional boluses (max 5 mL total per injection)</span></div>
-                    <div className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-purple-500 flex-shrink-0 mt-1.5" /><span><strong>Infusion option:</strong> Not typically used as continuous infusion — bolus preferred</span></div>
-                    <div className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-purple-500 flex-shrink-0 mt-1.5" /><span><strong>Note:</strong> Larger microsphere size may cause more attenuation artifact at higher doses</span></div>
+                    <div className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-teal-500 flex-shrink-0 mt-1.5" /><span><strong>Standard dose:</strong> 0.5 mL IV bolus (range 0.5–5.0 mL)</span></div>
+                    <div className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-teal-500 flex-shrink-0 mt-1.5" /><span><strong>Flush:</strong> 10 mL normal saline immediately after bolus</span></div>
+                    <div className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-teal-500 flex-shrink-0 mt-1.5" /><span><strong>Repeat dosing:</strong> May repeat up to 2 additional boluses (max 5 mL total per injection)</span></div>
+                    <div className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-teal-500 flex-shrink-0 mt-1.5" /><span><strong>Infusion option:</strong> Not typically used as continuous infusion — bolus preferred</span></div>
+                    <div className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-teal-500 flex-shrink-0 mt-1.5" /><span><strong>Note:</strong> Larger microsphere size may cause more attenuation artifact at higher doses</span></div>
                   </div>
                 </div>
                 <div>
@@ -1525,10 +1525,10 @@ function UEAScanCoachInner() {
                       { mode: "Myocardial perfusion", mi: "0.05–0.08", note: "Very low MI essential — Optison microspheres are more fragile at higher MI" },
                       { mode: "General note", mi: "Keep MI ≤ 0.2", note: "Optison is more sensitive to mechanical destruction than Definity or Lumason" },
                     ].map(({ mode, mi, note }) => (
-                      <div key={mode} className="p-2.5 rounded-lg bg-purple-50 border border-purple-100">
+                      <div key={mode} className="p-2.5 rounded-lg bg-teal-50 border border-teal-100">
                         <div className="flex items-center justify-between mb-0.5">
                           <span className="text-xs font-semibold text-gray-700">{mode}</span>
-                          <span className="text-xs font-black text-purple-600">MI {mi}</span>
+                          <span className="text-xs font-black text-teal-600">MI {mi}</span>
                         </div>
                         <p className="text-[10px] text-gray-500">{note}</p>
                       </div>
@@ -1557,7 +1557,7 @@ function UEAScanCoachInner() {
                       <th className="px-4 py-3 text-left font-bold text-gray-500 bg-gray-50">Feature</th>
                       <th className="px-4 py-3 text-left font-bold text-teal-600">Definity®</th>
                       <th className="px-4 py-3 text-left font-bold text-blue-600">Lumason®</th>
-                      <th className="px-4 py-3 text-left font-bold text-purple-600">Optison</th>
+                      <th className="px-4 py-3 text-left font-bold text-teal-600">Optison</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">

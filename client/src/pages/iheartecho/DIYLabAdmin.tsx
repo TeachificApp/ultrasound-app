@@ -224,7 +224,7 @@ export default function DIYLabAdmin() {
                   {sub?.status ?? "Unknown"}
                 </span>
                 {sub?.hasConcierge && (
-                  <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-400/20 text-purple-200">
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-teal-400/20 text-teal-200">
                     <Star className="w-3 h-3" /> Concierge
                   </span>
                 )}

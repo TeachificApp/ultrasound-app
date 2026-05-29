@@ -88,7 +88,7 @@ function ProductList({ onEdit }: { onEdit: (id: number) => void }) {
                     <span className="font-medium truncate">{p.title}</span>
                     <StatusBadge status={p.status} />
                     {p.checkoutMode !== "native" && (
-                      <Badge variant="outline" className="text-xs text-purple-600 border-purple-300">
+                      <Badge variant="outline" className="text-xs text-teal-600 border-teal-300">
                         {p.checkoutMode === "shopify" ? "Shopify" : "External"}
                       </Badge>
                     )}
@@ -273,7 +273,7 @@ function OrdersTab({ productId }: { productId: number }) {
   const statusColors: Record<string, string> = {
     pending: "bg-yellow-100 text-yellow-700",
     processing: "bg-blue-100 text-blue-700",
-    shipped: "bg-purple-100 text-purple-700",
+    shipped: "bg-teal-100 text-teal-700",
     delivered: "bg-green-100 text-green-700",
     cancelled: "bg-gray-100 text-gray-600",
     refunded: "bg-red-100 text-red-600",
@@ -860,10 +860,10 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
             )}
           </div>
           {/* AI Generate */}
-          <div className="bg-white border border-purple-200 rounded-xl p-5">
+          <div className="bg-white border border-teal-200 rounded-xl p-5">
             <div className="flex items-start gap-3 mb-4">
-              <div className="w-9 h-9 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Sparkles className="w-5 h-5 text-purple-600" />
+              <div className="w-9 h-9 bg-teal-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Sparkles className="w-5 h-5 text-teal-600" />
               </div>
               <div>
                 <p className="text-sm font-semibold text-gray-800">AI Generate Sales Page</p>
@@ -871,7 +871,7 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
               </div>
             </div>
             <Button
-              className="bg-purple-600 hover:bg-purple-700 text-white gap-2 w-full"
+              className="bg-teal-600 hover:bg-teal-700 text-white gap-2 w-full"
               disabled={aiGenerateLandingPage.isPending}
               onClick={() => aiGenerateLandingPage.mutate({ productId })}
             >
@@ -880,7 +880,7 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
                 : <><Sparkles className="w-4 h-4" /> Generate Sales Page with AI</>}
             </Button>
             {aiGenerateLandingPage.isPending && (
-              <p className="text-xs text-purple-500 text-center mt-2">This may take 15–30 seconds while the AI builds your page...</p>
+              <p className="text-xs text-teal-500 text-center mt-2">This may take 15–30 seconds while the AI builds your page...</p>
             )}
           </div>
         </TabsContent>

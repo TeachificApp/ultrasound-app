@@ -426,7 +426,7 @@ export default function AdminSalesDashboard() {
           {[
             { label: "Total Revenue", value: fmtCurrency(analytics?.summary.totalRevenue ?? 0), icon: DollarSign, color: "text-[#189aa1]", bg: "bg-[#189aa1]/10" },
             { label: "Total Orders", value: (analytics?.summary.totalSales ?? 0).toLocaleString(), icon: ShoppingCart, color: "text-blue-600", bg: "bg-blue-50" },
-            { label: "Avg. Order Value", value: fmtCurrency(analytics?.summary.avgOrderValue ?? 0), icon: TrendingUp, color: "text-purple-600", bg: "bg-purple-50" },
+            { label: "Avg. Order Value", value: fmtCurrency(analytics?.summary.avgOrderValue ?? 0), icon: TrendingUp, color: "text-teal-600", bg: "bg-teal-50" },
           ].map(kpi => (
             <Card key={kpi.label} className="border border-gray-200">
               <CardContent className="p-5 flex items-center gap-4">

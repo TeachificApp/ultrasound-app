@@ -1826,7 +1826,7 @@ function FormEditor({ templateId }: { templateId: number }) {
                               <span className="text-sm font-medium text-gray-800 truncate">{item.label}</span>
                               {item.isRequired && <span className="text-xs text-red-500 font-medium">*</span>}
                               {hasBranchRule && (
-                                <span className="text-xs px-1.5 py-0.5 rounded bg-purple-50 text-purple-600 font-medium flex items-center gap-0.5">
+                                <span className="text-xs px-1.5 py-0.5 rounded bg-teal-50 text-teal-600 font-medium flex items-center gap-0.5">
                                   <GitBranch className="w-2.5 h-2.5" /> branched
                                 </span>
                               )}

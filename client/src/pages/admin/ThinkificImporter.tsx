@@ -213,7 +213,7 @@ export default function ThinkificImporter() {
     const colors: Record<string, string> = {
       video: "bg-blue-100 text-blue-700",
       text: "bg-gray-100 text-gray-700",
-      quiz: "bg-purple-100 text-purple-700",
+      quiz: "bg-teal-100 text-teal-700",
       download: "bg-green-100 text-green-700",
       embed: "bg-orange-100 text-orange-700",
     };

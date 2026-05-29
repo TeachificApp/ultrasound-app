@@ -968,8 +968,8 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
       return (
         <div className="px-6 py-5 bg-white border border-gray-200 rounded-xl">
           <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
-              <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+            <div className="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center">
+              <svg className="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
             </div>
             <div>
               <p className="font-semibold text-gray-800 text-sm">{d.title || "Flashcard Deck"}</p>
@@ -977,7 +977,7 @@ export function BlockPreview({ block, coursePrice, courseTitle }: { block: Block
             </div>
           </div>
           {cards.slice(0, 2).map((c: any, i: number) => (
-            <div key={i} className="mb-2 p-2 bg-gradient-to-r from-purple-50 to-teal-50 rounded text-xs">
+            <div key={i} className="mb-2 p-2 bg-gradient-to-r from-teal-50 to-teal-50 rounded text-xs">
               <p className="font-medium text-gray-700 mb-0.5">Q: {c.front}</p>
               <p className="text-gray-500">A: {c.back}</p>
             </div>

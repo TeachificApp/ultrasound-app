@@ -36,7 +36,7 @@ const TYPE_ICONS: Record<string, any> = {
 };
 const TYPE_COLORS: Record<string, string> = {
   course: "bg-teal-100 text-teal-700", download: "bg-cyan-100 text-cyan-700",
-  physical: "bg-amber-100 text-amber-700", bundle: "bg-purple-100 text-purple-700",
+  physical: "bg-amber-100 text-amber-700", bundle: "bg-teal-100 text-teal-700",
   funnel: "bg-blue-100 text-blue-700",
 };
 const TYPE_LABELS: Record<string, string> = {

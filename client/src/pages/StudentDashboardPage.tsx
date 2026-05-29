@@ -84,7 +84,7 @@ function StatusBadge({ status }: { status: string }) {
     processing: { label: "Processing", color: "bg-blue-100 text-blue-700 border-blue-200" },
     shipped:    { label: "Shipped",    color: "bg-teal-100 text-teal-700 border-teal-200" },
     delivered:  { label: "Delivered",  color: "bg-emerald-100 text-emerald-700 border-emerald-200" },
-    refunded:   { label: "Refunded",   color: "bg-purple-100 text-purple-700 border-purple-200" },
+    refunded:   { label: "Refunded",   color: "bg-teal-100 text-teal-700 border-teal-200" },
     trialing:   { label: "Trial",      color: "bg-blue-100 text-blue-700 border-blue-200" },
     past_due:   { label: "Past Due",   color: "bg-red-100 text-red-700 border-red-200" },
     incomplete: { label: "Incomplete", color: "bg-amber-100 text-amber-700 border-amber-200" },
@@ -1371,7 +1371,7 @@ function AnalyticsTab() {
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {[
           { label: "Logins", value: summary.logins, color: "bg-blue-50 text-blue-600" },
-          { label: "Page Views", value: summary.pageViews, color: "bg-purple-50 text-purple-600" },
+          { label: "Page Views", value: summary.pageViews, color: "bg-teal-50 text-teal-600" },
           { label: "Video Plays", value: summary.videoPlays, color: "bg-orange-50 text-orange-600" },
           { label: "Quiz Attempts", value: summary.quizAttempts, color: "bg-pink-50 text-pink-600" },
           { label: "Downloads", value: summary.downloads, color: "bg-green-50 text-green-600" },
@@ -1447,7 +1447,7 @@ function AnalyticsTab() {
             {pageViews.map((p: any) => (
               <div key={p.path} className="px-5 py-2.5 flex items-center justify-between gap-4">
                 <span className="text-xs text-gray-600 font-mono truncate flex-1">{p.path}</span>
-                <span className="text-xs text-purple-600 font-semibold flex-shrink-0">{Number(p.views)} views</span>
+                <span className="text-xs text-teal-600 font-semibold flex-shrink-0">{Number(p.views)} views</span>
               </div>
             ))}
           </div>

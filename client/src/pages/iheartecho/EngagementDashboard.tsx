@@ -156,9 +156,9 @@ function MemberDrilldown({ userId, onClose }: { userId: number; onClose: () => v
                 </p>
               </div>
               <div className="rounded-lg p-3 text-center" style={{ background: "#7c3aed10" }}>
-                <p className="text-xl font-bold text-purple-600">{fmtNum(data.summary.flashcardAttempts)}</p>
+                <p className="text-xl font-bold text-teal-600">{fmtNum(data.summary.flashcardAttempts)}</p>
                 <p className="text-xs text-gray-500 mt-0.5">Flashcard Reviews</p>
-                <p className="text-xs font-semibold mt-0.5 text-purple-600">
+                <p className="text-xs font-semibold mt-0.5 text-teal-600">
                   {pct(data.summary.flashcardCorrect, data.summary.flashcardAttempts)} self-correct
                 </p>
               </div>
@@ -191,7 +191,7 @@ function MemberDrilldown({ userId, onClose }: { userId: number; onClose: () => v
             {data.summary.flashcardAttempts > 0 && (
               <div>
                 <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
-                  <Activity className="w-4 h-4 text-purple-500" /> Flashcard Activity (last 30 days)
+                  <Activity className="w-4 h-4 text-teal-500" /> Flashcard Activity (last 30 days)
                 </h4>
                 <ResponsiveContainer width="100%" height={140}>
                   <BarChart data={flashcardChart} barSize={8}>
@@ -485,7 +485,7 @@ export default function EngagementDashboard() {
                             </span>
                           </td>
                           <td className="px-3 py-3 text-center">
-                            <span className={`font-semibold ${m.flashcardAttempts > 0 ? "text-purple-600" : "text-gray-300"}`}>
+                            <span className={`font-semibold ${m.flashcardAttempts > 0 ? "text-teal-600" : "text-gray-300"}`}>
                               {fmtNum(m.flashcardAttempts)}
                             </span>
                           </td>

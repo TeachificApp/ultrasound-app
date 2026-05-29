@@ -165,7 +165,7 @@ export default function SonoQuizPlay() {
   useEffect(() => () => stopTimer(), []);
 
   // ── Derived ────────────────────────────────────────────────────────────────
-  const themeColor = quizInfo?.theme === "purple" ? "#7c3aed"
+  const themeColor = quizInfo?.theme === "teal" ? "#7c3aed"
     : quizInfo?.theme === "orange" ? "#ea580c"
     : quizInfo?.theme === "blue" ? "#2563eb"
     : quizInfo?.theme === "green" ? "#16a34a"

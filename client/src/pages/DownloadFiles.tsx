@@ -108,10 +108,10 @@ export default function DownloadFiles() {
     <div className="min-h-screen bg-gray-50">
       {/* Admin Preview Banner */}
       {isPreviewMode && (
-        <div className="bg-purple-600 text-white text-center py-2 px-4 text-sm font-medium flex items-center justify-center gap-2 sticky top-0 z-50">
+        <div className="bg-teal-600 text-white text-center py-2 px-4 text-sm font-medium flex items-center justify-center gap-2 sticky top-0 z-50">
           <Eye className="w-4 h-4" />
           <span>Preview Mode — You are viewing this download as a student would see it</span>
-          <button onClick={() => window.close()} className="ml-4 px-2 py-0.5 bg-purple-700 hover:bg-purple-800 rounded text-xs">Exit Preview</button>
+          <button onClick={() => window.close()} className="ml-4 px-2 py-0.5 bg-teal-700 hover:bg-teal-800 rounded text-xs">Exit Preview</button>
         </div>
       )}
       {/* Header */}
@@ -121,7 +121,7 @@ export default function DownloadFiles() {
             <ArrowLeft className="w-3 h-3" /> All Downloads
           </Link>
           <div className="flex items-center gap-3">
-            {isPreviewMode && <Eye className="w-6 h-6 text-purple-300" />}
+            {isPreviewMode && <Eye className="w-6 h-6 text-teal-300" />}
           {isSuccess && <CheckCircle className="w-6 h-6 text-green-300" />}
             <h1 className="text-2xl font-bold">{product.title}</h1>
           </div>

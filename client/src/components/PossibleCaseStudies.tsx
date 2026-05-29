@@ -584,7 +584,7 @@ export default function PossibleCaseStudies() {
                           </span>
                         )}
                         {c.isMedicalDirectorCase && (
-                          <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 border border-purple-200">
+                          <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-teal-100 text-teal-700 border border-teal-200">
                             MD Case
                           </span>
                         )}

@@ -39,7 +39,7 @@ const MEETING_TYPE_LABELS: Record<string, string> = {
 const MEETING_TYPE_COLORS: Record<string, string> = {
   quality_assurance: "bg-teal-100 text-teal-800",
   peer_review: "bg-blue-100 text-blue-800",
-  accreditation: "bg-purple-100 text-purple-800",
+  accreditation: "bg-teal-100 text-teal-800",
   staff_education: "bg-green-100 text-green-800",
   policy_review: "bg-orange-100 text-orange-800",
   other: "bg-gray-100 text-gray-700",

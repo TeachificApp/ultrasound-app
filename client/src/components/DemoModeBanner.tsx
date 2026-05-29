@@ -1,6 +1,6 @@
 /**
  * DemoModeBanner
- * Persistent purple banner shown on every page when a platform admin is
+ * Persistent teal banner shown on every page when a platform admin is
  * viewing the app as a demo user. Provides one-click exit back to the
  * real admin session.
  */
@@ -34,7 +34,7 @@ export default function DemoModeBanner() {
   return (
     <div
       className="fixed top-0 left-0 right-0 z-[9999] flex items-center justify-between gap-3 px-4 py-2 text-white text-sm font-medium shadow-lg"
-      style={{ background: "linear-gradient(90deg, #7c3aed 0%, #6d28d9 100%)" }}
+      style={{ background: "linear-gradient(90deg, #0e4a50 0%, #189aa1 100%)" }}
     >
       <div className="flex items-center gap-2 min-w-0">
         <FlaskConical className="w-4 h-4 flex-shrink-0" />

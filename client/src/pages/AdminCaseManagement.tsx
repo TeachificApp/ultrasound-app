@@ -81,12 +81,12 @@ const STATUS_COLORS: Record<string, string> = {
 const DIFFICULTY_COLORS: Record<string, string> = {
   beginner: "bg-emerald-50 text-emerald-600",
   intermediate: "bg-blue-50 text-blue-600",
-  advanced: "bg-purple-50 text-purple-600",
+  advanced: "bg-teal-50 text-teal-600",
 };
 
 const MODALITY_COLORS: Record<string, string> = {
   Abdominal: "bg-blue-100 text-blue-700",
-  Vascular: "bg-purple-100 text-purple-700",
+  Vascular: "bg-teal-100 text-teal-700",
   "OB/Gyn": "bg-pink-100 text-pink-700",
   MSK: "bg-orange-100 text-orange-700",
   POCUS: "bg-teal-100 text-teal-700",
@@ -826,7 +826,7 @@ export default function AdminCaseManagement() {
           <Button
             size="sm"
             variant="ghost"
-            className="h-8 w-8 p-0 text-gray-400 hover:text-purple-600"
+            className="h-8 w-8 p-0 text-gray-400 hover:text-teal-600"
             onClick={() => { setEditorCaseId(c.id); setEditorOpen(true); }}
             title="Edit case"
           >
@@ -892,7 +892,7 @@ export default function AdminCaseManagement() {
             <Button
               variant="outline"
               size="sm"
-              className="gap-1.5 border-purple-400 text-purple-600"
+              className="gap-1.5 border-teal-400 text-teal-600"
               onClick={() => { setAiCasePreview(null); setAiCaseOpen(true); }}
             >
               <Sparkles className="w-4 h-4" /> AI Generate Case
@@ -1122,7 +1122,7 @@ export default function AdminCaseManagement() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-purple-500" /> AI Ultrasound Case Generator
+              <Sparkles className="w-5 h-5 text-teal-500" /> AI Ultrasound Case Generator
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -1153,8 +1153,8 @@ export default function AdminCaseManagement() {
                       onClick={() => setAiPrompt(prompt)}
                       className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-all ${
                         aiPrompt === prompt
-                          ? "border-purple-500 bg-purple-500 text-white"
-                          : "border-gray-200 bg-gray-50 text-gray-600 hover:border-purple-400 hover:text-purple-600"
+                          ? "border-teal-500 bg-teal-500 text-white"
+                          : "border-gray-200 bg-gray-50 text-gray-600 hover:border-teal-400 hover:text-teal-600"
                       }`}
                     >
                       {label}
@@ -1214,9 +1214,9 @@ export default function AdminCaseManagement() {
                 : <><Sparkles className="w-4 h-4" /> Generate Case</>}
             </Button>
             {aiCasePreview && (
-              <div className="space-y-3 border border-purple-200 rounded-xl p-4 bg-purple-50">
+              <div className="space-y-3 border border-teal-200 rounded-xl p-4 bg-teal-50">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-purple-800">Preview — review before saving</p>
+                  <p className="text-sm font-semibold text-teal-800">Preview — review before saving</p>
                   <Button
                     size="sm"
                     className="gap-1.5 text-white"
@@ -1300,7 +1300,7 @@ export default function AdminCaseManagement() {
                   {aiCasePreview.tags?.length > 0 && (
                     <div className="flex flex-wrap gap-1">
                       {aiCasePreview.tags.map((tag: string) => (
-                        <span key={tag} className="text-xs bg-white border border-purple-200 text-purple-600 px-2 py-0.5 rounded-full">{tag}</span>
+                        <span key={tag} className="text-xs bg-white border border-teal-200 text-teal-600 px-2 py-0.5 rounded-full">{tag}</span>
                       ))}
                     </div>
                   )}

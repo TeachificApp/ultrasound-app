@@ -39,7 +39,7 @@ const MUSIC_TRACKS = [
 // ─── Themes ───────────────────────────────────────────────────────────────────
 const THEMES = [
   { id: "teal", label: "Teal", color: "#189aa1" },
-  { id: "purple", label: "Purple", color: "#7c3aed" },
+  { id: "teal", label: "Purple", color: "#7c3aed" },
   { id: "orange", label: "Orange", color: "#ea580c" },
   { id: "blue", label: "Ocean Blue", color: "#2563eb" },
   { id: "green", label: "Forest Green", color: "#16a34a" },

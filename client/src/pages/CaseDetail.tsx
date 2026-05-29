@@ -46,7 +46,7 @@ import { Lock, Crown } from "lucide-react";
 
 const MODALITY_COLORS: Record<string, string> = {
   TTE: "bg-blue-100 text-blue-700",
-  TEE: "bg-purple-100 text-purple-700",
+  TEE: "bg-teal-100 text-teal-700",
   Stress: "bg-orange-100 text-orange-700",
   Pediatric: "bg-pink-100 text-pink-700",
   Fetal: "bg-rose-100 text-rose-700",
@@ -268,7 +268,7 @@ export default function CaseDetail() {
               </span>
             )}
             {videos.length > 0 && (
-              <span className="flex items-center gap-1 text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full font-medium">
+              <span className="flex items-center gap-1 text-xs text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full font-medium">
                 <PlayCircle className="w-3 h-3" /> {videos.length} Video{videos.length !== 1 ? "s" : ""}
               </span>
             )}

@@ -377,7 +377,7 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
             <Button size="sm" variant={mode === "manual" ? "default" : "outline"} onClick={() => setMode("manual")} className={mode === "manual" ? "bg-teal-600 hover:bg-teal-700 text-white" : ""}>
               Manual
             </Button>
-            <Button size="sm" variant={mode === "ai" ? "default" : "outline"} onClick={() => setMode("ai")} className={mode === "ai" ? "bg-purple-600 hover:bg-purple-700 text-white" : ""}>
+            <Button size="sm" variant={mode === "ai" ? "default" : "outline"} onClick={() => setMode("ai")} className={mode === "ai" ? "bg-teal-600 hover:bg-teal-700 text-white" : ""}>
               <Sparkles className="w-4 h-4 mr-1" /> AI Generate
             </Button>
           </div>
@@ -504,8 +504,8 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
             <div className="py-2">
               {aiStep === "input" ? (
                 <div className="space-y-4">
-                  <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-lg p-3">
-                    <p className="text-sm text-purple-700 dark:text-purple-300 flex items-center gap-2">
+                  <div className="bg-teal-50 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-800 rounded-lg p-3">
+                    <p className="text-sm text-teal-700 dark:text-teal-300 flex items-center gap-2">
                       <Sparkles className="w-4 h-4" />
                       AI will generate a complete {type === "quiz" ? "quiz with questions" : "course curriculum with sections and lessons"} plus a full landing page based on your topics.
                     </p>
@@ -638,7 +638,7 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
                             <span className="font-semibold text-teal-700 dark:text-teal-400">Curriculum</span>
                             <span className="text-xs bg-teal-100 dark:bg-teal-900 text-teal-700 dark:text-teal-300 px-2 py-0.5 rounded-full">{aiPreview.sections.length} modules</span>
                             <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">{totalLessons} lessons</span>
-                            {totalQuizzes > 0 && <span className="text-xs bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded-full">{totalQuizzes} quizzes</span>}
+                            {totalQuizzes > 0 && <span className="text-xs bg-teal-100 dark:bg-teal-900 text-teal-700 dark:text-teal-300 px-2 py-0.5 rounded-full">{totalQuizzes} quizzes</span>}
                           </div>
                           <div className="mt-2 space-y-2">
                             {aiPreview.sections.map((sec: any, si: number) => (
@@ -651,7 +651,7 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
                                         <span className="text-gray-400">{li + 1}.</span>
                                         <span className="font-medium text-gray-700 dark:text-gray-300">{les.title}</span>
                                         <span className="ml-auto text-gray-400 shrink-0">{les.durationMinutes ? `${les.durationMinutes}m` : ""}</span>
-                                        {les.quiz?.questions?.length > 0 && <span className="text-purple-500 shrink-0">+quiz</span>}
+                                        {les.quiz?.questions?.length > 0 && <span className="text-teal-500 shrink-0">+quiz</span>}
                                       </div>
                                       {les.content && (
                                         <div className="mt-0.5 pl-4 text-gray-400 line-clamp-2" dangerouslySetInnerHTML={{ __html: les.content.replace(/<[^>]+>/g, ' ').slice(0, 120) + '...' }} />
@@ -719,7 +719,7 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
             </Button>
           ) : aiStep === "input" ? (
             <Button
-              className="bg-purple-600 hover:bg-purple-700 text-white"
+              className="bg-teal-600 hover:bg-teal-700 text-white"
               disabled={!aiTopics.trim() || aiGenerate.isPending}
               onClick={() => aiGenerate.mutate({
                 topics: aiTopics.trim(),
@@ -737,7 +737,7 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
             </Button>
           ) : (
             <Button
-              className="bg-purple-600 hover:bg-purple-700 text-white"
+              className="bg-teal-600 hover:bg-teal-700 text-white"
               disabled={create.isPending || aiCommit.isPending}
               onClick={handleAiCreate}
             >
@@ -801,7 +801,7 @@ function SortableLessonRow({ lesson, onEdit, onQuiz, onDelete, onCopy, onMoveUp,
       {lesson.requireVideoCompletion === 1 && <Badge variant="outline" className="text-xs text-orange-600 border-orange-300">Video req.</Badge>}
       {lesson.requireManualComplete === 1 && <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">Manual</Badge>}
       {lesson.type === "quiz" && (
-        <Button size="sm" variant="ghost" className="h-7 text-xs text-purple-600 hover:bg-purple-50" onClick={() => onQuiz(lesson)}>
+        <Button size="sm" variant="ghost" className="h-7 text-xs text-teal-600 hover:bg-teal-50" onClick={() => onQuiz(lesson)}>
           <HelpCircle className="w-3 h-3 mr-1" /> Quiz
         </Button>
       )}
@@ -899,7 +899,7 @@ function SortableSectionRow({ section, children, onAddLesson, onDrip, onDelete, 
           </Button>
         )}
         {onSaveAsTemplate && (
-          <Button size="sm" variant="ghost" className="h-7 text-xs text-purple-500 hover:bg-purple-50" title="Save section as reusable template" onClick={onSaveAsTemplate}>
+          <Button size="sm" variant="ghost" className="h-7 text-xs text-teal-500 hover:bg-teal-50" title="Save section as reusable template" onClick={onSaveAsTemplate}>
             <Save className="w-3 h-3 mr-1" /> Template
           </Button>
         )}
@@ -1148,7 +1148,7 @@ function CourseEditor({ courseId, onBack }: { courseId: number; onBack: () => vo
         >
           <Eye className="w-3 h-3 mr-1" /> Preview Course
         </Button>
-        <Button size="sm" variant="outline" className="h-8 text-xs text-purple-600 border-purple-300 hover:bg-purple-50"
+        <Button size="sm" variant="outline" className="h-8 text-xs text-teal-600 border-teal-300 hover:bg-teal-50"
           onClick={() => openLearnLink(`/courses/${course.slug}/player?preview=student`)}
         >
           <Users className="w-3 h-3 mr-1" /> Preview as Student
@@ -2311,10 +2311,10 @@ function LandingPageEditor({ courseId, courseType }: { courseId: number; courseT
       </div>
 
       {/* AI Generate */}
-      <div className="bg-white border border-purple-200 rounded-xl p-5">
+      <div className="bg-white border border-teal-200 rounded-xl p-5">
         <div className="flex items-start gap-3 mb-4">
-          <div className="w-9 h-9 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
-            <Sparkles className="w-5 h-5 text-purple-600" />
+          <div className="w-9 h-9 bg-teal-100 rounded-lg flex items-center justify-center flex-shrink-0">
+            <Sparkles className="w-5 h-5 text-teal-600" />
           </div>
           <div>
             <p className="text-sm font-semibold text-gray-800">AI Generate Landing Page</p>
@@ -2324,7 +2324,7 @@ function LandingPageEditor({ courseId, courseType }: { courseId: number; courseT
           </div>
         </div>
         <Button
-          className="bg-purple-600 hover:bg-purple-700 text-white gap-2 w-full"
+          className="bg-teal-600 hover:bg-teal-700 text-white gap-2 w-full"
           disabled={aiGenerateLandingPage.isPending}
           onClick={() => aiGenerateLandingPage.mutate({ courseId })}
         >
@@ -2333,7 +2333,7 @@ function LandingPageEditor({ courseId, courseType }: { courseId: number; courseT
             : <><Sparkles className="w-4 h-4" /> Generate Landing Page with AI</>}
         </Button>
         {aiGenerateLandingPage.isPending && (
-          <p className="text-xs text-purple-500 text-center mt-2">This may take 15–30 seconds while the AI builds your page...</p>
+          <p className="text-xs text-teal-500 text-center mt-2">This may take 15–30 seconds while the AI builds your page...</p>
         )}
       </div>
     </div>
@@ -2547,10 +2547,10 @@ function CourseOverviewEditor({
 
           <div className="max-w-4xl mx-auto px-6 py-6 space-y-5">
             {/* ── Top Zone (above progress bar) ── */}
-            <div className={cn("rounded-xl border-2 overflow-hidden bg-white", activeZone === "top" ? "border-purple-400" : "border-dashed border-purple-200")}>
+            <div className={cn("rounded-xl border-2 overflow-hidden bg-white", activeZone === "top" ? "border-teal-400" : "border-dashed border-teal-200")}>
               <div className="px-4 py-2 flex items-center justify-between" style={{ background: activeZone === "top" ? "#7c3aed" : "#f5f3ff" }}>
                 <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: activeZone === "top" ? "#fff" : "#7c3aed" }}>🔝 Top Zone — Above Progress Bar</span>
-                {activeZone !== "top" && <button onClick={() => { setActiveZone("top"); setSelectedBlockId(null); }} className="text-[10px] text-purple-500 hover:text-purple-700 font-medium">Edit this zone</button>}
+                {activeZone !== "top" && <button onClick={() => { setActiveZone("top"); setSelectedBlockId(null); }} className="text-[10px] text-teal-500 hover:text-teal-700 font-medium">Edit this zone</button>}
               </div>
               {topBlocks.length === 0 && activeZone !== "top" ? (
                 <div className="text-center text-gray-400 py-4 text-xs italic">No blocks in Top Zone</div>
@@ -2574,7 +2574,7 @@ function CourseOverviewEditor({
                         ))}
                       </SortableContext>
                     </DndContext>
-                    <button onClick={() => setAddMenuOpen(true)} className="w-full border-2 border-dashed border-purple-200 hover:border-purple-400 rounded-xl py-3 text-purple-500 hover:text-purple-700 text-sm flex items-center justify-center gap-2 transition-colors mt-2">
+                    <button onClick={() => setAddMenuOpen(true)} className="w-full border-2 border-dashed border-teal-200 hover:border-teal-400 rounded-xl py-3 text-teal-500 hover:text-teal-700 text-sm flex items-center justify-center gap-2 transition-colors mt-2">
                       <Plus className="w-4 h-4" /> Add Block to Top Zone
                     </button>
                   </div>
@@ -2902,7 +2902,7 @@ function CourseInstructorsEditor({ courseId, courseInstructors, onSaved }: { cou
           <Plus className="w-4 h-4 mr-1" /> {(allInstructors ?? []).length > 0 ? "Add Instructor" : "Create & Add Instructor"}
         </Button>
         {(allInstructors ?? []).length > 0 && (
-          <Button size="sm" variant="outline" className="border-dashed border-purple-300 text-purple-600 hover:bg-purple-50" onClick={() => setCreateOpen(true)}>
+          <Button size="sm" variant="outline" className="border-dashed border-teal-300 text-teal-600 hover:bg-teal-50" onClick={() => setCreateOpen(true)}>
             <Plus className="w-4 h-4 mr-1" /> Create New Profile
           </Button>
         )}
@@ -3102,7 +3102,7 @@ function SaveSectionTemplateDialog({ section, onClose }: { section: { id: number
         </div>
         <DialogFooter className="mt-4">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button className="bg-purple-600 hover:bg-purple-700 text-white" disabled={!name.trim() || save.isPending}
+          <Button className="bg-teal-600 hover:bg-teal-700 text-white" disabled={!name.trim() || save.isPending}
             onClick={() => save.mutate({ sectionId: section.id, name: name.trim(), description: description.trim() || undefined })}>
             {save.isPending ? "Saving…" : "Save Template"}
           </Button>
@@ -3487,7 +3487,7 @@ function CopyLessonDialog({
                 {(courses1).map((c: any) => (
                   <SelectItem key={c.id} value={String(c.id)}>
                     <span className="flex items-center gap-2">
-                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${c.type === "quiz" ? "bg-purple-100 text-purple-700" : "bg-teal-100 text-teal-700"}`}>{c.type === "quiz" ? "Quiz" : "Course"}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${c.type === "quiz" ? "bg-teal-100 text-teal-700" : "bg-teal-100 text-teal-700"}`}>{c.type === "quiz" ? "Quiz" : "Course"}</span>
                       <span>{c.title}</span>
                       {c.status !== "public" && <span className="text-xs text-gray-400">({c.status})</span>}
                     </span>
@@ -3555,7 +3555,7 @@ function CopyModuleDialog({
                 {(courses2).map((c: any) => (
                   <SelectItem key={c.id} value={String(c.id)}>
                     <span className="flex items-center gap-2">
-                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${c.type === "quiz" ? "bg-purple-100 text-purple-700" : "bg-teal-100 text-teal-700"}`}>{c.type === "quiz" ? "Quiz" : "Course"}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${c.type === "quiz" ? "bg-teal-100 text-teal-700" : "bg-teal-100 text-teal-700"}`}>{c.type === "quiz" ? "Quiz" : "Course"}</span>
                       <span>{c.title}</span>
                       {c.status !== "public" && <span className="text-xs text-gray-400">({c.status})</span>}
                     </span>
@@ -4205,10 +4205,10 @@ function QuizBuilderInline({ lesson, courseId }: { lesson: any; courseId?: numbe
 
       {/* AI Generate Panel */}
       {showAIPanel && (
-        <div className="border border-purple-200 rounded-xl p-5 bg-purple-50 space-y-4">
+        <div className="border border-teal-200 rounded-xl p-5 bg-teal-50 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-purple-800 flex items-center gap-2"><Sparkles className="w-4 h-4" /> AI Question Generator</h3>
-            {courseId && <span className="text-xs text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">Course context enabled</span>}
+            <h3 className="text-sm font-semibold text-teal-800 flex items-center gap-2"><Sparkles className="w-4 h-4" /> AI Question Generator</h3>
+            {courseId && <span className="text-xs text-teal-600 bg-teal-100 px-2 py-0.5 rounded-full">Course context enabled</span>}
           </div>
 
           {!aiPreview ? (
@@ -4225,14 +4225,14 @@ function QuizBuilderInline({ lesson, courseId }: { lesson: any; courseId?: numbe
                     <Label htmlFor="use-lessons" className="text-sm font-medium cursor-pointer">Generate from specific lesson content</Label>
                   </div>
                   {useFromLessons && (
-                    <div className="border border-purple-200 rounded-lg p-3 bg-white space-y-1 max-h-48 overflow-y-auto">
+                    <div className="border border-teal-200 rounded-lg p-3 bg-white space-y-1 max-h-48 overflow-y-auto">
                       <div className="flex gap-2 mb-2">
                         <Button size="sm" variant="ghost" className="text-xs h-6 px-2" onClick={() => setSelectedLessonIds(courseLessonList.map(l => l.id))}>Select All</Button>
                         <Button size="sm" variant="ghost" className="text-xs h-6 px-2" onClick={() => setSelectedLessonIds([])}>Clear</Button>
                         <span className="text-xs text-gray-500 ml-auto self-center">{selectedLessonIds.length} selected</span>
                       </div>
                       {courseLessonList.map(l => (
-                        <label key={l.id} className="flex items-center gap-2 cursor-pointer hover:bg-purple-50 rounded px-1 py-0.5">
+                        <label key={l.id} className="flex items-center gap-2 cursor-pointer hover:bg-teal-50 rounded px-1 py-0.5">
                           <input type="checkbox" className="rounded" checked={selectedLessonIds.includes(l.id)} onChange={e => setSelectedLessonIds(prev => e.target.checked ? [...prev, l.id] : prev.filter(id => id !== l.id))} />
                           <span className="text-sm text-gray-700 truncate">{l.title}</span>
                         </label>
@@ -4279,7 +4279,7 @@ function QuizBuilderInline({ lesson, courseId }: { lesson: any; courseId?: numbe
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={() => setShowAIPanel(false)}>Cancel</Button>
                 <Button
-                  className="bg-purple-600 hover:bg-purple-700 text-white gap-2"
+                  className="bg-teal-600 hover:bg-teal-700 text-white gap-2"
                   size="sm"
                   disabled={(!aiTopic.trim() && !(useFromLessons && selectedLessonIds.length > 0)) || aiGenerate.isPending}
                   onClick={() => aiGenerate.mutate({ quizId: quiz.id, topic: aiTopic.trim() || "based on selected lesson content", count: aiCount, difficulty: aiDifficulty, questionType: aiQType, courseId, lessonIds: useFromLessons && selectedLessonIds.length > 0 ? selectedLessonIds : undefined })}
@@ -4295,15 +4295,15 @@ function QuizBuilderInline({ lesson, courseId }: { lesson: any; courseId?: numbe
                 <div className="flex gap-2">
                   <Button size="sm" variant="ghost" className="text-xs h-7" onClick={() => setAIPreview(p => p!.map(q => ({ ...q, selected: true })))}>Select All</Button>
                   <Button size="sm" variant="ghost" className="text-xs h-7" onClick={() => setAIPreview(p => p!.map(q => ({ ...q, selected: false })))}>Deselect All</Button>
-                  <Button size="sm" variant="ghost" className="text-xs h-7 text-purple-600" onClick={() => setAIPreview(null)}>← Back</Button>
+                  <Button size="sm" variant="ghost" className="text-xs h-7 text-teal-600" onClick={() => setAIPreview(null)}>← Back</Button>
                 </div>
               </div>
               <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-1">
                 {aiPreview.map((q, qi) => (
-                  <div key={qi} className={`border rounded-lg p-3 cursor-pointer transition-colors ${q.selected ? "border-purple-400 bg-purple-50" : "border-gray-200 bg-white opacity-60"}`}
+                  <div key={qi} className={`border rounded-lg p-3 cursor-pointer transition-colors ${q.selected ? "border-teal-400 bg-teal-50" : "border-gray-200 bg-white opacity-60"}`}
                     onClick={() => setAIPreview(p => p!.map((item, i) => i === qi ? { ...item, selected: !item.selected } : item))}>
                     <div className="flex items-start gap-2">
-                      <div className={`mt-0.5 w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center text-xs ${q.selected ? "bg-purple-600 border-purple-600 text-white" : "border-gray-300"}`}>{q.selected ? "✓" : ""}</div>
+                      <div className={`mt-0.5 w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center text-xs ${q.selected ? "bg-teal-600 border-teal-600 text-white" : "border-gray-300"}`}>{q.selected ? "✓" : ""}</div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-800">{qi + 1}. {q.question}</p>
                         <div className="mt-1.5 space-y-0.5">
@@ -4320,7 +4320,7 @@ function QuizBuilderInline({ lesson, courseId }: { lesson: any; courseId?: numbe
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={() => { setShowAIPanel(false); setAIPreview(null); }}>Cancel</Button>
                 <Button
-                  className="bg-purple-600 hover:bg-purple-700 text-white gap-2"
+                  className="bg-teal-600 hover:bg-teal-700 text-white gap-2"
                   size="sm"
                   disabled={aiPreview.filter(q => q.selected).length === 0 || bulkInsert.isPending}
                   onClick={() => bulkInsert.mutate({
@@ -4637,14 +4637,14 @@ function QuizBuilderDialog({ lesson, onClose }: { lesson: any; onClose: () => vo
                     <Label htmlFor="dlg-use-lessons" className="text-sm font-medium cursor-pointer">Generate from specific lesson content</Label>
                   </div>
                   {useFromLessons && (
-                    <div className="border border-purple-200 rounded-lg p-3 bg-white space-y-1 max-h-48 overflow-y-auto">
+                    <div className="border border-teal-200 rounded-lg p-3 bg-white space-y-1 max-h-48 overflow-y-auto">
                       <div className="flex gap-2 mb-2">
                         <Button size="sm" variant="ghost" className="text-xs h-6 px-2" onClick={() => setSelectedLessonIds(courseLessonList.map(l => l.id))}>Select All</Button>
                         <Button size="sm" variant="ghost" className="text-xs h-6 px-2" onClick={() => setSelectedLessonIds([])}>Clear</Button>
                         <span className="text-xs text-gray-500 ml-auto self-center">{selectedLessonIds.length} selected</span>
                       </div>
                       {courseLessonList.map(l => (
-                        <label key={l.id} className="flex items-center gap-2 cursor-pointer hover:bg-purple-50 rounded px-1 py-0.5">
+                        <label key={l.id} className="flex items-center gap-2 cursor-pointer hover:bg-teal-50 rounded px-1 py-0.5">
                           <input type="checkbox" className="rounded" checked={selectedLessonIds.includes(l.id)} onChange={e => setSelectedLessonIds(prev => e.target.checked ? [...prev, l.id] : prev.filter(id => id !== l.id))} />
                           <span className="text-sm text-gray-700 truncate">{l.title}</span>
                         </label>
@@ -5622,7 +5622,7 @@ const LMS_NAV_GROUPS = [
 
 const GROUP_COLORS: Record<string, { bg: string; text: string; activeBg: string; activeText: string; dot: string }> = {
   teal:   { bg: "bg-teal-50",   text: "text-teal-700",   activeBg: "bg-teal-600",   activeText: "text-white", dot: "bg-teal-400" },
-  purple: { bg: "bg-teal-50",   text: "text-teal-700",   activeBg: "bg-teal-600",   activeText: "text-white", dot: "bg-teal-400" },
+  teal2: { bg: "bg-teal-50",   text: "text-teal-700",   activeBg: "bg-teal-600",   activeText: "text-white", dot: "bg-teal-400" },
   blue:   { bg: "bg-teal-50",   text: "text-teal-700",   activeBg: "bg-teal-600",   activeText: "text-white", dot: "bg-teal-400" },
   orange: { bg: "bg-teal-50",   text: "text-teal-700",   activeBg: "bg-teal-600",   activeText: "text-white", dot: "bg-teal-400" },
   gray:   { bg: "bg-gray-50",   text: "text-gray-600",   activeBg: "bg-gray-700",   activeText: "text-white", dot: "bg-gray-400" },
@@ -6306,7 +6306,7 @@ function CommunitiesTab() {
 function LMSComingSoonTab({ icon: Icon, title, description, color }: { icon: any; title: string; description: string; color: string }) {
   const colorMap: Record<string, { bg: string; iconBg: string; iconText: string; badge: string }> = {
     teal:   { bg: "bg-teal-50",   iconBg: "bg-teal-100",   iconText: "text-teal-600",   badge: "bg-teal-100 text-teal-700" },
-    purple: { bg: "bg-purple-50", iconBg: "bg-purple-100", iconText: "text-purple-600", badge: "bg-purple-100 text-purple-700" },
+    teal2: { bg: "bg-teal-50", iconBg: "bg-teal-100", iconText: "text-teal-600", badge: "bg-teal-100 text-teal-700" },
     blue:   { bg: "bg-blue-50",   iconBg: "bg-blue-100",   iconText: "text-blue-600",   badge: "bg-blue-100 text-blue-700" },
     orange: { bg: "bg-orange-50", iconBg: "bg-orange-100", iconText: "text-orange-600", badge: "bg-orange-100 text-orange-700" },
   };
@@ -6485,7 +6485,7 @@ const ITEM_TYPE_LABELS: Record<string, string> = {
 };
 const ITEM_TYPE_COLORS: Record<string, string> = {
   course: "bg-teal-100 text-teal-700",
-  quiz: "bg-purple-100 text-purple-700",
+  quiz: "bg-teal-100 text-teal-700",
   download: "bg-blue-100 text-blue-700",
   product: "bg-orange-100 text-orange-700",
   bundle: "bg-pink-100 text-pink-700",
@@ -7860,7 +7860,7 @@ function QuestionBankAdmin() {
         </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => setShowTagManager(p => !p)} className="gap-1.5"><Tag className="w-3.5 h-3.5" /> Tags</Button>
-          <Button size="sm" variant="outline" className="border-purple-300 text-purple-700 hover:bg-purple-50 gap-1.5" onClick={() => setShowAIPanel(p => !p)}><Sparkles className="w-3.5 h-3.5" /> AI Generate</Button>
+          <Button size="sm" variant="outline" className="border-teal-300 text-teal-700 hover:bg-teal-50 gap-1.5" onClick={() => setShowAIPanel(p => !p)}><Sparkles className="w-3.5 h-3.5" /> AI Generate</Button>
           <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5" onClick={() => setShowCreate(true)}><Plus className="w-3.5 h-3.5" /> Add Question</Button>
         </div>
       </div>
@@ -7892,40 +7892,40 @@ function QuestionBankAdmin() {
 
       {/* AI Generate Panel */}
       {showAIPanel && (
-        <div className="border border-purple-200 rounded-xl p-5 bg-purple-50 space-y-4">
+        <div className="border border-teal-200 rounded-xl p-5 bg-teal-50 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-purple-800 flex items-center gap-2"><Sparkles className="w-4 h-4" /> AI Question Generator</h3>
+            <h3 className="font-semibold text-teal-800 flex items-center gap-2"><Sparkles className="w-4 h-4" /> AI Question Generator</h3>
             <Button size="sm" variant="ghost" onClick={() => setShowAIPanel(false)}><X className="w-3.5 h-3.5" /></Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="md:col-span-2">
-              <Label className="text-xs font-medium text-purple-700 mb-1 block">Topic *</Label>
-              <Input value={aiTopic} onChange={e => setAITopic(e.target.value)} placeholder="e.g. Doppler physics, DVT diagnosis, Normal fetal echo anatomy" className="bg-white border-purple-200" />
+              <Label className="text-xs font-medium text-teal-700 mb-1 block">Topic *</Label>
+              <Input value={aiTopic} onChange={e => setAITopic(e.target.value)} placeholder="e.g. Doppler physics, DVT diagnosis, Normal fetal echo anatomy" className="bg-white border-teal-200" />
             </div>
             <div>
-              <Label className="text-xs font-medium text-purple-700 mb-1 block">Number of Questions</Label>
-              <select value={aiCount} onChange={e => setAICount(Number(e.target.value))} className="w-full h-9 rounded-md border border-purple-200 bg-white px-3 text-sm">
+              <Label className="text-xs font-medium text-teal-700 mb-1 block">Number of Questions</Label>
+              <select value={aiCount} onChange={e => setAICount(Number(e.target.value))} className="w-full h-9 rounded-md border border-teal-200 bg-white px-3 text-sm">
                 {[5, 10, 15, 20, 25, 30, 50].map(n => <option key={n} value={n}>{n} questions</option>)}
               </select>
             </div>
             <div>
-              <Label className="text-xs font-medium text-purple-700 mb-1 block">Difficulty</Label>
-              <select value={aiDifficulty} onChange={e => setAIDifficulty(e.target.value as any)} className="w-full h-9 rounded-md border border-purple-200 bg-white px-3 text-sm">
+              <Label className="text-xs font-medium text-teal-700 mb-1 block">Difficulty</Label>
+              <select value={aiDifficulty} onChange={e => setAIDifficulty(e.target.value as any)} className="w-full h-9 rounded-md border border-teal-200 bg-white px-3 text-sm">
                 <option value="beginner">Beginner</option>
                 <option value="intermediate">Intermediate</option>
                 <option value="advanced">Advanced</option>
               </select>
             </div>
             <div>
-              <Label className="text-xs font-medium text-purple-700 mb-1 block">Question Type</Label>
-              <select value={aiType} onChange={e => setAIType(e.target.value as any)} className="w-full h-9 rounded-md border border-purple-200 bg-white px-3 text-sm">
+              <Label className="text-xs font-medium text-teal-700 mb-1 block">Question Type</Label>
+              <select value={aiType} onChange={e => setAIType(e.target.value as any)} className="w-full h-9 rounded-md border border-teal-200 bg-white px-3 text-sm">
                 <option value="mcq">Multiple Choice</option>
                 <option value="truefalse">True / False</option>
                 <option value="mixed">Mixed</option>
               </select>
             </div>
             <div>
-              <Label className="text-xs font-medium text-purple-700 mb-1 block">Tags (optional)</Label>
+              <Label className="text-xs font-medium text-teal-700 mb-1 block">Tags (optional)</Label>
               <div className="flex flex-wrap gap-1.5">
                 {tags.map(tag => (
                   <button key={tag.id} onClick={() => setAITagIds(prev => prev.includes(tag.id) ? prev.filter(id => id !== tag.id) : [...prev, tag.id])}
@@ -7938,7 +7938,7 @@ function QuestionBankAdmin() {
             </div>
           </div>
           <div className="flex justify-end">
-            <Button className="bg-purple-600 hover:bg-purple-700 text-white gap-1.5" disabled={!aiTopic.trim() || aiGenerate.isPending}
+            <Button className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5" disabled={!aiTopic.trim() || aiGenerate.isPending}
               onClick={() => aiGenerate.mutate({ topic: aiTopic, count: aiCount, difficulty: aiDifficulty, questionType: aiType, tagIds: aiTagIds.length > 0 ? aiTagIds : undefined })}>
               {aiGenerate.isPending ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating...</> : <><Sparkles className="w-3.5 h-3.5" /> Generate & Add to Bank</>}
             </Button>
@@ -8617,7 +8617,7 @@ function CohortTab({ courseId }: { courseId: number }) {
                 <Download className="w-3.5 h-3.5 mr-1" /> ICS
               </Button>
               {(sessions as CohortSession[]).some(s => s.recurrenceRule && !s.parentSessionId) && (
-                <Button size="sm" variant="outline" className="text-xs text-purple-600 border-purple-200 hover:bg-purple-50"
+                <Button size="sm" variant="outline" className="text-xs text-teal-600 border-teal-200 hover:bg-teal-50"
                   disabled={expandRecurring.isPending}
                   onClick={async () => {
                     const parents = (sessions as CohortSession[]).filter(s => s.recurrenceRule && !s.parentSessionId);
@@ -8659,8 +8659,8 @@ function CohortTab({ courseId }: { courseId: number }) {
                       <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{fmtDate(s.sessionDate)}</span>
                       <span>{s.durationMinutes} min</span>
                       {s.timezone && <span className="flex items-center gap-1"><Globe className="w-3 h-3" />{s.timezone}</span>}
-                      {s.recurrenceRule && <span className="flex items-center gap-1 text-purple-600"><Repeat className="w-3 h-3" />{s.recurrenceRule}{s.recurrenceDaysOfWeek ? ` (${s.recurrenceDaysOfWeek.split(",").map(d => ["Su","Mo","Tu","We","Th","Fr","Sa"][+d]).join(",")})` : ""}</span>}
-                      {s.parentSessionId && <span className="text-purple-400 text-xs">Recurring instance</span>}
+                      {s.recurrenceRule && <span className="flex items-center gap-1 text-teal-600"><Repeat className="w-3 h-3" />{s.recurrenceRule}{s.recurrenceDaysOfWeek ? ` (${s.recurrenceDaysOfWeek.split(",").map(d => ["Su","Mo","Tu","We","Th","Fr","Sa"][+d]).join(",")})` : ""}</span>}
+                      {s.parentSessionId && <span className="text-teal-400 text-xs">Recurring instance</span>}
                       {s.meetingUrl && <a href={s.meetingUrl} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline flex items-center gap-1"><LinkIcon className="w-3 h-3" />Meeting Link</a>}
                       {s.recordingUrl && <a href={s.recordingUrl} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline flex items-center gap-1"><PlayCircle className="w-3 h-3" />Recording</a>}
                     </div>
@@ -8680,7 +8680,7 @@ function CohortTab({ courseId }: { courseId: number }) {
                     </Button>
                     {/* Expand recurring */}
                     {s.recurrenceRule && !s.parentSessionId && (
-                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-purple-400 hover:text-purple-600" title="Expand recurring sessions"
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-teal-400 hover:text-teal-600" title="Expand recurring sessions"
                         onClick={() => expandRecurring.mutate({ parentSessionId: s.id })} disabled={expandRecurring.isPending}>
                         <Repeat className="w-3.5 h-3.5" />
                       </Button>
@@ -8837,8 +8837,8 @@ function CohortTab({ courseId }: { courseId: number }) {
             <div className="space-y-2">
               {(recordings as CohortRecording[]).map(r => (
                 <div key={r.id} className="bg-white border border-gray-200 rounded-lg p-4 flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center flex-shrink-0">
-                    <Film className="w-5 h-5 text-purple-600" />
+                  <div className="w-10 h-10 rounded-lg bg-teal-50 flex items-center justify-center flex-shrink-0">
+                    <Film className="w-5 h-5 text-teal-600" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">

@@ -138,7 +138,7 @@ function AssetThumbnail({ asset }: { asset: any }) {
   }
   const iconMap: Record<string, { icon: React.ReactNode; bg: string; color: string }> = {
     image:    { icon: <FileImage className="w-10 h-10" />,  bg: "bg-blue-50 dark:bg-blue-950/30",   color: "text-blue-500" },
-    video:    { icon: <FileVideo className="w-10 h-10" />,  bg: "bg-purple-50 dark:bg-purple-950/30", color: "text-purple-500" },
+    video:    { icon: <FileVideo className="w-10 h-10" />,  bg: "bg-teal-50 dark:bg-teal-950/30", color: "text-teal-500" },
     audio:    { icon: <FileAudio className="w-10 h-10" />,  bg: "bg-pink-50 dark:bg-pink-950/30",   color: "text-pink-500" },
     document: { icon: <FileText className="w-10 h-10" />,   bg: "bg-orange-50 dark:bg-orange-950/30", color: "text-orange-500" },
     html:     { icon: <Code className="w-10 h-10" />,       bg: "bg-green-50 dark:bg-green-950/30",  color: "text-green-500" },

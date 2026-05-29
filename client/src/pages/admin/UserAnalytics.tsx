@@ -86,7 +86,7 @@ function OverviewTab({ from, to }: { from: string; to: string }) {
           <>
             <StatCard icon={<Users className="w-5 h-5 text-teal-600" />} label="Active Users" value={overview.activeUsers} color="bg-teal-50" />
             <StatCard icon={<LogIn className="w-5 h-5 text-blue-600" />} label="Logins" value={overview.logins} color="bg-blue-50" />
-            <StatCard icon={<Eye className="w-5 h-5 text-purple-600" />} label="Page Views" value={overview.pageViews} color="bg-purple-50" />
+            <StatCard icon={<Eye className="w-5 h-5 text-teal-600" />} label="Page Views" value={overview.pageViews} color="bg-teal-50" />
             <StatCard icon={<PlayCircle className="w-5 h-5 text-orange-600" />} label="Video Plays" value={overview.videoPlays} sub={`${overview.videoCompletes} completed`} color="bg-orange-50" />
             <StatCard icon={<HelpCircle className="w-5 h-5 text-pink-600" />} label="Quiz Attempts" value={overview.quizAttempts} color="bg-pink-50" />
             <StatCard icon={<Download className="w-5 h-5 text-green-600" />} label="Downloads" value={overview.downloads} color="bg-green-50" />
@@ -277,7 +277,7 @@ function UserListTab({ onSelectUser, initialSearch = "" }: { onSelectUser: (id: 
                     <span className={`text-xs font-medium ${u.loginCount > 0 ? "text-blue-600" : "text-gray-300"}`}>{u.loginCount}</span>
                   </td>
                   <td className="px-3 py-2.5 text-right">
-                    <span className={`text-xs font-medium ${u.pageViewCount > 0 ? "text-purple-600" : "text-gray-300"}`}>{u.pageViewCount}</span>
+                    <span className={`text-xs font-medium ${u.pageViewCount > 0 ? "text-teal-600" : "text-gray-300"}`}>{u.pageViewCount}</span>
                   </td>
                   <td className="px-3 py-2.5 text-right">
                     <span className={`text-xs font-medium ${u.videoPlayCount > 0 ? "text-orange-600" : "text-gray-300"}`}>{u.videoPlayCount}</span>
@@ -302,7 +302,7 @@ function UserListTab({ onSelectUser, initialSearch = "" }: { onSelectUser: (id: 
                         onClick={(e) => { e.stopPropagation(); onSelectUser(u.id); }}>
                         Analytics
                       </Button>
-                      <Button size="sm" variant="ghost" className="h-6 text-xs text-purple-600 hover:bg-purple-50 px-2"
+                      <Button size="sm" variant="ghost" className="h-6 text-xs text-teal-600 hover:bg-teal-50 px-2"
                         onClick={(e) => { e.stopPropagation(); navigate(`/admin/users/${u.id}`); }}>
                         Manage →
                       </Button>
@@ -383,7 +383,7 @@ function UserDetailView({ userId, onBack }: { userId: number; onBack: () => void
           <p className="text-xs text-gray-500">Logins (last 50)</p>
         </CardContent></Card>
         <Card className="border border-gray-200"><CardContent className="p-3 text-center">
-          <p className="text-xl font-bold text-purple-600">{pageViewsByPath.reduce((s, p) => s + p.views, 0)}</p>
+          <p className="text-xl font-bold text-teal-600">{pageViewsByPath.reduce((s, p) => s + p.views, 0)}</p>
           <p className="text-xs text-gray-500">Page Views</p>
         </CardContent></Card>
         <Card className="border border-gray-200"><CardContent className="p-3 text-center">
@@ -594,7 +594,7 @@ function UserDetailView({ userId, onBack }: { userId: number; onBack: () => void
                     {pageViewsByPath.map(p => (
                       <tr key={p.path} className="hover:bg-gray-50">
                         <td className="px-4 py-2.5 font-mono text-xs text-gray-700">{p.path}</td>
-                        <td className="px-3 py-2.5 text-right text-sm font-medium text-purple-600">{p.views}</td>
+                        <td className="px-3 py-2.5 text-right text-sm font-medium text-teal-600">{p.views}</td>
                         <td className="px-3 py-2.5 text-right text-xs text-gray-400">{fmtDate(p.lastViewed)}</td>
                       </tr>
                     ))}
@@ -749,7 +749,7 @@ function ActivityLogTab({ userId, userName }: { userId: number; userName: string
   ];
 
   const eventTypeColors: Record<string, string> = {
-    page_view: "bg-purple-100 text-purple-700",
+    page_view: "bg-teal-100 text-teal-700",
     login: "bg-blue-100 text-blue-700",
     video_play: "bg-orange-100 text-orange-700",
     video_complete: "bg-green-100 text-green-700",

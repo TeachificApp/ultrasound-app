@@ -570,7 +570,7 @@ export default function CohortSchedule() {
             </div>
             {(recordings ?? []).length > 0 && (
               <div className="text-center">
-                <p className="text-2xl font-bold text-purple-600">{recordings.length}</p>
+                <p className="text-2xl font-bold text-teal-600">{recordings.length}</p>
                 <p className="text-xs text-gray-500">Recordings</p>
               </div>
             )}
@@ -603,7 +603,7 @@ export default function CohortSchedule() {
               <Film className="w-4 h-4" />
               Replays
               {(recordings ?? []).length > 0 && (
-                <Badge className="ml-1 bg-purple-500 text-white text-xs px-1.5 py-0">{recordings.length}</Badge>
+                <Badge className="ml-1 bg-teal-500 text-white text-xs px-1.5 py-0">{recordings.length}</Badge>
               )}
             </TabsTrigger>
           </TabsList>
@@ -890,13 +890,13 @@ function RecordingCard({ recording }: { recording: any }) {
     <Card className="border border-gray-200 bg-white">
       <CardContent className="p-4">
         <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-purple-100">
-            <Film className="w-5 h-5 text-purple-600" />
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-teal-100">
+            <Film className="w-5 h-5 text-teal-600" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2 flex-wrap">
               <h3 className="font-semibold text-gray-900 text-base leading-tight">{recording.title}</h3>
-              <Badge className="bg-purple-100 text-purple-700 border-purple-200 text-xs flex-shrink-0">Recording</Badge>
+              <Badge className="bg-teal-100 text-teal-700 border-teal-200 text-xs flex-shrink-0">Recording</Badge>
             </div>
             {recording.description && (
               <p className="text-gray-500 text-sm mt-1 line-clamp-2">{recording.description}</p>
@@ -923,7 +923,7 @@ function RecordingCard({ recording }: { recording: any }) {
               </div>
             )}
             {!hasEmbed && recording.externalUrl && (
-              <Button size="sm" variant="outline" className="mt-3 h-8 text-xs gap-1.5 border-purple-300 text-purple-700 hover:bg-purple-50" asChild>
+              <Button size="sm" variant="outline" className="mt-3 h-8 text-xs gap-1.5 border-teal-300 text-teal-700 hover:bg-teal-50" asChild>
                 <a href={recording.externalUrl} target="_blank" rel="noopener noreferrer">
                   <PlayCircle className="w-3.5 h-3.5" />
                   Watch Recording

@@ -911,7 +911,7 @@ export default function UEANavigator() {
           >
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: "#fdf4ff" }}>
-                <Activity className="w-4 h-4 text-purple-600" />
+                <Activity className="w-4 h-4 text-teal-600" />
               </div>
               <div>
                 <h2 className="text-sm font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>
@@ -926,9 +926,9 @@ export default function UEANavigator() {
           {expandedSection === "plsvc" && (
             <div className="px-5 pb-5 border-t border-gray-100">
               {/* Overview */}
-              <div className="mt-4 mb-4 p-4 rounded-lg bg-purple-50 border border-purple-200">
-                <h3 className="text-xs font-bold text-purple-800 mb-2">What is PLSVC?</h3>
-                <p className="text-xs text-purple-700 leading-relaxed">
+              <div className="mt-4 mb-4 p-4 rounded-lg bg-teal-50 border border-teal-200">
+                <h3 className="text-xs font-bold text-teal-800 mb-2">What is PLSVC?</h3>
+                <p className="text-xs text-teal-700 leading-relaxed">
                   Persistent Left Superior Vena Cava (PLSVC) is the most common congenital thoracic venous anomaly, occurring in 0.3–0.5% of the general population and 4–8% of patients with congenital heart disease. The left SVC persists from embryonic development and typically drains into the right atrium via a dilated coronary sinus. It is usually an incidental finding but has important implications for pacemaker implantation, central line placement, and cardiac surgery.
                 </p>
               </div>

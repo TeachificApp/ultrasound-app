@@ -879,7 +879,7 @@ function CaseTracker({ tier }: { tier: StaffTier }) {
                 <input type="checkbox" checked={isMedDir} onChange={e => setIsMedDir(e.target.checked)} className="rounded" />
                 <span>Medical Director represented</span>
                 {isMedDir && typeof physicianMemberId === "number" && (
-                  <span className="text-[10px] text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded-full font-medium">auto-set</span>
+                  <span className="text-[10px] text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded-full font-medium">auto-set</span>
                 )}
               </label>
             </div>
@@ -920,7 +920,7 @@ function CaseTracker({ tier }: { tier: StaffTier }) {
                         <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium">Tech Dir</span>
                       )}
                       {c.isMedDirectorCase && (
-                        <span className="text-xs px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-700 font-medium">Med Dir</span>
+                        <span className="text-xs px-1.5 py-0.5 rounded-full bg-teal-50 text-teal-700 font-medium">Med Dir</span>
                       )}
                     </div>
                     <div className="flex items-center gap-3 mt-0.5 flex-wrap">

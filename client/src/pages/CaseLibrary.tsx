@@ -55,7 +55,7 @@ import { isIHeartEchoDomain } from "@/hooks/useSubdomain";
 const MODALITY_COLORS: Record<string, string> = {
   // AAUS modalities
   Abdominal: "bg-blue-100 text-blue-700",
-  Vascular: "bg-purple-100 text-purple-700",
+  Vascular: "bg-teal-100 text-teal-700",
   "OB/Gyn": "bg-pink-100 text-pink-700",
   MSK: "bg-orange-100 text-orange-700",
   POCUS: "bg-teal-100 text-teal-700",
@@ -357,7 +357,7 @@ export default function CaseLibrary() {
                         {c.mediaCount > 0 && (
                           <div className="flex items-center gap-1.5 mb-3">
                             {c.hasVideo ? (
-                              <span className="flex items-center gap-1 text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full font-medium">
+                              <span className="flex items-center gap-1 text-xs text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full font-medium">
                                 <PlayCircle className="w-3 h-3" /> Video
                               </span>
                             ) : null}

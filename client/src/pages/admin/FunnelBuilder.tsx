@@ -87,7 +87,7 @@ interface Funnel {
 const PAGE_TYPE_META: Record<PageType, { label: string; icon: React.ReactNode; color: string; description: string }> = {
   landing: { label: "Landing Page", icon: <FileText size={16} />, color: "bg-blue-100 text-blue-700", description: "Capture leads and warm up traffic" },
   checkout: { label: "Checkout", icon: <CreditCard size={16} />, color: "bg-green-100 text-green-700", description: "Collect payment for products" },
-  upsell: { label: "Upsell", icon: <Gift size={16} />, color: "bg-purple-100 text-purple-700", description: "Offer additional products after purchase" },
+  upsell: { label: "Upsell", icon: <Gift size={16} />, color: "bg-teal-100 text-teal-700", description: "Offer additional products after purchase" },
   downsell: { label: "Downsell", icon: <ShoppingCart size={16} />, color: "bg-orange-100 text-orange-700", description: "Alternative offer if upsell declined" },
   thank_you: { label: "Thank You", icon: <ThumbsUp size={16} />, color: "bg-teal-100 text-teal-700", description: "Confirm purchase and deliver access" },
   custom: { label: "Custom Page", icon: <Layers size={16} />, color: "bg-gray-100 text-gray-700", description: "Flexible page for any purpose" },
@@ -353,10 +353,10 @@ function CreateFunnelDialog({ onClose, onCreated }: { onClose: () => void; onCre
                     <div
                       key={`saved-${tpl.id}`}
                       onClick={() => { setSelectedTemplate(`saved:${tpl.id}`); setStep("details"); }}
-                      className={`p-4 rounded-xl border-2 cursor-pointer transition-all hover:border-purple-300 hover:shadow-sm ${selectedTemplate === `saved:${tpl.id}` ? "border-purple-500 bg-purple-50" : "border-gray-200"}`}
+                      className={`p-4 rounded-xl border-2 cursor-pointer transition-all hover:border-teal-300 hover:shadow-sm ${selectedTemplate === `saved:${tpl.id}` ? "border-teal-500 bg-teal-50" : "border-gray-200"}`}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600"><LayoutTemplate size={20} /></div>
+                        <div className="w-10 h-10 rounded-lg bg-teal-50 flex items-center justify-center text-teal-600"><LayoutTemplate size={20} /></div>
                         <div>
                           <h3 className="font-semibold text-gray-900">{tpl.name}</h3>
                           <p className="text-sm text-gray-500">{tpl.description || "Custom saved template"}</p>
@@ -668,7 +668,7 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
           </Button>
           <Button variant="outline" size="sm" onClick={() => duplicateFunnel.mutate({ id: funnelId })} className="gap-1.5 text-xs">
             <Copy size={14} /> Duplicate
-          <Button variant="outline" size="sm" onClick={() => { const tplName = prompt("Template name:", funnel.name + " Template"); if (tplName) saveAsTemplate.mutate({ id: funnelId, templateName: tplName }); }} className="gap-1.5 text-xs text-purple-600 border-purple-200 hover:bg-purple-50">
+          <Button variant="outline" size="sm" onClick={() => { const tplName = prompt("Template name:", funnel.name + " Template"); if (tplName) saveAsTemplate.mutate({ id: funnelId, templateName: tplName }); }} className="gap-1.5 text-xs text-teal-600 border-teal-200 hover:bg-teal-50">
             <LayoutTemplate size={14} /> Save as Template
           </Button>
           </Button>
@@ -907,9 +907,9 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
               <button
                 onClick={() => copyPageAsStandalone.mutate({ pageId: copyPageDialog.pageId })}
                 disabled={copyPageAsStandalone.isPending}
-                className="w-full flex items-center gap-3 p-3 rounded-xl border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-all text-left"
+                className="w-full flex items-center gap-3 p-3 rounded-xl border border-gray-200 hover:border-teal-300 hover:bg-teal-50 transition-all text-left"
               >
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-purple-100 text-purple-600"><Eye size={16} /></div>
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-teal-100 text-teal-600"><Eye size={16} /></div>
                 <div>
                   <h4 className="font-medium text-gray-900 text-sm">Copy as standalone landing page</h4>
                   <p className="text-xs text-gray-500">Publish at /p/[slug] — accessible without going through the funnel</p>
@@ -1004,7 +1004,7 @@ function FunnelDetailView({ funnelId, onBack, onEditPage }: { funnelId: number; 
                         <div className="space-y-1.5 max-h-64 overflow-y-auto">
                           {importablePages[selectedSourceIdx].pages.map((p: any) => {
                             const src = importablePages[selectedSourceIdx];
-                            const typeColor = src.sourceType === "funnel" ? "bg-blue-100 text-blue-700" : src.sourceType === "course" ? "bg-green-100 text-green-700" : "bg-purple-100 text-purple-700";
+                            const typeColor = src.sourceType === "funnel" ? "bg-blue-100 text-blue-700" : src.sourceType === "course" ? "bg-green-100 text-green-700" : "bg-teal-100 text-teal-700";
                             return (
                               <button
                                 key={`${p.sourceType}-${p.id}`}
@@ -1340,7 +1340,7 @@ function SortableFunnelPageRow({
             <button onClick={onDuplicate} className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 bg-blue-50 px-2 py-1 rounded-lg">
               <Copy size={12} /> Duplicate
             </button>
-            <button onClick={onCopyPage} className="text-xs text-purple-600 hover:text-purple-700 flex items-center gap-1 bg-purple-50 px-2 py-1 rounded-lg">
+            <button onClick={onCopyPage} className="text-xs text-teal-600 hover:text-teal-700 flex items-center gap-1 bg-teal-50 px-2 py-1 rounded-lg">
               <Copy size={12} /> Copy To...
             </button>
             <button onClick={onRename} className="text-xs text-gray-600 hover:text-gray-700 flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-lg">

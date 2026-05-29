@@ -981,7 +981,7 @@ function ManagedAccountsPanel() {
               onClick={() => setSelectedAccountId(account.id)}
             >
               <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "#7c3aed18" }}>
-                <Building2 className="w-5 h-5 text-purple-600" />
+                <Building2 className="w-5 h-5 text-teal-600" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-gray-800 group-hover:text-teal-700 transition-colors">{account.facilityName}</p>

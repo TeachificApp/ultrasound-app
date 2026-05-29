@@ -102,7 +102,7 @@ import { toast } from "sonner";
 
 const TYPE_META = {
   scenario: { label: "Scenario (MCQ)", icon: Stethoscope, color: "bg-blue-100 text-blue-700" },
-  image: { label: "Image-Based (MCQ)", icon: ImageIcon, color: "bg-purple-100 text-purple-700" },
+  image: { label: "Image-Based (MCQ)", icon: ImageIcon, color: "bg-teal-100 text-teal-700" },
   quickReview: { label: "Quick Review (Flashcard)", icon: FileText, color: "bg-teal-100 text-teal-700" },
   connect: { label: "Connect Game (Matching)", icon: Link2, color: "bg-teal-100 text-teal-700" },
   identifier: { label: "Identifier Game (Anatomy)", icon: Target, color: "bg-indigo-100 text-indigo-700" },
@@ -228,7 +228,7 @@ function QuestionPreviewModal({ challengeId, challengeQuestionIds, challengeTitl
             <div className="flex items-center gap-2 flex-wrap mb-3">
               <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                 q.type === "scenario" ? "bg-blue-100 text-blue-700" :
-                q.type === "image" ? "bg-purple-100 text-purple-700" :
+                q.type === "image" ? "bg-teal-100 text-teal-700" :
                 q.type === "quickReview" ? "bg-teal-100 text-teal-700" :
                 "bg-gray-100 text-gray-600"
               }`}>{q.type === "scenario" ? "Scenario (MCQ)" : q.type === "image" ? "Image-Based (MCQ)" : q.type === "quickReview" ? "Quick Review" : q.type}</span>
@@ -1195,7 +1195,7 @@ export default function QuickFireAdmin() {
             <Button
               variant="outline"
               size="sm"
-              className="gap-1.5 border-purple-400 text-purple-600"
+              className="gap-1.5 border-teal-400 text-teal-600"
               onClick={() => { setAiPreview([]); setAiOpen(true); }}
             >
               <Sparkles className="w-4 h-4" /> AI Generate
@@ -1677,7 +1677,7 @@ export default function QuickFireAdmin() {
                             "bg-teal-50 text-teal-700"
                           }`}>{q.category}</span>
                         )}
-                        {q.imageUrl && <ImageIcon className="w-3 h-3 text-purple-400" />}
+                        {q.imageUrl && <ImageIcon className="w-3 h-3 text-teal-400" />}
                         {(q.tags ?? []).slice(0, 3).map((t: string) => (
                           <span key={t} className="text-xs text-gray-400">#{t}</span>
                         ))}
@@ -1718,7 +1718,7 @@ export default function QuickFireAdmin() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-8 w-8 p-0 text-gray-400 hover:text-purple-500"
+                        className="h-8 w-8 p-0 text-gray-400 hover:text-teal-500"
                         title="Copy & Edit — creates a duplicate with a new QID"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1923,7 +1923,7 @@ export default function QuickFireAdmin() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="gap-1.5 border-purple-400 text-purple-600"
+                  className="gap-1.5 border-teal-400 text-teal-600"
                   onClick={() => { setFlashcardAiPreview([]); setFlashcardAiTopic(""); setFlashcardAiOpen(true); }}
                 >
                   <Sparkles className="w-4 h-4" /> AI Generate
@@ -2015,7 +2015,7 @@ export default function QuickFireAdmin() {
                           <p className="text-xs text-gray-500 mb-2 line-clamp-2" dangerouslySetInnerHTML={{ __html: q.reviewAnswer }} />
                         )}
                         <div className="flex items-center gap-3 text-[10px] text-gray-400">
-                          {q.imageUrl && <span className="flex items-center gap-1 text-purple-500"><ImageIcon className="w-3 h-3" />Has image</span>}
+                          {q.imageUrl && <span className="flex items-center gap-1 text-teal-500"><ImageIcon className="w-3 h-3" />Has image</span>}
                           {(q as any).videoUrl && <span className="flex items-center gap-1 text-blue-500"><PlayCircle className="w-3 h-3" />Has video</span>}
                           {q.difficulty && <Badge variant="outline" className="text-[10px]">{q.difficulty}</Badge>}
                           {!q.isActive && <Badge className="text-[10px] bg-red-100 text-red-600 border-0">Inactive</Badge>}
@@ -3148,7 +3148,7 @@ export default function QuickFireAdmin() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-purple-500" /> AI Question Generator
+              <Sparkles className="w-5 h-5 text-teal-500" /> AI Question Generator
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -3290,7 +3290,7 @@ export default function QuickFireAdmin() {
                               onClick={() => setAiTypeCounts(prev => ({ ...prev, [key]: Math.max(0, (prev[key] ?? 0) - 1) }))}
                             >-</button>
                             <span className={`w-6 text-center text-sm font-bold ${
-                              (aiTypeCounts[key] ?? 0) > 0 ? "text-purple-600" : "text-gray-300"
+                              (aiTypeCounts[key] ?? 0) > 0 ? "text-teal-600" : "text-gray-300"
                             }`}>{aiTypeCounts[key] ?? 0}</span>
                             <button
                               type="button"
@@ -3303,7 +3303,7 @@ export default function QuickFireAdmin() {
                     </div>
                     <p className="text-xs text-gray-400 mt-1.5">
                       Total: <span className={`font-bold ${
-                        Object.values(aiTypeCounts).reduce((a, b) => a + b, 0) > 40 ? "text-red-500" : "text-purple-600"
+                        Object.values(aiTypeCounts).reduce((a, b) => a + b, 0) > 40 ? "text-red-500" : "text-teal-600"
                       }`}>{Object.values(aiTypeCounts).reduce((a, b) => a + b, 0)}</span> questions
                     </p>
                   </div>
@@ -3380,12 +3380,12 @@ export default function QuickFireAdmin() {
                     <div
                       key={i}
                       className={`flex gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                        aiSelected.has(i) ? "border-purple-300 bg-purple-50" : "border-gray-100 bg-white opacity-60"
+                        aiSelected.has(i) ? "border-teal-300 bg-teal-50" : "border-gray-100 bg-white opacity-60"
                       }`}
                       onClick={() => setAiSelected((prev) => { const next = new Set(prev); if (next.has(i)) next.delete(i); else next.add(i); return next; })}
                     >
                       <div className="flex-shrink-0 mt-0.5">
-                        {aiSelected.has(i) ? <CheckSquare className="w-4 h-4 text-purple-500" /> : <Square className="w-4 h-4 text-gray-300" />}
+                        {aiSelected.has(i) ? <CheckSquare className="w-4 h-4 text-teal-500" /> : <Square className="w-4 h-4 text-gray-300" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-800 leading-snug" dangerouslySetInnerHTML={{ __html: q.question ?? "" }} />
@@ -3528,7 +3528,7 @@ export default function QuickFireAdmin() {
                       image: { label: "Image", color: "bg-indigo-50 text-indigo-700" },
                       connect: { label: "Connect", color: "bg-teal-50 text-teal-700" },
                       order: { label: "Order", color: "bg-orange-50 text-orange-700" },
-                      identifier: { label: "Identifier", color: "bg-purple-50 text-purple-700" },
+                      identifier: { label: "Identifier", color: "bg-teal-50 text-teal-700" },
                       quickReview: { label: "Flashcard", color: "bg-green-50 text-green-700" },
                     };
                     const meta = typeMeta[type] ?? { label: type, color: "bg-gray-50 text-gray-700" };
@@ -3536,12 +3536,12 @@ export default function QuickFireAdmin() {
                       <div
                         key={i}
                         className={`flex gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                          aiMixedSelected.has(i) ? "border-purple-300 bg-purple-50" : "border-gray-100 bg-white opacity-60"
+                          aiMixedSelected.has(i) ? "border-teal-300 bg-teal-50" : "border-gray-100 bg-white opacity-60"
                         }`}
                         onClick={() => setAiMixedSelected((prev) => { const next = new Set(prev); if (next.has(i)) next.delete(i); else next.add(i); return next; })}
                       >
                         <div className="flex-shrink-0 mt-0.5">
-                          {aiMixedSelected.has(i) ? <CheckSquare className="w-4 h-4 text-purple-500" /> : <Square className="w-4 h-4 text-gray-300" />}
+                          {aiMixedSelected.has(i) ? <CheckSquare className="w-4 h-4 text-teal-500" /> : <Square className="w-4 h-4 text-gray-300" />}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 mb-1">
@@ -3647,7 +3647,7 @@ export default function QuickFireAdmin() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-purple-500" /> AI Flashcard Generator
+              <Sparkles className="w-5 h-5 text-teal-500" /> AI Flashcard Generator
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -3735,12 +3735,12 @@ export default function QuickFireAdmin() {
                     <div
                       key={i}
                       className={`flex gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                        flashcardAiSelected.has(i) ? "border-purple-300 bg-purple-50" : "border-gray-100 bg-white opacity-60"
+                        flashcardAiSelected.has(i) ? "border-teal-300 bg-teal-50" : "border-gray-100 bg-white opacity-60"
                       }`}
                       onClick={() => setFlashcardAiSelected((prev) => { const next = new Set(prev); if (next.has(i)) next.delete(i); else next.add(i); return next; })}
                     >
                       <div className="flex-shrink-0 mt-0.5">
-                        {flashcardAiSelected.has(i) ? <CheckSquare className="w-4 h-4 text-purple-500" /> : <Square className="w-4 h-4 text-gray-300" />}
+                        {flashcardAiSelected.has(i) ? <CheckSquare className="w-4 h-4 text-teal-500" /> : <Square className="w-4 h-4 text-gray-300" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-800 leading-snug" dangerouslySetInnerHTML={{ __html: q.question ?? "" }} />
