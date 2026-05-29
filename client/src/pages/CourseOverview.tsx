@@ -11,6 +11,7 @@
  *   - Admin: "Edit Overview" button to open the block editor
  */
 import { useState, useEffect } from "react";
+import { RichTextDisplay } from "@/components/RichTextEditor";
 import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -22,7 +23,7 @@ import {
   Award, BookOpen, CheckCircle, ChevronDown, ChevronRight, Clock, Edit3,
   Lock, PlayCircle, User, FileText, HelpCircle, Download, Monitor,
   ArrowRight, ListChecks, ExternalLink, Video, Film, Upload, Link2,
-  CheckCircle2, Calendar, AlertCircle,
+  CheckCircle2, Calendar, AlertCircle, ChevronLeft, CalendarDays,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -89,7 +90,7 @@ export default function CourseOverview() {
   const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set());
   const [showEditor, setShowEditor] = useState(false);
   const [selectedInstructor, setSelectedInstructor] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<"overview" | "cohort">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "cohort" | "calendar">("overview");
 
   const { data, isLoading, refetch } = trpc.lmsLearner.getCourseOverview.useQuery(
     { slug: slug!, preview: isAdmin },
@@ -384,6 +385,19 @@ export default function CourseOverview() {
                   })()}
                 </span>
               </button>
+              <button
+                onClick={() => setActiveTab("calendar")}
+                className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === "calendar"
+                    ? "border-teal-600 text-teal-700"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
+              >
+                <span className="flex items-center gap-1.5">
+                  <CalendarDays className="w-4 h-4" />
+                  Calendar
+                </span>
+              </button>
             </div>
           </div>
         </div>
@@ -394,7 +408,12 @@ export default function CourseOverview() {
         <CohortDashboardTab courseId={courseId!} cohortData={cohortData as any} isLoading={cohortLoading} />
       )}
 
-      <div className={`max-w-5xl mx-auto px-6 py-8 space-y-8 ${isCohortCourse && activeTab === "cohort" ? "hidden" : ""}`}>
+      {/* Calendar Tab */}
+      {isCohortCourse && activeTab === "calendar" && (
+        <CohortCalendarTab cohortData={cohortData as any} isLoading={cohortLoading} />
+      )}
+
+      <div className={`max-w-5xl mx-auto px-6 py-8 space-y-8 ${isCohortCourse && (activeTab === "cohort" || activeTab === "calendar") ? "hidden" : ""}`}>
         {/* Top Zone blocks (above progress bar) */}
         {overviewTopBlocks.length > 0 && (
           <div className="bg-white rounded-xl overflow-hidden shadow-sm border border-gray-200">
@@ -853,7 +872,11 @@ function CohortSessionCard({ session, isUpcoming }: { session: any; isUpcoming: 
                 )}
               </div>
             </div>
-            {session.description && <p className="text-gray-500 text-xs mt-1 line-clamp-2">{session.description}</p>}
+            {session.description && (
+              <div className="text-gray-500 text-xs mt-1 prose prose-xs max-w-none line-clamp-3">
+                <RichTextDisplay content={session.description} />
+              </div>
+            )}
             <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 flex-wrap">
               <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{fmtCohortDate(session.sessionDate)}</span>
               <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{fmtCohortTime(session.sessionDate)} · {fmtCohortDuration(session.durationMinutes)}</span>
@@ -962,5 +985,276 @@ function CohortRecordingCard({ recording }: { recording: any }) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// ─── Calendar helpers ──────────────────────────────────────────────────────────
+
+/** Format a timestamp as an ICS DTSTART/DTEND string (UTC) */
+function toICSDate(ts: number, durationMinutes = 60): { start: string; end: string } {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const d = new Date(ts);
+  const end = new Date(ts + durationMinutes * 60 * 1000);
+  const fmt = (dt: Date) =>
+    `${dt.getUTCFullYear()}${pad(dt.getUTCMonth() + 1)}${pad(dt.getUTCDate())}T${pad(dt.getUTCHours())}${pad(dt.getUTCMinutes())}00Z`;
+  return { start: fmt(d), end: fmt(end) };
+}
+
+/** Build a Google Calendar "add event" URL */
+function googleCalendarUrl(title: string, start: number, durationMinutes = 60, description = "", location = "") {
+  const { start: s, end: e } = toICSDate(start, durationMinutes);
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: title,
+    dates: `${s}/${e}`,
+    details: description,
+    location,
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+/** Build and trigger download of a .ics file for a single event */
+function downloadICS(title: string, start: number, durationMinutes = 60, description = "", location = "") {
+  const { start: s, end: e } = toICSDate(start, durationMinutes);
+  const uid = `${start}-${Math.random().toString(36).slice(2)}@allaboutultrasound.com`;
+  const ics = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//All About Ultrasound//LMS//EN",
+    "BEGIN:VEVENT",
+    `UID:${uid}`,
+    `DTSTART:${s}`,
+    `DTEND:${e}`,
+    `SUMMARY:${title}`,
+    `DESCRIPTION:${description.replace(/\n/g, "\\n")}`,
+    `LOCATION:${location}`,
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\r\n");
+  const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${title.replace(/[^a-z0-9]/gi, "_")}.ics`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** Build and trigger download of a .ics file for ALL upcoming sessions */
+function downloadAllICS(sessions: any[], courseTitle: string) {
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//All About Ultrasound//LMS//EN",
+  ];
+  sessions.forEach((s) => {
+    const { start, end } = toICSDate(s.sessionDate, s.durationMinutes ?? 60);
+    const uid = `${s.sessionDate}-${s.id}@allaboutultrasound.com`;
+    lines.push(
+      "BEGIN:VEVENT",
+      `UID:${uid}`,
+      `DTSTART:${start}`,
+      `DTEND:${end}`,
+      `SUMMARY:${s.title}`,
+      `DESCRIPTION:${(s.description ?? "").replace(/\n/g, "\\n")}`,
+      `LOCATION:${s.meetingUrl ?? ""}`,
+      "END:VEVENT",
+    );
+  });
+  lines.push("END:VCALENDAR");
+  const blob = new Blob([lines.join("\r\n")], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${courseTitle.replace(/[^a-z0-9]/gi, "_")}_schedule.ics`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ─── CohortCalendarTab ─────────────────────────────────────────────────────────
+
+function CohortCalendarTab({ cohortData, isLoading }: { cohortData: any; isLoading: boolean }) {
+  const today = new Date();
+  const [viewYear, setViewYear] = useState(today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(today.getMonth()); // 0-indexed
+
+  if (isLoading) {
+    return (
+      <div className="max-w-5xl mx-auto px-6 py-12 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-gray-500 text-sm">Loading calendar…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!cohortData) {
+    return (
+      <div className="max-w-5xl mx-auto px-6 py-12">
+        <Card className="text-center py-16">
+          <CardContent>
+            <CalendarDays className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-500 font-medium">No schedule available</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const { sessions = [], assignments = [] } = cohortData;
+  const upcomingSessions = sessions.filter((s: any) => new Date(s.sessionDate) > today);
+
+  // Build a map: "YYYY-MM-DD" → events[]
+  type CalEvent = { type: "session" | "assignment"; id: number; title: string; ts: number; durationMinutes?: number; meetingUrl?: string; description?: string };
+  const eventMap: Record<string, CalEvent[]> = {};
+  const addEvent = (dateKey: string, ev: CalEvent) => {
+    if (!eventMap[dateKey]) eventMap[dateKey] = [];
+    eventMap[dateKey].push(ev);
+  };
+
+  sessions.forEach((s: any) => {
+    const d = new Date(s.sessionDate);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    addEvent(key, { type: "session", id: s.id, title: s.title, ts: s.sessionDate, durationMinutes: s.durationMinutes ?? 60, meetingUrl: s.meetingUrl, description: s.description ?? "" });
+  });
+  assignments.forEach((a: any) => {
+    if (!a.dueDate) return;
+    const d = new Date(a.dueDate);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    addEvent(key, { type: "assignment", id: a.id, title: a.title, ts: a.dueDate, description: a.description ?? "" });
+  });
+
+  // Calendar grid
+  const firstDay = new Date(viewYear, viewMonth, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const monthName = new Date(viewYear, viewMonth, 1).toLocaleString("default", { month: "long" });
+  const cells: (number | null)[] = [...Array(firstDay).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+  // pad to full weeks
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); };
+  const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); };
+
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+  return (
+    <div className="max-w-5xl mx-auto px-6 py-6">
+      {/* Header row */}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-bold text-gray-900">{monthName} {viewYear}</h2>
+        <div className="flex items-center gap-2">
+          {upcomingSessions.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs gap-1.5 border-teal-300 text-teal-700 hover:bg-teal-50"
+              onClick={() => downloadAllICS(upcomingSessions, "Cohort Schedule")}
+            >
+              <Calendar className="w-3.5 h-3.5" /> Export All (.ics)
+            </Button>
+          )}
+          <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+            <ChevronLeft className="w-4 h-4 text-gray-600" />
+          </button>
+          <button
+            onClick={() => { setViewYear(today.getFullYear()); setViewMonth(today.getMonth()); }}
+            className="px-2.5 py-1 rounded-lg text-xs font-medium text-teal-700 hover:bg-teal-50 transition-colors"
+          >
+            Today
+          </button>
+          <button onClick={nextMonth} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+            <ChevronRight className="w-4 h-4 text-gray-600" />
+          </button>
+        </div>
+      </div>
+
+      {/* Day-of-week headers */}
+      <div className="grid grid-cols-7 mb-1">
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(d => (
+          <div key={d} className="text-center text-[11px] font-semibold text-gray-400 uppercase tracking-wide py-1">{d}</div>
+        ))}
+      </div>
+
+      {/* Calendar grid */}
+      <div className="grid grid-cols-7 border-l border-t border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+        {cells.map((day, idx) => {
+          if (day === null) {
+            return <div key={`empty-${idx}`} className="border-r border-b border-gray-200 min-h-[80px] bg-gray-50/50" />;
+          }
+          const key = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+          const events = eventMap[key] ?? [];
+          const isToday = key === todayKey;
+          return (
+            <div key={key} className={`border-r border-b border-gray-200 min-h-[80px] p-1.5 ${isToday ? "bg-teal-50/60" : "bg-white hover:bg-gray-50/60"} transition-colors`}>
+              <div className={`text-xs font-semibold mb-1 w-6 h-6 flex items-center justify-center rounded-full ${isToday ? "bg-teal-600 text-white" : "text-gray-700"}`}>
+                {day}
+              </div>
+              <div className="space-y-0.5">
+                {events.slice(0, 3).map((ev, i) => (
+                  <CalendarEventPill key={i} event={ev} />
+                ))}
+                {events.length > 3 && (
+                  <div className="text-[10px] text-gray-400 pl-1">+{events.length - 3} more</div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Upcoming sessions list with add-to-calendar actions */}
+      {upcomingSessions.length > 0 && (
+        <div className="mt-8">
+          <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-1.5">
+            <CalendarDays className="w-4 h-4 text-teal-600" /> Upcoming Sessions
+          </h3>
+          <div className="space-y-3">
+            {upcomingSessions.map((s: any) => (
+              <div key={s.id} className="bg-white border border-gray-200 rounded-xl p-4 flex items-start gap-4 shadow-sm">
+                <div className="w-10 h-10 rounded-xl bg-teal-100 flex items-center justify-center flex-shrink-0">
+                  <Video className="w-5 h-5 text-teal-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-900 text-sm">{s.title}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{fmtCohortDate(s.sessionDate)} · {fmtCohortTime(s.sessionDate)} · {fmtCohortDuration(s.durationMinutes)}</p>
+                  {s.description && <p className="text-xs text-gray-400 mt-1 line-clamp-2">{s.description}</p>}
+                </div>
+                <div className="flex flex-col gap-1.5 flex-shrink-0">
+                  <a
+                    href={googleCalendarUrl(s.title, s.sessionDate, s.durationMinutes ?? 60, s.description ?? "", s.meetingUrl ?? "")}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors border border-blue-200"
+                  >
+                    <ExternalLink className="w-3 h-3" /> Google Calendar
+                  </a>
+                  <button
+                    onClick={() => downloadICS(s.title, s.sessionDate, s.durationMinutes ?? 60, s.description ?? "", s.meetingUrl ?? "")}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-gray-50 text-gray-700 hover:bg-gray-100 transition-colors border border-gray-200"
+                  >
+                    <Calendar className="w-3 h-3" /> Add to Calendar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CalendarEventPill({ event }: { event: { type: "session" | "assignment"; title: string; ts: number; durationMinutes?: number; meetingUrl?: string; description?: string } }) {
+  const isSession = event.type === "session";
+  return (
+    <div
+      title={`${event.title}\n${new Date(event.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}
+      className={`text-[10px] font-medium px-1.5 py-0.5 rounded truncate cursor-default ${
+        isSession ? "bg-teal-100 text-teal-800" : "bg-amber-100 text-amber-800"
+      }`}
+    >
+      {new Date(event.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} {event.title}
+    </div>
   );
 }

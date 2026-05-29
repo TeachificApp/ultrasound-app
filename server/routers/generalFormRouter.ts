@@ -155,6 +155,12 @@ export const generalFormRouter = router({
       openAt: z.string().optional(),
       closeAt: z.string().optional(),
       hostDomain: z.string().optional(),
+      displayMode: z.enum(["classic", "typeform", "paginated", "inline"]).optional(),
+      welcomeTitle: z.string().optional(),
+      welcomeSubtitle: z.string().optional(),
+      welcomeButtonText: z.string().optional(),
+      welcomeImageUrl: z.string().optional(),
+      submitButtonText: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await requireAdmin(ctx);
@@ -308,6 +314,70 @@ export const generalFormRouter = router({
         }
       }
       return { id: newId, name: formName };
+    }),
+
+  // ── Append fields from URL (AI scaffold into existing form) ──────────────
+  appendFieldsFromUrl: protectedProcedure
+    .input(z.object({
+      templateId: z.number(),
+      url: z.string().url(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Fetch page content
+      let pageText = "";
+      try {
+        const res = await fetch(input.url, { headers: { "User-Agent": "Mozilla/5.0" }, signal: AbortSignal.timeout(10000) });
+        const html = await res.text();
+        // Better HTML extraction: strip scripts/styles first, then tags
+        pageText = html
+          .replace(/<script[\s\S]*?<\/script>/gi, " ")
+          .replace(/<style[\s\S]*?<\/style>/gi, " ")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/\s+/g, " ")
+          .substring(0, 5000);
+      } catch {
+        pageText = `Form from: ${input.url}`;
+      }
+      // AI scaffold
+      const aiResp = await invokeLLM({
+        messages: [
+          { role: "system", content: "You are a form builder assistant. Extract form fields from a web page and return structured JSON. Focus on actual form questions, input fields, and survey items. Ignore navigation, ads, and boilerplate text." },
+          { role: "user", content: `Extract form fields from this page and return JSON with: { "sections": [{ "title": string, "items": [{ "itemType": "short_text"|"long_text"|"email"|"phone"|"number"|"dropdown"|"radio"|"checkbox"|"date"|"heading"|"paragraph", "label": string, "isRequired": boolean, "options": [{"label": string, "value": string}] }] }] }\n\nPage content:\n${pageText}` },
+        ],
+        response_format: { type: "json_schema", json_schema: { name: "form_fields", strict: true, schema: { type: "object", properties: { sections: { type: "array", items: { type: "object", properties: { title: { type: "string" }, items: { type: "array", items: { type: "object", properties: { itemType: { type: "string" }, label: { type: "string" }, isRequired: { type: "boolean" }, options: { type: "array", items: { type: "object", properties: { label: { type: "string" }, value: { type: "string" } }, required: ["label", "value"], additionalProperties: false } } }, required: ["itemType", "label", "isRequired", "options"], additionalProperties: false } } }, required: ["title", "items"], additionalProperties: false } } }, required: ["sections"], additionalProperties: false } } },
+      });
+      let parsed: any;
+      try {
+        parsed = JSON.parse(aiResp.choices[0].message.content as string);
+      } catch {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "AI failed to parse form structure" });
+      }
+      // Get current max sort order for sections
+      const [maxSec] = await db.select({ max: sql<number>`COALESCE(MAX(sortOrder),0)` }).from(generalFormSections).where(eq(generalFormSections.templateId, input.templateId));
+      let sortOrder = (maxSec?.max ?? 0) + 1;
+      let addedCount = 0;
+      for (const section of (parsed.sections ?? [])) {
+        const [ns] = await db.insert(generalFormSections).values({ templateId: input.templateId, title: section.title || "Imported Section", sortOrder: sortOrder++ });
+        const sectionId = (ns as any).insertId;
+        let itemOrder = 0;
+        for (const item of (section.items ?? [])) {
+          const [ni] = await db.insert(generalFormItems).values({
+            templateId: input.templateId, sectionId, itemType: item.itemType || "short_text", label: item.label || "Field", isRequired: item.isRequired ?? false, sortOrder: itemOrder++,
+          });
+          const itemId = (ni as any).insertId;
+          if (item.options?.length > 0) {
+            let optOrder = 0;
+            for (const opt of item.options) {
+              await db.insert(generalFormOptions).values({ itemId, label: opt.label, value: opt.value, sortOrder: optOrder++ });
+            }
+          }
+          addedCount++;
+        }
+      }
+      return { addedCount };
     }),
 
   // ── Sections ──────────────────────────────────────────────────────────────
@@ -552,6 +622,26 @@ export const generalFormRouter = router({
       if (template.status === "closed") throw new TRPCError({ code: "FORBIDDEN", message: "This form is closed." });
       if (template.closeAt && new Date(template.closeAt) < new Date()) throw new TRPCError({ code: "FORBIDDEN", message: "This form has expired." });
       if (template.openAt && new Date(template.openAt) > new Date()) throw new TRPCError({ code: "FORBIDDEN", message: "This form is not open yet." });
+      const sections = await db.select().from(generalFormSections).where(eq(generalFormSections.templateId, template.id)).orderBy(asc(generalFormSections.sortOrder));
+      const items = await db.select().from(generalFormItems).where(eq(generalFormItems.templateId, template.id)).orderBy(asc(generalFormItems.sortOrder));
+      const options = items.length > 0
+        ? await db.select().from(generalFormOptions).where(inArray(generalFormOptions.itemId, items.map((i: any) => i.id))).orderBy(asc(generalFormOptions.sortOrder))
+        : [];
+      const branchRules = await db.select().from(generalFormBranchRules).where(eq(generalFormBranchRules.templateId, template.id));
+      return { template, sections, items, options, branchRules };
+    }),
+
+  // ── ADMIN PREVIEW: Get form by slug (no isPublic check) ──────────────────
+  getFormPreview: protectedProcedure
+    .input(z.object({ slug: z.string() }))
+    .query(async ({ ctx, input }) => {
+      await requireAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [template] = await db.select().from(generalFormTemplates)
+        .where(eq(generalFormTemplates.publicSlug, input.slug))
+        .limit(1);
+      if (!template) throw new TRPCError({ code: "NOT_FOUND", message: "Form not found." });
       const sections = await db.select().from(generalFormSections).where(eq(generalFormSections.templateId, template.id)).orderBy(asc(generalFormSections.sortOrder));
       const items = await db.select().from(generalFormItems).where(eq(generalFormItems.templateId, template.id)).orderBy(asc(generalFormItems.sortOrder));
       const options = items.length > 0

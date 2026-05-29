@@ -3601,3 +3601,46 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] Form editor domain override — wire PublishDomainSelect into GeneralFormBuilder settings panel (hostDomain) replacing hardcoded CUSTOM_DOMAINS list
 - [x] Funnel URL preview update — FunnelSettingsPanel now calls refetch() on save so the info bar external link reflects the new customDomain immediately
 - [x] Funnel settings panel — updateFunnelSettings procedure now accepts customDomain alongside slug/SEO in a single save action
+
+- [ ] Fix: published lesson content (multimedia embed) not showing in student course player view
+- [ ] Fix: DIY Accreditation and DIY Forms cards not showing in iHeartEcho brand tools
+- [ ] Community: allow image upload for community icon (instead of letter avatar)
+- [ ] Community: full page editor for community look (header, side navs, branding)
+- [ ] Community: admin can add members individually and in bulk
+- [ ] Community: admin can sort and remove members
+- [ ] Community: all member comments require moderation by default; admins can approve members to post without moderation
+
+- [ ] Calendar view in Course Overview: implement Calendar tab with monthly/list view of live sessions, ICS download (single event + full course), and Add to Google Calendar links for cohort live sessions
+
+- [ ] Fix: recurring cohort session expansion only generates first day of week, not all selected days
+- [ ] Add rich text editor for cohort session/event descriptions
+- [ ] Community: image upload picker for community avatar/cover (replace URL text field)
+- [ ] Community: Members tab in CommunityAdmin (list, add individual, bulk add, sort, remove, set moderation)
+- [ ] Community: comment moderation queue in admin (approve/reject pending comments)
+
+- [ ] Enroll dialog: add "Create & Enroll New User" tab (name + email → create account → enroll) for all LMS content types
+- [ ] LMS enrollment and new account emails should send from learn.allaboutultrasound.com domain
+
+- [ ] Fix: Form Builder color picker closes after one click (ColorField defined inside render)
+- [ ] Fix: Form Builder live preview not updating when theme changes
+- [ ] Add: Transparent background type to Form Builder
+- [ ] Rename: "General Form Builder" → "Form Builder" throughout UI
+
+## Form Builder Overhaul (May 29, 2026)
+- [ ] Fix: ColorField defined inside StyleTab render function — move outside as stable component
+- [ ] Fix: Form Builder live preview not updating when theme changes
+- [ ] Add: Transparent background type to Form Builder
+- [ ] Rename: "General Form Builder" → "Form Builder" throughout UI
+- [ ] Add: Style/Branding tab to FormBuilderAdmin (DIY Forms)
+- [ ] Add: URL import + "Add fields from URL" to FormBuilderAdmin
+- [ ] Add: appendFieldsFromUrl procedure to generalFormRouter
+- [ ] Add: Typeform-style display modes to public form renderer
+  - [ ] displayMode setting: "classic" (current single-page), "typeform" (welcome + page-by-page), "paginated" (page-by-page no welcome), "inline" (single-page no header)
+  - [ ] Add displayMode + welcomeTitle + welcomeButtonText + welcomeImageUrl to generalFormTemplates schema
+  - [ ] DB migration for new columns
+  - [ ] Update updateForm procedure to accept new fields
+  - [ ] Build TypeformRenderer component with animated transitions, progress bar, keyboard nav
+  - [ ] Build WelcomeScreen component with full-screen hero, logo, CTA button
+  - [ ] Build PageByPageRenderer: one question per screen, Enter key to advance, progress bar
+  - [ ] Add Display Mode selector in Settings tab of GeneralFormBuilder
+- [ ] Add: custom filters and views to form results (sort, filter by field, date range, column visibility, export filtered)

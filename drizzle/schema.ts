@@ -1785,6 +1785,8 @@ export const accreditationFormTemplates = mysqlTable("accreditationFormTemplates
   version: int("version").default(1).notNull(),
   isActive: boolean("isActive").default(true).notNull(),
   hostDomain: varchar("hostDomain", { length: 255 }).default("app.allaboutultrasound.com"),
+  themeSettings: longtext("themeSettings"),
+  importedFromUrl: varchar("importedFromUrl", { length: 1000 }),
   createdByUserId: int("createdByUserId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
@@ -4084,6 +4086,13 @@ export const generalFormTemplates = mysqlTable("generalFormTemplates", {
   stripePriceId: varchar("stripePriceId", { length: 255 }),
   stripeAmount: int("stripeAmount"),
   hostDomain: varchar("hostDomain", { length: 255 }).default("app.allaboutultrasound.com"),
+  // Display mode: classic (single page), typeform (welcome + page-by-page), paginated (page-by-page no welcome), inline (no header)
+  displayMode: mysqlEnum("displayMode", ["classic", "typeform", "paginated", "inline"]).default("classic").notNull(),
+  welcomeTitle: varchar("welcomeTitle", { length: 300 }),
+  welcomeSubtitle: text("welcomeSubtitle"),
+  welcomeButtonText: varchar("welcomeButtonText", { length: 100 }),
+  welcomeImageUrl: text("welcomeImageUrl"),
+  submitButtonText: varchar("submitButtonText", { length: 100 }),
   createdByUserId: int("createdByUserId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
@@ -4493,6 +4502,7 @@ export const communityMembers = mysqlTable("community_members", {
   joinedAt: timestamp("joined_at").defaultNow().notNull(),
   pricingOptionId: varchar("pricing_option_id", { length: 64 }),
   stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 128 }),
+  approvedToPost: boolean("approved_to_post").default(true).notNull(),
 });
 export type CommunityMember = typeof communityMembers.$inferSelect;
 
@@ -4530,6 +4540,7 @@ export const communityPostComments = mysqlTable("community_post_comments", {
   userId: int("user_id").notNull(),
   parentId: int("parent_id"),
   body: longtext("body").notNull(),
+  status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("approved").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });

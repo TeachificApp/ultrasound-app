@@ -380,9 +380,19 @@ const communityMemberRouter = router({
 
     const [enriched] = await enrichPosts(db, [post], ctx.user.id);
 
-    // Get comments
+    // Get comments — non-admins only see approved comments (or their own pending ones)
+    const isAdminUser = ctx.user.role === "admin";
+    const commentWhere = isAdminUser
+      ? eq(communityPostComments.postId, input.postId)
+      : and(
+          eq(communityPostComments.postId, input.postId),
+          or(
+            eq(communityPostComments.status, "approved"),
+            eq(communityPostComments.userId, ctx.user.id),
+          ),
+        );
     const comments = await db.select().from(communityPostComments)
-      .where(eq(communityPostComments.postId, input.postId)).orderBy(asc(communityPostComments.createdAt));
+      .where(commentWhere).orderBy(asc(communityPostComments.createdAt));
     const commentUserIds = [...new Set(comments.map((c: any) => c.userId))];
     const commentAuthors = commentUserIds.length
       ? await db.select({ id: users.id, name: users.name, displayName: users.displayName, avatarUrl: users.avatarUrl, credentials: users.credentials })
@@ -453,13 +463,28 @@ const communityMemberRouter = router({
     const [post] = await db.select().from(communityPosts).where(eq(communityPosts.id, input.postId)).limit(1);
     if (!post || post.isLocked) throw new TRPCError({ code: "FORBIDDEN", message: "Post is locked." });
 
+    // Check if member requires moderation
+    const isAdminUser = ctx.user.role === "admin";
+    let commentStatus: "pending" | "approved" = "approved";
+    if (!isAdminUser) {
+      const [membership] = await db.select({ approvedToPost: communityMembers.approvedToPost })
+        .from(communityMembers)
+        .where(and(eq(communityMembers.communityId, post.communityId), eq(communityMembers.userId, ctx.user.id)))
+        .limit(1);
+      if (membership && !membership.approvedToPost) commentStatus = "pending";
+    }
+
     const [result] = await db.insert(communityPostComments).values({
       postId: input.postId,
       userId: ctx.user.id,
       body: input.body,
       parentId: input.parentId ?? null,
+      status: commentStatus,
     }).$returningId();
-    await db.update(communityPosts).set({ commentCount: sql`comment_count + 1` }).where(eq(communityPosts.id, input.postId));
+    // Only increment comment count for approved comments
+    if (commentStatus === "approved") {
+      await db.update(communityPosts).set({ commentCount: sql`comment_count + 1` }).where(eq(communityPosts.id, input.postId));
+    }
 
     // Notify post author
     const [actor] = await db.select({ name: users.name, displayName: users.displayName }).from(users).where(eq(users.id, ctx.user.id)).limit(1);
@@ -967,6 +992,173 @@ const communityAdminRouter = router({
       .onDuplicateKeyUpdate({ set: { badgeId: input.badgeId } });
     return { success: true };
   }),
+  /** List members of a community */
+  listMembers: protectedProcedure.input(z.object({
+    communityId: z.number(),
+    search: z.string().optional(),
+    page: z.number().default(1),
+    pageSize: z.number().default(50),
+  })).query(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) return { members: [], total: 0 };
+    const offset = (input.page - 1) * input.pageSize;
+    const baseWhere = eq(communityMembers.communityId, input.communityId);
+    const rows = await db
+      .select({
+        id: communityMembers.id,
+        userId: communityMembers.userId,
+        role: communityMembers.role,
+        joinedAt: communityMembers.joinedAt,
+        approvedToPost: communityMembers.approvedToPost,
+        name: users.name,
+        email: users.email,
+        avatarUrl: users.avatarUrl,
+      })
+      .from(communityMembers)
+      .innerJoin(users, eq(users.id, communityMembers.userId))
+      .where(baseWhere)
+      .orderBy(desc(communityMembers.joinedAt))
+      .limit(input.pageSize)
+      .offset(offset);
+    const [{ total }] = await db.select({ total: sql<number>`COUNT(*)` }).from(communityMembers).where(baseWhere);
+    return { members: rows, total: Number(total) };
+  }),
+
+  /** Add a member by userId or email */
+  addMember: protectedProcedure.input(z.object({
+    communityId: z.number(),
+    userId: z.number().optional(),
+    email: z.string().email().optional(),
+    role: z.enum(["admin", "moderator", "member"]).default("member"),
+  })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    let targetUserId = input.userId;
+    if (!targetUserId && input.email) {
+      const [u] = await db.select({ id: users.id }).from(users).where(eq(users.email, input.email)).limit(1);
+      if (!u) throw new TRPCError({ code: "NOT_FOUND", message: `No user found with email: ${input.email}` });
+      targetUserId = u.id;
+    }
+    if (!targetUserId) throw new TRPCError({ code: "BAD_REQUEST", message: "Provide userId or email" });
+    await db.insert(communityMembers)
+      .values({ communityId: input.communityId, userId: targetUserId, role: input.role })
+      .onDuplicateKeyUpdate({ set: { role: input.role } });
+    return { success: true, userId: targetUserId };
+  }),
+
+  /** Bulk add members by email list */
+  bulkAddMembers: protectedProcedure.input(z.object({
+    communityId: z.number(),
+    emails: z.array(z.string().email()).min(1).max(500),
+    role: z.enum(["admin", "moderator", "member"]).default("member"),
+  })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const found = await db.select({ id: users.id, email: users.email }).from(users)
+      .where(inArray(users.email, input.emails));
+    const notFound = input.emails.filter(e => !found.find(u => u.email === e));
+    if (found.length > 0) {
+      for (const u of found) {
+        await db.insert(communityMembers)
+          .values({ communityId: input.communityId, userId: u.id, role: input.role })
+          .onDuplicateKeyUpdate({ set: { role: input.role } });
+      }
+    }
+    return { added: found.length, notFound };
+  }),
+
+  /** Remove a member */
+  removeMember: protectedProcedure.input(z.object({
+    communityId: z.number(),
+    userId: z.number(),
+  })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    await db.delete(communityMembers)
+      .where(and(eq(communityMembers.communityId, input.communityId), eq(communityMembers.userId, input.userId)));
+    return { success: true };
+  }),
+
+  /** Update a member's role */
+  updateMemberRole: protectedProcedure.input(z.object({
+    communityId: z.number(),
+    userId: z.number(),
+    role: z.enum(["admin", "moderator", "member"]),
+  })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    await db.update(communityMembers)
+      .set({ role: input.role })
+      .where(and(eq(communityMembers.communityId, input.communityId), eq(communityMembers.userId, input.userId)));
+    return { success: true };
+  }),
+
+  /** Set whether a member requires comment moderation */
+  setMemberApproval: protectedProcedure.input(z.object({
+    communityId: z.number(),
+    userId: z.number(),
+    approvedToPost: z.boolean(),
+  })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    await db.update(communityMembers)
+      .set({ approvedToPost: input.approvedToPost })
+      .where(and(eq(communityMembers.communityId, input.communityId), eq(communityMembers.userId, input.userId)));
+    return { success: true };
+  }),
+
+  /** List pending comments awaiting moderation */
+  listPendingComments: protectedProcedure.input(z.object({
+    communityId: z.number(),
+  })).query(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) return [];
+    const rows = await db
+      .select({
+        id: communityPostComments.id,
+        postId: communityPostComments.postId,
+        userId: communityPostComments.userId,
+        body: communityPostComments.body,
+        status: communityPostComments.status,
+        createdAt: communityPostComments.createdAt,
+        authorName: users.name,
+        authorEmail: users.email,
+        authorAvatar: users.avatarUrl,
+      })
+      .from(communityPostComments)
+      .innerJoin(communityPosts, eq(communityPosts.id, communityPostComments.postId))
+      .innerJoin(users, eq(users.id, communityPostComments.userId))
+      .where(and(
+        eq(communityPosts.communityId, input.communityId),
+        eq(communityPostComments.status, "pending"),
+      ))
+      .orderBy(asc(communityPostComments.createdAt))
+      .limit(200);
+    return rows;
+  }),
+
+  /** Approve or reject a pending comment */
+  moderateComment: protectedProcedure.input(z.object({
+    commentId: z.number(),
+    action: z.enum(["approve", "reject"]),
+  })).mutation(async ({ ctx, input }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const newStatus = input.action === "approve" ? "approved" : "rejected";
+    await db.update(communityPostComments)
+      .set({ status: newStatus })
+      .where(eq(communityPostComments.id, input.commentId));
+    return { success: true };
+  }),
+
   /** AI: summarize recent posts in a channel */
   aiSummarizeChannel: protectedProcedure.input(z.object({ channelId: z.number(), limit: z.number().default(20) })).mutation(async ({ ctx, input }) => {
     await assertAdmin(ctx);

@@ -1199,6 +1199,8 @@ function FormResultsTab({ templateId }: { templateId: number }) {
 function FormEditor({ templateId }: { templateId: number }) {
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<"editor" | "branching" | "org-visibility" | "preview" | "settings" | "results">("editor");
+  const [urlImportOpen, setUrlImportOpen] = useState(false);
+  const [urlImportValue, setUrlImportValue] = useState("");
   const [editingItem, setEditingItem] = useState<FormItem | null>(null);
   const [editingItemOptions, setEditingItemOptions] = useState<FormOption[]>([]);
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
@@ -1245,6 +1247,11 @@ function FormEditor({ templateId }: { templateId: number }) {
 
   const reorderItemsMutation = trpc.formBuilder.reorderItems.useMutation({
     onSuccess: () => refetch(),
+    onError: (e) => toast.error(e.message),
+  });
+
+  const appendFieldsMutation = trpc.formBuilder.appendFieldsFromUrl.useMutation({
+    onSuccess: (d) => { toast.success(`Added ${d.addedCount} field(s) from URL`); refetch(); setUrlImportOpen(false); setUrlImportValue(""); },
     onError: (e) => toast.error(e.message),
   });
 
@@ -1495,6 +1502,9 @@ function FormEditor({ templateId }: { templateId: number }) {
           <Button variant="outline" className="w-full gap-2 border-dashed text-gray-500 hover:text-gray-700" onClick={openAddSection}>
             <Plus className="w-4 h-4" /> Add Section
           </Button>
+          <Button variant="outline" className="w-full gap-2 border-dashed text-gray-400 hover:text-teal-600 text-xs" onClick={() => setUrlImportOpen(true)}>
+            <FileCode className="w-3.5 h-3.5" /> Add Fields from URL (AI)
+          </Button>
         </div>
       )}
 
@@ -1651,6 +1661,41 @@ function FormEditor({ templateId }: { templateId: number }) {
           onSaved={refetch}
         />
       )}
+
+      {/* URL Import Dialog */}
+      <Dialog open={urlImportOpen} onOpenChange={setUrlImportOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Add Fields from URL (AI)</DialogTitle></DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-xs text-gray-500">Paste a URL to a webpage, PDF, or document. The AI will extract relevant form fields and add them to this template.</p>
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-1.5">URL *</label>
+              <Input
+                placeholder="https://example.com/form-requirements"
+                value={urlImportValue}
+                onChange={e => setUrlImportValue(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" && urlImportValue.trim()) appendFieldsMutation.mutate({ templateId, url: urlImportValue.trim() }); }}
+                autoFocus
+              />
+            </div>
+            {appendFieldsMutation.isPending && (
+              <div className="flex items-center gap-2 text-xs text-teal-600">
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Analyzing URL and extracting fields…
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUrlImportOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => appendFieldsMutation.mutate({ templateId, url: urlImportValue.trim() })}
+              disabled={!urlImportValue.trim() || appendFieldsMutation.isPending}
+              style={{ background: BRAND }} className="text-white"
+            >
+              {appendFieldsMutation.isPending ? "Extracting…" : "Extract & Add Fields"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

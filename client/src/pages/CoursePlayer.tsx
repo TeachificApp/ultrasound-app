@@ -1756,19 +1756,28 @@ export default function CoursePlayer() {
                   )}
 
                   {/* ── Embed lesson — only show if no content blocks override ── */}
-                  {lessonData.type === "embed" && lessonData.embedUrl && contentBlocks.length === 0 && (
-                    <div className="mb-5">
-                      <div className="aspect-video bg-black rounded-xl overflow-hidden shadow-lg ring-1 ring-gray-200">
-                        <iframe
-                          src={lessonData.embedUrl}
-                          className="w-full h-full"
-                          allowFullScreen
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          title={lessonData.title}
-                        />
+                  {lessonData.type === "embed" && lessonData.embedUrl && contentBlocks.length === 0 && (() => {
+                    // Resolve relative embed URLs (e.g. /api/media/:slug/embed) to absolute
+                    const resolvedEmbedUrl = lessonData.embedUrl.startsWith('/')
+                      ? `${window.location.origin}${lessonData.embedUrl}`
+                      : lessonData.embedUrl;
+                    // SCORM/HTML packages need full height — use min-h-[600px] instead of fixed aspect-video
+                    const isScormEmbed = lessonData.embedUrl.includes('/api/media/') || lessonData.embedUrl.includes('/media/');
+                    return (
+                      <div className="mb-5">
+                        <div className={`bg-black rounded-xl overflow-hidden shadow-lg ring-1 ring-gray-200 ${isScormEmbed ? 'min-h-[600px] h-[75vh]' : 'aspect-video'}`}>
+                          <iframe
+                            src={resolvedEmbedUrl}
+                            className="w-full h-full"
+                            allowFullScreen
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                            title={lessonData.title}
+                            style={{ border: 'none', minHeight: isScormEmbed ? '600px' : undefined }}
+                          />
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {/* ── Download lesson — only show if no content blocks override ── */}
                   {lessonData.type === "download" && lessonData.content && contentBlocks.length === 0 && (

@@ -780,14 +780,21 @@ CRITICAL REQUIREMENTS:
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
       // Fetch the asset to determine lesson type
-      const [asset] = await db.select({ mediaType: mediaAssets.mediaType, mimeType: mediaAssets.mimeType })
+      const [asset] = await db.select({ mediaType: mediaAssets.mediaType, mimeType: mediaAssets.mimeType, slug: mediaAssets.slug })
         .from(mediaAssets).where(eq(mediaAssets.id, input.mediaAssetId)).limit(1);
       if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Media asset not found" });
 
       // Map media type to lesson type
+      // scorm and html are interactive content that must be viewed in an iframe embed, NOT downloaded
       let lessonType: "video" | "text" | "quiz" | "download" | "embed" | "video_text" = "text";
+      let embedUrl: string | null = null;
       if (asset.mediaType === "video") lessonType = "video";
-      else if (["document", "zip", "scorm", "html"].includes(asset.mediaType ?? "")) lessonType = "download";
+      else if (["scorm", "html"].includes(asset.mediaType ?? "")) {
+        lessonType = "embed";
+        // Build the embed URL using the media serve route — the player will render this in an iframe
+        embedUrl = `/api/media/${asset.slug}/embed`;
+      }
+      else if (["document", "zip"].includes(asset.mediaType ?? "")) lessonType = "download";
       else if (asset.mediaType === "audio") lessonType = "video"; // treat audio as video player
 
       const [result] = await db.insert(lmsLessons).values({
@@ -797,6 +804,7 @@ CRITICAL REQUIREMENTS:
         type: lessonType,
         position: input.position,
         content: null,
+        embedUrl,
         mediaAssetId: input.mediaAssetId,
         durationMinutes: null,
       }).$returningId();

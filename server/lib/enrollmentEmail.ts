@@ -12,6 +12,15 @@ const SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send";
 const brandColor = "#0d9488";
 const brandDark = "#0e4a50";
 
+// LMS emails use a dedicated from address so recipients can identify the source
+// as the learning platform. Falls back to the platform-wide SENDGRID_FROM_EMAIL.
+const LMS_FROM_EMAIL = process.env.LMS_FROM_EMAIL
+  || process.env.SENDGRID_FROM_EMAIL
+  || "learn@allaboutultrasound.com";
+const LMS_FROM_NAME = process.env.LMS_FROM_NAME
+  || process.env.SENDGRID_FROM_NAME
+  || "All About Ultrasound™ Learning";
+
 export type ContentType = "course" | "download" | "bundle" | "quiz";
 
 /**
@@ -22,7 +31,8 @@ export type ContentType = "course" | "download" | "bundle" | "quiz";
 function buildAccessUrl(destination: string, accessToken?: string | null): string {
   if (!accessToken) return destination;
   const encoded = encodeURIComponent(destination);
-  return `https://members.allaboutultrasound.com/auth/access?token=${accessToken}&next=${encoded}`;
+  // Use learn subdomain for LMS auto-login so the session cookie is scoped correctly
+  return `https://learn.allaboutultrasound.com/auth/access?token=${accessToken}&next=${encoded}`;
 }
 
 function emailWrapper(content: string): string {
@@ -73,8 +83,8 @@ async function deliverEmail(opts: {
   htmlBody: string;
 }): Promise<boolean> {
   const apiKey = process.env.SENDGRID_API_KEY;
-  const senderEmail = process.env.SENDGRID_FROM_EMAIL || "noreply@allaboutultrasound.com";
-  const senderName = process.env.SENDGRID_FROM_NAME || "All About Ultrasound™";
+  const senderEmail = LMS_FROM_EMAIL;
+  const senderName = LMS_FROM_NAME;
   if (!apiKey) {
     console.warn("[enrollment-email] SENDGRID_API_KEY not set — skipping email");
     return false;

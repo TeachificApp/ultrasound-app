@@ -7,6 +7,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getUserRoles } from "../db";
+import { invokeLLM } from "../_core/llm";
 import {
   listFormTemplates,
   getFormTemplateById,
@@ -50,7 +51,15 @@ import {
   getFormSubmissionStatsForLab,
   getFormSubmissionStaffList,
   type FormSubmissionFilter,
+  getDb,
 } from "../db";
+import { eq, sql, and } from "drizzle-orm";
+import {
+  accreditationFormTemplates,
+  accreditationFormSections,
+  accreditationFormItems,
+  accreditationFormOptions,
+} from "../../drizzle/schema";
 
 // ─── Guard helper ─────────────────────────────────────────────────────────────
 
@@ -734,5 +743,131 @@ export const formBuilderRouter = router({
         throw new TRPCError({ code: 'FORBIDDEN' });
       }
       return getFormSubmissionStaffList(input.labId);
+    }),
+
+  /** Import a new DIY form template from a URL using AI scaffolding */
+  importFormByUrl: protectedProcedure
+    .input(z.object({ url: z.string().url(), formName: z.string().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      await requirePlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+      let pageText = '';
+      try {
+        const res = await fetch(input.url, {
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; FormImporter/1.0)' },
+          signal: AbortSignal.timeout(12000),
+          redirect: 'follow',
+        });
+        const html = await res.text();
+        pageText = html
+          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
+          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+          .replace(/\s+/g, ' ').trim().substring(0, 5000);
+      } catch (err: any) {
+        console.error('[importFormByUrl] fetch error:', err?.message);
+        pageText = `Form from: ${input.url}`;
+      }
+      const aiResp = await invokeLLM({
+        messages: [
+          { role: 'system', content: 'You are a form builder assistant. Given a web page or form description, extract or infer the form fields and return structured JSON. Focus on identifying actual form fields, questions, and input types from the content.' },
+          { role: 'user', content: `Create a form based on this page content. Return JSON with: { "name": string, "description": string, "sections": [{ "title": string, "items": [{ "itemType": "text"|"textarea"|"email"|"radio"|"checkbox"|"select"|"scale"|"heading"|"info", "label": string, "isRequired": boolean, "options": [{"label": string, "value": string}] }] }] }\n\nPage content:\n${pageText}` },
+        ],
+        response_format: { type: 'json_schema', json_schema: { name: 'form_scaffold', strict: true, schema: { type: 'object', properties: { name: { type: 'string' }, description: { type: 'string' }, sections: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, items: { type: 'array', items: { type: 'object', properties: { itemType: { type: 'string' }, label: { type: 'string' }, isRequired: { type: 'boolean' }, options: { type: 'array', items: { type: 'object', properties: { label: { type: 'string' }, value: { type: 'string' } }, required: ['label', 'value'], additionalProperties: false } } }, required: ['itemType', 'label', 'isRequired', 'options'], additionalProperties: false } } }, required: ['title', 'items'], additionalProperties: false } } }, required: ['name', 'description', 'sections'], additionalProperties: false } } },
+      });
+      let parsed: any;
+      try { parsed = JSON.parse(aiResp.choices[0].message.content as string); }
+      catch { throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'AI failed to parse form structure. Please try again or use a different URL.' }); }
+      const formName = input.formName || parsed.name || 'Imported Form';
+      const [newTpl] = await db.insert(accreditationFormTemplates).values({
+        name: formName, description: parsed.description ?? null, formType: 'general',
+        version: 1, isActive: true, importedFromUrl: input.url, createdByUserId: ctx.user.id,
+      });
+      const newId = (newTpl as any).insertId;
+      let sectionOrder = 0;
+      for (const section of (parsed.sections ?? [])) {
+        const [ns] = await db.insert(accreditationFormSections).values({ templateId: newId, title: section.title || 'Section', sortOrder: sectionOrder++ });
+        const sectionId = (ns as any).insertId;
+        let itemOrder = 0;
+        for (const item of (section.items ?? [])) {
+          const [ni] = await db.insert(accreditationFormItems).values({
+            templateId: newId, sectionId, itemType: item.itemType || 'text', label: item.label || 'Field', isRequired: item.isRequired ?? false, sortOrder: itemOrder++,
+          });
+          const itemId = (ni as any).insertId;
+          if (item.options?.length > 0) {
+            let optOrder = 0;
+            for (const opt of item.options) {
+              await db.insert(accreditationFormOptions).values({ itemId, label: opt.label, value: opt.value, sortOrder: optOrder++ });
+            }
+          }
+        }
+      }
+      return { id: newId, name: formName };
+    }),
+
+  /** Append AI-scaffolded fields from a URL to an existing DIY form template */
+  appendFieldsFromUrl: protectedProcedure
+    .input(z.object({ templateId: z.number().int().positive(), url: z.string().url() }))
+    .mutation(async ({ ctx, input }) => {
+      await requirePlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+      let pageText = '';
+      try {
+        const res = await fetch(input.url, {
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; FormImporter/1.0)' },
+          signal: AbortSignal.timeout(12000), redirect: 'follow',
+        });
+        const html = await res.text();
+        pageText = html
+          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
+          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+          .replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 5000);
+      } catch (err: any) {
+        console.error('[appendFieldsFromUrl] fetch error:', err?.message);
+        pageText = `Form fields from: ${input.url}`;
+      }
+      const aiResp = await invokeLLM({
+        messages: [
+          { role: 'system', content: 'You are a form builder assistant. Extract form fields from the page content and return structured JSON.' },
+          { role: 'user', content: `Extract form fields from this page. Return JSON with: { "sectionTitle": string, "items": [{ "itemType": "text"|"textarea"|"email"|"radio"|"checkbox"|"select"|"scale"|"heading"|"info", "label": string, "isRequired": boolean, "options": [{"label": string, "value": string}] }] }\n\nPage content:\n${pageText}` },
+        ],
+        response_format: { type: 'json_schema', json_schema: { name: 'form_fields', strict: true, schema: { type: 'object', properties: { sectionTitle: { type: 'string' }, items: { type: 'array', items: { type: 'object', properties: { itemType: { type: 'string' }, label: { type: 'string' }, isRequired: { type: 'boolean' }, options: { type: 'array', items: { type: 'object', properties: { label: { type: 'string' }, value: { type: 'string' } }, required: ['label', 'value'], additionalProperties: false } } }, required: ['itemType', 'label', 'isRequired', 'options'], additionalProperties: false } } }, required: ['sectionTitle', 'items'], additionalProperties: false } } },
+      });
+      let parsed: any;
+      try { parsed = JSON.parse(aiResp.choices[0].message.content as string); }
+      catch { throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'AI failed to parse fields. Please try again.' }); }
+      const [maxSec] = await db.select({ max: sql<number>`COALESCE(MAX(sortOrder), 0)` }).from(accreditationFormSections).where(eq(accreditationFormSections.templateId, input.templateId));
+      const [ns] = await db.insert(accreditationFormSections).values({ templateId: input.templateId, title: parsed.sectionTitle || 'Imported Fields', sortOrder: (maxSec?.max ?? 0) + 1 });
+      const sectionId = (ns as any).insertId;
+      let itemOrder = 0;
+      for (const item of (parsed.items ?? [])) {
+        const [ni] = await db.insert(accreditationFormItems).values({
+          templateId: input.templateId, sectionId, itemType: item.itemType || 'text', label: item.label || 'Field', isRequired: item.isRequired ?? false, sortOrder: itemOrder++,
+        });
+        const itemId = (ni as any).insertId;
+        if (item.options?.length > 0) {
+          let optOrder = 0;
+          for (const opt of item.options) {
+            await db.insert(accreditationFormOptions).values({ itemId, label: opt.label, value: opt.value, sortOrder: optOrder++ });
+          }
+        }
+      }
+      return { sectionId, itemCount: (parsed.items ?? []).length };
+    }),
+
+  /** Update theme/branding settings for a DIY form template */
+  updateTheme: protectedProcedure
+    .input(z.object({ templateId: z.number().int().positive(), themeSettings: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await requirePlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
+      await db.update(accreditationFormTemplates)
+        .set({ themeSettings: input.themeSettings, updatedAt: new Date() })
+        .where(eq(accreditationFormTemplates.id, input.templateId));
+      return { success: true };
     }),
 });

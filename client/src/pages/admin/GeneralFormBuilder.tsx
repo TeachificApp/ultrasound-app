@@ -1260,6 +1260,12 @@ function SettingsTab({ formId, template, onRefetch }: { formId: number; template
   const [notifyEmail, setNotifyEmail] = useState(template.notifyEmail ?? "");
   const [maxSubmissions, setMaxSubmissions] = useState(template.maxSubmissions?.toString() ?? "");
   const [hostDomain, setHostDomain] = useState(template.hostDomain ?? DEFAULT_HOST_DOMAIN);
+  const [displayMode, setDisplayMode] = useState<"classic" | "typeform" | "paginated" | "inline">(template.displayMode ?? "classic");
+  const [welcomeTitle, setWelcomeTitle] = useState(template.welcomeTitle ?? "");
+  const [welcomeSubtitle, setWelcomeSubtitle] = useState(template.welcomeSubtitle ?? "");
+  const [welcomeButtonText, setWelcomeButtonText] = useState(template.welcomeButtonText ?? "");
+  const [welcomeImageUrl, setWelcomeImageUrl] = useState(template.welcomeImageUrl ?? "");
+  const [submitButtonText, setSubmitButtonText] = useState(template.submitButtonText ?? "");
 
   const updateForm = trpc.generalForm.updateForm.useMutation({
     onSuccess: () => { toast.success("Settings saved"); onRefetch(); },
@@ -1280,6 +1286,12 @@ function SettingsTab({ formId, template, onRefetch }: { formId: number; template
       notifyEmail: notifyEmail || undefined,
       maxSubmissions: maxSubmissions ? parseInt(maxSubmissions) : undefined,
       hostDomain,
+      displayMode,
+      welcomeTitle: welcomeTitle || undefined,
+      welcomeSubtitle: welcomeSubtitle || undefined,
+      welcomeButtonText: welcomeButtonText || undefined,
+      welcomeImageUrl: welcomeImageUrl || undefined,
+      submitButtonText: submitButtonText || undefined,
     });
   };
 
@@ -1327,6 +1339,68 @@ function SettingsTab({ formId, template, onRefetch }: { formId: number; template
               className="mt-1 w-full text-sm"
             />
           </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Display Mode ─────────────────────────────────────────────────────── */}
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2">🖼️ Display Mode</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label className="mb-1 block">How should this form be displayed?</Label>
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              {([
+                { value: "classic", label: "Classic", desc: "Single page with header" },
+                { value: "typeform", label: "Typeform Style", desc: "Welcome screen + one question at a time" },
+                { value: "paginated", label: "Page by Page", desc: "One question at a time, no welcome screen" },
+                { value: "inline", label: "Inline / Embed", desc: "Single page, no header (embed-friendly)" },
+              ] as const).map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setDisplayMode(opt.value)}
+                  className={`text-left p-3 rounded-lg border-2 transition-all ${
+                    displayMode === opt.value
+                      ? "border-teal-500 bg-teal-50"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <div className={`text-sm font-semibold ${displayMode === opt.value ? "text-teal-700" : "text-gray-700"}`}>{opt.label}</div>
+                  <div className="text-xs text-gray-400 mt-0.5">{opt.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Submit button text (all modes) */}
+          <div>
+            <Label>Submit Button Text</Label>
+            <Input value={submitButtonText} onChange={e => setSubmitButtonText(e.target.value)} placeholder="Submit" className="mt-1 w-48" />
+          </div>
+
+          {/* Welcome screen fields (typeform mode only) */}
+          {displayMode === "typeform" && (
+            <div className="space-y-3 pt-2 border-t">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Welcome Screen</p>
+              <div>
+                <Label>Welcome Title</Label>
+                <Input value={welcomeTitle} onChange={e => setWelcomeTitle(e.target.value)} placeholder={template.name} className="mt-1" />
+              </div>
+              <div>
+                <Label>Welcome Subtitle</Label>
+                <Textarea value={welcomeSubtitle} onChange={e => setWelcomeSubtitle(e.target.value)} placeholder={template.description ?? ""} className="mt-1" rows={2} />
+              </div>
+              <div>
+                <Label>Start Button Text</Label>
+                <Input value={welcomeButtonText} onChange={e => setWelcomeButtonText(e.target.value)} placeholder="Start" className="mt-1 w-48" />
+              </div>
+              <div>
+                <Label>Welcome Image URL (optional)</Label>
+                <Input value={welcomeImageUrl} onChange={e => setWelcomeImageUrl(e.target.value)} placeholder="https://..." className="mt-1" />
+                {welcomeImageUrl && <img src={welcomeImageUrl} alt="Welcome" className="mt-2 rounded-lg max-h-32 object-cover" />}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

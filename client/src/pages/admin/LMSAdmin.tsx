@@ -8692,7 +8692,12 @@ function CohortTab({ courseId }: { courseId: number }) {
               </div>
               <div>
                 <Label className="text-sm font-medium text-gray-700 mb-1 block">Description</Label>
-                <textarea value={sessionForm.description} onChange={e => setSessionForm(p => ({ ...p, description: e.target.value }))} rows={3} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="What will be covered in this session..." />
+                <RichTextEditor
+                  value={sessionForm.description}
+                  onChange={v => setSessionForm(p => ({ ...p, description: v }))}
+                  placeholder="What will be covered in this session..."
+                  minHeight="100px"
+                />
               </div>
               <div>
                 <Label className="text-sm font-medium text-gray-700 mb-1 block">Status</Label>

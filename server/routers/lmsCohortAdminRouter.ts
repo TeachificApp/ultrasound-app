@@ -423,52 +423,123 @@ export const lmsCohortAdminRouter = router({
       await db.delete(lmsCohortSessions)
         .where(eq(lmsCohortSessions.parentSessionId, input.parentSessionId));
 
-      // Parse allowed days of week (0=Sun … 6=Sat). Empty = any day.
+      // Parse allowed days of week (0=Sun … 6=Sat). Empty = use same day as parent.
       const allowedDays: number[] = parent.recurrenceDaysOfWeek
         ? parent.recurrenceDaysOfWeek.split(",").map(Number).filter(n => !isNaN(n))
         : [];
 
-      const intervalDays = parent.recurrenceRule === "weekly" ? 7
-        : parent.recurrenceRule === "biweekly" ? 14
-        : 1; // monthly: advance month-by-month below
+      const weekIntervalDays = parent.recurrenceRule === "biweekly" ? 14 : 7;
 
       const instances: typeof lmsCohortSessions.$inferInsert[] = [];
-      let current = new Date(parent.sessionDate);
+      const parentDate = new Date(parent.sessionDate);
       const endDate = parent.recurrenceEndDate ? new Date(parent.recurrenceEndDate) : null;
       const maxCount = parent.recurrenceOccurrenceCount ?? 999;
       let occurrenceNum = 1;
 
-      while (occurrenceNum < maxCount) {
-        // Advance by interval
-        if (parent.recurrenceRule === "monthly") {
+      if (parent.recurrenceRule === "monthly") {
+        // Monthly: advance month-by-month from parent date
+        let current = new Date(parentDate);
+        while (occurrenceNum < maxCount) {
           current = new Date(current);
           current.setMonth(current.getMonth() + 1);
-        } else {
-          current = new Date(current.getTime() + intervalDays * 24 * 60 * 60 * 1000);
+          if (endDate && current > endDate) break;
+          occurrenceNum++;
+          instances.push({
+            courseId: parent.courseId,
+            title: `${parent.title} (${occurrenceNum})`,
+            description: parent.description,
+            sessionDate: new Date(current),
+            durationMinutes: parent.durationMinutes,
+            meetingUrl: parent.meetingUrl,
+            recordingUrl: null,
+            status: parent.status,
+            timezone: parent.timezone ?? "America/New_York",
+            recurrenceRule: null,
+            recurrenceDaysOfWeek: null,
+            recurrenceInterval: null,
+            recurrenceEndDate: null,
+            recurrenceOccurrenceCount: null,
+            parentSessionId: parent.id,
+          });
         }
-        if (endDate && current > endDate) break;
-
-        // If specific days of week are required, skip dates that don't match
-        if (allowedDays.length > 0 && !allowedDays.includes(current.getDay())) continue;
-
-        occurrenceNum++;
-        instances.push({
-          courseId: parent.courseId,
-          title: `${parent.title} (${occurrenceNum})`,
-          description: parent.description,
-          sessionDate: new Date(current),
-          durationMinutes: parent.durationMinutes,
-          meetingUrl: parent.meetingUrl,
-          recordingUrl: null,
-          status: parent.status,
-          timezone: parent.timezone ?? "America/New_York",
-          recurrenceRule: null,
-          recurrenceDaysOfWeek: null,
-          recurrenceInterval: null,
-          recurrenceEndDate: null,
-          recurrenceOccurrenceCount: null,
-          parentSessionId: parent.id,
-        });
+      } else if (allowedDays.length > 1) {
+        // Weekly/biweekly with multiple days selected:
+        // For each week cycle, emit one instance per selected day (sorted), preserving the
+        // parent's time-of-day. Start from the Monday of the parent's week.
+        const parentDay = parentDate.getDay(); // 0=Sun
+        // Find the Sunday (start of week) of the parent date
+        const weekStart = new Date(parentDate);
+        weekStart.setDate(weekStart.getDate() - parentDay);
+        weekStart.setHours(0, 0, 0, 0);
+        const parentTime = {
+          h: parentDate.getHours(),
+          m: parentDate.getMinutes(),
+          s: parentDate.getSeconds(),
+        };
+        const sortedDays = [...allowedDays].sort((a, b) => a - b);
+        let weekOffset = 0;
+        while (occurrenceNum < maxCount) {
+          for (const dayOfWeek of sortedDays) {
+            const candidate = new Date(weekStart);
+            candidate.setDate(candidate.getDate() + weekOffset * weekIntervalDays + dayOfWeek);
+            candidate.setHours(parentTime.h, parentTime.m, parentTime.s, 0);
+            // Skip dates on or before the parent session date
+            if (candidate <= parentDate) continue;
+            if (endDate && candidate > endDate) break;
+            if (occurrenceNum >= maxCount) break;
+            occurrenceNum++;
+            instances.push({
+              courseId: parent.courseId,
+              title: `${parent.title} (${occurrenceNum})`,
+              description: parent.description,
+              sessionDate: new Date(candidate),
+              durationMinutes: parent.durationMinutes,
+              meetingUrl: parent.meetingUrl,
+              recordingUrl: null,
+              status: parent.status,
+              timezone: parent.timezone ?? "America/New_York",
+              recurrenceRule: null,
+              recurrenceDaysOfWeek: null,
+              recurrenceInterval: null,
+              recurrenceEndDate: null,
+              recurrenceOccurrenceCount: null,
+              parentSessionId: parent.id,
+            });
+          }
+          weekOffset++;
+          // Safety: stop if we've gone past end date even without filling maxCount
+          if (endDate) {
+            const weekCheck = new Date(weekStart);
+            weekCheck.setDate(weekCheck.getDate() + weekOffset * weekIntervalDays);
+            if (weekCheck > endDate) break;
+          }
+          if (weekOffset > 520) break; // hard cap: 10 years of weekly
+        }
+      } else {
+        // Weekly/biweekly with single day (or no day specified — same day as parent)
+        let current = new Date(parentDate);
+        while (occurrenceNum < maxCount) {
+          current = new Date(current.getTime() + weekIntervalDays * 24 * 60 * 60 * 1000);
+          if (endDate && current > endDate) break;
+          occurrenceNum++;
+          instances.push({
+            courseId: parent.courseId,
+            title: `${parent.title} (${occurrenceNum})`,
+            description: parent.description,
+            sessionDate: new Date(current),
+            durationMinutes: parent.durationMinutes,
+            meetingUrl: parent.meetingUrl,
+            recordingUrl: null,
+            status: parent.status,
+            timezone: parent.timezone ?? "America/New_York",
+            recurrenceRule: null,
+            recurrenceDaysOfWeek: null,
+            recurrenceInterval: null,
+            recurrenceEndDate: null,
+            recurrenceOccurrenceCount: null,
+            parentSessionId: parent.id,
+          });
+        }
       }
 
       if (instances.length === 0) return { created: 0 };

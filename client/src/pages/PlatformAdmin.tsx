@@ -1513,7 +1513,8 @@ export default function PlatformAdmin() {
         </div>
 
         {/* ── iHeartEcho Only Tools ─────────────────────────────────── */}
-        {isIHE && (
+        {/* Show to platform admins on any domain — they manage both brands */}
+        {(isIHE || isPlatformAdminOrOwner) && (
           <div className="mb-8">
             <div className="mb-3">
               <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider">iHeartEcho Only</h2>
