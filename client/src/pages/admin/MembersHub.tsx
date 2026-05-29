@@ -25,8 +25,9 @@ import {
   Users, BookOpen, DollarSign, Crown, Mail, Activity,
   ChevronLeft, ChevronRight, Search, Download,
   CheckCircle, Clock, ArrowUpDown, ArrowUp, ArrowDown,
-  X, ExternalLink, GraduationCap, FileDown, HelpCircle,
+  X, ExternalLink, GraduationCap, FileDown, HelpCircle, Shield,
 } from "lucide-react";
+import SharingMonitor from "@/pages/admin/SharingMonitor";
 import { toast } from "sonner";
 
 // Lazy-load the heavy sub-pages to keep initial bundle small
@@ -633,12 +634,13 @@ export default function MembersHub() {
   });
 
   const tabs = [
-    { value: "members",     label: "Members",     icon: Users,      count: null },
-    { value: "enrollments", label: "Enrollments", icon: BookOpen,   count: null },
-    { value: "sales",       label: "Sales",       icon: DollarSign, count: null },
-    { value: "memberships", label: "Memberships", icon: Crown,      count: null },
-    { value: "contacts",    label: "Contacts",    icon: Mail,       count: null },
-    { value: "activity",    label: "Activity",    icon: Activity,   count: null },
+    { value: "members",         label: "Members",         icon: Users,      count: null },
+    { value: "enrollments",     label: "Enrollments",     icon: BookOpen,   count: null },
+    { value: "sales",           label: "Sales",           icon: DollarSign, count: null },
+    { value: "memberships",     label: "Memberships",     icon: Crown,      count: null },
+    { value: "contacts",        label: "Contacts",        icon: Mail,       count: null },
+    { value: "activity",        label: "Activity",        icon: Activity,   count: null },
+    { value: "sharing-monitor", label: "Sharing Monitor", icon: Shield,     count: null },
   ];
 
   return (
@@ -701,6 +703,14 @@ export default function MembersHub() {
         {/* Activity */}
         <TabsContent value="activity" className="mt-4">
           <GlobalActivityTab />
+        </TabsContent>
+
+        {/* Sharing Monitor */}
+        <TabsContent value="sharing-monitor" className="mt-4">
+          {/* Hide the standalone page header/breadcrumb since we're embedded in a tab */}
+          <div className="[&>div>div:first-child]:hidden">
+            <SharingMonitor />
+          </div>
         </TabsContent>
       </Tabs>
     </div>

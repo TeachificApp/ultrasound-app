@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import { Plus, Pencil, Trash2, Copy, Upload, FileIcon, GripVertical, ArrowLeft, ExternalLink, Eye, EyeOff, Image as ImageIcon, Link as LinkIcon, Users, UserPlus, Loader2, Sparkles, LayoutTemplate } from "lucide-react";
 import RichTextEditor from "@/components/RichTextEditor";
 import { DownloadSalesTab } from "@/components/ProductSalesTab";
@@ -261,6 +262,7 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
   const [slug, setSlug] = useState("");
   const [metaTitle, setMetaTitle] = useState("");
   const [metaDescription, setMetaDescription] = useState("");
+  const [publishDomain, setPublishDomain] = useState("");
   const updateSettingsMut = trpc.downloadsAdmin.updateDownloadSettings.useMutation({
     onSuccess: () => toast.success("URL & SEO settings saved"),
     onError: (e) => toast.error(e.message),
@@ -293,6 +295,7 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
     setSlug(product.slug ?? "");
     setMetaTitle((product as any).metaTitle ?? "");
     setMetaDescription((product as any).metaDescription ?? "");
+    setPublishDomain((product as any).publishDomain ?? "");
   }
 
   const handleSave = () => {
@@ -554,9 +557,14 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
             <Label className="text-sm">Meta Description (SEO)</Label>
             <Textarea value={metaDescription} onChange={e => setMetaDescription(e.target.value)} placeholder="Brief description for search engines (150-160 characters)" className="mt-1 resize-none h-20" maxLength={500} />
           </div>
+          <div>
+            <Label className="text-sm">Publish Domain Override</Label>
+            <PublishDomainSelect value={publishDomain} onChange={setPublishDomain} />
+            <p className="text-xs text-muted-foreground mt-1">Override the default publish domain for this download only.</p>
+          </div>
           <Button size="sm" variant="outline" className="border-teal-300 text-teal-600 hover:bg-teal-50"
             disabled={updateSettingsMut.isPending}
-            onClick={() => updateSettingsMut.mutate({ productId, slug: slug.trim() || product.slug, metaTitle: metaTitle.trim() || undefined, metaDescription: metaDescription.trim() || undefined })}
+            onClick={() => updateSettingsMut.mutate({ productId, slug: slug.trim() || product.slug, metaTitle: metaTitle.trim() || undefined, metaDescription: metaDescription.trim() || undefined, publishDomain: publishDomain || null })}
           >
             {updateSettingsMut.isPending ? "Saving..." : "Save URL & SEO"}
           </Button>

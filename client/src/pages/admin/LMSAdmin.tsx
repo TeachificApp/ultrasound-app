@@ -31,6 +31,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent } from "@/components/ui/card";
 import RichTextEditor from "@/components/RichTextEditor";
 import {
   BookOpen, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Clock, Copy, Download, Edit2, HelpCircle, Pencil, Plus, Trash2,
@@ -57,6 +58,7 @@ import AssignmentBlockEditor from "@/components/AssignmentBlockEditor";
 import { Block, BlockType, BlockPreview } from "@/components/BlockPreview";
 import { BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, SortableBlock, uid } from "@/pages/admin/LandingPageBuilder";
 import { useLearnLink } from "@/hooks/useLearnLink";
+import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 /** Convenience alias used in LandingPageEditor */
 function useOpenLearnLink() {
   const { openLearnLink } = useLearnLink();
@@ -1561,6 +1563,7 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
   const [slug, setSlug] = useState(course.slug ?? "");
   const [metaTitle, setMetaTitle] = useState(course.metaTitle ?? "");
   const [metaDescription, setMetaDescription] = useState(course.metaDescription ?? "");
+  const [publishDomain, setPublishDomain] = useState<string>((course as any).publishDomain ?? "");
   // Color scheme
   const [primaryColor, setPrimaryColor] = useState(course.primaryColor ?? "#0d9488");
   const [accentColor, setAccentColor] = useState(course.accentColor ?? "#0f766e");
@@ -2015,9 +2018,14 @@ function CourseSettingsForm({ course, onSave, saving }: { course: any; onSave: (
           <Label className="text-sm">Meta Description (SEO)</Label>
           <textarea value={metaDescription} onChange={e => setMetaDescription(e.target.value)} placeholder="Brief description for search engines (150–160 characters)" className="mt-1 w-full text-sm border border-gray-200 rounded-md p-2 resize-none h-20 focus:outline-none focus:ring-2 focus:ring-teal-500" maxLength={500} />
         </div>
+        <div>
+          <Label className="text-sm">Publish Domain Override</Label>
+          <PublishDomainSelect value={publishDomain} onChange={setPublishDomain} />
+          <p className="text-xs text-gray-400 mt-1">Override the default publish domain for this course only. Leave blank to use the global default set in LMS Settings.</p>
+        </div>
         <Button size="sm" variant="outline" className="border-teal-300 text-teal-600 hover:bg-teal-50"
           disabled={updateCourseSettings.isPending}
-          onClick={() => updateCourseSettings.mutate({ courseId: course.id, slug: slug.trim() || course.slug, metaTitle: metaTitle.trim() || undefined, metaDescription: metaDescription.trim() || undefined, status, hasCertificate, certificateTemplateId, isFeatured })}
+          onClick={() => updateCourseSettings.mutate({ courseId: course.id, slug: slug.trim() || course.slug, metaTitle: metaTitle.trim() || undefined, metaDescription: metaDescription.trim() || undefined, status, hasCertificate, certificateTemplateId, isFeatured, publishDomain: publishDomain || null })}
         >
           {updateCourseSettings.isPending ? "Saving..." : "Save URL & SEO"}
         </Button>
@@ -5331,6 +5339,13 @@ const LMS_NAV_GROUPS = [
       { value: "trash",       label: "Trash",       icon: Trash2, danger: true },
     ],
   },
+  {
+    label: "Settings",
+    color: "gray",
+    items: [
+      { value: "lms_settings", label: "Publish Domains", icon: Globe },
+    ],
+  },
 ] as const;
 
 const GROUP_COLORS: Record<string, { bg: string; text: string; activeBg: string; activeText: string; dot: string }> = {
@@ -5456,6 +5471,7 @@ export default function LMSAdmin() {
               {activeTab === "question_bank" && <QuestionBankAdmin />}
               {activeTab === "thinkific"   && <ThinkificImporter />}
               {activeTab === "trash"       && <TrashTab />}
+              {activeTab === "lms_settings" && <LMSPublishDomainSettings />}
             </main>
           </div>
         )}
@@ -8786,6 +8802,154 @@ function CohortTab({ courseId }: { courseId: number }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── LMS Publish Domain Settings ─────────────────────────────────────────────
+function LMSPublishDomainSettings() {
+  const { data: settings, isLoading, refetch } = trpc.lmsGroup.getPlatformSettings.useQuery();
+  const { data: domainsData } = trpc.lmsAdmin.getCustomDomains.useQuery();
+
+  const domains: string[] = domainsData?.domains ?? [];
+
+  const [courseDomain,   setCourseDomain]   = useState<string>("");
+  const [funnelDomain,   setFunnelDomain]   = useState<string>("");
+  const [downloadDomain, setDownloadDomain] = useState<string>("");
+  const [productDomain,  setProductDomain]  = useState<string>("");
+  const [formDomain,     setFormDomain]     = useState<string>("");
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    if (settings) {
+      setCourseDomain(  (settings as any).coursePublishDomain   ?? "");
+      setFunnelDomain(  settings.funnelPublishDomain            ?? "");
+      setDownloadDomain(settings.downloadPublishDomain          ?? "");
+      setProductDomain( settings.productPublishDomain           ?? "");
+      setFormDomain(    (settings as any).formPublishDomain     ?? "");
+      setDirty(false);
+    }
+  }, [settings]);
+
+  const updateSettings = trpc.lmsGroup.updatePlatformSettings.useMutation({
+    onSuccess: () => { toast.success("Publish domain defaults saved."); setDirty(false); refetch(); },
+    onError:   (e: { message: string }) => toast.error(e.message),
+  });
+
+  const handleSave = () => {
+    updateSettings.mutate({
+      coursePublishDomain:   courseDomain   || null,
+      funnelPublishDomain:   funnelDomain   || null,
+      downloadPublishDomain: downloadDomain || null,
+      productPublishDomain:  productDomain  || null,
+      formPublishDomain:     formDomain     || null,
+    });
+  };
+
+  const DomainSelect = ({
+    value, onChange, label, description,
+  }: { value: string; onChange: (v: string) => void; label: string; description: string }) => (
+    <div className="space-y-1.5">
+      <Label className="text-sm font-medium text-gray-700">{label}</Label>
+      <Select
+        value={value || "__app__"}
+        onValueChange={(v) => { onChange(v === "__app__" ? "" : v); setDirty(true); }}
+      >
+        <SelectTrigger className="text-sm">
+          <SelectValue placeholder="Use app subdomain (default)" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__app__">Use app subdomain (default)</SelectItem>
+          {domains.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+        </SelectContent>
+      </Select>
+      <p className="text-xs text-gray-400">{description}</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+          <Globe className="w-5 h-5 text-teal-600" />
+          Publish Domain Defaults
+        </h2>
+        <p className="text-sm text-gray-500 mt-1">
+          Set the default custom domain for each content type. Individual courses, downloads, products,
+          funnels, and forms can override this default in their own settings.
+          Domains are managed in Platform Admin → Domain Management.
+        </p>
+      </div>
+
+      <Card className="border-0 shadow-sm">
+        <CardContent className="pt-5 space-y-5">
+          {isLoading ? (
+            <div className="h-32 bg-gray-50 rounded-lg animate-pulse" />
+          ) : (
+            <>
+              <DomainSelect
+                value={courseDomain}
+                onChange={setCourseDomain}
+                label="Courses Default Domain"
+                description="Course landing pages will be served at this domain (e.g. learn.allaboutultrasound.com/course-slug)."
+              />
+              <DomainSelect
+                value={funnelDomain}
+                onChange={setFunnelDomain}
+                label="Funnels Default Domain"
+                description="Funnel pages will be served at this domain (e.g. allaboutultrasound.com/funnel-slug)."
+              />
+              <DomainSelect
+                value={downloadDomain}
+                onChange={setDownloadDomain}
+                label="Downloads Default Domain"
+                description="Download landing pages will be served at this domain (e.g. yourdomain.com/download/slug)."
+              />
+              <DomainSelect
+                value={productDomain}
+                onChange={setProductDomain}
+                label="Products Default Domain"
+                description="Product landing pages will be served at this domain (e.g. yourdomain.com/product/slug)."
+              />
+              <DomainSelect
+                value={formDomain}
+                onChange={setFormDomain}
+                label="Forms Default Domain"
+                description="Public form pages will be served at this domain (e.g. yourdomain.com/form/slug)."
+              />
+              <div className="flex justify-end pt-2 border-t border-gray-100">
+                <Button
+                  onClick={handleSave}
+                  disabled={!dirty || updateSettings.isPending}
+                  className="bg-teal-600 hover:bg-teal-700 text-white"
+                  size="sm"
+                >
+                  {updateSettings.isPending ? "Saving…" : "Save Defaults"}
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Note about per-item overrides */}
+      <Card className="border-0 shadow-sm bg-teal-50">
+        <CardContent className="pt-4 pb-4">
+          <div className="flex gap-3">
+            <div className="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center flex-shrink-0">
+              <Globe className="w-4 h-4 text-teal-600" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-teal-800">Per-item domain overrides</p>
+              <p className="text-xs text-teal-700 mt-0.5">
+                Each individual course, download, product, funnel, and form has a <strong>Publish Domain</strong> field
+                in its settings that overrides the default above. Leave it blank to use the default.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

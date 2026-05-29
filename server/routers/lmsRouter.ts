@@ -1917,6 +1917,8 @@ export const lmsGroupRouter = router({
       funnelPublishDomain: z.string().max(255).nullable().optional(),
       downloadPublishDomain: z.string().max(255).nullable().optional(),
       productPublishDomain: z.string().max(255).nullable().optional(),
+      coursePublishDomain: z.string().max(255).nullable().optional(),
+      formPublishDomain: z.string().max(255).nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
@@ -1957,6 +1959,7 @@ export const lmsGroupRouter = router({
       isFeatured: z.boolean().optional(),
       isDrip: z.boolean().optional(),
       accessDurationDays: z.number().int().positive().nullable().optional(),
+      publishDomain: z.string().max(255).nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });

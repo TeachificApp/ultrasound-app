@@ -81,12 +81,10 @@ import {
   Image,
   HardDrive,
   GraduationCap,
-  FileDown,
   LayoutTemplate,
   Globe,
   GripVertical,
   Volume2,
-  Activity,
   Award,
   ShoppingCart,
   Tag,
@@ -1183,12 +1181,8 @@ export default function PlatformAdmin() {
   // Dual App tool cards
   const DUAL_TOOLS_DEFAULT: ToolCard[] = [
     { id: "email", href: "/admin/email", icon: Mail, label: "Email Campaigns", description: "Create and send email campaigns to members", color: "#189aa1" },
-    { id: "sharing-monitor", href: "/admin/sharing-monitor", icon: Activity, label: "Sharing Monitor", description: "Track and review shared content access", color: "#7c3aed" },
-    { id: "diy-accreditation-admin", href: "/admin/diy-accreditation", icon: Award, label: "DIY Accreditation Admin", description: "Hub for all DIY Accreditation tools: navigator, forms, org management, lab admin", color: "#0891b2" },
-    { id: "form-builder", href: "/admin/form-builder", icon: ClipboardList, label: "DIY Accreditation Forms", description: "Build accreditation review forms for DIY organizations", color: "#0891b2" },
     { id: "general-form-builder", href: "/admin/general-forms", icon: ClipboardList, label: "General Form Builder", description: "Build public forms, surveys, and quizzes with branding, analytics, and share links", color: "#0e7490" },
     { id: "media-repository", href: "/admin/media-repository", icon: HardDrive, label: "Media Repository", description: "Shared media library with AAUS/IHE brand tags", color: "#0f766e" },
-    { id: "downloads", href: "/admin/lms?tab=downloads", icon: FileDown, label: "Digital Downloads", description: "Manage downloadable products and files", color: "#b45309" },
     { id: "lms", href: "/admin/lms", icon: Library, label: "LMS Management", description: "Manage courses, videos, and learning content", color: "#1d4ed8" },
     { id: "funnels", href: "/admin/funnels", icon: LayoutTemplate, label: "Funnel Management", description: "Build funnels, manage contacts/leads, and track Lead → User → Purchaser conversions", color: "#be185d" },
     { id: "members", href: "/admin/members", icon: Users, label: "Members", description: "Registered users, enrollments, sales, memberships, and activity logs", color: "#0d9488" },
@@ -1211,6 +1205,8 @@ export default function PlatformAdmin() {
   const IHE_ONLY_TOOLS_DEFAULT: ToolCard[] = [
     { id: "engagement", href: "/admin/engagement", icon: BarChart2, label: "Engagement Dashboard", description: "iHeartEcho engagement metrics and analytics", color: "#be185d" },
     { id: "image-quality", href: "/image-quality-review", icon: Image, label: "Image Quality Review", description: "Review and rate echo image quality submissions", color: "#0891b2" },
+    { id: "diy-accreditation-admin", href: "/admin/diy-accreditation", icon: Award, label: "DIY Accreditation Admin", description: "Hub for all DIY Accreditation tools: navigator, forms, org management, lab admin", color: "#0891b2" },
+    { id: "form-builder", href: "/admin/form-builder", icon: ClipboardList, label: "DIY Accreditation Forms", description: "Build accreditation review forms for DIY organizations", color: "#0891b2" },
   ];
 
   const [dualToolOrder, setDualToolOrder] = useState<string[]>(() => DUAL_TOOLS_DEFAULT.map(t => t.id));
@@ -1805,10 +1801,7 @@ export default function PlatformAdmin() {
         {/* Domain Management */}
         <DomainManagementPanel />
 
-        {/* Publish Domain Settings */}
-        <PublishDomainPanel />
-
-        {/* Enrollment Email Settings */}
+        {/* Enrollment Email Settings — Publish Domain Settings moved to LMS Admin → Settings → Publish Domains */}
         <EnrollmentEmailSettingsPanel />
 
         {/* DIY Organizations */}

@@ -2796,6 +2796,8 @@ export const lmsCourses = mysqlTable("lms_courses", {
   createdByUserId: int("created_by_user_id").notNull(),
   // Display order in the public Education Library (0 = unset/default, positive = explicit position)
   libraryOrder: int("library_order").default(0).notNull(),
+  // Per-course publish domain override (null = use global coursePublishDomain from platform_settings)
+  publishDomain: varchar("publish_domain", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -3037,6 +3039,8 @@ export const lmsLandingPages = mysqlTable("lms_landing_pages", {
   seoTitle: varchar("seo_title", { length: 255 }),
   seoDescription: text("seo_description"),
   seoImage: varchar("seo_image", { length: 512 }),
+  // Per-funnel publish domain override (null = use global funnelPublishDomain)
+  publishDomain: varchar("publish_domain", { length: 255 }),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
 export type LmsLandingPage = typeof lmsLandingPages.$inferSelect;
@@ -3196,6 +3200,8 @@ export const digitalProducts = mysqlTable("digital_products", {
   downloadCount: int("download_count").default(0).notNull(),
   // Display order in the public Education Library (0 = unset/default, positive = explicit position)
   libraryOrder: int("library_order").default(0).notNull(),
+  // Per-download publish domain override (null = use global downloadPublishDomain)
+  publishDomain: varchar("publish_domain", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -3865,6 +3871,8 @@ export const platformSettings = mysqlTable("platform_settings", {
   funnelPublishDomain: varchar("funnel_publish_domain", { length: 255 }),
   downloadPublishDomain: varchar("download_publish_domain", { length: 255 }),
   productPublishDomain: varchar("product_publish_domain", { length: 255 }),
+  coursePublishDomain: varchar("course_publish_domain", { length: 255 }),
+  formPublishDomain: varchar("form_publish_domain", { length: 255 }),
   // ── Future platform-wide toggles go here ──
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -3951,6 +3959,8 @@ export const physicalProducts = mysqlTable("physical_products", {
   metaKeywords: text("meta_keywords"),
   // Stats
   orderCount: int("order_count").default(0).notNull(),
+  // Per-product publish domain override (null = use global productPublishDomain)
+  publishDomain: varchar("publish_domain", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });

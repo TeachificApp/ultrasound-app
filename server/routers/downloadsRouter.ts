@@ -891,6 +891,7 @@ export const downloadsAdminRouter = router({
       metaTitle: z.string().max(255).optional(),
       metaDescription: z.string().max(500).optional(),
       status: z.enum(["draft", "published", "hidden", "private", "archived"]).optional(),
+      publishDomain: z.string().max(255).nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });

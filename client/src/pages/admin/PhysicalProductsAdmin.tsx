@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import {
   Plus, Pencil, Trash2, Copy, Upload, ShoppingBag, ArrowLeft,
   ExternalLink, Eye, Image as ImageIcon, Link as LinkIcon,
@@ -513,6 +514,7 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
       slug: product.slug,
       metaTitle: product.metaTitle ?? "",
       metaDescription: product.metaDescription ?? "",
+      publishDomain: (product as any).publishDomain ?? "",
     });
   }
 
@@ -538,6 +540,7 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
       slug: form.slug || product.slug,
       metaTitle: form.metaTitle || null,
       metaDescription: form.metaDescription || null,
+      publishDomain: form.publishDomain || null,
     });
   };
 
@@ -700,6 +703,14 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
               <div>
                 <Label className="text-sm">Meta Description (SEO)</Label>
                 <Textarea value={form.metaDescription ?? ""} onChange={e => setForm({ ...form, metaDescription: e.target.value })} placeholder="Brief description for search engines" className="mt-1 resize-none h-20" maxLength={500} />
+              </div>
+              <div>
+                <Label className="text-sm">Publish Domain Override</Label>
+                <PublishDomainSelect
+                  value={form.publishDomain ?? ""}
+                  onChange={v => setForm({ ...form, publishDomain: v })}
+                />
+                <p className="text-xs text-muted-foreground mt-1">Override the default publish domain for this product only.</p>
               </div>
             </CardContent>
           </Card>

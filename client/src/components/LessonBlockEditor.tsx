@@ -818,7 +818,7 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
 
     {/* Block Picker Modal */}
     <Dialog open={addMenuOpen} onOpenChange={open => { setAddMenuOpen(open); if (!open) setBlockSearch(""); }}>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+      <DialogContent className="w-[95vw] max-w-2xl max-h-[85vh] flex flex-col overflow-hidden p-4 sm:p-6">
         <DialogHeader className="shrink-0">
           <DialogTitle className="text-teal-700 flex items-center gap-2">
             <Plus className="w-5 h-5" /> Add Content Block
@@ -826,64 +826,41 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
         </DialogHeader>
 
         {/* Top-level tabs: Catalog vs From Lessons */}
-        <div className="flex gap-1 border-b border-gray-200 shrink-0 -mx-1 px-1 overflow-x-auto">
-          <button
-            onClick={() => setPickerTab("catalog")}
-            className={cn(
-              "px-4 py-2 text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5",
-              pickerTab === "catalog"
-                ? "text-teal-700 border-b-2 border-teal-500"
-                : "text-gray-500 hover:text-gray-700"
-            )}
-          >
-            <Plus className="w-3.5 h-3.5" /> New Block
-          </button>
-          <button
-            onClick={() => setPickerTab("from_lessons")}
-            className={cn(
-              "px-4 py-2 text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5",
-              pickerTab === "from_lessons"
-                ? "text-teal-700 border-b-2 border-teal-500"
-                : "text-gray-500 hover:text-gray-700"
-            )}
-          >
-            <BookOpen className="w-3.5 h-3.5" /> Copy from Other Lessons
-          </button>
-          <button
-            onClick={() => setPickerTab("templates")}
-            className={cn(
-              "px-4 py-2 text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5",
-              pickerTab === "templates"
-                ? "text-teal-700 border-b-2 border-teal-500"
-                : "text-gray-500 hover:text-gray-700"
-            )}
-          >
-            <Layers className="w-3.5 h-3.5" /> Block Templates
-          </button>
-          <button
-            onClick={() => { setPickerTab("import_url"); setImportPreview(null); }}
-            className={cn(
-              "px-4 py-2 text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5",
-              pickerTab === "import_url"
-                ? "text-teal-700 border-b-2 border-teal-500"
-                : "text-gray-500 hover:text-gray-700"
-            )}
-          >
-            <Globe className="w-3.5 h-3.5" /> Import from URL
-          </button>
+        <div className="flex border-b border-gray-200 shrink-0 overflow-x-auto scrollbar-none -mx-4 sm:-mx-6 px-4 sm:px-6">
+          {([
+            { id: "catalog", icon: <Plus className="w-3.5 h-3.5" />, label: "New Block" },
+            { id: "from_lessons", icon: <BookOpen className="w-3.5 h-3.5" />, label: "Copy" },
+            { id: "templates", icon: <Layers className="w-3.5 h-3.5" />, label: "Templates" },
+            { id: "import_url", icon: <Globe className="w-3.5 h-3.5" />, label: "Import URL" },
+          ] as const).map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => { setPickerTab(tab.id); if (tab.id === "import_url") setImportPreview(null); }}
+              className={cn(
+                "px-3 py-2 text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1 shrink-0",
+                pickerTab === tab.id
+                  ? "text-teal-700 border-b-2 border-teal-500"
+                  : "text-gray-500 hover:text-gray-700"
+              )}
+            >
+              {tab.icon}
+              <span className="hidden sm:inline">{tab.label}</span>
+              <span className="sm:hidden">{tab.label.split(" ")[0]}</span>
+            </button>
+          ))}
         </div>
 
         {/* ── Catalog tab ── */}
         {pickerTab === "catalog" && (
           <div className="flex flex-col flex-1 overflow-hidden">
             {/* Category tabs */}
-            <div className="flex border-b border-gray-200 overflow-x-auto bg-gray-50 shrink-0">
+            <div className="flex border-b border-gray-200 overflow-x-auto scrollbar-none bg-gray-50 shrink-0 -mx-4 sm:-mx-6 px-4 sm:px-6">
               {CATALOG_CATEGORIES.map(cat => (
                 <button
                   key={cat}
                   onClick={() => setActiveCategory(cat)}
                   className={cn(
-                    "px-4 py-2 text-xs font-medium whitespace-nowrap transition-colors",
+                    "px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors shrink-0",
                     activeCategory === cat
                       ? "text-teal-700 border-b-2 border-teal-500 bg-white"
                       : "text-gray-500 hover:text-gray-700"
@@ -894,7 +871,7 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
               ))}
             </div>
             {/* Block grid */}
-            <div className="grid grid-cols-4 gap-2 p-1 overflow-y-auto flex-1">
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 p-1 overflow-y-auto flex-1">
               {BLOCK_CATALOG.filter(b => b.category === activeCategory).map(b => (
                 <button
                   key={b.type}
