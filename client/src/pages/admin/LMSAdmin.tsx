@@ -8258,7 +8258,7 @@ const COMMON_TIMEZONES = [
 ];
 
 function CohortTab({ courseId }: { courseId: number }) {
-  const [activeTab, setActiveTab] = useState<"settings" | "groups" | "sessions" | "assignments" | "recordings">("settings");
+  const [activeTab, setActiveTab] = useState<"settings" | "groups" | "sessions" | "assignments" | "recordings" | "discussions">("settings");
   // Multi-cohort mode toggle
   const { data: courseData, refetch: refetchCourse } = trpc.lmsAdmin.getCourse.useQuery({ id: courseId });
   const updateCourse = trpc.lmsAdmin.updateCourse.useMutation({ onSuccess: () => { refetchCourse(); toast.success("Cohort settings saved"); }, onError: (e) => toast.error(e.message) });
@@ -8323,6 +8323,54 @@ function CohortTab({ courseId }: { courseId: number }) {
   const [messageBody, setMessageBody] = useState("");
   const [messageMedia, setMessageMedia] = useState<{ url: string; mimeType: string; fileName: string }[]>([]);
   const [uploadingMedia, setUploadingMedia] = useState(false);
+
+  // Admin Discussions tab state
+  const [discFilterGroupId, setDiscFilterGroupId] = useState<number | null>(null);
+  const { data: allDiscussions = [], refetch: refetchAllDiscussions } = trpc.lmsAdmin.getCourseDiscussions.useQuery(
+    { courseId, cohortGroupId: discFilterGroupId ?? undefined },
+    { enabled: activeTab === "discussions" }
+  );
+  const [discBody, setDiscBody] = useState("");
+  const [discMedia, setDiscMedia] = useState<{ url: string; mimeType: string; fileName: string }[]>([]);
+  const [discTargetGroupId, setDiscTargetGroupId] = useState<number | null>(null);
+  const [discUploadingMedia, setDiscUploadingMedia] = useState(false);
+  const pinMessage = trpc.lmsAdmin.pinCohortMessage.useMutation({ onSuccess: () => refetchAllDiscussions(), onError: (e) => toast.error(e.message) });
+  const moderateDelete = trpc.lmsAdmin.moderateDeleteCohortMessage.useMutation({ onSuccess: () => refetchAllDiscussions(), onError: (e) => toast.error(e.message) });
+  const postAdminMessage = trpc.lmsAdmin.postAdminCohortMessage.useMutation({
+    onSuccess: () => { refetchAllDiscussions(); setDiscBody(""); setDiscMedia([]); toast.success("Message posted"); },
+    onError: (e) => toast.error(e.message),
+  });
+  const handleDiscMediaUpload = async (file: File) => {
+    setDiscUploadingMedia(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload/cohort-media", { method: "POST", body: formData });
+      if (!res.ok) throw new Error("Upload failed");
+      const { url } = await res.json();
+      setDiscMedia(prev => [...prev, { url, mimeType: file.type, fileName: file.name }]);
+    } catch (e: any) {
+      toast.error(e.message ?? "Upload failed");
+    } finally {
+      setDiscUploadingMedia(false);
+    }
+  };
+
+  // Cohort Staff state (for Settings tab)
+  const [staffGroupId, setStaffGroupId] = useState<number | null>(null);
+  const { data: cohortStaff = [], refetch: refetchStaff } = trpc.lmsAdmin.getCohortStaff.useQuery(
+    { cohortGroupId: staffGroupId ?? 0, courseId },
+    { enabled: !!staffGroupId && activeTab === "settings" }
+  );
+  const upsertStaff = trpc.lmsAdmin.upsertCohortStaff.useMutation({ onSuccess: () => { refetchStaff(); toast.success("Staff updated"); setStaffDialog(null); }, onError: (e) => toast.error(e.message) });
+  const removeStaff = trpc.lmsAdmin.removeCohortStaff.useMutation({ onSuccess: () => { refetchStaff(); toast.success("Staff removed"); }, onError: (e) => toast.error(e.message) });
+  const [staffDialog, setStaffDialog] = useState<{ open: boolean; staff?: any } | null>(null);
+  const [staffForm, setStaffForm] = useState({ userEmail: "", role: "moderator" as "admin" | "moderator", canManageDiscussions: true, canAddSessions: false, canAddAssignments: false, canAddRecordings: false });
+  const [staffEmailSearch, setStaffEmailSearch] = useState("");
+  const { data: staffSearchResults = [] } = trpc.lmsEnrollmentAdmin.searchUsers.useQuery(
+    { query: staffEmailSearch },
+    { enabled: staffEmailSearch.length >= 3 && !!staffDialog?.open }
+  );
   const handleMediaUpload = async (file: File) => {
     setUploadingMedia(true);
     try {
@@ -8640,11 +8688,11 @@ function CohortTab({ courseId }: { courseId: number }) {
     <div className="space-y-4">
       {/* Sub-tabs */}
       <div className="flex gap-1 border-b border-gray-200 pb-0">
-        {(["settings", "groups", "sessions", "assignments", "recordings"] as const).map(t => (
+        {(["settings", "groups", "sessions", "assignments", "recordings", "discussions"] as const).map(t => (
           <button key={t} onClick={() => setActiveTab(t)}
             className={cn("px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize",
               activeTab === t ? "border-teal-600 text-teal-700" : "border-transparent text-gray-500 hover:text-gray-700")}>
-            {t === "sessions" ? "Live Sessions" : t === "assignments" ? "Assignments" : t === "recordings" ? "Recordings" : t === "groups" ? "Cohort Groups" : "Settings"}
+            {t === "sessions" ? "Live Sessions" : t === "assignments" ? "Assignments" : t === "recordings" ? "Recordings" : t === "groups" ? "Cohort Groups" : t === "discussions" ? "Discussions" : "Settings"}
           </button>
         ))}
       </div>
@@ -9681,6 +9729,175 @@ function CohortTab({ courseId }: { courseId: number }) {
                 <strong>Multi-cohort mode is active.</strong> Go to the <button className="underline font-medium" onClick={() => setActiveTab("groups")}>Cohort Groups</button> tab to manage your groups and assign students.
               </div>
             )}
+          </div>
+
+          {/* Cohort Staff Management */}
+          {courseData?.multiCohortMode && (
+            <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
+              <h3 className="text-base font-semibold text-gray-900">Cohort Staff &amp; Moderators</h3>
+              <p className="text-sm text-gray-500">Add admins or moderators to a specific cohort group. Staff can manage discussions and optionally add sessions, assignments, and recordings.</p>
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700">Select Group:</label>
+                <select className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm" value={staffGroupId ?? ""} onChange={e => setStaffGroupId(e.target.value ? Number(e.target.value) : null)}>
+                  <option value="">-- choose group --</option>
+                  {cohortGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                </select>
+              </div>
+              {staffGroupId && (
+                <div className="space-y-2">
+                  {cohortStaff.length === 0 && <p className="text-sm text-gray-400">No staff assigned to this group yet.</p>}
+                  {cohortStaff.map(s => (
+                    <div key={s.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
+                      <div>
+                        <span className="text-sm font-medium text-gray-800">{s.userName}</span>
+                        <span className="text-xs text-gray-500 ml-2">{s.userEmail}</span>
+                        <span className={`ml-2 text-xs px-2 py-0.5 rounded-full font-medium ${s.role === 'admin' ? 'bg-teal-100 text-teal-700' : 'bg-blue-100 text-blue-700'}`}>{s.role}</span>
+                        <span className="text-xs text-gray-400 ml-2">
+                          {[s.canManageDiscussions && 'discussions', s.canAddSessions && 'sessions', s.canAddAssignments && 'assignments', s.canAddRecordings && 'recordings'].filter(Boolean).join(', ')}
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        <button className="text-xs text-teal-600 hover:underline" onClick={() => { setStaffForm({ userEmail: s.userEmail ?? '', role: s.role, canManageDiscussions: !!s.canManageDiscussions, canAddSessions: !!s.canAddSessions, canAddAssignments: !!s.canAddAssignments, canAddRecordings: !!s.canAddRecordings }); setStaffDialog({ open: true, staff: s }); }}>Edit</button>
+                        <button className="text-xs text-red-500 hover:underline" onClick={() => removeStaff.mutate({ id: s.id })}>Remove</button>
+                      </div>
+                    </div>
+                  ))}
+                  <button className="mt-2 flex items-center gap-1 text-sm text-teal-600 hover:underline" onClick={() => { setStaffForm({ userEmail: '', role: 'moderator', canManageDiscussions: true, canAddSessions: false, canAddAssignments: false, canAddRecordings: false }); setStaffDialog({ open: true }); }}>
+                    <span className="text-lg leading-none">+</span> Add Staff Member
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Discussions Tab */}
+      {activeTab === "discussions" && (
+        <div className="space-y-4">
+          {/* Filter by group */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-sm font-medium text-gray-700">Filter by group:</span>
+            <button onClick={() => setDiscFilterGroupId(null)} className={`text-xs px-3 py-1 rounded-full border transition-colors ${!discFilterGroupId ? 'bg-teal-600 text-white border-teal-600' : 'border-gray-200 text-gray-600 hover:border-teal-400'}`}>All Groups</button>
+            {cohortGroups.map(g => (
+              <button key={g.id} onClick={() => setDiscFilterGroupId(g.id)} className={`text-xs px-3 py-1 rounded-full border transition-colors ${discFilterGroupId === g.id ? 'bg-teal-600 text-white border-teal-600' : 'border-gray-200 text-gray-600 hover:border-teal-400'}`}>{g.name}</button>
+            ))}
+          </div>
+
+          {/* Post new message */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+            <h4 className="text-sm font-semibold text-gray-800">Post as Admin</h4>
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-gray-600">Target group:</label>
+              <select className="border border-gray-200 rounded-lg px-2 py-1 text-xs" value={discTargetGroupId ?? ""} onChange={e => setDiscTargetGroupId(e.target.value ? Number(e.target.value) : null)}>
+                <option value="">-- select group --</option>
+                {cohortGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+              </select>
+            </div>
+            <textarea value={discBody} onChange={e => setDiscBody(e.target.value)} placeholder="Write a message to the cohort..." className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none" rows={3} />
+            {discMedia.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {discMedia.map((m, i) => (
+                  <div key={i} className="relative">
+                    {m.mimeType.startsWith('image/') ? <img src={m.url} alt={m.fileName} className="w-20 h-20 object-cover rounded-lg" /> : <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center text-xs text-gray-500 text-center p-1">{m.fileName}</div>}
+                    <button onClick={() => setDiscMedia(prev => prev.filter((_, j) => j !== i))} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 text-xs flex items-center justify-center">×</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <label className="cursor-pointer text-xs text-teal-600 hover:underline">
+                {discUploadingMedia ? 'Uploading...' : '+ Add Image/Video'}
+                <input type="file" accept="image/*,video/*" className="hidden" disabled={discUploadingMedia} onChange={e => { if (e.target.files?.[0]) handleDiscMediaUpload(e.target.files[0]); e.target.value = ''; }} />
+              </label>
+              <button disabled={(!discBody.trim() && discMedia.length === 0) || !discTargetGroupId || postAdminMessage.isPending} onClick={() => { if (!discTargetGroupId) return; postAdminMessage.mutate({ cohortGroupId: discTargetGroupId, courseId, body: discBody.trim() || undefined, mediaUrls: discMedia.length > 0 ? discMedia : undefined }); }} className="ml-auto px-4 py-1.5 bg-teal-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
+                {postAdminMessage.isPending ? 'Posting...' : 'Post'}
+              </button>
+            </div>
+          </div>
+
+          {/* Messages list */}
+          <div className="space-y-3">
+            {allDiscussions.length === 0 && <p className="text-sm text-gray-400 text-center py-8">No discussions yet.</p>}
+            {allDiscussions.map(msg => (
+              <div key={msg.id} className={`bg-white border rounded-xl p-4 space-y-2 ${msg.isPinned ? 'border-teal-400 bg-teal-50' : 'border-gray-200'}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold text-gray-800">{msg.userName}</span>
+                    {msg.isAdminPost && <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">Admin</span>}
+                    {msg.isPinned && <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium">📌 Pinned</span>}
+                    <span className="text-xs text-gray-400">{new Date(msg.createdAt).toLocaleString()}</span>
+                    {cohortGroups.find(g => g.id === msg.cohortGroupId) && <span className="text-xs text-gray-400">· {cohortGroups.find(g => g.id === msg.cohortGroupId)?.name}</span>}
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <button onClick={() => pinMessage.mutate({ id: msg.id, isPinned: !msg.isPinned })} className="text-xs text-gray-500 hover:text-teal-600">{msg.isPinned ? 'Unpin' : 'Pin'}</button>
+                    <button onClick={() => { if (confirm('Delete this message?')) moderateDelete.mutate({ id: msg.id }); }} className="text-xs text-red-500 hover:underline">Delete</button>
+                  </div>
+                </div>
+                {msg.body && <p className="text-sm text-gray-700 whitespace-pre-wrap">{msg.body}</p>}
+                {(msg.mediaUrls as any[])?.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {(msg.mediaUrls as any[]).map((m: any, i: number) => (
+                      m.mimeType?.startsWith('image/') ? <img key={i} src={m.url} alt={m.fileName} className="w-24 h-24 object-cover rounded-lg" /> : <a key={i} href={m.url} target="_blank" rel="noopener noreferrer" className="text-xs text-teal-600 hover:underline">{m.fileName}</a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Cohort Staff Dialog */}
+      {staffDialog?.open && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={e => { if (e.target === e.currentTarget) setStaffDialog(null); }}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
+            <h3 className="text-lg font-bold text-gray-900">{staffDialog.staff ? 'Edit Staff Member' : 'Add Staff Member'}</h3>
+            {!staffDialog.staff && (
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">Search User by Name or Email</label>
+                <input type="text" value={staffEmailSearch} onChange={e => { setStaffEmailSearch(e.target.value); setStaffForm(p => ({ ...p, userEmail: e.target.value })); }} placeholder="Type at least 3 characters..." className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+                {staffSearchResults.length > 0 && (
+                  <div className="border border-gray-200 rounded-lg overflow-hidden mt-1">
+                    {staffSearchResults.map((u: any) => (
+                      <button key={u.id} type="button" onClick={() => { setStaffForm(p => ({ ...p, userEmail: u.email ?? '' })); setStaffEmailSearch(u.name ?? u.email ?? ''); }} className="w-full text-left px-3 py-2 text-sm hover:bg-teal-50 border-b border-gray-100 last:border-0">
+                        <span className="font-medium">{u.name}</span> <span className="text-gray-400 text-xs">{u.email}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-700">Role</label>
+              <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" value={staffForm.role} onChange={e => setStaffForm(p => ({ ...p, role: e.target.value as 'admin' | 'moderator' }))}>
+                <option value="moderator">Moderator</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Permissions</label>
+              {([['canManageDiscussions', 'Manage Discussions'], ['canAddSessions', 'Add Live Sessions'], ['canAddAssignments', 'Add Assignments'], ['canAddRecordings', 'Add Recordings']] as [keyof typeof staffForm, string][]).map(([key, label]) => (
+                <label key={key} className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={!!staffForm[key]} onChange={e => setStaffForm(p => ({ ...p, [key]: e.target.checked }))} className="accent-teal-600" />
+                  <span className="text-sm text-gray-700">{label}</span>
+                </label>
+              ))}
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setStaffDialog(null)} className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm">Cancel</button>
+              <button disabled={upsertStaff.isPending} onClick={() => {
+                if (staffDialog.staff) {
+                  upsertStaff.mutate({ cohortGroupId: staffGroupId!, courseId, userId: staffDialog.staff.userId, ...staffForm });
+                } else {
+                  const user = (allUsers as any[]).find((u: any) => u.email === staffForm.userEmail);
+                  if (!user) { toast.error('User not found with that email'); return; }
+                  upsertStaff.mutate({ cohortGroupId: staffGroupId!, courseId, userId: user.id, ...staffForm });
+                }
+              }} className="flex-1 px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
+                {upsertStaff.isPending ? 'Saving...' : 'Save'}
+              </button>
+            </div>
           </div>
         </div>
       )}

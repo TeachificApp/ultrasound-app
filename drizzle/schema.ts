@@ -5074,8 +5074,27 @@ export const lmsCohortMessages = mysqlTable("lms_cohort_messages", {
   // JSON array of { url, mimeType, fileName } objects
   mediaUrls: json("media_urls").$type<{ url: string; mimeType: string; fileName: string }[]>(),
   isAdminPost: boolean("is_admin_post").default(false).notNull(),
+  isPinned: boolean("is_pinned").default(false).notNull(),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
 export type LmsCohortMessage = typeof lmsCohortMessages.$inferSelect;
 export type InsertLmsCohortMessage = typeof lmsCohortMessages.$inferInsert;
+
+// Cohort group staff (admins/moderators per cohort group)
+export const lmsCohortStaff = mysqlTable("lms_cohort_staff", {
+  id: int("id").autoincrement().primaryKey(),
+  cohortGroupId: int("cohort_group_id").notNull(),
+  courseId: int("course_id").notNull(),
+  userId: int("user_id").notNull(),
+  role: varchar("role", { length: 20 }).notNull().default("moderator"), // 'admin' | 'moderator'
+  canManageDiscussions: boolean("can_manage_discussions").default(true).notNull(),
+  canAddSessions: boolean("can_add_sessions").default(false).notNull(),
+  canAddAssignments: boolean("can_add_assignments").default(false).notNull(),
+  canAddRecordings: boolean("can_add_recordings").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type LmsCohortStaff = typeof lmsCohortStaff.$inferSelect;
+export type InsertLmsCohortStaff = typeof lmsCohortStaff.$inferInsert;

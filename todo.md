@@ -3804,3 +3804,19 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [x] lms_cohort_messages table created in DB (id, cohort_group_id, course_id, user_id, body, media_urls, is_admin_post)
 - [x] access_duration_days column added to lms_cohort_groups
 - [x] /api/upload/cohort-media endpoint created (images + videos, admin only, 100 MB limit)
+
+## Cohort Discussions Tab & Staff Management (2026-05-29)
+- [ ] Add lms_cohort_staff table (cohort_group_id, user_id, role: admin/moderator, can_manage_discussions, can_add_sessions, can_add_assignments, can_add_recordings)
+- [ ] Add isPinned and deletedAt columns to lms_cohort_messages
+- [ ] Backend: getCohortStaff, addCohortStaff, updateCohortStaff, removeCohortStaff procedures
+- [ ] Backend: pinCohortMessage, deleteCohortMessage (moderation) procedures
+- [ ] Backend: getCohortDiscussions (all groups for a course, admin view) procedure
+- [ ] UI: Add Discussions tab after Recordings in cohort sub-tabs
+- [ ] UI: Discussions tab shows all groups' threads, admin can post/delete/pin messages
+- [ ] UI: Cohort Settings tab — add/remove cohort admins and moderators per group
+- [ ] UI: Permission flags per staff member (manage discussions, add sessions, add assignments, add recordings)
+
+## Student Discussions Tab & Recurring Session Fix (2026-05-29)
+- [ ] Fix recurring session multi-day bug (only first selected day repeats, others ignored)
+- [ ] Add Discussions tab to student My Cohort view (post text/images/videos, see all group messages)
+- [ ] Backend: student getCohortDiscussions and postCohortMessage procedures (protected, not admin-only)

@@ -1771,6 +1771,96 @@ export const lmsLearnerRouter = router({
         .limit(1);
       return { assignment, mySubmission: mySubmission ?? null };
     }),
+
+  // ── Student Cohort Discussions ────────────────────────────────────────────────
+
+  /** Get discussion messages for the student's cohort group */
+  getCohortDiscussions: protectedProcedure
+    .input(z.object({ courseId: z.number(), limit: z.number().default(100), offset: z.number().default(0) }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Find the student's cohort group for this course
+      const [groupEnrollment] = await db.select({ cohortGroupId: lmsCohortGroupEnrollments.cohortGroupId })
+        .from(lmsCohortGroupEnrollments)
+        .where(and(
+          eq(lmsCohortGroupEnrollments.userId, ctx.user.id),
+          eq(lmsCohortGroupEnrollments.courseId, input.courseId),
+        ))
+        .limit(1);
+      if (!groupEnrollment) return { messages: [], cohortGroupId: null };
+      const { lmsCohortMessages } = await import("../../drizzle/schema");
+      const messages = await db.select({
+        id: lmsCohortMessages.id,
+        cohortGroupId: lmsCohortMessages.cohortGroupId,
+        userId: lmsCohortMessages.userId,
+        body: lmsCohortMessages.body,
+        mediaUrls: lmsCohortMessages.mediaUrls,
+        isAdminPost: lmsCohortMessages.isAdminPost,
+        isPinned: lmsCohortMessages.isPinned,
+        createdAt: lmsCohortMessages.createdAt,
+        userName: users.name,
+      })
+        .from(lmsCohortMessages)
+        .innerJoin(users, eq(users.id, lmsCohortMessages.userId))
+        .where(and(
+          eq(lmsCohortMessages.cohortGroupId, groupEnrollment.cohortGroupId),
+          eq(lmsCohortMessages.courseId, input.courseId),
+          isNull(lmsCohortMessages.deletedAt),
+        ))
+        .orderBy(desc(lmsCohortMessages.isPinned), desc(lmsCohortMessages.createdAt))
+        .limit(input.limit)
+        .offset(input.offset);
+      return { messages, cohortGroupId: groupEnrollment.cohortGroupId, currentUserId: ctx.user.id };
+    }),
+
+  /** Post a message in the student's cohort group discussion */
+  postStudentCohortMessage: protectedProcedure
+    .input(z.object({
+      courseId: z.number(),
+      body: z.string().optional(),
+      mediaUrls: z.array(z.object({ url: z.string(), mimeType: z.string(), fileName: z.string() })).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [groupEnrollment] = await db.select({ cohortGroupId: lmsCohortGroupEnrollments.cohortGroupId })
+        .from(lmsCohortGroupEnrollments)
+        .where(and(
+          eq(lmsCohortGroupEnrollments.userId, ctx.user.id),
+          eq(lmsCohortGroupEnrollments.courseId, input.courseId),
+        ))
+        .limit(1);
+      if (!groupEnrollment) throw new TRPCError({ code: "FORBIDDEN", message: "Not in a cohort group for this course" });
+      const { lmsCohortMessages } = await import("../../drizzle/schema");
+      const [result] = await db.insert(lmsCohortMessages).values({
+        cohortGroupId: groupEnrollment.cohortGroupId,
+        courseId: input.courseId,
+        userId: ctx.user.id,
+        body: input.body ?? null,
+        mediaUrls: input.mediaUrls ?? null,
+        isAdminPost: false,
+        isPinned: false,
+      }).$returningId();
+      return { id: result.id };
+    }),
+
+  /** Delete own cohort message */
+  deleteStudentCohortMessage: protectedProcedure
+    .input(z.object({ id: z.number(), courseId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { lmsCohortMessages } = await import("../../drizzle/schema");
+      const [msg] = await db.select({ userId: lmsCohortMessages.userId })
+        .from(lmsCohortMessages)
+        .where(eq(lmsCohortMessages.id, input.id))
+        .limit(1);
+      if (!msg) throw new TRPCError({ code: "NOT_FOUND" });
+      if (msg.userId !== ctx.user.id && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      await db.update(lmsCohortMessages).set({ deletedAt: new Date() }).where(eq(lmsCohortMessages.id, input.id));
+      return { success: true };
+    }),
 });
 
 // ─── Group Manager Router ─────────────────────────────────────────────────

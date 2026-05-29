@@ -670,7 +670,37 @@ function isDueSoonDate(d: Date | string | null | undefined) {
 
 function CohortDashboardTab({ courseId, cohortData, isLoading }: { courseId: number; cohortData: any; isLoading: boolean }) {
   const [, navigate] = useLocation();
-  const [cohortTab, setCohortTab] = useState<"sessions" | "assignments" | "replays">("sessions");
+  const [cohortTab, setCohortTab] = useState<"sessions" | "assignments" | "replays" | "discussions">("sessions");
+  const [discBody, setDiscBody] = useState("");
+  const [discMedia, setDiscMedia] = useState<{ url: string; mimeType: string; fileName: string }[]>([]);
+  const [discUploading, setDiscUploading] = useState(false);
+  const { data: discData, refetch: refetchDisc } = trpc.lmsLearner.getCohortDiscussions.useQuery(
+    { courseId },
+    { enabled: cohortTab === "discussions" }
+  );
+  const postDisc = trpc.lmsLearner.postStudentCohortMessage.useMutation({
+    onSuccess: () => { refetchDisc(); setDiscBody(""); setDiscMedia([]); },
+    onError: (e: any) => { const toast = (window as any).__toast; if (toast) toast.error(e.message); },
+  });
+  const deleteDisc = trpc.lmsLearner.deleteStudentCohortMessage.useMutation({
+    onSuccess: () => refetchDisc(),
+    onError: (e: any) => { const toast = (window as any).__toast; if (toast) toast.error(e.message); },
+  });
+  const handleDiscMediaUpload = async (file: File) => {
+    setDiscUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload/cohort-media", { method: "POST", body: formData });
+      if (!res.ok) throw new Error("Upload failed");
+      const { url } = await res.json();
+      setDiscMedia(prev => [...prev, { url, mimeType: file.type, fileName: file.name }]);
+    } catch (e: any) {
+      alert(e.message ?? "Upload failed");
+    } finally {
+      setDiscUploading(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -734,6 +764,7 @@ function CohortDashboardTab({ courseId, cohortData, isLoading }: { courseId: num
           { key: "sessions", label: "Live Sessions", icon: <Video className="w-4 h-4" />, count: upcomingSessions.length },
           { key: "assignments", label: "Assignments", icon: <FileText className="w-4 h-4" />, count: pendingAssignments.length },
           { key: "replays", label: "Replays", icon: <Film className="w-4 h-4" />, count: recordings.length },
+          { key: "discussions", label: "Discussions", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>, count: discData?.messages?.length ?? 0 },
         ] as const).map(({ key, label, icon, count }) => (
           <button
             key={key}
@@ -844,6 +875,72 @@ function CohortDashboardTab({ courseId, cohortData, isLoading }: { courseId: num
             <div className="space-y-4">
               {recordings.map((rec: any) => <CohortRecordingCard key={rec.id} recording={rec} />)}
             </div>
+          )}
+        </div>
+      )}
+
+      {/* Discussions tab */}
+      {cohortTab === "discussions" && (
+        <div className="space-y-4">
+          {!discData?.cohortGroupId && (
+            <Card className="text-center py-16"><CardContent className="pt-6">
+              <p className="text-gray-500 font-medium">You are not assigned to a cohort group yet.</p>
+              <p className="text-gray-400 text-sm mt-1">Discussions will appear here once you are placed in a group.</p>
+            </CardContent></Card>
+          )}
+          {discData?.cohortGroupId && (
+            <>
+              {/* Post composer */}
+              <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+                <textarea value={discBody} onChange={e => setDiscBody(e.target.value)} placeholder="Share something with your cohort..." className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none" rows={3} />
+                {discMedia.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {discMedia.map((m, i) => (
+                      <div key={i} className="relative">
+                        {m.mimeType.startsWith('image/') ? <img src={m.url} alt={m.fileName} className="w-20 h-20 object-cover rounded-lg" /> : <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center text-xs text-gray-500 text-center p-1">{m.fileName}</div>}
+                        <button onClick={() => setDiscMedia(prev => prev.filter((_, j) => j !== i))} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 text-xs flex items-center justify-center">×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <label className="cursor-pointer text-xs text-teal-600 hover:underline">
+                    {discUploading ? 'Uploading...' : '+ Add Image/Video'}
+                    <input type="file" accept="image/*,video/*" className="hidden" disabled={discUploading} onChange={e => { if (e.target.files?.[0]) handleDiscMediaUpload(e.target.files[0]); e.target.value = ''; }} />
+                  </label>
+                  <button disabled={(!discBody.trim() && discMedia.length === 0) || postDisc.isPending} onClick={() => postDisc.mutate({ courseId, body: discBody.trim() || undefined, mediaUrls: discMedia.length > 0 ? discMedia : undefined })} className="ml-auto px-4 py-1.5 bg-teal-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
+                    {postDisc.isPending ? 'Posting...' : 'Post'}
+                  </button>
+                </div>
+              </div>
+              {/* Messages */}
+              <div className="space-y-3">
+                {(discData.messages ?? []).length === 0 && <p className="text-sm text-gray-400 text-center py-8">No discussions yet. Be the first to post!</p>}
+                {(discData.messages ?? []).map((msg: any) => (
+                  <div key={msg.id} className={`bg-white border rounded-xl p-4 space-y-2 ${msg.isPinned ? 'border-teal-400 bg-teal-50' : 'border-gray-200'}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold text-gray-800">{msg.userName}</span>
+                        {msg.isAdminPost && <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">Instructor</span>}
+                        {msg.isPinned && <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium">📌 Pinned</span>}
+                        <span className="text-xs text-gray-400">{new Date(msg.createdAt).toLocaleString()}</span>
+                      </div>
+                      {msg.userId === (discData as any).currentUserId && (
+                        <button onClick={() => { if (confirm('Delete your message?')) deleteDisc.mutate({ id: msg.id, courseId }); }} className="text-xs text-red-400 hover:underline">Delete</button>
+                      )}
+                    </div>
+                    {msg.body && <p className="text-sm text-gray-700 whitespace-pre-wrap">{msg.body}</p>}
+                    {(msg.mediaUrls as any[])?.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {(msg.mediaUrls as any[]).map((m: any, i: number) => (
+                          m.mimeType?.startsWith('image/') ? <img key={i} src={m.url} alt={m.fileName} className="w-24 h-24 object-cover rounded-lg" /> : <a key={i} href={m.url} target="_blank" rel="noopener noreferrer" className="text-xs text-teal-600 hover:underline">{m.fileName}</a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
       )}

@@ -75,6 +75,7 @@ import {
   lmsCohortGroups,
   lmsCohortGroupEnrollments,
   lmsCohortMessages,
+  lmsCohortStaff,
 } from "../../drizzle/schema";
 import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
@@ -464,6 +465,7 @@ export const lmsCohortAdminRouter = router({
           occurrenceNum++;
           instances.push({
             courseId: parent.courseId,
+            cohortGroupId: parent.cohortGroupId,
             title: `${parent.title} (${occurrenceNum})`,
             description: parent.description,
             sessionDate: new Date(current),
@@ -507,22 +509,23 @@ export const lmsCohortAdminRouter = router({
             if (occurrenceNum >= maxCount) break;
             occurrenceNum++;
             instances.push({
-              courseId: parent.courseId,
-              title: `${parent.title} (${occurrenceNum})`,
-              description: parent.description,
-              sessionDate: new Date(candidate),
-              durationMinutes: parent.durationMinutes,
-              meetingUrl: parent.meetingUrl,
-              recordingUrl: null,
-              status: parent.status,
-              timezone: parent.timezone ?? "America/New_York",
-              recurrenceRule: null,
-              recurrenceDaysOfWeek: null,
-              recurrenceInterval: null,
-              recurrenceEndDate: null,
-              recurrenceOccurrenceCount: null,
-              parentSessionId: parent.id,
-            });
+            courseId: parent.courseId,
+            cohortGroupId: parent.cohortGroupId,
+            title: `${parent.title} (${occurrenceNum})`,
+            description: parent.description,
+            sessionDate: new Date(candidate),
+            durationMinutes: parent.durationMinutes,
+            meetingUrl: parent.meetingUrl,
+            recordingUrl: null,
+            status: parent.status,
+            timezone: parent.timezone ?? "America/New_York",
+            recurrenceRule: null,
+            recurrenceDaysOfWeek: null,
+            recurrenceInterval: null,
+            recurrenceEndDate: null,
+            recurrenceOccurrenceCount: null,
+            parentSessionId: parent.id,
+          });
           }
           weekOffset++;
           // Safety: stop if we've gone past end date even without filling maxCount
@@ -542,6 +545,7 @@ export const lmsCohortAdminRouter = router({
           occurrenceNum++;
           instances.push({
             courseId: parent.courseId,
+            cohortGroupId: parent.cohortGroupId,
             title: `${parent.title} (${occurrenceNum})`,
             description: parent.description,
             sessionDate: new Date(current),
@@ -1104,6 +1108,170 @@ export const lmsCohortAdminRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       await db.delete(lmsCohortMessages).where(eq(lmsCohortMessages.id, input.id));
       return { success: true };
+    }),
+
+  // ── Cohort Staff Management ──────────────────────────────────────────────────
+
+  /** List cohort staff for a group */
+  getCohortStaff: protectedProcedure
+    .input(z.object({ cohortGroupId: z.number(), courseId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const staff = await db.select({
+        id: lmsCohortStaff.id,
+        cohortGroupId: lmsCohortStaff.cohortGroupId,
+        courseId: lmsCohortStaff.courseId,
+        userId: lmsCohortStaff.userId,
+        role: lmsCohortStaff.role,
+        canManageDiscussions: lmsCohortStaff.canManageDiscussions,
+        canAddSessions: lmsCohortStaff.canAddSessions,
+        canAddAssignments: lmsCohortStaff.canAddAssignments,
+        canAddRecordings: lmsCohortStaff.canAddRecordings,
+        userName: users.name,
+        userEmail: users.email,
+      })
+        .from(lmsCohortStaff)
+        .innerJoin(users, eq(users.id, lmsCohortStaff.userId))
+        .where(and(
+          eq(lmsCohortStaff.cohortGroupId, input.cohortGroupId),
+          eq(lmsCohortStaff.courseId, input.courseId),
+        ));
+      return staff;
+    }),
+
+  /** Add or update a cohort staff member */
+  upsertCohortStaff: protectedProcedure
+    .input(z.object({
+      cohortGroupId: z.number(),
+      courseId: z.number(),
+      userId: z.number(),
+      role: z.enum(["admin", "moderator"]).default("moderator"),
+      canManageDiscussions: z.boolean().default(true),
+      canAddSessions: z.boolean().default(false),
+      canAddAssignments: z.boolean().default(false),
+      canAddRecordings: z.boolean().default(false),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.insert(lmsCohortStaff).values({
+        cohortGroupId: input.cohortGroupId,
+        courseId: input.courseId,
+        userId: input.userId,
+        role: input.role,
+        canManageDiscussions: input.canManageDiscussions,
+        canAddSessions: input.canAddSessions,
+        canAddAssignments: input.canAddAssignments,
+        canAddRecordings: input.canAddRecordings,
+      }).onDuplicateKeyUpdate({
+        set: {
+          role: input.role,
+          canManageDiscussions: input.canManageDiscussions,
+          canAddSessions: input.canAddSessions,
+          canAddAssignments: input.canAddAssignments,
+          canAddRecordings: input.canAddRecordings,
+        },
+      });
+      return { success: true };
+    }),
+
+  /** Remove a cohort staff member */
+  removeCohortStaff: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(lmsCohortStaff).where(eq(lmsCohortStaff.id, input.id));
+      return { success: true };
+    }),
+
+  // ── Discussion Moderation ─────────────────────────────────────────────────────
+
+  /** Get all discussions for a course (admin view — all groups) */
+  getCourseDiscussions: protectedProcedure
+    .input(z.object({ courseId: z.number(), cohortGroupId: z.number().optional(), limit: z.number().default(100) }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const conditions = [
+        eq(lmsCohortMessages.courseId, input.courseId),
+        isNull(lmsCohortMessages.deletedAt),
+      ];
+      if (input.cohortGroupId) conditions.push(eq(lmsCohortMessages.cohortGroupId, input.cohortGroupId));
+      const messages = await db.select({
+        id: lmsCohortMessages.id,
+        cohortGroupId: lmsCohortMessages.cohortGroupId,
+        courseId: lmsCohortMessages.courseId,
+        userId: lmsCohortMessages.userId,
+        body: lmsCohortMessages.body,
+        mediaUrls: lmsCohortMessages.mediaUrls,
+        isAdminPost: lmsCohortMessages.isAdminPost,
+        isPinned: lmsCohortMessages.isPinned,
+        createdAt: lmsCohortMessages.createdAt,
+        userName: users.name,
+        userEmail: users.email,
+      })
+        .from(lmsCohortMessages)
+        .innerJoin(users, eq(users.id, lmsCohortMessages.userId))
+        .where(and(...conditions))
+        .orderBy(desc(lmsCohortMessages.isPinned), desc(lmsCohortMessages.createdAt))
+        .limit(input.limit);
+      return messages;
+    }),
+
+  /** Pin or unpin a cohort message */
+  pinCohortMessage: protectedProcedure
+    .input(z.object({ id: z.number(), isPinned: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(lmsCohortMessages)
+        .set({ isPinned: input.isPinned })
+        .where(eq(lmsCohortMessages.id, input.id));
+      return { success: true };
+    }),
+
+  /** Soft-delete a cohort message (moderation) */
+  moderateDeleteCohortMessage: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(lmsCohortMessages)
+        .set({ deletedAt: new Date() })
+        .where(eq(lmsCohortMessages.id, input.id));
+      return { success: true };
+    }),
+
+  /** Post a message as admin (from Discussions tab) */
+  postAdminCohortMessage: protectedProcedure
+    .input(z.object({
+      cohortGroupId: z.number(),
+      courseId: z.number(),
+      body: z.string().optional(),
+      mediaUrls: z.array(z.object({ url: z.string(), mimeType: z.string(), fileName: z.string() })).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [result] = await db.insert(lmsCohortMessages).values({
+        cohortGroupId: input.cohortGroupId,
+        courseId: input.courseId,
+        userId: ctx.user.id,
+        body: input.body ?? null,
+        mediaUrls: input.mediaUrls ?? null,
+        isAdminPost: true,
+        isPinned: false,
+      }).$returningId();
+      return { id: result.id };
     }),
 
   /** Bulk assign multiple students to a cohort group */
