@@ -4006,3 +4006,20 @@ New canonical list: Abdominal, Small Parts, Pelvic/Gyn, OB 1st Trimester, OB 2nd
 - [ ] Add "Export CSV" button to LMSAdmin Enrollments tab (course/cohort view)
 - [ ] Add "Export CSV" button to LMSAdmin Orders/Products tab for digital/physical product access lists
 - [ ] CSV columns: Name, Email, Enrolled At, Status, Progress %, Completed At, Group (cohort only), Role
+
+## Members Hub Activity Panel — Full Expansion
+- [ ] Add quiz attempts (lms_quiz_attempts) to getActivityFeed
+- [ ] Add video completions (lms_video_events where event_type='complete') to getActivityFeed
+- [ ] Add community posts (community_posts) to getActivityFeed
+- [ ] Add cohort discussion messages (lms_cohort_messages) to getActivityFeed
+- [ ] Add digital purchases (digital_purchases) to getActivityFeed
+- [ ] Add physical product orders (physical_product_orders) to getActivityFeed
+- [ ] Add webinar registrations (webinar_registrations) to getActivityFeed
+- [ ] Add lesson comments (lesson_comments) to getActivityFeed
+- [ ] Add quickfire attempts (quickfireAttempts) to getActivityFeed
+- [ ] Add case library attempts (echoLibraryCaseAttempts) to getActivityFeed
+- [ ] Add userActivityLogs (general activity) to getActivityFeed
+- [ ] Update type filter enum in backend and frontend to include all new types
+- [ ] Update iconMap and labelMap in ActivityPanel UI for all new types
+- [ ] Add user profile link (ExternalLink) to each activity row in ActivityPanel
+- [ ] Show extra detail (score, product name, etc.) in activity row subtitle

@@ -4,7 +4,7 @@
  * Tabs: Editor | Style/Branding | Share | Settings | Analytics
  */
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useParams, useLocation } from "wouter";
+import { useParams, useLocation, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import Layout from "@/components/Layout";
@@ -38,6 +38,7 @@ import {
 import { toast } from "sonner";
 import {
   Plus,
+  ChevronLeft,
   Trash2,
   Edit2,
   Copy,
@@ -215,6 +216,12 @@ function FormList({ onSelect }: { onSelect: (id: number) => void }) {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
+      {/* Platform Admin breadcrumb */}
+      <div className="mb-1">
+        <Link href="/platform-admin" className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-[#189aa1] transition-colors">
+          <ChevronLeft className="w-3 h-3" /> Platform Admin
+        </Link>
+      </div>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -1849,6 +1856,14 @@ function FormEditorShell({ formId, onBack }: { formId: number; onBack: () => voi
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-1 text-xs text-gray-400 mb-3">
+        <Link href="/platform-admin" className="hover:text-[#189aa1] transition-colors flex items-center gap-0.5">
+          <ChevronLeft className="w-3 h-3" /> Platform Admin
+        </Link>
+        <span>/</span>
+        <button onClick={onBack} className="hover:text-[#189aa1] transition-colors">Form Builder</button>
+      </div>
       {/* Top bar */}
       <div className="flex items-center gap-3 mb-5">
         <Button variant="ghost" size="sm" onClick={onBack} className="gap-1 text-gray-500">
