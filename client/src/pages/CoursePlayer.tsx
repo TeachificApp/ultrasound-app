@@ -17,7 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
-  Award, BookOpen, Bookmark, BookmarkCheck, CheckCircle, ChevronLeft, ChevronRight,
+  Award, BookOpen, Bookmark, BookmarkCheck, CalendarDays, CheckCircle, ChevronLeft, ChevronRight,
   Download, Eye, FileText, HelpCircle, Lock, Menu, Maximize2, Minimize2, Monitor, PlayCircle, StickyNote, X,
   User, ListChecks, ChevronDown, ChevronUp,
 } from "lucide-react";
@@ -1339,7 +1339,7 @@ export default function CoursePlayer() {
             <button
               className="text-[10px] font-medium flex items-center gap-1 transition-colors opacity-80 hover:opacity-100"
               style={{ color: primaryColor }}
-              onClick={() => { setMobileSidebarOpen(false); navigate(`/courses/${slug}/overview`); }}
+              onClick={() => { setMobileSidebarOpen(false); navigate(`/courses/${slug}/overview${adminPreviewStudent ? '?preview=student' : ''}`); }}
             >
               <BookOpen className="w-3 h-3" /> Course Overview
             </button>
@@ -1382,10 +1382,19 @@ export default function CoursePlayer() {
                 <button
                   className="text-[10px] font-medium flex items-center gap-1 mb-2 transition-colors opacity-80 hover:opacity-100"
                   style={{ color: primaryColor }}
-                  onClick={() => navigate(`/courses/${slug}/overview`)}
+                  onClick={() => navigate(`/courses/${slug}/overview${adminPreviewStudent ? '?preview=student' : ''}`)}
                 >
                   <BookOpen className="w-3 h-3" /> Course Overview
                 </button>
+                {(course as any).type === "cohort" && (
+                  <button
+                    className="text-[10px] font-medium flex items-center gap-1 mb-2 transition-colors opacity-80 hover:opacity-100"
+                    style={{ color: primaryColor }}
+                    onClick={() => navigate(`/cohort/${(course as any).id}${adminPreviewStudent ? '?preview=student' : ''}`)}
+                  >
+                    <CalendarDays className="w-3 h-3" /> My Cohort
+                  </button>
+                )}
                 <h3 className="text-[11px] font-extrabold uppercase tracking-widest" style={{ color: primaryColor }}>{lbl.courseModules}</h3>
               </>
             )}

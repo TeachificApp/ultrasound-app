@@ -9,10 +9,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Calendar, Clock, Video, ExternalLink, PlayCircle, FileText,
   Upload, Link2, CheckCircle, AlertCircle, BookOpen, ChevronLeft,
-  Film, CheckCircle2, Download, ChevronRight, CalendarDays,
+  Eye, Film, CheckCircle2, Download, ChevronRight, CalendarDays,
   Plus,
 } from "lucide-react";
-import { Link, useParams, useLocation } from "wouter";
+import { Link, useParams, useLocation, useSearch } from "wouter";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -459,7 +459,11 @@ function CalEventChip({ session, now, compact }: { session: any; now: number; co
 export default function CohortSchedule() {
   const { courseId } = useParams<{ courseId: string }>();
   const [, navigate] = useLocation();
+  const searchString = useSearch();
+  const urlParams = new URLSearchParams(searchString);
+  const isStudentPreview = urlParams.get("preview") === "student";
   const { user, isLoading: authLoading } = useAuth();
+  const isAdmin = user?.role === "admin";
   const id = parseInt(courseId ?? "0", 10);
   const [now, setNow] = useState(() => Date.now());
 
@@ -473,7 +477,6 @@ export default function CohortSchedule() {
     { courseId: id },
     { enabled: !!user && id > 0 }
   );
-
   if (authLoading || isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -500,7 +503,7 @@ export default function CohortSchedule() {
     );
   }
 
-  if (error || !data) {
+  if ((error || !data) && !isAdmin) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <Card className="max-w-md w-full text-center p-8">
@@ -519,6 +522,23 @@ export default function CohortSchedule() {
     );
   }
 
+  if ((error || !data) && isAdmin) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full text-center p-8">
+          <AlertCircle className="w-12 h-12 text-amber-400 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Cohort not found</h2>
+          <p className="text-gray-500 mb-6">
+            This cohort ID ({id}) does not exist in the system. Make sure the course is set up as a cohort type.
+          </p>
+          <Button asChild variant="outline">
+            <Link href="/admin/lms">Go to LMS Admin</Link>
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
   const { course, sessions, assignments, recordings, mySubmissions, myGroup } = data as any;
   const upcomingSessions = sessions.filter((s: any) => isUpcoming(s.sessionDate));
   const pastSessions = sessions.filter((s: any) => isPast(s.sessionDate));
@@ -530,6 +550,19 @@ export default function CohortSchedule() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Student Preview Banner */}
+      {isStudentPreview && (
+        <div className="bg-teal-700 text-white text-center py-2 px-4 text-sm font-medium flex items-center justify-center gap-2 sticky top-0 z-50">
+          <Eye className="w-4 h-4" />
+          <span>Student Preview — viewing Cohort Schedule as a student</span>
+          <button
+            onClick={() => navigate(`/courses/${(data as any)?.course?.slug ?? ''}/player`)}
+            className="ml-4 px-2 py-0.5 bg-teal-800 hover:bg-teal-900 rounded text-xs"
+          >
+            Back to Player
+          </button>
+        </div>
+      )}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-5xl mx-auto px-4 py-4">
           <Link href="/my-courses" className="inline-flex items-center gap-1.5 text-sm text-teal-600 hover:text-teal-700 mb-4">

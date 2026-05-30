@@ -12,7 +12,7 @@
  */
 import { useState, useEffect } from "react";
 import { RichTextDisplay } from "@/components/RichTextEditor";
-import { useParams, useLocation } from "wouter";
+import { useParams, useLocation, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  Award, BookOpen, CheckCircle, ChevronDown, ChevronRight, Clock, Edit3,
+  Award, BookOpen, CheckCircle, ChevronDown, ChevronRight, Clock, Edit3, Eye,
   Lock, PlayCircle, User, FileText, HelpCircle, Download, Monitor,
   ArrowRight, ListChecks, ExternalLink, Video, Film, Upload, Link2,
   CheckCircle2, Calendar, AlertCircle, ChevronLeft, CalendarDays,
@@ -84,8 +84,13 @@ function OverviewBlockEditor({
 export default function CourseOverview() {
   const { slug } = useParams<{ slug: string }>();
   const [, navigate] = useLocation();
+  const searchString = useSearch();
+  const urlParams = new URLSearchParams(searchString);
+  const isStudentPreview = urlParams.get("preview") === "student";
   const { user, loading: authLoading } = useAuth();
   const isAdmin = user?.role === "admin";
+  // In student preview mode, treat as non-admin for UI purposes
+  const effectiveIsAdmin = isAdmin && !isStudentPreview;
 
   const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set());
   const [showEditor, setShowEditor] = useState(false);
@@ -93,7 +98,7 @@ export default function CourseOverview() {
   const [activeTab, setActiveTab] = useState<"overview" | "cohort" | "calendar">("overview");
 
   const { data, isLoading, refetch } = trpc.lmsLearner.getCourseOverview.useQuery(
-    { slug: slug!, preview: isAdmin },
+    { slug: slug!, preview: isAdmin }, // always pass isAdmin for data access
     { enabled: !!slug && !!user }
   );
 
@@ -159,7 +164,7 @@ export default function CourseOverview() {
 
   const enrolledAt = data.enrollment?.enrolledAt ? new Date(data.enrollment.enrolledAt) : new Date();
   const daysSinceEnroll = Math.floor((Date.now() - enrolledAt.getTime()) / (1000 * 60 * 60 * 24));
-  const dripBypassed = isAdmin;
+  const dripBypassed = effectiveIsAdmin;
 
   // Parse overview blocks (three zones)
   const overviewBlocks: Block[] = (() => {
@@ -320,6 +325,19 @@ export default function CourseOverview() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Student Preview Banner */}
+      {isStudentPreview && (
+        <div className="bg-teal-700 text-white text-center py-2 px-4 text-sm font-medium flex items-center justify-center gap-2 sticky top-0 z-50">
+          <Eye className="w-4 h-4" />
+          <span>Student Preview — viewing Course Overview as a student</span>
+          <button
+            onClick={() => navigate(`/courses/${slug}/player`)}
+            className="ml-4 px-2 py-0.5 bg-teal-800 hover:bg-teal-900 rounded text-xs"
+          >
+            Back to Player
+          </button>
+        </div>
+      )}
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
@@ -331,6 +349,16 @@ export default function CourseOverview() {
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {effectiveIsAdmin && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 text-gray-600"
+                onClick={() => setShowEditor(true)}
+              >
+                <Edit3 className="w-3.5 h-3.5" /> Edit Overview
+              </Button>
+            )}
             {continueLesson && (
               <Button
                 size="sm"
